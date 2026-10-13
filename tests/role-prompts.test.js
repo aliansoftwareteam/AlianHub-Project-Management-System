@@ -66,6 +66,30 @@ describe('the role playbook loader', () => {
         expect(() => rolePlaybooks.parse(PLAYBOOK(`${GOOD_META}\ntags: bug`), 'demo/tester.md')).toThrow('tags must be a [list]');
     });
 
+    it('reads the fields a playbook needs, with a dropdown\'s options, and refuses a field the field form would not make', () => {
+        const parsed = (fields) => rolePlaybooks.parse(PLAYBOOK(`${GOOD_META}\nfields: ${fields}`), 'demo/tester.md');
+        expect(rolePlaybooks.parse(PLAYBOOK(GOOD_META), 'demo/tester.md').fields).toEqual([]);
+        expect(parsed('[Customer:text, Requested date : date, Source:dropdown(Incoming | In process|Final)]').fields).toEqual([
+            { name: 'Customer', type: 'text' },
+            { name: 'Requested date', type: 'date' },
+            { name: 'Source', type: 'dropdown', options: ['Incoming', 'In process', 'Final'] },
+        ]);
+        expect(() => parsed('Customer:text')).toThrow('fields must be a [list]');
+        expect(() => parsed('[Customer]')).toThrow('the field "Customer" must be written as a name, a colon and a type');
+        expect(() => parsed('[Total:formula]')).toThrow('the field "Total" must have one of the types');
+        expect(() => parsed('[Source:dropdown]')).toThrow('the dropdown "Source" needs 1 to 10 options');
+        expect(() => parsed(`[Source:dropdown(${Array.from({ length: 11 }, (_, i) => `o${i}`).join('|')})]`)).toThrow('needs 1 to 10 options');
+        expect(() => parsed('[Source:dropdown(A|a)]')).toThrow('names an option twice');
+        expect(() => parsed('[Part:text(A|B)]')).toThrow('only a dropdown field lists options');
+        expect(() => parsed(`[${'x'.repeat(81)}:text]`)).toThrow('is longer than 80 characters');
+        expect(() => parsed('[Part:text, part:number]')).toThrow('fields names a field twice');
+        expect(() => parsed(`[${Array.from({ length: 7 }, (_, i) => `F${i}:text`).join(', ')}]`)).toThrow(`fields may list at most ${rolePlaybooks.MAX_FIELDS} fields`);
+    });
+
+    it('offers only field types the field form makes', () => {
+        expect(require('../Modules/Agents/setupRequests').FIELD_TYPES).toEqual(expect.arrayContaining([...rolePlaybooks.FIELD_TYPES]));
+    });
+
     const folderOf = (files) => {
         const root = fs.mkdtempSync(path.join(os.tmpdir(), 'roles-'));
         Object.entries(files).forEach(([rel, text]) => {

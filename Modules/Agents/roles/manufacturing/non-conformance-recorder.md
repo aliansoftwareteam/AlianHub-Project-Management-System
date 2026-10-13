@@ -9,6 +9,7 @@ hands_to: [corrective-action-tracker]
 gates: [the quality engineer approves the cause and the action]
 starter_rules: [tag:non-conformance]
 tags: [non-conformance]
+fields: [Part:text, Revision:text, Quantity checked:number, Quantity failed:number, Source:dropdown(Incoming|In process|Final|Customer)]
 ---
 
 # Non-conformance Recorder (Manufacturing, Quality)

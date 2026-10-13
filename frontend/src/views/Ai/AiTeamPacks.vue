@@ -69,6 +69,7 @@
                                 <span class="ah-field__hint" data-test="tp-starter-rules-hint">{{ $t('TeamPacks.starter_rules_hint', { n: starterRuleCount }, starterRuleCount) }}</span>
                             </div>
                             <p v-if="tagNames.length" class="ah-small tp-muted" data-test="tp-tags-hint">{{ $t('TeamPacks.tags_hint', { names: tagNames.join(', ') }) }}</p>
+                            <p v-if="fieldNames.length" class="ah-small tp-muted" data-test="tp-fields-hint">{{ $t('TeamPacks.fields_hint', { names: fieldNames.join(', ') }) }}</p>
 
                             <label v-if="managesAgents" class="tp-row" data-test="tp-create-agents">
                                 <input v-model="createAgents" class="ah-check" type="checkbox" />
@@ -96,6 +97,7 @@
                             <ul class="tp-list">
                                 <li v-for="project in result.projects" :key="project.projectId" class="ah-small" :data-mode="project.mode">{{ projectLine(project) }}</li>
                             </ul>
+                            <p v-if="undone && undoneFieldsKept" class="ah-small tp-muted" data-test="tp-fields-kept">{{ $t('TeamPacks.fields_kept') }}</p>
                             <p v-if="agentLine" class="ah-small tp-muted" data-test="tp-agents">{{ agentLine }}</p>
                             <p v-if="!undone && madeAgents.length" class="ah-small tp-muted" data-test="tp-agents-paused">{{ $t('TeamPacks.agents_paused_note') }}</p>
                             <ul v-if="keptAgents.length" class="tp-list" data-test="tp-kept">
@@ -126,7 +128,7 @@ import { aiAvailability, AI_STATE } from "@/composable/aiAvailability";
 import { refusalText } from "@/utils/assignmentRules";
 import { useCustomComposable } from "@/composable";
 import { isOwnerOrAdmin } from "@/utils/roles";
-import { applyTeamPack, blueprintName, fetchTeamPacks, packProjectLine, teamName, undoTeamPack } from "@/utils/dispatcher";
+import { applyTeamPack, blueprintName, fetchTeamPacks, fieldsKeptAfterUndo, packProjectLine, roleNamesOf, teamName, undoTeamPack } from "@/utils/dispatcher";
 
 defineOptions({ name: "AiTeamPacks" });
 
@@ -153,6 +155,7 @@ const result = ref(null);
 const undone = ref(false);
 const withStarterRules = ref(true);
 const undoneKept = ref([]);
+const undoneFieldsKept = ref(false);
 const createAgents = ref(true);
 
 const KEPT_WHY = Object.freeze({ running: "TeamPacks.agent_kept_running", edited: "TeamPacks.agent_kept_edited" });
@@ -177,9 +180,13 @@ const tagNames = computed(() => {
     const names = chosenRoles.value.flatMap((role) => role.tags || []);
     return names.filter((name, at) => names.findIndex((one) => one.toLowerCase() === name.toLowerCase()) === at);
 });
+const fieldNames = computed(() => {
+    const names = chosenRoles.value.flatMap((role) => (role.fields || []).map((field) => field.name));
+    return names.filter((name, at) => names.findIndex((one) => one.toLowerCase() === name.toLowerCase()) === at);
+});
 const ruleCount = computed(() => (result.value?.projects || []).reduce((sum, project) => sum + (project.rules || []).length, 0));
 const addedCount = computed(() => (result.value?.projects || []).reduce((sum, project) => sum + (project.added || []).length, 0));
-const changedCount = computed(() => addedCount.value + ruleCount.value + (result.value?.projects || []).filter((project) => project.proposalId || project.modeWas).length);
+const changedCount = computed(() => addedCount.value + ruleCount.value + (result.value?.projects || []).filter((project) => project.proposalId || project.fieldProposalId || project.modeWas).length);
 const madeAgents = computed(() => result.value?.agents?.made || []);
 const keptAgents = computed(() => (undone.value ? undoneKept.value : []));
 const agentLine = computed(() => {
@@ -191,7 +198,7 @@ const agentLine = computed(() => {
 });
 const projectName = (id) => (projects.value.find((p) => p.id === String(id)) || {}).name || id;
 
-const tagCount = computed(() => (result.value?.projects || []).reduce((sum, project) => sum + (project.tags || []).length, 0));
+const tagCount = computed(() => (result.value?.projects || []).reduce((sum, project) => sum + (project.tags || []).length + (project.fields || []).length, 0));
 
 const resultHead = computed(() => {
     if (undone.value) return t("TeamPacks.undone");
@@ -199,7 +206,8 @@ const resultHead = computed(() => {
     return ruleCount.value || tagCount.value ? t("TeamPacks.roles_were_on") : t("TeamPacks.nothing_new");
 });
 
-const projectLine = (project) => packProjectLine(t, project, projectName(project.projectId));
+const roleName = computed(() => roleNamesOf(packs.value.flatMap((pack) => pack.teams.flatMap((team) => team.roles))));
+const projectLine = (project) => packProjectLine(t, project, projectName(project.projectId), roleName.value);
 
 watch(blueprint, () => {
     const known = teamsOfPack.value.map((team) => team.team);
@@ -238,10 +246,12 @@ async function apply() {
             projectIds: projectIds.value,
             starterRules: withStarterRules.value && starterRuleCount.value > 0,
             proposeTags: tagNames.value.length > 0,
+            proposeFields: fieldNames.value.length > 0,
             createAgents: managesAgents.value && createAgents.value
         });
         undone.value = false;
         undoneKept.value = [];
+        undoneFieldsKept.value = false;
     } catch (e) {
         error.value = failText(e, t("TeamPacks.failed"));
     } finally {
@@ -256,6 +266,7 @@ async function undo() {
     try {
         const answer = await undoTeamPack(result.value);
         undoneKept.value = answer?.agents?.kept || [];
+        undoneFieldsKept.value = fieldsKeptAfterUndo([answer]);
         undone.value = true;
     } catch (e) {
         error.value = failText(e, t("TeamPacks.undo_failed"));

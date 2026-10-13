@@ -9,6 +9,7 @@ hands_to: [tech-lead]
 gates: [engineering lead confirms Urgent bugs]
 starter_rules: [type:Bug]
 tags: [bug, needs-triage]
+fields: [Area:text, Severity:dropdown(Critical|Major|Minor|Trivial), Customer count:number]
 ---
 
 # Bug Triager (Engineering)

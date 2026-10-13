@@ -7,6 +7,8 @@ team: sales-orders
 tools: [queue.list, queue.claim, queue.release, task.get, tasks.search, comments.list, fields.list, tags.list, members.list, page.get, pages.search, task.create, task.update, task.field.set, task.tags.add, task.relation.add, task.comment, task.assign, task.status.set]
 hands_to: [production-planner, customer-update-writer]
 gates: [customer service confirms the order before it goes to planning]
+tags: [order-to-confirm, ready-for-planning]
+fields: [Customer:text, Part:text, Revision:text, Quantity:number, Requested date:date, Terms:text]
 ---
 
 # Order Intake (Manufacturing, Sales and orders)

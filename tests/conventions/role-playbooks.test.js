@@ -7,7 +7,7 @@ const path = require('path');
 const ROOT = path.join(__dirname, '../../Modules/Agents/roles');
 const KEYS = ['slug', 'name', 'blueprint', 'department', 'team', 'tools', 'hands_to', 'gates'];
 const LISTS = ['tools', 'hands_to', 'gates'];
-const OPTIONAL_LISTS = ['tools_optional', 'starter_rules', 'tags'];
+const OPTIONAL_LISTS = ['tools_optional', 'starter_rules', 'tags', 'fields'];
 const STARTER_RULE = /^(type|tag|priority):\S.*$/;
 const PRIORITIES = ['URGENT', 'HIGH', 'MEDIUM', 'LOW'];
 const SECTIONS = [
@@ -98,6 +98,26 @@ describe('role playbooks', () => {
             .filter((rule) => rule.startsWith('tag:') && !(meta.tags || []).map((tag) => tag.toLowerCase()).includes(rule.slice('tag:'.length).toLowerCase()))
             .map((rule) => `${rel}: ${rule}`));
         expect(orphan).toEqual([]);
+    });
+
+    it('offer a tag of the same name beside a type condition, so a project without that type still routes on the tag', () => {
+        const orphan = FILES.flatMap(({ rel, meta }) => (meta.starter_rules || [])
+            .filter((rule) => rule.startsWith('type:') && !(meta.tags || []).map((tag) => tag.toLowerCase()).includes(rule.slice('type:'.length).toLowerCase()))
+            .map((rule) => `${rel}: ${rule}`));
+        expect(orphan).toEqual([]);
+    });
+
+    it('declare fields the parser reads', () => {
+        const parse = require('../../Modules/Agents/rolePlaybooks').parse;
+        const bad = FILES.filter(({ meta }) => meta.fields !== undefined).flatMap(({ file, rel }) => {
+            try {
+                parse(fs.readFileSync(file, 'utf8'), rel);
+                return [];
+            } catch (error) {
+                return [error.message];
+            }
+        });
+        expect(bad).toEqual([]);
     });
 
     it('give starter rules to a handful of roles in every blueprint', () => {

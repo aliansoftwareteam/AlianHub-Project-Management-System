@@ -45,12 +45,12 @@ let posted;
 const serve = ({ on = true } = {}) => apiRequest.mockImplementation((type, url, body) => {
     if (type === 'get') return ok({ on, packs: [], companyBlueprints: BLUEPRINTS });
     posted.push(body);
-    if (body.undo) return ok({ projects: body.projectIds.map((projectId) => ({ projectId, removed: IT_PACKS[0].roles, mode: 'off' })) });
+    if (body.undo) return ok({ projects: body.projectIds.map((projectId) => ({ projectId, removed: IT_PACKS[0].roles, mode: 'off', fieldsKept: true })) });
     return ok({
         blueprint: body.blueprint, teams: body.teams, applyId: 'ap1',
         projects: body.projectIds.map((projectId) => (projectId === 'p1'
             ? { projectId, added: body.only, mode: 'apply', modeWas: null, rules: [{ id: 'r1' }], rulesAwaitingTags: 0, tags: [] }
-            : { projectId, added: body.only, mode: 'suggest', modeWas: 'off', rules: [], rulesAwaitingTags: 1, tags: ['support'] })),
+            : { projectId, added: body.only, mode: 'suggest', modeWas: 'off', rules: [], rulesAwaitingTags: 1, tags: ['support'], rulesOnTag: [{ role: 'it-company/bug-triager', type: 'Bug', tag: 'bug' }], fields: ['Area'] })),
     });
 });
 
@@ -97,13 +97,14 @@ describe('the company blueprint picker', () => {
         expect(apply.text()).toBe('Turn on 3 starter roles');
         await apply.trigger('click');
         await flushPromises();
-        expect(posted).toEqual([{ blueprint: 'it-company', teams: ['engineering', 'support'], only: IT_PACKS[0].roles, projectIds: ['p1', 'p2'], starterRules: true, proposeTags: true }]);
+        expect(posted).toEqual([{ blueprint: 'it-company', teams: ['engineering', 'support'], only: IT_PACKS[0].roles, projectIds: ['p1', 'p2'], starterRules: true, proposeTags: true, proposeFields: true }]);
         expect(wrapper.find('[data-test="bp-result"]').text()).toContain('Turned on 6 roles');
         const lines = wrapper.findAll('[data-test="bp-result"] li');
         expect(lines.map((li) => li.attributes('data-mode'))).toEqual(['apply', 'suggest']);
         expect(lines[0].text()).toBe('Mobile app: the dispatcher is in apply mode. Added one routing rule.');
         expect(lines[1].text()).toBe('Website: the dispatcher is in suggest mode. Its dispatcher was off, so it now suggests a role; undo turns it off again. '
-            + 'One starter rule waits for its tag to be approved; it is added when the tag is approved. Proposed one tag for approval: support.');
+            + 'Bug Triager will route on tag bug, because the project has no Bug type. '
+            + 'One starter rule waits for its tag to be approved; it is added when the tag is approved. Proposed one tag for approval: support. Proposed one field for approval: Area.');
     });
 
     it('undoes the apply the server recorded', async () => {
@@ -115,6 +116,7 @@ describe('the company blueprint picker', () => {
         await flushPromises();
         expect(posted[1]).toEqual({ undo: true, blueprint: 'it-company', teams: ['engineering', 'support'], projectIds: ['p1'], applyId: 'ap1' });
         expect(wrapper.find('[data-test="bp-result"]').text()).toContain('off again');
+        expect(wrapper.find('[data-test="bp-fields-kept"]').exists()).toBe(true);
     });
 
     it('turns nothing on for an industry whose first roles are not written, and says so', async () => {

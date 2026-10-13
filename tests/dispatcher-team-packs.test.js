@@ -29,7 +29,7 @@ const SETTINGS = '/api/v2/assignment-rules/dispatcher/project/:projectId';
 const TRIAGER = 'it-company/bug-triager';
 const DESIGN_LEAD = 'it-company/design-lead';
 
-const NOTHING_ELSE = { modeWas: null, rules: [], skippedRules: 0, rulesAwaitingTags: 0, tags: [], proposalId: null };
+const NOTHING_ELSE = { modeWas: null, rules: [], skippedRules: 0, rulesAwaitingTags: 0, rulesOnTag: [], tags: [], proposalId: null, fields: [], fieldProposalId: null };
 
 const oid = () => new mongoose.Types.ObjectId().toString();
 const engineering = playbooks.all().filter((role) => role.blueprint === 'it-company' && role.team === 'engineering').map((role) => `${role.blueprint}/${role.slug}`);
@@ -169,7 +169,7 @@ describe('team packs', () => {
         recordAudit.mockClear();
 
         const res = await call('POST', PACKS, { body: { undo: true, blueprint: 'it-company', teams: ['engineering'], projectIds: [String(project._id)], applyId: applied.body.data.applyId } });
-        expect(res.body.data.projects).toEqual([{ projectId: String(project._id), removed: added, rules: [], mode: 'apply', modeRestored: null, tagsWithdrawn: false }]);
+        expect(res.body.data.projects).toEqual([{ projectId: String(project._id), removed: added, rules: [], mode: 'apply', modeRestored: null, tagsWithdrawn: false, fieldsWithdrawn: false, fieldsKept: false }]);
         expect(dispatcherOf(project)).toMatchObject({ mode: 'apply', roles: [DESIGN_LEAD, TRIAGER] });
         expect(audited()).toEqual([expect.objectContaining({ action: 'dispatcher.pack_undone', meta: expect.objectContaining({ projects: [{ projectId: String(project._id), roles: added, rules: 0 }] }) })]);
     });
@@ -223,7 +223,7 @@ describe('team packs', () => {
         recordAudit.mockClear();
         const id = String(project._id);
         const res = await call('POST', PACKS, { body: { undo: true, blueprint: 'it-company', teams: ['design'], projectIds: [id], applyId: applied.body.data.applyId, roles: { [id]: [TRIAGER] } } });
-        expect(res.body.data.projects).toEqual([{ projectId: id, removed: applied.body.data.projects[0].added, rules: [], mode: 'suggest', modeRestored: null, tagsWithdrawn: false }]);
+        expect(res.body.data.projects).toEqual([{ projectId: id, removed: applied.body.data.projects[0].added, rules: [], mode: 'suggest', modeRestored: null, tagsWithdrawn: false, fieldsWithdrawn: false, fieldsKept: false }]);
         expect(dispatcherOf(project).roles).toEqual([TRIAGER]);
         expect(audited()).toEqual([expect.objectContaining({ action: 'dispatcher.pack_undone', entityId: 'it-company', meta: expect.objectContaining({ blueprint: 'it-company', teams: ['design'] }) })]);
 
@@ -876,5 +876,134 @@ describe('team pack writes that interleave', () => {
         expect(dispatcherOf(project).roles).toEqual(engineering);
         const fresh = await call('PUT', SETTINGS, { params: { projectId: id }, body: { mode: 'apply', threshold: 80, roles: engineering, rules: [], revision: dispatcherOf(project).revision } });
         expect(fresh.statusCode).toBe(200);
+    });
+});
+
+describe('a pack brings what its playbooks need', () => {
+    const ONLY_TASK = [{ name: 'Task', value: 'task', key: 1 }];
+    const approve = (proposalId) => require('../Modules/Agents/proposals').approve(C, proposalId, { decider: { kind: 'human', userId: OWNER, personName: 'Olive' }, isPrivileged: true });
+    const projectRow = (project) => store(SCHEMA_TYPE.PROJECTS).find((one) => String(one._id) === String(project._id));
+    const triagerRules = (project) => dispatcherOf(project).rules.filter((rule) => rule.role === TRIAGER);
+    const engineeringBody = (project, extra = {}) => ({ blueprint: 'it-company', teams: ['engineering'], projectIds: [String(project._id)], starterRules: true, ...extra });
+    const plant = (project, extra = {}) => ({
+        blueprint: 'manufacturing', teams: ['sales-orders', 'quality'], only: ['manufacturing/order-intake', 'manufacturing/non-conformance-recorder'], projectIds: [String(project._id)], proposeTags: true, proposeFields: true, ...extra,
+    });
+    const fieldProposals = () => store(SCHEMA_TYPE.AGENT_PROPOSALS).filter((row) => (row.changes || []).some((change) => change.action === 'fields.create'));
+    const seedField = (project, fieldTitle) => mockDb.seed(SCHEMA_TYPE.CUSTOM_FIELDS, { type: 'task', isDelete: true, projectId: [String(project._id)], fieldTitle, fieldType: 'text' });
+
+    it('routes the Bug Triager on its bug tag when the project has no Bug type, once the tag is approved', async () => {
+        seedRules(GRANTS);
+        process.env.MCP_TOOLS_WORK = 'on';
+        const project = seedProject({ taskTypeCounts: ONLY_TASK });
+        const res = await call('POST', PACKS, { body: engineeringBody(project, { proposeTags: true }) });
+        const [row] = res.body.data.projects;
+        expect(row.rulesOnTag).toEqual([{ role: TRIAGER, type: 'Bug', tag: 'bug' }]);
+        expect(row.tags).toContain('bug');
+        expect(triagerRules(project)).toEqual([]);
+        const entry = store(SCHEMA_TYPE.ASSIGNMENT_RULES).find((one) => String(one.projectId) === String(project._id)).teamPacks[0];
+        expect(entry.waitingRules).toEqual(expect.arrayContaining([{ role: TRIAGER, tag: 'bug', proposalId: row.proposalId }]));
+
+        expect((await approve(row.proposalId)).error).toBeUndefined();
+        const bug = projectRow(project).tagsArray.find((tag) => tag.tagName === 'bug');
+        expect(triagerRules(project)).toEqual([{ id: expect.any(String), role: TRIAGER, when: { tags: [String(bug.uid)] } }]);
+    });
+
+    it('makes the tag rule at once when the project has the tag, and keeps the type rule where the type exists', async () => {
+        seedRules(GRANTS);
+        const tagged = seedProject({ taskTypeCounts: ONLY_TASK, tagsArray: [{ uid: 't9', tagName: 'Bug' }] });
+        const typed = seedProject({ taskTypeCounts: [...ONLY_TASK, { name: 'Bug', value: 'bug', key: 4 }] });
+        const [onTag, onType] = (await call('POST', PACKS, { body: { ...engineeringBody(tagged), projectIds: [String(tagged._id), String(typed._id)] } })).body.data.projects;
+        expect(onTag.rulesOnTag).toEqual([{ role: TRIAGER, type: 'Bug', tag: 'bug' }]);
+        expect(triagerRules(tagged)).toEqual([{ id: expect.any(String), role: TRIAGER, when: { tags: ['t9'] } }]);
+        expect(onType.rulesOnTag).toEqual([]);
+        expect(triagerRules(typed)).toEqual([{ id: expect.any(String), role: TRIAGER, when: { taskTypeKeys: [4] } }]);
+    });
+
+    it('still skips the type rule when nobody proposes the tag and the project lacks it', async () => {
+        seedRules(GRANTS);
+        const project = seedProject({ taskTypeCounts: ONLY_TASK });
+        const [row] = (await call('POST', PACKS, { body: engineeringBody(project) })).body.data.projects;
+        expect(row.rulesOnTag).toEqual([]);
+        expect(row.skippedRules).toBeGreaterThan(0);
+        expect(triagerRules(project)).toEqual([]);
+    });
+
+    it('proposes the fields its roles fill in one fields.create approval, only those the project lacks, and none a second time', async () => {
+        seedRules(GRANTS);
+        process.env.MCP_TOOLS_WORK = 'on';
+        const project = seedProject();
+        seedField(project, 'part');
+        const res = await call('POST', PACKS, { body: plant(project) });
+        expect(res.statusCode).toBe(200);
+        const [row] = res.body.data.projects;
+        expect(row.fields).toEqual(['Revision', 'Quantity checked', 'Quantity failed', 'Source', 'Customer', 'Quantity', 'Requested date', 'Terms']);
+        expect(fieldProposals()).toHaveLength(1);
+        const [proposal] = fieldProposals();
+        expect(String(proposal._id)).toBe(row.fieldProposalId);
+        expect(proposal).toMatchObject({ status: 'pending', source: 'system', agentId: 'team-pack', allowedActions: ['fields.create'] });
+        expect(proposal.changes).toHaveLength(1);
+        expect(proposal.changes[0].params.definitions.map((field) => field.name)).toEqual(row.fields);
+        expect(proposal.changes[0].params.definitions.find((field) => field.name === 'Source')).toEqual({ name: 'Source', type: 'dropdown', options: ['Incoming', 'In process', 'Final', 'Customer'] });
+        expect(row.proposalId).not.toBe(row.fieldProposalId);
+
+        const again = await call('POST', PACKS, { body: plant(project) });
+        expect(again.body.data.projects[0]).toMatchObject({ fields: [], fieldProposalId: null });
+        expect(fieldProposals()).toHaveLength(1);
+    });
+
+    it('makes the fields when a person approves, through the field form', async () => {
+        seedRules(GRANTS);
+        process.env.MCP_TOOLS_WORK = 'on';
+        const project = seedProject();
+        const [row] = (await call('POST', PACKS, { body: plant(project, { only: ['manufacturing/maintenance-planner'], teams: ['maintenance'] }) })).body.data.projects;
+        expect(row.fields).toEqual(['Machine', 'Machine hours', 'Duration hours', 'Window']);
+        expect((await approve(row.fieldProposalId)).error).toBeUndefined();
+        const made = store(SCHEMA_TYPE.CUSTOM_FIELDS).filter((field) => [].concat(field.projectId || []).map(String).includes(String(project._id)));
+        expect(made.map((field) => field.fieldTitle)).toEqual(row.fields);
+    });
+
+    it('proposes no fields without the option, or where agents cannot add them', async () => {
+        seedRules(GRANTS);
+        process.env.MCP_TOOLS_WORK = 'on';
+        const project = seedProject();
+        await call('POST', PACKS, { body: plant(project, { proposeFields: false }) });
+        expect(fieldProposals()).toEqual([]);
+        process.env.MCP_TOOLS_WORK = 'off';
+        const res = await call('POST', PACKS, { body: plant(project) });
+        expect(res.body.data.projects[0]).toMatchObject({ fields: [], fieldProposalId: null });
+        expect(fieldProposals()).toEqual([]);
+    });
+
+    it('withdraws a field approval nobody has decided when the pack is undone, and keeps fields already approved', async () => {
+        seedRules(GRANTS);
+        process.env.MCP_TOOLS_WORK = 'on';
+        const waiting = seedProject();
+        const decided = seedProject();
+        const first = await call('POST', PACKS, { body: plant(waiting) });
+        const undone = await call('POST', PACKS, { body: { undo: true, ...plant(waiting), applyId: first.body.data.applyId } });
+        expect(undone.body.data.projects[0]).toMatchObject({ fieldsWithdrawn: true, fieldsKept: false });
+        expect(fieldProposals()[0].status).toBe('declined');
+
+        const second = await call('POST', PACKS, { body: plant(decided) });
+        const proposal = fieldProposals().find((row) => String(row._id) === second.body.data.projects[0].fieldProposalId);
+        proposal.status = 'approved';
+        const kept = await call('POST', PACKS, { body: { undo: true, ...plant(decided), applyId: second.body.data.applyId } });
+        expect(kept.body.data.projects[0]).toMatchObject({ fieldsWithdrawn: false, fieldsKept: true });
+        expect(proposal.status).toBe('approved');
+    });
+
+    it('leaves another company\'s field approval alone', async () => {
+        seedRules(GRANTS);
+        process.env.MCP_TOOLS_WORK = 'on';
+        const project = seedProject();
+        const applied = await call('POST', PACKS, { body: plant(project) });
+        const home = mockDb;
+        const elsewhere = fakeMongo.create();
+        mockDb = { ...home, crud: (companyId, ...rest) => (companyId === C ? home : elsewhere).crud(companyId, ...rest) };
+        const packs = require('../Modules/AssignmentRules/dispatcher/packs');
+        await expect(packs.undo('c00000000000000000000009', { undo: true, ...plant(project), applyId: applied.body.data.applyId }, { id: OWNER }, { managesAgents: true }))
+            .rejects.toMatchObject({ statusCode: 404 });
+        mockDb = home;
+        expect(fieldProposals()[0].status).toBe('pending');
     });
 });

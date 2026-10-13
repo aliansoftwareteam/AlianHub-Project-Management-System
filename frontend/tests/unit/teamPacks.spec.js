@@ -32,7 +32,7 @@ const store = createStore({
 const access = store.state.settings;
 const projectState = store.state.projectData;
 
-const TRIAGER = { key: 'it-company/bug-triager', slug: 'bug-triager', name: 'Bug Triager', department: 'Engineering', summary: 'Sorts new bugs.', tools: ['task.get', 'task.comment'], starterRules: [{ kind: 'type', value: 'Bug' }], tags: ['bug', 'needs-triage'] };
+const TRIAGER = { key: 'it-company/bug-triager', slug: 'bug-triager', name: 'Bug Triager', department: 'Engineering', summary: 'Sorts new bugs.', tools: ['task.get', 'task.comment'], starterRules: [{ kind: 'type', value: 'Bug' }], tags: ['bug', 'needs-triage'], fields: [{ name: 'Area', type: 'text' }, { name: 'Severity', type: 'dropdown', options: ['Major', 'Minor'] }] };
 const REVIEWER = { key: 'it-company/code-reviewer', slug: 'code-reviewer', name: 'Code Reviewer', department: 'Engineering', summary: 'Reviews pull requests.', tools: ['task.get'], starterRules: [], tags: ['Bug'] };
 const LEAD = { key: 'it-company/design-lead', slug: 'design-lead', name: 'Design Lead', department: 'Design', summary: 'Runs design reviews.', tools: ['task.get'] };
 const PACKS = [{ blueprint: 'it-company', teams: [{ team: 'engineering', roles: [TRIAGER, REVIEWER] }, { team: 'design', roles: [LEAD] }] }];
@@ -44,11 +44,11 @@ const serve = ({ on = true, refuse = null } = {}) => apiRequest.mockImplementati
     if (url.endsWith('/team-packs') && type === 'get') return ok({ on, packs: PACKS });
     if (url.endsWith('/team-packs') && type === 'post') {
         if (refuse) return Promise.reject({ response: { status: refuse, data: { statusText: 'refused' } } });
-        if (body.undo) return ok({ projects: body.projectIds.map((projectId) => ({ projectId, removed: [TRIAGER.key, REVIEWER.key], mode: 'off' })), agents: { removed: [], kept: [], narrowed: [] } });
+        if (body.undo) return ok({ projects: body.projectIds.map((projectId) => ({ projectId, removed: [TRIAGER.key, REVIEWER.key], mode: 'off', fieldsKept: projectId === 'p1' })), agents: { removed: [], kept: [], narrowed: [] } });
         applied = body;
         return ok({ blueprint: body.blueprint, teams: body.teams, applyId: 'ap1', agents: { made: [], kept: [], widened: [] }, projects: [
-            { projectId: 'p1', added: [TRIAGER.key, REVIEWER.key], mode: 'suggest', rules: body.starterRules ? [RULE] : [], skippedRules: 0, tags: ['bug', 'needs-triage'], proposalId: 'prop1' },
-            { projectId: 'p2', added: [TRIAGER.key, REVIEWER.key], mode: 'suggest', modeWas: 'off', rules: [], skippedRules: 1, rulesAwaitingTags: 2, tags: [], proposalId: null }
+            { projectId: 'p1', added: [TRIAGER.key, REVIEWER.key], mode: 'suggest', rules: body.starterRules ? [RULE] : [], skippedRules: 0, tags: ['bug', 'needs-triage'], proposalId: 'prop1', fields: ['Area', 'Severity'], fieldProposalId: 'prop2' },
+            { projectId: 'p2', added: [TRIAGER.key, REVIEWER.key], mode: 'suggest', modeWas: 'off', rules: [], skippedRules: 1, rulesAwaitingTags: 2, tags: [], proposalId: null, rulesOnTag: [{ role: TRIAGER.key, type: 'Bug', tag: 'bug' }] }
         ] });
     }
     return ok([]);
@@ -117,7 +117,7 @@ describe('Team packs', () => {
         for (const input of wrapper.findAll('[data-test="tp-project"] input')) await input.setValue(true);
         await wrapper.find('[data-test="tp-apply"]').trigger('click');
         await flushPromises();
-        expect(applied).toEqual({ blueprint: 'it-company', teams: ['engineering'], projectIds: ['p1', 'p2'], starterRules: true, proposeTags: true, createAgents: true });
+        expect(applied).toEqual({ blueprint: 'it-company', teams: ['engineering'], projectIds: ['p1', 'p2'], starterRules: true, proposeTags: true, proposeFields: true, createAgents: true });
         const result = wrapper.find('[data-test="tp-result"]');
         expect(result.text()).toContain('Turned on 4 roles.');
         expect(result.text()).toContain('Mobile app: the dispatcher is in suggest mode.');
@@ -128,6 +128,7 @@ describe('Team packs', () => {
         const undo = apiRequest.mock.calls.find(([type, , body]) => type === 'post' && body.undo);
         expect(undo[2]).toEqual({ undo: true, blueprint: 'it-company', teams: ['engineering'], projectIds: ['p1', 'p2'], applyId: 'ap1' });
         expect(wrapper.find('[data-test="tp-result"]').text()).toContain('The pack\'s roles are off again.');
+        expect(wrapper.find('[data-test="tp-fields-kept"]').text()).toBe('Fields already approved stay in the project; undo only withdrew the approvals still waiting.');
         expect(wrapper.find('[data-test="tp-undo"]').exists()).toBe(false);
     });
 
@@ -138,11 +139,12 @@ describe('Team packs', () => {
         expect(box.element.checked).toBe(true);
         expect(wrapper.find('[data-test="tp-starter-rules-hint"]').text()).toContain('One starter rule');
         expect(wrapper.find('[data-test="tp-tags-hint"]').text()).toContain('bug, needs-triage');
+        expect(wrapper.find('[data-test="tp-fields-hint"]').text()).toContain('Area, Severity');
         await box.setValue(false);
         await wrapper.find('[data-test="tp-project"] input').setValue(true);
         await wrapper.find('[data-test="tp-apply"]').trigger('click');
         await flushPromises();
-        expect(applied).toMatchObject({ starterRules: false, proposeTags: true });
+        expect(applied).toMatchObject({ starterRules: false, proposeTags: true, proposeFields: true });
         expect(wrapper.find('[data-test="tp-result"]').text()).not.toContain('routing rule');
     });
 
@@ -159,6 +161,9 @@ describe('Team packs', () => {
         expect(lines[1]).not.toContain('Proposed');
         expect(lines[1]).toContain('2 starter rules wait for their tags to be approved; they are added when the tags are approved.');
         expect(lines[0]).not.toContain('to be approved');
+        expect(lines[0]).toContain('Proposed 2 fields for approval: Area, Severity.');
+        expect(lines[1]).toContain('Bug Triager will route on tag bug, because the project has no Bug type.');
+        expect(lines[1]).not.toContain('fields for approval');
     });
 
     it('offers the team\'s agents on by default, can leave them off, and sends the made agents back on undo', async () => {
