@@ -56,7 +56,7 @@ const runnableAgents = async (companyId, uid, task) => {
     return (rows || []).filter((agent) => inScope(agent, task));
 };
 
-const listed = (agent) => ({ _id: String(agent._id), name: agent.name, description: agent.description || '', autonomy: Number(agent.autonomy || 0), builtIn: agent.builtIn || '' });
+const listed = (agent) => ({ _id: String(agent._id), name: agent.name, description: agent.description || '', autonomy: Number(agent.autonomy || 0), ...(agent.builtIn ? { builtIn: agent.builtIn } : {}) });
 
 /* The engine queues the run when workflows are on; otherwise it executes here, after the reply. */
 const dispatch = (companyId, run, agent, task, { userId, note } = {}) => {
