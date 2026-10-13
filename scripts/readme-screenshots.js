@@ -75,6 +75,11 @@ const argValue = (flag) => {
 };
 
 const MONGO_URL = argValue('--mongo-url') || 'mongodb://127.0.0.1:27018';
+const LOOPBACK_URL = /^mongodb:\/\/(?:[^@/]*@)?(?:127\.0\.0\.1|localhost|\[::1\])(?::\d+)?(?:\/|$)/;
+if (!LOOPBACK_URL.test(MONGO_URL)) {
+    process.stderr.write(`Refusing ${MONGO_URL}: the script drops every database it finds, so it only runs against a MongoDB on this machine.\n`);
+    process.exit(1);
+}
 Object.assign(process.env, { E2E_MONGODB_URL: MONGO_URL });
 
 const log = (message) => process.stdout.write(`${message}\n`);
