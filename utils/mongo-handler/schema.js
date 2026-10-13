@@ -1203,6 +1203,8 @@ const schema = {
         role: { type: String, required: false },
         // 'team-pack:<blueprint>' on an agent a team pack made, so undoing the pack can find it again.
         madeBy: { type: String, required: false },
+        // 'workspace-guide' on the agent the product ships (Modules/Agents/workspaceGuide.js); unique per company.
+        builtIn: { type: String, required: false },
         projectIds: { type: Array, default: [], required: false },
         // 0 suggest everything · 1 act on low risk · 2 act on medium, propose the rest · 3 also on a schedule
         autonomy: { type: Number, default: 0, required: false },

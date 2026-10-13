@@ -27,6 +27,7 @@ const routingPolicy = require('../AICore/routingPolicy');
 const modelPin = require('../AICore/modelPin');
 const taskClass = require('../AICore/taskClass');
 const revisions = require('./revisions');
+const workspaceGuide = require('./workspaceGuide');
 const skillRecord = require('./skillRecord');
 const { buildTrace } = require('./runTrace');
 const knowledgeMemory = require('../Knowledge/memory/publish');
@@ -189,6 +190,19 @@ exports.createAgent = async (req, res) => {
         await revisions.recordCreate(companyId, saved, { actor });
         return res.send({ status: true, statusText: 'Agent created.', data: saved });
     } catch (e) { logger.error(`createAgent: ${e.message}`); return fail(res, e.message, e.status || 500); }
+};
+
+/* POST /api/v2/agents/workspace-guide — adds the built-in Workspace Guide once; a removed one is not made again */
+exports.addWorkspaceGuide = async (req, res) => {
+    try {
+        const companyId = companyOf(req);
+        if (!companyId) return fail(res, 'companyId is required.');
+        const caller = await callerOf(req, companyId);
+        if (refuseUnlessManager(res, caller, 'Agents cannot create agents.')) return undefined;
+        const out = await workspaceGuide.ensureWorkspaceAgent(companyId, { ownerId: caller.actor.userId, actor: caller.actor });
+        const statusText = out.created ? 'Workspace Guide added.' : (out.state === workspaceGuide.STATE.REMOVED ? 'The Workspace Guide was removed and is not added again.' : 'The Workspace Guide is already here.');
+        return res.send({ status: true, statusText, data: { state: out.state, created: out.created, agent: out.state === workspaceGuide.STATE.PRESENT ? out.agent : null } });
+    } catch (e) { logger.error(`addWorkspaceGuide: ${e.message}`); return fail(res, e.message, e.status || 500); }
 };
 
 /* PUT /api/v2/agents/:id — autonomy, spend cap, skills, scope */
