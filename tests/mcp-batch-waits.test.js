@@ -323,7 +323,7 @@ describe('"Always do this" and a batch', () => {
         const filed = proposalRows().find((row) => String(row._id) === out.proposalId);
         expect(standing.offerable(filed)).toBe(false);
         expect((await rowFor(MEMBER, out.proposalId)).always).toBe(false);
-        expect(await standing.approveAlways(CID, out.proposalId, { decider: person(MEMBER), isPrivileged: false, ip: '' })).toMatchObject({ status: 409 });
+        expect(await standing.approveAlways(CID, out.proposalId, { decider: person(OWNER), isPrivileged: true, ip: '' })).toMatchObject({ status: 409 });
         expect(filed.status).toBe('pending');
     });
 });

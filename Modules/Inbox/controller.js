@@ -397,7 +397,7 @@ exports.counts = async (req, res) => {
             count(SCHEMA_TYPE.NOTIFICATIONS, noticesOn('later'), notificationGroup),
             count(SCHEMA_TYPE.MENTIONS, mentionsOn('later'), mentionGroup),
             readApprovals(companyId, userId).then((rows) => rows.length),
-            readProposals(companyId, userId).then(queue.waitingCount),
+            readProposals(companyId, userId).then((rows) => ({ all: queue.waitingCount(rows), own: queue.ownWaitingCount(rows) })),
             S.nextWakeAt(companyId, userId, now, kept),
         ]);
 
@@ -416,10 +416,13 @@ exports.counts = async (req, res) => {
                 archive: 0,
                 // Done and Cleared hold rows already dealt with, so they carry no badge.
                 primary: notifications + mentions,
-                approval: approvals + proposals,
+                approval: approvals + proposals.all,
+                // Home asks the person only for what was filed for them; the rest waits for the team.
+                approvalOwn: approvals + proposals.own,
+                approvalTeam: proposals.all - proposals.own,
                 other,
                 approvals,
-                proposals,
+                proposals: proposals.all,
                 later: laterNotifications + laterMentions,
                 done: 0,
                 cleared: 0,

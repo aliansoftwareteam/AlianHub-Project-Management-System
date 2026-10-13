@@ -80,13 +80,19 @@ const seedToken = (_id, userId) => mockDb.seed(SCHEMA_TYPE.API_TOKENS, { _id, us
 const comment = (caller, body = 'Looks ready') => rpc(caller, 'task.comment', { taskId: fx.top._id, body });
 const tag = (caller) => rpc(caller, 'task.tags.add', { taskId: fx.top._id, tag: 'urgent' });
 const filed = async (reply) => { expect(reply).toMatchObject({ pending: true }); return reply.proposalId; };
-const always = (id, uid = MEMBER, over = {}) => standing.approveAlways(CID, id, { decider: person(uid), isPrivileged: privileged(uid), ip: '', ...over });
+const always = (id, uid = ADMIN, over = {}) => standing.approveAlways(CID, id, { decider: person(uid), isPrivileged: privileged(uid), ip: '', ...over });
 /* A standing approval as a person leaves one: a connected agent's comment is proposed, and approved with "Always do this". */
-const standingComment = async (uid = MEMBER, caller = ctx(OWNER)) => {
+const standingComment = async (uid = ADMIN, caller = ctx(OWNER)) => {
     const out = await always(await filed(await comment(caller)), uid);
     expect(out.error).toBeUndefined();
     return out.standing;
 };
+const ownConnection = (uid) => {
+    rows(SCHEMA_TYPE.API_TOKENS).find((row) => String(row._id) === TOKEN).userId = uid;
+    return ctx(uid);
+};
+/* One a member makes over their own connection. */
+const ownStanding = (uid) => standingComment(uid, ownConnection(uid));
 const seedStanding = (action, over = {}) => mockDb.seed(SCHEMA_TYPE.AGENT_STANDING_APPROVALS, {
     projectId: P_OPEN, action, tokenId: TOKEN, requestedBy: OWNER, agentId: `mcp:${TOKEN}`, agentName: 'Claude (MCP)', madeBy: MEMBER,
     madeAt: new Date(), expiresAt: new Date(Date.now() + 90 * DAY), status: 'active', uses: 0, ...over,
@@ -121,7 +127,7 @@ describe('"Always do this" on an approval', () => {
         const made = await standingComment();
         expect(comments()).toHaveLength(1);
         expect(standingRows()).toHaveLength(1);
-        expect(standingRows()[0]).toMatchObject({ projectId: P_OPEN, action: 'task.comment', tokenId: TOKEN, requestedBy: OWNER, madeBy: MEMBER, status: 'active' });
+        expect(standingRows()[0]).toMatchObject({ projectId: P_OPEN, action: 'task.comment', tokenId: TOKEN, requestedBy: OWNER, madeBy: ADMIN, status: 'active' });
         expect(String(standingRows()[0]._id)).toBe(made.id);
         const days = (new Date(standingRows()[0].expiresAt).getTime() - Date.now()) / DAY;
         expect(days).toBeGreaterThan(89.9);
@@ -135,19 +141,19 @@ describe('"Always do this" on an approval', () => {
         expect(outcomeOf(out)).toBe('applied');
         expect(comments()).toHaveLength(2);
         const audit = rows(SCHEMA_TYPE.AUDIT_LOGS).find((row) => String(row._id) === String(out.auditId));
-        expect(audit.meta).toMatchObject({ action: 'task.comment', standingApproval: { id: made.id, madeBy: MEMBER } });
+        expect(audit.meta).toMatchObject({ action: 'task.comment', standingApproval: { id: made.id, madeBy: ADMIN } });
         expect(audit.meta.reason).toContain(made.id);
         const done = proposalRows().find((row) => row.standingApprovalId === made.id);
-        expect(done).toMatchObject({ status: 'approved', decidedBy: MEMBER, projectId: P_OPEN, source: 'mcp', tokenId: TOKEN, auditIds: [String(out.auditId)] });
+        expect(done).toMatchObject({ status: 'approved', decidedBy: ADMIN, projectId: P_OPEN, source: 'mcp', tokenId: TOKEN, auditIds: [String(out.auditId)] });
         expect(new Date(done.undoUntil).getTime()).toBeGreaterThan(Date.now());
         expect(standingRows()[0]).toMatchObject({ uses: 1 });
-        expect((await queue.readApplied(CID, MEMBER)).map((row) => row.proposalId)).toEqual([String(done._id)]);
-        expect(await queue.readApplied(CID, ADMIN)).toEqual([]);
+        expect((await queue.readApplied(CID, ADMIN)).map((row) => row.proposalId)).toEqual([String(done._id)]);
+        expect(await queue.readApplied(CID, MEMBER)).toEqual([]);
 
-        const undone = await proposals.undoApproval(CID, done._id, { decider: person(MEMBER), isPrivileged: false, ip: '' });
+        const undone = await proposals.undoApproval(CID, done._id, { decider: person(ADMIN), isPrivileged: true, ip: '' });
         expect(undone.error).toBeUndefined();
         expect(undone.proposal.status).toBe('undone');
-        expect(await queue.readApplied(CID, MEMBER)).toEqual([]);
+        expect(await queue.readApplied(CID, ADMIN)).toEqual([]);
     });
 
     it('covers nothing else: another kind, another connection, another person\'s connection and another project still wait', async () => {
@@ -179,7 +185,7 @@ describe('"Always do this" on an approval', () => {
     });
 
     it('is made again by a second approval instead of twice', async () => {
-        await standingComment(MEMBER);
+        await standingComment(OWNER);
         standingRows()[0].status = 'ended';
         await standingComment(ADMIN);
         expect(standingRows().filter((row) => row.status === 'active')).toHaveLength(1);
@@ -314,7 +320,7 @@ describe('what a standing approval never covers', () => {
     });
 
     it('stops while its maker could not make the change by hand, and ends when the maker loses the seat', async () => {
-        await standingComment(OTHER);
+        seedStanding('task.comment', { madeBy: OTHER });
         expect(outcomeOf(await comment(ctx(OWNER), 'Second'))).toBe('applied');
 
         const commentRule = rows(SCHEMA_TYPE.RULES).find((rule) => rule.key === 'task_comment');
@@ -331,11 +337,12 @@ describe('what a standing approval never covers', () => {
         expect(standingRows()[0]).toMatchObject({ status: 'ended', endedBecause: standing.ENDED.MAKER });
         seat.roleType = 3;
         expect(outcomeOf(await comment(ctx(OWNER), 'Sixth'))).toBe('proposed');
-        expect(comments()).toHaveLength(3);
+        expect(comments()).toHaveLength(2);
     });
 
     it('stops when its maker can no longer open the project', async () => {
-        await standingComment(MEMBER);
+        seedStanding('task.comment', { madeBy: OTHER });
+        expect(outcomeOf(await comment(ctx(OWNER), 'First'))).toBe('applied');
         Object.assign(project(P_OPEN), { isPrivateSpace: true, AssigneeUserId: [OWNER] });
         expect(outcomeOf(await comment(ctx(OWNER), 'Second'))).toBe('proposed');
         expect(comments()).toHaveLength(1);
@@ -395,9 +402,9 @@ describe('how a standing approval ends', () => {
 
     it('when a person removes it, and the agent is back to asking', async () => {
         const made = await standingComment();
-        const out = await standing.end(CID, made.id, { projectId: P_OPEN, by: { userId: MEMBER, privileged: false } });
+        const out = await standing.end(CID, made.id, { projectId: P_OPEN, by: { userId: ADMIN, privileged: true } });
         expect(out.error).toBeUndefined();
-        expect(standingRows()[0]).toMatchObject({ status: 'ended', endedBecause: standing.ENDED.PERSON, endedBy: MEMBER });
+        expect(standingRows()[0]).toMatchObject({ status: 'ended', endedBecause: standing.ENDED.PERSON, endedBy: ADMIN });
         expect(outcomeOf(await comment(ctx(OWNER), 'After'))).toBe('proposed');
         expect(rows(SCHEMA_TYPE.AUDIT_LOGS).filter((row) => row.action === 'agent.standing_approval_ended')).toHaveLength(1);
     });
@@ -424,11 +431,30 @@ describe('who may make, list and remove a standing approval', () => {
     const listed = (uid, extra) => through(standingController.listStanding, request(uid, 'GET', `/api/v2/agents/standing-approvals/${P_OPEN}`, { params: { projectId: P_OPEN }, ...extra }));
     const removed = (uid, id, extra) => through(standingController.endStanding, request(uid, 'DELETE', `/api/v2/agents/standing-approvals/${P_OPEN}/${id}`, { params: { projectId: P_OPEN, id }, ...extra }));
 
-    it.each([['an owner', OWNER], ['an admin', ADMIN], ['a member', MEMBER]])('%s who may approve the change makes one with the approval', async (_who, uid) => {
+    it.each([['an owner', OWNER], ['an admin', ADMIN]])('%s who may approve the change makes one with the approval', async (_who, uid) => {
         const id = await filed(await comment(ctx(OWNER)));
         const out = await approve(uid, id, { always: true });
         expect(out).toMatchObject({ code: 200, body: { status: true, data: { standing: { action: 'task.comment', madeBy: uid } } } });
         expect(standingRows()).toHaveLength(1);
+    });
+
+    it('a member makes one over their own connection', async () => {
+        const id = await filed(await comment(ownConnection(MEMBER)));
+        const out = await approve(MEMBER, id, { always: true });
+        expect(out).toMatchObject({ code: 200, body: { status: true, data: { standing: { action: 'task.comment', requestedBy: MEMBER, madeBy: MEMBER } } } });
+        expect(standingRows()).toHaveLength(1);
+    });
+
+    it('a member makes none over another person\'s connection, and the proposal stays pending', async () => {
+        const id = await filed(await comment(ctx(OWNER)));
+        const out = await approve(MEMBER, id, { always: true });
+        expect(out.code).toBe(403);
+        expect(proposalRows().find((row) => String(row._id) === id).status).toBe('pending');
+        expect(standingRows()).toHaveLength(0);
+        expect(comments()).toHaveLength(0);
+        const row = (await queue.readQueue(CID, MEMBER)).find((r) => r.proposalId === id);
+        expect(row).toMatchObject({ always: false, mine: false });
+        expect((await queue.readQueue(CID, OWNER)).find((r) => r.proposalId === id)).toMatchObject({ always: true, mine: true });
     });
 
     it('an approval without the switch makes none', async () => {
@@ -463,7 +489,7 @@ describe('who may make, list and remove a standing approval', () => {
     });
 
     it('a person who may not make the change by hand makes none', async () => {
-        const id = await filed(await comment(ctx(OWNER)));
+        const id = await filed(await comment(ownConnection(MEMBER)));
         rows(SCHEMA_TYPE.RULES).find((rule) => rule.key === 'task_comment').roles = [];
         const out = await approve(MEMBER, id, { always: true });
         expect(out.code).toBeGreaterThanOrEqual(400);
@@ -472,8 +498,8 @@ describe('who may make, list and remove a standing approval', () => {
     });
 
     it('owners and admins list every one in the project, a member only their own', async () => {
-        await standingComment(MEMBER);
-        seedStanding('task.tags.add', { madeBy: ADMIN });
+        await ownStanding(MEMBER);
+        seedStanding('task.tags.add', { tokenId: TOKEN_2, madeBy: ADMIN });
         for (const uid of [OWNER, ADMIN]) {
             // eslint-disable-next-line no-await-in-loop
             const out = await listed(uid);
@@ -488,14 +514,14 @@ describe('who may make, list and remove a standing approval', () => {
     });
 
     it.each([['a guest', GUEST, {}], ['an API token', OWNER, SCRIPT], ['an agent\'s token', OWNER, AGENT], ['an agent\'s run', OWNER, RUN]])('%s lists none', async (_who, uid, extra) => {
-        await standingComment(MEMBER);
+        await ownStanding(MEMBER);
         const out = await listed(uid, extra);
         expect(out.code).toBeGreaterThanOrEqual(400);
         expect(out.body.data).toBeUndefined();
     });
 
     it.each([['its maker', MEMBER], ['an owner', OWNER], ['an admin', ADMIN]])('%s removes it', async (_who, uid) => {
-        const made = await standingComment(MEMBER);
+        const made = await ownStanding(MEMBER);
         expect(await removed(uid, made.id)).toMatchObject({ code: 200, body: { status: true } });
         expect(standingRows()[0]).toMatchObject({ status: 'ended', endedBy: uid });
         expect(socketEmitter.emit).toHaveBeenCalledWith('update', expect.objectContaining({ module: 'agent', companyId: CID, data: expect.objectContaining({ kind: 'standing_approval' }) }));
@@ -508,7 +534,7 @@ describe('who may make, list and remove a standing approval', () => {
         ['an agent\'s token', OWNER, AGENT],
         ['an agent\'s run', OWNER, RUN],
     ])('%s does not remove it', async (_who, uid, extra) => {
-        const made = await standingComment(MEMBER);
+        const made = await ownStanding(MEMBER);
         const out = await removed(uid, made.id, extra);
         expect(out.code).toBeGreaterThanOrEqual(400);
         expect(standingRows()[0].status).toBe('active');
@@ -517,7 +543,7 @@ describe('who may make, list and remove a standing approval', () => {
     });
 
     it('one from another project is not removed through this project', async () => {
-        const made = await standingComment(MEMBER);
+        const made = await ownStanding(MEMBER);
         const out = await through(standingController.endStanding, request(OWNER, 'DELETE', `/api/v2/agents/standing-approvals/${P_DEST}/${made.id}`, { params: { projectId: P_DEST, id: made.id } }));
         expect(out.code).toBe(404);
         expect(standingRows()[0].status).toBe('active');
@@ -529,9 +555,33 @@ describe('the approval queue', () => {
         await comment(ctx(OWNER));
         await rpc(ctx(OWNER), 'task.archive', { taskId: fx.bug._id });
         mockDb.seed(SCHEMA_TYPE.AGENT_PROPOSALS, { agentId: '6f0000000000000000000a91', agentName: 'Triage', what: 'Comment', changes: [{ action: 'task.comment', params: { taskId: String(fx.top._id), body: 'Hi' }, label: 'Comment' }], status: 'pending', projectId: P_OPEN, taskId: String(fx.top._id) });
-        const offered = (await queue.readQueue(CID, MEMBER)).map((row) => [row.changes[0].action, row.source, row.always]);
-        expect(offered).toEqual(expect.arrayContaining([['task.comment', 'mcp', true], ['task.archive', 'mcp', false], ['task.comment', '', false]]));
-        expect(offered).toHaveLength(3);
+        const offered = (uid) => queue.readQueue(CID, uid).then((queued) => queued.map((row) => [row.changes[0].action, row.source, row.always]));
+        expect(await offered(ADMIN)).toEqual(expect.arrayContaining([['task.comment', 'mcp', true], ['task.archive', 'mcp', false], ['task.comment', '', false]]));
+        expect(await offered(ADMIN)).toHaveLength(3);
+        expect((await offered(MEMBER)).filter(([, , always]) => always)).toEqual([]);
+    });
+});
+
+describe('what Home asks the person to approve', () => {
+    const inboxController = require('../Modules/Inbox/controller');
+    const counted = async (uid) => {
+        let sent;
+        await inboxController.counts({ uid, headers: { companyid: CID } }, { send: (body) => { sent = body; } });
+        return sent.data;
+    };
+    const RUN = '6f0000000000000000000a93';
+
+    it('counts what the person\'s own connection or agent filed apart from what waits for the team', async () => {
+        await comment(ownConnection(MEMBER));
+        await comment(secondToken(OWNER), 'From the owner');
+        mockDb.seed(SCHEMA_TYPE.AGENT_RUNS, { _id: RUN, startedBy: MEMBER, status: 'done' });
+        mockDb.seed(SCHEMA_TYPE.AGENT_PROPOSALS, { agentId: '6f0000000000000000000a91', agentName: 'Triage', runId: RUN, what: 'Comment', changes: [{ action: 'task.comment', params: { taskId: String(fx.top._id), body: 'Hi' }, label: 'Comment' }], status: 'pending', projectId: P_OPEN, taskId: String(fx.top._id) });
+
+        const queued = await queue.readQueue(CID, MEMBER);
+        expect(queued.filter((row) => row.mine).map((row) => row.source).sort()).toEqual(['', 'mcp']);
+        expect(queue.ownWaitingCount(queued)).toBe(2);
+        expect(await counted(MEMBER)).toMatchObject({ approval: 3, approvalOwn: 2, approvalTeam: 1 });
+        expect(await counted(OWNER)).toMatchObject({ approval: 3, approvalOwn: 1, approvalTeam: 2 });
     });
 });
 

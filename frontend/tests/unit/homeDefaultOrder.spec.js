@@ -99,7 +99,7 @@ beforeEach(() => {
     approvalCount = 0;
     apiRequest.mockReset();
     apiRequest.mockImplementation((type, url) => Promise.resolve(url === `${env.INBOX}/counts`
-        ? { data: { status: true, data: { approval: approvalCount } } }
+        ? { data: { status: true, data: { approval: approvalCount, approvalOwn: approvalCount, approvalTeam: 0 } } }
         : { data: {} }));
 });
 
@@ -147,13 +147,24 @@ describe('the order of Home', () => {
 });
 
 describe('what next on Home', () => {
-    it('approvals waiting: the Inbox\'s count, and the button opens that tab', async () => {
+    it('approvals waiting for the person: the Inbox\'s own count, and the button opens that tab', async () => {
         approvalCount = 2;
         groups.overdue = [task('t2')];
         await openHome();
         expect(line().attributes('data-kind')).toBe('approvals');
         expect(line().attributes('data-count')).toBe('2');
         await line().find('button').trigger('click');
+        expect(router.push).toHaveBeenCalledWith({ name: 'inbox', params: { cid: 'company-1' }, query: { tab: 'approval' } });
+    });
+
+    it('the team\'s proposals are a quieter link to the same tab, not a request for the person\'s approval', async () => {
+        apiRequest.mockImplementation((type, url) => Promise.resolve(url === `${env.INBOX}/counts`
+            ? { data: { status: true, data: { approval: 3, approvalOwn: 0, approvalTeam: 3 } } }
+            : { data: {} }));
+        groups.overdue = [task('t2')];
+        await openHome();
+        expect(line().attributes('data-kind')).toBe('overdue');
+        await line().find('[data-test="home-next-team"]').trigger('click');
         expect(router.push).toHaveBeenCalledWith({ name: 'inbox', params: { cid: 'company-1' }, query: { tab: 'approval' } });
     });
 

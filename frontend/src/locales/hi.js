@@ -885,6 +885,7 @@ export default {
         "next_label": "What next",
         "next_approvals": "One thing needs your approval. | {n} things need your approval.",
         "next_approvals_action": "Review",
+        "next_team": "One waiting for the team | {n} waiting for the team",
         "next_waiting": "One thing is waiting on you. | {n} things are waiting on you.",
         "next_waiting_action": "Show me",
         "next_overdue": "One of your tasks is overdue. | {n} of your tasks are overdue.",

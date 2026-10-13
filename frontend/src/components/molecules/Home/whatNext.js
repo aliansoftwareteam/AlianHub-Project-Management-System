@@ -9,7 +9,8 @@ export const NEXT = Object.freeze({
     TODAY: "today",
     START_PROJECT: "start_project",
     START_TASK: "start_task",
-    CLEAR: "clear"
+    CLEAR: "clear",
+    TEAM: "team"
 });
 
 const step = (kind, count = 0) => ({ kind, count });
@@ -24,10 +25,12 @@ export function whatNext({ approvals = 0, waiting = 0, overdue = 0, today = 0, e
     return step(NEXT.CLEAR);
 }
 
-/* Every number comes from a read the linked screen makes itself: the Inbox's count for its approval tab,
- * the rows My work lists, the rows the Waiting on you card holds. Nothing is counted here. */
+/* Every number comes from a read the linked screen makes itself: the Inbox's counts for its approval tab,
+ * the rows My work lists, the rows the Waiting on you card holds. Nothing is counted here. Only what was filed
+ * for the person asks for their approval; what waits for the rest of the team is a quieter link. */
 export function useWhatNext({ work, waiting, empty, canCreateProject, canOpenInbox }) {
     const approvals = ref(0);
+    const team = ref(0);
     const counted = ref(false);
 
     async function load() {
@@ -37,9 +40,12 @@ export function useWhatNext({ work, waiting, empty, canCreateProject, canOpenInb
         }
         try {
             const res = await apiRequest("get", `${env.INBOX}/counts`);
-            approvals.value = res?.data?.status ? Number(res.data.data?.approval) || 0 : 0;
+            const counts = res?.data?.status ? res.data.data || {} : {};
+            approvals.value = Number(counts.approvalOwn) || 0;
+            team.value = Number(counts.approvalTeam) || 0;
         } catch (error) {
             approvals.value = 0;
+            team.value = 0;
         } finally {
             counted.value = true;
         }
@@ -58,5 +64,5 @@ export function useWhatNext({ work, waiting, empty, canCreateProject, canOpenInb
         });
     });
 
-    return { next, load };
+    return { next, team, load };
 }

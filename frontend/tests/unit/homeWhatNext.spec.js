@@ -41,7 +41,7 @@ const openHome = async ({ waiting = 0, empty = false, canCreateProject = false, 
             const whatsNext = useWhatNext({ work, waiting: ref(waiting), empty: ref(empty), canCreateProject: ref(canCreateProject), canOpenInbox: ref(canOpenInbox) });
             work.fetchOpen();
             whatsNext.load();
-            return { work, next: whatsNext.next };
+            return { work, next: whatsNext.next, team: whatsNext.team };
         },
         render: () => null
     });
@@ -54,7 +54,7 @@ beforeEach(() => {
     apiRequest.mockReset();
     apiRequest.mockImplementation(answer);
     serverTasks = [];
-    serverCounts = { approval: 0, approvals: 0, proposals: 0, primary: 0 };
+    serverCounts = { approval: 0, approvalOwn: 0, approvalTeam: 0, approvals: 0, proposals: 0, primary: 0 };
 });
 
 describe('what next, in order', () => {
@@ -88,11 +88,20 @@ describe('what next, in order', () => {
 });
 
 describe('the numbers on the line are the linked screens\' own', () => {
-    it('approvals: the count the Inbox shows on its approval tab', async () => {
-        serverCounts = { approval: 2, approvals: 1, proposals: 1, primary: 9 };
+    it('approvals: only what was filed for the person; what waits for the team is counted apart', async () => {
+        serverCounts = { approval: 5, approvalOwn: 2, approvalTeam: 3, approvals: 1, proposals: 4, primary: 9 };
         serverTasks = [task('late', day(-2))];
         const home = await openHome();
         expect(home.next).toEqual({ kind: NEXT.APPROVALS, count: 2 });
+        expect(home.team).toBe(3);
+    });
+
+    it('a queue that holds only the team\'s proposals does not ask for the person\'s approval', async () => {
+        serverCounts = { approval: 4, approvalOwn: 0, approvalTeam: 4, approvals: 0, proposals: 4, primary: 0 };
+        serverTasks = [task('late', day(-2))];
+        const home = await openHome();
+        expect(home.next).toEqual({ kind: NEXT.OVERDUE, count: 1 });
+        expect(home.team).toBe(4);
     });
 
     it('overdue and today: the rows My work lists under those headings', async () => {
@@ -155,5 +164,15 @@ describe('the line on Home', () => {
         expect(buttons[0].text()).toBe(`Home.next_${kind}_action`);
         await buttons[0].trigger('click');
         expect(wrapper.emitted('act')).toEqual([[kind]]);
+    });
+
+    it('what waits for the team is a quieter second link, shown only when there is some', async () => {
+        const wrapper = mount(HomeWhatNext, { props: { next: { kind: NEXT.CLEAR, count: 0 }, team: 3 } });
+        const link = wrapper.find('[data-test="home-next-team"]');
+        expect(link.text()).toBe('Home.next_team');
+        expect(link.classes()).not.toContain('ah-btn--primary');
+        await link.trigger('click');
+        expect(wrapper.emitted('act')).toEqual([[NEXT.TEAM]]);
+        expect(mount(HomeWhatNext, { props: { next: { kind: NEXT.CLEAR, count: 0 }, team: 0 } }).find('[data-test="home-next-team"]').exists()).toBe(false);
     });
 });
