@@ -3,6 +3,8 @@
     <strong style="font-size:32px;">AlianHub</strong>
 </a>
 
+# AlianHub — Open-Source Project Management Software (Self-Hosted Jira / ClickUp Alternative)
+
 <br/>
 <br/>
 
@@ -14,7 +16,7 @@
 <br/>
 <div>
     <a href="https://demo.alianhub.com" target="_blank">
-      <img width="90" src="https://raw.githubusercontent.com/aliansoftwareteam/AlianHub-Project-Management-System/main/.gitbook/assets/DEMO_BTN.png" alt="Live Demo" />
+      <img width="90" src="https://raw.githubusercontent.com/aliansoftwareteam/AlianHub-Project-Management-System/main/.gitbook/assets/DEMO_BTN.png" alt="Open the AlianHub live demo" />
     </a>
 </div>
 </div>
@@ -27,6 +29,12 @@
 <br/>
 Built for enterprises, startups, and growing teams — no per-seat pricing, no vendor lock-in, your data on your own servers.
 </div>
+
+<br/>
+
+**AlianHub** is free, open-source project management software you host yourself. It brings task management, sprint planning, time tracking with timesheets and optional screenshots, Gantt charts, Kanban boards, docs and automations into one workspace. Each person can connect their own AI assistant (Claude, ChatGPT or Claude Code) over MCP to find, add and update work for them. Teams use it as a self-hosted alternative to Jira, ClickUp, Linear and Monday.com, released under the AGPL-3.0 license and run with Docker on your own servers.
+
+[Live demo](https://demo.alianhub.com) · [Website](https://alianhub.com) · [Documentation](https://help.alianhub.com) · [Self-host with Docker](#option-1--self-hosting-with-docker-recommended) · [FAQ](#faq)
 
 <br/>
 
@@ -44,7 +52,7 @@ Built for enterprises, startups, and growing teams — no per-seat pricing, no v
 
 <p align="center">
   <a href="https://demo.alianhub.com" target="_blank">
-    <img src="https://raw.githubusercontent.com/aliansoftwareteam/AlianHub-Project-Management-System/main/.gitbook/assets/AlianHub_Main.png" alt="AlianHub — open-source project management dashboard" width="100%" />
+    <img src="https://raw.githubusercontent.com/aliansoftwareteam/AlianHub-Project-Management-System/main/.gitbook/assets/AlianHub_Main.png" alt="AlianHub open-source project management dashboard with projects, tasks and widgets" width="100%" />
   </a>
 </p>
 
@@ -54,7 +62,7 @@ Built for enterprises, startups, and growing teams — no per-seat pricing, no v
 
 ## Quick Start
 
-### 🐳 Option 1 — Docker (recommended for self-hosting)
+### Option 1 — Self-hosting with Docker (recommended)
 
 ```bash
 # Grab the compose file and run
@@ -73,7 +81,7 @@ docker compose pull && docker compose up -d
 
 > Images are published to GHCR: `ghcr.io/aliansoftwareteam/alianhub:latest`. Multi-arch (amd64 + arm64).
 
-### 🛠 Option 2 — From source (for developers)
+### Option 2 — Install from source (for developers)
 
 ```bash
 git clone https://github.com/aliansoftwareteam/AlianHub-Project-Management-System.git
@@ -132,6 +140,15 @@ Unlike SaaS-only tools, AlianHub is built to be:
 
 It supports both web and desktop environments and is suitable for internal tools, enterprise deployments, and long-term team collaboration.
 
+### Why choose AlianHub over Jira or ClickUp
+
+- **Self-hosted and open source** — run it on your own servers with Docker; the code is AGPL-3.0 and your data stays in your own MongoDB.
+- **No per-seat pricing** — add as many people as your server can hold.
+- **Time tracking built in** — timers, weekly timesheets with approval, and an optional desktop tracker with screenshots, without a separate add-on.
+- **Bring your own AI** — each person connects Claude, ChatGPT or Claude Code over MCP. The AI acts only as that person, every change is logged, and risky changes wait for approval ([how it works](docs/CONNECT-YOUR-AI.md)).
+- **Easy to move in** — import tasks, subtasks, comments, checklists and custom fields from a ClickUp export ([guide](docs/MOVING-FROM-CLICKUP.md)).
+- **Multi-tenant** — one instance can host several companies, each with isolated data.
+
 ---
 
 ## Architecture
@@ -178,9 +195,11 @@ AlianHub is built using a pragmatic and scalable stack:
 
 ---
 
-## Key Features
+## Features
 
-- **📋 Project & task management** — Create projects with custom milestones, sprints, statuses, and custom fields. Track tasks across **List, Board, Table, Calendar, and Workload** views with drag-and-drop, sub-tasks, checklists, attachments, comments, due dates, and reminders.
+### Key features of AlianHub
+
+- **📋 Project & task management** — Create projects with custom milestones, sprints, statuses, and custom fields. Track tasks across **List, Board, Table, Calendar, Gantt, and Workload** views with drag-and-drop, sub-tasks, checklists, attachments, comments, due dates, and reminders.
 
 - **👥 Team collaboration with RBAC** — Assign tasks to users, manage role-based permissions per company, and create custom roles with dynamic permission rules. **Multi-tenant by design** — a single instance can host multiple companies, each with isolated data.
 
@@ -188,9 +207,19 @@ AlianHub is built using a pragmatic and scalable stack:
 
 - **🔍 Advanced search & saved filters** — Find tasks by project, status, assignee, creator, due date, or priority. Save frequently used filters for one-click reuse.
 
+- **🏃 Sprint planning** — Plan work in sprints with a backlog, start and complete a sprint, and follow it with burndown, velocity and sprint reports.
+
+- **📊 Gantt chart** — A bar per task from start date to due date. Drag bars to reschedule and draw links to show which task blocks another. Milestones show as diamonds.
+
+- **📝 Docs & wiki** — Write briefs, decisions and meeting notes as docs beside the work, nest pages, comment, keep versions, and share a read-only public link.
+
+- **⚙️ Automations** — Rules that do a small job when something happens, for example "when a task is marked done, tell the project lead". See [rules](docs/guide/rules.md).
+
 - **⏱️ Timesheets & reporting** — Project, user, and workload timesheets. Generate milestone and performance reports. Optional productivity tracking (screenshots / keystrokes / mouse events) for time-sensitive teams.
 
 - **🤖 AI assistance** — Generate tasks, subtasks, checklists, descriptions, and project templates with AI. Multiple LLM providers supported.
+
+- **🔌 AI agents over MCP** — Connect your own Claude, ChatGPT or Claude Code to AlianHub. It works as you, sees only what you can open, and changes that need approval wait for a person. See [Connect your AI](docs/CONNECT-YOUR-AI.md) and the [MCP agent guide](docs/MCP-AGENT-GUIDE.md).
 
 - **💬 Built-in chat & channels** — Real-time messaging and dedicated channels per project or team.
 
@@ -206,14 +235,18 @@ AlianHub is built using a pragmatic and scalable stack:
 
 | Capability | Status |
 |---|---|
-| List · Board (Kanban) · Table · Calendar · Workload views | ✅ Shipped |
+| List · Board (Kanban) · Table · Calendar · Gantt · Workload views | ✅ Shipped |
 | Sub-tasks, checklists, attachments, comments, custom fields | ✅ Shipped |
 | Time tracking — timesheets + optional screenshots / activity | ✅ Shipped |
 | Custom roles & per-company RBAC | ✅ Shipped |
 | Sprints, milestones & reports | ✅ Shipped |
 | AI task / sub-task / project generation | ✅ Shipped |
 | Built-in chat & channels · real-time sync (Socket.io) | ✅ Shipped |
-| **Gantt / timeline view** | 🔜 On the roadmap |
+| Docs & wiki pages · automations (rules) | ✅ Shipped |
+| Connect your own AI (Claude, ChatGPT) over MCP | ✅ Shipped |
+| Import from ClickUp | ✅ Shipped |
+
+---
 
 ## How AlianHub compares
 
@@ -229,7 +262,7 @@ Capabilities that are **free and built-in** here — but paid, limited, or absen
 | AI project generation | ✅ Free (your API key) | ❌ Not available |
 | Milestones | ✅ Free | ❌ Not available |
 
-> Comparison reflects each project's open-source edition; both are AGPL-3.0. AlianHub is younger and still closing gaps of its own (e.g. Gantt) — see the table above.
+> Comparison reflects each project's open-source edition; both are AGPL-3.0. AlianHub is younger and still closing gaps of its own — see [Discussions](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/discussions) for what's next.
 
 ---
 
@@ -360,6 +393,18 @@ For development:
 
 ---
 
+## Connect your AI (Claude, ChatGPT) over MCP
+
+AlianHub ships an MCP server, so the AI app you already use can work inside your workspace. Open **AI → Connect your AI** in AlianHub, copy the address, and add it as a custom connector in Claude or ChatGPT (or in Claude Code). After that you can ask in everyday words to find tasks, add tasks and subtasks, comment, log time or change a status.
+
+- It works as you: it sees only what you can open and changes only what your role allows.
+- Every change is written in the audit log, and risky changes wait for a person to approve them.
+- It cannot delete tasks, docs, comments or projects, and cannot change who may do what.
+
+Step-by-step guide: [docs/CONNECT-YOUR-AI.md](docs/CONNECT-YOUR-AI.md) · every tool: [docs/MCP-AGENT-GUIDE.md](docs/MCP-AGENT-GUIDE.md).
+
+---
+
 ## Demo
 
 You can explore a live demo here:
@@ -443,7 +488,7 @@ AlianHub Project-Management-System is a community-driven project, and your contr
 <br/>
 
 <a href="https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/graphs/contributors">
-  <img src="https://contrib.rocks/image?repo=aliansoftwareteam/AlianHub-Project-Management-System&max=400&columns=20" />
+  <img src="https://contrib.rocks/image?repo=aliansoftwareteam/AlianHub-Project-Management-System&max=400&columns=20" alt="Avatars of the people who contributed to AlianHub on GitHub" />
 </a>
 
 ---
@@ -461,6 +506,38 @@ AlianHub Project-Management-System is a community-driven project, and your contr
   at https://repobeats.axiom.co with this repo and paste the
   generated URL here.
 -->
+
+---
+
+## FAQ
+
+### Is AlianHub free?
+
+Yes. AlianHub is free and open source under the AGPL-3.0 license. You can self-host it with no per-seat pricing. Paid help with hosting, customization and support is available from [Aliansoftware](#deploy--customize-with-aliansoftware) if you want it.
+
+### Can I self-host AlianHub?
+
+Yes, that is how it is meant to run. Use the [Docker Compose file](#option-1--self-hosting-with-docker-recommended) (images on GHCR for amd64 and arm64) or [install from source](#option-2--install-from-source-for-developers) with Node.js and MongoDB. See [docs/ADMIN-GUIDE.md](docs/ADMIN-GUIDE.md) and [docs/ENV.md](docs/ENV.md).
+
+### How does AlianHub compare to Jira or ClickUp?
+
+AlianHub covers the everyday project work — tasks, sprints, Board, List, Calendar, Gantt and Workload views, docs, automations and time tracking — but runs on your own servers under an open-source license. See [Why choose AlianHub over Jira or ClickUp](#why-choose-alianhub-over-jira-or-clickup) and the [feature status](#feature-status) table.
+
+### Can I move from ClickUp to AlianHub?
+
+Yes. Export from ClickUp as CSV or Excel and import it under **Settings → Import & export**. Tasks, subtasks, statuses, assignees, dates, tags, checklists, comments and custom fields come across, and the import can be undone. [docs/MOVING-FROM-CLICKUP.md](docs/MOVING-FROM-CLICKUP.md) lists what comes across and what does not.
+
+### What AI features does AlianHub have?
+
+AI Assist generates tasks, subtasks, checklists, descriptions and sprint plans from plain language, using your own LLM API key. Each person can also connect Claude, ChatGPT or Claude Code over MCP to work in AlianHub for them — see [Connect your AI](#connect-your-ai-claude-chatgpt-over-mcp).
+
+### What license is AlianHub under?
+
+The GNU Affero General Public License v3.0 (AGPL-3.0). You can use, modify and self-host it freely; if you run a modified version as a public network service you must publish your changes. See [License](#license).
+
+### Does AlianHub have time tracking?
+
+Yes. Start a timer on a task or add time by hand, send in a weekly timesheet for approval, and optionally use the desktop tracker for screenshots and activity. See [docs/guide/time.md](docs/guide/time.md).
 
 ---
 
