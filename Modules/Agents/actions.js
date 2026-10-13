@@ -191,18 +191,27 @@ const DAY = /^\d{4}-\d{2}-\d{2}$/;
 const CLOCK = /^([01]\d|2[0-3]):[0-5]\d$/;
 const MAX_LOG_MINUTES = 24 * 60;
 
-/* The entry the manual log form writes (Modules/LogTime manualLogtime), for the person behind the agent only. */
+const DEFAULT_START = '09:00';
+
+/* The entry the manual log form writes (Modules/LogTime manualLogtime), for the person behind the agent only.
+ * With no start named, 09:00 on the day; before 09:00 today the entry ends now instead, clipped to midnight so it
+ * stays on the person's day. Only a start the person names is refused for being ahead of now. */
 const timelogEntry = (params, zone = 'UTC') => {
     const minutes = Number(params.minutes);
     if (!Number.isInteger(minutes) || minutes < 1 || minutes > MAX_LOG_MINUTES) throw new tools.DeterministicError(`The time must be a whole number of minutes from 1 to ${MAX_LOG_MINUTES}.`);
-    const day = params.date ? String(params.date) : DateTime.now().setZone(zone).toISODate();
-    const clock = params.startTime ? String(params.startTime) : '09:00';
-    if (!DAY.test(day) || !CLOCK.test(clock)) throw new tools.DeterministicError('The date must be written YYYY-MM-DD and the start time HH:MM.');
-    const start = DateTime.fromISO(`${day}T${clock}`, { zone });
-    if (!start.isValid || start.toISODate() !== day) throw new tools.DeterministicError(`${day} is not a real date.`);
     const now = DateTime.now().setZone(zone);
+    const day = params.date ? String(params.date) : now.toISODate();
+    const named = Boolean(params.startTime);
+    const clock = named ? String(params.startTime) : DEFAULT_START;
+    if (!DAY.test(day) || !CLOCK.test(clock)) throw new tools.DeterministicError('The date must be written YYYY-MM-DD and the start time HH:MM.');
+    let start = DateTime.fromISO(`${day}T${clock}`, { zone });
+    if (!start.isValid || start.toISODate() !== day) throw new tools.DeterministicError(`${day} is not a real date.`);
     if (start.startOf('day') > now.startOf('day')) throw new tools.DeterministicError('Time cannot be logged on a day that has not come yet.');
-    if (start > now) throw new tools.DeterministicError('Time cannot be logged from a start time that has not come yet.');
+    if (start > now) {
+        if (named) throw new tools.DeterministicError('Time cannot be logged from a start time that has not come yet.');
+        const endingNow = now.minus({ minutes });
+        start = endingNow < start.startOf('day') ? start.startOf('day') : endingNow;
+    }
     return { start: Math.floor(start.toSeconds()), minutes };
 };
 

@@ -627,7 +627,7 @@ Undo, by the dashboard's owner: the card is removed. A dashboard the change made
 { "name": "task.link", "arguments": { "taskId": "<task id>", "url": "https://example.com/acme/app/pull/12", "label": "PR 12" } }
 ```
 
-`timelog.start`, `timelog.stop`, `timelog.create`: your own time on a task.
+`timelog.start`, `timelog.stop`, `timelog.create`: your own time on a task. A `startTime` you give cannot be later than now. With none, `timelog.create` starts the entry at 09:00 on the day; before 09:00 today it ends the entry now instead, starting no earlier than midnight, so the entry stays on your day.
 
 ```json
 { "name": "timelog.create", "arguments": { "taskId": "<task id>", "minutes": 45, "date": "2026-11-03" } }

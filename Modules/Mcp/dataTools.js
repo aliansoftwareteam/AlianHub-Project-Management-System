@@ -402,7 +402,7 @@ const TOOLS = [
                 taskId: { type: 'string' },
                 minutes: { type: 'integer', minimum: 1, maximum: 1440 },
                 date: { type: 'string', description: 'YYYY-MM-DD, the person\'s own day; today when left out' },
-                startTime: { type: 'string', description: 'HH:MM in the person\'s time zone; 09:00 when left out' },
+                startTime: { type: 'string', description: 'HH:MM in the person\'s time zone, not later than now. When left out: 09:00, or before 09:00 today the entry ends now, starting no earlier than midnight' },
                 description: { type: 'string' },
                 billable: { type: 'boolean' },
             },

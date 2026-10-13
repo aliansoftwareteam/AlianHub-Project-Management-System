@@ -80,13 +80,41 @@ describe('timelog.create writes one entry for the person behind the agent', () =
         expect(rows(SCHEMA_TYPE.TIMESHEET)).toHaveLength(0);
     });
 
-    it('defaults to today at 09:00 UTC with a description naming the task', async () => {
-        await perform('timelog.create', { taskId: task._id, minutes: 15 });
-        const [entry] = rows(SCHEMA_TYPE.TIMESHEET);
-        const today = new Date().toISOString().slice(0, 10);
-        expect(entry.LogStartTime).toBe(Date.parse(`${today}T09:00:00Z`) / 1000);
+    const loggedAt = async (nowIso, params) => {
+        const clock = jest.spyOn(Date, 'now').mockReturnValue(Date.parse(nowIso));
+        try {
+            await perform('timelog.create', { taskId: task._id, ...params });
+        } finally {
+            clock.mockRestore();
+        }
+        return rows(SCHEMA_TYPE.TIMESHEET)[0];
+    };
+
+    it('defaults to today at 09:00 UTC with a description naming the task, once 09:00 has come', async () => {
+        const entry = await loggedAt('2026-09-02T10:00:00Z', { minutes: 15 });
+        expect(entry.LogStartTime).toBe(Date.parse('2026-09-02T09:00:00Z') / 1000);
         expect(entry.LogDescription).toMatch(/A-1/);
         expect(entry.billable).toBe(true);
+    });
+
+    it('before 09:00 ends the default entry now instead of starting it in the future', async () => {
+        const entry = await loggedAt('2026-09-02T03:00:00Z', { minutes: 90 });
+        expect([entry.LogStartTime, entry.LogEndTime]).toEqual([Date.parse('2026-09-02T01:30:00Z') / 1000, Date.parse('2026-09-02T03:00:00Z') / 1000]);
+    });
+
+    it('keeps an early default entry on the day, starting no earlier than midnight', async () => {
+        const entry = await loggedAt('2026-09-02T00:30:00Z', { minutes: 120 });
+        expect(entry.LogStartTime).toBe(Date.parse('2026-09-02T00:00:00Z') / 1000);
+    });
+
+    it('still starts a past day at 09:00 at any hour', async () => {
+        const entry = await loggedAt('2026-09-02T03:00:00Z', { minutes: 30, date: '2026-09-01' });
+        expect(entry.LogStartTime).toBe(Date.parse('2026-09-01T09:00:00Z') / 1000);
+    });
+
+    it('refuses a start the person names that has not come yet', async () => {
+        await expect(loggedAt('2026-09-02T08:00:00Z', { minutes: 30, startTime: '09:00' })).rejects.toMatchObject({ deterministic: true, message: expect.stringMatching(/start time that has not come yet/) });
+        expect(rows(SCHEMA_TYPE.TIMESHEET)).toHaveLength(0);
     });
 
     it.each([
