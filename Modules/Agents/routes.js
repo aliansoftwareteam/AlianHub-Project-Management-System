@@ -35,6 +35,7 @@ exports.init = (app) => {
     app.post('/api/v2/agents/chat/direct', chatCtrl.openDirect);
     app.get('/api/v2/agents/pipeline', ctrl.pipelineTasks);
     app.get('/api/v2/agents/release', ctrl.releaseCandidate);
+    app.post('/api/v2/agents/workspace-guide', setByPerson('agent.workspace_guide.add'), ctrl.addWorkspaceGuide);
     app.post('/api/v2/agents/pause-all', setByPerson('agent.pause_all'), ctrl.pauseAll);
     app.post('/api/v2/agents/draft', builderCtrl.draftAgent);
     app.get('/api/v2/agents/settings', ctrl.getSettings);

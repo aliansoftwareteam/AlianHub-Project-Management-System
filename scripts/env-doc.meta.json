@@ -1462,5 +1462,10 @@
     "group": "ai",
     "description": "How long an AI field with auto-refill waits after the last change to a task part it reads before it fills again.",
     "default": "60000"
+  },
+  "WORKSPACE_GUIDE_AUTO_CREATE": {
+    "group": "ai",
+    "description": "Whether each workspace created from now on gets the built-in Workspace Guide agent. \"true\" (the default) adds it at creation; \"false\" adds none until an owner or admin adds it from the Team board. Existing workspaces are never changed by this setting, and a guide an admin removed is not made again.",
+    "default": "true"
   }
 }

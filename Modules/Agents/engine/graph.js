@@ -151,8 +151,8 @@ const targetProjectsOf = async (companyId, run, changes) => {
 };
 
 /* Below the review level every change is proposed and no decision is recorded,
- * as before; from it, the policy reviews each change and a refusal still goes
- * through perform() so it leaves the same audit row as a registry refusal. At
+ * as before, except the Workspace Guide's mention reply (policy.isMentionReply);
+ * from it, the policy reviews each change and a refusal still goes through perform() so it leaves the same audit row as a registry refusal. At
  * every level the project's own rule is asked last and can only hold a change back. */
 async function review(state, config) {
     await renewLock(state, config);
@@ -169,12 +169,13 @@ async function review(state, config) {
     const toPropose = [];
     const targets = reviewing && taint.routes(run) ? await targetProjectsOf(companyId, run, changes) : new Map();
     for (const change of changes) {
-        const decided = reviewing
-            ? policy.decide({ agent, action: change.action, params: change.params, rating: change.rating, run, task, targetProjectId: targets.has(namedTaskOf(change)) ? targets.get(namedTaskOf(change)) : null })
-            : { decision: policy.DECISION.PROPOSE, reason: '', rating: change.rating };
+        const direct = policy.isMentionReply({ agent, action: change.action, params: change.params, run, task });
+        let decided = { decision: policy.DECISION.PROPOSE, reason: '', rating: change.rating };
+        if (direct) decided = policy.mentionReply(change.rating);
+        else if (reviewing) decided = policy.decide({ agent, action: change.action, params: change.params, rating: change.rating, run, task, targetProjectId: targets.has(namedTaskOf(change)) ? targets.get(namedTaskOf(change)) : null });
         // eslint-disable-next-line no-await-in-loop
         const verdict = await heldByProject(change, decided);
-        if (reviewing || verdict !== decided) decisions.push({ action: change.action, decision: verdict.decision, reason: verdict.reason, rating: verdict.rating, at: new Date() });
+        if (reviewing || direct || verdict !== decided) decisions.push({ action: change.action, decision: verdict.decision, reason: verdict.reason, rating: verdict.rating, at: new Date() });
         if (verdict.decision === policy.DECISION.PROPOSE) toPropose.push(change); else toAct.push({ change, verdict });
     }
     if (!reviewing && !decisions.length) return { changes, alreadyTracked, toPropose: changes };

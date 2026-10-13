@@ -1,7 +1,10 @@
 <template>
     <div class="member-row member-row--agent">
         <AgentIdentity :name="agent.name" :sub="ownerLine" size="lg" />
-        <span class="member-row__role">{{ $t('Parity.role_agent') }}</span>
+        <span class="member-row__role">
+            {{ $t('Parity.role_agent') }}
+            <span v-if="agent.builtIn" class="ah-chip ah-chip--agent ah-chip--mono">{{ $t('Parity.built_in_tag') }}</span>
+        </span>
         <span class="member-row__access">{{ accessLine }}</span>
         <span class="member-row__active ah-mono">{{ activeLine }}</span>
     </div>
