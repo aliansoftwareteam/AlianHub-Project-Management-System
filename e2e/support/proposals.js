@@ -23,16 +23,25 @@ async function openProposals(state) {
     const client = new MongoClient(resolveMongoUrl(), { serverSelectionTimeoutMS: 5000 });
     await client.connect();
     const collection = client.db(state.companyId).collection('agent_proposals');
+    const runs = client.db(state.companyId).collection('agent_runs');
     const seeded = [];
+    const seededRuns = [];
     return {
-        async seed({ agent, project, task, what, why }) {
+        /* `runBy` files it from a run that person started, which makes it their own agent's proposal. */
+        async seed({ agent, project, task, what, why, runBy }) {
             const _id = new ObjectId();
             const now = new Date();
+            let runId = null;
+            if (runBy) {
+                runId = new ObjectId();
+                await runs.insertOne({ _id: runId, agentId: String(agent._id), startedBy: String(runBy), status: 'done', createdAt: now, updatedAt: now });
+                seededRuns.push(runId);
+            }
             await collection.insertOne({
                 _id,
                 agentId: String(agent._id),
                 agentName: agent.name,
-                runId: null,
+                runId: runId && String(runId),
                 what,
                 why,
                 changes: [{ action: 'task.comment', params: { taskId: String(task._id), body: `Looks good ${uniqueSuffix()}` }, label: 'Comment on the task', reversible: true }],
@@ -52,6 +61,7 @@ async function openProposals(state) {
         },
         async close() {
             if (seeded.length) await collection.deleteMany({ _id: { $in: seeded } });
+            if (seededRuns.length) await runs.deleteMany({ _id: { $in: seededRuns } });
             await client.close();
         },
     };

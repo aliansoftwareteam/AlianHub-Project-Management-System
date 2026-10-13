@@ -104,6 +104,12 @@ describe('the numbers on the line are the linked screens\' own', () => {
         expect(home.team).toBe(4);
     });
 
+    it('the team\'s proposals the Waiting on you card also lists are not said as waiting on the person', async () => {
+        serverCounts = { approval: 1, approvalOwn: 0, approvalTeam: 1, approvals: 0, proposals: 1, primary: 0 };
+        expect((await openHome({ waiting: 1 })).next).toEqual({ kind: NEXT.CLEAR, count: 0 });
+        expect((await openHome({ waiting: 3 })).next).toEqual({ kind: NEXT.WAITING, count: 2 });
+    });
+
     it('overdue and today: the rows My work lists under those headings', async () => {
         serverTasks = [task('late-1', day(-3)), task('late-2', day(-1)), task('now', day(0)), task('later', day(4))];
         const home = await openHome();

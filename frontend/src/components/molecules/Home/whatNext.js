@@ -56,7 +56,8 @@ export function useWhatNext({ work, waiting, empty, canCreateProject, canOpenInb
         const groups = work.groups.value;
         return whatNext({
             approvals: approvals.value,
-            waiting: unref(waiting),
+            // The Waiting on you card lists the team's proposals too; those are the quieter link, not a step.
+            waiting: Math.max(0, (Number(unref(waiting)) || 0) - team.value),
             overdue: groups.overdue.length,
             today: groups.today.length,
             empty: unref(empty),
