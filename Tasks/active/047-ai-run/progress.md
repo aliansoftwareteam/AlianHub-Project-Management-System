@@ -95,7 +95,8 @@ Every merged slice below is still behind its flag. `MCP_OAUTH` and the three `MC
 - [x] AI-1 measured again: 15 delegations and 3 reserves, three runs each, on build 852: 15 of 15 by the 2-of-3 rule, reserves 0 of 3 (`ai-1-run-2-results.md`)
 - [ ] The one-week trial on one project
 - [ ] The newcomer tests run again, on the "connect, then say it" path
-- [ ] The scorecard's AI row and newcomer row filled
+- [x] The scorecard's AI row filled: 15 of 15 delegations pass (runs 1 and 2, `scorecard.md`)
+- [ ] The scorecard's newcomer row filled (AP-500, S-6)
 
 **Throughout**
 - [x] S-3 Batch 1 (#1407, inside build 767): 51 keys reworded. The baseline went from 132 to 81
