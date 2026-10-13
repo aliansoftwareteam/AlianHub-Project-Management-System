@@ -61,7 +61,7 @@ const projectFields = ({ approvedBrief, assumptions, guide }) => {
     if (text(approvedBrief).trim()) Object.assign(fields, briefDescription({ approvedBrief, assumptions }));
     if (Array.isArray(assumptions) && assumptions.length) fields.aiAssumptions = assumptions.map((a) => (typeof a === 'string' ? { point: null, text: a } : { point: a && a.point ? String(a.point) : null, text: text(a && a.text) })).filter((a) => a.text);
     const stored = normaliseGuide(guide);
-    if (stored) fields.aiGuide = stored;
+    if (stored) fields.aiGuide = text(guide.markdown).trim() ? { ...stored, markdown: text(guide.markdown) } : stored;
     return fields;
 };
 
@@ -167,10 +167,10 @@ const queueRuns = async ({ companyId, uid, projectId, pairs, agents }) => {
 
 /* Everything after the tasks exist. Never throws: the project is already
  * created, and a failure here must not roll it back. */
-const start = async ({ companyId, uid, projectId, projectName, pairs, agents, withGuide, approvedBrief, assumptions }) => {
+const start = async ({ companyId, uid, projectId, projectName, pairs, agents, withGuide, withGuideAgent = true, approvedBrief, assumptions }) => {
     const out = { guideAgentId: null, runsQueued: 0, runsRefused: [] };
     if (withGuide) require('../Knowledge/ingest/events').publishGuideSaved(companyId, projectId);
-    if (withGuide) {
+    if (withGuide && withGuideAgent) {
         try {
             const agent = await createGuideAgent({ companyId, projectId, projectName, ownerId: uid });
             out.guideAgentId = String(agent._id);

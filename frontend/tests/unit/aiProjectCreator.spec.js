@@ -71,8 +71,9 @@ class FakeEventSource {
     close() {}
 }
 
-function routes({ clarify, briefResponse = brief, planResponse = plan, guideResponse = guide, execute } = {}) {
+function routes({ clarify, briefResponse = brief, planResponse = plan, guideResponse = guide, execute, executeFails } = {}) {
     apiRequest.mockImplementation((method, url, body) => {
+        if (url === env.AI_PROJECT_EXECUTE && executeFails) return Promise.reject(executeFails);
         if (url === env.AI_PROJECT_CLARIFY) return Promise.resolve({ data: { status: true, data: clarify(body) } });
         if (url === env.AI_PROJECT_BRIEF) return ok({ brief: briefResponse, coverage: allMet });
         if (url === env.AI_PROJECT_PLAN) return Promise.resolve({ data: { status: true, plan: planResponse, planId: 'plan-1' } });
@@ -105,6 +106,13 @@ async function reachPreview(wrapper) {
     await wrapper.find('[data-test="generate-plan"]').trigger('click');
     await flushPromises();
 }
+
+const picksOn = (wrapper) => wrapper.findAll('[data-test="plan-card"] [data-test="intent-pick"]').map((box) => box.attributes('data-pick'));
+const cardLine = (wrapper, key) => wrapper.vm.planCard.lines.find((line) => line.pick === key);
+const tick = async (wrapper, key) => {
+    await wrapper.find(`[data-test="plan-card"] [data-pick="${key}"]`).trigger('change');
+    await nextTick();
+};
 
 const buttonByText = (wrapper, text) => wrapper.findAll('button').find((b) => b.text() === text);
 
@@ -216,6 +224,7 @@ describe('AiProjectCreator guided flow', () => {
         expect(wrapper.find('[data-test="plan-assumptions"]').text()).toContain('No launch date given');
 
         const guideBody = callsTo(env.AI_PROJECT_GUIDE)[0][2];
+        expect(guideBody.planId).toBe('plan-1');
         expect(guideBody.approvedBrief).toBe(brief.markdown);
         expect(guideBody.assumptions).toEqual(brief.assumptions);
         expect(wrapper.text()).toContain('Discovery');
@@ -232,8 +241,8 @@ describe('AiProjectCreator guided flow', () => {
         const wrapper = mountCreator();
         await reachPreview(wrapper);
 
-        const rows = wrapper.findAll('[data-test="plan-views"] li').map((li) => li.findAll('span').map((s) => s.text()));
-        expect(rows).toEqual([['Board by person', 'AiProject.view_kind_board'], ['Due dates', 'AiProject.view_kind_calendar']]);
+        expect(picksOn(wrapper).filter((key) => key.startsWith('views:'))).toEqual(['views:0', 'views:1']);
+        expect(cardLine(wrapper, 'views:0')).toMatchObject({ kind: 'planView', name: 'Board by person', layout: 'board' });
         expect(wrapper.find('[data-test="plan-views-notes"]').text()).toBe('Gantt — AiProject.view_reason_kind');
 
         await wrapper.find('[data-test="create-everything"]').trigger('click');
@@ -264,21 +273,24 @@ describe('AiProjectCreator guided flow', () => {
         expect(wrapper.vm.splitSummary).toEqual({ agent: 1, agentAfter: 1, person: 1 });
     });
 
-    it('executes with the approved brief, assumptions and guide, then shows the queued runs, refusals and guide link', async () => {
+    it('executes the plan it was shown by its id, then shows the queued runs, refusals and guide link', async () => {
         routes({ clarify: () => ({ coverage: allMet, round: 1, maxRounds: 2, questions: [] }) });
         const wrapper = mountCreator();
         await describeAndStart(wrapper);
         await wrapper.find('[data-test="approve-brief"]').trigger('click');
         await wrapper.find('[data-test="generate-plan"]').trigger('click');
         await flushPromises();
+        wrapper.vm.guideMarkdown = '## Stages\n1. Reworded';
 
         await wrapper.find('[data-test="create-everything"]').trigger('click');
         await flushPromises();
 
         const body = callsTo(env.AI_PROJECT_EXECUTE)[0][2];
-        expect(body.approvedBrief).toBe(brief.markdown);
-        expect(body.assumptions).toEqual(brief.assumptions);
-        expect(body.guide).toMatchObject({ stages: guide.stages, markdown: guide.markdown });
+        expect(body.planId).toBe('plan-1');
+        expect(body).not.toHaveProperty('plan');
+        expect(body).not.toHaveProperty('approvedBrief');
+        expect(body).not.toHaveProperty('guide');
+        expect(body.edits.guideMarkdown).toBe('## Stages\n1. Reworded');
         expect(wrapper.vm.step).toBe('executing');
 
         FakeEventSource.last.emit({
@@ -295,6 +307,26 @@ describe('AiProjectCreator guided flow', () => {
 
         await wrapper.find('[data-test="open-guide"]').trigger('click');
         expect(push).toHaveBeenCalledWith({ name: 'AiAgent', params: { cid: 'company-1', id: 'agent-9' } });
+    });
+
+    it('says when the plan has expired and generates it again', async () => {
+        routes({ clarify: () => ({ coverage: allMet, round: 1, maxRounds: 2, questions: [] }), executeFails: { response: { status: 410, data: { status: false } } } });
+        const wrapper = mountCreator();
+        await reachPreview(wrapper);
+        expect(wrapper.find('[data-test="generate-again"]').exists()).toBe(false);
+
+        await wrapper.find('[data-test="create-everything"]').trigger('click');
+        await flushPromises();
+        expect(wrapper.vm.step).toBe('preview');
+        expect(wrapper.text()).toContain('AiProject.plan_expired');
+
+        await wrapper.find('[data-test="generate-again"]').trigger('click');
+        await flushPromises();
+        expect(callsTo(env.AI_PROJECT_PLAN)).toHaveLength(2);
+        expect(callsTo(env.AI_PROJECT_PLAN)[1][2].approvedBrief).toBe(brief.markdown);
+        expect(wrapper.vm.step).toBe('preview');
+        expect(wrapper.find('[data-test="generate-again"]').exists()).toBe(false);
+        expect(wrapper.text()).not.toContain('AiProject.plan_expired');
     });
 
     it('emits created for the new project only when it is opened', async () => {
@@ -404,15 +436,15 @@ describe('AiProjectCreator guided flow', () => {
         const wrapper = mountCreator();
         await reachPreview(wrapper);
 
-        const rows = wrapper.findAll('[data-test="plan-rules"] li').map((li) => li.findAll('span').map((s) => s.text()));
-        expect(rows).toEqual([['Tell the creator when done', 'AiProject.rule_off'], ['Review subtask', 'AiProject.rule_off']]);
-        expect(wrapper.find('[data-test="plan-rule-sentence"]').text()).toBe(tellCreator.sentence);
+        expect(picksOn(wrapper).filter((key) => key.startsWith('rules:'))).toEqual(['rules:0', 'rules:1']);
+        expect(cardLine(wrapper, 'rules:0')).toMatchObject({ kind: 'planRule', text: tellCreator.sentence });
+        expect(cardLine(wrapper, 'rules:1')).toMatchObject({ kind: 'planRule', text: 'Review subtask' });
         expect(wrapper.findAll('[data-test="plan-rules-notes"] li')).toHaveLength(1);
         expect(wrapper.text()).not.toContain('Only these steps');
 
         await wrapper.find('[data-test="create-everything"]').trigger('click');
         await flushPromises();
-        expect(callsTo(env.AI_PROJECT_EXECUTE)[0][2].plan.rules).toEqual(planResponse.rules);
+        expect(callsTo(env.AI_PROJECT_EXECUTE)[0][2].planId).toBe('plan-1');
 
         FakeEventSource.last.emit({
             event: 'complete', projectId: 'proj-1', totals: { sprints: 1, tasks: 4 },
@@ -425,5 +457,82 @@ describe('AiProjectCreator guided flow', () => {
         expect(outcome.find('[data-test="plan-rules-hint"]').text()).toBe('AiProject.rules_turn_on');
         expect(outcome.findAll('[data-test="plan-rules-notes"] li')).toHaveLength(2);
         expect(outcome.text()).not.toContain('Only an owner');
+    });
+
+    it('shows the plan on the shared plan card, every part ticked, and sends no picks when nothing is unticked', async () => {
+        const planResponse = { ...plan, views: [{ name: 'Board by person', kind: 'board' }] };
+        routes({ clarify: () => ({ coverage: allMet, round: 1, maxRounds: 2, questions: [] }), planResponse });
+        const wrapper = mountCreator();
+        await reachPreview(wrapper);
+
+        expect(picksOn(wrapper)).toEqual(['lists:0', 'tasks:0', 'tasks:1', 'tasks:2', 'views:0', 'agents:0']);
+        expect(wrapper.findAll('[data-test="plan-card"] [data-test="intent-pick"]').every((box) => box.element.checked)).toBe(true);
+        expect(cardLine(wrapper, 'tasks:2')).toMatchObject({ kind: 'planTask', name: 'Pick the payment provider', list: 'Sprint 1' });
+        expect(wrapper.vm.planCard.needs['tasks:1']).toEqual(['lists:0']);
+
+        await wrapper.find('[data-test="create-everything"]').trigger('click');
+        await flushPromises();
+        expect(callsTo(env.AI_PROJECT_EXECUTE)[0][2].picks).toBeUndefined();
+    });
+
+    it('sends only the ticked parts, and unticking a list leaves its tasks out', async () => {
+        const planResponse = {
+            ...plan,
+            sprints: [...plan.sprints, { sprintName: 'Sprint 2', tasks: [{ TaskName: 'Launch', estimatedHours: 1, subtasks: [] }] }],
+            views: [{ name: 'Board by person', kind: 'board' }, { name: 'Due dates', kind: 'calendar' }],
+        };
+        routes({ clarify: () => ({ coverage: allMet, round: 1, maxRounds: 2, questions: [] }), planResponse });
+        const wrapper = mountCreator();
+        await reachPreview(wrapper);
+
+        await tick(wrapper, 'tasks:1');
+        await tick(wrapper, 'views:0');
+        await tick(wrapper, 'agents:0');
+        await tick(wrapper, 'lists:1');
+        expect(wrapper.vm.leftOut).toEqual(['lists:1', 'tasks:1', 'tasks:3', 'views:0', 'agents:0']);
+        expect(wrapper.find('[data-pick="tasks:3"]').element.checked).toBe(false);
+        expect(wrapper.findAll('.aipg-folder.is-left-out')).toHaveLength(1);
+        expect(wrapper.findAll('.aipg-task.is-left-out').map((li) => li.find('input').element.value)).toEqual(['Summarise the theme PR', 'Launch']);
+        expect(wrapper.find('.aipg-plan-header .aipg-helper').text()).toContain('AiProject.sprint_count');
+        expect(wrapper.vm.keptTotals).toMatchObject({ sprints: 1, tasks: 2 });
+
+        await tick(wrapper, 'tasks:1');
+        expect(wrapper.vm.leftOut).not.toContain('tasks:1');
+
+        await wrapper.find('[data-test="create-everything"]').trigger('click');
+        await flushPromises();
+        expect(callsTo(env.AI_PROJECT_EXECUTE)[0][2].picks).toEqual({ lists: [0], tasks: [0, 1, 2], views: [1], agents: [] });
+        expect(wrapper.vm.progress.totalSprints).toBe(1);
+        expect(wrapper.vm.progress.totalTasks).toBe(4);
+    });
+
+    it('will not create with every list unticked', async () => {
+        routes({ clarify: () => ({ coverage: allMet, round: 1, maxRounds: 2, questions: [] }) });
+        const wrapper = mountCreator();
+        await reachPreview(wrapper);
+
+        await tick(wrapper, 'lists:0');
+        await wrapper.find('[data-test="create-everything"]').trigger('click');
+        await flushPromises();
+        expect(callsTo(env.AI_PROJECT_EXECUTE)).toHaveLength(0);
+        expect(wrapper.vm.error).toBe('AiProject.keep_one_list');
+    });
+
+    it('shows a part the person may not make locked with the reason, unticked and never sent', async () => {
+        const rule = { name: 'Tell the creator when done', sentence: 'When a task is done, tell its creator.', trigger: 'task.status_changed', conditions: [], actions: [] };
+        const planResponse = { ...plan, rules: [rule], locked: ['rules:0', 'views:9'], lockedWhy: { 'rules:0': 'owner_admin' } };
+        routes({ clarify: () => ({ coverage: allMet, round: 1, maxRounds: 2, questions: [] }), planResponse });
+        const wrapper = mountCreator();
+        await reachPreview(wrapper);
+
+        const box = wrapper.find('[data-test="plan-card"] [data-pick="rules:0"]');
+        expect(box.element.checked).toBe(false);
+        expect(box.element.disabled).toBe(true);
+        expect(wrapper.find('[data-test="intent-pick-locked"]').text()).toBe('IntentPreview.pick_locked');
+        expect(wrapper.vm.planCard.locked).toEqual(['rules:0']);
+
+        await wrapper.find('[data-test="create-everything"]').trigger('click');
+        await flushPromises();
+        expect(callsTo(env.AI_PROJECT_EXECUTE)[0][2].picks).toMatchObject({ rules: [] });
     });
 });

@@ -9,6 +9,7 @@ jest.mock('../Modules/AICore/llmProvider', () => ({ getProvider: jest.fn(), isAn
 const { SCHEMA_TYPE } = require('../Config/schemaType');
 const llm = require('../Modules/AICore/llmProvider');
 const guideCtrl = require('../Modules/AIProjectGenerator/guideController');
+const planStash = require('../Modules/AIProjectGenerator/planStash');
 const skills = require('../Modules/Agents/skills');
 const persistence = require('../Modules/AICore/persistence');
 const memory = require('../Modules/Agents/memory');
@@ -71,21 +72,34 @@ describe('the guide shape', () => {
 describe('POST /api/v1/ai/project/guide', () => {
     const res = () => { const r = { status: jest.fn(() => r), send: jest.fn(() => r) }; return r; };
     const req = (body, over = {}) => ({ uid: 'u1', aud: ['6f0000000000000000000c01'], headers: { companyid: '6f0000000000000000000c01' }, body, ...over });
+    const planned = (approvedBrief, extra = {}) => ({ planId: planStash.rememberPlan({ uid: 'u1', companyId: '6f0000000000000000000c01', plan: null, approvedBrief, ...extra }) });
 
     it('refuses without a user, a company, or a real brief', async () => {
-        let r = res(); await guideCtrl.guide(req({ approvedBrief: 'x'.repeat(40) }, { uid: null }), r);
+        let r = res(); await guideCtrl.guide(req(planned('x'.repeat(40)), { uid: null }), r);
         expect(r.status).toHaveBeenCalledWith(401);
-        r = res(); await guideCtrl.guide(req({ approvedBrief: 'x'.repeat(40) }, { aud: ['other'] }), r);
+        r = res(); await guideCtrl.guide(req(planned('x'.repeat(40)), { aud: ['other'] }), r);
         expect(r.status).toHaveBeenCalledWith(403);
-        r = res(); await guideCtrl.guide(req({ approvedBrief: 'short' }), r);
+        r = res(); await guideCtrl.guide(req(planned('short')), r);
         expect(r.status).toHaveBeenCalledWith(400);
+    });
+
+    it('answers 410 without a stored plan, whatever brief the body carries', async () => {
+        const chat = jest.fn();
+        llm.getProvider.mockReturnValue({ chat });
+        for (const body of [{ approvedBrief: 'x'.repeat(40) }, { planId: 'f'.repeat(24), approvedBrief: 'x'.repeat(40) }]) {
+            const r = res();
+            await guideCtrl.guide(req(body), r);
+            expect(r.status).toHaveBeenCalledWith(410);
+            expect(r.send.mock.calls[0][0]).toMatchObject({ status: false, code: 'PLAN_EXPIRED' });
+        }
+        expect(chat).not.toHaveBeenCalled();
     });
 
     it('returns the normalised guide from the model', async () => {
         const chat = jest.fn(async () => ({ content: JSON.stringify(GUIDE), model: 'test-model', usage: { inputTokens: 10, outputTokens: 5 } }));
         llm.getProvider.mockReturnValue({ chat });
         const r = res();
-        await guideCtrl.guide(req({ approvedBrief: '## What and for whom\nA shop for bikes, for commuters.', assumptions: [], plan: null }), r);
+        await guideCtrl.guide(req(planned('## What and for whom\nA shop for bikes, for commuters.')), r);
         expect(r.status).not.toHaveBeenCalled();
         const body = r.send.mock.calls[0][0];
         expect(body.status).toBe(true);
@@ -98,7 +112,7 @@ describe('POST /api/v1/ai/project/guide', () => {
     it('fails cleanly when the model returns nothing usable', async () => {
         llm.getProvider.mockReturnValue({ chat: jest.fn(async () => ({ content: 'not json' })) });
         const r = res();
-        await guideCtrl.guide(req({ approvedBrief: 'x'.repeat(40) }), r);
+        await guideCtrl.guide(req(planned('x'.repeat(40))), r);
         expect(r.status).toHaveBeenCalledWith(500);
     });
 });

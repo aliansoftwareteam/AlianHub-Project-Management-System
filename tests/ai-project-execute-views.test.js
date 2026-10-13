@@ -6,7 +6,7 @@ jest.mock('../utils/commonFunctions', () => ({ removeCache: jest.fn() }));
 jest.mock('../Modules/Sprints/controller', () => ({ addSprintFun: jest.fn() }));
 jest.mock('../Modules/Tasks/helpers/helper', () => ({ HandleHistory: jest.fn(async () => null) }));
 jest.mock('../Modules/Tasks/helpers/handleNotification', () => ({ HandleBothNotification: jest.fn(async () => null) }));
-jest.mock('../Modules/createProject/controller', () => ({ checkProjectPlan: jest.fn(async () => null), removeProjectCount: jest.fn(async () => null) }));
+jest.mock('../Modules/createProject/controller', () => ({ checkProjectPlan: jest.fn(async () => ({ status: true })), removeProjectCount: jest.fn(async () => null) }));
 jest.mock('../Modules/Company/helpers/companyCurrency', () => ({ defaultCurrencyOf: jest.fn(async () => 'USD') }));
 jest.mock('../Modules/AIProjectGenerator/sseEmitter', () => ({ emit: jest.fn() }));
 jest.mock('../Modules/AIProjectGenerator/executeAgents', () => ({

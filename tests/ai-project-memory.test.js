@@ -16,6 +16,7 @@ const persistence = require('../Modules/AICore/persistence');
 const memory = require('../Modules/Agents/memory');
 const ctrl = require('../Modules/AIProjectGenerator/controller');
 const guideCtrl = require('../Modules/AIProjectGenerator/guideController');
+const planStash = require('../Modules/AIProjectGenerator/planStash');
 const executeAgents = require('../Modules/AIProjectGenerator/executeAgents');
 const orchestrator = require('../Modules/AIProjectGenerator/orchestrator');
 const { buildSystemPrompt, buildCoverageSystemPrompt, buildClarifySystemPrompt, buildBriefSystemPrompt, buildTasksSystemPrompt, _readPartial: readPartial } = require('../Modules/AIProjectGenerator/promptBuilder');
@@ -278,12 +279,14 @@ describe('the guide', () => {
     it('gets the block as its own section between the assumptions and the plan outline, reading the project rows when a projectId is given', async () => {
         mockChat.mockImplementation(async () => reply(GUIDE));
         const r = res();
-        await guideCtrl.guide(req({
+        const planId = planStash.rememberPlan({
+            uid: U,
+            companyId: C,
             approvedBrief: '## What and for whom\nA shop for bikes, for commuters.',
             assumptions: [{ point: 'constraints', text: 'No date given.' }],
             plan: { sprints: [{ sprintName: 'Week 1', tasks: [{ TaskName: 'List the bikes' }] }] },
-            projectId: P,
-        }), r);
+        });
+        await guideCtrl.guide(req({ planId, projectId: P }), r);
         expect(r.body.status).toBe(true);
         const [guideCall] = mockChat.mock.calls.map(([opts]) => opts);
         const gm = guideCall.messages[0].content;
@@ -302,7 +305,8 @@ describe('the guide', () => {
     it('answers 404 for a project the caller cannot see, before any model call', async () => {
         mockChat.mockImplementation(async () => reply(GUIDE));
         const r = res();
-        await guideCtrl.guide(req({ approvedBrief: '## What and for whom\nA shop for bikes, for commuters.', projectId: HIDDEN }), r);
+        const planId = planStash.rememberPlan({ uid: U, companyId: C, plan: null, approvedBrief: '## What and for whom\nA shop for bikes, for commuters.' });
+        await guideCtrl.guide(req({ planId, projectId: HIDDEN }), r);
         expect(r.code).toBe(404);
         expect(r.body.statusText).toBe('Project not found');
         expect(mockChat).not.toHaveBeenCalled();
@@ -320,13 +324,15 @@ describe('/execute with an approved brief', () => {
         orchestrator.executePlan.mockImplementation(async ({ companyId, uid, approvedBrief, assumptions }) => executeAgents.start({
             companyId, uid, projectId: NEW_PROJECT, projectName: 'Bike shop', pairs: [], agents: [], withGuide: false, approvedBrief, assumptions,
         }));
-        const r = res();
-        await ctrl.execute(req({
+        const planId = planStash.rememberPlan({
+            uid: U,
+            companyId: C,
             plan: validPlan(),
-            source: 'other',
             approvedBrief: APPROVED,
             assumptions: [{ point: 'team', text: 'No team named; planning for the owner alone.' }, { point: 'existing', text: 'Nothing exists yet; planning for a fresh store.' }],
-        }), r);
+        });
+        const r = res();
+        await ctrl.execute(req({ planId, source: 'other' }), r);
         expect(r.body).toMatchObject({ status: true });
         await sleep(350);
         expect(orchestrator.executePlan).toHaveBeenCalledTimes(1);
