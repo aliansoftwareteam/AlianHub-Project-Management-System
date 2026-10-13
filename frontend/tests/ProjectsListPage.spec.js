@@ -3,7 +3,8 @@ import { flushPromises, mount } from '@vue/test-utils';
 import { createStore } from 'vuex';
 import { nextTick, reactive, ref } from 'vue';
 
-const { push, replace, currentRoute, stub } = vi.hoisted(() => ({
+const { push, replace, currentRoute, stub, access } = vi.hoisted(() => ({
+    access: { create: true, ai: true },
     push: vi.fn(),
     replace: vi.fn(() => Promise.resolve()),
     currentRoute: { value: null },
@@ -15,9 +16,11 @@ vi.mock('vue-router', () => ({
     useRoute: () => currentRoute.value
 }));
 vi.mock('@/composable', () => ({
-    useCustomComposable: () => ({ checkPermission: () => true }),
+    useCustomComposable: () => ({ checkPermission: (key) => (key === 'project.project_create' ? access.create : true) }),
     useGetterFunctions: () => ({ getUser: () => ({}) })
 }));
+vi.mock('@/composable/aiAvailability', () => ({ canUseAi: () => access.ai }));
+vi.mock('@/components/molecules/AdminOnlyNote/AdminOnlyNote.vue', () => stub('AdminOnlyNote', ['what']));
 vi.mock('@/views/Projects/helper', () => ({ useProjectsHelper: () => ({ dispatchProjects: vi.fn(() => Promise.resolve()) }) }));
 vi.mock('@/views/Projects/composables/useProjectLifecycle', () => ({
     useProjectLifecycle: () => ({ archive: vi.fn(), showSpinner: ref(false), updateProject: vi.fn(), markProjectFavourite: vi.fn() })
@@ -87,5 +90,54 @@ describe('ProjectsListPage from the palette\'s "New project"', () => {
         expect(sidebar(wrapper).exists()).toBe(true);
         expect(sidebar(wrapper).props('initialName')).toBe('Ops');
         expect(replace).toHaveBeenCalledWith({ query: {} });
+    });
+});
+
+describe('ProjectsListPage header when projects already exist', () => {
+    const newProject = (wrapper) => wrapper.find('[data-test="header-new-project"]');
+    const createAi = (wrapper) => wrapper.find('[data-test="header-create-ai"]');
+    const setAccess = (create, ai) => { access.create = create; access.ai = ai; };
+
+    it('offers New project and Create with AI to a creator with AI', async () => {
+        setAccess(true, true);
+        const wrapper = mountPage();
+        await flushPromises();
+        expect(wrapper.find('.pl2__row[role="button"]').exists()).toBe(true);
+        expect(newProject(wrapper).exists()).toBe(true);
+        expect(createAi(wrapper).exists()).toBe(true);
+        expect(wrapper.findComponent({ name: 'AdminOnlyNote' }).exists()).toBe(false);
+    });
+
+    it('offers only New project when AI is off', async () => {
+        setAccess(true, false);
+        const wrapper = mountPage();
+        await flushPromises();
+        expect(newProject(wrapper).exists()).toBe(true);
+        expect(createAi(wrapper).exists()).toBe(false);
+    });
+
+    it('shows neither to a Member, and the admin-only note instead', async () => {
+        setAccess(false, true);
+        const wrapper = mountPage();
+        await flushPromises();
+        expect(newProject(wrapper).exists()).toBe(false);
+        expect(createAi(wrapper).exists()).toBe(false);
+        expect(wrapper.findComponent({ name: 'AdminOnlyNote' }).props('what')).toBe('projects');
+    });
+
+    it('opens the create sidebar from New project', async () => {
+        setAccess(true, true);
+        const wrapper = mountPage();
+        await flushPromises();
+        await newProject(wrapper).trigger('click');
+        expect(wrapper.findComponent({ name: 'CreateProjectSidebar' }).exists()).toBe(true);
+    });
+
+    it('opens the AI creator from Create with AI', async () => {
+        setAccess(true, true);
+        const wrapper = mountPage();
+        await flushPromises();
+        await createAi(wrapper).trigger('click');
+        expect(wrapper.findComponent({ name: 'AiProjectCreator' }).exists()).toBe(true);
     });
 });
