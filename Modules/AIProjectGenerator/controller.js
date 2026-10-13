@@ -22,7 +22,7 @@ const planViews = require('./planViews');
 const planDashboard = require('./planDashboard');
 const planPicks = require('./planPicks');
 const sseEmitter = require('./sseEmitter');
-const { PLAN_EXPIRED, PLAN_IN_USE, PLANS_BUSY, cacheKey, rememberPlan, hasRoomForPlan, storedPlan, storedGuide, claimPlan, releasePlan, isClaimed, forgetPlan, rememberTasksPlan, storedTasksPlan, forgetTasksPlan } = require('./planStash');
+const { PLAN_EXPIRED, PLAN_IN_USE, PLANS_BUSY, cacheKey, rememberPlan, hasRoomForPlan, storedPlan, storedGuide, claimPlan, releasePlan, keepClaimWhile, isClaimed, forgetPlan, rememberTasksPlan, storedTasksPlan, forgetTasksPlan } = require('./planStash');
 const orchestrator = require('./orchestrator');
 const clarifier = require('./clarifier');
 const memoryStore = require('../Agents/memory');
@@ -737,7 +737,8 @@ exports.execute = async (req, res) => {
             companyOwnerId: companyId,
         };
 
-        if (!claimPlan({ uid, planId })) return storedPlan({ uid, companyId, planId }) ? planInUse(res) : planExpired(res);
+        const claim = { uid, planId, token: claimPlan({ uid, planId }) };
+        if (!claim.token) return storedPlan({ uid, companyId, planId }) ? planInUse(res) : planExpired(res);
         const jobId = token();
 
         // Reply right away with the jobId; client opens SSE on /execute/events/:jobId.
@@ -746,10 +747,10 @@ exports.execute = async (req, res) => {
         // Tiny delay so the client has time to attach the SSE listener before
         // we start emitting (otherwise an instant-success run can race).
         setTimeout(() => {
-            orchestrator.executePlan({ plan, companyId, uid: String(uid), userData, jobId, approvedBrief, assumptions, guide, withGuideAgent: picked.withGuideAgent })
-                .then((out) => (out && out.ok ? forgetPlan({ uid, planId }) : releasePlan({ uid, planId })))
+            keepClaimWhile(claim, orchestrator.executePlan({ plan, companyId, uid: String(uid), userData, jobId, approvedBrief, assumptions, guide, withGuideAgent: picked.withGuideAgent }))
+                .then((out) => (out && out.ok ? forgetPlan(claim) : releasePlan(claim)))
                 .catch((e) => {
-                    releasePlan({ uid, planId });
+                    releasePlan(claim);
                     logger.error(`AIPG execute error: ${e && e.message ? e.message : e}`);
                 });
         }, 200);
@@ -1027,7 +1028,9 @@ exports.tasksExecute = async (req, res) => {
         if (!stored) return planExpired(res);
         if (stored.mode !== mode) return sendError(res, 400, 'mode does not match the generated plan');
         if (isClaimed({ uid, planId, kind: 'tasksplan' })) return planInUse(res);
-        const reCheck = tasksPlanSchemaForMode(mode).safeParse(keptTaskPlan(stored.plan, mode, req.body && req.body.keep));
+        const keep = req.body && req.body.keep;
+        if (!Array.isArray(keep)) return sendError(res, 400, 'keep must be a list of item places');
+        const reCheck = tasksPlanSchemaForMode(mode).safeParse(keptTaskPlan(stored.plan, mode, keep));
         if (!reCheck.success) return sendError(res, 400, 'Keep at least one item of the plan.');
         let plan = reCheck.data;
 
@@ -1047,15 +1050,16 @@ exports.tasksExecute = async (req, res) => {
             companyOwnerId: companyId,
         };
 
-        if (!claimPlan({ uid, planId, kind: 'tasksplan' })) return storedTasksPlan({ uid, companyId, projectId, planId }) ? planInUse(res) : planExpired(res);
+        const claim = { uid, planId, kind: 'tasksplan', token: claimPlan({ uid, planId, kind: 'tasksplan' }) };
+        if (!claim.token) return storedTasksPlan({ uid, companyId, projectId, planId }) ? planInUse(res) : planExpired(res);
         const jobId = token();
         res.send({ status: true, jobId });
 
         setTimeout(() => {
-            orchestrator.executeTasksIntoProject({ tasksPlan: plan, projectId, companyId, uid: String(uid), userData, jobId, mode, targetSprintId })
-                .then((out) => (out && out.ok ? forgetTasksPlan({ uid, planId }) : releasePlan({ uid, planId, kind: 'tasksplan' })))
+            keepClaimWhile(claim, orchestrator.executeTasksIntoProject({ tasksPlan: plan, projectId, companyId, uid: String(uid), userData, jobId, mode, targetSprintId }))
+                .then((out) => (out && out.ok ? forgetTasksPlan(claim) : releasePlan(claim)))
                 .catch((e) => {
-                    releasePlan({ uid, planId, kind: 'tasksplan' });
+                    releasePlan(claim);
                     logger.error(`AIPG tasksExecute error: ${e && e.message ? e.message : e}`);
                 });
         }, 200);
@@ -1066,18 +1070,29 @@ exports.tasksExecute = async (req, res) => {
 };
 
 /* `keep` names the items to make, by place: tasks counted across the lists in order, or lists in sprints mode.
- * No `keep` makes every item. */
+ * Links, epics and fields stay only where a kept task names them. */
 function keptTaskPlan(plan, mode, keep) {
     const copy = JSON.parse(JSON.stringify(plan));
-    if (!Array.isArray(keep)) return copy;
     const places = new Set(keep.filter((at) => Number.isInteger(at) && at >= 0));
-    if (mode === 'tasks') return { ...copy, tasks: (copy.tasks || []).filter((task, at) => places.has(at)) };
     if (mode === 'sprints') return { ...copy, sprints: (copy.sprints || []).filter((sprint, at) => places.has(at)) };
-    let flat = 0;
-    const sprints = (copy.sprints || [])
-        .map((sprint) => ({ ...sprint, tasks: (sprint.tasks || []).filter(() => places.has(flat++)) }))
-        .filter((sprint) => sprint.tasks.length);
-    return { ...copy, sprints };
+    let narrowed;
+    if (mode === 'tasks') {
+        narrowed = { ...copy, tasks: (copy.tasks || []).filter((task, at) => places.has(at)) };
+    } else {
+        let flat = 0;
+        const sprints = (copy.sprints || [])
+            .map((sprint) => ({ ...sprint, tasks: (sprint.tasks || []).filter(() => places.has(flat++)) }))
+            .filter((sprint) => sprint.tasks.length);
+        narrowed = { ...copy, sprints };
+    }
+    const tasks = mode === 'tasks' ? narrowed.tasks : narrowed.sprints.flatMap((sprint) => sprint.tasks);
+    const refs = new Set(tasks.map((task) => task.ref).filter(Boolean));
+    const epics = new Set(tasks.map((task) => task.epicRef).filter(Boolean));
+    const fields = new Set(tasks.flatMap((task) => (task.fieldValues || []).map((value) => value.fieldRef)));
+    if (Array.isArray(narrowed.links)) narrowed.links = narrowed.links.filter((link) => refs.has(link.from) && refs.has(link.to));
+    if (Array.isArray(narrowed.epics)) narrowed.epics = narrowed.epics.filter((epic) => epics.has(epic.ref));
+    if (Array.isArray(narrowed.customFields)) narrowed.customFields = narrowed.customFields.filter((field) => fields.has(field.ref));
+    return narrowed;
 }
 
 exports.events = (req, res) => sseEmitter.handleEvents(req, res);

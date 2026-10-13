@@ -59,7 +59,7 @@ export function useAiTaskGenerator() {
         try {
             const res = await apiRequest('post', `${env.AI_PROJECT_TASKS_BASE}/${projectId}/tasks/execute`, {
                 planId,
-                keep: Array.isArray(keep) ? keep : undefined,
+                keep: Array.isArray(keep) ? keep : [],
                 userName: userName || '',
                 mode: mode || 'full',
                 targetSprintId: targetSprintId || '',

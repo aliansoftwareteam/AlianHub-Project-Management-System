@@ -119,12 +119,57 @@ describe('tasks/execute makes the plan tasks/plan stored', () => {
         expect(made()).toMatchObject({ projectId: OPEN, companyId: C, mode: 'full' });
     });
 
-    it('makes every item when nothing is unticked, and refuses when nothing is kept', async () => {
-        await execute({ planId: stash() });
-        expect(made().tasksPlan.sprints.flatMap((s) => s.tasks)).toHaveLength(3);
-        const none = await execute({ planId: stash(), keep: [] });
-        expect(none.code).toBe(400);
+    it('refuses when nothing is kept, or keep is not a list', async () => {
+        for (const keep of [[], undefined, null, { 0: true }, '0,1', [99, -1, 1.5]]) {
+            const out = await execute({ planId: stash(), keep });
+            expect(out.code).toBe(400);
+        }
+        expect(orchestrator.executeTasksIntoProject).not.toHaveBeenCalled();
+    });
+
+    it('makes a kept task once however often it is named', async () => {
+        await execute({ planId: stash(), keep: [2, 2, 0, 0, 7] });
+        expect(names(made().tasksPlan)).toEqual([['Week 1', ['One']], ['Week 2', ['Three']]]);
+    });
+
+    it('carries links, epics and fields only for the kept tasks', async () => {
+        const plan = {
+            sprints: [{ sprintName: 'Week 1', tasks: [
+                { ...task('One'), ref: 't1', epicRef: 'e1', fieldValues: [{ fieldRef: 'f1', value: 'x' }] },
+                { ...task('Two'), ref: 't2', epicRef: 'e2', fieldValues: [{ fieldRef: 'f2', value: 'y' }] },
+                { ...task('Three'), ref: 't3' },
+            ] }],
+            links: [{ from: 't1', to: 't3', type: 'blocks' }, { from: 't1', to: 't2', type: 'blocks' }],
+            epics: [{ ref: 'e1', name: 'Kept' }, { ref: 'e2', name: 'Dropped' }],
+            customFields: [{ ref: 'f1', title: 'Kept', type: 'text' }, { ref: 'f2', title: 'Dropped', type: 'text' }],
+        };
+        await execute({ planId: stash({ plan }), keep: [0, 2] });
+        expect(made().tasksPlan.links).toEqual([{ from: 't1', to: 't3', type: 'blocks' }]);
+        expect(made().tasksPlan.epics.map((e) => e.ref)).toEqual(['e1']);
+        expect(made().tasksPlan.customFields.map((f) => f.ref)).toEqual(['f1']);
+    });
+
+    it('starts exactly one run when two calls for the same plan race', async () => {
+        const planId = stash();
+        const calls = [res(), res()];
+        await Promise.all(calls.map((out) => ctrl.tasksExecute(req(OPEN, { mode: 'full', planId, keep: [0] }), out)));
+        await sleep(250);
+        expect(calls.map((out) => out.code).sort()).toEqual([200, 409]);
         expect(orchestrator.executeTasksIntoProject).toHaveBeenCalledTimes(1);
+    });
+
+    it('keeps a lapsed run from freeing the plan another run has since claimed', async () => {
+        let finishA;
+        orchestrator.executeTasksIntoProject.mockImplementationOnce(() => new Promise((resolve) => { finishA = resolve; }));
+        orchestrator.executeTasksIntoProject.mockImplementationOnce(() => new Promise(() => {}));
+        const planId = stash();
+        expect((await execute({ planId, keep: [0] })).body.status).toBe(true);
+        myCache.del(planStash.cacheKey('tasksplanclaim', GUEST, planId));
+        expect((await execute({ planId, keep: [0] })).body.status).toBe(true);
+        finishA({ ok: true });
+        await sleep(10);
+        expect(planStash.storedTasksPlan({ uid: GUEST, companyId: C, projectId: OPEN, planId })).toBeTruthy();
+        expect((await execute({ planId, keep: [0] })).code).toBe(409);
     });
 
     it.each([
@@ -134,7 +179,7 @@ describe('tasks/execute makes the plan tasks/plan stored', () => {
         ['a planId from another company', () => planStash.rememberTasksPlan({ uid: GUEST, companyId: '6f0000000000000000000c02', projectId: OPEN, mode: 'full', plan: FULL })],
         ['a planId for another project', () => stash({ projectId: OTHER_PROJECT })],
     ])('answers 410 for %s and makes nothing', async (_, planIdOf) => {
-        const out = await execute({ planId: planIdOf(), plan: FULL });
+        const out = await execute({ planId: planIdOf(), keep: [0], plan: FULL });
         expect(out.code).toBe(410);
         expect(out.body).toEqual({ status: false, statusText: 'This plan has expired. Generate it again.', code: 'PLAN_EXPIRED' });
         expect(orchestrator.executeTasksIntoProject).not.toHaveBeenCalled();
@@ -142,8 +187,8 @@ describe('tasks/execute makes the plan tasks/plan stored', () => {
 
     it('uses a plan once: a second call after it was made answers 410', async () => {
         const planId = stash();
-        expect((await execute({ planId })).body.status).toBe(true);
-        expect((await execute({ planId })).code).toBe(410);
+        expect((await execute({ planId, keep: [0] })).body.status).toBe(true);
+        expect((await execute({ planId, keep: [0] })).code).toBe(410);
         expect(orchestrator.executeTasksIntoProject).toHaveBeenCalledTimes(1);
     });
 
@@ -151,18 +196,18 @@ describe('tasks/execute makes the plan tasks/plan stored', () => {
         let finish;
         orchestrator.executeTasksIntoProject.mockImplementationOnce(() => new Promise((resolve) => { finish = resolve; }));
         const planId = stash();
-        expect((await execute({ planId })).body.status).toBe(true);
-        const second = await execute({ planId });
+        expect((await execute({ planId, keep: [0] })).body.status).toBe(true);
+        const second = await execute({ planId, keep: [0] });
         expect(second.code).toBe(409);
         expect(second.body.code).toBe('PLAN_IN_USE');
         finish({ ok: false, error: 'rolled back' });
         await sleep(10);
-        expect((await execute({ planId })).body.status).toBe(true);
+        expect((await execute({ planId, keep: [0] })).body.status).toBe(true);
         expect(orchestrator.executeTasksIntoProject).toHaveBeenCalledTimes(2);
     });
 
     it('refuses a mode other than the one the plan was generated for', async () => {
-        const out = await execute({ planId: stash(), mode: 'sprints' });
+        const out = await execute({ planId: stash(), mode: 'sprints', keep: [0] });
         expect(out.code).toBe(400);
         expect(orchestrator.executeTasksIntoProject).not.toHaveBeenCalled();
     });

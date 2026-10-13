@@ -227,6 +227,50 @@ describe('/execute builds the plan /plan proposed', () => {
         expect(orchestrator.executePlan).toHaveBeenCalledTimes(2);
     });
 
+    it('keeps a lapsed build from freeing or using up the plan another build has since claimed', async () => {
+        let finishA;
+        orchestrator.executePlan.mockImplementationOnce(() => new Promise((resolve) => { finishA = resolve; }));
+        orchestrator.executePlan.mockImplementationOnce(() => new Promise(() => {}));
+        const planId = planStash.rememberPlan({ uid: OWNER, companyId: C, plan: storedPlan() });
+        expect((await execute({ planId, source: 'other' })).body.status).toBe(true);
+        myCache.del(planStash.cacheKey('planclaim', OWNER, planId));
+        expect((await execute({ planId, source: 'other' })).body.status).toBe(true);
+        finishA({ ok: true });
+        await sleep(10);
+        expect(planStash.storedPlan({ uid: OWNER, companyId: C, planId })).toBeTruthy();
+        expect(planStash.isClaimed({ uid: OWNER, planId })).toBe(true);
+        expect((await execute({ planId, source: 'other' })).code).toBe(409);
+    });
+
+    it('releases a claim only for the token that holds it', () => {
+        const planId = planStash.rememberPlan({ uid: OWNER, companyId: C, plan: storedPlan() });
+        const token = planStash.claimPlan({ uid: OWNER, planId });
+        expect(planStash.claimPlan({ uid: OWNER, planId })).toBeNull();
+        expect(planStash.releasePlan({ uid: OWNER, planId, token: 'f'.repeat(24) })).toBe(false);
+        expect(planStash.releasePlan({ uid: OWNER, planId })).toBe(false);
+        expect(planStash.forgetPlan({ uid: OWNER, planId, token: 'f'.repeat(24) })).toBe(false);
+        expect(planStash.forgetPlan({ uid: OWNER, planId })).toBe(false);
+        expect(planStash.isClaimed({ uid: OWNER, planId })).toBe(true);
+        expect(planStash.releasePlan({ uid: OWNER, planId, token })).toBe(true);
+        expect(planStash.isClaimed({ uid: OWNER, planId })).toBe(false);
+    });
+
+    it('renews the claim while the build runs, and stops when it settles', async () => {
+        const planId = planStash.rememberPlan({ uid: OWNER, companyId: C, plan: storedPlan() });
+        const claim = { uid: OWNER, planId, token: planStash.claimPlan({ uid: OWNER, planId }) };
+        const key = planStash.cacheKey('planclaim', OWNER, planId);
+        myCache.ttl(key, 1);
+        let finish;
+        const running = planStash.keepClaimWhile(claim, new Promise((resolve) => { finish = resolve; }), { every: 20 });
+        await sleep(60);
+        expect(myCache.getTtl(key) - Date.now()).toBeGreaterThan(60 * 1000);
+        finish('done');
+        expect(await running).toBe('done');
+        myCache.ttl(key, 1);
+        await sleep(60);
+        expect(myCache.getTtl(key) - Date.now()).toBeLessThanOrEqual(1000);
+    });
+
     it('frees the plan when the build throws', async () => {
         orchestrator.executePlan.mockRejectedValueOnce(new Error('boom'));
         const planId = planStash.rememberPlan({ uid: OWNER, companyId: C, plan: storedPlan() });
@@ -237,7 +281,7 @@ describe('/execute builds the plan /plan proposed', () => {
 
     it('never pushes out a plan being built, and refuses a new plan when every kept plan is being built', async () => {
         const ids = [1, 2, 3].map(() => planStash.rememberPlan({ uid: OWNER, companyId: C, plan: storedPlan() }));
-        planStash.claimPlan({ uid: OWNER, planId: ids[0] });
+        const token = planStash.claimPlan({ uid: OWNER, planId: ids[0] });
         const fourth = planStash.rememberPlan({ uid: OWNER, companyId: C, plan: storedPlan() });
         expect(ids.map((planId) => Boolean(planStash.storedPlan({ uid: OWNER, companyId: C, planId })))).toEqual([true, false, true]);
         planStash.claimPlan({ uid: OWNER, planId: ids[2] });
@@ -250,7 +294,7 @@ describe('/execute builds the plan /plan proposed', () => {
         expect(r.body.code).toBe('PLANS_BUSY');
         expect(mockChat).not.toHaveBeenCalled();
 
-        planStash.releasePlan({ uid: OWNER, planId: ids[0] });
+        planStash.releasePlan({ uid: OWNER, planId: ids[0], token });
         expect(planStash.rememberPlan({ uid: OWNER, companyId: C, plan: storedPlan() })).toEqual(expect.any(String));
         expect(planStash.storedPlan({ uid: OWNER, companyId: C, planId: ids[0] })).toBeNull();
     });
