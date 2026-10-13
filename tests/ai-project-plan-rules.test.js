@@ -66,6 +66,7 @@ const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 const res = () => { const r = { code: 200, body: null }; r.status = (c) => { r.code = c; return r; }; r.send = (b) => { r.body = b; return r; }; return r; };
 const req = (body) => ({ headers: { companyid: C }, aud: [C], body, uid: U });
 const shapeOf = ({ name, trigger, conditions = [], actions: steps }) => ({ name, trigger, conditions, actions: steps });
+const keptOf = (rule) => ({ ...shapeOf(rule), sentence: expect.stringMatching(/^When .+\.$/) });
 
 let mem;
 const flag = process.env.MCP_TOOLS_WORK;
@@ -136,8 +137,33 @@ describe('trimming the rules', () => {
 
     it('keeps each rule as the draft automation.create takes, never switched on and never reacting to automations', () => {
         const { kept } = planAutomations.trimRules([{ ...TELL_CREATOR, enabled: true, reactToAutomation: true, projectId: P, junk: 1 }], project);
-        expect(kept).toEqual([shapeOf(TELL_CREATOR)]);
+        expect(kept).toEqual([keptOf(TELL_CREATOR)]);
         expect(planAutomations.trimRules(kept, project).kept).toEqual(kept);
+    });
+
+    it('carries the sentence of the rule that will be made, for the person to read before approving', () => {
+        const { kept } = planAutomations.trimRules([TELL_CREATOR, OVERDUE_HIGH], project);
+        expect(kept[0].sentence).toBe('When a task status changes to done, send "Finished." to the task creator.');
+        expect(kept[1].sentence).toMatch(/^When .*HIGH/i);
+    });
+
+    it('holds a starter automation to 1 to 3 steps, as the prompt says', () => {
+        const step = { action: 'add_comment', config: { body: 'x' } };
+        const { kept, dropped } = planAutomations.trimRules([
+            { name: 'None', trigger: 'task.created', actions: [] },
+            { name: 'Four', trigger: 'task.created', actions: [step, step, step, step] },
+            { name: 'Three', trigger: 'task.created', actions: [step, step, step] },
+        ], project);
+        expect(kept.map((rule) => rule.name)).toEqual(['Three']);
+        expect(dropped.map(({ name, code }) => [name, code])).toEqual([['None', 'steps'], ['Four', 'steps']]);
+    });
+
+    it('caps a dropped reason, so a long model value cannot fail the plan\'s final validation', () => {
+        const long = 'x'.repeat(2500);
+        const { dropped } = planAutomations.trimRules([{ name: 'Long', trigger: 'task.status_changed', conditions: [{ field: 'statusRef', op: 'changedTo', value: long }], actions: [{ action: 'add_comment', config: { body: 'x' } }] }], project);
+        expect(dropped).toHaveLength(1);
+        expect(dropped[0].reason.length).toBeLessThanOrEqual(300);
+        expect(PlanSchema.safeParse({ ...validPlan(), rulesDropped: dropped }).success).toBe(true);
     });
 
     it('reads anything that is not a list as no rules', () => {
@@ -157,6 +183,7 @@ describe('trimming the rules', () => {
 
 describe('/plan and /execute', () => {
     it('sends the kept rules and what was left out, with why', async () => {
+        permissionGuard.getRoleType.mockResolvedValue(ROLE_OWNER);
         const bad = { name: 'Email the client', trigger: 'task.created', actions: [{ action: 'send_email', config: {} }] };
         mockChat.mockResolvedValue({ content: JSON.stringify({ needsClarification: false, plan: validPlan([TELL_CREATOR, bad]) }), inputTokens: 1, outputTokens: 1, totalTokens: 2, model: 'fake-1' });
         const r = res();
@@ -164,8 +191,28 @@ describe('/plan and /execute', () => {
         expect(r.body).toMatchObject({ status: true });
         await sleep(350);
         const complete = sseEmitter.emit.mock.calls.map(([, payload]) => payload).find((payload) => payload.event === 'complete');
-        expect(complete.plan.rules).toEqual([shapeOf(TELL_CREATOR)]);
+        expect(complete.plan.rules).toEqual([keptOf(TELL_CREATOR)]);
         expect(complete.plan.rulesDropped).toEqual([{ name: 'Email the client', reason: expect.stringContaining('Only these steps'), code: 'step' }]);
+    });
+
+    it('drops every rule with code admin at /plan for a person who may not manage automations', async () => {
+        permissionGuard.getRoleType.mockResolvedValue(ROLE_MEMBER);
+        mockChat.mockResolvedValue({ content: JSON.stringify({ needsClarification: false, plan: validPlan([TELL_CREATOR, REVIEW_SUBTASK]) }), inputTokens: 1, outputTokens: 1, totalTokens: 2, model: 'fake-1' });
+        await ctrl.plan(req({ description: 'A shop for bikes; tell whoever opened a task when it is done.' }), res());
+        await sleep(350);
+        const complete = sseEmitter.emit.mock.calls.map(([, payload]) => payload).find((payload) => payload.event === 'complete');
+        expect(complete.plan.rules).toEqual([]);
+        expect(complete.plan.rulesDropped.map(({ name, code }) => [name, code])).toEqual([['Tell the creator when done', 'admin'], ['Add a review subtask', 'admin']]);
+    });
+
+    it('still sends the plan when a rule carries a 2500-character value', async () => {
+        permissionGuard.getRoleType.mockResolvedValue(ROLE_OWNER);
+        const long = { name: 'Long', trigger: 'task.status_changed', conditions: [{ field: 'statusRef', op: 'changedTo', value: 'y'.repeat(2500) }], actions: [{ action: 'add_comment', config: { body: 'x' } }] };
+        mockChat.mockResolvedValue({ content: JSON.stringify({ needsClarification: false, plan: validPlan([long]) }), inputTokens: 1, outputTokens: 1, totalTokens: 2, model: 'fake-1' });
+        await ctrl.plan(req({ description: 'A shop for bikes with a very long rule.' }), res());
+        await sleep(350);
+        const complete = sseEmitter.emit.mock.calls.map(([, payload]) => payload).find((payload) => payload.event === 'complete');
+        expect(complete.plan.rulesDropped).toEqual([{ name: 'Long', reason: expect.any(String), code: 'fit' }]);
     });
 
     it('trims the rules again at /execute, whatever the client sends back', async () => {
@@ -193,7 +240,7 @@ describe('making the rules', () => {
         expect(given).toMatchObject({ companyId: C, projectId: P, approvedBy: U, who: { uid: U }, asked: { actor: { kind: 'human', userId: U }, depth: 0 } });
         expect(given.plan).toEqual({ rules: [TELL_CREATOR, REVIEW_SUBTASK].map(({ name, ...rule }) => ({ conditions: [], ...rule })) });
         expect(out).toEqual({
-            made: [{ name: 'Tell the creator when done', ruleId: 'r1' }],
+            made: [{ name: 'Tell the creator when done', sentence: expect.stringMatching(/^When /), ruleId: 'r1' }],
             notMade: [{ name: 'Add a review subtask', reason: 'The automation was not saved.', code: 'other' }],
         });
     });

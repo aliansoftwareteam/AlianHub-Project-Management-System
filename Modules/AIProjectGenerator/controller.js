@@ -270,7 +270,7 @@ async function generatePlanForJob({ jobId, uid, companyId, description, addition
         }
 
         if (plan && typeof plan === 'object') {
-            const trimmed = planAutomations.trimRules(plan.rules, plan.project);
+            const trimmed = await planAutomations.trimRulesFor({ companyId, uid, given: plan.rules, project: plan.project });
             plan.rules = trimmed.kept;
             plan.rulesDropped = trimmed.dropped;
         }

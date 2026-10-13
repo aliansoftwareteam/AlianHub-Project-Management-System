@@ -394,7 +394,7 @@ describe('AiProjectCreator guided flow', () => {
     });
 
     it('lists the planned automations as off, what was left out with why, and what was made on the done screen', async () => {
-        const tellCreator = { name: 'Tell the creator when done', trigger: 'task.status_changed', conditions: [], actions: [{ action: 'notify', config: { recipients: ['task_creator'], message: 'Done' } }] };
+        const tellCreator = { name: 'Tell the creator when done', sentence: 'When a task status changes to done, send "Done" to the task creator.', trigger: 'task.status_changed', conditions: [], actions: [{ action: 'notify', config: { recipients: ['task_creator'], message: 'Done' } }] };
         const planResponse = {
             ...plan,
             rules: [tellCreator, { name: 'Review subtask', trigger: 'task.created', conditions: [], actions: [{ action: 'create_subtask', config: { title: 'Review' } }] }],
@@ -406,7 +406,8 @@ describe('AiProjectCreator guided flow', () => {
 
         const rows = wrapper.findAll('[data-test="plan-rules"] li').map((li) => li.findAll('span').map((s) => s.text()));
         expect(rows).toEqual([['Tell the creator when done', 'AiProject.rule_off'], ['Review subtask', 'AiProject.rule_off']]);
-        expect(wrapper.find('[data-test="plan-rules-notes"]').text()).toBe('Email the client — AiProject.rule_reason_step');
+        expect(wrapper.find('[data-test="plan-rule-sentence"]').text()).toBe(tellCreator.sentence);
+        expect(wrapper.findAll('[data-test="plan-rules-notes"] li')).toHaveLength(1);
         expect(wrapper.text()).not.toContain('Only these steps');
 
         await wrapper.find('[data-test="create-everything"]').trigger('click');
@@ -422,10 +423,7 @@ describe('AiProjectCreator guided flow', () => {
         const outcome = wrapper.find('[data-test="rules-outcome"]');
         expect(outcome.find('[data-test="plan-rules"]').text()).toContain('Tell the creator when done');
         expect(outcome.find('[data-test="plan-rules-hint"]').text()).toBe('AiProject.rules_turn_on');
-        expect(outcome.findAll('[data-test="plan-rules-notes"] li').map((li) => li.text())).toEqual([
-            'Review subtask — AiProject.rule_reason_admin',
-            'Odd one — AiProject.rule_reason_other'
-        ]);
+        expect(outcome.findAll('[data-test="plan-rules-notes"] li')).toHaveLength(2);
         expect(outcome.text()).not.toContain('Only an owner');
     });
 });

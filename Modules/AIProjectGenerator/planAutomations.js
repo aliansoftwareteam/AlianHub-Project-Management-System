@@ -5,11 +5,14 @@ const projectSetup = require('../Agents/projectSetup');
 const planWork = require('../Agents/planWork');
 const rules = require('../Agents/automationRequests');
 const { checkDraft } = require('../Automations/helpers/aiDraftCheck');
+const { describeRule } = require('../Automations/helpers/sentenceRules');
 const { whoOf } = require('../Agents/taskRequests');
 
 const RULES_MAX = 3;
+const STEPS_MAX = 3;
 const RULES_READ = 20;
 const NAME_MAX = 80;
+const TEXT_MAX = 300;
 const PLANNED = 'planned-project';
 const OFF = 'is switched off on this server';
 
@@ -18,7 +21,7 @@ const objectOf = (value) => (value && typeof value === 'object' && !Array.isArra
 const nameOf = (value) => (typeof value === 'string' ? value.replace(/\s+/g, ' ').trim().slice(0, NAME_MAX) : '');
 const statusRows = (project) => listOf(objectOf(project).taskStatusData).map(objectOf).filter((row) => typeof row.name === 'string' && row.name.trim());
 
-/* Statuses here are the plan's own, since the project does not exist yet; no person is named, so a rule may only point at roles such as the task's creator. */
+/* The project does not exist yet, so the plan's own statuses stand in, and no person can be named: only roles such as the task's creator. */
 const plannedRefs = (project) => {
     const statuses = statusRows(project);
     return {
@@ -35,27 +38,44 @@ const draftCode = (message) => {
     return 'fit';
 };
 
-const problemOf = (rule, project) => {
+const checkedOf = (rule, project) => {
+    if (!rule.actions.length || rule.actions.length > STEPS_MAX) return { problem: { code: 'steps', message: `a starter automation has 1 to ${STEPS_MAX} steps` } };
     const wrong = rules.draftProblem(rule);
-    if (wrong) return { code: draftCode(wrong), message: wrong };
+    if (wrong) return { problem: { code: draftCode(wrong), message: wrong } };
     const checked = checkDraft({ trigger: rule.trigger, project: PLANNED, conditions: rule.conditions, actions: rule.actions }, plannedRefs(project));
-    return checked.rule ? null : { code: 'fit', message: checked.rejected.join(' ') };
+    if (!checked.rule) return { problem: { code: 'fit', message: checked.rejected.join(' ') } };
+    return { sentence: describeRule(checked.rule, { people: [] }).slice(0, TEXT_MAX) };
 };
 
-/* The rules a plan may ask for: catalogue triggers and steps only, each one a rule the plan's own statuses can hold, at most three; one that fails is dropped with the reason. */
+const note = (name, { code, message }, extra = {}) => ({ name, reason: String(message || '').slice(0, TEXT_MAX), code, ...extra });
+
+/* Catalogue triggers and steps only, each a rule the plan's own statuses can hold; `sentence` is what will be made, for the person to read before approving. */
 const trimRules = (given, project) => {
     const kept = [];
     const dropped = [];
     for (const entry of listOf(given).slice(0, RULES_READ)) {
         const name = nameOf(objectOf(entry).name);
         const rule = { name, ...planWork.ruleOf(entry) };
-        const problem = !name ? { code: 'name_missing', message: 'a rule needs a name' }
-            : kept.length >= RULES_MAX ? { code: 'too_many', message: `a plan holds at most ${RULES_MAX} rules` }
-                : problemOf(rule, project);
-        if (problem) dropped.push({ name, reason: problem.message, code: problem.code });
-        else kept.push(rule);
+        if (!name) dropped.push(note(name, { code: 'name_missing', message: 'a rule needs a name' }));
+        else if (kept.length >= RULES_MAX) dropped.push(note(name, { code: 'too_many', message: `a plan holds at most ${RULES_MAX} rules` }, { max: RULES_MAX }));
+        else {
+            const { problem, sentence } = checkedOf(rule, project);
+            if (problem) dropped.push(note(name, problem));
+            else kept.push({ ...rule, sentence });
+        }
     }
     return { kept, dropped };
+};
+
+const adminRefusal = { code: 'admin', message: rules.REFUSED.filer };
+
+/* As trimRules, and a person who may not manage automations is told now rather than shown rules that would never be made. */
+const trimRulesFor = async ({ companyId, uid, given, project }) => {
+    const trimmed = trimRules(given, project);
+    if (!trimmed.kept.length) return trimmed;
+    const may = await rules.mayManage(companyId, uid).catch(() => false);
+    if (may) return trimmed;
+    return { kept: [], dropped: [...trimmed.kept.map((rule) => note(rule.name, adminRefusal)), ...trimmed.dropped] };
 };
 
 const refusalCode = (error) => {
@@ -66,15 +86,15 @@ const refusalCode = (error) => {
     return 'other';
 };
 
-const failed = (rule, reason) => ({ name: rule.name, reason, code: refusalCode(reason) });
+const failed = (rule, reason) => ({ name: rule.name, reason: String(reason || '').slice(0, TEXT_MAX), code: refusalCode(reason) });
 
-/* The rules made, switched off, in a project that exists, as the person who ran the generator and through the same
- * path an approved project.setup plan takes; nothing here throws, so a rule that fails never undoes the project. */
+/* Made switched off, as the person who ran the generator, by the path an approved project.setup plan takes. Never throws, so a rule that fails cannot undo the project. */
 const makeRules = async ({ companyId, uid, projectId, plan }) => {
-    const { kept } = trimRules(objectOf(plan).rules, objectOf(plan).project);
-    if (!kept.length) return { made: [], notMade: [] };
     const person = { kind: 'human', userId: String(uid) };
+    let kept = [];
     try {
+        kept = trimRules(objectOf(plan).rules, objectOf(plan).project).kept;
+        if (!kept.length) return { made: [], notMade: [] };
         const parts = await projectSetup.carryOut({
             companyId, who: whoOf(person), approvedBy: String(uid), projectId,
             plan: { rules: kept.map(planWork.ruleOf) }, asked: { actor: person, depth: 0, within: {} },
@@ -83,7 +103,7 @@ const makeRules = async ({ companyId, uid, projectId, plan }) => {
         if (part.error) return { made: [], notMade: kept.map((rule) => failed(rule, part.error)) };
         const items = kept.map((rule, at) => objectOf(listOf(part.items)[at]));
         return {
-            made: kept.flatMap((rule, at) => (items[at].made ? [{ name: rule.name, ruleId: String(items[at].ruleId || '') }] : [])),
+            made: kept.flatMap((rule, at) => (items[at].made ? [{ name: rule.name, sentence: rule.sentence, ruleId: String(items[at].ruleId || '') }] : [])),
             notMade: kept.flatMap((rule, at) => (items[at].made ? [] : [failed(rule, items[at].error)])),
         };
     } catch (error) {
@@ -92,4 +112,4 @@ const makeRules = async ({ companyId, uid, projectId, plan }) => {
     }
 };
 
-module.exports = { RULES_MAX, trimRules, makeRules, refusalCode };
+module.exports = { RULES_MAX, STEPS_MAX, trimRules, trimRulesFor, makeRules, refusalCode };

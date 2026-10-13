@@ -187,6 +187,7 @@ const PlanRuleNoteSchema = z.object({
     name: z.string().max(200).optional().default(''),
     reason: z.string().max(2000).optional().default(''),
     code: z.string().max(40).optional().default('other'),
+    max: z.number().int().optional(),
 });
 
 const SprintSchema = z.object({
