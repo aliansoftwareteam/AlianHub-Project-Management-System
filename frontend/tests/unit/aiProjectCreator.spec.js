@@ -222,6 +222,38 @@ describe('AiProjectCreator guided flow', () => {
         expect(wrapper.text()).toContain('Payment provider');
     });
 
+    it('lists the planned views by name and kind, what was left out with why, and the views made on the done screen', async () => {
+        const planResponse = {
+            ...plan,
+            views: [{ name: 'Board by person', kind: 'board', look: { groupBy: 'assignee' } }, { name: 'Due dates', kind: 'calendar' }],
+            viewsDropped: [{ name: 'Gantt', reason: 'needs a kind: one of list, board, table, calendar, workload', code: 'kind' }]
+        };
+        routes({ clarify: () => ({ coverage: allMet, round: 1, maxRounds: 2, questions: [] }), planResponse });
+        const wrapper = mountCreator();
+        await reachPreview(wrapper);
+
+        const rows = wrapper.findAll('[data-test="plan-views"] li').map((li) => li.findAll('span').map((s) => s.text()));
+        expect(rows).toEqual([['Board by person', 'AiProject.view_kind_board'], ['Due dates', 'AiProject.view_kind_calendar']]);
+        expect(wrapper.find('[data-test="plan-views-notes"]').text()).toBe('Gantt — AiProject.view_reason_kind');
+
+        await wrapper.find('[data-test="create-everything"]').trigger('click');
+        await flushPromises();
+        FakeEventSource.last.emit({
+            event: 'complete', projectId: 'proj-1', totals: { sprints: 1, tasks: 4 },
+            views: { made: [{ name: 'Board by person', kind: 'board' }], notMade: [{ name: 'Due dates', reason: 'permission_denied: ProjectRequiredComponent is not granted', code: 'permission' }, { name: 'Odd one', reason: 'something new', code: 'unheard_of' }] }
+        });
+        await flushPromises();
+
+        const outcome = wrapper.find('[data-test="outcome"]');
+        expect(outcome.find('[data-test="plan-views"]').text()).toContain('Board by person');
+        expect(outcome.findAll('[data-test="plan-views-notes"] li').map((li) => li.text())).toEqual([
+            'Due dates — AiProject.view_reason_permission',
+            'Odd one — AiProject.view_reason_other'
+        ]);
+        expect(outcome.text()).not.toContain('permission_denied');
+        expect(outcome.text()).not.toContain('AiProject.runs_queued');
+    });
+
     it('counts the split itself when the server sends labels but no totals', async () => {
         routes({ clarify: () => ({ coverage: allMet, round: 1, maxRounds: 2, questions: [] }), planResponse: { ...plan, splitSummary: undefined } });
         const wrapper = mountCreator();
