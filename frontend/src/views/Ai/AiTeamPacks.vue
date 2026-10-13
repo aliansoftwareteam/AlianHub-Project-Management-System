@@ -66,7 +66,7 @@
                                     <input v-model="withStarterRules" class="ah-check" type="checkbox" data-test="tp-starter-rules" />
                                     <span class="tp-row__name">{{ $t('TeamPacks.starter_rules') }}</span>
                                 </label>
-                                <span class="ah-field__hint" data-test="tp-starter-rules-hint">{{ $t('TeamPacks.starter_rules_hint', { n: starterRuleCount }, starterRuleCount) }}</span>
+                                <span class="ah-field__hint" data-test="tp-starter-rules-hint">{{ $t('TeamPacks.starter_rules_hint', { n: starterRuleCount }, starterRuleCount) }}<template v-if="hasTypeRule"> {{ $t('TeamPacks.starter_rules_type_hint') }}</template></span>
                             </div>
                             <p v-if="tagNames.length" class="ah-small tp-muted" data-test="tp-tags-hint">{{ $t('TeamPacks.tags_hint', { names: tagNames.join(', ') }) }}</p>
                             <p v-if="fieldNames.length" class="ah-small tp-muted" data-test="tp-fields-hint">{{ $t('TeamPacks.fields_hint', { names: fieldNames.join(', ') }) }}</p>
@@ -175,6 +175,7 @@ const atCap = computed(() => projectIds.value.length >= MAX_PROJECTS);
 const teamsOfPack = computed(() => (packs.value.find((pack) => pack.blueprint === blueprint.value) || { teams: [] }).teams);
 const roleCount = computed(() => teamsOfPack.value.filter((team) => teams.value.includes(team.team)).reduce((sum, team) => sum + team.roles.length, 0));
 const chosenRoles = computed(() => teamsOfPack.value.filter((team) => teams.value.includes(team.team)).flatMap((team) => team.roles));
+const hasTypeRule = computed(() => chosenRoles.value.some((role) => (role.starterRules || []).some((rule) => rule.kind === "type")));
 const starterRuleCount = computed(() => chosenRoles.value.reduce((sum, role) => sum + (role.starterRules || []).length, 0));
 const tagNames = computed(() => {
     const names = chosenRoles.value.flatMap((role) => role.tags || []);
@@ -198,12 +199,12 @@ const agentLine = computed(() => {
 });
 const projectName = (id) => (projects.value.find((p) => p.id === String(id)) || {}).name || id;
 
-const tagCount = computed(() => (result.value?.projects || []).reduce((sum, project) => sum + (project.tags || []).length + (project.fields || []).length, 0));
+const proposedCount = computed(() => (result.value?.projects || []).reduce((sum, project) => sum + (project.tags || []).length + (project.fields || []).length, 0));
 
 const resultHead = computed(() => {
     if (undone.value) return t("TeamPacks.undone");
     if (addedCount.value) return t("TeamPacks.applied", { n: addedCount.value }, addedCount.value);
-    return ruleCount.value || tagCount.value ? t("TeamPacks.roles_were_on") : t("TeamPacks.nothing_new");
+    return ruleCount.value || proposedCount.value ? t("TeamPacks.roles_were_on") : t("TeamPacks.nothing_new");
 });
 
 const roleName = computed(() => roleNamesOf(packs.value.flatMap((pack) => pack.teams.flatMap((team) => team.roles))));

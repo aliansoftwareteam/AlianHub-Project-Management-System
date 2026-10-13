@@ -936,7 +936,7 @@ describe('a pack brings what its playbooks need', () => {
         const res = await call('POST', PACKS, { body: plant(project) });
         expect(res.statusCode).toBe(200);
         const [row] = res.body.data.projects;
-        expect(row.fields).toEqual(['Revision', 'Quantity checked', 'Quantity failed', 'Source', 'Customer', 'Quantity', 'Requested date', 'Terms']);
+        expect(row.fields).toEqual(['Revision', 'Quantity checked', 'Quantity failed', 'Source', 'Customer', 'Quantity', 'Requested date', 'Delivery address', 'Terms']);
         expect(fieldProposals()).toHaveLength(1);
         const [proposal] = fieldProposals();
         expect(String(proposal._id)).toBe(row.fieldProposalId);
@@ -990,6 +990,60 @@ describe('a pack brings what its playbooks need', () => {
         const kept = await call('POST', PACKS, { body: { undo: true, ...plant(decided), applyId: second.body.data.applyId } });
         expect(kept.body.data.projects[0]).toMatchObject({ fieldsWithdrawn: false, fieldsKept: true });
         expect(proposal.status).toBe('approved');
+    });
+
+    it('does not ask again for fields a person declined or edited out in the last 30 days, but does after an undo withdrew them', async () => {
+        seedRules(GRANTS);
+        process.env.MCP_TOOLS_WORK = 'on';
+        const maintenance = (project) => plant(project, { only: ['manufacturing/maintenance-planner'], teams: ['maintenance'] });
+        const declined = seedProject();
+        const first = (await call('POST', PACKS, { body: maintenance(declined) })).body.data.projects[0];
+        Object.assign(fieldProposals().find((row) => String(row._id) === first.fieldProposalId), { status: 'declined', decidedBy: OWNER, decidedAt: new Date() });
+        expect((await call('POST', PACKS, { body: maintenance(declined) })).body.data.projects[0].fields).toEqual([]);
+
+        const old = seedProject();
+        const stale = (await call('POST', PACKS, { body: maintenance(old) })).body.data.projects[0];
+        Object.assign(fieldProposals().find((row) => String(row._id) === stale.fieldProposalId), { status: 'declined', decidedBy: OWNER, decidedAt: new Date(Date.now() - 31 * 24 * 60 * 60 * 1000) });
+        expect((await call('POST', PACKS, { body: maintenance(old) })).body.data.projects[0].fields).toEqual(stale.fields);
+
+        const edited = seedProject();
+        const filed = (await call('POST', PACKS, { body: maintenance(edited) })).body.data.projects[0];
+        const row = fieldProposals().find((one) => String(one._id) === filed.fieldProposalId);
+        Object.assign(row, { status: 'edited', decidedBy: OWNER, decidedAt: new Date() });
+        row.changes[0].params.definitions = row.changes[0].params.definitions.filter((field) => field.name !== 'Window');
+        seedField(edited, 'Machine');
+        seedField(edited, 'Machine hours');
+        seedField(edited, 'Duration hours');
+        expect((await call('POST', PACKS, { body: maintenance(edited) })).body.data.projects[0].fields).toEqual([]);
+
+        const withdrawn = seedProject();
+        const applied = await call('POST', PACKS, { body: maintenance(withdrawn) });
+        await call('POST', PACKS, { body: { undo: true, ...maintenance(withdrawn), applyId: applied.body.data.applyId } });
+        expect((await call('POST', PACKS, { body: maintenance(withdrawn) })).body.data.projects[0].fields).toEqual(applied.body.data.projects[0].fields);
+    });
+
+    it('counts an approval still being applied as kept on undo, and records a withdrawal in the undo log', async () => {
+        seedRules(GRANTS);
+        process.env.MCP_TOOLS_WORK = 'on';
+        const applying = seedProject();
+        const first = await call('POST', PACKS, { body: plant(applying) });
+        fieldProposals()[0].status = 'applying';
+        const kept = await call('POST', PACKS, { body: { undo: true, ...plant(applying), applyId: first.body.data.applyId } });
+        expect(kept.body.data.projects[0]).toMatchObject({ fieldsWithdrawn: false, fieldsKept: true });
+
+        const waiting = seedProject();
+        const second = await call('POST', PACKS, { body: plant(waiting) });
+        recordAudit.mockClear();
+        await call('POST', PACKS, { body: { undo: true, ...plant(waiting), applyId: second.body.data.applyId } });
+        expect(audited()[0].meta.projects).toEqual([expect.objectContaining({ projectId: String(waiting._id), fieldsWithdrawn: true })]);
+    });
+
+    it('reports a tag fallback only for a rule it adds', async () => {
+        seedRules(GRANTS);
+        const project = seedProject({ taskTypeCounts: ONLY_TASK, tagsArray: [{ uid: 't9', tagName: 'bug' }] });
+        mockDb.seed(SCHEMA_TYPE.ASSIGNMENT_RULES, { projectId: String(project._id), entries: [], dispatcher: { mode: 'suggest', roles: [], rules: [{ role: TRIAGER, when: { tags: ['t9'] } }] } });
+        const [row] = (await call('POST', PACKS, { body: engineeringBody(project) })).body.data.projects;
+        expect(row.rulesOnTag).toEqual([]);
     });
 
     it('leaves another company\'s field approval alone', async () => {

@@ -69,6 +69,7 @@ exports.applyPack = async (req, res) => {
                     rules: project.rules.length,
                     ...(undone ? {} : { tags: project.tags }),
                     ...(!undone && project.fields.length ? { fields: project.fields } : {}),
+                    ...(undone && project.fieldsWithdrawn ? { fieldsWithdrawn: true } : {}),
                     ...(modeChanged(project) ? { mode: project.mode } : {}),
                 })),
                 agents: { [undone ? 'removed' : 'created']: agentsChanged.map((agent) => agent.agentId), kept: result.agents.kept.map((agent) => agent.agentId), ...(undone ? { narrowed: result.agents.narrowed.map((agent) => agent.agentId) } : { widened: result.agents.widened.map((agent) => agent.agentId) }) },

@@ -8,7 +8,7 @@ tools: [queue.list, queue.claim, queue.release, task.get, tasks.search, comments
 hands_to: [production-planner, customer-update-writer]
 gates: [customer service confirms the order before it goes to planning]
 tags: [order-to-confirm, ready-for-planning]
-fields: [Customer:text, Part:text, Revision:text, Quantity:number, Requested date:date, Terms:text]
+fields: [Customer:text, Part:text, Revision:text, Quantity:number, Requested date:date, Delivery address:textarea, Terms:text]
 ---
 
 # Order Intake (Manufacturing, Sales and orders)

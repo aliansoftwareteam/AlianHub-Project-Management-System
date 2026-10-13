@@ -83,7 +83,7 @@ describe('the role playbook loader', () => {
         expect(() => parsed('[Part:text(A|B)]')).toThrow('only a dropdown field lists options');
         expect(() => parsed(`[${'x'.repeat(81)}:text]`)).toThrow('is longer than 80 characters');
         expect(() => parsed('[Part:text, part:number]')).toThrow('fields names a field twice');
-        expect(() => parsed(`[${Array.from({ length: 7 }, (_, i) => `F${i}:text`).join(', ')}]`)).toThrow(`fields may list at most ${rolePlaybooks.MAX_FIELDS} fields`);
+        expect(() => parsed(`[${Array.from({ length: 9 }, (_, i) => `F${i}:text`).join(', ')}]`)).toThrow(`fields may list at most ${rolePlaybooks.MAX_FIELDS} fields`);
     });
 
     it('offers only field types the field form makes', () => {

@@ -19,6 +19,8 @@ const FIELD_ACTION = 'fields.create';
 const KEPT_APPLIES = 20;
 const ROUTING_ON = 'suggest';
 const DECIDED = Object.freeze(['approved', 'edited']);
+const DECIDED_OR_APPLYING = Object.freeze(['applying', ...DECIDED]);
+const DECLINE_MEMORY_MS = 30 * 24 * 60 * 60 * 1000;
 const MANAGE_REFUSAL = 'Only an Owner or an Admin can create or remove agents. Leave the team\'s agents out to turn on its roles.';
 
 const packs = () => {
@@ -127,7 +129,8 @@ const starterRulesFor = (roleKeys, project, held) => {
                 return;
             }
             const rule = { id: new mongoose.Types.ObjectId().toString(), ...cleanRule({ role: key, when }) };
-            if (![...held, ...made].some((one) => sameRule(one, rule))) made.push(rule);
+            if ([...held, ...made].some((one) => sameRule(one, rule))) return;
+            made.push(rule);
             if (fallback) onTag.push(fallback);
         });
     });
@@ -191,8 +194,31 @@ const pendingFieldNames = async (companyId, projectId) => {
     const rows = await MongoDbCrudOpration(companyId, {
         type: SCHEMA_TYPE.AGENT_PROPOSALS, data: [{ projectId: { $in: idForms([projectId]) }, agentId: PACK_AGENT._id, status: 'pending' }, { _id: 1, changes: 1 }],
     }, 'find');
-    return new Set((rows || []).flatMap((row) => (row.changes || []).filter((change) => change.action === FIELD_ACTION))
-        .flatMap((change) => ((change.params || {}).definitions || []).map((field) => lower(field && field.name))));
+    return new Set((rows || []).flatMap((row) => fieldNamesOf(row.changes)));
+};
+
+const fieldNamesOf = (changes) => (changes || []).filter((change) => change.action === FIELD_ACTION)
+    .flatMap((change) => ((change.params || {}).definitions || []).map((field) => lower(field && field.name)));
+
+/* A person who turned a field down is not asked again for a month: declined, or edited out of an approval, whose
+ * stored changes keep only what ran, so what was proposed is read from the apply that filed it. A withdrawal by an undo is no answer. */
+const declinedFieldNames = async (companyId, projectId) => {
+    const rows = await MongoDbCrudOpration(companyId, {
+        type: SCHEMA_TYPE.AGENT_PROPOSALS,
+        data: [{
+            projectId: { $in: idForms([projectId]) }, agentId: PACK_AGENT._id, status: { $in: ['declined', 'edited'] },
+            decidedBy: { $ne: require('../../Agents/proposals').SYSTEM_DECIDER }, decidedAt: { $gte: new Date(Date.now() - DECLINE_MEMORY_MS) },
+        }, { _id: 1, status: 1, changes: 1 }],
+    }, 'find');
+    if (!(rows || []).length) return new Set();
+    const row = plain(await MongoDbCrudOpration(companyId, { type: SCHEMA_TYPE.ASSIGNMENT_RULES, data: [rowFilter(projectId), { teamPacks: 1 }] }, 'findOne'));
+    const proposedBy = new Map(((row && row.teamPacks) || []).map(plain).filter((entry) => entry && entry.fieldProposalId)
+        .map((entry) => [String(entry.fieldProposalId), (entry.fieldNames || []).map(lower)]));
+    return new Set(rows.flatMap((one) => {
+        const ran = fieldNamesOf(one.changes);
+        if (one.status === 'declined') return ran;
+        return (proposedBy.get(String(one._id)) || []).filter((name) => !ran.includes(name));
+    }));
 };
 
 /* Like the tags, every field a project lacks waits in one approval, and a field the project has by name is never asked for. */
@@ -201,7 +227,8 @@ async function fieldProposalFor(companyId, projectId, fields, blueprint) {
     const setup = require('../../Agents/setupRequests');
     const held = new Set((await setup.fieldsOfProject(companyId, projectId)).map((field) => lower(field.fieldTitle || '')));
     const waiting = await pendingFieldNames(companyId, projectId);
-    const fresh = fields.filter((field) => !held.has(lower(field.name)) && !waiting.has(lower(field.name)));
+    const declined = await declinedFieldNames(companyId, projectId);
+    const fresh = fields.filter((field) => ![held, waiting, declined].some((names) => names.has(lower(field.name))));
     if (!fresh.length) return null;
     const proposals = require('../../Agents/proposals');
     const changes = [];
@@ -226,7 +253,7 @@ async function fieldProposalFor(companyId, projectId, fields, blueprint) {
 }
 
 const decidedProposal = async (companyId, projectId, proposalId) => OBJECT_ID.test(String(proposalId || '')) && Boolean(await MongoDbCrudOpration(companyId, {
-    type: SCHEMA_TYPE.AGENT_PROPOSALS, data: [{ _id: new mongoose.Types.ObjectId(proposalId), projectId: { $in: idForms([projectId]) }, agentId: PACK_AGENT._id, status: { $in: DECIDED } }, { _id: 1 }],
+    type: SCHEMA_TYPE.AGENT_PROPOSALS, data: [{ _id: new mongoose.Types.ObjectId(proposalId), projectId: { $in: idForms([projectId]) }, agentId: PACK_AGENT._id, status: { $in: DECIDED_OR_APPLYING } }, { _id: 1 }],
 }, 'findOne'));
 
 async function withdrawProposal(companyId, projectId, proposalId) {
@@ -336,6 +363,7 @@ async function recordApply(companyId, { blueprint, projectIds, plans, agents, ac
             rules: plan.body ? plan.rules : [],
             proposalId: plan.proposalId || null,
             fieldProposalId: plan.fieldProposalId || null,
+            fieldNames: plan.fieldProposalId ? plan.fieldProposal.names : [],
             modeWas: plan.modeWas,
             waitingRules: plan.waitingRules.map((rule) => ({ ...rule, proposalId: rule.proposalId || plan.proposalId })).filter((rule) => rule.proposalId),
         };

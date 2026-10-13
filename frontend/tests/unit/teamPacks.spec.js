@@ -138,6 +138,7 @@ describe('Team packs', () => {
         const box = wrapper.find('[data-test="tp-starter-rules"]');
         expect(box.element.checked).toBe(true);
         expect(wrapper.find('[data-test="tp-starter-rules-hint"]').text()).toContain('One starter rule');
+        expect(wrapper.find('[data-test="tp-starter-rules-hint"]').text()).toContain('routes on the role\'s tag of the same name instead.');
         expect(wrapper.find('[data-test="tp-tags-hint"]').text()).toContain('bug, needs-triage');
         expect(wrapper.find('[data-test="tp-fields-hint"]').text()).toContain('Area, Severity');
         await box.setValue(false);

@@ -13380,6 +13380,7 @@ export default {
         "roles_were_on": "The roles were already on.",
         "starter_rules": "Also add the roles' starter routing rules",
         "starter_rules_hint": "One starter rule, by task type, tag or priority. It is never added twice, and undo removes only the rules this pack added. | {n} starter rules, by task type, tag or priority. A rule is never added twice, and undo removes only the rules this pack added.",
+        "starter_rules_type_hint": "A rule by task type that a project lacks routes on the role's tag of the same name instead.",
         "tags_hint": "These roles hand work on with the tags {names}. The tags a project lacks are proposed to you as one approval per project; nothing is created until you approve.",
         "rules_added": "Added one routing rule. | Added {n} routing rules.",
         "rules_waiting": "One starter rule waits for a tag or task type this project lacks. | {n} starter rules wait for a tag or task type this project lacks.",
