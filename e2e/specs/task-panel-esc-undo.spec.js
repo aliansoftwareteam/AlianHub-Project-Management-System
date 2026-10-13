@@ -25,7 +25,7 @@ test.describe('task panel: Esc and undo', () => {
     test('Esc with the assignee picker open closes the picker and keeps the panel', async ({ page, state, loginAs }) => {
         const { dialog } = await openFreshTask({ page, state, loginAs });
         await dialog.locator('.ah-detail__props').getByRole('button', { name: /^(Assignee|Add User)$/ }).first().click();
-        const picker = page.getByRole('dialog', { name: 'List Of User' });
+        const picker = page.getByRole('dialog', { name: 'Choose people' });
         await expect(picker).toBeVisible();
 
         await page.keyboard.press('Escape');

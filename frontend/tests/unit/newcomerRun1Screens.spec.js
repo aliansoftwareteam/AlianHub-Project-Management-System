@@ -123,4 +123,17 @@ describe('the assignee in the task panel', () => {
         await wrapper.setProps({ showName: false });
         expect(wrapper.find('[data-test="assignee-name"]').exists()).toBe(false);
     });
+
+    it('opens the picker, titled "Choose people", from the same add button with the name shown', async () => {
+        const { default: Assignee } = await import('@/components/molecules/Assignee/Assignee.vue');
+        const store = createStore({ modules: { settings: { namespaced: true, getters: { companyUsers: () => [] } } } });
+        const wrapper = mount(Assignee, {
+            props: { users: ['u1'], showName: true, showAddUser: true, addUser: true, options: [] },
+            global: { plugins: [i18n, store], stubs: { UserProfile: true, DropDown: true, DropDownOption: true, Sidebar: { name: 'Sidebar', props: ['title', 'visible'], template: '<div class="picker" :data-open="visible">{{ title }}</div>' } } }
+        });
+        expect(wrapper.find('.picker').attributes('data-open')).toBe('false');
+        await wrapper.find('button.assignee__add-btn').trigger('click');
+        expect(wrapper.find('.picker').attributes('data-open')).toBe('true');
+        expect(wrapper.find('.picker').text()).toBe('Projects.choose_people');
+    });
 });
