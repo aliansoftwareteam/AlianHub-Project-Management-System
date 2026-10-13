@@ -24,6 +24,7 @@
                 :width="imageWidth"
                 :thumbnail="'30x30'"
             />
+            <span v-if="showName && detailedUsers.length === 1" class="assignee__name" data-test="assignee-name">{{ detailedUsers[0].title }}</span>
 
             <DropDown :id="'Assignee_'+makeUniqueId(6)" mode="listbox" v-if="detailedUsers.length > numOfUsers">
                 <template #button>
@@ -77,7 +78,7 @@
 
         <Sidebar
             themed
-            :title="$t('Projects.list_of_user')"
+            :title="$t('Projects.choose_people')"
             :value="detailedUsers.map((x) => ({value: x.id, label: x.title ,id: x.id, image: x.image, isOnline: x.isOnline,designation:x.designation}))"
             v-model:visible="visible"
             :options="detailedOptions"
@@ -130,6 +131,10 @@ const emit = defineEmits(["selected", "removed", "agent"])
 
 // PROPS
 const props = defineProps({
+    showName: {
+        type: Boolean,
+        default: false
+    },
     numOfUsers: {
         type: Number,
         default: 4
@@ -358,6 +363,7 @@ function openSidebar () {
 
 </script>
 <style>
+.assignee__name { margin-left: var(--sp-4, 8px); min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--ink); font: 400 var(--row-font, 12.5px) var(--font-ui); }
 .share__with-assignee .profile-image{
     font-size: 8px !important;
 }

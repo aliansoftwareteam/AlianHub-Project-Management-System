@@ -368,9 +368,9 @@ describe('the legacy pickers follow the theme', () => {
     });
 
     test.each([
-        ['components/molecules/Assignee/Assignee.vue', "$t('Projects.list_of_user')"],
+        ['components/molecules/Assignee/Assignee.vue', "$t('Projects.choose_people')"],
         ['components/molecules/PriorityCompo/PriorityComp.vue', "$t('Permissions.select_priorities')"],
-        ['views/Projects/components/ProjectSidebars.vue', "$t('Projects.list_of_user')"],
+        ['views/Projects/components/ProjectSidebars.vue', "$t('Projects.choose_people')"],
         ['components/organisms/CreateChannelSidebar/CreateChannelSidebar.vue', "$t('Channel.create_channel')"]
     ])('%s opens its picker themed', (rel, title) => {
         const tags = template(rel).split('<Sidebar').slice(1).map((rest) => rest.split(/\/>|<template/)[0]);

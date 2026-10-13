@@ -4,6 +4,7 @@ import { reactive } from 'vue';
 import { readFileSync } from 'fs';
 import { resolve } from 'path';
 import moment from 'moment';
+import { createStore } from 'vuex';
 
 const toast = vi.hoisted(() => ({ success: vi.fn(), error: vi.fn() }));
 const state = vi.hoisted(() => ({ list: null }));
@@ -51,11 +52,22 @@ function makeList(tasks = tasksOf(), over = {}) {
     };
 }
 
-const mountPage = async (list = makeList()) => {
+const detailStore = () => createStore({
+    modules: {
+        projectData: {
+            namespaced: true,
+            state: () => ({ taskDetailData: {} }),
+            getters: { gettaskDetailData: (s) => s.taskDetailData },
+            mutations: { setTaskDetailData: (s, payload) => { s.taskDetailData = payload; } }
+        }
+    }
+});
+
+const mountPage = async (list = makeList(), store = detailStore()) => {
     state.list = list;
     const wrapper = mount(PersonalList, {
         attachTo: document.body,
-        global: { stubs: { ShellIcon: true }, components: { RouterLink: { props: ['to'], template: '<a class="rl"><slot /></a>' } } }
+        global: { plugins: [store], stubs: { ShellIcon: true }, components: { RouterLink: { props: ['to'], template: '<a class="rl"><slot /></a>' } } }
     });
     await flushPromises();
     return wrapper;
@@ -395,5 +407,27 @@ describe('PersonalList panels', () => {
         expect(wrapper.find('.create-project').exists()).toBe(true);
         await wrapper.get('.create-project').trigger('click');
         expect(wrapper.find('.create-project').exists()).toBe(false);
+    });
+});
+
+describe('a change made in the open task\'s panel', () => {
+    it('shows on its row at once, not only when the panel closes', async () => {
+        const store = detailStore();
+        const wrapper = await mountPage(makeList(), store);
+        expect(wrapper.html()).toContain('personal__mono--danger');
+        const friday = moment().add(5, 'days').startOf('day').toISOString();
+        store.commit('projectData/setTaskDetailData', { fullDocument: { _id: 't3', DueDate: friday }, updatedFields: { DueDate: friday } });
+        await flushPromises();
+        expect(wrapper.html()).not.toContain('personal__mono--danger');
+        wrapper.unmount();
+    });
+
+    it('leaves the rows alone for another task, or for a subtask of the open one', async () => {
+        const { withDetailChange } = await import('@/views/PersonalList/followDetail');
+        const rows = tasksOf();
+        expect(withDetailChange(rows, { fullDocument: { _id: 'elsewhere', DueDate: 'x' } })).toBe(rows);
+        expect(withDetailChange(rows, { fullDocument: { _id: 't1', DueDate: 'x' }, isSubTaskUpdate: true })).toBe(rows);
+        expect(withDetailChange(rows, {})).toBe(rows);
+        expect(withDetailChange(rows, { fullDocument: { _id: 't1', DueDate: 'x' } })[0].DueDate).toBe('x');
     });
 });

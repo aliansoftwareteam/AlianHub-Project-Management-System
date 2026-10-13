@@ -25,6 +25,7 @@
                         v-if="checkPermission('task.task_assignee',project?.isGlobalPermission) === true && checkPermission('task.task_list',project?.isGlobalPermission) == true"
                         class="taskdetail-label task-detail-right-wrapper ml-5px"
                         :numOfUsers="2"
+                        showName
                         :users="task.AssigneeUserId"
                         :addUser="checkPermission('task.task_assignee',project?.isGlobalPermission) === true"
                         :options="permittedOptions"
@@ -43,6 +44,7 @@
                         v-else
                         class="taskdetail-label task-detail-right-wrapper ml-5px"
                         :numOfUsers="2"
+                        showName
                         :showAddUser="true"
                         @selected="updateAssignee($event, checkApps('MultipleAssignees',project) ? 'add' : 'replace')"
                         @removed="updateAssignee($event, 'remove')"

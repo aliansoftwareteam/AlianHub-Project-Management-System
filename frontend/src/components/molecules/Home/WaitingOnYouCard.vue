@@ -70,6 +70,7 @@ import { useWorkflowApprovals } from "@/views/Ai/useWorkflowApprovals";
 import { canDecide as canDecideApproval } from "@/views/Ai/workflowApprovals";
 import { useAgentAccess } from "@/views/Ai/agentAccess";
 import { proposalTitle } from "@/views/Ai/plainLabels";
+import { plainReason } from "@/views/Ai/auditWords";
 import { findingReasons } from "@/views/Projects/ProjectDetail/findingText";
 
 defineOptions({ name: "WaitingOnYouCard" });
@@ -80,7 +81,7 @@ const GATE_OWNER_ADMIN = "owner_admin";
 
 const router = useRouter();
 const store = useStore();
-const { t } = useI18n();
+const { t, te } = useI18n();
 const $toast = useToast();
 const companyId = inject("$companyId");
 const { canManage } = useAgentAccess();
@@ -98,7 +99,7 @@ const time = (value) => (value ? new Date(value).getTime() || 0 : 0);
 
 /* The server has the last word on every decision; this only keeps off the card what the AI Inbox would lock. */
 const mine = (p) => (typeof p.locked === "boolean" ? !p.locked : p.gate !== GATE_OWNER_ADMIN || canManage.value);
-const whyOf = (p) => (p.finding && findingReasons(t, p.finding).join(" · ")) || p.why || "";
+const whyOf = (p) => (p.finding && findingReasons(t, p.finding).join(" · ")) || plainReason(t, te, p.why);
 const planOf = (p) => (!p.batch && hasParts(p.changes) ? p.changes : null);
 const fromProposal = (p) => ({ kind: "proposal", id: String(p._id), what: proposalTitle(t, p) || t("Home.waiting_untitled"), who: p.agentName || "", why: whyOf(p), at: time(p.createdAt), source: p, plan: planOf(p) });
 const fromApproval = (a) => ({ kind: "approval", id: String(a._id), what: a.title || t("Workflows.approval_untitled"), who: a.run?.name || a.ownerName || "", at: time(a.createdAt || a.deadlineAt), source: a });

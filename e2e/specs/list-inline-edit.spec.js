@@ -45,7 +45,7 @@ test.describe('List rows: inline edit', () => {
         await page.goto(`/#/${state.companyId}/project/${project._id}/s/${task.sprintId}`);
 
         await row.getByRole('button', { name: 'Assignee: none, set' }).click();
-        const picker = page.getByRole('dialog', { name: 'List Of User' });
+        const picker = page.getByRole('dialog', { name: 'Choose people' });
         await picker.getByRole('option', { name: /Olivia Owner/ }).click();
 
         await expect.poll(async () => (await serverTask(owner.api, task._id)).AssigneeUserId || []).toContain(owner.uid);

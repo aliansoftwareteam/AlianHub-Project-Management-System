@@ -21,6 +21,7 @@
                     </router-link>
                 </div>
             </nav>
+            <AdminOnlyNote v-if="!canInvite" what="invite" class="st__admin-only" />
         </aside>
 
         <transition name="ah-fade">
@@ -42,6 +43,7 @@
                         </router-link>
                     </div>
                 </nav>
+                <AdminOnlyNote v-if="!canInvite" what="invite" class="st__admin-only" />
             </aside>
         </transition>
 
@@ -77,6 +79,7 @@ import { useStore } from "vuex";
 import { useI18n } from "vue-i18n";
 import { useCustomComposable } from "@/composable";
 import ShellIcon from "@/components/organisms/Shell/ShellIcon.vue";
+import AdminOnlyNote from "@/components/molecules/AdminOnlyNote/AdminOnlyNote.vue";
 import AddTeamSidebar from "@/components/molecules/AddTeamSidebar/AddTeamSidebar.vue";
 import CreateProjectSidebar from "@/components/organisms/CreateProject/CreateProjectSidebar.vue";
 import { customField } from "@/plugins/customFieldView/helper.js";
@@ -115,6 +118,8 @@ const isOwnerOrAdmin = computed(() => isOwnerOrAdminRole(companyUser.value.roleT
 
 const canCreateTeam = computed(() => checkPermission("settings.settings_create_team") === true && !!currentCompany.value?.planFeature?.team);
 const canCreateProject = computed(() => checkPermission("project.project_list") === true && checkPermission("project.project_create") === true);
+
+const canInvite = computed(() => checkPermission("settings.settings_invite_member") === true);
 
 const anyVisible = (keys) => keys.some((k) => checkPermission(k) !== null);
 const membersVisible = () => checkPermission("settings.settings_role_management") !== null
@@ -219,4 +224,5 @@ watch(narrow, (v) => { if (!v) drawer.value = false; });
 
 <style scoped>
 @import "./settingsShell.css";
+.st__admin-only { margin: var(--sp-6, 12px); }
 </style>

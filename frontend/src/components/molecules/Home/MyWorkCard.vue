@@ -43,7 +43,7 @@
             </template>
 
             <template v-if="groups.next.length">
-                <div class="hc-group"><span>{{ $t('Home.group_next') }}<span class="hc-group__count">{{ groups.next.length }}</span><template v-if="firstRun && sampleProject"> · {{ $t('Home.from_sample') }}</template></span></div>
+                <div class="hc-group" data-test="mywork-soon" tabindex="-1"><span>{{ $t('Home.group_next') }}<span class="hc-group__count">{{ groups.next.length }}</span><template v-if="firstRun && sampleProject"> · {{ $t('Home.from_sample') }}</template></span></div>
                 <TaskRow v-for="task in groups.next" :key="task._id" v-bind="rowProps(task)" @toggle="$emit('complete', task)" @open="$emit('open', task)" @timer="$emit('timer', task)" @set-date="$emit('set-date', task)" />
             </template>
 

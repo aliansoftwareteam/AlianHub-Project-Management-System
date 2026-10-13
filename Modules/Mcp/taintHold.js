@@ -10,7 +10,8 @@ const heldForApproval = (ctx, action) => {
     const rated = rating(action);
     const risky = rated ? escalations(rated) : ['has no risk rating'];
     if (!risky.length) return '';
-    return `${action} ${risky.join(', ')}; it came from an outside client (${ctx.oauth.clientId}), so it needs a person's approval`;
+    const client = (ctx.actor && ctx.actor.agentName) || ctx.oauth.clientId;
+    return `${action} ${risky.join(', ')}; it came from an outside client (${client}), so it needs a person's approval`;
 };
 
 const WAITS = 'From this app it waits for a person\'s approval in AlianHub, and changes nothing until then.';
