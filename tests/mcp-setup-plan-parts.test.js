@@ -187,7 +187,7 @@ describe('only the ticked parts are made', () => {
         const id = await filed();
         await approve(id, { 0: { lists: [0], fields: [1] } });
         const out = await undo(id);
-        expect(out.results[0].result.removed).toEqual({ views: [], fields: ['Region'], lists: ['Backlog'], statuses: [] });
+        expect(out.results[0].result.removed).toEqual({ dashboards: [], views: [], fields: ['Region'], lists: ['Backlog'], statuses: [] });
         expect(liveFields()).toEqual([]);
         expect(listNames()).not.toContain('Backlog');
     });

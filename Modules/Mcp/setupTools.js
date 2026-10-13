@@ -12,6 +12,7 @@ const copies = require('../Agents/projectDuplicate');
 const lists = require('../Agents/listSetup');
 const planWork = require('../Agents/planWork');
 const planFiling = require('../Agents/planFiling');
+const dashboards = require('../Agents/dashboardRequests');
 const { TITLE_MAX } = require('../Agents/taskRequests');
 const { DRAFT: RULE_DRAFT } = require('./automationTools');
 const { LIST_NAME_MAX } = require('../Agents/workRequests');
@@ -159,6 +160,17 @@ const PLAN_VIEW = Object.freeze({
         },
     },
     required: ['name'],
+});
+
+const PLAN_DASHBOARD = Object.freeze({
+    type: 'object',
+    additionalProperties: false,
+    properties: {
+        name: { type: 'string', minLength: 1, maxLength: dashboards.NAME_MAX },
+        cards: { type: 'array', minItems: 1, maxItems: dashboards.PLAN_CARDS_MAX, items: { type: 'string', enum: Object.keys(dashboards.CARDS) }, description: 'Each card once, in the order they go down the dashboard' },
+    },
+    required: ['name', 'cards'],
+    description: 'One dashboard for the project, owned by the person who approves the plan: shown to everyone on the project where that person can open it, otherwise private to them',
 });
 
 const PLAN_RULE = Object.freeze({ type: 'object', additionalProperties: false, properties: { ...RULE_DRAFT }, required: ['trigger', 'actions'] });
@@ -324,14 +336,15 @@ const TOOLS = [
         filedUnder: GRANT,
         target: projectTarget,
         description: 'Sets up a project that exists from one plan, in one call: '
-            + `up to ${plans.STATUSES_MAX} statuses, ${plans.LISTS_MAX} lists, ${setup.FIELDS_MAX} custom fields, ${plans.VIEWS_MAX} saved views, ${planWork.RULES_MAX} automations (rules) and ${planWork.TASKS_MAX} first tasks (tasks). Name only the parts you need. `
+            + `up to ${plans.STATUSES_MAX} statuses, ${plans.LISTS_MAX} lists, ${setup.FIELDS_MAX} custom fields, ${plans.VIEWS_MAX} saved views, one dashboard of up to ${dashboards.PLAN_CARDS_MAX} cards, ${planWork.RULES_MAX} automations (rules) and ${planWork.TASKS_MAX} first tasks (tasks). Name only the parts you need. `
             + 'A status is added before the statuses that close a task; a status the company does not have yet needs an owner or an admin to approve the plan. '
             + 'Anything the project already has by that name is kept, not made twice, so read statuses.list, lists.list and fields.list first. '
             + 'A field is written the way fields.create takes one, a rollup or a formula included, without first values. A view shows a field of this plan by its name (showFields) and a field the project already has by its id (showFieldIds). '
             + 'When one request needs more than one of these, for example a view and a rollup field, send them as one plan here, not as a call for each: the person then approves once. '
             + 'Write a rule the way automation.create takes one, without the project (read automation.catalogue first). A rule can use a status from this plan. It always starts switched off, and only an owner or an admin can ask for one and approve it. '
             + 'A first task has a name and, if wanted, a list and a status from this plan or the project, one assignee and a due day. It is made the way task.create makes a task with its details, so the plan is refused if this connection could not make that call. '
-            + 'The parts are made in this order: statuses and lists, fields, views, automations, tasks. It cannot make a project. '
+            + `A dashboard has a name and its cards, each one the dashboard editor adds with nothing more to fill in (${Object.keys(dashboards.CARDS).join(', ')}). It belongs to the person who approves the plan. `
+            + 'The parts are made in this order: statuses and lists, fields, views, the dashboard, automations, tasks. It cannot make a project. '
             + `${WAITS} The person sees the whole plan as one preview, can leave any part out, and approves it once; the answer then says, part by part, what was made, what was kept and what could not be made.`,
         input: input({
             projectId: ID,
@@ -339,6 +352,7 @@ const TOOLS = [
             lists: NAMES(plans.LISTS_MAX, LIST_NAME_MAX, 'Lists to create, by name'),
             fields: { type: 'array', minItems: 1, maxItems: setup.FIELDS_MAX, items: CREATE_FIELD },
             views: { type: 'array', minItems: 1, maxItems: plans.VIEWS_MAX, items: PLAN_VIEW },
+            dashboard: PLAN_DASHBOARD,
             rules: { type: 'array', minItems: 1, maxItems: planWork.RULES_MAX, items: PLAN_RULE, description: 'Automations to add, each made of a trigger, optional conditions and steps' },
             tasks: { type: 'array', minItems: 1, maxItems: planWork.TASKS_MAX, items: PLAN_TASK, description: 'First tasks to create' },
             ...REASON,
@@ -356,10 +370,10 @@ const TOOLS = [
         filedUnder: GRANT,
         target: () => WRITE_TARGET,
         description: 'Asks for a new project, in one call: its name, what it is for, and the plan project.setup takes, '
-            + `up to ${plans.STATUSES_MAX} statuses, ${plans.LISTS_MAX} lists, ${setup.FIELDS_MAX} custom fields and ${plans.VIEWS_MAX} saved views. Name only the parts you need; the name alone is enough. `
+            + `up to ${plans.STATUSES_MAX} statuses, ${plans.LISTS_MAX} lists, ${setup.FIELDS_MAX} custom fields, ${plans.VIEWS_MAX} saved views and one dashboard. Name only the parts you need; the name alone is enough. `
             + `It starts blank: the statuses ${projects.startingStatuses().join(', ')}, one list, and ${projects.viewKinds().join(' and ')} views. It is private, with only the person who approves it on it; they add the others afterwards. `
             + 'Use it only when the person has no project for the work: read projects.list first. It cannot make an automation or a task, and a connection limited to some projects cannot use it. '
-            + `${WAITS} The person sees the whole plan as one preview and approves it once. Undo moves the project to the trash.`,
+            + `${WAITS} The person sees the whole plan as one preview and approves it once. Undo moves the project to the trash, and its dashboard with it unless someone changed the dashboard since.`,
         input: input({
             name: { type: 'string', minLength: 1, maxLength: projects.NAME_MAX, description: `The project's name, at least ${projects.NAME_MIN} characters` },
             description: { type: 'string', maxLength: projects.DESCRIPTION_MAX, description: 'What the project is for, in a few lines' },
@@ -367,6 +381,7 @@ const TOOLS = [
             lists: NAMES(plans.LISTS_MAX, LIST_NAME_MAX, 'Lists to create, by name'),
             fields: { type: 'array', minItems: 1, maxItems: setup.FIELDS_MAX, items: FIELD },
             views: { type: 'array', minItems: 1, maxItems: plans.VIEWS_MAX, items: NEW_PROJECT_VIEW },
+            dashboard: PLAN_DASHBOARD,
             ...REASON,
         }, ['name']),
         check: (args) => projects.problemIn(args),

@@ -40,4 +40,11 @@ describe("the generator's plan card", () => {
         expect(card.lines.some((line) => line.kind === 'planAgent')).toBe(false);
         expect(chosenParts(card, ['tasks:1'])).toEqual({ lists: [0, 1], tasks: [0, 2], views: [0], rules: [] });
     });
+
+    it('shows the dashboard with its cards as one part to leave out', () => {
+        const card = cardOf({ ...plan, dashboard: { name: 'Shop at a glance', cards: ['due_soon'], cardKeys: ['DueSoonCard'] } });
+        expect(card.lines).toContainEqual({ kind: 'planDashboard', name: 'Shop at a glance', cards: ['DueSoonCard'], pick: 'dashboards:0' });
+        expect(mountCard(card).text()).toContain('Shop at a glance');
+        expect(chosenParts(card, ['dashboards:0'])).toMatchObject({ dashboards: [] });
+    });
 });

@@ -267,6 +267,12 @@ const PlanViewSchema = z.object({
     look: z.record(z.string(), z.unknown()).optional(),
 });
 
+// Loose for the same reason: ./planDashboard.js keeps the cards the picker adds as they are.
+const PlanDashboardSchema = z.object({
+    name: z.string().max(200).optional().default(''),
+    cards: z.array(z.string().max(40)).max(20).optional().default([]),
+});
+
 const PlanSchema = z.object({
     // Any shape on purpose: ./planAutomations.js keeps only catalogue rules and
     // drops the rest with a reason, so a bad rule never sends the plan back for repair.
@@ -276,6 +282,7 @@ const PlanSchema = z.object({
     // Safety cap only: 200 sprints is far beyond any honest plan.
     sprints: z.array(SprintSchema).min(1).max(200),
     views: z.array(PlanViewSchema).max(20).optional(),
+    dashboard: PlanDashboardSchema.nullable().optional(),
 }).superRefine((plan, ctx) => {
     const issue = (msg, path) => ctx.addIssue({ code: z.ZodIssueCode.custom, message: msg, path: path || [] });
 

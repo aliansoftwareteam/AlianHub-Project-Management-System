@@ -22,6 +22,7 @@ const LISTED = Object.freeze({
     lists: { max: plans.LISTS_MAX, shown: (name) => Boolean(textOf(name, NAME_MAX)) },
     fields: { max: setup.FIELDS_MAX, shown: (field) => Boolean(textOf(objectOf(field).name, setup.FIELD_NAME_MAX)) },
     views: { max: plans.VIEWS_MAX, shown: (view) => Boolean(textOf(objectOf(view).name, setup.VIEW_NAME_MAX)) },
+    dashboards: { max: plans.DASHBOARDS_MAX, shown: (dashboard) => Boolean(textOf(objectOf(dashboard).name, NAME_MAX)) },
     rules: { max: planWork.RULES_MAX, shown: () => true },
     tasks: { max: planWork.TASKS_MAX, shown: (task) => Boolean(planWork.taskOf(task).name) },
 });

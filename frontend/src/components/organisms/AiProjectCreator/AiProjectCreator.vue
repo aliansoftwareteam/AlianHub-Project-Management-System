@@ -332,6 +332,10 @@
                             :notes-title="$t('AiProject.views_dropped_title')"/>
                     </div>
 
+                    <p v-if="plan.dashboardDropped" class="aipg-helper" data-test="dashboard-dropped">
+                        {{ plan.dashboardDropped.code === 'name_missing' ? $t('AiProject.dashboard_dropped_name_missing') : $t('AiProject.dashboard_dropped_no_cards', { name: plan.dashboardDropped.name || '' }) }}
+                    </p>
+
                     <div class="aipg-folder-list">
                         <details
                             v-for="(sprint, si) in plan.sprints"
@@ -462,6 +466,9 @@
                             :notes="outcome.viewsNotMade"
                             :title="$t('AiProject.views_made_title')"
                             :notes-title="$t('AiProject.views_not_made_title')"/>
+                        <p v-if="outcome.dashboard" class="aipg-outcome-line" data-test="dashboard-outcome">
+                            {{ dashboardOutcome }}
+                        </p>
                         <button
                             v-if="outcome.guideAgentId"
                             type="button"
@@ -577,7 +584,7 @@ export default defineComponent({
         const guideLoading = ref(false);
         const guideError = ref('');
 
-        const outcome = reactive({ guideAgentId: null, runsQueued: 0, runsRefused: [], viewsMade: [], viewsNotMade: [] });
+        const outcome = reactive({ guideAgentId: null, runsQueued: 0, runsRefused: [], viewsMade: [], viewsNotMade: [], dashboard: null });
         const ruleOutcome = reactive({ made: [], notMade: [] });
 
         // True when ANY in-flight operation owns the modal — brief upload,
@@ -753,7 +760,14 @@ export default defineComponent({
         });
 
         const hasOutcome = computed(() => outcome.runsQueued > 0 || outcome.runsRefused.length > 0 || !!outcome.guideAgentId
-            || outcome.viewsMade.length > 0 || outcome.viewsNotMade.length > 0);
+            || outcome.viewsMade.length > 0 || outcome.viewsNotMade.length > 0 || Boolean(outcome.dashboard));
+
+        const dashboardOutcome = computed(() => {
+            const made = outcome.dashboard;
+            if (!made) return '';
+            if (!made.made) return t('AiProject.dashboard_not_made', { name: made.name });
+            return t(made.shared ? 'AiProject.dashboard_made_shared' : 'AiProject.dashboard_made_private', { name: made.name });
+        });
 
         // What this run cost. One wizard run can be two LLM calls — the clarify
         // round and the plan itself — so both are collected and added up;
@@ -1110,6 +1124,7 @@ export default defineComponent({
             const views = payload.views || {};
             if (Array.isArray(views.made)) outcome.viewsMade = views.made.filter(Boolean);
             if (Array.isArray(views.notMade)) outcome.viewsNotMade = views.notMade.filter(Boolean);
+            if (payload.dashboard && typeof payload.dashboard === 'object') outcome.dashboard = payload.dashboard;
         }
 
         // User's picks first, then the model's — known slugs only, mirroring the
@@ -1377,6 +1392,7 @@ export default defineComponent({
             outcome.runsRefused = [];
             outcome.viewsMade = [];
             outcome.viewsNotMade = [];
+            outcome.dashboard = null;
             emit('close');
         }
 
@@ -1394,7 +1410,7 @@ export default defineComponent({
         return {
             clientWidth, step, loading, briefUploading, error, rolledBack,
             description, isPrivateSpace, proposalId, source, skills, briefFile, briefId, briefStats,
-            plan, planId, planExpired, onGenerateAgain, editableProjectName, planCard, leftOut, keptTotals, isLeftOut, taskKey,
+            plan, planId, planExpired, onGenerateAgain, editableProjectName, planCard, dashboardOutcome, leftOut, keptTotals, isLeftOut, taskKey,
             jobId, progress, createdProjectId,
             placeholderText,
             canGenerate, hasSource, hasGeneratedPlan, hasGeneratedQuestions, totals, isBusy,
