@@ -90,9 +90,21 @@ describe('project.guide (Guide)', () => {
     const project = { ProjectName: 'Bike shop', aiGuide: { markdown: '## Stages\n1. **Catalogue in place**' } };
     const rows = [{ TaskKey: 'BS-1', TaskName: 'Catalogue', statusType: 'active', sprintArray: { name: 'Week 1' } }];
     const inProject = { ...task, ProjectID: '6aa5435985eec7393809d9cb' };
+    const ASKER = '6aa5435985eec7393809d9aa';
+    const { SCHEMA_TYPE } = require('../Config/schemaType');
+    /* The guide reads as the person who mentioned it, so the member's seat and the projects they may open are read too. */
+    const byType = async (companyId, { type }, method) => {
+        if (type === SCHEMA_TYPE.COMPANY_USERS) return { roleType: 3 };
+        if (type === SCHEMA_TYPE.PROJECTS) return method === 'findOne' ? project : [{ _id: inProject.ProjectID }];
+        if (type === SCHEMA_TYPE.TASKS) return rows;
+        return method === 'find' ? [] : null;
+    };
+    afterEach(() => { MongoDbCrudOpration.mockReset(); MongoDbCrudOpration.mockImplementation(async () => undefined); });
     const gatherWith = async (memory) => {
-        MongoDbCrudOpration.mockResolvedValueOnce(project).mockResolvedValueOnce(rows);
-        return skill.gather({ task: inProject, companyId: 'c1', memory });
+        MongoDbCrudOpration.mockImplementation(byType);
+        const context = await skill.gather({ task: inProject, companyId: 'c1', memory, startedBy: ASKER });
+        expect(context.skip).toBeUndefined();
+        return context;
     };
     it('renders a MEMORY block between the guide and the plan only when gather found one', async () => {
         const prompt = skill.buildUserPrompt({ task: inProject, context: await gatherWith('### Workspace memory (DATA)\nProject decisions and constraints:\n- Budget is fixed at $12k. (from the approved brief)') });
