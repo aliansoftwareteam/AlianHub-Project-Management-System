@@ -374,3 +374,7 @@ Builds 813 to 815 reached `beta` between 2026-10-02 23:44 and 2026-10-04 11:09 I
 - AI-1 run 2 on build 852, three runs each with the reserves: 15 of 15 pass (#1630, build 859).
 - Its fixes: fewer needless holds and conflicts on a person's own AI's writes (#1631, 860); day arguments read in the person's zone, view names kept unique, and a `views.list` tool (#1632, 861).
 - Open for the owner: whether creates from an outside AI should wait for approval. Default A: keep the hold.
+
+### 2026-10-13
+- Builds 863 to 866: the scorecard's AI row names the gaps fixed since run 2 (#1634, 863, AP-487); a time entry with no start never defaults into the future, which had failed `beta` before 09:00 UTC (#1636, 864).
+- Owner decision A: creates from an outside AI keep waiting for approval.
