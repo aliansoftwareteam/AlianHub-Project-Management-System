@@ -178,3 +178,77 @@ The three worst stops, each with the screen and the words on it:
 - Every stop is filed as a finding with the screen and the words on it, whether the line passed or not.
 - The first run spends no model budget on AlianHub's side. On path A the newcomer's own Claude plan is used.
 - Run it once on the build as it is today, and again after "Describe your project" (S-2) is built.
+
+## Run 1, 2026-10-13, AI newcomer, path B
+
+Date: 2026-10-13, 14:56 to 15:05 IST. Build: `14.36.0-beta.866` (from `/health`). Observer and newcomer: one QA agent (Claude) playing both. Path: B (skip "Connect your AI", work by hand). Tracker: AP-500.
+
+**An AI newcomer is not a real person.** The agent read the screen through page text and screenshots, never got tired or impatient, and knows other project tools. Its times are machine times, slowed by a browser tool whose screenshots lagged one step behind the page. Treat this run as a walk-through that finds walls, not as a measure of how long a person takes. Finish lines nine and ten still need real people.
+
+Set-up as found:
+- **Account.** The owner invited `s6.newcomer@example.test` and joined it through the invite link. The account's role is **Member** (My settings shows "Member · joined Oct 2026"). This matters more than anything else below: the script was written for a newcomer who owns a new workspace, and a Member cannot do tasks 3 and 10.
+- **Window.** The Browser pane is 800 px wide, which gives the phone layout (bottom bar). The run used an emulated 1280 × 860 desktop window. Task 6 also used the narrow layout for a while.
+- **Model budget.** None spent. The Ask box was opened but no question was sent.
+- **Used a project tool before:** yes (an AI agent). **Tour started by itself:** no. Instead Home shows a "Get going" checklist, 1 of 4 done ("Connect your AI", "Open My Work", "Set your notifications" ticked, "Learn the shortcuts: press ?"). "Take the tour" is under More, Tools. Not opened.
+- **Menu:** Simple, as the script expects. The rail shows Home, My work, Projects, Inbox and Ask (the five), plus **App connections**, plus New task and More. My settings says Simple is "Five places: Home, My work, Projects, Inbox and Ask. A place you open joins them", so App connections probably joined while the owner set up the account.
+- **Home on first sight.** The "What next" line says **"6 things need your approval."** with a Review button, and a "Waiting on you 6" card lists them. None is the newcomer's. They are:
+  - two from "Claude Code (app · claude.ai), for Local PM", 3 days old: create the task "NC BR-40 mounting hole burrs 10 Oct 2026" in Sweep Project W2d, and create "GitHub: each project picks its own repositories" in AlianHub Platform;
+  - three from "Code Reviewer", dated 4 Sep: post pull-request reviews on SPWC-15;
+  - one from "Daily PM", 4 Sep: break SPWC-14 into five subtasks.
+  
+  Every one has a live **Approve** button (and Decline, Edit) for this brand-new Member. The run did not press them, because they write into the owner's projects. Whether the server would accept the approval was not tested.
+
+### Score sheet
+
+| # | Task | Limit (min) | Time taken | Result | First wrong click | Words not understood | Where they stopped | Settings page opened |
+|---|---|---|---|---|---|---|---|---|
+| 1 | Sign up | 2 | not measured | done by the owner, not measured | — | — | Owner: with no email set up, the join link only appears after "Resend Invitation" | — |
+| 2 | Connect your AI, or skip | 1 (B) | 0:06, 1 click | **pass** | none | — | — | none |
+| 3 | Make a project by describing it | 3 | 0:40 to the stop | **fail** | "+ New" (expected "New project"; it offers only New task and New reminder) | "router", "read like review work" (Ask page) | No way to make a project anywhere: see finding 1 | none |
+| 4 | Add three tasks | 2 | 0:53 | **pass, in Personal List** (no project to put them in) | none | — | — | none |
+| 5 | Assign one | 1 | 1:01 | **pass, in Personal List** (already assigned) | none | "List Of User" | — | none |
+| 6 | Set a date | 1 | 3:04 | **fail** (over time) | the Due Date "Empty" box in the side panel (expected a calendar; nothing opened) | — | — | none |
+| | **Clock for tasks 2 to 6** | under 10 | 6:11 (task 1 not on the clock) | line nine: **fail** (task 3) | | | | |
+| 7 | Find what to do next | 1 | under 0:30 | **pass, with doubt** | none | — | — | none |
+| 8 | Approve a proposal | 2 | 0:10 to find and read | **not finished**: observer stopped before Approve | none | "task.create: Creates a task in a project at once…", "task.add reaches the whole project", "outside client (https://claude.ai/oauth/…)" | Inbox, "Needs your approval 6", none of them the newcomer's | none |
+| 9 | Simple mode off and on | 2 | about 1:20 | **pass** | avatar menu (expected a "Simple/Full" or "Menu" item; it shows My profile, Settings, Dark theme, Keyboard shortcuts, Log out) | — | — | My settings (allowed) |
+| 10 | Invite a person | 2 | about 1:00 to the stop | **fail** | avatar menu → Settings → Company (expected Members or Invite) | — | No invite or members place for a Member: see finding 2 | Company (Settings) |
+| | **Whole session** | under 60 | about 9 min | line ten: **fail** | | | | |
+
+Totals:
+- Passes: 5 of 10 (tasks 2, 4, 5, 7, 9), two of them only in the Personal List. Helped: 0. Fails: 3 (tasks 3, 6, 10). Not finished: 1 (task 8). Not measured: 1 (task 1).
+- Stops: 2 (tasks 3 and 10). No hint could move them: the role has no button to press.
+- Help pages opened: 0. Tour followed: no. Settings pages opened in tasks 1 to 6: 0.
+- Line nine (sign-up to a running project in under ten minutes, no settings page): **fail**, task 3 cannot be done.
+- Line ten (the first hour without help or a tour): **fail**, tasks 3, 6 and 10.
+
+Per-task notes:
+- **Task 2.** "Skip for now" sits under the big "Connect your AI" button. One click, the checklist moves on to "Next: Open My Work". The newcomer could not say what connecting gives them: the card does not say.
+- **Task 3.** Tried, in order: "+ New" (New task, New reminder), Projects (a table of ten projects with Filter and Portfolio view, no "New project"), Ask, More (Goals, Planner, Chat, Docs, Dash, Time, Portfolio, Automations, Integrations, Connections, External data, three reports, Notepad, Clips, Reminders, Talk to Text, Take the tour, Settings, Trash), the sidebar "PROJECTS" heading on hover, Portfolio. On Ask the placeholder reads "Ask, plan or build. Type / for a skill, @ to add a task, doc or project.", and "/" lists Intake, Reporter, Project Guide, Bug Triager, Tech Lead, Support Agent, Maintenance Planner, Non-conformance Recorder. A person told to "describe it in your own words" would type there and press Ask; this run did not, to keep the no-model-budget rule. What the newcomer would have typed: "We move to a new office next month. Plan the move: movers, IT equipment, telling clients the new address."
+- **Task 4.** Home's Personal List card says "Somewhere to type before a project exists", so the tasks went there: "Book the movers", "Pack the IT equipment", "Tell clients the new address". The second and third were added the same way, typed into the top box and Enter. The box clears at once and the row shows up 2 to 5 seconds later. One typed task was lost once, possibly because of the browser tool.
+- **Task 5.** Personal List tasks are assigned to their creator, so it was already done. The Assignee row shows only a grey avatar, no name; the name is only in the hover text. The newcomer looked for "Assignee" and found it. Clicking the add-person icon opens a drawer titled "List Of User".
+- **Task 6.** "Next Friday" was read as Friday 16 October. In the wide layout, clicking the Due Date "Empty" box in the side panel opened nothing (the box is 163 px wide inside a 138 px cell and runs past the panel edge). In the narrow layout, under "Properties", it opened a calendar. A mis-click (the screenshot was a step behind) set Monday 28 September first; the second try set 16/10/2026 and the toast said "Due date updated successfully". No time was added. **The list behind the panel still showed "Sep 28"** after the change.
+- **Task 7.** Home's "What next" reads "6 things need your approval." The newcomer read it aloud, but it points at other people's agents, not at their own work. "Book the movers, Fri" sits under "NEXT" in My Work, and "TODAY 0 · Your day is clear".
+- **Task 8.** Review leads to Inbox, "Needs your approval 6". Each card has WHY and WHAT CHANGES, and the two "create the task" cards say clearly what would be made and where. Who proposed it reads "Claude Code (app · claude.ai), for Local PM": a person the newcomer has never heard of. No proposal was seeded in the newcomer's own space (script step 5 was left open), so all six belong to the owner.
+- **Task 9.** Avatar menu, then My profile. The page heading says "My settings", while the menu said "My profile". The Simple / Full choice is low on that page, below Language, Time format, Working hours and a long Timezone list. Full turns the rail into Home, Everything, Goals, Projects, Inbox, Planner, Chat, AI, Docs, App connections, Dash, Time. **"My work" becomes "Everything" and "Ask" becomes "AI"**: the same places change names between the two modes. Simple put it back.
+- **Task 10.** No "Invite" or "Members" anywhere a Member can reach: not the avatar menu, not Settings (My settings, Notifications, Sign-in & security, Company, Language & Region, Integrations, Templates, Task templates, Time Off, Time Tracking), not the More menu, not a project's page. The address `colleague.s6@example.test` was never typed, so what the screen says when mail cannot be sent was not reached.
+
+### Findings, worst first
+
+1. **A newcomer who joins by invitation cannot make a project.** The invitation made a Member, and a Member sees no "New project" anywhere: "+ New" offers only New task and New reminder, and the Projects page has only Filter and Portfolio view. The screen never says why or who can. Task 3, and with it finish line nine, cannot pass on this path. Either a newcomer must start their own workspace (script step 2, not checked here), or the Projects page should say "Only admins can make projects. Ask <owner>", or Members should be able to make one.
+2. **A Member cannot invite anyone, and nothing says so.** No Members or Invite place exists for the role, and there is no "ask an admin" hint. Task 10 cannot pass.
+3. **A brand-new Member's Home opens on six strangers' approvals, with live Approve buttons.** "What next" points at them instead of the newcomer's own task due Friday. They are three to five weeks old, sit on projects the newcomer never opened, and come from "Claude Code … for Local PM", "Code Reviewer" and "Daily PM". Two card titles are raw tool text: "task.create: Creates a task in a project at once, with as much as you know in one call…". The WHY lines read "task.add reaches the whole project; it came from an outside client (https://claude.ai/oauth/claude-code-client-metadata)". Should a person who joined a minute ago be able to approve another person's agent? To decide, and to check on the server.
+4. **"Describe it in your own words" has no path without a model.** Ask is the only place to describe a project. It names no "make a project" skill, and on path B nothing says that a key or a connected AI is needed. The Ask page also greets a newcomer with "Your 100 most recently updated open tasks — 44 read like review work, 20 read like code changes…" and "Classified the way the router classifies them". That is team-wide work they have never seen, in words they do not know.
+5. **The task list does not follow the side panel.** After the due date changed to 16/10/2026 in the panel (toast "Due date updated successfully"), the Personal List row still showed "Sep 28". In the wide layout the Due Date box in the panel runs past its cell, and clicking it opened nothing.
+6. **Simple / Full is hard to find and renames places.** It is at the bottom of My settings, reached from a menu item called "My profile", with no rail or More entry. Switching to Full renames "My work" to "Everything" and "Ask" to "AI".
+7. **The join link only appears after "Resend Invitation" when email is not set up** (reported by the owner, task 1).
+8. **Small things.** "List Of User" as a title. Assignee shows an avatar with no name. "Get going" still reads 1/4 after "Skip for now". The "+ New" menu draws over the checklist's "Open My Work" button. The More menu is see-through over the second rail. Quick-add clears the box before the new row appears.
+
+### Not tested, and why
+
+- Task 1 was the owner's. The sign-up form, field count and "Create account" path without an invitation were not seen.
+- Path A, and Ask with a model: no model budget in run 1.
+- Pressing Approve: the only proposals belong to the owner's projects.
+- What the screen says when an invitation cannot be mailed: the newcomer never reached an invite form.
+
+Next run: give the newcomer a workspace of their own (or an Admin role), seed one proposal in their own project for task 8, and run it with a real person.
