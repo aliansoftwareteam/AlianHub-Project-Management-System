@@ -126,6 +126,23 @@ describe('a day reads as the person\'s own calendar day', () => {
         expect(rows(SCHEMA_TYPE.TIMESHEET)).toHaveLength(1);
     });
 
+    it('with no start, uses 09:00 on the person\'s clock once it has come, and ends the entry now before it', async () => {
+        user(INSIDER).Time_Zone = 'Asia/Kolkata';
+        const parent = mockDb.seed(SCHEMA_TYPE.RULES, { key: 'sheet_settings', name: 'sheet_settings', isParent: true, roles: [] });
+        mockDb.seed(SCHEMA_TYPE.RULES, { key: 'user_timesheet', name: 'user_timesheet', isParent: false, parentId: String(parent._id), roles: [{ key: 3, permission: true }, { key: 0, permission: true }] });
+        const clock = jest.spyOn(Date, 'now');
+        const startOfLast = () => rows(SCHEMA_TYPE.TIMESHEET).slice(-1)[0].LogStartTime;
+        clock.mockReturnValue(Date.parse('2026-10-11T05:00:00Z'));
+        expect(await rpc(ctx(INSIDER), 'timelog.create', { taskId: T_OPEN, minutes: 30 })).toMatchObject({ ok: true });
+        expect(startOfLast()).toBe(Date.parse('2026-10-11T03:30:00Z') / 1000);
+        clock.mockReturnValue(Date.parse('2026-10-11T01:00:00Z'));
+        expect(await rpc(ctx(INSIDER), 'timelog.create', { taskId: T_OPEN, minutes: 30 })).toMatchObject({ ok: true });
+        expect(startOfLast()).toBe(Date.parse('2026-10-11T00:30:00Z') / 1000);
+        clock.mockReturnValue(Date.parse('2026-10-10T19:00:00Z'));
+        expect(await rpc(ctx(INSIDER), 'timelog.create', { taskId: T_OPEN, minutes: 60 })).toMatchObject({ ok: true });
+        expect(startOfLast()).toBe(Date.parse('2026-10-10T18:30:00Z') / 1000);
+    });
+
     it('answers the day in UTC for a person with no time zone stored', async () => {
         const found = await rpc(ctx(INSIDER), 'tasks.search', { query: 'Open task' });
         expect(found.tasks.find((task) => task.taskId === T_OPEN)).toMatchObject({ dueDate: '2026-10-10', dueDateWeekday: 'Saturday' });
