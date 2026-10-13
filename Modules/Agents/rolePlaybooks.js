@@ -5,7 +5,7 @@ const logger = require('../../Config/loggerConfig');
 const ROOT = path.join(__dirname, 'roles');
 const KEYS = ['slug', 'name', 'blueprint', 'department', 'team', 'tools', 'hands_to', 'gates'];
 const LISTS = ['tools', 'hands_to', 'gates'];
-const OPTIONAL_LISTS = ['tools_optional', 'starter_rules', 'tags'];
+const OPTIONAL_LISTS = ['tools_optional', 'starter_rules', 'tags', 'fields'];
 const SLUG = /^[a-z0-9]+(-[a-z0-9]+)*$/;
 const STARTER_KINDS = Object.freeze(['type', 'tag', 'priority']);
 const STARTER_RULE = /^(type|tag|priority):\s*(\S.*)$/;
@@ -13,6 +13,12 @@ const PRIORITIES = Object.freeze(['URGENT', 'HIGH', 'MEDIUM', 'LOW']);
 const MAX_STARTER = 5;
 const MAX_TAGS = 6;
 const TAG_MAX = 50;
+const FIELD_TYPES = Object.freeze(['text', 'textarea', 'number', 'money', 'date', 'dropdown', 'checkbox', 'email', 'phone', 'url', 'people', 'rating', 'progress']);
+const FIELD = /^([^:()|]+?)\s*:\s*([a-z]+)\s*(?:\(([^()]*)\))?$/;
+const MAX_FIELDS = 8;
+const FIELD_NAME_MAX = 80;
+const MAX_OPTIONS = 10;
+const OPTION_MAX = 60;
 
 class PlaybookError extends Error {}
 
@@ -29,6 +35,27 @@ const parseFrontmatter = (block) => Object.fromEntries(block.split('\n').filter(
     return [key, list ? list[1].split(',').map((item) => item.trim()).filter(Boolean) : value.trim()];
 }));
 
+const fieldsOf = (entries, fail) => {
+    const fields = entries.map((entry) => {
+        const [, name, type, list] = entry.match(FIELD) || [];
+        if (!name) fail(`the field "${entry}" must be written as a name, a colon and a type, with a dropdown's options in brackets split by |`);
+        if (!FIELD_TYPES.includes(type)) fail(`the field "${name}" must have one of the types ${FIELD_TYPES.join(', ')}`);
+        if (name.length > FIELD_NAME_MAX) fail(`the field name "${name}" is longer than ${FIELD_NAME_MAX} characters`);
+        const options = list === undefined ? [] : list.split('|').map((option) => option.trim()).filter(Boolean);
+        if (type !== 'dropdown') {
+            if (list !== undefined) fail(`only a dropdown field lists options, and "${name}" is ${type}`);
+            return { name, type };
+        }
+        if (!options.length || options.length > MAX_OPTIONS) fail(`the dropdown "${name}" needs 1 to ${MAX_OPTIONS} options`);
+        if (options.some((option) => option.length > OPTION_MAX)) fail(`an option of "${name}" is longer than ${OPTION_MAX} characters`);
+        if (new Set(options.map((option) => option.toLowerCase())).size !== options.length) fail(`the dropdown "${name}" names an option twice`);
+        return { name, type, options };
+    });
+    if (fields.length > MAX_FIELDS) fail(`fields may list at most ${MAX_FIELDS} fields`);
+    if (new Set(fields.map((field) => field.name.toLowerCase())).size !== fields.length) fail('fields names a field twice');
+    return fields;
+};
+
 const optionalOf = (meta, fail) => {
     const starterRules = (meta.starter_rules || []).map((entry) => {
         const [, kind, value] = entry.match(STARTER_RULE) || [];
@@ -42,7 +69,7 @@ const optionalOf = (meta, fail) => {
     const long = tags.find((name) => name.length > TAG_MAX);
     if (long) fail(`the tag "${long}" is longer than ${TAG_MAX} characters`);
     if (new Set(tags.map((name) => name.toLowerCase())).size !== tags.length) fail('tags names a tag twice');
-    return { starterRules, tags };
+    return { starterRules, tags, fields: fieldsOf(meta.fields || [], fail) };
 };
 
 const parse = (text, rel) => {
@@ -73,6 +100,7 @@ const parse = (text, rel) => {
         gates: meta.gates,
         starterRules: optional.starterRules,
         tags: optional.tags,
+        fields: optional.fields,
         body,
     };
 };
@@ -126,4 +154,4 @@ const whoFor = async (companyId, key, max = 300) => {
     return summary(body ? { ...role, body } : role, max);
 };
 
-module.exports = { STARTER_KINDS, PRIORITIES, PlaybookError, parse, readAll, all, find, summary, useOverrides, whoFor };
+module.exports = { STARTER_KINDS, PRIORITIES, FIELD_TYPES, MAX_FIELDS, PlaybookError, parse, readAll, all, find, summary, useOverrides, whoFor };

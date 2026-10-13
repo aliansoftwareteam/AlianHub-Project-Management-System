@@ -15,9 +15,12 @@ const MAX_PROJECTS = 50;
 const SUMMARY_MAX = 280;
 const PACK_AGENT = Object.freeze({ _id: 'team-pack', name: 'Team pack' });
 const TAG_ACTION = 'tag.create';
+const FIELD_ACTION = 'fields.create';
 const KEPT_APPLIES = 20;
 const ROUTING_ON = 'suggest';
 const DECIDED = Object.freeze(['approved', 'edited']);
+const DECIDED_OR_APPLYING = Object.freeze(['applying', ...DECIDED]);
+const DECLINE_MEMORY_MS = 30 * 24 * 60 * 60 * 1000;
 const MANAGE_REFUSAL = 'Only an Owner or an Admin can create or remove agents. Leave the team\'s agents out to turn on its roles.';
 
 const packs = () => {
@@ -28,7 +31,7 @@ const packs = () => {
         if (!teams.has(role.team)) teams.set(role.team, []);
         teams.get(role.team).push({
             key: settings.roleKey(role), slug: role.slug, name: role.name, department: role.department, summary: playbooks.summary(role, SUMMARY_MAX), tools: [...role.tools, ...role.toolsOptional],
-            starterRules: role.starterRules.map((rule) => ({ ...rule })), tags: [...role.tags],
+            starterRules: role.starterRules.map((rule) => ({ ...rule })), tags: [...role.tags], fields: role.fields.map((field) => ({ ...field })),
         });
     });
     return [...byBlueprint].map(([blueprint, teams]) => ({ blueprint, teams: [...teams].map(([team, roles]) => ({ team, roles })) }));
@@ -102,23 +105,36 @@ const conditionFor = (kind, value, project) => {
     return tag ? { tags: [String(tag.uid)] } : null;
 };
 
+/* Many projects have only the type Task, so a type rule the project cannot place routes on the role's tag of that name. */
+const placeableRule = (role, { kind, value }, project) => {
+    const when = conditionFor(kind, value, project);
+    if (when || kind !== 'type') return { kind, value, when };
+    const tag = (role.tags || []).find((name) => lower(name) === lower(value));
+    return tag ? { kind: 'tag', value: tag, when: conditionFor('tag', tag, project), insteadOfType: value } : { kind, value, when };
+};
+
 const starterRulesFor = (roleKeys, project, held) => {
     const made = [];
     const missingTags = [];
+    const onTag = [];
     let skipped = 0;
     roleKeys.forEach((key) => {
-        ((settings.roleOf(key) || {}).starterRules || []).forEach(({ kind, value }) => {
-            const when = conditionFor(kind, value, project);
+        const role = settings.roleOf(key) || {};
+        (role.starterRules || []).forEach((starter) => {
+            const { kind, value, when, insteadOfType } = placeableRule(role, starter, project);
+            const fallback = insteadOfType ? { role: key, type: insteadOfType, tag: lower(value) } : null;
             if (!when) {
-                if (kind === 'tag') missingTags.push({ role: key, tag: lower(value) });
+                if (kind === 'tag') missingTags.push({ role: key, tag: lower(value), fallback });
                 skipped += 1;
                 return;
             }
             const rule = { id: new mongoose.Types.ObjectId().toString(), ...cleanRule({ role: key, when }) };
-            if (![...held, ...made].some((one) => sameRule(one, rule))) made.push(rule);
+            if ([...held, ...made].some((one) => sameRule(one, rule))) return;
+            made.push(rule);
+            if (fallback) onTag.push(fallback);
         });
     });
-    return { made, skipped, missingTags };
+    return { made, skipped, missingTags, onTag };
 };
 
 const tagNamesFor = (roleKeys, project) => {
@@ -164,6 +180,81 @@ async function tagProposalFor(companyId, projectId, names, blueprint) {
         },
     };
 }
+
+const fieldsFor = (roleKeys) => {
+    const seen = new Set();
+    return roleKeys.flatMap((key) => (settings.roleOf(key) || {}).fields || []).filter((field) => {
+        if (seen.has(lower(field.name))) return false;
+        seen.add(lower(field.name));
+        return true;
+    });
+};
+
+const pendingFieldNames = async (companyId, projectId) => {
+    const rows = await MongoDbCrudOpration(companyId, {
+        type: SCHEMA_TYPE.AGENT_PROPOSALS, data: [{ projectId: { $in: idForms([projectId]) }, agentId: PACK_AGENT._id, status: 'pending' }, { _id: 1, changes: 1 }],
+    }, 'find');
+    return new Set((rows || []).flatMap((row) => fieldNamesOf(row.changes)));
+};
+
+const fieldNamesOf = (changes) => (changes || []).filter((change) => change.action === FIELD_ACTION)
+    .flatMap((change) => ((change.params || {}).definitions || []).map((field) => lower(field && field.name)));
+
+/* A person who turned a field down is not asked again for a month: declined, or edited out of an approval, whose
+ * stored changes keep only what ran, so what was proposed is read from the apply that filed it. A withdrawal by an undo is no answer. */
+const declinedFieldNames = async (companyId, projectId) => {
+    const rows = await MongoDbCrudOpration(companyId, {
+        type: SCHEMA_TYPE.AGENT_PROPOSALS,
+        data: [{
+            projectId: { $in: idForms([projectId]) }, agentId: PACK_AGENT._id, status: { $in: ['declined', 'edited'] },
+            decidedBy: { $ne: require('../../Agents/proposals').SYSTEM_DECIDER }, decidedAt: { $gte: new Date(Date.now() - DECLINE_MEMORY_MS) },
+        }, { _id: 1, status: 1, changes: 1 }],
+    }, 'find');
+    if (!(rows || []).length) return new Set();
+    const row = plain(await MongoDbCrudOpration(companyId, { type: SCHEMA_TYPE.ASSIGNMENT_RULES, data: [rowFilter(projectId), { teamPacks: 1 }] }, 'findOne'));
+    const proposedBy = new Map(((row && row.teamPacks) || []).map(plain).filter((entry) => entry && entry.fieldProposalId)
+        .map((entry) => [String(entry.fieldProposalId), (entry.fieldNames || []).map(lower)]));
+    return new Set(rows.flatMap((one) => {
+        const ran = fieldNamesOf(one.changes);
+        if (one.status === 'declined') return ran;
+        return (proposedBy.get(String(one._id)) || []).filter((name) => !ran.includes(name));
+    }));
+};
+
+/* Like the tags, every field a project lacks waits in one approval, and a field the project has by name is never asked for. */
+async function fieldProposalFor(companyId, projectId, fields, blueprint) {
+    if (!fields.length || !require('../../Agents/registry').get(FIELD_ACTION)) return null;
+    const setup = require('../../Agents/setupRequests');
+    const held = new Set((await setup.fieldsOfProject(companyId, projectId)).map((field) => lower(field.fieldTitle || '')));
+    const waiting = await pendingFieldNames(companyId, projectId);
+    const declined = await declinedFieldNames(companyId, projectId);
+    const fresh = fields.filter((field) => ![held, waiting, declined].some((names) => names.has(lower(field.name))));
+    if (!fresh.length) return null;
+    const proposals = require('../../Agents/proposals');
+    const changes = [];
+    for (let at = 0; at < fresh.length; at += setup.FIELDS_MAX) {
+        const part = fresh.slice(at, at + setup.FIELDS_MAX);
+        changes.push({ action: FIELD_ACTION, params: { projectId, definitions: part.map((field) => ({ ...field })) }, label: `Add the fields ${part.map((field) => `"${field.name}"`).join(', ')}` });
+    }
+    const check = proposals.validateChanges(changes);
+    if (!check.valid) throw new RuleError(`Project ${projectId}: the fields cannot be proposed. ${check.reason}`, 400);
+    return {
+        names: fresh.map((field) => field.name),
+        input: {
+            agent: PACK_AGENT,
+            projectId,
+            what: `Add ${fresh.length} field${fresh.length === 1 ? '' : 's'} for the ${blueprint} team pack`,
+            why: 'The roles of this team pack fill these fields, and the project does not have them yet.',
+            changes,
+            source: proposals.SOURCE_SYSTEM,
+            allowedActions: [FIELD_ACTION],
+        },
+    };
+}
+
+const decidedProposal = async (companyId, projectId, proposalId) => OBJECT_ID.test(String(proposalId || '')) && Boolean(await MongoDbCrudOpration(companyId, {
+    type: SCHEMA_TYPE.AGENT_PROPOSALS, data: [{ _id: new mongoose.Types.ObjectId(proposalId), projectId: { $in: idForms([projectId]) }, agentId: PACK_AGENT._id, status: { $in: DECIDED_OR_APPLYING } }, { _id: 1 }],
+}, 'findOne'));
 
 async function withdrawProposal(companyId, projectId, proposalId) {
     if (!OBJECT_ID.test(String(proposalId || ''))) return false;
@@ -253,7 +344,7 @@ const EVERY_ENTRY = Object.freeze({ arrayFilters: [{ 'pack.applyId': { $exists: 
 /* What an apply added is kept on each of its projects' rule rows, so an undo takes back that and never a list a client
  * sends. Only the last few applies per project are kept. */
 async function recordApply(companyId, { blueprint, projectIds, plans, agents, actorId }, written) {
-    const changed = plans.some((plan) => plan.body || plan.proposalId || plan.waitingRules.length) || agents.made.length || agents.widened.length;
+    const changed = plans.some((plan) => plan.body || plan.proposalId || plan.fieldProposalId || plan.waitingRules.length) || agents.made.length || agents.widened.length;
     if (!changed) return null;
     const applyId = new mongoose.Types.ObjectId().toString();
     const shared = {
@@ -271,6 +362,8 @@ async function recordApply(companyId, { blueprint, projectIds, plans, agents, ac
             roles: plan.body ? plan.added : [],
             rules: plan.body ? plan.rules : [],
             proposalId: plan.proposalId || null,
+            fieldProposalId: plan.fieldProposalId || null,
+            fieldNames: plan.fieldProposalId ? plan.fieldProposal.names : [],
             modeWas: plan.modeWas,
             waitingRules: plan.waitingRules.map((rule) => ({ ...rule, proposalId: rule.proposalId || plan.proposalId })).filter((rule) => rule.proposalId),
         };
@@ -297,15 +390,16 @@ async function apply(companyId, body, actorId, { managesAgents = false } = {}) {
         const project = body.starterRules === true || body.proposeTags === true ? await readProject(companyId, projectId) : {};
         const kept = current.roles.filter((key) => settings.roleOf(key));
         const added = pack.roles.filter((key) => !kept.includes(key));
-        const starter = body.starterRules === true ? starterRulesFor(pack.roles, project, current.rules) : { made: [], skipped: 0, missingTags: [] };
+        const starter = body.starterRules === true ? starterRulesFor(pack.roles, project, current.rules) : { made: [], skipped: 0, missingTags: [], onTag: [] };
         const mode = current.mode === 'off' ? ROUTING_ON : current.mode;
         const changed = added.length || starter.made.length || mode !== current.mode;
         const tags = body.proposeTags === true ? tagNamesFor(pack.roles, project) : [];
         const proposal = await tagProposalFor(companyId, projectId, tags, pack.blueprint);
         const waitingOn = starter.missingTags.length ? await pendingTagNames(companyId, projectId) : new Map();
         const proposed = new Set((proposal ? proposal.names : []).map(lower));
-        const waitingRules = starter.missingTags.filter(({ tag }) => proposed.has(tag) || waitingOn.has(tag))
-            .map(({ role, tag }) => ({ role, tag, proposalId: proposed.has(tag) ? null : waitingOn.get(tag) }));
+        const waits = starter.missingTags.filter(({ tag }) => proposed.has(tag) || waitingOn.has(tag));
+        const waitingRules = waits.map(({ role, tag }) => ({ role, tag, proposalId: proposed.has(tag) ? null : waitingOn.get(tag) }));
+        const fieldProposal = body.proposeFields === true ? await fieldProposalFor(companyId, projectId, fieldsFor(pack.roles), pack.blueprint) : null;
         plans.push({
             projectId,
             added,
@@ -315,7 +409,9 @@ async function apply(companyId, body, actorId, { managesAgents = false } = {}) {
             skippedRules: starter.skipped - waitingRules.length,
             rulesAwaitingTags: waitingRules.length,
             waitingRules,
+            rulesOnTag: [...starter.onTag, ...waits.map((wait) => wait.fallback).filter(Boolean)],
             proposal,
+            fieldProposal,
             wanted: pack.roles,
             starter: starter.made,
             body: changed ? bodyWith(current, [...kept, ...added], [...current.rules, ...starter.made], mode) : null,
@@ -342,6 +438,10 @@ async function apply(companyId, body, actorId, { managesAgents = false } = {}) {
             plan.proposalId = String((await proposals.create(companyId, plan.proposal.input))._id);
             written.done(`the tag approval of project ${plan.projectId}`, () => proposals.withdraw(companyId, plan.proposalId, 'The team pack could not be applied.'));
         }
+        for (const plan of plans.filter((one) => one.fieldProposal)) {
+            plan.fieldProposalId = String((await proposals.create(companyId, plan.fieldProposal.input))._id);
+            written.done(`the field approval of project ${plan.projectId}`, () => proposals.withdraw(companyId, plan.fieldProposalId, 'The team pack could not be applied.'));
+        }
         if (agentPlan) agents = await packAgents.write(companyId, agentPlan, actorId, written);
         applyId = await recordApply(companyId, { blueprint: pack.blueprint, projectIds, plans, agents, actorId }, written);
     } catch (error) {
@@ -356,8 +456,11 @@ async function apply(companyId, body, actorId, { managesAgents = false } = {}) {
         rules: plan.rules,
         skippedRules: plan.skippedRules,
         rulesAwaitingTags: plan.rulesAwaitingTags,
+        rulesOnTag: plan.rulesOnTag,
         tags: plan.proposal ? plan.proposal.names : [],
         proposalId: plan.proposalId || null,
+        fields: plan.fieldProposal ? plan.fieldProposal.names : [],
+        fieldProposalId: plan.fieldProposalId || null,
     }));
     const { skills, ...shown } = agents;
     return { blueprint: pack.blueprint, teams: pack.teams, applyId, projects, agents: shown };
@@ -401,6 +504,7 @@ async function undo(companyId, body, actor, { managesAgents = false } = {}) {
                 mode: done ? done.body.mode : seen.mode,
                 modeRestored: done && done.change.mode ? done.change.mode.from : null,
                 proposalId: entry.proposalId,
+                fieldProposalId: entry.fieldProposalId || null,
                 heir: entry.modeWas ? heir : null,
                 modeWas: entry.modeWas,
             });
@@ -422,7 +526,9 @@ async function undo(companyId, body, actor, { managesAgents = false } = {}) {
                 type: SCHEMA_TYPE.ASSIGNMENT_RULES, data: [onEntry(plan.projectId, plan.heir.applyId), { $set: { 'teamPacks.$[pack].modeWas': plan.modeWas } }, entryNamed(plan.heir.applyId)],
             }, 'updateOne');
         }
-        projects.push({ projectId: plan.projectId, removed: plan.removed, rules: plan.rules, mode: plan.mode, modeRestored: plan.modeRestored, tagsWithdrawn: withdrawn });
+        const fieldsWithdrawn = await withdrawProposal(companyId, plan.projectId, plan.fieldProposalId).catch(() => false);
+        const fieldsKept = !fieldsWithdrawn && await decidedProposal(companyId, plan.projectId, plan.fieldProposalId).catch(() => false);
+        projects.push({ projectId: plan.projectId, removed: plan.removed, rules: plan.rules, mode: plan.mode, modeRestored: plan.modeRestored, tagsWithdrawn: withdrawn, fieldsWithdrawn, fieldsKept });
     }
     const agents = await packAgents.remove(companyId, pack.blueprint, agentIds, reached, actor);
     agents.narrowed = await packAgents.narrow(companyId, widened);

@@ -46,18 +46,28 @@ export const undoTeamPack = (applied) => apiRequest("post", `${BASE}/team-packs`
     applyId: applied.applyId
 }).then(dataOf);
 
-export const packProjectLine = (t, project, name) => {
+export const packProjectLine = (t, project, name, roleName = (key) => key) => {
     const rules = (project.rules || []).length;
     const tags = project.tags || [];
+    const fields = project.fields || [];
     return [
         t("TeamPacks.project_on", { project: name, mode: t(`TeamPacks.mode_${project.mode}`) }),
         project.modeWas === "off" ? t("TeamPacks.mode_switched") : "",
         rules ? t("TeamPacks.rules_added", { n: rules }, rules) : "",
+        ...(project.rulesOnTag || []).map((one) => t("TeamPacks.rule_on_tag", { role: roleName(one.role), tag: one.tag, type: one.type })),
         project.skippedRules ? t("TeamPacks.rules_waiting", { n: project.skippedRules }, project.skippedRules) : "",
         project.rulesAwaitingTags ? t("TeamPacks.rules_await_tags", { n: project.rulesAwaitingTags }, project.rulesAwaitingTags) : "",
-        tags.length ? t("TeamPacks.tags_proposed", { n: tags.length, names: tags.join(", ") }, tags.length) : ""
+        tags.length ? t("TeamPacks.tags_proposed", { n: tags.length, names: tags.join(", ") }, tags.length) : "",
+        fields.length ? t("TeamPacks.fields_proposed", { n: fields.length, names: fields.join(", ") }, fields.length) : ""
     ].filter(Boolean).join(" ");
 };
+
+export const roleNamesOf = (roles) => {
+    const names = new Map((roles || []).filter((role) => role && role.key).map((role) => [role.key, role.name]));
+    return (key) => names.get(key) || key;
+};
+
+export const fieldsKeptAfterUndo = (answers) => (answers || []).some((answer) => (answer?.projects || []).some((project) => project.fieldsKept));
 
 export const DISPATCHER_CHANGED_EVENT = "dispatcherChanged";
 
@@ -107,11 +117,11 @@ export const priorityChoices = (list) => (Array.isArray(list) ? list : [])
 export const COMPANY_SIZES = Object.freeze(["small", "medium", "large"]);
 
 /* The starter roles of a company blueprint go in one request per playbook blueprint, each narrowed to those roles by `only`,
- * with their starter rules and missing tags as a team pack brings them. */
+ * with their starter rules, missing tags and missing fields as a team pack brings them. */
 export async function applyStarterRoles(groups, projectIds) {
     const applied = [];
     for (const group of groups) {
-        applied.push(await applyTeamPack({ blueprint: group.blueprint, teams: group.teams, only: group.roles, projectIds, starterRules: true, proposeTags: true }));
+        applied.push(await applyTeamPack({ blueprint: group.blueprint, teams: group.teams, only: group.roles, projectIds, starterRules: true, proposeTags: true, proposeFields: true }));
     }
     return applied;
 }

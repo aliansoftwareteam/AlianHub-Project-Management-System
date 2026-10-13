@@ -77,6 +77,7 @@
                     <ul class="bp__list">
                         <li v-for="project in resultProjects" :key="project.projectId" class="ah-small" :data-mode="project.mode">{{ projectLine(project) }}</li>
                     </ul>
+                    <p v-if="undone && undoneFieldsKept" class="ah-small bp__muted" data-test="bp-fields-kept">{{ $t('TeamPacks.fields_kept') }}</p>
                     <button v-if="!undone && (addedCount || otherChanges)" type="button" class="ah-btn ah-btn--secondary ah-btn--sm" data-test="bp-undo" :disabled="busy" @click="undo">
                         {{ busy ? $t('TeamPacks.undoing') : $t('TeamPacks.undo') }}
                     </button>
@@ -93,7 +94,7 @@ import { useStore } from "vuex";
 import { refusalText } from "@/utils/assignmentRules";
 import { useCustomComposable } from "@/composable";
 import { isOwnerOrAdmin } from "@/utils/roles";
-import { applyStarterRoles, blueprintName, COMPANY_SIZES, fetchTeamPacks, packProjectLine, teamName, undoStarterRoles } from "@/utils/dispatcher";
+import { applyStarterRoles, blueprintName, COMPANY_SIZES, fetchTeamPacks, fieldsKeptAfterUndo, packProjectLine, roleNamesOf, teamName, undoStarterRoles } from "@/utils/dispatcher";
 
 defineOptions({ name: "BlueprintPicker" });
 
@@ -120,6 +121,7 @@ const busy = ref(false);
 const error = ref("");
 const results = ref(null);
 const undone = ref(false);
+const undoneFieldsKept = ref(false);
 
 /* The server checks every project again; this only keeps out of reach what it would refuse. */
 const whyNot = (project) => {
@@ -137,7 +139,7 @@ const groups = computed(() => current.value?.packs || []);
 const startCount = computed(() => groups.value.reduce((sum, group) => sum + group.roles.length, 0));
 const resultProjects = computed(() => (results.value || []).flatMap((one) => one.projects));
 const addedCount = computed(() => resultProjects.value.reduce((sum, project) => sum + (project.added || []).length, 0));
-const otherChanges = computed(() => resultProjects.value.some((project) => (project.rules || []).length || (project.tags || []).length || project.modeWas));
+const otherChanges = computed(() => resultProjects.value.some((project) => (project.rules || []).length || (project.tags || []).length || (project.fields || []).length || project.modeWas));
 const projectName = (id) => (projects.value.find((p) => p.id === String(id)) || {}).name || id;
 
 const resultHead = computed(() => {
@@ -146,7 +148,8 @@ const resultHead = computed(() => {
     return otherChanges.value ? t("TeamPacks.roles_were_on") : t("TeamPacks.nothing_new");
 });
 
-const projectLine = (project) => packProjectLine(t, project, projectName(project.projectId));
+const roleName = computed(() => roleNamesOf(current.value?.roles));
+const projectLine = (project) => packProjectLine(t, project, projectName(project.projectId), roleName.value);
 
 const failText = (e, fallback) => (e?.response?.status === OFF ? t("TeamPacks.dispatcher_off") : refusalText(e, fallback));
 
@@ -185,7 +188,7 @@ async function undo() {
     busy.value = true;
     error.value = "";
     try {
-        await undoStarterRoles(results.value);
+        undoneFieldsKept.value = fieldsKeptAfterUndo(await undoStarterRoles(results.value));
         undone.value = true;
     } catch (e) {
         error.value = failText(e, t("TeamPacks.undo_failed"));

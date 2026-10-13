@@ -609,6 +609,6 @@ const executors = {
 };
 
 module.exports = {
-    executors, answerOf, reasonOf, lineOf, createFields, createView, withdrawFields, withdrawView, draftsOf, draftsProblem, draftsMisfit, valuesOf, valuesProblem, valuesMisfit, fieldChoice, lookOf, lookProblem, viewNameOf, viewIdOf, sourceView, noSource, savedViewShowing, sharedViewNamed, viewInUse, savedViews,
+    executors, answerOf, reasonOf, lineOf, fieldsOfProject, createFields, createView, withdrawFields, withdrawView, draftsOf, draftsProblem, draftsMisfit, valuesOf, valuesProblem, valuesMisfit, fieldChoice, lookOf, lookProblem, viewNameOf, viewIdOf, sourceView, noSource, savedViewShowing, sharedViewNamed, viewInUse, savedViews,
     FIELD_TYPES, CREATE_TYPES, FIELDS_MAX, FIELD_NAME_MAX, OPTIONS_MAX, OPTION_MAX, NOTE_MAX, VALUES_MAX, FIELD_SET, VIEW_KINDS, VIEW_NAME_MAX, GROUPS, SORTS, DIRECTIONS, PRIORITIES, SUBTASKS, LOOK_MAX, DUE,
 };
