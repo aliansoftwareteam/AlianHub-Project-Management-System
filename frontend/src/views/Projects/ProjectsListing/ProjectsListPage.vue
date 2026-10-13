@@ -17,7 +17,10 @@
                     </div>
                 </div>
                 <router-link v-if="hasPortfolio" class="ah-btn ah-btn--secondary ah-btn--sm" :to="{ name: 'Portfolio', params: { cid: companyId } }">{{ $t('Projects.portfolio_view') }}</router-link>
-                <button v-if="canCreate" type="button" class="ah-btn ah-btn--primary ah-btn--sm" @click="creating = true">
+                <button v-if="canCreate && aiEnabled" type="button" class="ah-btn ah-btn--outline ah-btn--sm" data-test="header-create-ai" @click="aiCreating = true">
+                    <ShellIcon name="ai" :size="14" />{{ $t('Projects.create_with_ai') }}
+                </button>
+                <button v-if="canCreate" type="button" class="ah-btn ah-btn--primary ah-btn--sm" data-test="header-new-project" @click="creating = true">
                     <ShellIcon name="plus" :size="14" />{{ $t('Projects.new_project') }}
                 </button>
             </div>

@@ -26,6 +26,7 @@
     margin-left: auto;
     display: flex;
     align-items: center;
+    flex-wrap: wrap;
     gap: 6px;
 }
 
@@ -210,6 +211,8 @@
 
 @media (max-width: 767px) {
     .pl2 { padding: 14px 12px; }
+    .pl2__head-actions { margin-left: 0; width: 100%; }
+    .pl2__head-actions .ah-btn { min-height: 36px; }
     .pl2__row {
         grid-template-columns: minmax(0, 1fr) 44px;
         row-gap: 8px;
