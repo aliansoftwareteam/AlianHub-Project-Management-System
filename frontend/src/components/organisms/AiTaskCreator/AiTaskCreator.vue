@@ -206,6 +206,7 @@ const mode = ref('full');           // full | tasks | sprints
 const targetSprintId = ref('');
 const requirements = ref('');
 const plan = ref({ sprints: [] });
+const planId = ref('');
 
 // What this generation cost. Same shape and rules as the project creator's
 // display: the cost is shown only when the model used has a price on file, so
@@ -293,6 +294,7 @@ function reset() {
     targetSprintId.value = props.activeSprintId || (props.sprints[0] && props.sprints[0].id) || '';
     requirements.value = '';
     plan.value = { sprints: [] };
+    planId.value = '';
     planUsage.value = null;
     progressMsg.value = '';
     error.value = '';
@@ -348,6 +350,7 @@ async function generate() {
         }
         selectAll(p);
         plan.value = p;
+        planId.value = (res && res.planId) || '';
         planUsage.value = (res && res.usage) || null;
         step.value = 'preview';
     } catch (e) {
@@ -356,53 +359,30 @@ async function generate() {
     }
 }
 
-// Build a clean plan with only the checked items, stripping the UI-only
-// __selected flag. Shape depends on mode (flat tasks / sprint names / full).
-function buildSelectedPlan() {
-    const strip = (t) => { const rest = { ...t }; delete rest.__selected; return rest; };
-    // Plan-level extras (links / epics / custom fields) must ride along to the
-    // backend — it skips any that reference unselected tasks. Previously these
-    // were dropped here, so they were generated + previewed but never created.
-    const extras = {};
-    if (Array.isArray(plan.value.links) && plan.value.links.length) extras.links = plan.value.links;
-    if (Array.isArray(plan.value.epics) && plan.value.epics.length) extras.epics = plan.value.epics;
-    if (Array.isArray(plan.value.customFields) && plan.value.customFields.length) extras.customFields = plan.value.customFields;
-
-    if (mode.value === 'tasks') {
-        return { tasks: (plan.value.tasks || []).filter((t) => t.__selected).map(strip), ...extras };
-    }
-    if (mode.value === 'sprints') {
-        return {
-            sprints: (plan.value.sprints || [])
-                .filter((s) => s.__selected)
-                .map((s) => ({ sprintName: s.sprintName })),
-        };
-    }
-    const sprints = [];
-    for (const s of (plan.value.sprints || [])) {
-        const tasks = (s.tasks || []).filter((t) => t.__selected).map(strip);
-        if (tasks.length) sprints.push({ sprintName: s.sprintName, tasks });
-    }
-    return { sprints, ...extras };
-}
-
-function payloadHasContent(payload) {
-    if (mode.value === 'tasks') return (payload.tasks || []).length > 0;
-    return (payload.sprints || []).length > 0;
+// The places of the checked items: tasks counted across the lists in order, or lists in sprints mode.
+function keptPlaces() {
+    let items;
+    if (mode.value === 'tasks') items = plan.value.tasks || [];
+    else if (mode.value === 'sprints') items = plan.value.sprints || [];
+    else items = (plan.value.sprints || []).flatMap((s) => s.tasks || []);
+    return items.flatMap((item, at) => (item.__selected ? [at] : []));
 }
 
 async function create() {
-    const payload = buildSelectedPlan();
-    if (!payloadHasContent(payload)) return;
+    const keep = keptPlaces();
+    if (!keep.length) return;
     error.value = '';
     progressMsg.value = t('AiTask.creating');
     step.value = 'creating';
     try {
         const res = await executeTasks(props.projectId, {
-            plan: payload,
+            planId: planId.value,
+            keep,
             mode: mode.value,
             targetSprintId: mode.value === 'tasks' ? targetSprintId.value : '',
         });
+        if (res && res.expired) throw new Error(t('AiTask.plan_expired'));
+        if (res && res.inUse) throw new Error(t('AiTask.plan_in_use'));
         if (!res || !res.status || !res.jobId) {
             throw new Error((res && res.statusText) || t('AiTask.start_failed'));
         }

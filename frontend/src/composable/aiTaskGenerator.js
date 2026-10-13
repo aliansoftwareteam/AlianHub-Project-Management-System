@@ -8,7 +8,7 @@ import * as env from '@/config/env';
  *
  * Endpoints (Modules/AIProjectGenerator):
  *   POST /api/v1/ai/project/:projectId/tasks/plan     — async via SSE, returns a tasks plan
- *   POST /api/v1/ai/project/:projectId/tasks/execute  — persists the plan, returns jobId
+ *   POST /api/v1/ai/project/:projectId/tasks/execute  — makes the stored plan's kept items, returns jobId
  *   GET  /api/v1/ai-progress/:jobId                    — SSE progress stream (shared)
  */
 export function useAiTaskGenerator() {
@@ -53,14 +53,23 @@ export function useAiTaskGenerator() {
         });
     }
 
-    async function executeTasks(projectId, { plan, userName, mode, targetSprintId } = {}) {
-        const res = await apiRequest('post', `${env.AI_PROJECT_TASKS_BASE}/${projectId}/tasks/execute`, {
-            plan,
-            userName: userName || '',
-            mode: mode || 'full',
-            targetSprintId: targetSprintId || '',
-        });
-        return res.data;
+    // The server makes the plan it stored under planId; it answers 410 once that copy has expired and 409 while
+    // another run of it is going.
+    async function executeTasks(projectId, { planId, keep, userName, mode, targetSprintId } = {}) {
+        try {
+            const res = await apiRequest('post', `${env.AI_PROJECT_TASKS_BASE}/${projectId}/tasks/execute`, {
+                planId,
+                keep: Array.isArray(keep) ? keep : undefined,
+                userName: userName || '',
+                mode: mode || 'full',
+                targetSprintId: targetSprintId || '',
+            });
+            return res.data;
+        } catch (e) {
+            if (e && e.response && e.response.status === 410) return { status: false, expired: true };
+            if (e && e.response && e.response.status === 409) return { status: false, inUse: true };
+            throw e;
+        }
     }
 
     /**

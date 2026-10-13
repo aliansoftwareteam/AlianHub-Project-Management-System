@@ -70,13 +70,8 @@ export function useAiProjectGenerator() {
         return unwrap(res.data);
     }
 
-    async function generateGuide({ planId, approvedBrief, assumptions, plan }) {
-        const res = await apiRequest('post', env.AI_PROJECT_GUIDE, {
-            planId: planId || undefined,
-            approvedBrief,
-            assumptions: Array.isArray(assumptions) ? assumptions : [],
-            plan: plan || undefined,
-        });
+    async function generateGuide({ planId }) {
+        const res = await apiRequest('post', env.AI_PROJECT_GUIDE, { planId: planId || undefined });
         return unwrap(res.data);
     }
 
@@ -124,14 +119,14 @@ export function useAiProjectGenerator() {
                     });
                 } else if (payload.event === 'error') {
                     if (unsubscribe) unsubscribe();
-                    reject(new Error(payload.error || 'Plan generation failed. Please try again.'));
+                    reject(Object.assign(new Error(payload.error || 'Plan generation failed. Please try again.'), { code: payload.code }));
                 }
             });
         });
     }
 
     // The server builds the plan it proposed under planId, with the brief and guide it kept; it answers 410 once
-    // that copy has expired.
+    // that copy has expired and 409 while another build of it is running.
     async function execute({ planId, edits, userName, isPrivateSpace, proposalId, skills, source, picks }) {
         try {
             const res = await apiRequest('post', env.AI_PROJECT_EXECUTE, {
@@ -147,6 +142,7 @@ export function useAiProjectGenerator() {
             return unwrap(res.data);
         } catch (e) {
             if (e && e.response && e.response.status === 410) return { status: false, expired: true };
+            if (e && e.response && e.response.status === 409) return { status: false, inUse: true };
             throw e;
         }
     }

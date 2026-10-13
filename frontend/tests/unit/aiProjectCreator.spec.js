@@ -224,9 +224,7 @@ describe('AiProjectCreator guided flow', () => {
         expect(wrapper.find('[data-test="plan-assumptions"]').text()).toContain('No launch date given');
 
         const guideBody = callsTo(env.AI_PROJECT_GUIDE)[0][2];
-        expect(guideBody.planId).toBe('plan-1');
-        expect(guideBody.approvedBrief).toBe(brief.markdown);
-        expect(guideBody.assumptions).toEqual(brief.assumptions);
+        expect(guideBody).toEqual({ planId: 'plan-1' });
         expect(wrapper.text()).toContain('Discovery');
         expect(wrapper.text()).toContain('Payment provider');
     });
@@ -352,6 +350,39 @@ describe('AiProjectCreator guided flow', () => {
         expect(wrapper.vm.step).toBe('preview');
         expect(wrapper.find('[data-test="generate-again"]').exists()).toBe(false);
         expect(wrapper.text()).not.toContain('AiProject.plan_expired');
+    });
+
+    it('says the plan is already being built on a second click, without offering to generate again', async () => {
+        routes({ clarify: () => ({ coverage: allMet, round: 1, maxRounds: 2, questions: [] }), executeFails: { response: { status: 409, data: { status: false, code: 'PLAN_IN_USE' } } } });
+        const wrapper = mountCreator();
+        await reachPreview(wrapper);
+        await wrapper.find('[data-test="create-everything"]').trigger('click');
+        await flushPromises();
+        expect(wrapper.vm.step).toBe('preview');
+        expect(wrapper.text()).toContain('AiProject.plan_in_use');
+        expect(wrapper.text()).not.toContain('AiProject.plan_expired');
+        expect(wrapper.find('[data-test="generate-again"]').exists()).toBe(false);
+    });
+
+    it('sends a cleared guide as an empty guide', async () => {
+        routes({ clarify: () => ({ coverage: allMet, round: 1, maxRounds: 2, questions: [] }) });
+        const wrapper = mountCreator();
+        await reachPreview(wrapper);
+        wrapper.vm.guideMarkdown = '';
+        await wrapper.find('[data-test="create-everything"]').trigger('click');
+        await flushPromises();
+        expect(callsTo(env.AI_PROJECT_EXECUTE)[0][2].edits.guideMarkdown).toBe('');
+    });
+
+    it('says when every kept plan is being built instead of generating another', async () => {
+        routes({ clarify: () => ({ coverage: allMet, round: 1, maxRounds: 2, questions: [] }) });
+        const base = apiRequest.getMockImplementation();
+        apiRequest.mockImplementation((method, url, body) => (url === env.AI_PROJECT_PLAN
+            ? Promise.reject({ response: { status: 409, data: { status: false, code: 'PLANS_BUSY', statusText: 'busy' } } })
+            : base(method, url, body)));
+        const wrapper = mountCreator();
+        await reachPreview(wrapper);
+        expect(wrapper.text()).toContain('AiProject.plans_busy');
     });
 
     it('emits created for the new project only when it is opened', async () => {
