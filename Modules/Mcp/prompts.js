@@ -257,6 +257,7 @@ const rolePrompt = (role) => Object.freeze({
         request ? `What I want you to work on: "${request}".` : 'Ask me what to work on, unless I have just told you.',
         'Ask me for anything the playbook needs that you do not have before you start, and show me what you will change before you change it.',
         ...(has('queue.list') ? [`Your queue is \`queue.list\` with role "${role.blueprint}/${role.slug}": the tasks a lead routed to the ${role.name}.`] : []),
+        ...(has('queue.claim') && has('queue.release') ? [`Give that same role to \`queue.claim\` and \`queue.release\`, so your claim stays yours when other roles work over this connection too.`] : []),
         markMissing(role.body, has),
         CONTENT_RULE,
     ].filter(Boolean),
