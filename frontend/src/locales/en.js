@@ -3556,7 +3556,7 @@ export default {
         view_reason_name_missing: "The view had no name.",
         view_reason_look: "Its grouping, sorting or filters could not be used.",
         view_reason_kind: "This kind of view is not available.",
-        view_reason_too_many: "A plan can hold at most 5 views.",
+        view_reason_too_many: "A plan can hold at most {n} views.",
         view_reason_no_source: "The project has no tab of this kind to start from.",
         view_reason_other: "The view could not be made.",
         open_project: "Open project →",

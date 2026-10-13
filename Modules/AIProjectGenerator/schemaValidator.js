@@ -258,7 +258,6 @@ const PlanViewSchema = z.object({
     name: z.string().max(200).optional().default(''),
     kind: z.string().max(40).optional().default('list'),
     look: z.record(z.string(), z.unknown()).optional(),
-    showFields: z.array(z.string().max(200)).max(50).optional(),
 });
 
 const PlanSchema = z.object({
@@ -597,6 +596,11 @@ function sanitizeMemberIds(plan, allowedIds) {
     for (const sprint of plan.sprints) {
         for (const task of sprint.tasks) {
             task.AssigneeUserId = filterIds(task.AssigneeUserId, `task:${task.TaskName}`);
+        }
+    }
+    for (const view of (Array.isArray(plan.views) ? plan.views : [])) {
+        if (view && view.look && Array.isArray(view.look.assigneeIds)) {
+            view.look.assigneeIds = filterIds(view.look.assigneeIds, `view:${view.name}`);
         }
     }
     return { plan, removed };

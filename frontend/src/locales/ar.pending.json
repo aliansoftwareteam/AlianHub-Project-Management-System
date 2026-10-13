@@ -1694,7 +1694,7 @@
     "AiProject.view_reason_no_source": "The project has no tab of this kind to start from.",
     "AiProject.view_reason_other": "The view could not be made.",
     "AiProject.view_reason_permission": "You may not add views to this project.",
-    "AiProject.view_reason_too_many": "A plan can hold at most 5 views.",
+    "AiProject.view_reason_too_many": "A plan can hold at most {n} views.",
     "AiProject.views_dropped_title": "Left out of the plan",
     "AiProject.views_made_title": "Views made",
     "AiProject.views_not_made_title": "Views not made",

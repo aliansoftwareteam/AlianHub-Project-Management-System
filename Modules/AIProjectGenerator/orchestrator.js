@@ -643,6 +643,26 @@ async function pushNewStatusesToSettings({ companyId, statusUpdates }) {
     await Promise.allSettled(ops);
 }
 
+/* A tab outside the allowlist was added only so a planned view could start from it; with no view of its kind made it goes again. */
+async function dropUnusedTabs({ companyId, projectDoc, plannedKeys, made }) {
+    const used = new Set((made || []).map((view) => planViews.tabKeyOf(view.kind)));
+    const unused = [...plannedKeys].filter((key) => !AI_PROJECT_VIEW_KEYS.has(key) && !used.has(key));
+    const tabs = Array.isArray(projectDoc.ProjectRequiredComponent) ? projectDoc.ProjectRequiredComponent : [];
+    const ids = tabs.filter((tab) => unused.includes(String(tab.keyName || '').toLowerCase())).map((tab) => tab._id);
+    if (!ids.length) return;
+    try {
+        await MongoDbCrudOpration(companyId, {
+            type: SCHEMA_TYPE.PROJECTS,
+            data: [{ _id: projectDoc._id }, { $pull: { ProjectRequiredComponent: { _id: { $in: ids } } } }],
+        }, 'updateOne');
+        projectDoc.ProjectRequiredComponent = tabs.filter((tab) => !ids.includes(tab._id));
+        const stored = await MongoDbCrudOpration(companyId, { type: SCHEMA_TYPE.PROJECTS, data: [{ _id: projectDoc._id }] }, 'findOne');
+        socketEmitter.emit('update', { type: 'update', companyId: String(companyId), data: stored || projectDoc, updatedFields: { ProjectRequiredComponent: 'pull' }, module: 'project' });
+    } catch (e) {
+        logger.warn(`[AIPG] unused tabs left on ${projectDoc._id}: ${e && e.message ? e.message : e}`);
+    }
+}
+
 async function saveProject(companyId, projectDoc) {
     return MongoDbCrudOpration(companyId, { type: SCHEMA_TYPE.PROJECTS, data: projectDoc }, 'save');
 }
@@ -1130,6 +1150,7 @@ async function executePlan({ plan, companyId, uid, userData, jobId, approvedBrie
         }
 
         const views = await planViews.makeViews({ companyId, uid, projectId: tracker.project, views: plan.views });
+        await dropUnusedTabs({ companyId, projectDoc, plannedKeys: planViews.tabKeysFor(plan.views), made: views.made });
 
         // 9. History row (best-effort, single entry).
         const historyObject = {
@@ -1592,6 +1613,7 @@ module.exports = {
     loadCompanyContext,
     buildProjectDoc,
     pickRequiredComponents,
+    dropUnusedTabs,
     mergeStatusList,
     rollback,
     bgFromText,

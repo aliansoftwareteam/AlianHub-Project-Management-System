@@ -74,6 +74,7 @@ describe('the plan schema and prompt', () => {
         expect(PlanSchema.safeParse(validPlan([BY_PERSON, DUE_DATES])).data.views).toEqual([BY_PERSON, DUE_DATES]);
         expect(PlanSchema.safeParse(validPlan([1, 2, 3, 4, 5, 6].map(named))).success).toBe(true);
         expect(PlanSchema.safeParse(validPlan()).success).toBe(true);
+        expect(PlanSchema.safeParse(validPlan([{ ...DUE_DATES, showFields: ['Budget'] }])).data.views).toEqual([DUE_DATES]);
     });
 
     it('asks the model for up to five views of the kinds a setup plan takes', () => {
@@ -104,7 +105,44 @@ describe('trimming the views', () => {
         expect(dropped.map((entry) => entry.code)).toEqual(['name_missing', 'look']);
     });
 
-    it('gives each reason from the routes a code the web app translates', () => {
+    it('keeps each view in the shape that is made, so the preview shows the trimmed name', () => {
+        const long = { name: `${'A'.repeat(70)}`, kind: 'board', look: { groupBy: 'assignee', junk: true } };
+        const { kept } = planViews.trimViews([long]);
+        expect(kept).toEqual([projectSetup.viewOf(long)]);
+        expect(kept[0].name).toHaveLength(60);
+        expect(kept[0].look).toEqual({ groupBy: 'assignee' });
+        expect(planViews.trimViews(kept).kept).toEqual(kept);
+    });
+
+    it('takes each code from where the plan check raises it', () => {
+        const at = (views) => projectSetup.viewsProblemOf({ views });
+        expect(at([{ name: '', kind: 'list' }])).toEqual({ code: 'name_missing', message: 'views[0] needs a name' });
+        expect(at([{ name: 'G', kind: 'gantt' }])).toEqual({ code: 'kind', message: 'views[0] (G) needs a kind: one of list, board, table, calendar, workload' });
+        expect(at([{ name: 'S', kind: 'list', look: { sortDirection: 'asc' } }])).toEqual({ code: 'look', message: 'views[0] (S): sortDirection needs sortBy' });
+        expect(at([{ name: 'A', kind: 'list' }, { name: 'a', kind: 'board' }])).toEqual({ code: 'name_taken', message: '"a" is named twice in views' });
+        expect(at([1, 2, 3, 4, 5, 6].map(named))).toEqual({ code: 'too_many', message: 'views needs 1 to 5 views' });
+        expect(at([BY_PERSON])).toEqual({ code: '', message: '' });
+    });
+
+    it('takes each code from where making a view refuses it', async () => {
+        const { MongoDbCrudOpration } = require('../utils/mongo-handler/mongoQueries');
+        const setup = require('../Modules/Agents/setupRequests');
+        const project = { _id: P, ProjectName: 'Bike shop', taskStatusData: [], ProjectRequiredComponent: [
+            { _id: '6f0000000000000000000b01', keyName: 'ProjectListView', name: 'List', viewStatus: true },
+            { _id: '6f0000000000000000000b02', keyName: 'ProjectListView', title: 'Mine', viewStatus: true },
+        ] };
+        MongoDbCrudOpration.mockImplementation(async (companyId, { type }, op) => (op === 'findOne' && type === 'projects' ? project : []));
+        const refusal = (asked) => setup.createView({ companyId: C, who: { uid: U, via: '' }, projectId: P, kind: 'list', ...asked }).catch((error) => ({ code: error.code, message: error.message }));
+        expect(await refusal({ name: 'G', kind: 'gantt' })).toEqual({ code: 'kind', message: 'The kind of view must be one of list, board, table, calendar, workload.' });
+        expect(await refusal({ name: 'mine' })).toEqual({ code: 'name_taken', message: expect.stringMatching(/^This project already has a saved view named "Mine"\. Use that one/) });
+        expect(await refusal({ name: 'Grouped', look: { groupBy: 'colour' } })).toEqual({ code: 'look', message: expect.stringMatching(/^groupBy must be one of status, assignee, priority, due_date/) });
+        expect(await refusal({ name: 'Due', kind: 'calendar' })).toEqual({ code: 'no_source', message: 'this project has no calendar view to start from; the person adds one in AlianHub first' });
+        expect((await refusal({ name: 'Fresh' })).code).toBe('other');
+        expect([403, 404, 500].map(setup.routeRefusalCode)).toEqual(['permission', 'other', 'other']);
+        MongoDbCrudOpration.mockImplementation(async () => []);
+    });
+
+    it('reads a code from the English text only for a reason that came without one', () => {
         expect(planViews.reasonCode('This project already has a saved view named "Mine". Use that one, or pick another name.')).toBe('name_taken');
         expect(planViews.reasonCode('The person approving may not make this part: x is not granted')).toBe('permission');
         expect(planViews.reasonCode('this project has no calendar view to start from; the person adds one in AlianHub first')).toBe('no_source');
@@ -147,6 +185,20 @@ describe('/plan', () => {
         const { plan } = orchestrator.executePlan.mock.calls[0][0];
         expect(plan.views).toHaveLength(5);
         expect(plan.viewsDropped).toBeUndefined();
+    });
+
+    it('keeps only company members in a view\'s assignees at /execute', async () => {
+        const MEMBER = '6f0000000000000000000a02';
+        const STRANGER = '6f0000000000000000000a09';
+        const { sanitizeMemberIds } = require('../Modules/AIProjectGenerator/schemaValidator');
+        const sanitized = sanitizeMemberIds({ project: { LeadUserId: [] }, sprints: [], views: [{ name: 'Mine', kind: 'list', look: { assigneeIds: [MEMBER, STRANGER] } }] }, new Set([MEMBER]));
+        expect(sanitized.plan.views[0].look.assigneeIds).toEqual([MEMBER]);
+        expect(sanitized.removed).toEqual([{ label: 'view:Mine', id: STRANGER }]);
+
+        const r = res();
+        await ctrl.execute(req({ plan: validPlan([{ name: 'Theirs', kind: 'list', look: { assigneeIds: [STRANGER] } }]), source: 'other' }), r);
+        await sleep(350);
+        expect(orchestrator.executePlan.mock.calls[0][0].plan.views[0].look.assigneeIds).toEqual([]);
     });
 });
 
