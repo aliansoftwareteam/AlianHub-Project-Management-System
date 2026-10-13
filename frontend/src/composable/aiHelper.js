@@ -1,6 +1,6 @@
 import { computed, inject } from "vue";
 import { useCustomComposable } from ".";
-import Swal from "sweetalert2";
+import Swal from '@/utils/lazySwal';
 import { apiRequest } from "@/services";
 import * as env from '@/config/env';
 import { useRouter } from "vue-router";
@@ -26,7 +26,6 @@ export function useAiApiFunction() {
                         title: t('AI.please_upgrade_plan_to_use_ai'),
                         text: t('AI.ai_available_on_paid_plans_upgrade_now'),
                         icon: 'info',
-                        confirmButtonColor: '#28C76F',
                         confirmButtonText: t('Header.upgrade_now'),
                         showCloseButton:true    
                     }).then((result) => {

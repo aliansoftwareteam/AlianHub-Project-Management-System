@@ -1,9 +1,12 @@
+const mongoose = require("mongoose");
 const mongoC = require("../../utils/mongo-handler/mongoQueries")
 const { myCache } = require('../../Config/config');
 const serviceCtr = require("../serviceFunction.js")
 const { removeCache } = require('../../utils/commonFunctions');
 const { dbCollections } = require("../../Config/collections.js");
-const { generateToken } = require("../../Config/jwt.js");
+const { newSessionCredentials } = require("./helpers/refreshSession");
+const { sessionCacheKey } = require("./helpers/refreshTokenRules");
+const { signedInPersonOnly } = require("./helpers/accountSecurity");
 
 
 /**
@@ -22,21 +25,22 @@ exports.insertSessionFun = async (reqData, userAgent, ip, cb) => {
             return;
         }
         const userAgentObj = serviceCtr.getBrowersInfo(userAgent) || {};
+        const credentials = newSessionCredentials(reqData.userId);
         let obj = {
             type: dbCollections.SESSIONS,
             data: {
+                ...credentials.fields,
                 userId: reqData.userId,
                 ip: ip,
-                refreshToken: generateToken(Number(process.env.SESSIONEXPIREDTIME || 172800)),
                 info: userAgentObj
             }
         }
         mongoC.MongoDbCrudOpration(dbCollections.GLOBAL, obj, "save").then((res)=>{
-            const cacheKey = `session:${reqData.userId}:${obj.data.refreshToken}`;
-            myCache.set(cacheKey, JSON.stringify({_id: res._id, userId: reqData.userId, refreshToken: obj.data.refreshToken}), 600);
+            const cacheKey = sessionCacheKey(String(reqData.userId), String(res._id), credentials.fields.refreshTokenJti);
+            myCache.set(cacheKey, JSON.stringify({_id: res._id, userId: reqData.userId}), 600);
             cb({
                 status: true,
-                data: {userId: reqData.userId, refreshToken: obj.data.refreshToken, _id: res._id},
+                data: {userId: reqData.userId, refreshToken: credentials.refreshToken, _id: res._id},
             })
         }).catch((error)=>{
             cb({
@@ -53,12 +57,21 @@ exports.insertSessionFun = async (reqData, userAgent, ip, cb) => {
 };
 
 
-/**
- * Update Session Function
- * @param {Object} reqData 
- * @param {*} cb 
- * @returns 
- */
+const SESSION_UPDATABLE_FIELDS = {
+    webToken: (value) => typeof value === 'string',
+    lastActive: (value) => (typeof value === 'string' || typeof value === 'number') && !Number.isNaN(new Date(value).getTime()),
+};
+
+// The body used to be handed to Mongo as the update itself, which let a caller rewrite
+// the owner or token fields of their own session row.
+const sessionUpdateOf = (updateObject) => {
+    if (!updateObject || typeof updateObject !== 'object' || Array.isArray(updateObject)) return null;
+    const entries = Object.entries(updateObject);
+    const allowed = entries.length && entries.every(([field, value]) => Object.hasOwn(SESSION_UPDATABLE_FIELDS, field) && SESSION_UPDATABLE_FIELDS[field](value));
+    if (!allowed) return null;
+    return { $set: Object.fromEntries(entries.map(([field, value]) => [field, field === 'lastActive' ? new Date(value) : value])) };
+};
+
 exports.updateSessionFun = async (reqData, cb) => {
     try {
         if (!(reqData && reqData.userId)) {
@@ -68,27 +81,33 @@ exports.updateSessionFun = async (reqData, cb) => {
             });
             return;
         }
-        if (!(reqData && reqData.refreshToken)) {
+        if (!(reqData.sessionId && mongoose.Types.ObjectId.isValid(reqData.sessionId))) {
             cb({
                 status: false,
-                message: "Refresh Token is require"
+                message: "Session id is required"
+            });
+            return;
+        }
+        const update = sessionUpdateOf(reqData.updateObject);
+        if (!update) {
+            cb({
+                status: false,
+                message: "Only webToken and lastActive can be updated"
             });
             return;
         }
         let obj = {
             type: dbCollections.SESSIONS,
             data: [
-                { refreshToken: reqData.refreshToken, userId: reqData.userId },
-                reqData.updateObject
+                { _id: new mongoose.Types.ObjectId(reqData.sessionId), userId: String(reqData.userId) },
+                update
             ]
         }
 
-        mongoC.MongoDbCrudOpration(dbCollections.GLOBAL, obj, "findOneAndUpdate").then((res)=>{
-            const cacheKey = `session:${reqData.userId}:${reqData.refreshToken}`;
-            removeCache(cacheKey, true);
+        mongoC.MongoDbCrudOpration(dbCollections.GLOBAL, obj, "findOneAndUpdate").then(()=>{
             cb({
                 status: true,
-                data: {userId: reqData.userId, refreshToken: reqData.refreshToken}
+                data: {userId: reqData.userId, _id: reqData.sessionId}
             })
         }).catch((error)=>{
             cb({
@@ -107,7 +126,7 @@ exports.updateSessionFun = async (reqData, cb) => {
 
 exports.updateSession = (req, res) => {
     try {
-        exports.updateSessionFun(req.body, (resData) => {
+        exports.updateSessionFun({ userId: req.uid, sessionId: req.sessionId, updateObject: req.body && req.body.updateObject }, (resData) => {
             if (!(resData && resData.status)) {
                 res.status(400).json({message: resData.message});
                 return;
@@ -118,28 +137,6 @@ exports.updateSession = (req, res) => {
         res.status(400).json({message: error.message ? error.message : error});
     }
 }
-/**
- * Register Sesstion
- * @param {Object} req 
- * @param {Object} res 
- */
-exports.registerSesstion = (req, res) => {
-    try {
-        const forwarded = req?.headers['x-forwarded-for'] || req.ip;
-        const clientIp = forwarded ? forwarded?.split(',')[0] : req?.connection?.remoteAddress;
-        exports.insertSessionFun(req.body, req.headers['user-agent'] || "", clientIp, (iSessionRes) => {
-            if (iSessionRes.status) {
-                res.status(200).json(iSessionRes)
-                return;
-            }
-            res.status(400).json({message: iSessionRes.message});
-        });
-    } catch (error) {
-        res.status(400).json({message: error.message ? error.message : error});
-    }
-};
-
-
 exports.getSessionwithRefreshTokenFun = (data, cb) => {
     try {
         let obj = {
@@ -176,15 +173,16 @@ exports.getSessionwithRefreshTokenFun = (data, cb) => {
 };
 
 
+// An empty filter here would sign out every user on the instance.
 exports.deleteSessionFun = (id, cb) => {
     try {
+        if (!id) {
+            cb({ status: false, message: "User id is required" });
+            return;
+        }
         let obj = {
             type: dbCollections.SESSIONS,
-            data: [{
-            }]
-        }
-        if (id) {
-            obj.data[0].userId = id;
+            data: [{ userId: String(id) }]
         }
         mongoC.MongoDbCrudOpration(dbCollections.GLOBAL, obj, "deleteMany").then((resData)=>{
             if (!(resData && resData.deletedCount)) {
@@ -210,67 +208,81 @@ exports.deleteSessionFun = (id, cb) => {
     }
 };
 
+const respondDeleted = (res, userId) => (resData) => {
+    if (!(resData && resData.status)) {
+        res.status(400).json({status: false, message: resData.message});
+        return;
+    }
+    removeCache(`session:${userId}:`, true);
+    res.status(200).json(resData);
+};
 
-/**
- * Delete All Session
- * @param {Object} req 
- * @param {Object} res 
- */
-exports.deleteAllSession = (req, res) => {
+exports.deleteAllSession = async (req, res) => {
     try {
-        exports.deleteSessionFun("", (resData) => {
-            if (!(resData && resData.status)) {
-                res.status(400).json({message: resData.message});
-                return;
-            }
-            removeCache(`session:`, true);
-            res.status(200).json(resData);
-        });
+        if (!req.uid) {
+            return res.status(401).json({ status: false, message: "Unauthorized" });
+        }
+        if (!(await signedInPersonOnly(req, res))) return undefined;
+        exports.deleteSessionFun(String(req.uid), respondDeleted(res, String(req.uid)));
     } catch (error) {
-        res.status(400).json({message: error.message ? error.message : error});
+        res.status(400).json({status: false, message: error.message ? error.message : error});
     }
 };
 
+const OBJECT_ID_PATTERN = /^[a-f0-9]{24}$/i;
 
-/**
- * Delete User Specific Session
- * @param {Object} req 
- * @param {Object} res 
- * @returns 
- */
-exports.deleteUserSpecificSession = (req, res) => {
+exports.canManageUserSessions = async (uid, targetId, companyId) => {
+    if (String(uid) === String(targetId)) return true;
+    if (!OBJECT_ID_PATTERN.test(String(targetId || '')) || !OBJECT_ID_PATTERN.test(String(companyId || ''))) return false;
+    const { getRoleType, isPrivileged, ROLE_OWNER } = require("../../Config/permissionGuard");
+    const callerRole = await getRoleType(companyId, uid);
+    if (!isPrivileged(callerRole)) return false;
+    // Ending a departed member's sessions is exactly what an admin needs after removing them, so the
+    // target's role is read from whatever row they still hold.
+    const targetRole = await getRoleType(companyId, targetId, { seat: 'any' });
+    if (targetRole === null) return false;
+    return callerRole === ROLE_OWNER || targetRole !== ROLE_OWNER;
+};
+
+exports.deleteUserSpecificSession = async (req, res) => {
     try {
+        if (!req.uid) {
+            return res.status(401).json({ status: false, message: "Unauthorized" });
+        }
+        if (!(await signedInPersonOnly(req, res))) return undefined;
         if (!(req.params && req.params.id)) {
-            res.status(400).json({message: "User id is required"});
+            res.status(400).json({status: false, message: "User id is required"});
             return;
         }
-        exports.deleteSessionFun(req.params.id, (resData) => {
-            if (!(resData && resData.status)) {                
-                res.status(400).json({message: resData.message});
-                return;
-            }
-            removeCache(`session:${req.params.id}`, true);
-            res.status(200).json(resData);
-        });
+        const targetId = String(req.params.id);
+        const allowed = await exports.canManageUserSessions(String(req.uid), targetId, req.headers['companyid']);
+        if (!allowed) {
+            return res.status(403).json({ status: false, message: "You can only sign out your own sessions, or a member of a company you administer." });
+        }
+        exports.deleteSessionFun(targetId, respondDeleted(res, targetId));
     } catch (error) {
-        res.status(400).json({message: error.message ? error.message : error});
+        res.status(400).json({status: false, message: error.message ? error.message : error});
     }
 };
 
 
 exports.removeSession = (req, cb) => {
     try {
-        const bodyData = req.body;
+        // Treat "no session found" as success — the user is already logged out.
+        // Only propagate failures if the DB operation itself throws (handled in .catch).
+        if (!(req.uid && req.sessionId && mongoose.Types.ObjectId.isValid(req.sessionId))) {
+            cb({ status: true, data: { deletedCount: 0 } });
+            return;
+        }
         let obj = {
             type: dbCollections.SESSIONS,
             data: [{
-                userId: bodyData.id,
-                refreshToken: bodyData.refreshToken
+                _id: new mongoose.Types.ObjectId(req.sessionId),
+                userId: String(req.uid)
             }]
         }
         mongoC.MongoDbCrudOpration(dbCollections.GLOBAL, obj, "deleteMany").then((resData)=>{
-            // Treat "no session found" as success — the user is already logged out.
-            // Only propagate failures if the DB operation itself throws (handled in .catch).
+            removeCache(`session:${req.uid}:${req.sessionId}:`, true);
             cb({
                 status: true,
                 data: resData,

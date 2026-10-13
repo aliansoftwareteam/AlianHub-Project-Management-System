@@ -1,10 +1,12 @@
 .time-bar {
     display: flex;
     align-items: center;
-    border: 1px solid #DFE1E6;
+    border: 1px solid var(--border);
     /* justify-content: space-between; */
     font-size: 10px;
-    min-width: 1560px;
+    min-width: 1080px;
+    /* Room for the closing "12 AM" label, which sits past the last tick like every other label. */
+    margin-right: 30px;
     /* padding: 5px; */
   }
   
@@ -14,7 +16,8 @@
     /* border-right: 1px solid #ccc; */
     display: flex;
     /* justify-content: center; */
-    border: 1px solid #FFFFFF;
+    border: 1px solid var(--surface);
+    background: var(--surface);
     width: 78px;
     text-align: left;
     position: relative;
@@ -26,16 +29,16 @@
   }
   
   .selected {
-    background-color: #8591F9;
-    border: 1px solid #3845B3;
+    background-color: var(--brand);
+    border: 1px solid var(--brand);
   }
   
   .time-name {
     text-align: center;
   }
   .inRange{
-     background-color: #E8F2FF;
-     border: 1px solid #E8F2FF;
+     background-color: var(--brand-tint);
+     border: 1px solid var(--hairline);
   }
   .time-slot div {
       position: absolute;
@@ -50,7 +53,7 @@
   .time-slot div span {
       left: -3px;
       position: relative;
-      color:  #535358;
+      color:  var(--ink-2);
       font-size: 10px;
       line-height: 16px;
   }
@@ -62,18 +65,19 @@
   }
  
  .time__bar-componenet::-webkit-scrollbar-thumb {
-    background-color: #2F3990;
+    background-color: var(--brand);
     border-radius: 6px; 
 }
 .time__bar-componenet{
     height: 75px !important;
 }
 .time__slot-length{
-  right: 0px;
+  left: 100%;
+  white-space: nowrap;
 }
 .colorlightgray.else_condition{
-  left: 28px;
+  left: -2px;
 }
 .time__slot--count.else_condition{
-  left: 0;
+  left: -3px;
 }

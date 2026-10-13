@@ -81,7 +81,7 @@
                         <template v-if="checkApps('tags') && clientWidth > 768">
                             <div v-for="(item, index) in tagChipArray" :key="index" @click.stop="">
                                 <div v-if="(index < chipCount)" class="tagList">
-                                    <TagChip :data="item" :isBorder="false" :ids="ids" :tagsArray="projectData.tagsArray" :prjectGlobalPermission='projectData?.isGlobalPermission' :taskId="task._id" :sprintId="task.sprintId" :taskName="task.TaskName"/>
+                                    <TagChip :data="item" :isBorder="false" :ids="ids" :tagsArray="projectData.tagsArray" :prjectGlobalPermission='projectData?.isGlobalPermission' :taskId="task._id" :sprintId="task.sprintId" :taskName="task.TaskName" light-surface/>
                                 </div>
                                 <div v-if="index == chipCount" class="tagcount" @click="openDropDwon()"> +{{tagChipArray.length - chipCount}} </div>
                             </div>
@@ -272,7 +272,7 @@
         <ConfirmationSidebar
             v-model="showSidebar"
             :title="`${archive ? $t('Projects.archive') : $t('Projects.delete')}`"
-            :message="archive ? $t('conformationmsg.archive') : $t('conformationmsg.delete')"
+            :message="$t(taskRemovalMessageKey(task, archive))"
             :confirmationString="`${archive ? 'archive' : 'delete'}`"
             :acceptButtonClass="archive ? 'btn-primary': 'btn-danger'"
             :acceptButton="`${archive ? $t('Projects.archive') : $t('Projects.delete')}`"
@@ -295,6 +295,7 @@ import TaskStatus from '@/components/atom/TaskStatus/TaskStatus.vue';
 import ProjectTaskType from '@/components/atom/TaskTypeSelection/TaskTypeSelection.vue';
 import DueDateCompo from '@/components/molecules/DueDateCompo/DueDateCompo.vue';
 import ConfirmationSidebar from '@/components/molecules/ConfirmationSidebar/ConfirmationSidebar.vue';
+import { taskRemovalMessageKey } from '@/utils/taskRemovalWords';
 import CreateTagPopup from '@/components/molecules/TagList/CreateTagPopup.vue';
 import TagChip from '@/components/atom/TagChip/TagChip.vue';
 import ConvertToSubTaskSidebar from '@/components/molecules/ConvertToSubTaskSidebar/ConvertToSubTaskSidebar.vue';
@@ -302,6 +303,7 @@ import ConvertToList from '@/components/molecules/ConvertToList/ConvertToList.vu
 import SubtaskProgressBadge from '@/components/atom/SubtaskProgressBadge/SubtaskProgressBadge.vue';
 import { apiRequest } from '@/services';
 import * as env from '@/config/env';
+import { subtaskProgress as countSubtasks } from '@/views/Projects/ListView/subtaskProgress';
 
 import TaskQuickMenu from './components/TaskQuickMenu.vue';
 import { useTaskActions } from './composables/useTaskActions';
@@ -309,6 +311,7 @@ import { useTaskMutations } from './composables/useTaskMutations';
 
 import { useConvertDate, useCustomComposable } from '@/composable';
 import { useTaskSelection } from '@/composable/useTaskSelection.js';
+import { permittedAssignees, selfAssignable } from '@/utils/assigneeOptions';
 import { useStore } from 'vuex';
 import { customField } from '../../../plugins/customFieldView/helper.js';
 
@@ -409,24 +412,14 @@ const projectTaskType = computed(() => projectData.value.taskTypeCounts);
 const taskStatus = computed(() => projectData.value.taskStatusData.find((x) => x.key === task.value.statusKey));
 const taskType = computed(() => projectData.value.taskTypeCounts.find((x) => x.key === task.value.TaskTypeKey));
 
-// Subtask completion (AHE-3776) for the list-row badge shown after the subtask
-// count. When the row is expanded its subtasks are loaded into `subtaskArray`
-// (used live); when collapsed they aren't loaded, so we fetch a lightweight
-// done/total count once on mount (`fetchedProgress`) and fall back to it — that
-// way the badge shows on a collapsed row right after reload. A subtask is done
-// when statusType is 'close'; only non-deleted subtasks count.
+// Subtask completion (AHE-3776) for the badge after the subtask count, by the List's rule:
+// the loaded subtasks are counted only when the row holds all of them, and the count fetched
+// on mount answers otherwise. A row can hold a few that arrived as events.
 const fetchedProgress = ref({ total: 0, completed: 0 });
 
 const subtaskProgress = computed(() => {
-    const loaded = Array.isArray(task.value?.subtaskArray)
-        ? task.value.subtaskArray.filter((s) => s && (s.deletedStatusKey === 0 || s.deletedStatusKey === undefined))
-        : [];
-    if (loaded.length) {
-        const completed = loaded.filter((s) => (s?.status?.type || s?.statusType) === 'close').length;
-        return { total: loaded.length, completed };
-    }
-    // Collapsed row — subtasks not loaded; use the count fetched on mount.
-    return fetchedProgress.value;
+    const progress = countSubtasks(task.value, fetchedProgress.value);
+    return progress ? { total: progress.total, completed: progress.done } : { total: 0, completed: 0 };
 });
 
 // One-time, read-only count of this parent's subtasks (done vs total) so the
@@ -437,7 +430,7 @@ const subtaskProgress = computed(() => {
 function fetchSubtaskProgress() {
     if (!task.value?.isParentTask) return;
     if ((Number(task.value?.subTasks) || 0) <= 0) return;
-    if (Array.isArray(task.value?.subtaskArray) && task.value.subtaskArray.length) return;
+    if ((task.value?.subtaskArray || []).length >= Number(task.value.subTasks)) return;
     const findQuery = [
         { $match: { ParentTaskId: String(task.value._id), deletedStatusKey: { $in: [0, undefined] } } },
         { $group: { _id: null, total: { $sum: 1 }, completed: { $sum: { $cond: [{ $eq: ['$statusType', 'close'] }, 1, 0] } } } },
@@ -462,52 +455,15 @@ const sprintData = computed(() => {
     return sprintData || null;
 });
 
-const permittedOptions = computed(() => {
-    let users = [];
-    if (sprintData.value) {
-        if (props.data.isParentTask) {
-            if (sprintData.value?.private) {
-                users = sprintData.value?.AssigneeUserId || [];
-            } else {
-                users = projectData.value?.isPrivateSpace ? (projectData.value?.AssigneeUserId || []) : companyUsers.value;
-            }
-        } else {
-            users = sprintData.value?.private
-                ? props.parentAssignee.filter((x) => sprintData.value?.AssigneeUserId?.includes(x))
-                : props.parentAssignee;
-        }
-    }
-
-    if (projectData.value?.isPrivateSpace) {
-        users = users.filter((x) => projectData.value?.AssigneeUserId.includes(x));
-        return Array.from(new Set([...users, ...(props.data?.AssigneeUserId || [])]));
-    }
-    return users;
-});
-
-const nonPermittedOptions = computed(() => {
-    let users = [];
-    if (sprintData.value) {
-        if (props.data.isParentTask) {
-            if (sprintData.value?.private) {
-                users = (sprintData.value?.AssigneeUserId || []).filter((x) => x === userId.value);
-            } else {
-                users = projectData.value?.isPrivateSpace
-                    ? (projectData.value?.AssigneeUserId || []).filter((x) => x === userId.value)
-                    : [userId.value];
-            }
-        } else {
-            users = (props.parentAssignee || [])?.filter((x) => x === userId.value);
-            if (sprintData.value?.private) {
-                users = users.filter((x) => sprintData.value?.AssigneeUserId?.includes(x));
-            }
-        }
-    }
-    if (projectData.value?.isPrivateSpace) {
-        users = users.filter((x) => projectData.value?.AssigneeUserId.includes(x));
-    }
-    return users;
-});
+const assigneeInput = computed(() => ({
+    task: props.data,
+    sprint: sprintData.value,
+    project: projectData.value,
+    parentAssignees: props.parentAssignee,
+    companyUsers: companyUsers.value
+}));
+const permittedOptions = computed(() => permittedAssignees(assigneeInput.value));
+const nonPermittedOptions = computed(() => selfAssignable({ ...assigneeInput.value, userId: userId.value }));
 
 watch(() => props.data, (newVal, oldVal) => {
     if (JSON.stringify(newVal) !== JSON.stringify(oldVal)) {

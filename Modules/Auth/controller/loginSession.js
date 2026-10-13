@@ -5,21 +5,26 @@ const config = require("../../../Config/config");
 const logger = require("../../../Config/loggerConfig");
 const serviceCtr = require("../../serviceFunction.js")
 const sendMail = require("../../service.js");
-const { generateToken, verifyToken, generateJWTToken, removeCacheAndCookie } = require("../../../Config/jwt.js");
+const { removeCacheAndCookie } = require("../../../Config/jwt.js");
+const { readCookie, clearOptions, httpOnlyCookies } = require("../../../Config/cookies");
 const helperCtr = require("../helper.js");
 const sesstionCtr = require("../session.js");
+const refreshSession = require("../helpers/refreshSession");
+const trackerCode = require("../helpers/trackerCode");
 const mongoose = require("mongoose");
 const { removeCache } = require("../../../utils/commonFunctions.js");
 const { updateUserFun } = require("../../Users/controller.js");
 
 
 
-const { addAndRemoveUserInMongodbNotificationCount, generateTokenV2Fun, verifyAuth } = require('./authHelpers');
+const { addAndRemoveUserInMongodbNotificationCount, generateTokenV2Fun, sessionRefusalFor, verifyAuth } = require('./authHelpers');
 const twoFactorRules = require('../helpers/twoFactorRules');
+const { pinSessionTenant } = require('../../../Config/tenant');
+const { getRoleType, isPrivileged } = require('../../../Config/permissionGuard');
+const { requestAddress } = require('../../../utils/requestAddress');
+const { signedInPersonOnly } = require('../helpers/accountSecurity');
 exports.manageAttempt = (req, res) => {
-    const forwarded = req?.headers['x-forwarded-for'] || req.ip;
-    const clientIp = forwarded ? forwarded?.split(',')[0] : req?.connection?.remoteAddress;
-    helperCtr.manageResetAttempt(clientIp, req.body, (mRes) => {
+    helperCtr.manageResetAttempt(req.ip, req.body, (mRes) => {
         if (!mRes.status) {
             res.status(mRes.statusCode).json({message: mRes.message});
             return;
@@ -35,14 +40,9 @@ exports.manageAttempt = (req, res) => {
  * @returns 
  */
 
-exports.removeUserNotification = (req,res) => {
-    if (!(req.body && req.body.companyId)) {
-        res.send({
-            status: false,
-            statusText: "CompanyId is required"
-        })
-        return;
-    }
+exports.removeUserNotification = async (req,res) => {
+    const companyId = pinSessionTenant(req, res);
+    if (!companyId) return;
     if (!(req.body && req.body.userId)) {
         res.send({
             status: false,
@@ -52,8 +52,18 @@ exports.removeUserNotification = (req,res) => {
     }
 
     let type = req.body.type !== undefined && req.body.type ? req.body.type : "Remove" 
+    const userId = String(req.body.userId);
 
-    addAndRemoveUserInMongodbNotificationCount(req.body.companyId,req.body.userId,type).then((response)=>{
+    // Joining adds only yourself; taking someone else out follows their removal by an owner or admin.
+    if (userId !== String(req.uid || '')) {
+        const mayActForOthers = type !== 'Add' && isPrivileged(await getRoleType(companyId, req.uid));
+        if (!mayActForOthers) {
+            res.status(403).send({ status: false, statusText: 'You can only change your own notification count.' });
+            return;
+        }
+    }
+
+    addAndRemoveUserInMongodbNotificationCount(companyId,userId,type).then((response)=>{
         res.send(response)
     }).catch((error)=>{
         res.send(error);
@@ -70,16 +80,26 @@ exports.removeUserNotification = (req,res) => {
  */
 
 /**
- * Issue a real session for `uid`: create the session row, mint the access
- * token, set the auth cookies, and respond — the canonical post-auth path.
- * Shared by password login and the 2FA second-step (/api/v2/auth/2fa/validate)
- * so both produce an identical session. On failure it sets
+ * Issue a real session for `uid`: check the account, create the session row,
+ * mint the access token, set the auth cookies, and respond. Password, 2FA,
+ * magic-link and setup sign-ins all end here. On failure it sets
  * req.errorMessageObject and calls next() (the route's manageAttempt handler
- * returns the error). Behaviour is unchanged from the previous inline block.
+ * returns the error), before any session row exists.
  */
-const finalizeSession = (req, res, uid, next) => {
-    const forwarded = req?.headers['x-forwarded-for'] || req.ip;
-    const clientIp = forwarded ? forwarded?.split(',')[0] : req?.connection?.remoteAddress;
+const finalizeSession = async (req, res, uid, next, onSuccess) => {
+    let refusal;
+    try {
+        refusal = await sessionRefusalFor(uid);
+    } catch (error) {
+        logger.error(`finalizeSession: ${error.message || error}`);
+        refusal = {message: "unauthorize user"};
+    }
+    if (refusal) {
+        req.errorMessageObject = refusal;
+        next();
+        return;
+    }
+    const clientIp = requestAddress(req);
     sesstionCtr.insertSessionFun({userId: uid}, req.headers['user-agent'] || "", clientIp, (sData) => {
         if (!(sData && sData.status)) {
             req.errorMessageObject = {message: "unauthorize user"};
@@ -92,23 +112,25 @@ const finalizeSession = (req, res, uid, next) => {
                 next();
                 return;
             }
-            // TODO(P1-SEC-09): see matching comment near login.
-            // Set httpOnly: true once the frontend no longer
-            // reads these cookies with js-cookie.
             const setCookie = {
                 maxAge: serviceCtr.convertToSeconds(process.env.JWT_EXP)*1000,
-                httpOnly: false,
+                httpOnly: httpOnlyCookies(),
                 secure: config.NODE_ENV === "production",
                 sameSite: config.NODE_ENV === "production" ? "Strict" : "Lax",
                 domain: process.env.NODE_ENV === "production" ? req.hostname : undefined,
             };
             res.cookie("refreshToken", sData.data.refreshToken, { ...setCookie, maxAge: Number(process.env.SESSIONEXPIREDTIME || 172800)*1000 });
             res.cookie("accessToken", gData.token, { ...setCookie });
-            res.status(200).json({
+            const payload = {
                 uid: uid,
                 refreshToken: sData.data.refreshToken,
                 accessToken: gData.token
-            });
+            };
+            if (typeof onSuccess === "function") {
+                onSuccess(payload);
+                return;
+            }
+            res.status(200).json(payload);
         });
     });
 };
@@ -153,60 +175,69 @@ exports.loginAuth = (req, res, next) => {
     }
 };
 
-/**
- * Tracker login Auth
- * @param {Object} req 
- * @param {Object} res 
- */
-
-exports.loginAuthTracker = (req,res) => {
+exports.issueTrackerCode = async (req, res) => {
+    const refuse = (statusCode, message) => res.status(statusCode).json({ status: false, statusText: message, message });
     try {
-        let obj = {
-            type: dbCollections.SESSIONS,
-            data: [{
-                refreshToken: req.body.refreshToken
-            }]
+        if (!(req.uid && req.sessionId)) return refuse(401, 'Sign in to connect the desktop tracker.');
+        const codeChallenge = req.body && req.body.codeChallenge;
+        if (codeChallenge && !trackerCode.isCodeChallenge(codeChallenge)) {
+            return refuse(400, 'The desktop tracker sent an unusable code challenge.');
         }
-        
-        mongoC.MongoDbCrudOpration(dbCollections.GLOBAL, obj, "findOne").then(async (sessionData)=>{
-            if (sessionData) {
-                const forwarded = req?.headers['x-forwarded-for'] || req.ip;
-                const clientIp = forwarded ? forwarded?.split(',')[0] : req?.connection?.remoteAddress;
-                sesstionCtr.insertSessionFun({userId: sessionData.userId}, req.headers['user-agent'] || "", clientIp, (sData) => {
-                    if (!(sData && sData.status)) {
-                        res.status(400).json({message: 'Invalid Refresh Token'})
-                        return;
-                    }
-                    generateTokenV2Fun(sessionData.userId, sData.data.refreshToken, (gData) => {
-                        if (!(gData && gData.status)) {
-                            res.status(400).json({message: 'Invalid Refresh Token'})
-                            return;
-                        }
-                        res.status(200).json({
-                            uid: sessionData.userId,
-                            refreshToken: sData.data.refreshToken,
-                            accessToken: gData.token
-                        });
-                    });
-                });
-                return;
-            } else {
-                res.status(400).json({message: 'Invalid Refresh Token'})
+        const issued = await trackerCode.issueTrackerCode({ userId: req.uid, sessionId: req.sessionId, codeChallenge });
+        if (!issued) return refuse(401, 'Your session is expired');
+        return res.status(200).json({ status: true, statusText: 'OK', data: { code: issued.code, expiresAt: issued.expiresAt } });
+    } catch (error) {
+        logger.error(`issueTrackerCode: ${error.message || error}`);
+        return refuse(400, 'Could not create a tracker sign-in code.');
+    }
+};
+
+exports.loginAuthTracker = async (req, res) => {
+    const invalid = () => res.status(400).json({message: 'Invalid or expired tracker sign-in code'});
+    try {
+        const { code, refreshToken, userId, codeVerifier } = req.body || {};
+        // Tracker builds released before one-time codes post the deep-link value as `refreshToken`.
+        const redeemed = await trackerCode.redeemTrackerCode(code || refreshToken, codeVerifier || (req.body || {}).code_verifier);
+        if (!redeemed.ok) {
+            if (redeemed.reason === 'legacy') {
+                return res.status(400).json({message: 'This desktop tracker is too old to sign in. Update it and try again.'});
             }
-        })
+            return invalid();
+        }
+        const sessionUserId = redeemed.userId;
+        if (userId && String(userId) !== sessionUserId) return invalid();
+
+        const refusal = await sessionRefusalFor(sessionUserId).catch((error) => {
+            logger.error(`loginAuthTracker: ${error.message || error}`);
+            return { message: 'unauthorize user' };
+        });
+        if (refusal) return invalid();
+
+        const clientIp = requestAddress(req);
+        sesstionCtr.insertSessionFun({userId: sessionUserId}, req.headers['user-agent'] || "", clientIp, (sData) => {
+            if (!(sData && sData.status)) return invalid();
+            generateTokenV2Fun(sessionUserId, sData.data.refreshToken, (gData) => {
+                if (!(gData && gData.status)) return invalid();
+                res.status(200).json({
+                    uid: sessionUserId,
+                    refreshToken: sData.data.refreshToken,
+                    accessToken: gData.token
+                });
+            });
+        });
     } catch (error) {
         res.status(400).json({message: error.message ? error.message : error});
     }
 }
 
-
-/**
- * Change Password
- * @param {Object} req 
- * @param {Object} res 
- */
-
-exports.logout = (req, res) => {
+exports.logout = async (req, res) => {
+    try {
+        if (!(await signedInPersonOnly(req, res))) return;
+    } catch (error) {
+        logger.error(`logout: ${error.message || error}`);
+        res.status(400).json({ message: 'Could not sign out.' });
+        return;
+    }
     sesstionCtr.removeSession(req, async(data) => {
         if (!data.status) {
             res.status(400).json({
@@ -218,21 +249,18 @@ exports.logout = (req, res) => {
             domain: process.env.NODE_ENV === "production" ? req.hostname : undefined,
             expires: new Date(0)
         }
-        const updateData = [
-            { _id: new mongoose.Types.ObjectId(req.body.id) },
-            {
-                $set: { isOnline: false, lastActive: new Date() }
-            }
-        ];
-        let obj = {
-            type: dbCollections.USERS,
-            data: updateData
+        if (req.uid && mongoose.Types.ObjectId.isValid(String(req.uid))) {
+            await mongoC.MongoDbCrudOpration('global', {
+                type: dbCollections.USERS,
+                data: [
+                    { _id: new mongoose.Types.ObjectId(String(req.uid)) },
+                    { $set: { isOnline: false, lastActive: new Date() } }
+                ]
+            }, "updateOne");
+            removeCache(`UserData:${req.uid}`)
+            removeCache('UserAllData:',true)
         }
-        const cacheKey = `UserData:${req.body.id}`;
-        await mongoC.MongoDbCrudOpration('global', obj, "updateOne");         
-        removeCache(cacheKey)
-        removeCache('UserAllData:',true)
-            
+
         res.cookie("accessToken","deleted",{...deleteCookie})
         res.cookie("refreshToken","deleted",{...deleteCookie})
         
@@ -247,15 +275,24 @@ exports.testV2 = (req, res) => {
     res.json(req.body);
 }
 
-exports.generateTokenV2 = async (req, res) => {
-    const refreshToken = req.headers['refresh-token'] || "";
-    if (!(req.body && req.body.uid)) {
-        res.status(400).json({
-            status: false,
-            statusText: "The user id is required."
-        });
-        return;
+const refuseRefresh = (res, reason) => {
+    if (reason === 'userRequired') {
+        return res.status(400).json({ status: false, statusText: "The user id is required." });
     }
+    if (reason === 'rotated') {
+        return res.status(409).json({
+            status: false,
+            statusText: "This refresh token was just exchanged. Retry with the current one.",
+            isRotated: true
+        });
+    }
+    res.clearCookie('accessToken', clearOptions(res.req));
+    res.clearCookie('refreshToken', clearOptions(res.req));
+    return res.status(400).json({ message: "Your session is expired", isLogout: true });
+};
+
+exports.generateTokenV2 = async (req, res) => {
+    const refreshToken = req.headers['refresh-token'] || readCookie(req, 'refreshToken') || "";
     if (!refreshToken) {
         res.status(400).json({
             status: false,
@@ -263,40 +300,31 @@ exports.generateTokenV2 = async (req, res) => {
         });
         return;
     }
-    const cacheKey = `session:${req.body.uid}:${refreshToken}`;
-    try {   
-        const validRefreshToken = verifyToken(refreshToken);
-        if (!(validRefreshToken && validRefreshToken.status)) {
-            removeCacheAndCookie("", cacheKey, res, refreshToken);
-            res.status(400).json({message: "Your session is expired", isLogout: true});
-            return;
-        }
-        generateTokenV2Fun(req.body.uid, refreshToken, (gData) => {
+    try {
+        const resolved = await refreshSession.resolveRefreshSession(refreshToken, req.body && req.body.uid);
+        if (!resolved.ok) return refuseRefresh(res, resolved.reason);
+        const rotated = await refreshSession.rotateRefreshSession(resolved);
+        if (!rotated.ok) return refuseRefresh(res, rotated.reason);
+
+        generateTokenV2Fun(rotated.userId, rotated.refreshToken, (gData) => {
             if (!(gData && gData.status)) {
-                removeCacheAndCookie("", cacheKey, res, refreshToken);
+                removeCacheAndCookie("", "", res, rotated.refreshToken);
                 res.status(400).json(gData);
                 return;
             }
-            // TODO(P1-SEC-09): set httpOnly: true once the frontend stops
-            // reading these cookies directly. Currently App.vue,
-            // socketHelper.js, CreateCompany.vue, services/index.js, etc.
-            // call Cookies.get('accessToken' | 'refreshToken'), so flipping
-            // httpOnly here breaks socket auth and the refresh flow until
-            // the frontend stores tokens in memory/localStorage (or the
-            // backend switches to reading req.cookies via cookie-parser).
             const setCookie = {
-                maxAge: serviceCtr.convertToSeconds(process.env.JWT_EXP)*1000,
-                httpOnly: false,
+                httpOnly: httpOnlyCookies(),
                 secure: config.NODE_ENV === "production",
                 sameSite: config.NODE_ENV === "production" ? "Strict" : "Lax",
                 domain: process.env.NODE_ENV === "production" ? req.hostname : undefined
             };
-            res.cookie("accessToken", gData.token, { ...setCookie });
-            res.json(gData);
+            res.cookie("refreshToken", rotated.refreshToken, { ...setCookie, maxAge: Math.max(0, rotated.expiresAt * 1000 - Date.now()) });
+            res.cookie("accessToken", gData.token, { ...setCookie, maxAge: serviceCtr.convertToSeconds(process.env.JWT_EXP)*1000 });
+            res.json({ ...gData, refreshToken: rotated.refreshToken });
         });
     } catch (error) {
         logger.error(`Generate Jwt Token Error: ${error}`);
-        removeCacheAndCookie("", cacheKey, res, refreshToken);
+        removeCacheAndCookie("", "", res, refreshToken);
         res.status(400).json({
             status: false,
             isLogout: true,

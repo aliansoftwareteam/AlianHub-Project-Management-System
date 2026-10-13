@@ -3,8 +3,8 @@
     Created By: Parth Detroja
 -->
 <template>
-    <div class="bg-white d-flex align-items-center position-re border-radius-6-px" :class="{'mr-15' : clientWidth > 767 , 'mr-010' : clientWidth <= 767}">
-        <DropDown maxHeight="47dvh" zIndex="99" :bodyClass="{'main-filter-dropdown-wrapper' : true}">
+    <div class="d-flex align-items-center position-re" :class="{'mr-15' : clientWidth > 767 , 'mr-010' : clientWidth <= 767}">
+        <DropDown mode="dialog" themed :aria-label="$t('Filters.filter')" maxHeight="47dvh" zIndex="99" :bodyClass="{'main-filter-dropdown-wrapper' : true}" :bodyClassHeader="{'top-filter-section' : true}">
             <template #head>
                 <div class="d-flex align-items-center justify-content-between filter-title" v-if="clientWidth <= 767">
                     <h3 class="m-0">{{$t('Filters.filter')}}</h3>
@@ -16,18 +16,20 @@
                     </div>
                 </div>
             </template>
-            <template #button>
-                <div class="top-filter-section">
-                    <img :src="editIcon" id="projectviewfilter_driver" alt="TaskFilter" class="task-filter-icon cursor-pointer" ref="closeFilterRef"/>
-                    <span v-if="isApplyed" class="task-filter-count">{{inputs.length}}</span>
-                    <img v-if="isApplyed" src="@/assets/images/svg/deletered.svg" alt="close" class="task-filter-close cursor-pointer" @click.stop.prevent="clearFilter"/>
-                </div>
+            <template #button="{ triggerAttrs }">
+                <button type="button" v-bind="triggerAttrs" ref="closeFilterRef" class="task-filter-trigger" :title="$t('Projects.filter')" :aria-label="$t('Projects.filter')">
+                    <img :src="editIcon" alt="" aria-hidden="true" class="task-filter-icon"/>
+                </button>
+                <span v-if="isApplyed" class="task-filter-count">{{inputs.length}}</span>
+                <button v-if="isApplyed" type="button" class="task-filter-clear" :title="$t('Filters.clearall')" :aria-label="$t('Filters.clearall')" @click.stop.prevent="clearFilter">
+                    <img src="@/assets/images/svg/deletered.svg" alt="" aria-hidden="true" class="task-filter-close"/>
+                </button>
             </template>
             <template #options>
-                <div class="bottom-filter-section bg-white" >
+                <div class="bottom-filter-section">
                     <div class="d-flex justify-content-between w-100 mb-13px" v-if="clientWidth > 767">
                         <div class="filter-title">
-                            <h2 class="m-0 font-size-18 text-capitalize">{{ isEdit === true ? selectedRow.name : $t('Filters.filter')}}</h2>
+                            <h2 class="m-0 font-size-18">{{ isEdit === true ? selectedRow.name : $t('Filters.filter')}}</h2>
                         </div>
                         <div class="filter-info d-flex">
                             <a href="https://help.alianhub.com/" target="_blank">
@@ -47,13 +49,14 @@
                             :users="users"
                             :mainOptions="keysArray"
                             :dueDateOptions="dueDateOptions"
+                            :customFields="customFieldDefs"
                             @delete="deleteRow"
                         />
                     </div>
                     <div class="d-flex w-100 add-filter-wrapper">
                         <div class="add-section mb-13px" :class="{'d-flex justify-content-between w-100' : clientWidth <= 767}" v-if="keysArray.length">
                             <span><a href="#" class="mr-10px"  @click.stop.prevent="clearFilter($event), $refs.closeFilterRef.click()" v-if="clientWidth <= 767" :class="{'font-weight-500 font-size-18' : clientWidth <=767}">{{$t('Filters.clearall')}}</a></span>
-                            <a href="#" class="blue" @click.stop.prevent="addRow" :class="{'font-weight-400 font-size-12' : clientWidth > 767 , 'font-weight-500 font-size-18' : clientWidth <= 767}">+ {{$t('Filters.addfilter')}}</a>
+                            <a href="#" class="tf-link" @click.stop.prevent="addRow" :class="{'font-weight-400 font-size-12' : clientWidth > 767 , 'font-weight-500 font-size-18' : clientWidth <= 767}">+ {{$t('Filters.addfilter')}}</a>
                         </div>
                     </div>
                     <FieldsActions
@@ -106,13 +109,15 @@ import { apiRequest } from '../../../services';
 import { useI18n } from "vue-i18n";
 const { t } = useI18n();
 import { buildFilterQuery } from "@/composable/commonFunction";
+import { clearFilterSignal, VIEW_FILTER_ROWS } from "@/views/Projects/composables/taskFilterSignal";
+import { useProjectCustomFields } from "@/views/Projects/composables/projectCustomFields";
+import { comparisonsFor, customFilterOptions, needsValue } from "@/views/Projects/composables/customFieldQuery";
 
 // Utils
 const { getUser } = useGetterFunctions();
 const { getters } = useStore();
 const priorities = computed(() => getters["settings/companyPriority"]);
 const $toast = useToast();
-const companyOwner = computed(() => getters["settings/companyOwnerDetail"]);
 
 // Props
 const props = defineProps({
@@ -152,6 +157,14 @@ const isInvalid = ref(false);
 const selectedRow = ref({});
 const filters = ref([]);
 const closeFilterRef = ref();
+const viewFilterRows = inject(VIEW_FILTER_ROWS, null);
+let syncedRows = null;
+const rowsOf = (list) => list.map(({ name, comparison, values, condition, date }) => ({ name, comparison, values, condition, date }));
+const shareRows = (rows) => {
+    if (!viewFilterRows) return;
+    syncedRows = rows;
+    viewFilterRows.value = rows;
+};
 const mainOptions = ref([
     { value: 'statusKey', name: "status",type:'array',filterOn:'statusKey' },
     { value: 'DueDate', name: "due_date",type:'date',filterOn:'DueDate' } ,
@@ -176,8 +189,11 @@ const dueDateOptions = ref(
     ]
 )
 
+const { defs: customFieldDefs } = useProjectCustomFields(computed(() => props.projectData));
+const customOptions = computed(() => customFilterOptions(customFieldDefs.value));
+
 const keysArray = computed(() => {
-    return mainOptions.value.filter(option => {
+    return [...mainOptions.value, ...customOptions.value].filter(option => {
         if(!inputs.value.some(input => input.name.value === option.value)) {
             return option;
         }
@@ -215,19 +231,14 @@ const prioritiesArray = computed(() => {
         return { ...x, finalValue: x.value}
     })?.sort((a, b) => a?.name.localeCompare(b?.name));
 });
-function getUserData() {
-    const user = getUser(userId.value);
-    return {
-        id: user.id,
-        Employee_Name: user.Employee_Name,
-        companyOwnerId: companyOwner.value.id,
-    };
-}
-const userData = getUserData();
 
-// Mounted
 onMounted(() => {
-    addRow();
+    if (viewFilterRows?.value?.length) {
+        syncedRows = viewFilterRows.value;
+        loadRows(viewFilterRows.value);
+    } else {
+        addRow();
+    }
     getFiltersData();
 });
 
@@ -251,32 +262,6 @@ const getFiltersData = async () => {
 };
 
 /**
- * This function is used to manage all the task history for the project and tasks
- * @param {*} type 
- * @param {*} key 
- * @param {*} message 
- */
-const manageHistory = async (type, key, message) => {
-    const axiosData = {
-        "type": type,
-        "companyId": companyId.value,
-        "projectId": props.projectData.id,
-        "taskId": null,
-        "object": {
-            "sprintId": null,
-            "key": key,
-            "message": message
-        },
-        "userData": getUserData()
-    };
-    await apiRequest("post", env.HANDLE_HISTORY, axiosData).then((result) => {
-        if(result.data.status) {
-            console.info(result.data.statusText)
-        }
-    });
-}
-
-/**
  * This function is used for the handle update event
  * @param {*} obj 
  */
@@ -286,13 +271,11 @@ const handleUpdate = async (obj) => {
         { $set: obj?.name ? { name: obj.name } : { filters: obj.filters } }
     ]
 
-    await apiRequest("put", `${env.TASK_GLOBAL_FILTER}/update`, params).then((result) => {
+    await apiRequest("put", `${env.TASK_GLOBAL_FILTER}/update?projectId=${props.projectData?.id || ''}`, params).then((result) => {
         if (result.status) {
             getFiltersData();
             $toast.success(t('Toast.Filter_update_successfully'), { position: 'top-right' });
 
-            const msg = `<b>${userData.Employee_Name}</b> has been updated <b>${selectedRow.value.name}</b> filter`;
-            manageHistory('project', "Project_Filter", msg);
         }
     });
 }
@@ -302,7 +285,7 @@ const handleUpdate = async (obj) => {
  * @param {String} type 
  */
  const manageArray = (type) => {
-    let arrayData = [];
+    let arrayData = { value: [] };
     if(type === "statusKey") {
         arrayData = statusArray;
     } else if (type === "Task_Priority") {
@@ -324,7 +307,8 @@ const handleUpdate = async (obj) => {
  * Populate the value in comparision array based on key
  * @param {String} key 
  */
-const manageComparisonArray = (key) => {
+const manageComparisonArray = (key, name = {}) => {
+    if (name.type === "custom") return comparisonsFor(name.fieldType);
     const arraykeys = ["statusKey", "Task_Priority", "Task_Leader", "TaskTypeKey", "tagsArray"];
     const dateKeys = ["DueDate"];
     let arrayData = [];
@@ -357,7 +341,12 @@ const validateItems = () => {
         if (typeof item.comparison !== "object" || Object.keys(item.comparison).length === 0) {
             item.isValidate = false;
         }
-        if (item.name.value === "DueDate") {
+        if (item.name.type === "custom") {
+            const value = item.values?.[0];
+            if (needsValue(item.comparison?.value) && (!Array.isArray(item.values) || !item.values.length || value === "" || value === null)) {
+                item.isValidate = false;
+            }
+        } else if (item.name.value === "DueDate") {
             if (item.values.length === 0) {
                 item.isValidate = false;
             }
@@ -430,7 +419,7 @@ const applyFilter = (data) => {
         isEdit.value = true;
         selectedRow.value = data.item;
         queries = JSON.parse(JSON.stringify(data.item.filters));
-        queries.map(x => x.comparisonsData = manageComparisonArray(x.name.value));
+        queries.map(x => x.comparisonsData = manageComparisonArray(x.name.value, x.name));
         queries.map(x => manageArray(x.name.value).value.filter(v => x.values.includes(v.finalValue)));
         nextTick(() => {
             inputs.value = queries
@@ -444,6 +433,7 @@ const applyFilter = (data) => {
     }
     filterBy = buildFilterQuery(queries)
     emits('apply', filterBy);
+    shareRows(rowsOf(queries));
     isApplyed.value = true;
     closeFilterRef.value.click();
 }
@@ -451,14 +441,45 @@ const applyFilter = (data) => {
 /**
  * This function is used to clear all the selected filters and close it
  */
-const clearFilter = () => {
+const resetPanel = () => {
     inputs.value = [];
     addRow();
-    emits('clear', true);
     isValidate.value = true;
     isEdit.value = false;
     isApplyed.value = false;
+    if (viewFilterRows?.value?.length) shareRows([]);
 }
+
+const loadRows = (rows) => {
+    if (!rows.length) {
+        inputs.value = [];
+        addRow();
+        isApplyed.value = false;
+    } else {
+        inputs.value = rows.map((row) => ({
+            ...JSON.parse(JSON.stringify(row)),
+            isAllChecked: false,
+            isValidate: true,
+            comparisonsData: manageComparisonArray(row.name.value, row.name),
+            displayData: (manageArray(row.name.value).value || []).filter((option) => row.values.includes(option.finalValue)),
+        }));
+        isApplyed.value = true;
+    }
+    isValidate.value = true;
+    isEdit.value = false;
+}
+if (viewFilterRows) {
+    watch(viewFilterRows, (rows) => {
+        if (rows === syncedRows) return;
+        syncedRows = rows;
+        loadRows(rows || []);
+    });
+}
+const clearFilter = () => {
+    resetPanel();
+    emits('clear', true);
+}
+watch(clearFilterSignal, resetPanel);
 
 /**
  * This function is used to save the filter to the database
@@ -531,7 +552,7 @@ const deleteFilter = (row) => {
 
 const handleConfirm = async (val) => {
     if (val) {
-        await apiRequest("delete", `${env.TASK_GLOBAL_FILTER}/delete/${companyId.value}/${selectedRow.value._id}`).then((result) => {
+        await apiRequest("delete", `${env.TASK_GLOBAL_FILTER}/delete/${companyId.value}/${selectedRow.value._id}?projectId=${props.projectData?.id || ''}`).then((result) => {
             if (result.status) {
                 const index = filters.value.findIndex(x => x._id === selectedRow.value._id);
                 if (index !== -1) {
@@ -539,10 +560,6 @@ const handleConfirm = async (val) => {
                 }
                 $toast.success(t("Toast.Filter_deleted_successfully"), { position: 'top-right' });
                 isConfirm.value = false;
-
-                // Filter history
-                const msg = `<b>${userData.Employee_Name}</b> has been deleted <b>${selectedRow.value.name}</b> filter`;
-                manageHistory('project', "Project_Filter", msg);
             }
         });
     }

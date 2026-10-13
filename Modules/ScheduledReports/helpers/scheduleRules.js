@@ -3,6 +3,8 @@
 // the dev /run-due endpoint share identical, testable logic. Unit-tested in
 // tests/schedule-rules.test.js.
 
+const { textHtml, subjectText } = require('../../Template/emailText');
+
 const CADENCES = ['daily', 'weekly', 'monthly'];
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
@@ -47,22 +49,20 @@ const isDue = (schedule, now) => {
     return next.getTime() <= new Date(now).getTime();
 };
 
-const esc = (s) => String(s == null ? '' : s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
-
 // Pure HTML body for an emailed report.
 const reportEmailHtml = ({ name = 'Report', dimensionLabel = 'Group', metricLabel = 'Value', rows = [], total = 0 } = {}) => {
     const body = (rows || []).map((r) =>
-        `<tr><td style="padding:6px 10px;border-bottom:1px solid #eee">${esc(r.label)}</td><td style="padding:6px 10px;border-bottom:1px solid #eee;text-align:right">${esc(r.value)}</td></tr>`).join('');
+        `<tr><td style="padding:6px 10px;border-bottom:1px solid #eee">${textHtml(r.label)}</td><td style="padding:6px 10px;border-bottom:1px solid #eee;text-align:right">${textHtml(r.value)}</td></tr>`).join('');
     return `<div style="font-family:Arial,Helvetica,sans-serif;color:#33384a">
-<h2 style="margin:0 0 12px">${esc(name)}</h2>
+<h2 style="margin:0 0 12px">${textHtml(name)}</h2>
 <table style="border-collapse:collapse;min-width:320px">
-<thead><tr><th style="text-align:left;padding:6px 10px;border-bottom:2px solid #ddd">${esc(dimensionLabel)}</th><th style="text-align:right;padding:6px 10px;border-bottom:2px solid #ddd">${esc(metricLabel)}</th></tr></thead>
-<tbody>${body || '<tr><td colspan="2" style="padding:10px;color:#999">No data.</td></tr>'}<tr><td style="padding:6px 10px;font-weight:bold">Total</td><td style="padding:6px 10px;text-align:right;font-weight:bold">${esc(total)}</td></tr></tbody>
+<thead><tr><th style="text-align:left;padding:6px 10px;border-bottom:2px solid #ddd">${textHtml(dimensionLabel)}</th><th style="text-align:right;padding:6px 10px;border-bottom:2px solid #ddd">${textHtml(metricLabel)}</th></tr></thead>
+<tbody>${body || '<tr><td colspan="2" style="padding:10px;color:#999">No data.</td></tr>'}<tr><td style="padding:6px 10px;font-weight:bold">Total</td><td style="padding:6px 10px;text-align:right;font-weight:bold">${textHtml(total)}</td></tr></tbody>
 </table>
 <p style="color:#9aa0b4;font-size:12px;margin-top:14px">Scheduled report delivered by AlianHub.</p>
 </div>`;
 };
 
-const reportEmailSubject = (name) => `AlianHub report: ${name || 'Scheduled report'}`;
+const reportEmailSubject = (name) => subjectText(`AlianHub report: ${name || 'Scheduled report'}`);
 
 module.exports = { CADENCES, cleanRecipients, validateSchedule, computeNextRun, isDue, reportEmailHtml, reportEmailSubject };

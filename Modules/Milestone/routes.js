@@ -1,4 +1,21 @@
 const ctrl = require('./controller');
+const { SCHEMA_TYPE } = require('../../Config/schemaType');
+const { READ, requireProjectAccess, keepVisibleProjects, projectIdsFrom } = require('../../Config/projectAccess');
+const { requireCompanyAdmin } = require('../../Config/permissionGuard');
+
+const MILESTONE = ['project.project_milestone'];
+const MILESTONE_STATUS = [['project.project_milestone_status_change', 'project.project_milestone']];
+
+const bodyMilestone = (req) => req.body && req.body.milestoneObject;
+const queryProject = (req) => req.query && req.query.projectId;
+const readsProject = (projectIds) => requireProjectAccess({ mode: READ, projectIds });
+/* The report names its projects as a list or as one id; either way it is the list that is narrowed. */
+const reportedProjects = (req) => (req.body ? [].concat(req.body.element === undefined || req.body.element === null ? [] : req.body.element) : []);
+const changesMilestone = (milestoneId, permissions) => requireProjectAccess({
+    projectIds: projectIdsFrom({ records: [[SCHEMA_TYPE.MILESTONE, milestoneId]], direct: (req) => req.body && req.body.projectId }),
+    permissions: () => permissions,
+    passMissing: () => true,
+});
 
 exports.init = (app) => {
     /**
@@ -8,16 +25,14 @@ exports.init = (app) => {
     *      addMilestone:
     *        type: object
     *        required:
-    *         - companyId
     *         - projectId
     *         - milestoneObject
     *         - ProjectName
-    *         - userDetail
     *        properties:
     *         companyId: 
     *           type: string
-    *           required: true
-    *           description: companyId.
+    *           required: false
+    *           description: Ignored; the company comes from the companyid header.
     *         projectId: 
     *           type: string
     *           required: true
@@ -32,8 +47,8 @@ exports.init = (app) => {
     *           description: ProjectName.
     *         userDetail:
     *           type: object
-    *           required: true
-    *           description: userDetail.
+    *           required: false
+    *           description: Ignored; history and notifications name the signed-in user.
     *         milestoneStatusObj:
     *           type: object
     *           required: false
@@ -60,7 +75,7 @@ exports.init = (app) => {
     /**
      * add milestone API
     */
-    app.post('/api/v1/addmilestone', ctrl.addMilestone);
+    app.post('/api/v1/addmilestone', changesMilestone(() => null, MILESTONE), ctrl.addMilestone);
 
 
     /**
@@ -70,16 +85,14 @@ exports.init = (app) => {
     *      updateMilestone:
     *        type: object
     *        required:
-    *         - companyId
     *         - projectId
     *         - milestoneObject
     *         - ProjectName
-    *         - userDetail
     *        properties:
     *         companyId: 
     *           type: string
-    *           required: true
-    *           description: companyId.
+    *           required: false
+    *           description: Ignored; the company comes from the companyid header.
     *         projectId: 
     *           type: string
     *           required: true
@@ -94,8 +107,8 @@ exports.init = (app) => {
     *           description: ProjectName.
     *         userDetail:
     *           type: object
-    *           required: true
-    *           description: userDetail.
+    *           required: false
+    *           description: Ignored; history and notifications name the signed-in user.
     *         milestoneStatusObj:
     *           type: object
     *           required: false
@@ -135,7 +148,7 @@ exports.init = (app) => {
     /**
      * update milestone API
     */
-    app.post('/api/v1/updatemilestone', ctrl.updateMilestone);
+    app.post('/api/v1/updatemilestone', changesMilestone(bodyMilestone, MILESTONE), ctrl.updateMilestone);
     
     
     /**
@@ -145,16 +158,14 @@ exports.init = (app) => {
     *      deleteMilestone:
     *        type: object
     *        required:
-    *         - companyId
     *         - projectId
     *         - milestoneObjForDelete
     *         - ProjectName
-    *         - userDetail
     *        properties:
     *         companyId: 
     *           type: string
-    *           required: true
-    *           description: companyId.
+    *           required: false
+    *           description: Ignored; the company comes from the companyid header.
     *         projectId: 
     *           type: string
     *           required: true
@@ -169,8 +180,8 @@ exports.init = (app) => {
     *           description: ProjectName.
     *         userDetail:
     *           type: object
-    *           required: true
-    *           description: userDetail.
+    *           required: false
+    *           description: Ignored; history and notifications name the signed-in user.
     *         onlyNumber:
     *           type: number
     *           required: true
@@ -197,7 +208,7 @@ exports.init = (app) => {
     /**
      * delete milestone API
     */
-    app.post('/api/v1/deletemilestone', ctrl.deleteMilestone);
+    app.post('/api/v1/deletemilestone', changesMilestone((req) => req.body && req.body.milestoneObjForDelete, MILESTONE), ctrl.deleteMilestone);
     
     
     /**
@@ -207,16 +218,14 @@ exports.init = (app) => {
     *      clearMilestoneStatus:
     *        type: object
     *        required:
-    *         - companyId
     *         - projectId
     *         - milestoneObject
     *         - ProjectName
-    *         - userDetail
     *        properties:
     *         companyId: 
     *           type: string
-    *           required: true
-    *           description: companyId.
+    *           required: false
+    *           description: Ignored; the company comes from the companyid header.
     *         projectId: 
     *           type: string
     *           required: true
@@ -231,8 +240,8 @@ exports.init = (app) => {
     *           description: ProjectName.
     *         userDetail:
     *           type: object
-    *           required: true
-    *           description: userDetail.
+    *           required: false
+    *           description: Ignored; history and notifications name the signed-in user.
     */
     /**
      * @swagger
@@ -255,7 +264,7 @@ exports.init = (app) => {
     /**
      * clear milestone API
     */
-    app.post('/api/v1/clearmilestonestatus', ctrl.clearMilestoneStatus);
+    app.post('/api/v1/clearmilestonestatus', changesMilestone(bodyMilestone, MILESTONE_STATUS), ctrl.clearMilestoneStatus);
     
     
     /**
@@ -265,16 +274,14 @@ exports.init = (app) => {
     *      cancelMilestoneStatus:
     *        type: object
     *        required:
-    *         - companyId
     *         - projectId
     *         - milestoneObject
     *         - ProjectName
-    *         - userDetail
     *        properties:
     *         companyId: 
     *           type: string
-    *           required: true
-    *           description: companyId.
+    *           required: false
+    *           description: Ignored; the company comes from the companyid header.
     *         projectId: 
     *           type: string
     *           required: true
@@ -289,8 +296,8 @@ exports.init = (app) => {
     *           description: ProjectName.
     *         userDetail:
     *           type: object
-    *           required: true
-    *           description: userDetail.
+    *           required: false
+    *           description: Ignored; history and notifications name the signed-in user.
     *         statusObj:
     *           type: object
     *           required: false
@@ -321,7 +328,7 @@ exports.init = (app) => {
     /**
      * cancel milestone status API
     */
-    app.post('/api/v1/cancelmilestonestatus', ctrl.cancelMilestoneStatus);
+    app.post('/api/v1/cancelmilestonestatus', changesMilestone(bodyMilestone, MILESTONE_STATUS), ctrl.cancelMilestoneStatus);
     
     
     /**
@@ -331,14 +338,13 @@ exports.init = (app) => {
     *      refundAmount:
     *        type: object
     *        required:
-    *         - companyId
     *         - projectId
     *         - milestoneObject
     *        properties:
     *         companyId: 
     *           type: string
-    *           required: true
-    *           description: companyId.
+    *           required: false
+    *           description: Ignored; the company comes from the companyid header.
     *         projectId: 
     *           type: string
     *           required: true
@@ -373,7 +379,7 @@ exports.init = (app) => {
     /**
      * refundAmount API
     */
-    app.post('/api/v1/refundamount', ctrl.refundAmount);
+    app.post('/api/v1/refundamount', changesMilestone(bodyMilestone, MILESTONE_STATUS), ctrl.refundAmount);
     
     
     /**
@@ -383,14 +389,13 @@ exports.init = (app) => {
     *      draggableMilestone:
     *        type: object
     *        required:
-    *         - companyId
     *         - projectId
     *         - milestoneObject
     *        properties:
     *         companyId: 
     *           type: string
-    *           required: true
-    *           description: companyId.
+    *           required: false
+    *           description: Ignored; the company comes from the companyid header.
     *         projectId: 
     *           type: string
     *           required: true
@@ -421,10 +426,20 @@ exports.init = (app) => {
     /**
      * draggableMilestone API
     */
-    app.post('/api/v1/draggablemilestone', ctrl.draggableMilestone);
+    app.post('/api/v1/draggablemilestone', changesMilestone(bodyMilestone, MILESTONE), ctrl.draggableMilestone);
 
-    app.get('/api/v1/milestone/project/:pid', ctrl.getMilestoneByProject);
-    app.get('/api/v1/milestone/:id', ctrl.getMilestone);
-    app.post('/api/v1/milestone', ctrl.updateWeeklyRangeMilestone);
-    app.post('/api/v1/milestoneReport', ctrl.getMilestoneReport);
+    app.get('/api/v1/milestone/project/:pid', readsProject((req) => req.params.pid), ctrl.getMilestoneByProject);
+    app.get('/api/v1/milestone/:id', readsProject(projectIdsFrom({ records: [[SCHEMA_TYPE.MILESTONE, (req) => req.params.id]], direct: (req) => req.params.id })), ctrl.getMilestone);
+    app.post('/api/v1/milestone', requireCompanyAdmin({ permission: 'settings.milestone_weekly_range' }), ctrl.updateWeeklyRangeMilestone);
+    app.post('/api/v1/milestoneReport', keepVisibleProjects({ get: reportedProjects, set: (req, ids) => { req.body.element = ids; } }), ctrl.getMilestoneReport);
+
+    // Billing (handoff 19a / 19b / 19d). `billing.*` is deliberately absent from
+    // Modules/Agents/registry.js — no agent path may reach these.
+    app.get('/api/v2/billing/contract', readsProject(queryProject), ctrl.getBillingContract);
+    app.put('/api/v2/billing/contract', changesMilestone(() => null, []), ctrl.updateBillingContract);
+    app.post('/api/v2/billing/milestone', changesMilestone(() => null, MILESTONE), ctrl.createBillingMilestone);
+    app.patch('/api/v2/billing/milestone/:id', changesMilestone((req) => req.params.id, MILESTONE), ctrl.updateBillingMilestone);
+    app.get('/api/v2/billing/hourly', readsProject(queryProject), ctrl.getHourlyBilling);
+    app.get('/api/v2/billing/client-view', readsProject(queryProject), ctrl.getClientView);
+    app.post('/api/v2/billing/client-view/message', changesMilestone(() => null, []), ctrl.postClientMessage);
 };

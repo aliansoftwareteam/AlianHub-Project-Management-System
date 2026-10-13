@@ -1,0 +1,129 @@
+import { onBeforeUnmount, watch } from "vue";
+import { useStore } from "vuex";
+import { apiRequest } from "@/services";
+
+const BASE = "/api/v2/assignment-rules/dispatcher";
+
+const dataOf = (response) => response?.data?.data;
+
+export const fetchDispatcher = (projectId) => apiRequest("get", `${BASE}/project/${projectId}`, undefined).then(dataOf);
+
+export const saveDispatcher = (projectId, body) => apiRequest("put", `${BASE}/project/${projectId}`, body).then(dataOf);
+
+export const addRoutingRule = (projectId, rule) => apiRequest("post", `${BASE}/project/${projectId}/rules`, rule).then(dataOf);
+
+export const fetchNeedsRouting = (projectId) => apiRequest("get", `${BASE}/project/${projectId}/needs-routing`, undefined).then(dataOf);
+
+export const fetchOrgChart = () => apiRequest("get", `${BASE}/company/org-chart`, undefined).then(dataOf);
+
+export const fetchFlowBoard = () => apiRequest("get", `${BASE}/company/flow-board`, undefined).then(dataOf);
+
+export const fetchTaskRouting = (taskId) => apiRequest("get", `${BASE}/task/${taskId}`, undefined).then(dataOf);
+
+export const actOnRouting = (taskId, decisionId, action, body = {}) => apiRequest("post", `${BASE}/task/${taskId}/decisions/${decisionId}/${action}`, body).then(dataOf);
+
+/* A blueprint's display name; one the locales do not know yet shows as its slug. */
+export const blueprintName = (t, te, blueprint) => {
+    const key = `Blueprints.${String(blueprint || "").replace(/-/g, "_")}`;
+    return te(key) ? t(key) : String(blueprint || "");
+};
+
+export const teamName = (t, te, team) => {
+    const key = `Teams.${String(team || "").replace(/-/g, "_")}`;
+    return te(key) ? t(key) : String(team || "");
+};
+
+export const fetchTeamPacks = () => apiRequest("get", `${BASE}/team-packs`, undefined).then(dataOf);
+
+export const applyTeamPack = (body) => apiRequest("post", `${BASE}/team-packs`, body).then(dataOf);
+
+/* The server undoes what it recorded for `applied.applyId`; the lists in the answer are only shown. */
+export const undoTeamPack = (applied) => apiRequest("post", `${BASE}/team-packs`, {
+    undo: true,
+    blueprint: applied.blueprint,
+    teams: applied.teams,
+    projectIds: applied.projects.map((project) => project.projectId),
+    applyId: applied.applyId
+}).then(dataOf);
+
+export const packProjectLine = (t, project, name, roleName = (key) => key) => {
+    const rules = (project.rules || []).length;
+    const tags = project.tags || [];
+    const fields = project.fields || [];
+    return [
+        t("TeamPacks.project_on", { project: name, mode: t(`TeamPacks.mode_${project.mode}`) }),
+        project.modeWas === "off" ? t("TeamPacks.mode_switched") : "",
+        rules ? t("TeamPacks.rules_added", { n: rules }, rules) : "",
+        ...(project.rulesOnTag || []).map((one) => t("TeamPacks.rule_on_tag", { role: roleName(one.role), tag: one.tag, type: one.type })),
+        project.skippedRules ? t("TeamPacks.rules_waiting", { n: project.skippedRules }, project.skippedRules) : "",
+        project.rulesAwaitingTags ? t("TeamPacks.rules_await_tags", { n: project.rulesAwaitingTags }, project.rulesAwaitingTags) : "",
+        tags.length ? t("TeamPacks.tags_proposed", { n: tags.length, names: tags.join(", ") }, tags.length) : "",
+        fields.length ? t("TeamPacks.fields_proposed", { n: fields.length, names: fields.join(", ") }, fields.length) : ""
+    ].filter(Boolean).join(" ");
+};
+
+export const roleNamesOf = (roles) => {
+    const names = new Map((roles || []).filter((role) => role && role.key).map((role) => [role.key, role.name]));
+    return (key) => names.get(key) || key;
+};
+
+export const fieldsKeptAfterUndo = (answers) => (answers || []).some((answer) => (answer?.projects || []).some((project) => project.fieldsKept));
+
+export const DISPATCHER_CHANGED_EVENT = "dispatcherChanged";
+
+/* Calls `onChange` whenever the dispatcher's decisions or settings change in the company; the socket is replaced on reconnect. */
+export function useDispatcherChanges(onChange) {
+    const store = useStore();
+    let listening = null;
+    const listenOn = (socket) => {
+        if (listening) listening.off(DISPATCHER_CHANGED_EVENT, onChange);
+        listening = socket && typeof socket.on === "function" ? socket : null;
+        if (listening) listening.on(DISPATCHER_CHANGED_EVENT, onChange);
+    };
+    watch(() => store?.getters?.["settings/getSocketInstance"], listenOn, { immediate: true });
+    onBeforeUnmount(() => listenOn(null));
+}
+
+const CONDITION_KEYS = Object.freeze({ type: "taskTypeKeys", tag: "tags", priority: "priorities", status: "statusKeys", list: "sprintIds" });
+const NUMBER_KINDS = Object.freeze(["type", "status"]);
+export const CONDITION_KINDS = Object.freeze([...Object.keys(CONDITION_KEYS), "field"]);
+
+/* A rule's id is kept through an edit so a team pack's undo can still find the rule it added. */
+const ruleIdOf = (rule) => (rule?.id ? { ruleId: rule.id } : {});
+const idOfRow = (row) => (row.ruleId ? { id: row.ruleId } : {});
+
+export const ruleToRow = (rule) => {
+    const when = rule?.when || {};
+    if (Array.isArray(when.fields) && when.fields.length) return { ...ruleIdOf(rule), kind: "field", fieldId: when.fields[0].id, value: String(when.fields[0].value ?? ""), role: rule.role };
+    const kind = Object.keys(CONDITION_KEYS).find((name) => Array.isArray(when[CONDITION_KEYS[name]]) && when[CONDITION_KEYS[name]].length) || "type";
+    return { ...ruleIdOf(rule), kind, fieldId: "", value: String((when[CONDITION_KEYS[kind]] || [""])[0] ?? ""), role: rule?.role || "" };
+};
+
+export const rowToRule = (row) => {
+    if (row.kind === "field") return { ...idOfRow(row), role: row.role, when: { fields: [{ id: row.fieldId, value: row.value }] } };
+    const value = NUMBER_KINDS.includes(row.kind) ? Number(row.value) : row.value;
+    return { ...idOfRow(row), role: row.role, when: { [CONDITION_KEYS[row.kind]]: [value] } };
+};
+
+export const rowIsComplete = (row) => Boolean(row.role && String(row.value).trim() && (row.kind !== "field" || String(row.fieldId).trim())
+    && (!NUMBER_KINDS.includes(row.kind) || Number.isFinite(Number(row.value))));
+
+/* settings/companyPriority holds the company's task_priorities settings: [{ name, value, image, statusImage, isDeleted }],
+ * and a task stores the `value` in Task_Priority. */
+export const priorityChoices = (list) => (Array.isArray(list) ? list : [])
+    .filter((priority) => priority && priority.isDeleted !== true && priority.value && priority.name)
+    .map((priority) => ({ value: priority.value, label: priority.name }));
+
+export const COMPANY_SIZES = Object.freeze(["small", "medium", "large"]);
+
+/* The starter roles of a company blueprint go in one request per playbook blueprint, each narrowed to those roles by `only`,
+ * with their starter rules, missing tags and missing fields as a team pack brings them. */
+export async function applyStarterRoles(groups, projectIds) {
+    const applied = [];
+    for (const group of groups) {
+        applied.push(await applyTeamPack({ blueprint: group.blueprint, teams: group.teams, only: group.roles, projectIds, starterRules: true, proposeTags: true, proposeFields: true }));
+    }
+    return applied;
+}
+
+export const undoStarterRoles = (applied) => Promise.all(applied.map((one) => undoTeamPack(one)));

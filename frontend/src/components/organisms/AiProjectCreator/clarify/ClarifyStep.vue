@@ -22,11 +22,11 @@
 
         <!-- Error -->
         <div v-else-if="errorMessage" class="cw__error">
-            <p class="cw__error-title">Couldn't draft clarifying questions</p>
+            <p class="cw__error-title">{{ $t('AiProject.clarify_failed') }}</p>
             <p class="cw__error-msg">{{ errorMessage }}</p>
             <div class="cw__error-actions">
-                <button type="button" class="cw__btn cw__btn--ghost" @click="$emit('retry')">Try again</button>
-                <button type="button" class="cw__btn cw__btn--primary" @click="$emit('skip-all')">Skip and generate plan</button>
+                <button type="button" class="cw__btn cw__btn--ghost" @click="$emit('retry')">{{ $t('AiProject.try_again') }}</button>
+                <button type="button" class="cw__btn cw__btn--primary" @click="$emit('skip-all')">{{ $t('AiProject.clarify_skip_all') }}</button>
             </div>
         </div>
 
@@ -35,13 +35,13 @@
             <header class="cw__head">
                 <span class="cw__step">{{ currentIndex + 1 }}/{{ questions.length }}</span>
                 <h3 class="cw__question">
-                    {{ currentQuestion.question }}<span v-if="currentQuestion.required" class="cw__req" aria-label="Required">*</span>
+                    {{ currentQuestion.question }}<span v-if="currentQuestion.required" class="cw__req" :aria-label="$t('AiProject.required')">*</span>
                 </h3>
                 <button
                     type="button"
                     class="cw__close"
                     :disabled="generating"
-                    aria-label="Close"
+                    :aria-label="$t('AiProject.close')"
                     @click="$emit('back')"
                 >×</button>
             </header>
@@ -73,7 +73,7 @@
                     <span class="cw__option-body">
                         <span class="cw__option-label">
                             <span class="cw__option-text">{{ opt.label }}</span>
-                            <span v-if="isRecommended(opt.value)" class="cw__rec">Recommended</span>
+                            <span v-if="isRecommended(opt.value)" class="cw__rec">{{ $t('AiProject.recommended') }}</span>
                         </span>
                         <span v-if="opt.description" class="cw__option-desc">{{ opt.description }}</span>
                     </span>
@@ -103,13 +103,13 @@
                 >
                     <span class="cw__option-body">
                         <span class="cw__option-label">
-                            <span class="cw__option-text">Other</span>
+                            <span class="cw__option-text">{{ $t('AiProject.other') }}</span>
                         </span>
                         <input
                             v-model="otherDraft"
                             type="text"
                             class="cw__other-input"
-                            placeholder="Type your own answer here"
+                            :placeholder="$t('AiProject.other_placeholder')"
                             maxlength="200"
                             @focus="selectOther"
                             @input="onOtherDraftInput"
@@ -129,7 +129,7 @@
                     @click="onBack"
                 >
                     <span class="cw__back-arrow">←</span>
-                    {{ currentIndex > 0 ? 'Previous' : 'Back' }}
+                    {{ currentIndex > 0 ? $t('AiProject.previous') : $t('AiProject.back_plain') }}
                 </button>
                 <span class="cw__spacer"></span>
                 <button
@@ -138,7 +138,17 @@
                     :disabled="generating"
                     @click="onLetAIDecideAll"
                 >
-                    Let AI decide
+                    {{ $t('AiProject.let_ai_decide') }}
+                </button>
+                <button
+                    v-if="allowUnknown"
+                    type="button"
+                    class="cw__btn cw__btn--ghost"
+                    :class="{ 'cw__btn--unknown-active': isUnknownSelected }"
+                    :disabled="generating"
+                    @click="onUnknown"
+                >
+                    {{ $t('AiProject.unknown_yet') }}
                 </button>
                 <button
                     type="button"
@@ -146,7 +156,7 @@
                     :disabled="generating"
                     @click="onSkip"
                 >
-                    Skip
+                    {{ $t('AiProject.skip') }}
                 </button>
                 <button
                     type="button"
@@ -154,9 +164,9 @@
                     :disabled="!canAdvance || generating"
                     @click="onNext"
                 >
-                    <span v-if="generating">Generating plan…</span>
-                    <span v-else>{{ isLastQuestion ? 'Generate plan' : 'Next' }}</span>
-                    <kbd v-if="!generating" class="cw__kbd cw__kbd--inline">Enter</kbd>
+                    <span v-if="generating">{{ $t('AiProject.generating_plan') }}</span>
+                    <span v-else>{{ isLastQuestion ? $t('AiProject.continue') : $t('AiProject.clarify_next') }}</span>
+                    <kbd v-if="!generating" class="cw__kbd cw__kbd--inline">{{ $t('AiProject.key_enter') }}</kbd>
                 </button>
             </footer>
         </div>
@@ -165,6 +175,7 @@
 
 <script setup>
 import { defineProps, defineEmits, computed, reactive, ref, watch } from 'vue';
+import { useI18n } from 'vue-i18n';
 
 const props = defineProps({
     loading: { type: Boolean, default: false },
@@ -175,6 +186,7 @@ const props = defineProps({
 });
 
 const emit = defineEmits(['submit', 'back', 'retry', 'skip-all']);
+const { t } = useI18n();
 
 // ── Wizard state ────────────────────────────────────────────────────
 // `answers` and `skipped` are keyed by question.id and persist across
@@ -183,6 +195,7 @@ const emit = defineEmits(['submit', 'back', 'retry', 'skip-all']);
 const currentIndex = ref(0);
 const answers = reactive({});
 const skipped = reactive({});
+const unknown = reactive({});
 const otherDraft = ref('');
 const customDraft = ref('');
 const textDraft = ref('');
@@ -194,6 +207,7 @@ watch(
         currentIndex.value = 0;
         for (const k of Object.keys(answers)) delete answers[k];
         for (const k of Object.keys(skipped)) delete skipped[k];
+        for (const k of Object.keys(unknown)) delete unknown[k];
         // Pre-fill recommended answers so the user can hit Enter to accept.
         for (const q of qs || []) {
             if (q && q.id && q.recommended != null && q.type !== 'text') {
@@ -239,6 +253,8 @@ const isFreeText = computed(() => currentQuestion.value?.type === 'text');
 const isMultiSelect = computed(() => currentQuestion.value?.type === 'toggle_chips');
 const isPresetChips = computed(() => currentQuestion.value?.type === 'preset_chips');
 const allowOther = computed(() => ['segmented', 'radio_cards', 'select_card'].includes(currentQuestion.value?.type));
+const allowUnknown = computed(() => !!currentQuestion.value && currentQuestion.value.allowUnknown !== false);
+const isUnknownSelected = computed(() => !!currentQuestion.value && !!unknown[currentQuestion.value.id]);
 
 // Render `toggle` as two synthetic Yes/No rows so the same row template
 // works across every type. For everything else we use the question's
@@ -248,8 +264,8 @@ const renderableOptions = computed(() => {
     if (!q) return [];
     if (q.type === 'toggle') {
         return [
-            { value: true, label: 'Yes' },
-            { value: false, label: 'No' },
+            { value: true, label: t('AiProject.option_yes') },
+            { value: false, label: t('AiProject.option_no') },
         ];
     }
     return Array.isArray(q.options) ? q.options : [];
@@ -262,10 +278,10 @@ const showCustomInput = computed(() => {
     return sel === 'custom';
 });
 
-const customPlaceholder = computed(() => 'Type your answer here');
+const customPlaceholder = computed(() => t('AiProject.custom_placeholder'));
 const textPlaceholder = computed(() => {
     const r = currentQuestion.value?.recommended;
-    return typeof r === 'string' && r.length ? r : 'Type your answer here…';
+    return typeof r === 'string' && r.length ? r : t('AiProject.text_placeholder');
 });
 
 const isOtherSelected = computed(() => {
@@ -300,6 +316,7 @@ function onOptionClick(value) {
     const q = currentQuestion.value;
     if (!q) return;
     if (skipped[q.id]) delete skipped[q.id];
+    if (unknown[q.id]) delete unknown[q.id];
 
     if (isMultiSelect.value) {
         const cur = Array.isArray(answers[q.id]) ? [...answers[q.id]] : [];
@@ -327,6 +344,7 @@ function selectOther() {
     const q = currentQuestion.value;
     if (!q || !allowOther.value) return;
     if (skipped[q.id]) delete skipped[q.id];
+    if (unknown[q.id]) delete unknown[q.id];
     answers[q.id] = { value: '__other__', customText: otherDraft.value };
 }
 
@@ -334,6 +352,7 @@ function onOtherDraftInput() {
     const q = currentQuestion.value;
     if (!q) return;
     if (skipped[q.id]) delete skipped[q.id];
+    if (unknown[q.id]) delete unknown[q.id];
     answers[q.id] = { value: '__other__', customText: otherDraft.value };
 }
 
@@ -347,6 +366,7 @@ function onTextDraftInput() {
     const q = currentQuestion.value;
     if (!q) return;
     if (skipped[q.id]) delete skipped[q.id];
+    if (unknown[q.id]) delete unknown[q.id];
     answers[q.id] = textDraft.value;
 }
 
@@ -372,7 +392,7 @@ function isAnswered(q) {
 const canAdvance = computed(() => {
     const q = currentQuestion.value;
     if (!q) return false;
-    if (skipped[q.id]) return true; // skipped means user chose to move on
+    if (skipped[q.id] || unknown[q.id]) return true;
     if (!q.required) return true;   // optional → can always advance
     return isAnswered(q);
 });
@@ -398,11 +418,7 @@ function onNext() {
     currentIndex.value += 1;
 }
 
-function onSkip() {
-    const q = currentQuestion.value;
-    if (!q || props.generating) return;
-    skipped[q.id] = true;
-    delete answers[q.id];
+function advanceOrSubmit() {
     if (isLastQuestion.value) {
         emit('submit', buildClarifications());
     } else {
@@ -410,23 +426,45 @@ function onSkip() {
     }
 }
 
+function onSkip() {
+    const q = currentQuestion.value;
+    if (!q || props.generating) return;
+    skipped[q.id] = true;
+    delete unknown[q.id];
+    delete answers[q.id];
+    advanceOrSubmit();
+}
+
+// "I don't know yet" is an answer in its own right: the brief states an
+// assumption for it, whereas a skip is silence.
+function onUnknown() {
+    const q = currentQuestion.value;
+    if (!q || props.generating) return;
+    unknown[q.id] = true;
+    delete skipped[q.id];
+    delete answers[q.id];
+    advanceOrSubmit();
+}
+
 function onLetAIDecideAll() {
     if (props.generating) return;
     emit('submit', buildClarifications({ skipAll: true }));
 }
 
-// Build the clarifications array the backend expects:
-//   [{ id, question, category, type, answer, skipped }]
+// [{ id, point, question, category, type, answer, skipped, unknown }]
 function buildClarifications({ skipAll = false } = {}) {
     return (props.questions || []).map((q) => {
-        const isSkipped = skipAll || !!skipped[q.id] || !isAnswered(q);
+        const isUnknown = !skipAll && !!unknown[q.id];
+        const isSkipped = !isUnknown && (skipAll || !!skipped[q.id] || !isAnswered(q));
         return {
             id: q.id,
+            point: q.point || null,
             question: q.question,
             category: q.category,
             type: q.type,
-            answer: isSkipped ? null : answers[q.id],
+            answer: isSkipped || isUnknown ? null : answers[q.id],
             skipped: isSkipped,
+            unknown: isUnknown,
         };
     });
 }
@@ -483,10 +521,10 @@ function onKeydown(evt) {
 
 /* ── Card surface ──────────────────────────────────────────────── */
 .cw__card {
-    background: #fff;
-    border: 1px solid #e5e7eb;
+    background: var(--surface);
+    border: 1px solid var(--hairline);
     border-radius: 14px;
-    box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04);
+    box-shadow: 0 1px 2px var(--shadow-ink);
     padding: 18px 18px 14px;
     display: flex;
     flex-direction: column;
@@ -503,8 +541,8 @@ function onKeydown(evt) {
     flex-shrink: 0;
     font-size: 11px;
     font-weight: 600;
-    color: #2F3990;
-    background: #eef0ff;
+    color: var(--brand);
+    background: var(--brand-tint);
     padding: 3px 8px;
     border-radius: 999px;
     letter-spacing: 0.2px;
@@ -514,12 +552,12 @@ function onKeydown(evt) {
     flex: 1;
     font-size: 15px;
     font-weight: 600;
-    color: #2b2b35;
+    color: var(--ink);
     line-height: 1.4;
     min-width: 0;
 }
 .cw__req {
-    color: #b07000;
+    color: var(--warn-ink);
     font-weight: 700;
     margin-left: 2px;
 }
@@ -527,7 +565,7 @@ function onKeydown(evt) {
     appearance: none;
     background: transparent;
     border: none;
-    color: #9aa0a6;
+    color: var(--ink-2);
     font-size: 20px;
     line-height: 1;
     width: 28px;
@@ -538,8 +576,8 @@ function onKeydown(evt) {
     transition: background-color 0.15s ease, color 0.15s ease;
 }
 .cw__close:hover:not(:disabled) {
-    background: #f4f5f7;
-    color: #2b2b35;
+    background: var(--canvas);
+    color: var(--ink);
 }
 .cw__close:disabled {
     opacity: 0.4;
@@ -550,7 +588,7 @@ function onKeydown(evt) {
 .cw__hint {
     margin: 0;
     font-size: 12px;
-    color: #6b7280;
+    color: var(--ink-2);
     line-height: 1.5;
 }
 
@@ -562,7 +600,7 @@ function onKeydown(evt) {
 }
 .cw__option {
     appearance: none;
-    background: #f8f9fb;
+    background: var(--surface-2);
     border: 1px solid transparent;
     border-radius: 10px;
     padding: 12px 14px;
@@ -576,11 +614,11 @@ function onKeydown(evt) {
     color: inherit;
 }
 .cw__option:hover:not(.cw__option--selected) {
-    background: #f1f3f7;
+    background: var(--fill);
 }
 .cw__option--selected {
-    background: #eef0ff;
-    border-color: #c7cdfa;
+    background: var(--brand-tint);
+    border-color: var(--brand-border);
 }
 .cw__option--other {
     cursor: default;
@@ -600,7 +638,7 @@ function onKeydown(evt) {
     flex-wrap: wrap;
     font-size: 14px;
     font-weight: 500;
-    color: #2b2b35;
+    color: var(--ink);
 }
 .cw__option-text {
     overflow: hidden;
@@ -609,8 +647,8 @@ function onKeydown(evt) {
 .cw__rec {
     font-size: 10px;
     font-weight: 600;
-    color: #2F3990;
-    background: #e6e8ff;
+    color: var(--brand);
+    background: var(--brand-tint);
     padding: 2px 6px;
     border-radius: 4px;
     letter-spacing: 0.3px;
@@ -618,7 +656,7 @@ function onKeydown(evt) {
 }
 .cw__option-desc {
     font-size: 12px;
-    color: #6b7280;
+    color: var(--ink-2);
     line-height: 1.45;
 }
 .cw__kbd {
@@ -632,9 +670,9 @@ function onKeydown(evt) {
     padding: 0 6px;
     font-size: 11px;
     font-family: inherit;
-    color: #6b7280;
-    background: #fff;
-    border: 1px solid #e5e7eb;
+    color: var(--ink-2);
+    background: var(--surface);
+    border: 1px solid var(--hairline);
     border-radius: 4px;
 }
 
@@ -642,35 +680,35 @@ function onKeydown(evt) {
 .cw__inline-input,
 .cw__other-input {
     appearance: none;
-    border: 1px solid #e5e7eb;
-    background: #fff;
+    border: 1px solid var(--hairline);
+    background: var(--surface);
     border-radius: 6px;
     padding: 6px 10px;
     font-size: 13px;
-    color: #2b2b35;
+    color: var(--ink);
     outline: none;
     transition: border-color 0.15s ease, box-shadow 0.15s ease;
     width: 100%;
 }
 .cw__inline-input:focus,
 .cw__other-input:focus {
-    border-color: #2F3990;
-    box-shadow: 0 0 0 3px rgba(47, 57, 144, 0.18);
+    border-color: var(--brand);
+    box-shadow: 0 0 0 3px var(--brand-ring);
 }
 .cw__inline-input::placeholder,
 .cw__other-input::placeholder {
-    color: #9aa0a6;
+    color: var(--ink-2);
 }
 
 /* Free-text textarea */
 .cw__textarea {
     width: 100%;
-    border: 1px solid #e5e7eb;
+    border: 1px solid var(--hairline);
     border-radius: 10px;
     padding: 10px 12px;
     font-size: 13px;
-    color: #2b2b35;
-    background: #fff;
+    color: var(--ink);
+    background: var(--surface);
     outline: none;
     resize: vertical;
     min-height: 90px;
@@ -680,11 +718,11 @@ function onKeydown(evt) {
     transition: border-color 0.15s ease, box-shadow 0.15s ease;
 }
 .cw__textarea:focus {
-    border-color: #2F3990;
-    box-shadow: 0 0 0 3px rgba(47, 57, 144, 0.18);
+    border-color: var(--brand);
+    box-shadow: 0 0 0 3px var(--brand-ring);
 }
 .cw__textarea::placeholder {
-    color: #9aa0a6;
+    color: var(--ink-2);
 }
 
 /* ── Footer ────────────────────────────────────────────────────── */
@@ -693,7 +731,7 @@ function onKeydown(evt) {
     align-items: center;
     gap: 8px;
     padding-top: 4px;
-    border-top: 1px solid #f0f1f3;
+    border-top: 1px solid var(--hairline);
     margin-top: 4px;
     padding-top: 12px;
 }
@@ -716,31 +754,36 @@ function onKeydown(evt) {
 }
 .cw__btn--ghost {
     background: transparent;
-    border-color: #e5e7eb;
-    color: #4b5563;
+    border-color: var(--hairline);
+    color: var(--ink-2);
 }
 .cw__btn--ghost:hover:not(:disabled) {
-    background: #f4f5f7;
-    border-color: #d1d5db;
+    background: var(--canvas);
+    border-color: var(--border);
+}
+.cw__btn--unknown-active {
+    background: var(--warn-bg);
+    border-color: var(--warn);
+    color: var(--warn-ink);
 }
 .cw__btn--link {
     background: transparent;
     border-color: transparent;
-    color: #6b7280;
+    color: var(--ink-2);
     padding: 6px 8px;
 }
 .cw__btn--link:hover:not(:disabled) {
-    color: #2F3990;
+    color: var(--brand);
     background: transparent;
 }
 .cw__btn--primary {
-    background: #2F3990;
-    color: #fff;
-    border-color: #2F3990;
+    background: var(--brand);
+    color: var(--on-brand);
+    border-color: var(--brand);
 }
 .cw__btn--primary:hover:not(:disabled) {
-    background: #252D75;
-    border-color: #252D75;
+    background: var(--brand-deep);
+    border-color: var(--brand-deep);
 }
 .cw__btn:disabled {
     opacity: 0.5;
@@ -751,21 +794,21 @@ function onKeydown(evt) {
     line-height: 1;
 }
 .cw__kbd--inline {
-    color: rgba(255, 255, 255, 0.9);
-    background: rgba(255, 255, 255, 0.15);
-    border-color: rgba(255, 255, 255, 0.25);
+    color: var(--on-brand);
+    background: color-mix(in srgb, var(--on-brand) 15%, transparent);
+    border-color: color-mix(in srgb, var(--on-brand) 25%, transparent);
 }
 .cw__btn--ghost .cw__kbd--inline,
 .cw__btn--link .cw__kbd--inline {
-    color: #6b7280;
-    background: #fff;
-    border-color: #e5e7eb;
+    color: var(--ink-2);
+    background: var(--surface);
+    border-color: var(--hairline);
 }
 
 /* ── Skeleton (loading questions) ─────────────────────────────── */
 .cw__skeleton {
-    background: #fff;
-    border: 1px solid #e5e7eb;
+    background: var(--surface);
+    border: 1px solid var(--hairline);
     border-radius: 14px;
     padding: 18px;
     display: flex;
@@ -775,7 +818,7 @@ function onKeydown(evt) {
 .cw__skeleton-line {
     height: 12px;
     border-radius: 4px;
-    background: linear-gradient(90deg, #f0f1f3 0%, #e5e7eb 50%, #f0f1f3 100%);
+    background: linear-gradient(90deg, var(--fill) 0%, var(--track) 50%, var(--fill) 100%);
     background-size: 200% 100%;
     animation: cw-shimmer 1.4s infinite;
 }
@@ -792,7 +835,7 @@ function onKeydown(evt) {
 .cw__skeleton-row {
     height: 44px;
     border-radius: 10px;
-    background: linear-gradient(90deg, #f4f5f7 0%, #eaecf0 50%, #f4f5f7 100%);
+    background: linear-gradient(90deg, var(--canvas) 0%, var(--track) 50%, var(--canvas) 100%);
     background-size: 200% 100%;
     animation: cw-shimmer 1.4s infinite;
 }
@@ -803,8 +846,8 @@ function onKeydown(evt) {
 
 /* ── Error state ──────────────────────────────────────────────── */
 .cw__error {
-    background: #fff5f5;
-    border: 1px solid #fecaca;
+    background: var(--danger-bg);
+    border: 1px solid var(--danger);
     border-radius: 10px;
     padding: 14px 16px;
     display: flex;
@@ -815,12 +858,12 @@ function onKeydown(evt) {
     margin: 0;
     font-size: 13px;
     font-weight: 600;
-    color: #c5343a;
+    color: var(--danger-ink);
 }
 .cw__error-msg {
     margin: 0;
     font-size: 12px;
-    color: #4b5563;
+    color: var(--ink-2);
     line-height: 1.5;
 }
 .cw__error-actions {

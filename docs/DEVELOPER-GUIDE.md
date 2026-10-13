@@ -1,0 +1,222 @@
+# Developer guide
+
+How to run, test and change AlianHub. Operators read [ADMIN-GUIDE.md](ADMIN-GUIDE.md) instead; the variable reference is [ENV.md](ENV.md).
+
+## Run it
+
+Node 20 (`engines` in `package.json`) and a MongoDB you can reach.
+
+```bash
+npm ci && (cd frontend && npm ci)
+cp .env.example .env            # MONGODB_URL, JWT_SECRET, APIURL, STORAGE_TYPE at least
+npm run nodemon                 # API on :4000 with reload
+cd frontend && npm run serve    # SPA on :8080, proxies /api to :4000
+```
+
+`npm run setup` does the install and `.env` steps for you and starts the server. A fresh database lands on `/setup`, the in-app first run (see the admin guide).
+
+The backend serves the built SPA from `frontend/dist`; `cd frontend && npm run build` produces it (2–3 minutes).
+
+## Test it
+
+| Command | What runs |
+|---|---|
+| `npm test` | Jest, two projects: `unit` (`tests/*.test.js`, helpers and rules) and `conventions` (`tests/conventions/*.test.js`, repository-wide checks) |
+| `npm run test:unit` / `npm run test:conventions` | one project |
+| `npm run lint` | ESLint over the backend (`.eslintrc.cjs`); 0 errors is the gate, warnings are allowed |
+| `cd frontend && npm test` | Vitest + `@vue/test-utils` in jsdom (`frontend/tests/*.spec.js`) |
+| `cd frontend && npm run lint -- --no-fix` | Vue CLI ESLint |
+| `node scripts/unused-components.js` | `.vue` files nothing imports (must print nothing) |
+| `node scripts/env-doc.js --check` | env variables described and docs regenerated |
+| `npm run style:check` | hard-coded colours and legacy style classes against `scripts/style-baseline.json` |
+| `npm run env:doc:check` | `docs/ENV.md`, `.env.example` and `frontend/.env.example` match what the code reads, and every description is still read. Not run in CI: run `node scripts/env-doc.js` and commit the three files in the docs pull request that follows merges to `beta` |
+| `node scripts/env-doc.js --check` | every env variable the code reads is described; generated files that are out of date are a warning here and a failure in `npm run env:doc:check` |
+| `npm run api:doc:check` | `docs/API.md` and `docs/api/openapi.json` match the routes and `scripts/api-doc.meta.json`. Not run in CI: run `npm run api:doc` and commit both files in the docs pull request that follows merges to `beta` |
+| `npm run visual` | the screenshot check of the core screens; CI only, see [Screenshot check](#screenshot-check) |
+
+`.github/workflows/ci.yml` runs all of that on every pull request to `beta`, `staging` and `main`, except the screenshot check, which has a workflow of its own. A pull request that only changes files under `Tasks/` or Markdown under `.claude/` skips the suites: nothing they test can have changed. A draft pull request skips them too: a draft cannot be merged, and marking it ready for review runs them. Work that goes in through a combined pull request can therefore stay a draft, and the suites run once, on the combined one. The frontend is built once for the browser tests (`npm run e2e`, three shards) and the API tests (`npm run test:integration`, two shards); every shard has its own database and server. The check named `e2e` passes only when all of them did, and a failing shard keeps its report as the artifact `e2e-report-shard-<n>` or `integration-logs-shard-<n>`. The conventions project is the place for a rule that must hold everywhere: it reads the tree and fails with the offending file, so a new rule needs no per-module wiring.
+
+The `Clock` workflow (`.github/workflows/clock.yml`) runs weekly and on demand, never on pull requests: it runs the backend unit suite (two shards) and the frontend suite with the clock moved forward by 3, 40 and 400 days, which catches code that reads the real clock against test data written with fixed dates, something no test file's text can reveal. `tests/support/shift-clock.js` moves `new Date()` and `Date.now()` by `CLOCK_SHIFT_DAYS` days and leaves explicit dates and timers alone; a failing job names each failing test and its offset in the job summary. To run one offset locally, set the variable: `CLOCK_SHIFT_DAYS=40 npx jest --selectProjects unit tests/some.test.js` or `cd frontend && CLOCK_SHIFT_DAYS=40 npx vitest run tests/some.spec.js`. A test that fails only because a TLS certificate looks expired goes in `tests/support/clock-skip.js` with its reason; any other failure means the test or the code under test should own its clock (pin both the data and the clock, or use the file's fake-timer helper).
+
+The conventions in place:
+
+- `v2-guard` — every `/api/v2/*` prefix is in the JWT guard list of `Config/setMiddleware.js`, public by design, or guards itself.
+- `tenant-scoping` — tenant ids are not read from `req.body`/`req.query`; a per-file baseline may only fall.
+- `i18n-namespaces` — no `*V2` locale namespace, and every static `t('A.b')` key exists in `frontend/src/locales/en.js`.
+- `env-doc` — every `process.env.*` and `VUE_APP_*` read is described in `scripts/env-doc.meta.json`.
+- `api-doc` — `scripts/api-doc.meta.json` is well formed and the API reference generates from the current tree, the same on every run. It does not compare the committed files, so a pull request that adds or removes a route needs to do nothing: a route with no entry is listed as undocumented until the docs pull request describes it.
+- `unused-components` — no orphaned single-file component.
+- `style-check` — hard-coded colours and legacy style classes under `frontend/src`; a per-file baseline may only fall.
+- `naming-conventions` — module folder and file naming.
+
+Writing a frontend spec: mount with `@vue/test-utils`; `frontend/tests/setup.js` installs i18n, `$t`, and the shell provides (`$userId`, `$companyId`, `$clientWidth`, `$socket`). Mock `@/services` and heavy children with `vi.mock`; keep shared mocks in `vi.hoisted`. `frontend/tests/TaskDetailPanel.spec.js` is the template for a large component, `useProjectTree.spec.js` for a composable.
+
+### Tests that pass by chance
+
+A test that fails one run in ten is wrong, not unlucky. What causes it here, and what to do:
+
+- A spec mocks a module that `frontend/tests/setup.js` also mocks with an async factory (`@formkit/vue` against `@/plugins/customFieldView/lazyFormKit`). Which factory wins depends on load, and the real FormKit then fails with `E600`. Mock the module the component imports, in the spec itself, so the spec owns it.
+- A real timer, an unawaited promise, or an assertion made before the next tick. Use fake timers and `await flushPromises()`.
+- State shared between tests: a module-level variable, `document.body`, a mock that is not reset. Reset it in `beforeEach`.
+- A fixed date near today, or a count or list another test changes (the shared e2e workspace). Make the test create its own project, task or member with `uniqueSuffix()` and assert on that.
+- Never fix it with a longer timeout, a retry, or a looser assertion. Show it steady: run it 20 times with `npx vitest run --no-file-parallelism <file>` and with `--maxWorkers=4`, and under CPU load (a few `while :; do :; done` loops) while you do.
+
+### Screenshot atlas
+
+Unit specs cannot show what a visual change did. `npm run atlas` opens every screen in `scripts/atlas-manifest.js` in a headless Chromium and saves one PNG per screen, theme and size, plus an `index.html` gallery that opens from disk. `npm run atlas:compare` puts two atlases side by side.
+
+```bash
+ATLAS_TOKEN=$(npm run -s demo:token -- --email rahul.manager@demo.test 2>/dev/null | tail -1) npm run atlas
+npm run atlas -- --only home,project-board --themes dark --sizes 1440x900   # a few screens
+npm run atlas:compare -- artifacts/atlas/<before> artifacts/atlas/<after>
+```
+
+| Option | Default | Meaning |
+|---|---|---|
+| `--base-url` | `http://localhost:4000` | the running app |
+| `--out` | `artifacts/atlas/<UTC timestamp>/` (git-ignored) | output folder; a second run into the same folder replaces only the shots it retakes |
+| `--only` | every screen | comma-separated screen names from the manifest |
+| `--core` | off | only the screens marked `core` in the manifest, at the sizes the screenshot check takes them |
+| `--themes` | `light,dark` | written to `localStorage 'ah.theme'` before the app loads |
+| `--sizes` | `1440x900,390x844` | viewport sizes |
+| `--variant a\|b\|c\|classic` | none, which is the dense default (the same as `b`) | written to `localStorage 'ah.variant'`; `classic` is the look before the dense default |
+| `--css <file>` | none | a stylesheet added to every page once it has settled, to see a CSS change at every screen without a rebuild; `atlas.json` records the file name and, per screen under `cssMoved`, how many elements the stylesheet resized or pushed along and the five biggest changes |
+| `--company`, `--project` | the account's only workspace; the project with the most views | which workspace and project the `:cid` and `:projectId` routes open |
+| `--token-file` | `ATLAS_TOKEN_FILE` | file holding the session token when `ATLAS_TOKEN` is unset |
+
+- **Session.** The app keeps its session in the `accessToken` cookie and in `localStorage` (`userId`, `selectedCompany`, `isLogging`); the atlas sets those from the token, so it never types a password. A demo token lasts an hour ([QA-DEMO-TEAM.md](QA-DEMO-TEAM.md)). The token is never printed or written to the output.
+- **Read-only.** Every request that is not a GET is answered with a 403 inside the browser and never reaches the server, except the POSTs the app reads with, listed with their reasons in `scripts/atlas/readOnly.js`. The script's own lookups pass through the same filter. Setup steps in the manifest may only press a shortcut, open a menu, hover, scroll and wait. A screen reached through the rail has `phoneSteps` for sizes under 768 px wide, where the rail is the tab bar's More sheet. Two things follow: the Personal List shows its error state (opening it creates the list on a first visit, so that call stays blocked), and AI summaries stay empty. The refused requests are listed at the end of the run and in `atlas.json`.
+- **Rate limit.** The server allows 1000 API requests a minute per address (`GLOBAL_RATE_LIMIT_PER_MIN`), and on one machine the atlas shares that count with every open tab. It reads the `RateLimit-*` headers, pauses while fewer than 300 are left and retakes a screen a 429 cut short, so a full run can stop for up to a minute at a time.
+- **Layout findings.** After each shot the atlas measures the page and writes the result under `layout` in `atlas.json`, with a one-line summary on the console and in the gallery: a document wider than the viewport and the three widest elements past the edge; containers that scroll sideways (`page: true` when the same container also scrolls the page up and down, so the whole screen pans) and containers that cut their content off; controls cut off sideways with nothing to scroll; controls under 24 by 24 px whose centre is within 12 px of another control in the same scroller; text clipped to nothing; and fixed or sticky layers over more than 40% of the height. The rules are in `scripts/atlas/layout.js` (`tests/atlas-layout.test.js`). Each screen is a fresh page load, so a stylesheet another screen would have loaded first is not there.
+- **Add a screen** with one line in `scripts/atlas-manifest.js`; `tests/atlas-manifest.test.js` fails when its route is not one the router declares. Routes left out, and why, are in `LEFT_OUT` in the same file.
+- **Compare** writes `before/`, `after/` and `diff/` images and an `index.html` ordered by the share of pixels that changed. It decodes PNGs with `sharp`, already a dependency; `--threshold` (default 8 of 255 per channel) sets how far a pixel must move to count.
+- Chromium comes from Playwright: `npx playwright install chromium` once (the e2e suite needs the same).
+
+### Screenshot check
+
+The atlas shows a look; this check holds one. After every merge to `beta`, and on demand from the Actions tab, the `Visual` workflow (`.github/workflows/visual.yml`, job **Core screens**) opens the core screens, compares each with a PNG in `e2e/visual-baseline/` using Playwright's `toHaveScreenshot`, and fails when one differs. It is a workflow of its own, so a changed look never hides a failing functional test.
+
+**What it covers.** The screens marked `core: true` in `scripts/atlas-manifest.js`: Home, Everything, the command palette, Docs, a doc, a dashboard, project List, Board and Table, the task panel and My settings, in light and dark at 1440x900. Those also marked `phone: true` (Home, List, Board, task panel) are taken at 390x844 too: 30 screenshots, viewport only. The data is the e2e harness seed (`e2e/support/fixtures.js`) plus one doc and one dashboard (`e2e/visual/global-setup.js`), in a database made for the run.
+
+**Where it runs.** In CI only, inside `mcr.microsoft.com/playwright:v<version>-noble`, the image of the `@playwright/test` version in `package.json`; `tests/visual-report.test.js` fails when the two differ. Operating system, fonts and browser build are the same on every run. A screenshot made on macOS or Windows never matches, so `npm run visual` refuses to run outside CI. `VISUAL_LOCAL=1 npm run visual` runs it anyway, against a baseline in `e2e/.state/` that is never committed, which is how to debug the check itself (it needs `npm run e2e:db`, `E2E_MONGODB_URL` and a built frontend, like `npm run e2e`).
+
+**Accept an intended change.** The failing run names the screens in its summary and uploads two artifacts: `visual-report` (the Playwright report with expected, actual and diff for each) and `visual-baseline` (the new screenshot of every changed or missing screen). Look at the diff, then:
+
+```bash
+npm run visual:accept -- <run id>   # the number in the run's address; needs `gh auth status` to pass
+git add e2e/visual-baseline && git commit -m "test(visual): new baseline for <what changed>"
+```
+
+A pull request that changes a core screen on purpose carries the new PNGs in the same pull request.
+
+**A screen with no baseline** is skipped, not failed, and its first screenshot is in the same `visual-baseline` artifact. That is how the baseline starts and how a new screen joins: add `core: true` (and `phone: true` if it matters at 390 px) to its manifest entry, push, accept the run. A route with a parameter the seed has no record for needs that record added in `e2e/visual/global-setup.js`. Removing the mark means deleting the screen's PNGs; `tests/visual-core.test.js` fails on a PNG that belongs to no core screen, and on a baseline over 10 MB (it is about 2 MB).
+
+**What holds a screen still.**
+
+- Clock: the page runs at 2026-01-14 10:00 UTC, `en-US` (`e2e/visual/freeze.js`), through Playwright's clock. Time moves on from there, because a frozen `Date` stops every debounce in the app.
+- Dates from the server: the seed is stamped with the real time of the run. Every ISO date in an API response that falls inside the run is rewritten to 08:00 that morning, plus a millisecond per real second so records keep their order. Dates outside the run pass through. Socket messages are not rewritten.
+- Writes: every request that is not a read is refused in the browser, with the atlas's list (`scripts/atlas/readOnly.js`), so one screenshot cannot change what the next one sees.
+- Motion: animations and transitions off, reduced motion on, carets and focus outlines hidden, scrollbars hidden (`captureCss` in `e2e/visual/masks.js`). A screenshot is taken only once two in a row are identical.
+- Fonts and images: the check waits for `document.fonts.ready` and for every image, and fails with its own message when Inter Tight did not load. The fonts come from Google Fonts, so that failure is the network, not the design.
+- A screen that opens on "not found", "no access" or "offline" fails instead of becoming a baseline.
+
+**What is masked or hidden** is listed with a reason each in `e2e/visual/masks.js`. Masked (painted over): the presence dot on avatars. Hidden (taken out of the layout): the live strip of running agents and timers, the running-agents count in the rail, toasts. Add an entry only for something the list above cannot hold still.
+
+**Tolerance.** `THRESHOLD` (how far a pixel may move) and `MAX_DIFF_PIXEL_RATIO` (how much of a screenshot may) are in `e2e/visual/settings.js`. To measure the noise, re-run the job on one commit: with the baseline committed, any screen it reports is noise. `npm run visual -- --update` (the `update` input of the workflow, which GitHub offers once the workflow is on the default branch) goes further and proposes every screenshot whose bytes differ at all; `npm run atlas:compare -- e2e/visual-baseline <downloaded artifact>` then shows by how much.
+
+The job is not a required check yet (`continue-on-error: true`). To make it one: commit the baseline, tune the tolerance, remove that line from the workflow and add **Core screens** to the required checks of `beta`.
+
+## Change it
+
+### Requests and tenants
+
+Every request carries the company in the `companyid` header; `Config/jwt.js` verifies the JWT or API token and sets `req.uid` and `req.aud` (the companies the token may act for). In a handler:
+
+```js
+const { tenantOf, tenantDb } = require('../../Config/tenant');
+const { ok, fail, asyncHandler } = require('../../Config/respond');
+
+exports.listPages = asyncHandler(async (req, res) => {
+    const companyId = tenantOf(req);            // validated ObjectId, checked against req.aud, throws TenantError
+    const db = tenantDb(req);                   // (mongoObj, method) => MongoDbCrudOpration(companyId, mongoObj, method)
+    const rows = await db({ type: SCHEMA_TYPE.PAGES, data: [{ deletedStatusKey: 0 }] }, 'find');
+    return ok(res, { data: rows });
+});
+```
+
+Rules the lint and tests enforce: a query's first argument is a tenant id from the request, never a literal (`'global'` for the global database is the one exception) and never `undefined`; collection names come from `SCHEMA_TYPE`; after a write, emit the socket event and clear the cache (`removeCache`) that served the old value.
+
+Responses stay `{ status, statusText, data }` with HTTP 200 — the SPA reads `status`. `fail(res, text, statusCode)` records the code in the body so `Config/strictStatus.js` can send a real 4xx to API-token callers and to anyone sending `Prefer: status-codes`. An uncaught error or `next(err)` reaches `Config/errorHandler.js`, which logs the stack with the request id and answers `{ status: false, statusText, requestId }`.
+
+Every response carries `X-Request-Id`; `Config/requestLog.js` writes one line per request (`id method url status ms uid aud`) and winston prefixes the id to anything logged inside that request, so `grep <id> log/*.log` reconstructs a failure.
+
+### Add a module
+
+1. `Modules/<Name>/routes.js` exporting `init(app)` that registers `/api/v2/<name>/...` routes; `controller.js` (or `controller/`) for handlers; `helpers/` for logic that has no `req`.
+2. `Modules/<Name>/init.js` — `exports.init = (app) => require('./routes').init(app)` — and a `require('./Modules/<Name>/init').init(app)` line inside `initializeControllers()` in `index.js`.
+3. Add the prefix to the `verifyJWTToken` list in `Config/setMiddleware.js`, or add it to `PUBLIC_BY_DESIGN` / `SELF_GUARDED` in `tests/conventions/v2-guard.test.js` with a reason. The test fails until you choose.
+4. New collections go in `Config/schemaType.js`, `Config/collections.js` and `utils/mongo-handler/schema.js` together.
+5. A `tests/<name>-rules.test.js` for the helpers; controllers are covered by conventions.
+
+### Add a view
+
+1. The page under `frontend/src/views/<Area>/`, lazy-loaded from `frontend/src/router/<area>/index.js` (`requiresAuth`, `meta.title`).
+2. Copy in `frontend/src/locales/en.js` under the area's namespace (`Projects`, `Settings`, …) — never a new `*V2` twin; other locales fall back to English until translated.
+3. A rail or More entry in `frontend/src/components/organisms/Shell/navItems.js` when the page is a destination.
+4. Shared UI comes from `components/organisms/Shell` (`ShellIcon`, panels), `ProjectHeader` for project pages, `atom/EmptyState` for empty states.
+
+### Environment variables
+
+Read them once at module load (`process.env.NAME || default`), describe the key in `scripts/env-doc.meta.json`, run `node scripts/env-doc.js` to regenerate `docs/ENV.md`, `.env.example` and `frontend/.env.example`. The conventions test fails on an undescribed variable.
+
+### Locale keys
+
+`t('Namespace.key')` with a literal key; when the key is built at run time, end the literal with `_` or `.` (`t('Inbox.tab_' + kind)`) so the audit can resolve the prefix. `node scripts/i18n-rename-namespace.js <From> <To>` moves a namespace and rewrites every reference.
+
+Keys waiting for a translator, per locale, on 2026-10-02 (`npm run i18n:backfill -- --dry-run` prints today's count as "pending review"): `ar` 12,660 · `ge` 10,798 · `fr` 10,786 · `gr` 10,779 · `hi` 10,778 · `ch`, `gu`, `it` 10,777 each · `ru`, `spa` 10,776 each. `ja`, `ko` and `ptBr` show English as it is and have no list. A translator clears a key in three steps:
+
+1. Open `frontend/src/locales/<locale>.pending.json`: every key in it is listed with its English text, and is still English (or a machine translation) in `<locale>.js`.
+2. Write the translation at that key in `frontend/src/locales/<locale>.js`, keeping every `{placeholder}` as it is, then delete the key's line from `<locale>.pending.json`; nothing removes it for you.
+3. Run `npm run i18n:backfill` (it puts the file back in order) and `npm run i18n:check`, and commit both files together.
+
+### Colours and style classes
+
+Colours come from the tokens in `frontend/src/assets/css/tokens.css` (`var(--surface)`, `var(--ink)`, `var(--brand)`, …) and the `ah-` classes built on them, so a screen follows the theme. `scripts/style-check.js` counts what each `.vue`, `.css` and `.scss` file under `frontend/src` still hard-codes, and `scripts/style-baseline.json` holds those two counts per file:
+
+- **Hard-coded colours** — hex (`#rgb`, `#rgba`, `#rrggbb`, `#rrggbbaa`), `rgb()`/`rgba()`/`hsl()`/`hsla()` with literal arguments, and CSS colour names (`white`, `black`, `red`, …). They are read from declaration values in stylesheets, `<style>` blocks and `style=` / `:style=` attributes. Not read: selectors, comments, strings, `url()`, `var()` and its fallback, `<script>`, SVG attributes such as `fill=`, and `tokens.css` itself. A colour name counts only in a property that takes a colour, or inside a string of a `:style` binding.
+- **Legacy classes** — uses in `class=` / `:class=` of a class that a sheet in `frontend/src/assets/css` (other than `tokens.css`) defines on its own (`.name` or `.name:hover`, not `.a .b`) with a hard-coded colour or font value: `bg-white`, `bg-light-gray`, `GunPowder`, `color47`, `btn-white`, `blue`, `black`, `font-size-13`, `font-weight-500`, `border`, `form-control`, … The list is derived from those sheets on every run, so a utility rewritten onto tokens stops counting.
+
+| Command | What it does |
+|---|---|
+| `npm run style:check` | totals, and every file above or below its baseline; `--top 25` adds the files with the most, `--json` prints the counts |
+| `npm run style:check -- <file>` | every finding in that file, by line |
+| `npm run style:baseline` | lowers the baseline to the current counts; refuses to raise one |
+| `npm run style:baseline -- --allow-increase` | also raises; a deliberate exception only |
+
+The conventions test fails when a file is above its baseline, when a file without an entry has any, and when an entry is higher than the file now needs — so the PR that removes colours lowers the baseline too. A deliberate exception is a file that moved or was split (its counts move with it) or a colour that cannot be a token; say which in the PR body. The baseline is one sorted line per file with no timestamp: on a merge conflict keep the higher count and re-run `npm run style:baseline`.
+
+### The installed app and its service worker
+
+The web app can be installed (`frontend/public/manifest.webmanifest`, icons drawn from `frontend/public/logo.png` by `node scripts/make-app-icons.js` and committed) and its shell opens with no network. A production build writes `sw.js` (`frontend/shellWorkerPlugin.js`): the list of the build's files, then `frontend/src/serviceWorker/rules.js` and `worker.js` as they are, unminified. The worker is hand-written and has no dependency. The dev server has no worker, and the app registers one only in a production build, in a browser, on a secure address (`registration.js`); the desktop app never does.
+
+**What it holds.** At install, what a first paint needs: `index.html`, the manifest, the entry and vendor scripts and styles, the sign-in chunk (`firstPaintChunks: ['login']` in `vue.config.js`; the build fails if no chunk has that name), and everything under `fonts/` and `icons/`. On build 14.36.0-beta.752 that is 8 files and 12.1 MB uncompressed, against 212 files and 33.9 MB for every script and style. It is fetched four files at a time, and a later build copies the files whose names did not change. Every other file of the build with a content hash in its name (`js/`, `css/`, `img/`) is kept the first time a page asks for it, by its exact name from the build's own list, and stays across builds while its name is still in the list. Nothing else, ever. When a worker takes over it deletes every other cache of the address.
+
+**What it never touches.** `routeFor` in `rules.js` is the whole route table, and anything it does not name goes to the network without the worker answering: every request that is not a GET, any other origin, any address with a query string, any request carrying `Authorization`, `refresh-token`, `companyid`, `x-api-key` or `Range`, and every path the server answers itself (`RESERVED_SEGMENTS`: `/api`, `/socket.io`, `/share`, `/form`, `/oauth`, `/.well-known`, `/mcp`, `/scim`, `/pickers`, …). So API answers, downloads, stored files, socket traffic and sign-in endpoints are never held and fail visibly offline; the app's own offline store (`frontend/src/offline`) is unchanged. A page load is answered only for `/` and `/index.html`, so the server-rendered share, form and consent pages load exactly as before. `tests/app-shell-worker.test.js` scans the server's routes and fails when a new top-level path is missing from `RESERVED_SEGMENTS`.
+
+**Sign-out.** On sign-out and on a workspace switch the app tells the worker to delete every cache except the builds', and deletes the same caches from the page (`dropWorkerRuntimeCaches`). That includes the files kept on first use, so which screens the last person opened is not left behind; the next person fetches them again as they go.
+
+**A page that cannot load.** With no network, a first page whose chunk is not held cannot open. `config/chunkRecovery.js` then does not reload (the file would be missing again) and App.vue shows the offline start screen in place of a blank page.
+
+**How a new build reaches people.** A page load is answered by the network whenever there is one, so a load after a release runs the new build; the held document is only for when the network gives no answer. The server sends `sw.js` with `Cache-Control: no-cache`, and an open tab asks for it again when it is looked at after an hour. A new worker waits; it takes over only when a tab tells it to. A tab already on the new build tells it at once (nothing to reload). A tab still on the earlier build shows "A new version is ready" with Reload and Later, and reloads only on Reload. No tab is ever reloaded by itself.
+
+**Withdrawing it.** `APP_SHELL_WORKER=off` makes `/sw.js` answer with a worker that deletes every cache of the address, unregisters itself and handles no request (`Config/appShellWorker.js`), and with an `X-App-Shell-Worker: withdrawn` header. Each browser installs that worker on its next page load; the app asks for the header (one `HEAD /sw.js` per load) before it registers, and when it is there removes the registration and the caches itself and does not register again. Unset the variable to bring the worker back.
+
+**Why it cannot loop.** A worker shipped in June 2026 (`/service-worker.js`) was withdrawn after a reload loop: registered from `index.html` in every environment, it answered every same-origin GET from its cache, the dev server's unhashed bundles included. This one is registered by production builds only, answers by exact name only files whose names carry a content hash, and never reloads a page. The two reloads the app does on its own account are the Reload button of the notice, and the offline start screen (`components/offline/OfflineStart.vue`), which reloads only after `GET /version` has answered.
+
+**Push.** The Firebase push worker keeps its own scope (`/firebase-cloud-messaging-push-scope`); a scope holds one worker, and `/` is the shell's.
+
+The end-to-end suite blocks service workers (`e2e/playwright.config.js`), because every test opens a fresh browser that would download the whole bundle again; `e2e/specs/app-shell.spec.js` turns them on for itself, and `e2e/specs/app-shell-worker.spec.js` runs the worker's whole life (install, offline, sign-out message, a second and third build, withdrawal) against a page of a few lines, with no app build.
+
+## Where things are
+
+`.claude/ARCHITECTURE.md` (request pipeline, multi-tenancy, sockets), `.claude/CONVENTIONS.md` (naming, module layout, response shape), `.claude/FOLDER-STRUCTURE.md` (the tree), `BRANCHING.md` and `CONTRIBUTING.md` (how a change lands).

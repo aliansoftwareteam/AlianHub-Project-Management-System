@@ -1,6 +1,9 @@
 const { SCHEMA_TYPE } = require("../../Config/schemaType.js");
-const { MongoDbCrudOpration } = require("../../utils/mongo-handler/mongoQueries.js");
+const { removeCache } = require("../../utils/commonFunctions.js");
+const { MongoDbCrudOpration, dropCompanyDatabase } = require("../../utils/mongo-handler/mongoQueries.js");
 const iCtr = require('../ImportSettings/controller.js');
+const { ensureNotificationDefaults } = require('../notification/defaults');
+const vectorStore = require('../Knowledge/vectorStore');
 const helperCtr = require('../Auth/controller/helper.js');
 const logger = require('../../Config/loggerConfig.js');
 const { addAndRemoveUserInMongodbNotificationCount } = require("../Auth/controller.js");
@@ -10,11 +13,20 @@ const serviceCtr = require("../service.js");
 const serviceFunctionCtr = require("../serviceFunction.js");
 const config =  require('../../Config/config.js');
 const { dbCollections } = require("../../Config/collections.js");
-const defaultSubscriptionDataRef = require("./defaultSubscriptionData.js")
 const { updateCompanyFun } = require("./controller/updateCompany.js");
 const { updateUserFun } = require("../Users/controller.js");
 const { storeRefferalCode, checkAndStoreRefferalCode } = require("../Affiliate/controller.js");
 const { handleCreateCompanyDataStorageFunForUpload, handleCreateCompanyDataStorageFun } = require(`../../common-storage/common-${process.env.STORAGE_TYPE}.js`);
+const { seedSampleProject } = require("../createProject/sampleProject.js");
+const { ensureViewCatalogue } = require("../projectTabs/catalogue.js");
+const { normaliseFocus, FOCUS_LABELS } = require("../createProject/sampleTasks.js");
+const { pinSessionTenant } = require("../../Config/tenant.js");
+const { getRoleType, ROLE_OWNER } = require("../../Config/permissionGuard.js");
+const { escapeHtml } = require('../../utils/escapeHtml');
+const { WORKSPACE_FAILURE, failureReply } = require('./helpers/workspaceFailure');
+const { NEW_COMPANY_PLAN, companyRowFor } = require('./helpers/companyRow');
+
+const TEAM_SIZES = ["1", "2-15", "16-50", "50+"];
 
 
 exports.setCompany = (companyId) => {
@@ -238,31 +250,24 @@ exports.companyValidation = (bodyData, cb) => {
             })
             return;
         }
-        if (!(bodyData && bodyData.companyName)) {
+        if (!(bodyData && typeof bodyData.companyName === "string" && bodyData.companyName.trim())) {
             cb({
                 status: false,
                 statusText: "companyName is required"
             })
             return;
         }
-        if (!(bodyData && bodyData.phoneNumber)) {
+        if (bodyData.teamSize !== undefined && bodyData.teamSize !== "" && !TEAM_SIZES.includes(String(bodyData.teamSize))) {
             cb({
                 status: false,
-                statusText: "phoneNumber is required"
+                statusText: "teamSize is invalid"
             })
             return;
         }
-        if (!(bodyData && bodyData.country)) {
+        if (bodyData.teamFocus !== undefined && bodyData.teamFocus !== "" && !FOCUS_LABELS[normaliseFocus(bodyData.teamFocus)]) {
             cb({
                 status: false,
-                statusText: "country is required"
-            })
-            return;
-        }
-        if (!(bodyData && bodyData.countryCodeObj)) {
-            cb({
-                status: false,
-                statusText: "countryCodeObj is required"
+                statusText: "teamFocus is invalid"
             })
             return;
         }
@@ -441,174 +446,179 @@ exports.companyValidationFromAdmin = (bodyData, cb) => {
     }
 };
 
-/**
- * Send Mail After Company Creation
- * @param {Object} allSettledRes 
- * @param {String} companyId 
- * @param {Object} req 
- */
-exports.sendMailAfterCompanyCreation = (allSettledRes, companyId, req) => {
-    const rejectedPromise = allSettledRes.filter((x) => x.status === "rejected") || [];
-    logger.info(`${companyId} Company Creation rejectedPromise: ${rejectedPromise}`);
-    // Send Error Mail
-    if (rejectedPromise && rejectedPromise.length) {
-        const subject = "AlianHub - Company Creation - Error Report";
-        const toMail = config.ERRORRECIVEREMAIL;
-        let html = "<p>Dear Developer,</p>";
-        html += "<h3>Error Details:</h3>";
-        html += "<ul>";
-        html += `<li><strong>Date/Time:</strong> ${new Date()}</li>`;
-        html += `<li><strong>Company Id:</strong> ${companyId}</li>`;
-        html += `<li><strong>Error Message/Code:</strong> ${JSON.stringify(rejectedPromise, null, 4)}</li>`;
-        html += `<li><strong>Environment:</strong> ${config.NODE_ENV}</li>`;
-        html += `<li><strong>Browser/Device Information:</strong> ${req?.headers["user-agent"] || "Unknown"}</li>`;
-        html += `</ul>`
-        serviceCtr.sendAttachMail(subject, html, toMail, null, () => {
-            logger.info(`Company Creation Error Email Send Successfully (${companyId}).`);
-        });
-    };
+const reasonOf = (failure) => failure?.statusText || failure?.error?.message || failure?.message || String(failure?.error || failure);
+
+exports.sendMailAfterCompanyCreation = (problems, companyId, req) => {
+    if (!problems.length) return;
+    logger.info(`${companyId} Company Creation problems: ${JSON.stringify(problems)}`);
+    const subject = "AlianHub - Company Creation - Error Report";
+    const toMail = config.ERRORRECIVEREMAIL;
+    let html = "<p>Dear Developer,</p>";
+    html += "<h3>Error Details:</h3>";
+    html += "<ul>";
+    html += `<li><strong>Date/Time:</strong> ${new Date()}</li>`;
+    html += `<li><strong>Company Id:</strong> ${companyId}</li>`;
+    html += `<li><strong>Error Message/Code:</strong> ${escapeHtml(JSON.stringify(problems, null, 4))}</li>`;
+    html += `<li><strong>Environment:</strong> ${config.NODE_ENV}</li>`;
+    html += `<li><strong>Browser/Device Information:</strong> ${escapeHtml(req?.headers["user-agent"] || "Unknown")}</li>`;
+    html += `</ul>`
+    serviceCtr.sendAttachMail(subject, html, toMail, null, () => {
+        logger.info(`Company Creation Error Email Send Successfully (${companyId}).`);
+    });
 };
 
-/**
- * Create Company V2
- * @param {Object} req 
- * @param {Object} res 
- */
-exports.createCompanyV2 = (req, res) => {
-    try {
-        exports.companyValidation(req.body, async(validation) => {
-            if (!validation.status) {
-                res.json(validation);
-                return
-            }
-            const bodyData = req.body;
-            let resObject = await exports.checkFreeCompanyCounts(bodyData.userId);
-            if (!resObject.isFree) {
-                logger.info(`checkFreeCompanyCounts Errors:: ${bodyData.userId} reached the maximum limit for creating free companies. Upgrade to unlock more.`);
-                emitListener(bodyData?.eventId, {step: "STOP",error: "You've reached the maximum limit for creating free companies.",freeCompanyLimitReached:true});
-                res.json({
-                    status: false,
-                    statusText: "You've reached the maximum limit for creating free companies. Upgrade to unlock more.",
-                    freeCompanyLimitReached:true
-                });
-                return;          
-            }
-            let obj = {
-                type: SCHEMA_TYPE.PRECOMPANIES,
-                data: [{
-                    isAvailable: true,
-                    pickupCount: 0
-                },
-                {
-                    isAvailable: false,
-                    $inc: {
-                        pickupCount: 1
-                    }
-                }]
-            }
-            MongoDbCrudOpration(SCHEMA_TYPE.GOLBAL, obj, 'findOneAndUpdate')
-            .then((compnayData) => {
-                if (!(compnayData && compnayData._id)) {
-                    logger.error(`Predefine comapny not found.`);
-                    res.json({
-                        status: false,
-                        statusText: "Predefine comapny not found."
-                    })
-                    return;
-                }
-    
-                emitListener(bodyData?.eventId, {step: 1});
-                const companyMongoId = compnayData._id;
-                const companyId = JSON.parse(JSON.stringify(compnayData._id));
-                const companyObj = {
-                    type : SCHEMA_TYPE.COMPANIES,
-                    data: {
-                        userId: bodyData.userId,
-                        Cst_CompanyName:  bodyData.companyName,
-                        Cst_Phone:  bodyData.phoneNumber,
-                        Cst_Country: bodyData.country,
-                        Cst_City: bodyData.city,
-                        Cst_State: bodyData.state,
-                        Cst_DialCode: bodyData.countryCodeObj,
-                        Cst_LogTimeDays: bodyData.logtimeDays,
-                        totalProjects: bodyData.totalProjects,
-                        isInactive: bodyData.isInactive,
-                        isFree: bodyData.isFree,
-                        subscriptionData: bodyData.subscriptionData,
-                        totalData :bodyData.totalData,
-                        _id: companyMongoId,
-                        companyData: [{users:1}],
-                        Cst_stateCode: bodyData.Cst_stateCode,
-                        Cst_countryCode: bodyData.Cst_countryCode
-                    }
-                }
-                companyObj.data.planFeature = defaultSubscriptionDataRef.planObj;
-                const importSettingsData = {
-                    "companyId": companyId,
-                    "uid": bodyData.userId,
-                    "email": bodyData.email,
-                };
-                let userUpdateObj = {
-                    type: SCHEMA_TYPE.USERS,
-                    data: [
-                        { _id: bodyData.userId },
-                        { $push: { AssignCompany: companyId } },
-                        false, // Upsert
-                    ]
-                }
-                // Please don't change a array object position in allProcess Array
-                const allProcess = [
-                    () => exports.addAndRemoveUserInMongodbNotificationCountFun(companyId, bodyData.userId), // addAndRemoveUserInMongodbNotificationCount
-                    () => exports.createCompanyGlobalFun(companyObj), // Create Company in Global Database
-                    () => exports.importSettingsV2Fun(importSettingsData), // Import Settings
-                    () => exports.updateCompnayIdInUserFun(userUpdateObj, companyId,bodyData.userId) // ADD COMPANY ID IN USER DOCUMENT AFTER THE PROCESS COMPLETE
-                ];
-                let paymentObj = {};
-                serviceFunctionCtr.allSettledWithRetry(3, allProcess)
-                .then(async(allSettledRes) => {
-                    await handleCreateCompanyDataStorageFunForUpload(req.body, companyId)
-                    emitListener(bodyData?.eventId, {step: "STOP",companyId:companyId});
-                    if (process.env.PAYMENTMETHOD) {
-                        paymentObj = allSettledRes[4].status === "fulfilled" ? allSettledRes[4].value : {}
-                    }
-                    await storeRefferalCode(companyId,bodyData.userId);
-                    if (req.body.refferalCode && req.body.refferalCode !== '') {
-                       await checkAndStoreRefferalCode(req.body.refferalCode,companyId,bodyData.userId);
-                    }
-                    res.send({
-                        status: true,
-                        statusText: "Company created successfully",
-                        companyId: companyId,
-                        companyData: allSettledRes[1].status === "fulfilled" ? allSettledRes[1].value : {},
-                        paymentObj: paymentObj
-                    });
+const CREATION_TRIES = 3;
 
-                    exports.sendMailAfterCompanyCreation(allSettledRes, companyId, req);
-                }).catch((error) => {
-                    logger.error(`Company Creation Error All allSettledWithRetry (${companyId}) Error: ${error}.`);
-                    emitListener(bodyData?.eventId, {step: "STOP", error: error?.message || error});
-                    res.json({
-                        status: false,
-                        statusText: "Error" + error?.message
-                    });
-                });
-            }).catch((error) => {
-                logger.error(`ERROR in get tmp company data: ${error?.message || error}`);
-                emitListener(bodyData?.eventId, {step: "STOP", error: error?.message || error});
-                res.json({
-                    status: false,
-                    statusText: "Something went to wrong. Please contact to Admin.",
-                    error: error?.message || error
-                });
-            })
+// Only the operator's preset route fills the ready-made companies, so a fresh install has none waiting.
+const prepareCompanyNow = async () => {
+    const reserved = await MongoDbCrudOpration(SCHEMA_TYPE.GOLBAL, {
+        type: SCHEMA_TYPE.PRECOMPANIES,
+        data: { isAvailable: false, pickupCount: 1 }
+    }, 'save');
+    await exports.setCompany(String(reserved._id));
+    return reserved;
+};
+
+const takeCompany = async () => {
+    const readyCompany = await MongoDbCrudOpration(SCHEMA_TYPE.GOLBAL, {
+        type: SCHEMA_TYPE.PRECOMPANIES,
+        data: [{ isAvailable: true, pickupCount: 0 }, { isAvailable: false, $inc: { pickupCount: 1 } }]
+    }, 'findOneAndUpdate');
+    return readyCompany && readyCompany._id ? readyCompany : prepareCompanyNow();
+};
+
+const COMPANY_ROW = "the company row";
+
+/* `needed` marks what a workspace cannot open without: its own row, the owner's seat in it, and the company on the
+ * owner's account. Without the unread counter row the workspace opens and only its unread counts are missing. */
+const creationSteps = (companyMongoId, bodyData) => {
+    const companyId = String(companyMongoId);
+    const { userId, email } = bodyData;
+    return [
+        { name: "the unread counter row", needed: false, run: () => exports.addAndRemoveUserInMongodbNotificationCountFun(companyId, userId) },
+        { name: COMPANY_ROW, needed: true, run: () => exports.createCompanyGlobalFun(companyRowFor(companyMongoId, bodyData)) },
+        { name: "the owner's seat and notification settings", needed: true, run: () => exports.importSettingsV2Fun({ companyId, uid: userId, email }) },
+        { name: "the company on the owner's account", needed: true, run: () => exports.updateCompnayIdInUserFun({
+            type: SCHEMA_TYPE.USERS,
+            data: [{ _id: userId }, { $push: { AssignCompany: companyId } }, false]
+        }, companyId, userId) },
+    ];
+};
+
+/* Takes back what an unfinished creation wrote, so the same person can try again under the same name. A company
+ * row left behind would also count against the person's free workspaces. The prepared database stays reserved: one
+ * that has just failed is not handed to the next sign-up. Answers the names of what could not be taken back. */
+const undoCreation = async (companyMongoId, userId) => {
+    const companyId = String(companyMongoId);
+    const ownRowsOf = (type) => () => MongoDbCrudOpration(companyId, { type, data: [{ userId }] }, 'deleteMany');
+    const takeBack = [
+        { name: "the company on the owner's account", run: () => updateUserFun(SCHEMA_TYPE.GOLBAL, {
+            type: SCHEMA_TYPE.USERS,
+            data: [{ _id: userId }, { $pull: { AssignCompany: companyId } }]
+        }, 'updateOne', companyId, userId) },
+        { name: "the owner's seat", run: ownRowsOf(SCHEMA_TYPE.COMPANY_USERS) },
+        { name: "the owner's notification settings", run: ownRowsOf(SCHEMA_TYPE.NOTIFICATIONS_SETTINGS) },
+        { name: "the unread counter row", run: ownRowsOf(SCHEMA_TYPE.USERID) },
+        { name: COMPANY_ROW, run: () => updateCompanyFun(SCHEMA_TYPE.GOLBAL, {
+            type: SCHEMA_TYPE.COMPANIES,
+            data: [{ _id: companyMongoId, userId }]
+        }, 'deleteOne', companyId) },
+    ];
+    const results = await Promise.allSettled(takeBack.map((step) => step.run()));
+    removeCache(`company_users:${companyId}`);
+    return takeBack.filter((step, index) => results[index].status === "rejected").map((step) => step.name);
+};
+
+exports.createCompanyV2 = async (req, res) => {
+    try {
+        if (!req.uid) return res.status(401).json({ status: false, statusText: "Unauthorized" });
+        const account = await MongoDbCrudOpration(SCHEMA_TYPE.GOLBAL, {
+            type: SCHEMA_TYPE.USERS,
+            data: [{ _id: new mongoose.Types.ObjectId(String(req.uid)) }, { Employee_Email: 1 }]
+        }, 'findOne');
+        if (!(account && account.Employee_Email)) return res.status(401).json({ status: false, statusText: "Unauthorized" });
+        req.body = { ...(req.body || {}), ...NEW_COMPANY_PLAN(), userId: String(req.uid), email: account.Employee_Email };
+        const bodyData = req.body;
+        const validation = await new Promise((resolve) => exports.companyValidation(bodyData, resolve));
+        if (!validation.status) return res.json(failureReply(WORKSPACE_FAILURE.INVALID_DETAILS, validation.statusText));
+
+        const resObject = await exports.checkFreeCompanyCounts(bodyData.userId);
+        if (!resObject.isFree) {
+            logger.info(`checkFreeCompanyCounts Errors:: ${bodyData.userId} reached the maximum limit for creating free companies. Upgrade to unlock more.`);
+            emitListener(bodyData.eventId, {step: "STOP",error: "You've reached the maximum limit for creating free companies.",freeCompanyLimitReached:true});
+            return res.json({
+                status: false,
+                statusText: "You've reached the maximum limit for creating free companies. Upgrade to unlock more.",
+                freeCompanyLimitReached:true
+            });
+        }
+
+        const refuse = (failure) => {
+            emitListener(bodyData.eventId, { step: "STOP", error: failure.statusText, code: failure.code });
+            return res.json(failureReply(failure));
+        };
+
+        let company;
+        try {
+            company = await takeCompany();
+        } catch (error) {
+            logger.error(`ERROR in get tmp company data: ${error?.message || error}`);
+            return refuse(WORKSPACE_FAILURE.NOT_PREPARED);
+        }
+        emitListener(bodyData.eventId, {step: 1});
+        const companyId = String(company._id);
+
+        const steps = creationSteps(company._id, bodyData);
+        const settled = await serviceFunctionCtr.allSettledWithRetry(CREATION_TRIES, steps.map((step) => step.run));
+        const outcomeOf = (name) => settled[steps.findIndex((step) => step.name === name)];
+        const failedSteps = steps.filter((step) => outcomeOf(step.name).status === "rejected");
+        const problems = failedSteps.map((step) => ({ step: step.name, reason: reasonOf(outcomeOf(step.name).reason) }));
+
+        if (failedSteps.some((step) => step.needed)) {
+            logger.error(`Company creation (${companyId}) could not finish: ${failedSteps.map((step) => step.name).join(", ")}`);
+            const leftBehind = await undoCreation(company._id, bodyData.userId);
+            exports.sendMailAfterCompanyCreation([...problems, { step: "taking the unfinished workspace back", leftBehind }], companyId, req);
+            return refuse(WORKSPACE_FAILURE.NOT_FINISHED);
+        }
+
+        const withoutStopping = async (name, run) => {
+            try {
+                await run();
+            } catch (error) {
+                logger.error(`Company creation (${companyId}) went on without ${name}: ${reasonOf(error)}`);
+                problems.push({ step: name, reason: reasonOf(error) });
+            }
+        };
+        // The storage was made when the company was prepared: only a logo sent with the request is stored here.
+        await withoutStopping("the logo", () => handleCreateCompanyDataStorageFunForUpload(bodyData, companyId));
+        // A preset company may have been seeded before the catalogue import stopped wiping and refilling.
+        await withoutStopping("the project views", () => ensureViewCatalogue(companyId));
+        if (bodyData.teamFocus && bodyData.seedSampleProject !== false) {
+            emitListener(bodyData.eventId, {step: 2});
+            await withoutStopping("the sample project", () => seedSampleProject({ companyId, uid: bodyData.userId, teamFocus: bodyData.teamFocus }));
+        }
+        await withoutStopping("the notification defaults", () => ensureNotificationDefaults(companyId, bodyData.userId));
+        vectorStore.prepareCompany(companyId);
+        await withoutStopping("the referral code", async () => {
+            await storeRefferalCode(companyId, bodyData.userId);
+            if (bodyData.refferalCode && bodyData.refferalCode !== '') {
+                await checkAndStoreRefferalCode(bodyData.refferalCode, companyId, bodyData.userId);
+            }
         });
+
+        // The page opens the workspace on this message as well as on the reply, so it is said only now.
+        emitListener(bodyData.eventId, {step: "STOP", companyId});
+        res.send({
+            status: true,
+            statusText: "Company created successfully",
+            companyId,
+            companyData: outcomeOf(COMPANY_ROW).value,
+            paymentObj: {}
+        });
+        exports.sendMailAfterCompanyCreation(problems, companyId, req);
     } catch (error) {
         logger.error(`ERROR in create compnay v2 function: ${error?.message || error}`);
-        res.json({
-            status: false,
-            statusText: "Something went to wrong. Please contact to Admin.",
-            error: error?.message || error
-        });
+        if (!res.headersSent) res.json(failureReply(WORKSPACE_FAILURE.SERVER_ERROR));
     }
 };
 
@@ -620,6 +630,9 @@ exports.checkFreeCompanyCountsApi = (req,res) => {
                 status: false,
                 statusText: "Bad request, userId is required."
             });
+        }
+        if (String(userId) !== String(req.uid || '')) {
+            return res.json({ status: true, statusText: "Success", isFree: true, companies: [] });
         }
         exports.checkFreeCompanyCounts(userId).then((result) => {
             res.json({
@@ -696,61 +709,60 @@ exports.checkFreeCompanyCounts = (userId) => {
     });
 };
 
-exports.deleteCompany = (req, res) => {
+/* Destroys the tenant's whole database, so it is gated harder than any other company write:
+ * the owner of the company the verified session names, who has typed that company's name back.
+ * The role is read against the pinned tenant, not the header, so the company being judged and
+ * the company being dropped cannot be two different ones. */
+exports.deleteCompany = async (req, res) => {
+    const refuse = (code, statusText) => res.status(code).send({ status: false, statusText });
     try {
-        if (!(req.body && req.body.companyId)) {
-            res.send({
-                status: false,
-                statusText: "CompanyId is required"
-            })
-            return;
-        }
-        mongoose.connect(process.env.MONGODB_URL+"/"+req.body.companyId);
-        const connection = mongoose.connection;
-        connection.once('open', () => {
-            logger.info(`MongoDB database connection established successfully ${req.body.companyId}`);
-        });
-        mongoose.connection.dropDatabase().then(() => {
-            try {
-                mongoose.connection.close();
-                let delObj = {
-                    type: SCHEMA_TYPE.COMPANIES,
-                    data: [
-                        {
-                            _id: new mongoose.Types.ObjectId(req.body.companyId)
-                        }
-                    ]
-                }
-                updateCompanyFun(SCHEMA_TYPE.GOLBAL,delObj,"deleteOne",req.body.companyId)
-                .then(() => {
-                    let findObj = {
-                        type: dbCollections.USERS,
-                        data: [
-                            {'AssignCompany': { $in: [req.body.companyId]}},
-                            {
-                                $pull: { 'AssignCompany': req.body.companyId }
-                            }
-                        ]
-                    };
+        const companyId = pinSessionTenant(req, res);
+        if (!companyId) return undefined;
+        if (req.apiToken) return refuse(403, "An API token cannot delete a company.");
 
-                    updateUserFun(dbCollections.GLOBAL,findObj,"updateMany",req.body.companyId,'',true)
-                    .then(() => {
-                        res.send({ status: true, statusText: "Done"});
-                    }).catch((error) => {
-                        res.send({ status: false, statusText: error});
-                        console.error(error,"errorerror");
-                    });
-                })
-            } catch (err) {
-                res.send({ status: false, statusText: error});
-                console.error(err,"ERROR IN CLOSE CONNECTION");
-            }
-        }).catch((error) => {
-            res.send({ status: false, statusText: error});
-            console.error(error,"ERROR IN DROP DATABASE");
-        });
+        const roleType = await getRoleType(companyId, req.uid);
+        if (roleType !== ROLE_OWNER) return refuse(403, "Only the company owner can delete this company.");
+
+        const company = await MongoDbCrudOpration(SCHEMA_TYPE.GOLBAL, {
+            type: SCHEMA_TYPE.COMPANIES,
+            data: [{ _id: new mongoose.Types.ObjectId(companyId) }, { Cst_CompanyName: 1 }],
+        }, "findOne");
+        if (!company) return refuse(404, "No such company.");
+        if (String(req.body.confirm || "") !== String(company.Cst_CompanyName || "")) {
+            return refuse(400, "Type the company name to confirm the deletion.");
+        }
+
+        const companyRow = { _id: new mongoose.Types.ObjectId(companyId) };
+        const markDeleting = (update) => MongoDbCrudOpration(SCHEMA_TYPE.GOLBAL, { type: SCHEMA_TYPE.COMPANIES, data: [companyRow, update] }, "updateOne");
+        await markDeleting({ $set: { deletingAt: new Date() } });
+        try {
+            await dropCompanyDatabase(companyId);
+        } catch (error) {
+            await markDeleting({ $unset: { deletingAt: 1 } }).catch(() => {});
+            throw error;
+        }
+
+        const delObj = {
+            type: SCHEMA_TYPE.COMPANIES,
+            data: [{ _id: new mongoose.Types.ObjectId(companyId) }],
+        };
+        await updateCompanyFun(SCHEMA_TYPE.GOLBAL, delObj, "deleteOne", companyId);
+
+        const findObj = {
+            type: dbCollections.USERS,
+            data: [
+                { 'AssignCompany': { $in: [companyId] } },
+                { $pull: { 'AssignCompany': companyId } },
+            ],
+        };
+        await updateUserFun(dbCollections.GLOBAL, findObj, "updateMany", companyId, '', true);
+        // A cached membership or role would let the next request pass and reopen, so recreate, the database.
+        removeCache(companyId, true);
+
+        logger.info(`Company ${companyId} deleted by ${req.uid}`);
+        return res.send({ status: true, statusText: "Done" });
     } catch (error) {
-        res.send({ status: false, statusText: error});
-        console.error(error,"ERROR IN DELETE COMPANY:");
+        logger.error(`ERROR in delete company: ${error.message || error}`);
+        return refuse(500, "Could not delete the company.");
     }
 }

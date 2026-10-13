@@ -6,6 +6,8 @@ const path = require('path');
 const { generateSignedUrl, checkBucketInDB, uploadStorageThumbnailFile } = require("./helpers/bucket.helper.js");
 const thumbnailArray = require("../../../thumbnail.json");
 const jwt = require("jsonwebtoken");
+const { sendStoredFile } = require("./helpers/downloadHeaders.js");
+const { refuseUnverifiedBucket } = require("../bucketAccess");
 
 /**
  * @description Create a bucket for the specified database.
@@ -53,49 +55,16 @@ exports.createBucketOnStorage = async(req, res) => {
 }
 
 
-/**
- * @description Get a bucket with the specified bucket id.
- * @param {*} req 
- * @param {*} res
- */
-exports.getBucketOnStorage = (req,res) => {
-    const {bucketId} = req.params;
-
-    if(!bucketId) {
-        return res.status(400).json({
-            success: false,
-            statusText: 'bucketId is required'
-        })
-    }
-
-    const object = {
-        type: dbCollections.BUCKETS,
-        data: [{id : bucketId}]
-    }
-
+exports.getBucketOnStorage = async (req, res) => {
+    const { bucketId } = req.params;
     try {
-        MongoDbCrudOpration("global", object, "find")
-        .then(result => {
-            if(result.length > 0){
-                return res.status(200).json(result)
-            } else {
-                return res.status(400).json({
-                    success: false,
-                    statusText: 'Bucket not found'
-                })
-            }
-        })
-        .catch(err => {
-            return res.status(400).json({
-                success: false,
-                statusText: err
-            })
-        })
+        const bucket = await MongoDbCrudOpration("global", { type: dbCollections.BUCKETS, data: [{ id: bucketId }] }, "findOne");
+        if (!bucket) {
+            return res.status(404).json({ status: false, statusText: 'Bucket not found', message: 'Bucket not found' });
+        }
+        return res.status(200).json({ status: true, statusText: 'Bucket found', data: bucket });
     } catch (error) {
-        return res.status(400).json({
-            success: false,
-            statusText: error
-        })
+        return res.status(400).json({ status: false, statusText: 'Bucket lookup failed', message: error.message });
     }
 }
 
@@ -157,92 +126,30 @@ exports.updateBucketOnStorage = (req,res) => {
 }
 
 
-/**
- * @description This is remove bucket from the database as well as from storage.
- * @param {*} req
- * @param {*} res
- */
-exports.removeBucketOnStorage = (req, res) => {
-    const {bucketId} = req.params;
-    if(!bucketId) {
-        return res.status(400).json({
-            success: false,
-            statusText: 'bucketId is required'
-        })
-    }
-
-    const object = {
-        type: dbCollections.BUCKETS,
-        data: [
-            {
-                id : bucketId
-            }
-        ]
-    }
+exports.removeBucketOnStorage = async (req, res) => {
+    const { bucketId } = req.params;
     try {
-        MongoDbCrudOpration("global", object, "findOneAndDelete")
-       .then(result => {
-            if(result!== null){
-                const bucketDir = path.join(__dirname, '../../../storage', bucketId);
-                if (fs.existsSync(bucketDir)) {
-                    fs.rmdirSync(bucketDir, { recursive: true });
-                    return res.status(200).json({
-                        success: true,
-                        data: result
-                    })
-                } else {
-                    return res.status(400).json({
-                        success: false,
-                        statusText: 'Bucket not found'
-                    })
-                }
-
-            } else {
-                return res.status(400).json({
-                    success: false,
-                    statusText: 'Bucket not found'
-                })
-            }
-        })
-       .catch(err => {
-            return res.status(400).json({
-                success: false,
-                statusText: err
-            })
-        })
+        const removed = await MongoDbCrudOpration("global", { type: dbCollections.BUCKETS, data: [{ id: bucketId }] }, "findOneAndDelete");
+        if (!removed) {
+            return res.status(404).json({ status: false, statusText: 'Bucket not found', message: 'Bucket not found' });
+        }
+        await fs.promises.rm(path.join(__dirname, '../../../storage', bucketId), { recursive: true, force: true });
+        return res.status(200).json({ status: true, statusText: 'Bucket removed', data: removed });
     } catch (error) {
-        return res.status(400).json({
-            success: false,
-            statusText: error
-        })
+        return res.status(400).json({ status: false, statusText: 'Bucket removal failed', message: error.message });
     }
 }
 
 
-/**
- * @description Get Bucket size with Bucket id in server storage derectory.
- * @param {*} req
- * @param {*} res
- */
-exports.getBucketSizeOnStorage = (req,res) =>{
-    const {bucketId} = req.params;
-    const {unit = ''} = req.query;
-
-    if(!bucketId) {
-        return res.status(400).json({
-            success: false,
-            statusText: 'bucketId is required'
-        })
+exports.getBucketSizeOnStorage = async (req, res) => {
+    const { bucketId } = req.params;
+    const { unit = '' } = req.query;
+    try {
+        const size = await getBucketSizeCompanyWiseStorage(bucketId, unit);
+        return res.status(200).json({ status: true, statusText: 'Bucket size', data: size });
+    } catch (error) {
+        return res.status(400).json({ status: false, statusText: 'Bucket size failed', message: error.message || String(error.statusText || error) });
     }
-
-    getBucketSizeCompanyWiseStorage(bucketId, unit).then((res)=>{
-        return res.status(200).json({...res})
-    }).catch((err)=>{
-        return res.status(400).json({
-            success: false,
-            statusText: err
-        })
-    })
 }
 
 /**
@@ -259,13 +166,8 @@ exports.uploadFileOnStorage = async(req, res) => {
         return;
     }
     
-    if (!(req.body && req.body.companyId)) {
-        res.status(400).send({
-            status: false,
-            statusText: 'companyId is required'
-        });
-        return;
-    }
+    const bucketId = req.storageBucket;
+    if (!bucketId) return refuseUnverifiedBucket(res);
 
     if (req.file === undefined || req.file.path === undefined) {
         res.status(400).send({
@@ -280,7 +182,7 @@ exports.uploadFileOnStorage = async(req, res) => {
         let promises = [];
         if(index !== -1) {
             thumbnailArray[index].size.forEach((thu)=>{
-                promises.push(uploadStorageThumbnailFile(req.body.path,thu.height,thu.width,req.body.companyId,req.file))
+                promises.push(uploadStorageThumbnailFile(req.body.path,thu.height,thu.width,bucketId,req.file))
             })
             Promise.allSettled(promises).then(()=>{
                 return res.status(200).send({
@@ -294,7 +196,7 @@ exports.uploadFileOnStorage = async(req, res) => {
                 })
             })
         } else {
-            const filePath = path.join(__dirname, '../../../storage', req.body.companyId, req.body.path)
+            const filePath = path.join(__dirname, '../../../storage', bucketId, req.body.path)
             fs.unlinkSync(filePath);
             return res.status(400).send({
                 status: false,
@@ -363,13 +265,9 @@ exports.handleFileRequest = async(req, res) => {
         if(!token) {
             const bucketValid = await checkBucketInDB(bucketId);
             if(bucketValid && Object.keys(bucketValid).length && bucketValid.rule.isPrivate == false) {
-                const filePath = path.join(__dirname, '../../../storage', bucketId, filepath);
+                const filePath = exports.resolveBucketFile(bucketId, filepath);
                 if (fs.existsSync(filePath)) {
-                    res.sendFile(filePath, (err) => {
-                        if (err) {
-                            return;
-                        }
-                    });
+                    sendStoredFile(res, filePath);
                     return;
                 } else {
                     res.status(404).send({status: false,statusText:'Resorce Not Found'});
@@ -386,22 +284,10 @@ exports.handleFileRequest = async(req, res) => {
                 res.status(404).send({status: false,statusText:'Resorce Not Found on bucket'});
                 return;
             }
-            const filePath = path.join(__dirname, '../../../storage', bucketId, filepath);
+            const filePath = exports.resolveBucketFile(bucketId, filepath);
     
             if (fs.existsSync(filePath)) {
-                if(req.query.download) {
-                    res.download(filePath, err => {
-                        if(err) {
-                            return;
-                        }
-                    })
-                } else {
-                    res.sendFile(filePath, (err) => {
-                        if (err) {
-                            return;
-                        }
-                    });
-                }
+                sendStoredFile(res, filePath, { download: Boolean(req.query.download) });
             } else {
                 res.status(404).send({status: false,statusText:'Resorce Not Found'});
                 return;
@@ -460,7 +346,7 @@ exports.removeFileFromStorage = (req,res) => {
                 }
             });
             Promise.allSettled(promises).then(()=>{
-                const filePath = path.join(__dirname, '../../../storage', bucketId, filepath);
+                const filePath = exports.resolveBucketFile(bucketId, filepath);
                 // fs.chmodSync(filePath, 0o666);
                 if (fs.existsSync(filePath)) {
                     fs.unlinkSync(filePath);
@@ -482,7 +368,7 @@ exports.removeFileFromStorage = (req,res) => {
             }) 
         }
     } else {
-        const filePath = path.join(__dirname, '../../../storage', bucketId, filepath);
+        const filePath = exports.resolveBucketFile(bucketId, filepath);
         if (fs.existsSync(filePath)) {
             fs.unlinkSync(filePath);
             res.status(200).send({
@@ -508,13 +394,8 @@ exports.uploadBase64FileOnServerStorage = (req,res) => {
             return;
         }
         
-        if (!(req.body && req.body.companyId)) {
-            res.status(400).send({
-                status: false,
-                statusText: 'companyId is required'
-            });
-            return;
-        }
+        const bucketId = req.storageBucket;
+        if (!bucketId) return refuseUnverifiedBucket(res);
     
         if (!(req.body && req.body.base64String)) {
             res.status(400).send({
@@ -524,13 +405,13 @@ exports.uploadBase64FileOnServerStorage = (req,res) => {
             return;
         }
     
-        const bucketDir = path.join(__dirname, '../../../storage', req.body.companyId);
+        const bucketDir = path.join(__dirname, '../../../storage', bucketId);
     
         const dirPath = path.join(bucketDir, req.body.path);
     
         const base64Data = req.body.base64String.replace(/^data:([A-Za-z-+/]+);base64,/, '');
         const buffer = Buffer.from(base64Data, 'base64');
-        iconsThumbnailGenerator(req.body.path,req.body.companyId,{},buffer,path.basename(dirPath),req.body.key || '').then(()=>{
+        iconsThumbnailGenerator(req.body.path,bucketId,{},buffer,path.basename(dirPath),req.body.key || '').then(()=>{
             if (!fs.existsSync(dirPath)) {
                 fs.mkdirSync(path.dirname(dirPath), { recursive: true });
             }
@@ -561,3 +442,12 @@ exports.uploadBase64FileOnServerStorage = (req,res) => {
         })
     }
 }
+const STORAGE_ROOT = path.resolve(__dirname, '../../../storage');
+
+/* req.params[0] arrives URL-decoded, so "..%2f" is a real "../" by the time it is joined. */
+exports.resolveBucketFile = (bucketId, filepath) => {
+    const bucketRoot = path.resolve(STORAGE_ROOT, String(bucketId || ''));
+    if (path.dirname(bucketRoot) !== STORAGE_ROOT) return '';
+    const target = path.resolve(bucketRoot, String(filepath || ''));
+    return target.startsWith(bucketRoot + path.sep) ? target : '';
+};

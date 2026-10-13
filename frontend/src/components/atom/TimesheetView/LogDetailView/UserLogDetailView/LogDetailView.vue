@@ -2,7 +2,7 @@
 <Sidebar  width="923px">
     <template #head-left>
             <div class="d-flex align-items-center">
-                <UserProfile
+                <UserProfile decorative
                     v-if="user.profileImage && user.profileImage != null && user.profileImage != ''"
                     :showDot="false"
                     class="timesheet_user_profile mr-10px"

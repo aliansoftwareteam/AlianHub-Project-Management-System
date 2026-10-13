@@ -1,0 +1,383 @@
+const mongoose = require('mongoose');
+const { SCHEMA_TYPE } = require('./schemaType');
+const { MongoDbCrudOpration } = require('../utils/mongo-handler/mongoQueries');
+const { getRoleType, isPrivileged, evaluatePermission, isWritable, fineGrainedEnforced } = require('./permissionGuard');
+const logger = require('./loggerConfig');
+const { visibleProjectIds } = require('../Modules/Agents/scope');
+const { allowsProject } = require('./tokenNarrowing');
+const { PRIVATE_PROJECTS, seesEveryPrivateProject } = require('./rulePermissions');
+const { PROJECT_AGENT_FIELDS } = require('./projectAgentFields');
+const { sprintIdentities } = require('../Modules/Sprints/helpers/sprintVisibility');
+
+const OBJECT_ID = /^[a-f0-9]{24}$/i;
+const TEAM_PREFIX = 'tId_';
+
+const DETAILS = 'project.project_details';
+const DELETE_OR_CLOSE = ['project.project_delete', 'project.project_close'];
+const STATUS_OR_CLOSE = ['project.project_status_change', 'project.project_close'];
+const SECURITY_SETTINGS = 'settings.settings_security_permissions';
+const PROJECT_LIST_SETTINGS = 'settings.settings_project_list';
+
+// Each entry is an any-of list: the edit passes when one of the keys is writable. The pairs
+// mirror the web app, which reaches the same field from more than one gated control. A list
+// of lists needs every group (the web app shows the privacy switch only to a caller holding
+// both). An empty list means the field belongs to the caller (favourites, watch settings), so
+// membership is enough for the caller's own entry. A field not listed falls back to project_details.
+const FIELD_PERMISSIONS = {
+    ProjectName: ['project.project_name_edit'],
+    Description: ['project.project_description'],
+    descriptionBlock: ['project.project_description'],
+    AssigneeUserId: ['project.project_assignee'],
+    LeadUserId: ['project.project_assignee'],
+    status: STATUS_OR_CLOSE,
+    statusType: STATUS_OR_CLOSE,
+    deletedStatusKey: DELETE_OR_CLOSE,
+    ProjectType: ['project.project_type'],
+    ProjectCurrency: ['project.project_currency'],
+    BillingPeriod: ['project.project_currency'],
+    DueDate: ['project.project_due_date'],
+    dueDateDeadLine: ['project.project_due_date'],
+    StartDate: ['project.project_start_date'],
+    EndDate: ['project.project_end_date'],
+    source: ['project.project_source'],
+    proposalId: ['project.project_source'],
+    attachments: ['project.project_attachments'],
+    customField: ['project.project_custom_field'],
+    checklistArray: ['project.project_checklist'],
+    tagsArray: ['task.task_tag'],
+    projectIcon: ['project.project_create', DETAILS],
+    ProjectRequiredComponent: ['project.view_list', DETAILS],
+    viewColumn: ['task.list_view_column'],
+    isGlobalPermission: [SECURITY_SETTINGS],
+    isPrivateSpace: [[PROJECT_LIST_SETTINGS], [DETAILS]],
+    favouriteTasks: [],
+    watchers: [],
+};
+
+// Kept by the server: who owns the project, its tenant, the counters and activity other
+// writes maintain, and the settings for agents. No client screen edits them through the project update.
+const SERVER_ONLY_FIELDS = new Set([
+    '_id', 'CompanyId', 'companyId', 'projectCreatedBy', 'personalOwner', 'isPersonal', 'isRestrict',
+    'sprintsObj', 'sprintsfolders', 'lastTaskId', 'milestoneAmount', 'proposalIdNumeric',
+    'lastProjectActivity', 'userActivity', 'legacyId', 'demo',
+    ...PROJECT_AGENT_FIELDS,
+]);
+
+const PROJECT_UPDATE_OPERATORS = ['$set', '$unset', '$push', '$pull', '$addToSet'];
+
+const isPlainObject = (value) => Boolean(value) && typeof value === 'object' && !Array.isArray(value);
+
+/* The create form makes the project's id ahead (its icon is uploaded under it), and the create route pins the
+ * company and the creator itself. The form also sends the list maps and the task counter, empty: a new project
+ * starts with them as the schema has them, whatever is sent. Every other field the server keeps is refused. */
+const NEW_PROJECT_ROUTE_FIELDS = ['_id', 'CompanyId', 'companyId', 'projectCreatedBy'];
+const NEW_PROJECT_STARTING_FIELDS = ['sprintsObj', 'sprintsfolders', 'lastTaskId'];
+const NEW_PROJECT_KEPT_FIELDS = new Set([...SERVER_ONLY_FIELDS, 'deletedStatusKey']
+    .filter((field) => ![...NEW_PROJECT_ROUTE_FIELDS, ...NEW_PROJECT_STARTING_FIELDS].includes(field)));
+
+const fieldOf = (path) => path.split('.')[0];
+
+const fieldKeptFromNewProject = (body) => Object.keys(isPlainObject(body) ? body : {}).map(fieldOf).find((field) => NEW_PROJECT_KEPT_FIELDS.has(field));
+
+const withoutStartingFields = (body) => Object.fromEntries(Object.entries(body).filter(([path]) => !NEW_PROJECT_STARTING_FIELDS.includes(fieldOf(path))));
+
+const projectUpdateError = (body) => {
+    const { updateObject, key } = body || {};
+    if (key !== undefined && key !== null && key !== '' && !PROJECT_UPDATE_OPERATORS.includes(key)) {
+        return 'This update operator is not supported.';
+    }
+    if (updateObject === undefined || updateObject === null) return null;
+    if (!isPlainObject(updateObject)) return 'Update Object must be an object.';
+    for (const path of Object.keys(updateObject)) {
+        if (!path || path.startsWith('$')) return 'This update operator is not supported.';
+        if (SERVER_ONLY_FIELDS.has(path.split('.')[0])) return `${path.split('.')[0]} cannot be changed.`;
+    }
+    return null;
+};
+
+const requireSupportedProjectUpdate = (req, res, next) => {
+    const error = projectUpdateError(req.body);
+    if (!error) return next();
+    return res.status(400).json({ status: false, statusText: error, message: error });
+};
+
+const fieldsOf = (updateObject) => Object.entries(updateObject || {}).flatMap(([field, value]) => (
+    field.startsWith('$') && value && typeof value === 'object' ? fieldsOf(value) : [field.split('.')[0]]
+));
+
+const entriesOf = (updateObject) => Object.entries(updateObject || {}).flatMap(([path, value]) => (
+    path.startsWith('$') && isPlainObject(value) ? entriesOf(value) : [[path, value]]
+));
+
+const isCallersOwn = (path, value, uid) => {
+    const [field, ...rest] = path.split('.');
+    if (!uid) return false;
+    if (field === 'watchers') return rest.length === 1 && rest[0] === String(uid);
+    if (field === 'favouriteTasks') {
+        return rest.length === 0 && isPlainObject(value) && Object.keys(value).length === 1 && String(value.userId) === String(uid);
+    }
+    return false;
+};
+
+const groupsFor = (path, value, uid) => {
+    const entry = FIELD_PERMISSIONS[path.split('.')[0]];
+    if (!entry) return [[DETAILS]];
+    if (!entry.length) return isCallersOwn(path, value, uid) ? [] : [[DETAILS]];
+    return Array.isArray(entry[0]) ? entry : [entry];
+};
+
+const permissionsForProjectUpdate = (updateObject, uid) => {
+    const groups = entriesOf(updateObject).flatMap(([path, value]) => groupsFor(path, value, uid));
+    const seen = new Set();
+    return groups.filter((group) => {
+        const id = group.join('|');
+        if (seen.has(id)) return false;
+        seen.add(id);
+        return true;
+    });
+};
+
+const toGroups = (permissions) => (permissions || []).map((p) => (Array.isArray(p) ? p : [p])).filter((g) => g.length);
+
+const isAssigned = async (companyId, project, uid) => {
+    const assignees = (project.AssigneeUserId || []).map(String);
+    if (assignees.includes(uid)) return true;
+    const teamIds = assignees.filter((a) => a.startsWith(TEAM_PREFIX)).map((a) => a.slice(TEAM_PREFIX.length)).filter((id) => OBJECT_ID.test(id));
+    if (!teamIds.length) return false;
+    const teams = await MongoDbCrudOpration(companyId, {
+        type: SCHEMA_TYPE.TEAMS_MANAGEMENT,
+        data: [{ _id: { $in: teamIds.map((id) => new mongoose.Types.ObjectId(id)) } }, { assigneeUsersArray: 1 }],
+    }, 'find');
+    return (teams || []).some((team) => (team.assigneeUsersArray || []).map(String).includes(uid));
+};
+
+const anyWritable = async (companyId, uid, projectId, keys) => {
+    for (const key of keys) {
+        if (isWritable(await evaluatePermission(companyId, uid, key, { projectId }))) return true;
+    }
+    return false;
+};
+
+const NOT_FOUND = { allowed: false, statusCode: 404 };
+const MISSING = { allowed: false, statusCode: 404, missing: true };
+const forbidden = (permission) => ({ allowed: false, statusCode: 403, permission });
+
+const READ = 'read';
+const WRITE = 'write';
+
+/*
+ * Public spaces have no member list in the web app (the assignee picker only exists on
+ * private spaces), so every company member counts as a member of a public project and
+ * the catalogue alone decides. A private space the caller is not assigned to answers 404
+ * unless their role may list every private space: then it is readable, and a write
+ * answers 403 because its existence is no secret.
+ */
+const decideProjectAccess = async (companyId, uid, projectId, { mode = WRITE, permissions = [] } = {}) => {
+    const company = String(companyId || '');
+    const user = String(uid || '');
+    const id = String(projectId || '');
+    if (!OBJECT_ID.test(company) || !OBJECT_ID.test(user) || !OBJECT_ID.test(id)) return NOT_FOUND;
+    if (!allowsProject(user, id)) return NOT_FOUND;
+
+    const roleType = await getRoleType(company, user);
+    if (roleType === null) return NOT_FOUND;
+
+    const project = await MongoDbCrudOpration(company, {
+        type: SCHEMA_TYPE.PROJECTS,
+        data: [{ _id: new mongoose.Types.ObjectId(id) }, { isPrivateSpace: 1, AssigneeUserId: 1, isPersonal: 1, personalOwner: 1 }],
+    }, 'findOne');
+    if (!project) return MISSING;
+    if (project.isPersonal === true) return String(project.personalOwner) === user ? { allowed: true } : NOT_FOUND;
+    if (isPrivileged(roleType)) return { allowed: true };
+
+    if (project.isPrivateSpace === true && !(await isAssigned(company, project, user))) {
+        if (!seesEveryPrivateProject(await evaluatePermission(company, user, PRIVATE_PROJECTS))) return NOT_FOUND;
+        if (mode !== READ) return forbidden(null);
+    }
+
+    if (mode === READ || !fineGrainedEnforced()) return { allowed: true };
+    for (const group of toGroups(permissions)) {
+        if (!(await anyWritable(company, user, id, group))) return forbidden(group[0]);
+    }
+    return { allowed: true };
+};
+
+const PROJECT_ACCESS_FIELDS = Object.freeze({ isPrivateSpace: 1, AssigneeUserId: 1, isPersonal: 1, personalOwner: 1 });
+
+/* What a read of many projects is judged by, read once for the person: their role, their own id and teams, and
+ * whether their role lists every private project. */
+const readStanding = async (companyId, uid) => {
+    const roleType = await getRoleType(String(companyId || ''), String(uid || ''));
+    const privileged = isPrivileged(roleType);
+    return {
+        uid: String(uid || ''),
+        roleType,
+        privileged,
+        identities: new Set(roleType === null || privileged ? [String(uid)] : await sprintIdentities(companyId, uid)),
+        everyPrivate: privileged || (roleType !== null && seesEveryPrivateProject(await evaluatePermission(companyId, uid, PRIVATE_PROJECTS))),
+    };
+};
+
+/* decideProjectAccess for a read, on a project row already read with PROJECT_ACCESS_FIELDS. */
+const opensProjectRow = (project, standing) => {
+    if (standing.roleType === null || !allowsProject(standing.uid, project._id)) return false;
+    if (project.isPersonal === true) return String(project.personalOwner) === standing.uid;
+    if (standing.privileged || project.isPrivateSpace !== true || standing.everyPrivate) return true;
+    return (project.AssigneeUserId || []).map(String).some((id) => standing.identities.has(id));
+};
+
+/* canReadProject for many projects in one read: `open` holds the rows the person can open, by id, and `found` the
+ * ids that have a project behind them at all. */
+const readableProjects = async (companyId, uid, projectIds, fields = {}) => {
+    const ids = [...new Set((projectIds || []).map(String))].filter((id) => OBJECT_ID.test(id));
+    const standing = await readStanding(companyId, uid);
+    const rows = ids.length ? await MongoDbCrudOpration(String(companyId), {
+        type: SCHEMA_TYPE.PROJECTS,
+        data: [{ _id: { $in: ids.map((id) => new mongoose.Types.ObjectId(id)) } }, { ...fields, ...PROJECT_ACCESS_FIELDS }],
+    }, 'find') || [] : [];
+    return {
+        standing,
+        found: new Set(rows.map((row) => String(row._id))),
+        open: new Map(rows.filter((row) => opensProjectRow(row, standing)).map((row) => [String(row._id), row])),
+    };
+};
+
+const canEditProject = (companyId, uid, projectId, permissions = []) => decideProjectAccess(companyId, uid, projectId, { mode: WRITE, permissions });
+
+const canReadProject = (companyId, uid, projectId) => decideProjectAccess(companyId, uid, projectId, { mode: READ });
+
+const keepVisibleProjectIds = async (companyId, uid, projectIds) => {
+    const visible = new Set(await visibleProjectIds(companyId, uid));
+    return [...new Set((projectIds || []).map(String))].filter((id) => visible.has(id));
+};
+
+const refuse = (res, decision) => {
+    if (decision.statusCode === 404) {
+        return res.status(404).json({ status: false, statusText: 'Project not found.', error: 'Not Found' });
+    }
+    return res.status(403).json({
+        status: false,
+        statusText: 'You do not have permission to perform this action.',
+        error: 'Forbidden',
+        ...(decision.permission ? { permission: decision.permission } : {}),
+    });
+};
+
+const asList = (value) => (Array.isArray(value) ? value : [value]).filter((v) => v !== undefined && v !== null && v !== '');
+
+const PROJECT_FIELD = {
+    [SCHEMA_TYPE.SPRINTS]: 'projectId',
+    [SCHEMA_TYPE.FOLDERS]: 'projectId',
+    [SCHEMA_TYPE.MILESTONE]: 'projectId',
+    [SCHEMA_TYPE.EPICS]: 'ProjectID',
+    [SCHEMA_TYPE.RECURRING_TASKS]: 'ProjectID',
+    [SCHEMA_TYPE.TASKS]: 'ProjectID',
+    [SCHEMA_TYPE.PROJECT_INVOICES]: 'ProjectID',
+};
+
+const idsIn = (value) => asList(value).map((v) => (v && typeof v === 'object' ? (v._id || v.id) : v)).map(String).filter((id) => OBJECT_ID.test(id));
+
+/* Requests whose task record the caller cannot open. requireProjectAccess answers them like a task that is not there. */
+const namesClosedTask = new WeakSet();
+
+/* Required on use: the task rule is built on this file's project rule. */
+const opensTask = (companyId, uid, task) => require('../Modules/Tasks/helpers/taskReadAccess').canReadTask(companyId, uid, task);
+
+/*
+ * The project of a sprint, epic or milestone is read from the stored record, so a client
+ * cannot pair its own project id with someone else's record. Ids the handler also takes
+ * from the request (`direct`) are checked too. A task record is held to the rule a task is
+ * read by, its list included, and a conversation is a task only where `conversations` says so.
+ */
+const projectIdsFrom = ({ records = [], direct = () => [], conversations = false }) => async (req) => {
+    const companyId = String(req.headers['companyid'] || '');
+    const ids = [];
+    for (const [type, pick] of records) {
+        const recordIds = idsIn(await pick(req));
+        if (!recordIds.length || !OBJECT_ID.test(companyId)) continue;
+        const field = PROJECT_FIELD[type];
+        const docs = await MongoDbCrudOpration(companyId, {
+            type,
+            data: [{ _id: { $in: recordIds.map((id) => new mongoose.Types.ObjectId(id)) } }, { [field]: 1, sprintId: 1, mainChat: 1, AssigneeUserId: 1 }],
+        }, 'find');
+        for (const doc of docs || []) {
+            if (doc[field]) ids.push(String(doc[field]));
+            if (type !== SCHEMA_TYPE.TASKS) continue;
+            if ((doc.mainChat === true && !conversations) || !(await opensTask(companyId, String(req.uid || ''), doc))) namesClosedTask.add(req);
+        }
+    }
+    return [...ids, ...idsIn(await direct(req))];
+};
+
+/*
+ * Express middleware. `mode` is 'read' (the project must be visible to the caller) or
+ * 'write' (visible, plus the permission keys). `projectIds(req)` returns one id or a list
+ * (sync or async); a request that names no well-formed id passes through so the handler's
+ * own validation answers it. `permissions(req)` returns permission keys or any-of lists.
+ * An id with no project behind it passes when `passMissing(req, id)` says so (reads always):
+ * there is nothing to protect, and chat containers live outside the projects collection.
+ * Some handlers take the tenant from the body rather than the header, so a body companyId
+ * that disagrees with the header is refused here: otherwise the check would run in one
+ * company and the handler in another.
+ */
+const requireProjectAccess = ({ mode = WRITE, projectIds, permissions = () => [], passMissing = () => mode === READ }) => async (req, res, next) => {
+    try {
+        const companyId = String(req.headers['companyid'] || '');
+        const bodyCompany = req.body && (req.body.companyId || req.body.CompanyId);
+        if (bodyCompany && String(bodyCompany) !== companyId) {
+            return res.status(403).json({ status: false, statusText: 'You do not have access to this company', error: 'Forbidden' });
+        }
+        const ids = asList(await projectIds(req)).map(String).filter((id) => OBJECT_ID.test(id));
+        if (namesClosedTask.has(req)) return res.status(404).json({ status: false, statusText: 'Task not found.', error: 'Not Found' });
+        if (!ids.length) return next();
+        const keys = mode === READ ? [] : await permissions(req);
+        for (const id of [...new Set(ids)]) {
+            const decision = await decideProjectAccess(companyId, req.uid, id, { mode, permissions: keys });
+            if (decision.missing && await passMissing(req, id)) continue;
+            if (!decision.allowed) return refuse(res, decision);
+        }
+        return next();
+    } catch (error) {
+        logger.error(`requireProjectAccess error: ${error.message || error}`);
+        return res.status(403).json({ status: false, statusText: 'Permission check failed.', error: 'Forbidden' });
+    }
+};
+
+/* For list-shaped reads: the project ids in the request are narrowed to the visible ones. */
+const keepVisibleProjects = ({ get, set }) => async (req, res, next) => {
+    try {
+        const ids = get(req);
+        if (!Array.isArray(ids)) return next();
+        set(req, await keepVisibleProjectIds(String(req.headers['companyid'] || ''), req.uid, ids));
+        return next();
+    } catch (error) {
+        logger.error(`keepVisibleProjects error: ${error.message || error}`);
+        return res.status(403).json({ status: false, statusText: 'Permission check failed.', error: 'Forbidden' });
+    }
+};
+
+module.exports = {
+    FIELD_PERMISSIONS,
+    DELETE_OR_CLOSE,
+    STATUS_OR_CLOSE,
+    SECURITY_SETTINGS,
+    PROJECT_LIST_SETTINGS,
+    DETAILS,
+    READ,
+    WRITE,
+    fieldsOf,
+    fieldKeptFromNewProject,
+    withoutStartingFields,
+    requireSupportedProjectUpdate,
+    permissionsForProjectUpdate,
+    canEditProject,
+    canReadProject,
+    readStanding,
+    opensProjectRow,
+    readableProjects,
+    PROJECT_ACCESS_FIELDS,
+    keepVisibleProjectIds,
+    projectIdsFrom,
+    requireProjectAccess,
+    keepVisibleProjects,
+};

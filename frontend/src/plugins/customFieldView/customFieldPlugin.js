@@ -1,19 +1,19 @@
-import CustomFieldRender from './component/molecules/customFieldTaskView/customFieldRender.vue';
-import CustomFieldSidebar from './component/molecules/customFieldSidebar/customField.vue';
-import SettingCustomFieldComponent from './component/molecules/settingCustomField/settingCustomFieldComponent.vue';
-import CustomFieldListViewColumn from './component/molecules/customFieldViewColumn/customFieldListViewColumn.vue';
-import CustomFieldComp from './component/molecules/customFieldComp/customFieldComp.vue';
-import customFieldProjectDetail from './component/molecules/customFieldProjectDetail/customFieldProjectDetail.vue';
-import CustomFieldsSidebarComponent from './component/molecules/customFieldSidebar/customFieldsSidebarComponent/customFieldsSidebarComponent.vue';
+import { defineAsyncComponent } from 'vue';
+
+/* The field components share one chunk, fetched when the first of them renders; the app warms it
+ * once the shell is up (config/warmChunks.js), so a list's field columns are there with its rows. */
+export const CUSTOM_FIELD_LOADERS = {
+    CustomFieldRenderViewComponent: () => import(/* webpackChunkName: "custom-fields" */ './component/molecules/customFieldTaskView/customFieldRender.vue'),
+    CustomFieldSidebarComponent: () => import(/* webpackChunkName: "custom-fields" */ './component/molecules/customFieldSidebar/customField.vue'),
+    SettingCustomFieldViewComponent: () => import(/* webpackChunkName: "custom-fields" */ './component/molecules/settingCustomField/settingCustomFieldComponent.vue'),
+    CustomFieldListViewColumnComponent: () => import(/* webpackChunkName: "custom-fields" */ './component/molecules/customFieldViewColumn/customFieldListViewColumn.vue'),
+    CustomFieldProjectComponent: () => import(/* webpackChunkName: "custom-fields" */ './component/molecules/customFieldComp/customFieldComp.vue'),
+    CustomFieldProjectDetailView: () => import(/* webpackChunkName: "custom-fields" */ './component/molecules/customFieldProjectDetail/customFieldProjectDetail.vue'),
+    CustomFieldsSidebarComponent: () => import(/* webpackChunkName: "custom-fields" */ './component/molecules/customFieldSidebar/customFieldsSidebarComponent/customFieldsSidebarComponent.vue')
+};
+
 export default {
     install(app) {
-        // Create Company In Side a global component
-        app.component('CustomFieldRenderViewComponent', CustomFieldRender);
-        app.component('CustomFieldSidebarComponent', CustomFieldSidebar);
-        app.component('SettingCustomFieldViewComponent', SettingCustomFieldComponent);
-        app.component('CustomFieldListViewColumnComponent', CustomFieldListViewColumn);
-        app.component('CustomFieldProjectComponent', CustomFieldComp);
-        app.component('CustomFieldProjectDetailView', customFieldProjectDetail);
-        app.component('CustomFieldsSidebarComponent', CustomFieldsSidebarComponent);
+        Object.entries(CUSTOM_FIELD_LOADERS).forEach(([name, loader]) => app.component(name, defineAsyncComponent(loader)));
     }
 };

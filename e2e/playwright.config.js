@@ -1,0 +1,26 @@
+const { defineConfig, devices } = require('@playwright/test');
+
+module.exports = defineConfig({
+    testDir: './specs',
+    outputDir: './test-results',
+    globalSetup: require.resolve('./support/global-setup.js'),
+    fullyParallel: true,
+    forbidOnly: Boolean(process.env.CI),
+    retries: process.env.CI ? 1 : 0,
+    workers: process.env.CI ? 2 : undefined,
+    timeout: 60000,
+    expect: { timeout: 15000 },
+    reporter: [['list'], ['html', { outputFolder: 'report', open: 'never' }], ...(process.env.CI ? [[require.resolve('./support/summaryReporter.js')]] : [])],
+    use: {
+        trace: 'on-first-retry',
+        screenshot: 'only-on-failure',
+        // Each test opens a fresh browser, which would install the app's worker and download the whole
+        // bundle again. specs/app-shell.spec.js allows them for itself.
+        serviceWorkers: 'block',
+        consoleGuard: true,
+        pageTreeOnFailure: true,
+    },
+    projects: [
+        { name: 'chromium', use: { ...devices['Desktop Chrome'] } },
+    ],
+});

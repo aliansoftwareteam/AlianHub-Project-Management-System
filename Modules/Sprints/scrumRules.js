@@ -2,6 +2,8 @@
 // controller, the nightly cadence cron and the unit tests share one source of
 // truth. Mirrors the Modules/projectSetting/autoArchiveRules.js pattern.
 
+const { escapeHtml } = require('../../utils/escapeHtml');
+
 const DEFAULT_LENGTH_DAYS = 7;
 const MIN_LENGTH_DAYS = 1;
 const MAX_LENGTH_DAYS = 60;
@@ -204,7 +206,18 @@ function findLifecycleWrite(updateObject) {
     return null;
 }
 
+function sprintStartedMessage(actor, sprint, commitment) {
+    return `<b>${escapeHtml(actor.Employee_Name)}</b> started sprint <b>${escapeHtml(sprint.name)}</b> with <b>${Number(commitment.tasks) || 0}</b> task(s) committed.`;
+}
+
+function sprintCompletedMessage(actor, sprint, closeReport, movedTo) {
+    const moved = movedTo ? ` to <b>${escapeHtml(movedTo.name)}</b>` : '';
+    return `<b>${escapeHtml(actor.Employee_Name)}</b> completed sprint <b>${escapeHtml(sprint.name)}</b> — <b>${Number(closeReport.done.tasks) || 0}</b> done, <b>${Number(closeReport.notDone.tasks) || 0}</b> moved${moved}.`;
+}
+
 module.exports = {
+    sprintStartedMessage,
+    sprintCompletedMessage,
     normaliseCadence,
     computeWindow,
     nextSprintName,

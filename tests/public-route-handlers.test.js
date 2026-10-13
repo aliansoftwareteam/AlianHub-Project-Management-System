@@ -1,0 +1,306 @@
+const verified = require('./fixtures/verifiedRequest');
+jest.mock('../Config/loggerConfig', () => ({ error: jest.fn(), info: jest.fn(), warn: jest.fn() }));
+jest.mock('../utils/mongo-handler/mongoQueries', () => ({ MongoDbCrudOpration: jest.fn() }));
+jest.mock('../Config/knownCompany', () => ({ isKnownCompany: jest.fn(async () => true) }));
+jest.mock('../utils/data', () => ({ importUserNotifications: jest.fn(async () => undefined) }));
+jest.mock('../Config/permissionGuard', () => ({ getRoleType: jest.fn(), isPrivileged: (roleType) => roleType === 1 || roleType === 2, evaluatePermission: jest.fn(), isWritable: (permission) => permission === true }));
+jest.mock('../Modules/Company/controller/updateCompany', () => ({ updateCompanyFun: jest.fn() }));
+jest.mock('../Modules/settings/Members/controller', () => ({ updateMemberFunction: jest.fn() }));
+jest.mock('../Modules/Users/controller', () => ({ updateUserFun: jest.fn(), getUserByQueyFun: jest.fn() }));
+jest.mock('../Modules/Auth/controller', () => ({ addAndRemoveUserInMongodbNotificationCount: jest.fn(), insertAuthFun: jest.fn() }));
+jest.mock('../Modules/Auth/controller/sendVerificationMail', () => ({ storeVerificationToken: jest.fn(async () => 'token'), mailVerificationLink: jest.fn(async () => undefined) }));
+jest.mock('../Modules/storage/server/helpers/bucket.helper.js', () => ({}));
+
+const path = require('path');
+const { MongoDbCrudOpration } = require('../utils/mongo-handler/mongoQueries');
+const { importUserNotifications } = require('../utils/data');
+const { getRoleType, evaluatePermission } = require('../Config/permissionGuard');
+const { mongoOperation } = require('../Modules/Auth/controller/mongoOperation');
+const { updateTask } = require('../Modules/Tasks/helpers/getTasksData');
+const { resolveBucketFile } = require('../Modules/storage/server/controller');
+const { importSettingsNotification } = require('../Modules/ImportSettings/controller');
+const { changePassword } = require('../Modules/Auth/controller/password');
+const { deleteUserSpecificSession } = require('../Modules/Auth/session');
+const createUser = require('../Modules/Auth/controller/createUser');
+const { invitationPreview } = require('../Modules/Auth/controller/invitationPreview');
+const trackerPermission = require('../Modules/trackerUserPermission/controller');
+
+const COMPANY = '6f0000000000000000000c01';
+const OTHER_COMPANY = '6f0000000000000000000c02';
+const USER = '6f0000000000000000000001';
+const OTHER_USER = '6f0000000000000000000002';
+const MEMBER_ROW = '6f00000000000000000000a1';
+
+const response = () => {
+    const res = { statusCode: 200, body: undefined };
+    res.status = jest.fn((code) => { res.statusCode = code; return res; });
+    res.json = jest.fn((body) => { res.body = body; return res; });
+    res.send = jest.fn((body) => { res.body = body; return res; });
+    return res;
+};
+const request = ({ body = {}, params = {}, companyId = COMPANY, uid = USER } = {}) => verified({ body, params, headers: { companyid: companyId }, uid });
+const settle = () => new Promise((resolve) => setImmediate(resolve));
+
+beforeEach(() => {
+    jest.clearAllMocks();
+    getRoleType.mockReset();
+    evaluatePermission.mockReset();
+    MongoDbCrudOpration.mockResolvedValue([]);
+});
+
+describe('mongoOperation reads only the caller company', () => {
+    const body = (overrides) => ({ dbName: COMPANY, collection: 'timesheets', methodName: 'aggregate', dataObj: [[{ $match: {} }]], ...overrides });
+
+    it('refuses another database', async () => {
+        const res = response();
+        await mongoOperation(request({ body: body({ dbName: 'global', collection: 'users' }) }), res);
+        expect(res.statusCode).toBe(403);
+        expect(MongoDbCrudOpration).not.toHaveBeenCalled();
+    });
+
+    it('refuses another company database', async () => {
+        const res = response();
+        await mongoOperation(request({ body: body({ dbName: OTHER_COMPANY }) }), res);
+        expect(res.statusCode).toBe(403);
+    });
+
+    it.each(['deleteMany', 'updateMany', 'findOneAndUpdate', 'save', 'insertMany'])('refuses %s', async (methodName) => {
+        const res = response();
+        await mongoOperation(request({ body: body({ methodName }) }), res);
+        expect(res.statusCode).toBe(403);
+        expect(MongoDbCrudOpration).not.toHaveBeenCalled();
+    });
+
+    it.each(['$out', '$merge'])('refuses a pipeline that writes with %s', async (stage) => {
+        const res = response();
+        await mongoOperation(request({ body: body({ methodName: 'aggregate', dataObj: [[{ $match: {} }, { [stage]: 'copy' }]] }) }), res);
+        expect(res.statusCode).toBe(403);
+    });
+
+    it('runs a read on the caller company', async () => {
+        const res = response();
+        await mongoOperation(request({ body: body({ dataObj: [[{ $match: { TicketID: 't1' } }]] }) }), res);
+        expect(MongoDbCrudOpration).toHaveBeenCalledWith(COMPANY, expect.objectContaining({ type: 'timesheets' }), 'aggregate');
+        expect(res.body).toEqual({ status: true, statusText: 'OK', data: [] });
+    });
+});
+
+describe('PUT /api/v1/task only runs the project lifecycle cascade', () => {
+    const PROJECT = '6f00000000000000000000b1';
+    const body = (key) => ({ firstParameter: { _id: 't1' }, secondParameter: { $set: { a: 1 } }, key });
+    const closeProject = { firstParameter: { objId: { ProjectID: PROJECT }, deletedStatusKey: 0 }, secondParameter: { $set: { deletedStatusKey: 8 } }, key: 'updateMany' };
+
+    it.each(['deleteMany', 'find', 'aggregate', 'findOneAndDelete', 'updateOne'])('refuses %s', async (key) => {
+        const res = response();
+        await updateTask(request({ body: body(key) }), res);
+        expect(res.statusCode).toBe(403);
+        expect(MongoDbCrudOpration).not.toHaveBeenCalled();
+    });
+
+    it('refuses an updateMany that is not a cascade', async () => {
+        const res = response();
+        await updateTask(request({ body: body('updateMany') }), res);
+        expect(res.statusCode).toBe(403);
+        expect(MongoDbCrudOpration).not.toHaveBeenCalled();
+    });
+
+    it('runs the cascade updateMany for a caller allowed to close the project', async () => {
+        getRoleType.mockResolvedValue(1);
+        evaluatePermission.mockResolvedValue(true);
+        MongoDbCrudOpration.mockResolvedValueOnce([{ _id: 't1', ProjectID: PROJECT }]);
+        const res = response();
+        await updateTask(request({ body: closeProject }), res);
+        expect(res.statusCode).toBe(200);
+        expect(MongoDbCrudOpration).toHaveBeenCalledWith(COMPANY, expect.anything(), 'updateMany');
+    });
+});
+
+describe('storage download stays inside its bucket', () => {
+    it('resolves a file in the bucket', () => {
+        expect(resolveBucketFile(COMPANY, 'project/a.png')).toMatch(new RegExp(`storage\\${path.sep}${COMPANY}\\${path.sep}project`));
+    });
+
+    it.each([
+        ['USER_PROFILES', `../${COMPANY}/project/a.png`],
+        [COMPANY, '../../package.json'],
+        [COMPANY, '/etc/passwd'],
+        ['..', 'package.json'],
+        [COMPANY, ''],
+    ])('refuses bucket %s with path %s', (bucketId, filepath) => {
+        expect(resolveBucketFile(bucketId, filepath)).toBe('');
+    });
+});
+
+describe('importSettingsNotification only imports for the caller', () => {
+    it('refuses another user', () => {
+        const res = response();
+        importSettingsNotification(request({ body: { companyId: COMPANY, userId: OTHER_USER } }), res);
+        expect(res.statusCode).toBe(403);
+        expect(importUserNotifications).not.toHaveBeenCalled();
+    });
+
+    it('refuses another company', () => {
+        const res = response();
+        importSettingsNotification(request({ body: { companyId: OTHER_COMPANY, userId: USER } }), res);
+        expect(res.statusCode).toBe(403);
+    });
+
+    it('imports for the caller', async () => {
+        const res = response();
+        importSettingsNotification(request({ body: { companyId: COMPANY, userId: USER } }), res);
+        await settle();
+        expect(importUserNotifications).toHaveBeenCalledWith(COMPANY, USER);
+        expect(res.body.status).toBe(true);
+    });
+});
+
+describe('a session acts only on its own account', () => {
+    it("refuses changing another user's password", async () => {
+        const res = response();
+        await changePassword(request({ params: { id: OTHER_USER }, body: { oldPassword: 'a', newPassword: 'b' } }), res);
+        expect(res.statusCode).toBe(403);
+        expect(MongoDbCrudOpration).not.toHaveBeenCalled();
+    });
+
+    it("refuses ending another user's sessions", async () => {
+        const res = response();
+        await deleteUserSpecificSession(request({ params: { id: OTHER_USER } }), res);
+        expect(res.statusCode).toBe(403);
+        expect(MongoDbCrudOpration).not.toHaveBeenCalled();
+    });
+});
+
+describe('signup honours assignCompany only with a pending invitation', () => {
+    it('does not look up malformed ids', async () => {
+        expect(await createUser.findPendingInvitation({ companyId: 'global', email: 'a@b.c' })).toBeNull();
+        expect(await createUser.findPendingInvitation({ companyId: COMPANY, email: 'a@b.c', companyUserId: '{"$ne":null}' })).toBeNull();
+        expect(MongoDbCrudOpration).not.toHaveBeenCalled();
+    });
+
+    it('matches the pending row for the lower-cased email', async () => {
+        MongoDbCrudOpration.mockResolvedValue({ _id: MEMBER_ROW });
+        await createUser.findPendingInvitation({ companyId: COMPANY, email: 'New@Example.com', companyUserId: MEMBER_ROW });
+        const [db, query, method] = MongoDbCrudOpration.mock.calls[0];
+        expect(db).toBe(COMPANY);
+        expect(method).toBe('findOne');
+        expect(query.data[0]).toMatchObject({ userEmail: 'new@example.com', status: 1 });
+        expect(String(query.data[0]._id)).toBe(MEMBER_ROW);
+    });
+
+    const TOKEN = 'c'.repeat(64);
+    const invited = (extra) => ({ email: 'x@y.z', assignCompany: COMPANY, isInvitation: true, ...extra });
+
+    it('drops the company and the verified flag without an invitation', async () => {
+        MongoDbCrudOpration.mockResolvedValue(null);
+        const admitted = await createUser.admitInvitee(invited({ memberId: MEMBER_ROW, linkId: TOKEN }));
+        expect(admitted).toMatchObject({ assignCompany: '', isInvitation: false });
+    });
+
+    it('keeps the company for the invitation the link names, with its token', async () => {
+        MongoDbCrudOpration.mockResolvedValue({ _id: MEMBER_ROW, linkId: TOKEN });
+        const admitted = await createUser.admitInvitee(invited({ memberId: MEMBER_ROW, linkId: TOKEN }));
+        expect(admitted).toMatchObject({ assignCompany: COMPANY, isInvitation: true });
+        expect(admitted).not.toHaveProperty('memberId');
+        expect(admitted).not.toHaveProperty('linkId');
+        expect(String(MongoDbCrudOpration.mock.calls[0][1].data[0]._id)).toBe(MEMBER_ROW);
+    });
+
+    it.each([
+        ['no invitation id or token', {}],
+        ['no token', { memberId: MEMBER_ROW }],
+        ['a wrong token', { memberId: MEMBER_ROW, linkId: 'd'.repeat(64) }],
+    ])('drops the company for an invited email with %s', async (_label, extra) => {
+        MongoDbCrudOpration.mockResolvedValue({ _id: MEMBER_ROW, linkId: TOKEN });
+        const admitted = await createUser.admitInvitee(invited(extra));
+        expect(admitted).toMatchObject({ assignCompany: '', isInvitation: false });
+    });
+
+    it('drops the company when the invitation stores no token', async () => {
+        MongoDbCrudOpration.mockResolvedValue({ _id: MEMBER_ROW, linkId: '' });
+        const admitted = await createUser.admitInvitee(invited({ memberId: MEMBER_ROW, linkId: '' }));
+        expect(admitted).toMatchObject({ assignCompany: '', isInvitation: false });
+    });
+
+    it('never marks a plain signup verified', async () => {
+        const admitted = await createUser.admitInvitee({ email: 'x@y.z' });
+        expect(admitted.isInvitation).toBe(false);
+        expect(MongoDbCrudOpration).not.toHaveBeenCalled();
+    });
+});
+
+describe('invitationPreview', () => {
+    it('refuses malformed ids', async () => {
+        const res = response();
+        await invitationPreview(request({ body: { companyId: 'global', memberId: MEMBER_ROW } }), res);
+        expect(res.body.status).toBe(false);
+        expect(MongoDbCrudOpration).not.toHaveBeenCalled();
+    });
+
+    const TOKEN = 'e'.repeat(64);
+
+    it('shows the email of a pending invitation to the holder of its token', async () => {
+        MongoDbCrudOpration.mockResolvedValueOnce({ status: 1, userEmail: 'new@example.com', linkId: TOKEN }).mockResolvedValueOnce({ Cst_CompanyName: 'Acme' });
+        const res = response();
+        await invitationPreview(request({ body: { companyId: COMPANY, memberId: MEMBER_ROW, linkId: TOKEN } }), res);
+        expect(res.body.data).toEqual({ workspaceName: 'Acme', status: 1, email: 'new@example.com' });
+    });
+
+    /* An admin holds the link too, and could invite any address to learn whether it has an account. */
+    it.each([
+        ['had an account when it was sent', { userId: USER }],
+        ['had none', {}],
+    ])('answers the same fields for an address that %s, and never reads accounts', async (_label, row) => {
+        MongoDbCrudOpration.mockResolvedValueOnce({ status: 1, userEmail: 'new@example.com', linkId: TOKEN, ...row }).mockResolvedValueOnce({ Cst_CompanyName: 'Acme' });
+        const res = response();
+        await invitationPreview(request({ body: { companyId: COMPANY, memberId: MEMBER_ROW, linkId: TOKEN } }), res);
+        expect(res.body).toEqual({ status: true, statusText: 'Invitation found.', data: { workspaceName: 'Acme', status: 1, email: 'new@example.com' } });
+        expect(MongoDbCrudOpration).toHaveBeenCalledTimes(2);
+        for (const [, query] of MongoDbCrudOpration.mock.calls) expect(['users', 'userAuth']).not.toContain(query.type);
+    });
+
+    it.each([
+        ['used', { status: 2, linkId: TOKEN }],
+        ['removed', { status: 3, linkId: TOKEN }],
+        ['deleted', { status: 1, linkId: TOKEN, isDelete: true }],
+        ['stored without a token', { status: 1, linkId: '' }],
+    ])('refuses an invitation that is %s', async (_label, member) => {
+        MongoDbCrudOpration.mockResolvedValueOnce({ userEmail: 'new@example.com', ...member }).mockResolvedValueOnce({ Cst_CompanyName: 'Acme' });
+        const res = response();
+        await invitationPreview(request({ body: { companyId: COMPANY, memberId: MEMBER_ROW, linkId: member.linkId } }), res);
+        expect(res.body).toEqual({ status: false, statusText: 'Invalid invitation link.' });
+    });
+});
+
+describe('manageTrackerUserPermission', () => {
+    const body = { CompanyId: OTHER_COMPANY, DataObj: { userId: OTHER_USER } };
+
+    it('refuses a member', async () => {
+        getRoleType.mockResolvedValue(3);
+        const spy = jest.spyOn(trackerPermission, 'updateTrackerUsersAndUser').mockResolvedValue({ status: true });
+        const res = response();
+        trackerPermission.handleTrackerUserPermission(request({ body }), res);
+        await settle();
+        expect(res.statusCode).toBe(403);
+        expect(spy).not.toHaveBeenCalled();
+    });
+
+    it('refuses a body naming another company', async () => {
+        getRoleType.mockResolvedValue(2);
+        const spy = jest.spyOn(trackerPermission, 'updateTrackerUsersAndUser').mockResolvedValue({ status: true });
+        const res = response();
+        trackerPermission.handleTrackerUserPermission(request({ body }), res);
+        await settle();
+        expect(res.statusCode).toBe(403);
+        expect(spy).not.toHaveBeenCalled();
+    });
+
+    it('lets an admin change the session company', async () => {
+        getRoleType.mockResolvedValue(2);
+        const spy = jest.spyOn(trackerPermission, 'updateTrackerUsersAndUser').mockResolvedValue({ status: true });
+        const res = response();
+        trackerPermission.handleTrackerUserPermission(request({ body: { DataObj: body.DataObj } }), res);
+        await settle();
+        expect(getRoleType).toHaveBeenCalledWith(COMPANY, USER);
+        expect(spy).toHaveBeenCalledWith(body.DataObj, COMPANY);
+    });
+});

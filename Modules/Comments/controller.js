@@ -2,104 +2,147 @@ const { SCHEMA_TYPE } = require("../../Config/schemaType");
 const { MongoDbCrudOpration } = require("../../utils/mongo-handler/mongoQueries");
 const mongoose = require("mongoose")
 const logger = require("../../Config/loggerConfig");
-const { handleTaskAttachmentsDuplicateFunctionality } = require(`../../common-storage/common-${process.env.STORAGE_TYPE}.js`);
+const { handleStoredFileCopy } = require(`../../common-storage/common-${process.env.STORAGE_TYPE}.js`);
 const { replaceObjectKey } = require("../Auth/helper");
 const socketEmitter = require('../../event/socketEventEmitter');
 const { escapeRegex } = require("../../utils/escapeRegex");
-const { parseMentionIds } = require("./helpers/parseMentions");
-const { handleNotificationtFun } = require("../notification/prepare-notification-data/controllerV2");
+const { escapeCommentFields } = require("./helpers/plainText");
 const { getRoleType, isPrivileged } = require("../../Config/permissionGuard");
+const { sprintIdentities, visibleSprintExpr } = require("../Sprints/helpers/sprintVisibility");
+const { commentThreadAccess, refuseThread } = require("./helpers/threadAccess");
+const { threadOf, canPostToThread, canChangeComment, changesThreadOrAuthor, liveModuleOf } = require("./helpers/threadWriteAccess");
+const { resolveMentionIds, deliverMentions } = require("./helpers/commentNotifications");
+const { taskIdMatch } = require("./helpers/taskIdMatch");
+const { isThreadFile, mayCarryMedia, refuseMedia } = require("./helpers/commentFileKeys");
+const { judge: judgeDownload } = require("../storage/downloadScope");
+const { withoutAssignment, withoutThreadState, placeReply } = require("./helpers/commentThreads");
+const { notifyReply } = require("./helpers/threadNotices");
+const { parseAgentMentionIds, parseOwnAiMentionIds } = require("./helpers/parseMentions");
+const { withoutAiFields } = require("./helpers/aiActor");
+const { withoutImportFields } = require("./helpers/importFields");
+const { bumpUnreadCounts } = require("./helpers/unreadBumps");
+const { isChatMessage, holdsThreads, replyLookup, withThreadSummary, readable, keptRootIds, announceThread } = require("./helpers/chatThreads");
+const { withoutServerOwnedFields } = require("./helpers/serverOwnedFields");
+const { keptFromCaller } = require("./helpers/conversationRows");
 
-/* @mention delivery: record the mention (feeds the in-app "mentions" tab, which
- * queries the mentions collection by mentionIds) and fire the notification
- * pipeline (in-app + push + email) targeted at the mentioned users — NOT the
- * task watchers. Best-effort: never throws, so it can't break comment save. */
-const notifyMentions = async (companyId, comment, mentionIds) => {
-    const mentionerId = String(comment.userId || comment.createdBy || '');
-    const taskId = comment.taskId && String(comment.taskId) !== 'default' ? String(comment.taskId) : '';
-    const projectId = String(comment.projectId || '');
-    const sprintId = comment.sprintId ? String(comment.sprintId) : '';
-
-    await MongoDbCrudOpration(companyId, {
-        type: SCHEMA_TYPE.MENTIONS,
-        data: {
-            comment_id: String(comment._id),
-            comment_message: comment.message || '',
-            comment_type: taskId ? 'task' : 'project',
-            mentionIds,
-            userId: mentionerId,
-            projectId,
-            taskId,
-            sprintId,
-            type: 'mention',
-            notSeen: mentionIds,
-        },
-    }, 'save').catch((err) => logger.error(`[mentions] record save failed: ${err.message}`));
-
-    try {
-        await handleNotificationtFun({ body: {
-            createdAt: new Date(),
-            key: "comments_I'm_@mentioned_in",
-            message: comment.message || '',
-            projectId,
-            taskId,
-            type: 'task',
-            userId: mentionerId,
-            assigneeUsers: mentionIds,
-            folderId: comment.folderId ? String(comment.folderId) : '',
-            isSelected: false,
-            notSeen: mentionIds,
-            sprintId,
-            updatedAt: new Date(),
-            companyId,
-            changeType: 'mention',
-            comments_id: String(comment._id),
-        } });
-    } catch (err) {
-        logger.error(`[mentions] notification dispatch failed: ${err.message}`);
-    }
+/* A comment an agent run writes never starts agents, so agents cannot start each other.
+ * Required on use: the agent modules are only needed by a comment that names an agent. */
+const startMentionedAgents = async (req, companyId, comment) => {
+    if (!parseAgentMentionIds(comment.message).length) return;
+    const { resolveActor, isAgent } = require("../Agents/actor");
+    const actor = await resolveActor(req);
+    if (actor.runId) return;
+    const mark = require("../Agents/actingAgent").current();
+    await require("../Agents/triggers").fromComment(companyId, {
+        authorId: comment.userId, taskId: comment.taskId, message: comment.message, depth: mark ? mark.depth + 1 : 0,
+        ...(isAgent(actor) ? { postedBy: actor, path: `${req.method} ${String(req.originalUrl || '').split('?')[0]}`, ip: req.ip || '' } : {}),
+    });
 };
 
-/**
- * This endpoint is used to save data in comments collection
- * @param {*} req 
- * @param {*} res 
- * @returns 
- */
+/* Only a signed-in person names their own connected AI: a comment written through a token or by an agent hands nothing over. */
+const namesOwnAi = (req, message) => !req.apiToken && !req.mcp && !req.agentRun && parseOwnAiMentionIds(message).length > 0;
+
+const handToOwnAi = async (req, companyId, comment) => {
+    if (!namesOwnAi(req, comment.message)) return;
+    await require("../Agents/manager/workQueue").handOverFromComment(companyId, { authorId: comment.userId, taskId: comment.taskId, message: comment.message });
+};
+
+const askOwnAi = async (req, companyId, saved) => {
+    if (!namesOwnAi(req, saved.message)) return;
+    await require("../Agents/manager/chatQuestions").fromChatMessage(companyId, saved);
+};
+
+/* A question for a person's own AI is what its author last wrote as a signed-in person: any other change of a
+ * message that asked one, an owner's or an admin's included, takes the question back. */
+const ownAiFollowsChange = async (req, companyId, before, after) => {
+    const concerned = Boolean(before.ownAiAsk) || [before.message, after.message].some((message) => parseOwnAiMentionIds(message).length > 0);
+    if (!concerned) return;
+    const byAuthor = String(before.userId) === String(req.uid) && !req.apiToken && !req.mcp && !req.agentRun;
+    await require("../Agents/manager/chatQuestions").afterMessageChange(companyId, { before, after, byAuthor });
+};
+
+/* A summary kept for a task was made from its comments: it goes when one of them is deleted, and is marked as
+ * behind when one is edited. A failure here leaves a summary that says less than it should, never a failed write.
+ * Required on use: only a delete or an edit needs the store. */
+const keptSummaryFollows = async (companyId, comment, { deleted, edited }) => {
+    if (!comment.taskId || comment.taskId === 'default' || (!deleted && !edited)) return;
+    const kept = require("../AI/taskAiValues");
+    await Promise.resolve()
+        .then(() => (deleted ? kept.forgetSummary(companyId, comment.taskId) : kept.markSummaryBehind(companyId, comment.taskId)))
+        .catch((error) => logger.error(`[comments] kept summary of task ${comment.taskId}: ${error.message}`));
+};
+
+const writeOptionsFrom = (options) => {
+    if (options === undefined) return {};
+    const valid = Boolean(options) && typeof options === 'object' && !Array.isArray(options)
+        && Object.keys(options).every((key) => key === 'timestamps' && typeof options[key] === 'boolean');
+    return valid ? options : null;
+};
+
 exports.save = async (req, res) => {
     try {
         const { data } = req.body
-        const convertData = replaceObjectKey(data, ["objId"]);
+        const companyId = req.headers['companyid'];
+        const placement = await placeReply(companyId, withoutImportFields(withoutAiFields(withoutAssignment(escapeCommentFields(replaceObjectKey(data, ["objId"]))))));
+        if (!placement.allowed) return refuseThread(res, placement);
+        const convertData = placement.data;
         // SEC (AHE-3834) — the author is the authenticated caller, never a client-supplied
         // userId. Legit callers already send their own id, so this is transparent.
         if (req.uid) convertData.userId = req.uid;
-        // @mentions: extract the [Name](userId) tokens the editor inserts so the
-        // comment records who was mentioned (drives the mention notification).
-        const mentionIds = parseMentionIds(convertData.message);
+        const thread = threadOf(convertData);
+        const access = await canPostToThread(companyId, req.uid, thread);
+        if (!access.allowed) return refuseThread(res, access);
+        if (!(await mayCarryMedia(companyId, req.uid, convertData, convertData.mediaURL))) return refuseMedia(res);
+        const chatThread = Boolean(placement.parent) && await isChatMessage(companyId, placement.parent);
+        const mentionIds = await resolveMentionIds(companyId, convertData.userId, thread, convertData.message);
         const query = {
             type: SCHEMA_TYPE.COMMENTS,
             data: {
-                ...convertData,
-                ...(mentionIds.length ? { mentionIds } : {}),
+                ...withoutServerOwnedFields(convertData),
+                mentionIds,
                 ...(convertData.taskId !== 'default' ? { taskId: convertData.taskId } : {})
             }
         }
 
-        const response = await MongoDbCrudOpration(req.headers['companyid'], query, "save");
-        if (data?.objId?.projectId && data?.objId?.taskId && data?.objId?.sprintId) {
-            socketEmitter.emit('insert', { type: "insert", data: response , updatedFields: {}, module: 'comments' });
-        } else if(data?.taskId === "default"){
-            socketEmitter.emit('insert', { type: "insert", data: response , updatedFields: {}, module: 'comments' });
+        const response = await MongoDbCrudOpration(companyId, query, "save");
+        if (response && response._id) {
+            await startMentionedAgents(req, companyId, { ...thread, userId: convertData.userId, message: convertData.message })
+                .catch((err) => logger.error(`[mentions] agents not started: ${err.message}`));
+            await handToOwnAi(req, companyId, { ...thread, userId: convertData.userId, message: convertData.message })
+                .catch((err) => logger.error(`[mentions] task not handed over: ${err.message}`));
         }
-        else {
-            socketEmitter.emit('insert', { type: "insert", data: response , updatedFields: {}, module: 'comments_project' });
+        socketEmitter.emit('insert', { type: "insert", data: response , updatedFields: {}, module: placement.parent ? 'comments' : liveModuleOf(response || convertData), companyId });
+        const saved = response && response._id && (typeof response.toObject === "function" ? response.toObject() : response);
+        if (saved) {
+            await askOwnAi(req, companyId, saved).catch((err) => logger.error(`[mentions] own AI not asked: ${err.message}`));
         }
-        if (mentionIds.length && response && response._id) {
-            notifyMentions(req.headers['companyid'], response, mentionIds)
-                .catch((err) => logger.error(`[mentions] notify failed: ${err.message}`));
+        if (saved && !placement.parent) {
+            bumpUnreadCounts(companyId, saved, mentionIds)
+                .catch((err) => logger.error(`[comments] unread counts not raised: ${err.message}`));
         }
+        if (mentionIds.length && saved) {
+            deliverMentions(companyId, { ...saved, folderId: convertData.folderId }, mentionIds)
+                .then((failures) => failures.forEach((err) => logger.error(`[mentions] delivery failed: ${(err && err.message) || JSON.stringify(err)}`)))
+                .catch((err) => logger.error(`[mentions] delivery failed: ${err.message}`));
+        }
+        if (placement.parent && response && response._id) {
+            notifyReply(companyId, response, placement.parent, mentionIds, { chat: chatThread })
+                .catch((err) => logger.error(`[comments] reply notice failed: ${err.message}`));
+        }
+        if (chatThread && saved) {
+            await announceThread(companyId, saved.parentId)
+                .catch((err) => logger.error(`[comments] thread count not sent: ${err.message}`));
+        }
+        const ai = response && response._id
+            ? await require("../AI/aiMention").acceptFromComment(req, companyId, response)
+                .catch((err) => { logger.error(`[ai-mention] not accepted: ${err.message}`); return null; })
+            : null;
+        const agents = response && response._id
+            ? await Promise.resolve().then(() => require("../Agents/chatAgents").fromChatMessage(req, companyId, response))
+                .catch((err) => { logger.error(`[agent-chat] not started: ${err.message}`); return null; })
+            : null;
         if (response) {
-            return res.status(200).json({ status: true, data: response || {}  });
+            return res.status(200).json({ status: true, data: response || {}, ...(ai ? { ai } : {}), ...(agents ? { agents: agents.agents } : {}) });
         } else {
             return res.status(404).json({ status: false });
         }
@@ -112,21 +155,20 @@ exports.save = async (req, res) => {
     }
 }
 
-/**
- * This endpoint is used to update data in comments collection
- * @param {*} req 
- * @param {*} res 
- * @returns 
- */
 exports.update = async (req, res) => {
     try {
-        const { id, isProjectComment, data, options = {} } = req.body;
+        const { id } = req.body;
+        const data = withoutImportFields(withoutAiFields(withoutThreadState(escapeCommentFields(req.body.data))));
 
         if (!id) {
             return res.status(400).json({
                 status: false,
                 message: `'id' parameter is required.`
             });
+        }
+        const options = writeOptionsFrom(req.body.options);
+        if (!options) {
+            return res.status(400).json({ status: false, message: "'options' may only carry timestamps (true or false)." });
         }
 
         // SEC (AHE-3834) — a comment may only be edited/soft-deleted by its author
@@ -139,9 +181,16 @@ exports.update = async (req, res) => {
             { type: SCHEMA_TYPE.COMMENTS, data: [{ _id: new mongoose.Types.ObjectId(id) }] },
             'findOne'
         );
-        if (!existingComment) {
-            return res.status(404).json({ status: false, message: 'Comment not found.' });
+        const commentNotFound = () => res.status(404).json({ status: false, message: 'Comment not found.' });
+        if (!existingComment) return commentNotFound();
+        const access = await canChangeComment(req.headers['companyid'], req.uid, existingComment);
+        if (!access.allowed) return commentNotFound();
+        if (changesThreadOrAuthor(existingComment, data)) {
+            return res.status(400).json({ status: false, message: 'A comment cannot move to another thread or author.' });
         }
+        const namesNewMedia = Object.prototype.hasOwnProperty.call(data || {}, 'mediaURL')
+            && String(data.mediaURL || '') !== String(existingComment.mediaURL || '');
+        if (namesNewMedia && !(await mayCarryMedia(req.headers['companyid'], req.uid, existingComment, data.mediaURL))) return refuseMedia(res);
         const isOwner = String(existingComment.userId) === String(req.uid);
         const changedKeys = Object.keys(data || {});
         const pinOnly = changedKeys.length > 0 && changedKeys.every((k) => k === 'pinnedMessage');
@@ -152,6 +201,11 @@ exports.update = async (req, res) => {
             }
         }
 
+        const changes = withoutServerOwnedFields(data);
+        delete changes.mentionIds;
+        const mentionIds = changes.message !== undefined
+            ? await resolveMentionIds(req.headers['companyid'], existingComment.userId, threadOf(existingComment), changes.message)
+            : undefined;
         const params = {
             type: SCHEMA_TYPE.COMMENTS,
             data: [
@@ -160,23 +214,26 @@ exports.update = async (req, res) => {
                 },
                 {
                     $set: {
-                        ...data,
-                        ...(data.message !== undefined ? { mentionIds: parseMentionIds(data.message) } : {}),
+                        ...changes,
+                        ...(mentionIds ? { mentionIds } : {}),
                         ...((data.taskId && data.taskId !== 'default') ? { taskId: new mongoose.Types.ObjectId(data.taskId) } : {})
                     }
                 },
-                {
-                    returnDocument: 'after',
-                    ...options
-                }
+                { returnDocument: 'after', ...options }
             ]
         }
 
-        const response = await MongoDbCrudOpration(req.headers['companyid'], params, 'findOneAndUpdate');
-        if(!isProjectComment){
-            socketEmitter.emit('update', { type: "update", data: response , updatedFields: {}, module: 'comments' });
-        }else{
-            socketEmitter.emit('update', { type: "update", data: response , updatedFields: {}, module: 'comments_project' });
+        const companyId = req.headers['companyid'];
+        const response = await MongoDbCrudOpration(companyId, params, 'findOneAndUpdate');
+        socketEmitter.emit('update', { type: "update", data: response , updatedFields: {}, module: liveModuleOf(existingComment), companyId });
+        const deletionChanged = changedKeys.includes('isDeleted') && Boolean(data.isDeleted) !== Boolean(existingComment.isDeleted);
+        if (response && (deletionChanged || changes.message !== undefined)) {
+            await ownAiFollowsChange(req, companyId, existingComment, response).catch((err) => logger.error(`[mentions] own AI did not follow the change: ${err.message}`));
+        }
+        if (response) await keptSummaryFollows(companyId, existingComment, { deleted: deletionChanged && Boolean(data.isDeleted), edited: changes.message !== undefined });
+        if (response && existingComment.parentId && deletionChanged && await isChatMessage(companyId, existingComment)) {
+            await announceThread(companyId, existingComment.parentId)
+                .catch((err) => logger.error(`[comments] thread count not sent: ${err.message}`));
         }
         if (response) {
             return res.status(200).json({ status: true,data: response || {} });
@@ -192,12 +249,6 @@ exports.update = async (req, res) => {
     }
 }
 
-/**
- * This endpoint is used to get message form comments collection
- * @param {*} req 
- * @param {*} res 
- * @returns 
- */
 exports.getPaginatedMessages = async (req, res) => {
     try {
         const {
@@ -211,22 +262,33 @@ exports.getPaginatedMessages = async (req, res) => {
             tabLeaveTime = null
         } = req.query;
 
+        const companyId = req.headers['companyid'];
+        const thread = { projectId, sprintId, taskId };
+        const access = await commentThreadAccess(companyId, req.uid, thread);
+        if (!access.allowed) return refuseThread(res, access);
+
+        const threaded = holdsThreads(taskId);
+        const keptRoots = threaded && String(mainChat) === 'true' && await isChatMessage(companyId, thread)
+            ? await keptRootIds(companyId, thread)
+            : [];
+
         const searchResultMatch = {
             $match: {
                 $and: [
                     { projectId: new mongoose.Types.ObjectId(projectId) },
-                    // BUG-032 / #86 fix: align soft-delete handling with the other
-                    // comment-listing endpoints (searchMessageFromMainChat /
-                    // searchComments). Without this filter, soft-deleted comments
-                    // (isDeleted === true) reappeared in main-chat pagination.
-                    // `$ne: true` keeps documents whose flag is missing/false.
-                    { isDeleted: { $ne: true } },
+                    access.match,
+                    // `$ne: true` keeps documents written before the flag existed. A deleted chat message
+                    // that still has thread replies stays, as a placeholder for its thread.
+                    keptRoots.length
+                        ? { $or: [{ isDeleted: { $ne: true } }, { _id: { $in: keptRoots } }] }
+                        : { isDeleted: { $ne: true } },
+                    { parentId: null },
                     ...(sprintId ? [{ sprintId: new mongoose.Types.ObjectId(sprintId) }] : []),
                     ...(tabLeaveTime ? [{ updatedAt: { $gte: new Date(Number(tabLeaveTime)) } }] : []),
                     ...(!isDefault && mainChat
                         ? [{ taskId: "default" }]
                         : taskId
-                            ? [{ taskId: taskId !== 'default' ?  new mongoose.Types.ObjectId(taskId) : taskId }]
+                            ? [{ taskId: taskIdMatch(taskId) }]
                             : [{ project: true }]),
                 ]
             }
@@ -243,16 +305,16 @@ exports.getPaginatedMessages = async (req, res) => {
 
         const limitStage = tabLeaveTime ? null : { $limit: parseInt(batchLimit) };
         
-        const aggregationPipeline = [searchResultMatch, sortOption, skipStage, ...(limitStage ? [limitStage] : [])];
+        const aggregationPipeline = [searchResultMatch, sortOption, skipStage, ...(limitStage ? [limitStage] : []), ...(threaded ? [replyLookup] : [])];
 
         const params = {
             type: SCHEMA_TYPE.COMMENTS,
             data: [aggregationPipeline],
         };
 
-        const response = await MongoDbCrudOpration(req.headers['companyid'], params, 'aggregate');
+        const response = await MongoDbCrudOpration(companyId, params, 'aggregate');
 
-        return res.status(200).json({ status: true, data: response || [] });
+        return res.status(200).json({ status: true, data: (response || []).map((row) => readable(withThreadSummary(row))) });
 
     } catch (error) {
         return res.status(500).json({
@@ -273,13 +335,16 @@ exports.searchMessageFromMainChat = async (req, res) => {
     try {
         const { searchText, projectId, sprintId, taskId, skip = 0, limit = 25, isPinnedMessage, sort = 'asc' } = req.query;
 
+        const access = await commentThreadAccess(req.headers['companyid'], req.uid, { projectId, sprintId, taskId });
+        if (!access.allowed) return refuseThread(res, access);
+
         const query = {
             type: SCHEMA_TYPE.COMMENTS,
             data: [
                 {
                     projectId: new mongoose.Types.ObjectId(projectId),
                     ...(sprintId ? {sprintId: new mongoose.Types.ObjectId(sprintId)} : { project: true }),
-                    taskId: (taskId && taskId !== "default") ? new mongoose.Types.ObjectId(taskId) : 'default',
+                    taskId: taskId ? taskIdMatch(taskId) : 'default',
                     ...((isPinnedMessage === "true") ? { pinnedMessage: true } : {}),
                     ...(searchText && searchText !== ''
                         ? {
@@ -299,7 +364,8 @@ exports.searchMessageFromMainChat = async (req, res) => {
                     // isDeleted field. Using `$ne: true` keeps them in results
                     // while still excluding soft-deleted ones (consistent with
                     // searchComments).
-                    isDeleted: { $ne: true }
+                    isDeleted: { $ne: true },
+                    $and: [access.match]
                 },
                 {},
                 // Oldest-first stays the default so the existing pinned-messages /
@@ -340,6 +406,7 @@ exports.searchComments = async (req, res) => {
             batchSize = 20,
             sortBy = 'createdAt',
         } = req.body;
+        const privileged = isPrivileged(await getRoleType(req.headers['companyid'], req.uid));
 
         // Parse inputs and prepare default values
         const searchStr = searchText.toString();
@@ -349,15 +416,15 @@ exports.searchComments = async (req, res) => {
         const convertedProjectIds = projectIds.map(id => new mongoose.Types.ObjectId(id));
         const skipValue = parseInt(skip);
         const batchSizeValue = parseInt(batchSize);
+        const chatKeptFromCaller = await keptFromCaller(req.headers['companyid'], req.uid);
 
-
-        // Aggregation stages
         const searchResultMatch = {
             $match: {
                 $and: [
                     { ...additionalFilter },
                     { projectId: { $in: convertedProjectIds } },
                     { isDeleted: { $ne: true } },
+                    chatKeptFromCaller,
                     ...(searchStr
                         ? [
                             {
@@ -389,25 +456,24 @@ exports.searchComments = async (req, res) => {
                 ]
             }
         }
-        if (req.body?.roleType === 1 || req.body?.roleType === 2) {
-            sprintLookup.$lookup.pipeline.push({
-                $project: {
-                    name: 1,
-                    folderId: 1,
-                    isAccessible: 1,
-                },
-            });
+        /* Legacy sprints hold folderId as text, and the folder $lookup below matches BSON types strictly. */
+        const sprintFields = {
+            $project: {
+                name: 1,
+                folderId: { $convert: { input: '$folderId', to: 'objectId', onError: '$folderId', onNull: '$folderId' } },
+                isAccessible: 1,
+            },
+        };
+        if (privileged) {
+            sprintLookup.$lookup.pipeline.push(sprintFields);
         } else{
+            /* The assignee list holds user ids and `tId_<teamId>`, and the caller comes from the
+             * session: a body userId would let a client read someone else's private sprints. */
+            const identities = await sprintIdentities(req.headers['companyid'], req.uid);
             sprintLookup.$lookup.pipeline.push(
                 {
                     $addFields: {
-                        isAccessible: {
-                            $cond: {
-                                if: { $eq: ['$private', true] },
-                                then: { $in: [req.body.userId, '$AssigneeUserId'] },
-                                else: true,
-                            },
-                        },
+                        isAccessible: visibleSprintExpr(identities),
                     },
                 },
                 {
@@ -415,13 +481,7 @@ exports.searchComments = async (req, res) => {
                         isAccessible: true,
                     },
                 },
-                {
-                    $project: {
-                        name: 1,
-                        folderId: 1,
-                        isAccessible: 1,
-                    },
-                }
+                sprintFields
             );
         }
 
@@ -467,7 +527,7 @@ exports.searchComments = async (req, res) => {
             searchResultMatch,
             sprintLookup,
             sprintUnwind,
-            ...(req.body?.roleType !== 1 && req.body?.roleType !== 2 ? [checkIsSprint] : []),
+            ...(privileged ? [] : [checkIsSprint]),
             folderLookup,
             folderUnwind,
             sortOption,
@@ -500,51 +560,31 @@ exports.searchComments = async (req, res) => {
  * @param {*} companyId 
  * @returns 
  */
-exports.updateCommentSprint = (projectId, companyId) => {
-    return new Promise((resolve, reject) => {
-        try {
-            let findObj = {
-                type: SCHEMA_TYPE.SPRINTS,
-                data: [{ projectId: new mongoose.Types.ObjectId(projectId) }],
+exports.updateCommentSprint = async (projectId, companyId) => {
+    try {
+        const sprints = await MongoDbCrudOpration(companyId, {
+            type: SCHEMA_TYPE.SPRINTS,
+            data: [{ projectId: new mongoose.Types.ObjectId(projectId) }],
+        }, "find");
+        await Promise.allSettled((sprints || []).filter((sprint) => sprint.legacyId).map((sprint) => {
+            const updateObj = {
+                type: SCHEMA_TYPE.COMMENTS,
+                data: [
+                    {
+                        $expr: { $eq: [{ $toString: "$sprintId" }, sprint.legacyId] },
+                        projectId: new mongoose.Types.ObjectId(projectId)
+                    },
+                    { sprintId: new mongoose.Types.ObjectId(String(sprint._id)) }
+                ]
             };
-            let updatePromises = [];
-            MongoDbCrudOpration(companyId, findObj, "find").then(async (resp) => {
-                resp.forEach((sprint) => {
-                    let legacyId = sprint.legacyId ? sprint.legacyId : '';
-                    let sprintId = JSON.parse(JSON.stringify(sprint._id));
-                    if (legacyId) {
-                        const updateObj = {
-                            type: SCHEMA_TYPE.COMMENTS,
-                            data: [
-                                {
-                                    $expr: {
-                                        $eq: [{ $toString: "$sprintId" }, legacyId]
-                                    },
-                                    projectId: new mongoose.Types.ObjectId(projectId)
-                                },
-                                { sprintId: new mongoose.Types.ObjectId(sprintId) }
-                            ]
-                        }
-                        const promise = MongoDbCrudOpration(companyId, updateObj, "updateMany").catch((err) => {
-                            console.error(err, "ERROR IN IF UPDATE MANY");
-                        })
-                        updatePromises.push(promise);
-                    } else {
-                        console.info("ELSE IN COMMENT");
-                    }
-                })
-            })
-            Promise.allSettled(updatePromises).then(() => {
-                resolve();
-            }).catch((error) => {
-                console.error(error, "ERROR IN ALL SETTLED");
-                reject();
+            return MongoDbCrudOpration(companyId, updateObj, "updateMany").catch((err) => {
+                logger.error(`ERROR IN UPDATE MANY updateCommentSprint: ${err}`);
             });
-        } catch (error) {
-            reject();
-            console.error(error, "ERROR IN UPDATE COMMENTS:");
-        }
-    })
+        }));
+    } catch (error) {
+        logger.error(`ERROR IN UPDATE COMMENTS: ${error}`);
+        throw error;
+    }
 }
 
 /**
@@ -563,7 +603,7 @@ exports.updateCommentCollection = (companyId, task, sprintObj, newProjectData,ta
                 data: [
                     {
                         sprintId: new mongoose.Types.ObjectId(task.sprintId),
-                        taskId: new mongoose.Types.ObjectId(task._id)
+                        taskId: taskIdMatch(task._id)
                     },
                     {
                         sprintId: new mongoose.Types.ObjectId(sprintObj.id),
@@ -593,10 +633,26 @@ exports.updateCommentCollection = (companyId, task, sprintObj, newProjectData,ta
  * @param {*} sprintObj 
  * @returns 
  */
-exports.addCommentCollection = (companyId, projectData, task, newTask, sprintObj) => {
+/* Only a file in the comment's own thread folder that the person duplicating may read is copied,
+ * and it alone: the storage copy used to take every file beside it. Any other key is kept as it is. */
+const copiedMediaKey = async (companyId, actorId, comment, folder) => {
+    const key = comment.mediaURL;
+    if (!key) return '';
+    if (!isThreadFile(comment, key) || !(await judgeDownload({ companyId, uid: actorId, key })).allowed) return key;
+    const copy = `${folder}/${key.substring(key.lastIndexOf('/') + 1)}`;
+    try {
+        await handleStoredFileCopy(companyId, key, copy);
+        return copy;
+    } catch (error) {
+        logger.error(`comment file not copied to the duplicate: ${error.message || error}`);
+        return key;
+    }
+};
+
+exports.addCommentCollection = (companyId, projectData, task, newTask, sprintObj, userData) => {
     return new Promise(async (resolve, reject) => {
         try {
-            const comment = await MongoDbCrudOpration(companyId, { type: SCHEMA_TYPE.COMMENTS, data: [{ taskId: task._id }] }, "find").then((querySnapshot) => {
+            const comment = await MongoDbCrudOpration(companyId, { type: SCHEMA_TYPE.COMMENTS, data: [{ taskId: taskIdMatch(task._id) }] }, "find").then((querySnapshot) => {
                 if (querySnapshot.length === 0) {
                     return []
                 } else {
@@ -605,17 +661,10 @@ exports.addCommentCollection = (companyId, projectData, task, newTask, sprintObj
             })
             const commentsToInsert = [];
 
-            comment.forEach((cmt) => {
+            const folder = `Project/${projectData.id}/${sprintObj.id}/${newTask.id}/Comments`;
+            for (const cmt of comment) {
                 let parsedMap = JSON.parse(JSON.stringify(cmt));
-                let newMediaURL = '';
-
-                if (parsedMap.mediaURL) {
-                    const previousUrl = parsedMap.mediaURL;
-                    let lastSlashIndex = previousUrl.lastIndexOf('/');
-                    let fileName = previousUrl.substring(lastSlashIndex + 1);
-                    newMediaURL = `Project/${projectData.id}/${sprintObj.id}/${newTask.id}/Comments/${fileName}`;
-                    handleTaskAttachmentsDuplicateFunctionality(companyId, previousUrl, newMediaURL);
-                }
+                const newMediaURL = await copiedMediaKey(companyId, userData && userData.id, parsedMap, folder);
 
                 const obj = {
                     ...parsedMap,
@@ -627,7 +676,7 @@ exports.addCommentCollection = (companyId, projectData, task, newTask, sprintObj
                 delete obj._id;
 
                 commentsToInsert.push(obj);
-            });
+            }
             let obj = {
                 type: SCHEMA_TYPE.COMMENTS,
                 data: [commentsToInsert]

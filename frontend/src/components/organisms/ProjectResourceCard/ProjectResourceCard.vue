@@ -30,6 +30,7 @@ import { ref, watch, onMounted, inject } from 'vue';
 import { apiRequest } from '@/services';
 import * as env from '@/config/env';
 import ProjectListModal from '@/components/molecules/ProjectListModal/ProjectListModal.vue';
+import { ROLE_GUEST } from "@/utils/roles";
 
 // AHE-3789 — Running Projects card. Fetches a companyId-scoped count of active
 // projects that had logged time in the selected period, from the additive,
@@ -90,7 +91,7 @@ const buildPayload = (extra = {}) => {
         dateFrom: r.from,
         dateTo: r.to,
         callerUserId: (userIdRef && userIdRef.value) || '',
-        callerRoleType: Number(props.companyUserDetail && props.companyUserDetail.roleType) || 3,
+        callerRoleType: Number(props.companyUserDetail?.roleType ?? ROLE_GUEST),
         ...extra,
     };
 };
@@ -134,9 +135,9 @@ onMounted(load);
 <style scoped>
 .prc { height: 100%; width: 100%; padding: 6px 8px; overflow: hidden; display: flex; flex-direction: column; }
 .prc-clickzone { display: flex; flex-direction: column; flex: 1; cursor: pointer; border-radius: 8px; transition: background-color 0.15s ease; }
-.prc-clickzone:hover { background: #f5f7fb; }
+.prc-clickzone:hover { background: var(--surface-hover); }
 .prc-number { font-size: 40px; font-weight: 700; color: #0e7490; text-align: center; margin-top: auto; }
-.prc-number-label { font-size: 12px; color: #6b7280; text-align: center; margin-bottom: auto; }
+.prc-number-label { font-size: 12px; color: var(--ink-2); text-align: center; margin-bottom: auto; }
 .prc-skel { background: linear-gradient(90deg, #eef0f6 25%, #e3e7f1 37%, #eef0f6 63%); background-size: 400% 100%; animation: prc-shimmer 1.4s ease infinite; border-radius: 4px; }
 @keyframes prc-shimmer { 0% { background-position: 100% 0; } 100% { background-position: 0 0; } }
 .prc-skel-num { width: 90px; height: 40px; margin: auto auto 8px auto; }

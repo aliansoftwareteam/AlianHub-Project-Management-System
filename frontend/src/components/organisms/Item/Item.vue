@@ -1,10 +1,10 @@
 <template>
-    <div class="project-item-wrapper position-re mb-2px" :class="[{'opacity-5' : item?.isRestrict === true || item?.status === 'close', 'bg-light-gray-v1 py-5px': selected}]" id="projectleftlistsingle_driver">
+    <div class="project-item-wrapper position-re mb-2px" :class="[{'opacity-5' : item?.isRestrict === true || item?.status === 'close', 'item-bg-light-gray-v1 py-5px': selected}]" id="projectleftlistsingle_driver">
         <div
-            class="project-item cursor-pointer ml-016 border-radius-5-px hover-bg-light-purple-v1" @click="item?.status !== 'close' && $emit('change', item)"
+            class="project-item cursor-pointer ml-016 border-radius-5-px item-hover-bg-light-purple-v1" @click="item?.status !== 'close' && $emit('change', item)"
             :class="{
-                'bg-light-purple-v2': selected && ($route.params.folderId || $route.params.sprintId),
-                'bg-light-purple-v1': selected && !($route.params.folderId && $route.params.sprintId),
+                'item-bg-light-purple-v2': selected && ($route.params.folderId || $route.params.sprintId),
+                'item-bg-light-purple-v1': selected && !($route.params.folderId && $route.params.sprintId),
                 'new_project_add': new Date(item?.createdAt).getTime() > new Date(new Date().getFullYear(), new Date().getMonth(), new Date().getDate() - 2).getTime()
             }"
         >
@@ -23,14 +23,14 @@
                 </template>
                 <div class="d-flex flex-column text-ellipsis ml-6px w-100" v-if="!editName">
                     <div class="d-flex align-items-center justify-content-between">
-                        <span class="text-ellipsis project-sb-ptitle font-size-13 font-weight-500 mw-80" :title="item.ProjectName">
+                        <span class="text-ellipsis project-sb-ptitle item-font-size-13 item-font-weight-500 mw-80" :title="item.ProjectName">
                             {{item.ProjectName}}
                         </span>
                         <div class="d-flex align-items-center lastproject__activity-wrapper">
-                            <span v-if="lastActivity && !isOpened && !isShowArchived" class="font-size-11 project-last-activity">
+                            <span v-if="lastActivity && !isOpened && !isShowArchived" class="item-font-size-11 project-last-activity">
                                 {{getTimeAgo(lastActivity * 1000)}}
                             </span>
-                            <DropDown :id="item.id" @isVisible="(val) => isOpened = val" :title="item.ProjectName" v-if="
+                            <DropDown mode="menu" :id="item.id" @isVisible="(val) => isOpened = val" :title="item.ProjectName" v-if="
                                 (
                                     item.status !== 'close' && (
                                         checkPermission('project.project_sprint_create',item.isGlobalPermission) === true
@@ -44,29 +44,29 @@
                                 && (showArchivedProjects ? item.deletedStatusKey === 2 : !item.deletedStatusKey)
                             ">
                                 <template #button>
-                                    <img ref="butt" src="@/assets/images/svg/horizontalDots.svg" class="project__three-dot ml-6px vertical-middle" :class="{'project-option': clientWidth > 767 && !isOpened, 'project-option-mobile': clientWidth <= 767 }" alt="dots">
+                                    <img src="@/assets/images/svg/horizontalDots.svg" class="project__three-dot ml-6px vertical-middle" :class="{'project-option': clientWidth > 767 && !isOpened, 'project-option-mobile': clientWidth <= 767 }" :alt="$t('Projects.project_actions', { name: item.ProjectName })">
                                 </template>
                                 <template #options>
                                     <template v-if="!showArchivedProjects">
-                                        <DropDownOption @click="item?.status !== 'close' && $refs.butt.click(), createSprint = true, createFolder = false" v-if="checkPermission('project.project_sprint_create',item.isGlobalPermission) === true">
+                                        <DropDownOption @click="createSprint = true, createFolder = false" v-if="checkPermission('project.project_sprint_create',item.isGlobalPermission) === true">
                                             <div class="d-flex align-items-center project-mobile-desc">
                                                 <img :src="listIcon" alt="listIcon" class="mr-10px">
                                                 {{$t('Projects.create_new_list')}}
                                             </div>
                                         </DropDownOption>
-                                        <DropDownOption @click="item?.status !== 'close' && $refs.butt.click(), createSprint = false, createFolder = true" v-if="checkPermission('project.project_folder_create',item.isGlobalPermission) === true">
+                                        <DropDownOption @click="createSprint = false, createFolder = true" v-if="checkPermission('project.project_folder_create',item.isGlobalPermission) === true">
                                             <div class="d-flex align-items-center project-mobile-desc">
                                                 <img :src="folderIcon" alt="folderIcon" class="mr-10px">
                                                 {{$t('Projects.create_new_folder')}}
                                             </div>
                                         </DropDownOption>
-                                        <DropDownOption @click="item?.status !== 'close' && $refs.butt.click(),toggleRenameProject()" v-if="checkPermission('project.project_name_edit',item.isGlobalPermission) === true">
+                                        <DropDownOption @click="toggleRenameProject()" v-if="checkPermission('project.project_name_edit',item.isGlobalPermission) === true">
                                             <div class="d-flex align-items-center project-mobile-desc">
                                                 <img :src="editIcon" alt="editIcon" class="mr-10px">
                                                 {{$t('Projects.rename')}}
                                             </div>
                                         </DropDownOption>
-                                        <DropDownOption v-if="checkPermission('project.project_create',item.isGlobalPermission) === true" @click="$refs.butt.click(), $emit('changeAvatar', {id: item.id, name: item.ProjectName, icon: item.projectIcon})">
+                                        <DropDownOption v-if="checkPermission('project.project_create',item.isGlobalPermission) === true" @click="$emit('changeAvatar', {id: item.id, name: item.ProjectName, icon: item.projectIcon})">
                                             <div class="d-flex align-items-center project-mobile-desc">
                                                 <img :src="colorPalletIcon" alt="colorPalletIcon" class="mr-10px">
                                                 {{$t('Projects.color_avatar')}}
@@ -78,21 +78,21 @@
                                                 {{$t('Projects.duplicate')}}
                                             </div>
                                         </DropDownOption>
-                                        <DropDownOption @click="item?.status !== 'close' && $refs.butt.click(), showSidebar = true, archive = 0" v-if="checkPermission('project.project_close',item.isGlobalPermission) === true">
+                                        <DropDownOption @click="showSidebar = true, archive = 0" v-if="checkPermission('project.project_close',item.isGlobalPermission) === true">
                                             <div class="d-flex align-items-center project-mobile-desc">
                                                 <img :src="cancelIcon" alt="cancelIcon" class="mr-10px">
                                                 {{$t('Projects.close_project')}}
                                             </div>
                                         </DropDownOption>
                                     </template>
-                                    <DropDownOption v-if="checkPermission('project.project_list',item.isGlobalPermission) === true && item.deletedStatusKey === 2" @click="item?.status !== 'close' && $refs.butt.click(), updateProject(0)">
+                                    <DropDownOption v-if="checkPermission('project.project_list',item.isGlobalPermission) === true && item.deletedStatusKey === 2" @click="updateProject(0)">
                                         <div class="d-flex align-items-center project-mobile-desc">
                                             <img :src="inventoryIcon" alt="restoreInventoryIcon" class="mr-10px">
                                             {{$t('Projects.restore')}}
                                         </div>
                                     </DropDownOption>
-                                    <DropDownOption v-if="checkPermission('project.project_list',item.isGlobalPermission) === true && checkPermission('project.project_delete',item.isGlobalPermission) === true" @click="item?.status !== 'close' && $refs.butt.click(), showSidebar = true, archive = 2">
-                                        <div class="d-flex align-items-center project-mobile-desc mobile-deleteIcon red">
+                                    <DropDownOption v-if="checkPermission('project.project_list',item.isGlobalPermission) === true && checkPermission('project.project_delete',item.isGlobalPermission) === true" @click="showSidebar = true, archive = 2">
+                                        <div class="d-flex align-items-center project-mobile-desc mobile-deleteIcon item-red">
                                             <img :src="deleteIcon" alt="deleteIcon" class="mr-10px">
                                             {{$t('Projects.delete')}}
                                         </div>
@@ -102,7 +102,7 @@
                         </div>
                     </div>
                     <div class="d-flex align-items-center justify-content-between" v-if="!isShowArchived">
-                        <span class="font-size-11 gray text-ellipsis" >{{item.projectStatusData.find((x) => x.value === item.status)?.name}}</span>
+                        <span class="item-font-size-11 item-gray text-ellipsis" >{{item.projectStatusData.find((x) => x.value === item.status)?.name}}</span>
                         <!-- <img :src="publicFolderIcon" alt="publicFolderIcon" v-if="!item.isPrivateSpace && !editName" style="margin-left: 10px;"> -->
                         <div class="d-flex align-items-center">
                             <div class="count-block parent-count-block ml-5px" v-if="showCounts({project: item, showArchived: showArchivedProjects}).count"  :style="showCounts({project: item, showArchived: showArchivedProjects}).styles">
@@ -110,9 +110,9 @@
                             </div>
                             <!-- <div class="count-block parent-count-block">5</div> -->
                             <template v-if="Object.keys(userActivityObj || {}).length">
-                                <DropDown>
+                                <DropDown mode="dialog" :aria-label="$t('Projects.active_members')" @isVisible="(visible) => visible && userActivityClick()">
                                     <template #button>
-                                        <img :src="Object.keys(userActivityObj || {}).length ? clockBlue : clockGray" alt="clockBlue" class="ml-5px" @click="userActivityClick">
+                                        <img :src="Object.keys(userActivityObj || {}).length ? clockBlue : clockGray" :alt="$t('Projects.active_members')" class="ml-5px">
                                     </template>
 
                                     <template #options>
@@ -120,7 +120,7 @@
                                             <div class="d-flex align-items-center justify-content-between w-100 user__activity">
                                                 <div class="d-flex align-items-center">
                                                     <div class="mr-5px">
-                                                        <UserProfile
+                                                        <UserProfile decorative
                                                             width="30px"
                                                             :thumbnail="'30x30'"
                                                             :showDot="false"
@@ -144,7 +144,7 @@
                                                     <span v-if="userActivity[1]?.timestamp">
                                                         {{getTimeAgo(userActivity[1]?.timestamp * 1000)}}
                                                     </span>
-                                                    <span v-else>Just now</span>
+                                                    <span v-else>{{ $t('Projects.just_now') }}</span>
                                                 </div>
                                             </div>
                                         </DropDownOption>
@@ -154,7 +154,7 @@
                             <template v-else>
                                 <img :src="item?.[userId] ? clockBlue : clockGray" alt="clockBlue" @click="userActivityClick" class="ml-5px">
                             </template>
-                            <img v-if="item?.isPrivateSpace" :src="round_clock" alt="time" title="Private project" class="ml-5px">
+                            <img v-if="item?.isPrivateSpace" :src="round_clock" alt="time" :title="$t('Projects.private_project')" class="ml-5px">
                             {{item?.[userId]}}
                         </div>
                     </div>
@@ -163,7 +163,7 @@
                     <input
                         type="text"
                         class="form-control ml-10px project__name-input"
-                        placeholder="Project Name"
+                        :placeholder="$t('ProjectSlider.project_name')"
                         v-model.trim="projectName.value"
                         :id="`${item.id}_input`"
                         @blur="editName = false"
@@ -174,7 +174,7 @@
                         'type':projectName.type,
                         'event':$event.event})"
                     />
-                    <div class="red position-ab z-index-1 font-size-11 error__text-data">{{projectName.error}}</div>
+                    <div class="item-red position-ab z-index-1 item-font-size-11 error__text-data">{{projectName.error}}</div>
                 </div>
             </div>
         </div>
@@ -246,14 +246,13 @@
 // PACKAGES
 import { defineEmits, defineProps, defineComponent, ref, inject, computed, nextTick, watch, onMounted } from 'vue';
 import { useProjects } from "@/composable/projects"
-import { useCustomComposable, useGetterFunctions, useHistoryNotification } from '@/composable';
+import { useCustomComposable, useGetterFunctions } from '@/composable';
 import { useValidation } from '@/composable/Validation';
 import { useToast } from 'vue-toast-notification';
 import moment from 'moment';
 import { useStore } from 'vuex';
 import * as env from '@/config/env';
 import { apiRequest } from '../../../services'
-import { EditProjectName } from '@/utils/NotificationTemplate';
 
 // COMPONENTS
 import SubItem from '@/components/molecules/SubItem/SubItem.vue'
@@ -266,7 +265,6 @@ import UserProfile from "@/components/atom/UserProfile/UserProfile.vue";
 import Spinner from "@/components/atom/SpinnerComp/SpinnerComp.vue"
 import Skelaton from '@/components/atom/Skelaton/Skelaton.vue';
 import { useI18n } from "vue-i18n";
-import { closeProject } from '@/utils/NotificationTemplate';
 const { t } = useI18n();
 // import Skelaton from '@/components/atom/Skelaton/Skelaton/.vue';
 
@@ -290,12 +288,11 @@ const  { checkErrors , checkAllFields } = useValidation();
 const userId = inject('$userId');
 const companyId = inject('$companyId');
 const {markFavourite} = useProjects();
-const {showCounts, checkPermission,sanitizeInput} = useCustomComposable();
+const {showCounts, checkPermission} = useCustomComposable();
 const clientWidth = inject('$clientWidth');
 const showArchivedProjects = inject('showArchivedProjects');
 const $toast = useToast()
 const {getUser} = useGetterFunctions()
-const {addHistory} = useHistoryNotification();
 
 defineComponent({
     name: "Item-Component",
@@ -610,59 +607,11 @@ function renameProject() {
     .then(async (valid) => {
         if(valid) {
             editName.value = false;
-            const prevProjectName = sanitizeInput(propItem.value.ProjectName);
-            const newProjectName = sanitizeInput(projectName.value.value);
             const updateObj = { ProjectName: projectName.value.value };
             try {
                 await apiRequest("put",`/api/v1/${env.PROJECTACTIONS}/${propItem.value._id}`,{updateObject: updateObj})
                 $toast.success(t("Toast.Project_name_updated_successfully"), {position: 'top-right'});
-                const user = getUser(userId.value);
-                const userData = {
-                    id: user.id,
-                    Employee_Name: user.Employee_Name,
-                    companyOwnerId: user.companyOwnerId
-                }
-
-                // Call history API
-                const axiosData = {
-                    "type": "project",
-                    "companyId": companyId.value,
-                    "projectId": propItem.value._id,
-                    "taskId": null,
-                    "object": {
-                        "sprintId": null,
-                        "key": "Project_Name",
-                        "message": `<b>${userData.Employee_Name}</b> has changed the name of <b>${prevProjectName}</b> to <b>${newProjectName}</b>`
-                    },
-                    "userData": userData
-                };
-                apiRequest("post", env.HANDLE_HISTORY, axiosData).then((result) => {
-                    if(result.data.status) {
-                        console.info(result.data.statusText)
-                    }
-                });
                 emits('projectAction',{...propItem.value,ProjectName: projectName.value.value},'ProjectName');
-                let notifyObj = {
-                        TaskName: newProjectName,
-                        previousTaskName: prevProjectName
-                    }
-                    let notificationObject = {
-                        message: EditProjectName(notifyObj),
-                        key: "project_name",
-                    };
-                    
-                    apiRequest("post", env.HANDLE_NOTIFICATION, {
-                        type: 'project',
-                        companyId: companyId.value,
-                        projectId: propItem.value._id,
-                        object: notificationObject,
-                        userData: userData,
-                        changeType:'name',
-                        changeData: notifyObj
-                    })
-                    .catch((error) => {
-                        console.error("ERROR in update notification", error);
-                    })
                 resetProjectName();   
             } catch (error) {
                 console.error(`Error while renaming project`,error);
@@ -689,53 +638,8 @@ async function updateProject(value = null) {
         showSidebar.value = false;
         showSpinner.value = false;
         updateChildTasks(value !== null);
-        const user = getUser(userId.value);
-        const userData = {
-            id: user.id,
-            Employee_Name: user.Employee_Name,
-            companyOwnerId: user.companyOwnerId
-        }
-
-        let type = `${value !== null ? 'restored' : archive.value === 0 ? 'closed' : 'deleted'}`;
-
+        const type = `${value !== null ? 'restored' : archive.value === 0 ? 'closed' : 'deleted'}`;
         $toast.success(t(`Toast.Project ${type} successfully`), {position: 'top-right'});
-
-        var historyObj = {
-            'message': `<b>${userData.Employee_Name}</b> has ${type} the <b>${sanitizeInput(propItem.value.ProjectName)}</b> Project`,
-            'key' : 'Project_Name',
-        }
-        addHistory({
-            "type": 'project',
-            "companyId": companyId.value,
-            "projectId": propItem.value._id,
-            "taskId": null,
-            "object": historyObj,
-            "userData": userData
-        });
-
-        if(type === 'closed'){            
-            let notifyObj = {
-                'projectName' : propItem.value.ProjectName ||' ',
-                'userName' : userData?.Employee_Name || ''
-            }
-            let notificationObject = {
-                message: closeProject(notifyObj),
-                key: "project_close",
-            };
-            
-            apiRequest("post", env.HANDLE_NOTIFICATION, {
-                type: 'project',
-                companyId: companyId.value,
-                projectId: propItem.value._id,
-                object: notificationObject,
-                userData: userData,
-                changeType:'project_close',
-                changeData: notifyObj
-            })
-            .catch((error) => {
-                console.error("ERROR in update notification", error);
-            })
-        }
         emits('projectAction',{...propItem.value,...updateObject},value === null || archive.value === 0 ? 'RemoveProject' : 'AddProject');
     } catch (error) {
         showSidebar.value = false;
@@ -868,5 +772,35 @@ const handleSidebarClose = () => {
 }
 .create__sprint-folder{
     padding: 4px 10px 0px 32px;
+}
+</style>
+
+<style scoped>
+.item-gray {
+    color: var(--ink-2);
+}
+.item-red {
+    color: var(--danger-ink);
+}
+.item-bg-light-gray-v1 {
+    background-color: var(--surface-2);
+}
+.item-bg-light-purple-v1 {
+    background-color: var(--brand-tint);
+}
+.item-bg-light-purple-v2 {
+    background-color: var(--brand-tint);
+}
+.item-hover-bg-light-purple-v1:hover {
+    background-color: var(--surface-hover) !important;
+}
+.item-font-weight-500 {
+    font-weight: 500 !important;
+}
+.item-font-size-11 {
+    font-size: 11px;
+}
+.item-font-size-13 {
+    font-size: 13px;
 }
 </style>

@@ -1,0 +1,90 @@
+{
+    "job": 13,
+    "title": "Totals of a number field",
+    "sentence": "Show the total of Cost for each group, and show on \"[AI bench] Parent\" the total Cost of its subtasks.",
+    "start": "The list",
+    "passed": "AI-1 run 1, 2026-10-08, builds 815 to 817: pass with one approval, 9 steps",
+    "kept": "Rebuilt on 2026-10-09 from Tasks/active/047-ai-run/ai-1-run-1-results.md and the tool path of the job in ai-benchmark.md: the run did not record its calls. Ids are named by placeholder and resolved against the replay world.",
+    "calls": [
+        {
+            "tool": "person.place",
+            "arguments": {},
+            "answer": "read"
+        },
+        {
+            "tool": "fields.list",
+            "arguments": {
+                "projectId": "$project"
+            },
+            "answer": "read"
+        },
+        {
+            "tool": "project.setup",
+            "arguments": {
+                "projectId": "$project",
+                "reason": "Totals of Cost for each group and on each parent",
+                "fields": [
+                    {
+                        "name": "[AI bench] Cost total",
+                        "type": "rollup",
+                        "function": "sum",
+                        "source": "Cost"
+                    }
+                ],
+                "views": [
+                    {
+                        "name": "[AI bench] Cost by status",
+                        "kind": "list",
+                        "groupBy": "status",
+                        "showFieldIds": [
+                            "$field:Cost"
+                        ],
+                        "showFields": [
+                            "[AI bench] Cost total"
+                        ]
+                    }
+                ]
+            },
+            "answer": "pending"
+        },
+        {
+            "tool": "task.fields.list",
+            "arguments": {
+                "taskId": "$task:[AI bench] Parent"
+            },
+            "answer": "read",
+            "after": "approve"
+        }
+    ],
+    "preview": {
+        "kind": "setup",
+        "title": "QA Sandbox",
+        "lines": [
+            {
+                "kind": "computedField",
+                "name": "[AI bench] Cost total",
+                "type": "rollup",
+                "function": "sum",
+                "source": "Cost"
+            },
+            {
+                "kind": "planView",
+                "name": "[AI bench] Cost by status",
+                "layout": "list"
+            },
+            {
+                "kind": "group",
+                "by": "status"
+            },
+            {
+                "kind": "columns",
+                "names": [
+                    "Cost",
+                    "[AI bench] Cost total"
+                ]
+            }
+        ]
+    },
+    "approve": true,
+    "undo": true
+}

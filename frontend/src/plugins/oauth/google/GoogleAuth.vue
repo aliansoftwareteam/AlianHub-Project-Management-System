@@ -1,26 +1,28 @@
 <template>
-    <button @click="signInWithGoogle" class="border-0 border-radius-6-px cursor-pointer p-15px" :disabled="isSpinner" title="Google">
-        <div v-if="isSpinner" class="oauth-spinner"></div>
-        <img v-else :src="GoogleIcon" alt="google-icon"/>
+    <button type="button" class="auth__provider" :disabled="isSpinner" :aria-busy="isSpinner" @click="signInWithGoogle">
+        <span v-if="isSpinner" class="oauth-spinner"></span>
+        <ShellIcon v-else name="google" :size="16" />
+        <span>{{ label || $t('Auth.continue_with', { provider: 'Google' }) }}</span>
     </button>
 </template>
 
 <script setup>
+import { publicConfig } from "@/config/publicConfig";
+import ShellIcon from "@/components/organisms/Shell/ShellIcon.vue";
 /* global google */
 import { onMounted, ref, defineProps } from "vue";
-import Cookies from 'js-cookie';
 import { useToast } from 'vue-toast-notification';
 import { useRouter, useRoute } from 'vue-router'
 import { useI18n } from "vue-i18n";
 
 // Image
-import GoogleIcon from "@/assets/images/svg/google_icon.svg";
 
 // Utilities
 import { apiRequestWithoutSecure, apiRequestWithoutCompnay, getAuth } from "@/services";
 import * as env from '@/config/env';
 
 const props = defineProps({
+    label: { type: String, default: "" },
     mode: {
         type: String,
         default: "login"
@@ -32,6 +34,10 @@ const props = defineProps({
     companyUserDocID: {
         type: String,
         default: null
+    },
+    linkId: {
+        type: String,
+        default: ""
     }
 });
 
@@ -46,20 +52,20 @@ let googleClient = null;
 const userData = ref();
 const isSpinner = ref(false)
 
-onMounted(() => {
-    if (!window.google) {
-        console.error("Google script not loaded!");
-        return;
-    }
-
+// The Google script loads async, so it can arrive after this button mounts.
+function initClient() {
+    if (googleClient || !window.google?.accounts?.oauth2) return googleClient;
     googleClient = google.accounts.oauth2.initCodeClient({
-        client_id: process.env.VUE_APP_GOOGLE_CLIENT_ID,
+        client_id: publicConfig.auth.google.clientId,
         scope: "openid email profile",
         ux_mode: "popup",
         redirect_uri: "postmessage",
         callback: handleGoogleCallback,
     });
-});
+    return googleClient;
+}
+
+onMounted(initClient);
 
 function parseJwt(token) {
     const base64Url = token.split(".")[1];
@@ -68,8 +74,8 @@ function parseJwt(token) {
 }
 
 function signInWithGoogle() {
-    if (!googleClient) {
-        console.error("Google client not initialized");
+    if (!initClient()) {
+        $toast.error(t("Auth.google_unavailable"), { position: "top-right" });
         return;
     }
     googleClient.requestCode();
@@ -104,10 +110,7 @@ const login = async (userInfo) => {
         const object = {
             email: userInfo.email,
             googleId: userInfo.sub,
-            // Forward the signed Google ID token so the backend can verify the
-            // identity server-side (google-auth-library) instead of trusting the
-            // client-supplied email/sub. Without this, login is rejected when
-            // the server runs in hardened mode.
+            // The server takes the identity from this token alone.
             idToken: userInfo.idToken,
             isLoginType: "frontend",
             authProvider: "google"
@@ -126,8 +129,6 @@ const login = async (userInfo) => {
         userData.value = userResponse?.data?.data.userData;
         if (userResponse.data.status == false) {
             localStorage.removeItem("updateToken");
-            Cookies.remove('refreshToken');
-            Cookies.remove('accessToken');
             throw new Error('MongoDB Error from Api')
         }
 
@@ -135,8 +136,6 @@ const login = async (userInfo) => {
         let cid = localStorage.getItem("selectedCompany") ?? companyID;
         if (!uData.isEmailVerified) {
             localStorage.removeItem("updateToken");
-            Cookies.remove('refreshToken');
-            Cookies.remove('accessToken');
             throw new Error("Verify your email and try again");
         }
 
@@ -194,11 +193,9 @@ const login = async (userInfo) => {
         } else if(error?.response?.data?.message === "User not found"){
             $toast.error('User not found', { position: 'top-right' });
         } else {
-            $toast.error(t("Toast.something_went_wrong"), { position: 'top-right' });
+            $toast.error(error?.response?.data?.message || t("Toast.something_went_wrong"), { position: 'top-right' });
         }
-        
-        Cookies.remove('refreshToken');
-        Cookies.remove('accessToken');
+
         localStorage.removeItem("updateToken");
         localStorage.removeItem("userId");
         localStorage.removeItem("isLogging");
@@ -215,8 +212,10 @@ const signup = async (userInfo) => {
             lastName: userInfo.family_name,
             email: userInfo.email,
             googleId: userInfo.sub,
+            idToken: userInfo.idToken,
             assignCompany: props.companyID,
-            companyUserDocID: props.companyUserDocID
+            companyUserDocID: props.companyUserDocID,
+            linkId: props.linkId
         };
 
         const signupRes = await apiRequestWithoutSecure("post", env.API_SIGNUP_WITH_GOOGLE, payload);

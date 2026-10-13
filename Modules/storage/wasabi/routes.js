@@ -1,14 +1,27 @@
 const { handleProfileGetForUser, handleTaskTypeImageGet } = require(`../../../common-storage/common-${process.env.STORAGE_TYPE}.js`);
 const ctrl = require('./controller');
-const multer = require("multer");
-const { DEFAULT_LIMITS, safeFileFilter } = require('../../../utils/uploadConfig');
+const multer = require('../../../utils/contextMulter');
+const { DEFAULT_LIMITS } = require('../../../utils/uploadConfig');
+const { requireStoredFileRead } = require('../downloadScope');
+const { REMOVE, requireStoredFileChange, uploadScopeRefusal } = require('../changeScope');
+const { USER_PROFILES_BUCKET, isProfileUpload, refuseBeforeWrite, refuseUpload, requireOwnBucket, requireProfileImageRead, requireSafeObjectPath, uploadRefusal, bodyField, paramField } = require('../bucketAccess');
 
+const wasabiUploadRefusal = async (req) => {
+    const body = req.body || {};
+    const profile = isProfileUpload(body);
+    return (await uploadRefusal(req, profile ? USER_PROFILES_BUCKET : body.companyId, body.path))
+        || (profile ? null : uploadScopeRefusal(req, 'wasabi'));
+};
+
+const signedRead = [requireOwnBucket(bodyField('companyId')), requireStoredFileRead(bodyField('companyId'), bodyField('path'), { storage: 'wasabi' })];
 
 const upload = multer({
     dest: "wasabiUploads/",
     limits: DEFAULT_LIMITS,
-    fileFilter: safeFileFilter,
+    fileFilter: refuseBeforeWrite(wasabiUploadRefusal),
 });
+const { agentsRefused } = require('../../Agents/guard');
+
 exports.init = (app) => {
 
     /**
@@ -51,10 +64,10 @@ exports.init = (app) => {
     /**
      * get presigned url of the wasabi object
      */
-	app.post("/api/v1/wasabi/retriveObject", ctrl.getPresignedUrl);
+	app.post("/api/v1/wasabi/retriveObject", ...signedRead, ctrl.getPresignedUrl);
 
 
-    app.post("/api/v1/admin/wasabi/retriveObject", ctrl.getPresignedUrl);
+    app.post("/api/v1/admin/wasabi/retriveObject", ...signedRead, ctrl.getPresignedUrl);
     
     /**
     * @swagger
@@ -91,7 +104,7 @@ exports.init = (app) => {
     /**
      * get presigned url of the userProffileObject
      */
-    app.get("/api/v1/wasabi/retriveUserProfile/:companyId/:path",ctrl.getUserProfilePresignedUrl)
+    app.get("/api/v1/wasabi/retriveUserProfile/:companyId/:path", requireSafeObjectPath(paramField('path')), requireProfileImageRead(paramField('path')), ctrl.getUserProfilePresignedUrl)
 	
 	/**
     * @swagger
@@ -114,7 +127,7 @@ exports.init = (app) => {
     *         replaceFile:
     *           type: boolean
     *           required: false
-    *           description: Set true if you want to replace same name file in wasabi Other wise this parameter is not required.
+    *           description: Ignored. A stored file is never replaced; every upload is stored under a new timestamped name.
     *         file:
     *           type: string
     *           required: true
@@ -150,14 +163,11 @@ exports.init = (app) => {
     /**
      * upload file in wasabi.
      */
-	app.post("/api/v1/wasabi/uploadFile",upload.single("file"), ctrl.uploadFileWasabi);
-	app.post("/api/v1/wasabi/uploadFile_64", (req, res) => {
+	app.post("/api/v1/wasabi/uploadFile", upload.single("file"), refuseUpload(wasabiUploadRefusal), ctrl.uploadFileWasabi);
+	app.post("/api/v1/wasabi/uploadFile_64", refuseUpload(wasabiUploadRefusal), (req, res) => {
         try {
-            const values = [];
-            const keys = ["companyId","path","base64String","replaceFile","key", "isUserProfile"];
-            keys.forEach(x => {
-                values.push(req.body[x])
-            })
+            const values = [req.storageBucket, ...["path", "base64String", "replaceFile", "key"].map((key) => req.body[key])];
+            values.push(isProfileUpload(req.body));
             if(!values.length) {
                 return res.status(400).json("Req data missing")
             }
@@ -217,7 +227,7 @@ exports.init = (app) => {
     /**
      * delete file from wasabi api.
      */
-	app.post("/api/v1/wasabi/deleteFile", ctrl.deleteFileWasabi);
-    app.post("/api/v1/getUserProfile", handleProfileGetForUser);
-    app.post("/api/v1/getTaskTypeImage", handleTaskTypeImageGet);
+	app.post("/api/v1/wasabi/deleteFile", agentsRefused('file.delete'), requireOwnBucket(bodyField('companyId')), requireStoredFileChange(REMOVE, bodyField('path'), { storage: 'wasabi' }), ctrl.deleteFileWasabi);
+    app.post("/api/v1/getUserProfile", requireSafeObjectPath(bodyField('path')), requireProfileImageRead(bodyField('path')), handleProfileGetForUser);
+    app.post("/api/v1/getTaskTypeImage", ...signedRead, handleTaskTypeImageGet);
 }

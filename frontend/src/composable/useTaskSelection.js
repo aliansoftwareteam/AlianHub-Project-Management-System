@@ -1,25 +1,26 @@
 import { computed } from 'vue';
 import { useStore } from 'vuex';
+import { NAV_ATTR, readSequence } from '@/components/organisms/TaskDetailOverlay/taskNavigation';
+import { locate } from '@/store/ProjectData/taskTree';
 
-// Composable for multi-task selection across List / Kanban / Table views.
-// Components only see this composable — they don't touch the Vuex module
-// directly. Keeps the selection contract small and replaceable.
-//
-// Usage:
-//   const { isSelected, toggle, toggleGroup, count, hasSelection, clear } = useTaskSelection();
-//   <input type="checkbox" :checked="isSelected(task._id)" @click.stop="toggle(task._id, $event, visibleTaskIds)" />
-//
-// Shift+click range selection: pass the ordered list of currently visible
-// task IDs as the third arg to `toggle`; the composable handles the range
-// vs single behavior against the stored anchor.
+// Rows carry data-task-nav in screen order, so the ids read here already follow the
+// view's filter, sort, grouping and collapsed groups.
+export function visibleTaskIdsAround(el, scopeSelector) {
+    const root = el && typeof el.closest === 'function' ? el.closest(scopeSelector) : null;
+    return root ? readSequence(root).map((item) => item.taskId) : [];
+}
+
+function focusRowCheckbox(el, scopeSelector, taskId) {
+    const root = el && typeof el.closest === 'function' ? el.closest(scopeSelector) : null;
+    const row = root?.querySelector(`[${NAV_ATTR}="${String(taskId).replace(/"/g, '')}"]`);
+    row?.querySelector('input[type="checkbox"]')?.focus();
+}
+
 export function useTaskSelection() {
     const store = useStore();
 
-    // Direct state-backed refs. Going through Vuex method-style getters
-    // (`(state) => (id) => state.x.includes(id)`) can lose reactivity for
-    // callers that only invoke the inner function — Vue tracks the getter
-    // access, not the array membership. Reading `state.selectedTaskIds`
-    // directly inside a computed registers the right dependency.
+    // Read the state array directly: a method-style Vuex getter only tracks the getter
+    // access, so callers lose reactivity on membership changes.
     const selectedTaskIds = computed(() => store.state.taskSelection.selectedTaskIds);
     const count = computed(() => selectedTaskIds.value.length);
     const hasSelection = computed(() => selectedTaskIds.value.length > 0);
@@ -30,81 +31,83 @@ export function useTaskSelection() {
         return selectedTaskIds.value.includes(String(taskId));
     };
 
+    const rangeTo = (id, visibleTaskIds) => {
+        const anchor = store.state.taskSelection.lastAnchorId;
+        if (!anchor || !Array.isArray(visibleTaskIds) || !visibleTaskIds.length) return null;
+        const ids = visibleTaskIds.map(String);
+        const start = ids.indexOf(String(anchor));
+        const end = ids.indexOf(id);
+        if (start === -1 || end === -1) return null;
+        return start < end ? ids.slice(start, end + 1) : ids.slice(end, start + 1);
+    };
+
     const toggle = (taskId, evt, visibleTaskIds) => {
         if (!taskId) return;
         const id = String(taskId);
-        const wantsRange = !!(evt && evt.shiftKey);
-        const anchor = store.state.taskSelection.lastAnchorId;
-
-        if (wantsRange && anchor && Array.isArray(visibleTaskIds) && visibleTaskIds.length) {
-            const ids = visibleTaskIds.map(String);
-            const start = ids.indexOf(String(anchor));
-            const end = ids.indexOf(id);
-            if (start !== -1 && end !== -1) {
-                const [from, to] = start < end ? [start, end] : [end, start];
-                const range = ids.slice(from, to + 1);
-                store.commit('taskSelection/selectMany', range);
-                store.commit('taskSelection/setAnchor', id);
-                return;
-            }
+        const range = evt?.shiftKey ? rangeTo(id, visibleTaskIds) : null;
+        if (range) {
+            store.commit('taskSelection/selectMany', range);
+        } else {
+            store.commit('taskSelection/toggle', id);
         }
-
-        store.commit('taskSelection/toggle', id);
         store.commit('taskSelection/setAnchor', id);
     };
 
-    // Locate a task in the projectData store and return it together with
-    // its parent task (if it is a subtask). Used by the cascade logic to
-    // walk parent ↔ subtask relationships without each caller having to
-    // re-traverse the store.
     const findTaskWithParent = (taskId) => {
         const tasksState = store.state.projectData?.tasks || {};
-        const targetId = String(taskId);
         for (const pid of Object.keys(tasksState)) {
             const project = tasksState[pid];
             const sprintIds = Array.isArray(project?.sprints) ? project.sprints : [];
             for (const sid of sprintIds) {
-                const sprintData = project[sid];
-                if (!sprintData?.tasks) continue;
-                for (const t of sprintData.tasks) {
-                    if (String(t?._id) === targetId) return { task: t, parent: null };
-                    if (Array.isArray(t?.subtaskArray)) {
-                        const sub = t.subtaskArray.find((s) => String(s?._id) === targetId);
-                        if (sub) return { task: sub, parent: t };
-                    }
-                }
+                if (!project[sid]?.tasks) continue;
+                const found = locate({ tasks: project[sid].tasks }, taskId);
+                if (found) return { task: found.row, parent: found.parent };
             }
         }
         return null;
     };
 
-    // Toggle a task and keep the parent ↔ subtask selection consistent:
-    //   • Parent toggled  → mirror new state onto every subtask.
-    //   • Subtask toggled → if every sibling is now selected, select the
-    //                       parent too; otherwise deselect the parent.
-    // Falls back to a plain toggle for tasks that have no relations
-    // (top-level tasks with no subtaskArray).
-    const toggleAndCascade = (task, evt) => {
+    const subtaskIdsOf = (task) => (task?.isParentTask && Array.isArray(task.subtaskArray)
+        ? task.subtaskArray.map((s) => String(s?._id || '')).filter(Boolean)
+        : []);
+
+    const selectRange = (range, id, { rowsAlone = false } = {}) => {
+        store.commit('taskSelection/selectMany', range);
+        const subIds = rowsAlone ? [] : range.flatMap((rid) => subtaskIdsOf(findTaskWithParent(rid)?.task));
+        if (subIds.length) store.commit('taskSelection/selectMany', subIds);
+        store.commit('taskSelection/setAnchor', id);
+    };
+
+    // The browser flips the box before the handler runs; a range only ever selects,
+    // so a shift-click on an already checked box has to be put back.
+    const syncCheckbox = (evt, id) => {
+        const box = evt?.target;
+        if (box && box.type === 'checkbox') box.checked = isSelected(id);
+    };
+
+    // Parent toggled: mirror onto its loaded subtasks. Subtask toggled: the parent is selected
+    // exactly when every sibling is. A view that passes rowsAlone does neither: each row, on
+    // any level, is selected by itself.
+    const toggleAndCascade = (task, evt, visibleTaskIds, { rowsAlone = false } = {}) => {
         if (!task?._id) return;
         const id = String(task._id);
-        toggle(id, evt);
+        const range = evt?.shiftKey ? rangeTo(id, visibleTaskIds) : null;
+        if (range) {
+            selectRange(range, id, { rowsAlone });
+            syncCheckbox(evt, id);
+            return;
+        }
+        toggle(id);
+        syncCheckbox(evt, id);
+        if (rowsAlone) return;
         const isNowSelected = selectedTaskIds.value.includes(id);
 
-        // Down-cascade: parent → its loaded subtasks.
-        if (task.isParentTask && Array.isArray(task.subtaskArray) && task.subtaskArray.length) {
-            const subIds = task.subtaskArray.map((s) => String(s?._id)).filter(Boolean);
-            if (subIds.length) {
-                if (isNowSelected) {
-                    store.commit('taskSelection/selectMany', subIds);
-                } else {
-                    store.commit('taskSelection/deselectMany', subIds);
-                }
-            }
+        const subIds = subtaskIdsOf(task);
+        if (subIds.length) {
+            store.commit(isNowSelected ? 'taskSelection/selectMany' : 'taskSelection/deselectMany', subIds);
             return;
         }
 
-        // Up-cascade: subtask → its parent. After this subtask was toggled,
-        // re-derive the parent's expected state from its siblings.
         if (task.isParentTask === false) {
             const parent = findTaskWithParent(id)?.parent;
             if (!parent?._id || !Array.isArray(parent.subtaskArray)) return;
@@ -122,8 +125,39 @@ export function useTaskSelection() {
         }
     };
 
-    // Group header tri-state: select all visible ids when none/some are
-    // selected, deselect them all when every visible id is already selected.
+    // Shift+Space selects up to the focused row; Shift+Arrow extends by one row and
+    // returns the id that should take focus next.
+    const extendByKey = (task, evt, visibleTaskIds, options = {}) => {
+        if (!task?._id || !evt?.shiftKey || evt.ctrlKey || evt.metaKey || evt.altKey) return null;
+        const id = String(task._id);
+        const ids = (visibleTaskIds || []).map(String);
+        if (evt.key === ' ' || evt.key === 'Spacebar') {
+            evt.preventDefault();
+            const range = rangeTo(id, ids);
+            if (range) selectRange(range, id, options);
+            else toggleAndCascade(task, undefined, undefined, options);
+            return id;
+        }
+        if (evt.key !== 'ArrowDown' && evt.key !== 'ArrowUp') return null;
+        evt.preventDefault();
+        const at = ids.indexOf(id);
+        const nextId = at === -1 ? undefined : ids[at + (evt.key === 'ArrowDown' ? 1 : -1)];
+        if (!nextId) return null;
+        if (!rangeTo(id, ids)) store.commit('taskSelection/setAnchor', id);
+        selectRange(rangeTo(nextId, ids) || [id, nextId], nextId, options);
+        return nextId;
+    };
+
+    const selectFromEvent = (task, evt, scopeSelector, options = {}) => {
+        const ids = visibleTaskIdsAround(evt?.target, scopeSelector);
+        if (evt?.type !== 'keydown') {
+            toggleAndCascade(task, evt, ids, options);
+            return;
+        }
+        const focusId = extendByKey(task, evt, ids, options);
+        if (focusId && focusId !== String(task._id)) focusRowCheckbox(evt.target, scopeSelector, focusId);
+    };
+
     const toggleGroup = (groupTaskIds) => {
         if (!Array.isArray(groupTaskIds) || !groupTaskIds.length) return;
         const ids = groupTaskIds.map(String);
@@ -136,7 +170,6 @@ export function useTaskSelection() {
         }
     };
 
-    // Tri-state value for group header checkboxes: 'none' | 'some' | 'all'.
     const groupState = (groupTaskIds) => {
         if (!Array.isArray(groupTaskIds) || !groupTaskIds.length) return 'none';
         const selectedSet = new Set(selectedTaskIds.value);
@@ -161,6 +194,8 @@ export function useTaskSelection() {
         isSelected,
         toggle,
         toggleAndCascade,
+        extendByKey,
+        selectFromEvent,
         toggleGroup,
         groupState,
         clear,

@@ -1,34 +1,28 @@
 <template>
     <div class="d-flex flex-row h-100 overflow-hidden project__components" v-if="(isRuleData === false ? rulePermission !== null : true) && checkPermission('project.project_list',projectData.isGlobalPermission) !== null">
-        <div :class="[{'section-left' : clientWidth && clientWidth > 1300}]" v-if="checkPermission('project.project_list',projectData.isGlobalPermission) !== null">
-            <ProjectListing
-                ref="projectList"
-                v-if="checkPermission('project.project_list',projectData.isGlobalPermission) !== null"
-                v-model:projectData="projectData"
-                v-model:showArchivedProjects="showArchivedProjects"
-                v-model:isFilterHasData="isFilterHasData"
-                v-model:isAdvanceFilterApplied="isAdvanceFilterApplied"
-                @update:showArchivedProjects="showArchived = showArchivedProjects"
-                @showArchived="showArchived = $event"
-                :filterFavorites="filterFavorites"
-                @update:filterFavorites="filterFavorites = $event"
-                @update:searchData="projectSearchText = $event"
-                @createProject="openSidebar()"
-                @createAiProject="openAiCreator()"
-                :loadingProjects="loadingProjects"
-                @changeAvatar="showColorAvatar = true, assignAvatarData($event)"
-                v-model:sprintLoading="sprintLoading"
-            />
-        </div>
         <template v-if="!loadingProjects && !isRuleData">
             <template v-if="projects?.length && projectData && !isFilterHasData">
                 <template v-if="isRuleData === false ? checkPermission('task.task_list',projectData.isGlobalPermission) !== null && !projectData.isRestrict : !projectData.isRestrict">
-                    <div class="section-right bg-white position-re">
-                        <div class="list-view-header">
-                            <div class="list-head-leftrightwrappper">
-                                <div class="list-head-left d-flex align-items-center">
-                                    <img :src="sidebarArrowIcon" alt="sidebarArrowIcon" class="cursor-pointer mr-10px" @click="$refs.projectList.toggleSidebar(true)" v-if="clientWidth <= responseWidth" :class="[{'z-index-5' : projectData?.deletedStatusKey === 2}]">
-                                    <img :src="projectData?.favouriteTasks?.filter((x) => x.userId === userId)?.length ? projectStar : blankStar" alt="projectStar" class="cursor-pointer mark__project-favourite" @click="markProjectFavourite()"/>
+                    <ProjectTreePanel />
+                    <div class="section-right projects-bg-white position-re">
+                        <ProjectHeader
+                            ref="projectHeader"
+                            :project="projectData"
+                            :projects="projects"
+                            :sprint="headerSprint"
+                            :folders="headerFolders"
+                            :agentSummary="agentSummary"
+                            :agentsAtWork="agentWorkCountIn(projectData?._id)"
+                            :agentsPaused="projectData?.agentLimits?.paused === true"
+                            @show-agent-work="setAgentWorking(true)"
+                            :showAiAssist="canAiAssist"
+                            :showAddTask="canAddTask"
+                            @select-project="selectProject({ _id: $event }, true)"
+                            @ai-assist="openAiTaskCreator()"
+                            @add-task="addTaskRequest++"
+                        >
+                            <template #title>
+                                    <FavouriteStar type="project" :id="projectData?._id || ''" :name="projectData?.ProjectName || ''" />
                                     <div v-if="clientWidth > 767">
                                         <span v-if="projectData?.projectIcon && projectData?.projectIcon.type === 'color'" class="d-flex align-items-center justify-content-center ml-9px" :class="{'inital-box' : clientWidth > 767 , 'project-firtsleeter-box' : clientWidth <=767}" :style="[{'background-color': projectData?.projectIcon.data}]">{{ projectData?.ProjectName.charAt(0).toUpperCase()}}</span>
                                         <template v-else-if="projectData?.projectIcon && projectData?.projectIcon?.type === 'image'">
@@ -37,15 +31,7 @@
                                         </template>
                                     </div>
                                     <div class="list-text-wrapper">
-                                        <template v-if="!editProject">
-                                            <span v-if="checkPermission('project.project_name_edit',projectData.isGlobalPermission) === true" class="text-ellipsis font-weight-bold text-capitalize black list-view-header-title ml-12px" @dblclick="projectName.value = projectData?.ProjectName, editProject = true" :title="projectData.ProjectName">
-                                                {{ projectData?.ProjectName }}
-                                            </span>
-                                            <span v-else class="text-ellipsis font-weight-bold text-capitalize black list-view-header-title ml-12px" :title="projectData.ProjectName">
-                                                {{ projectData?.ProjectName }}
-                                            </span>
-                                        </template>
-                                        <div v-else class="position-re project-titlerename-input ml-10px mr-5px" :class="{'list-type-error': projectName.error }">
+                                        <div v-if="editProject" class="position-re project-titlerename-input ml-10px mr-5px" :class="{'list-type-error': projectName.error }">
                                             <input
                                                 type="text"
                                                 class="form-control project__name-input"
@@ -56,7 +42,7 @@
                                                 :isOutline="false"
                                                 :isDirectFocus="true"
                                                 @blur="editProject = false"
-                                                :style="{borderColor: !projectName.error.length ? '#cecece' : 'red'}"
+                                                :style="{borderColor: !projectName.error.length ? 'var(--border)' : 'var(--danger)'}"
                                                 @keypress.enter="projectName.value !== projectData?.ProjectName ? updateProjectName() : editProject = false"
                                                 @keyup="checkErrors({'field':projectName,
                                                 'name':projectName.name,
@@ -64,7 +50,7 @@
                                                 'type':projectName.type,
                                                 'event':$event.event})"
                                             />
-                                            <div class="red position-ab z-index-1 font-size-11 text-nowrap project__name-error">{{ projectName.error }}</div>
+                                            <div class="projects-red position-ab z-index-1 projects-font-size-11 text-nowrap project__name-error">{{ projectName.error }}</div>
                                         </div>
 
                                         <div v-if="clientWidth <= 767" class="d-flex align-items-center">
@@ -75,43 +61,48 @@
                                                     <img v-else class="vertical-middle profile-sm-square mobile-projectlist-icon" :src="projectData.projectIcon.data" alt=""/>
                                                 </template>
                                             </div>
-                                            <DropDown id="project_avail_views" maxHeight="90vh" title="All Views" :bodyClass="{'viewlist-mobile-dropdown' : true}">
+                                            <DropDown mode="listbox" themed id="project_avail_views" maxHeight="90vh" :title="$t('Projects.all_views')" :bodyClass="{'viewlist-mobile-dropdown' : true}">
                                                 <template #button>
                                                     <div
                                                         class="d-flex align-items-center text-nowrap border-top-radius-10-px cursor-pointer h-100"
                                                         :ref="projectView"
                                                     >
                                                         <img :src="publicIcon" v-if="!projectData.isPrivateSpace" class="pr-10px vertical-middle" alt="public-folder"/>
-                                                        <span class="font-size-14 text-ellipsis d-inline-block gray81 project__requirement">
-                                                            <img :src="activeTab !== 'EmbedView'
-                                                                    ? projectComponentsIcons(projectData?.ProjectRequiredComponent?.find(x => x.keyName === activeTab)?.keyName)?.icon
-                                                                    : projectComponentsIcons(projectData?.ProjectRequiredComponent?.find(x => x.name === embedViewName)?.type)?.icon" alt="list" class="mr-5px">
-                                                            {{activeTab !== 'EmbedView' ? viewLabel(projectData?.ProjectRequiredComponent?.find(x => x.keyName === activeTab)?.name) : embedViewName || "N/A"}}
+                                                        <span class="projects-font-size-14 text-ellipsis d-inline-block project__requirement">
+                                                            <span v-if="activeTab !== 'EmbedView' && projectComponentsIcons(activeTab)?.icon" class="ah-mask-icon phone-view__icon mr-5px" :style="maskOf(projectComponentsIcons(activeTab).icon)" aria-hidden="true"></span>
+                                                            <img v-else-if="activeTab === 'EmbedView' && icons[selectedEmbedView?.type]" :src="icons[selectedEmbedView.type]" alt="" class="mr-5px">
+                                                            {{activeTab !== 'EmbedView' ? (shownView?.title || viewLabel(shownView?.name)) : embedViewName || "N/A"}}
                                                         </span>
-                                                        <img :src="listDropIcon" alt="ListDropIcon" :style="[{marginLeft : clientWidth <=375 ? '2px' : '10px'}]"/>
+                                                        <img :src="listDropIcon" alt="" :style="[{marginLeft : clientWidth <=375 ? '2px' : '10px'}]"/>
                                                     </div>
                                                 </template>
                                                 <template #options>
                                                     <DropDownOption
-                                                        v-for="view in projectData.ProjectRequiredComponent"
-                                                        :key="view.id"
+                                                        v-for="view in phoneViews"
+                                                        :key="viewKeyOf(view)"
+                                                        :selected="isPhoneViewActive(view)"
                                                         @click="$refs[projectView].click(),handleView(view),!view?.keyName ? openEmbedView(view) : ''"
                                                     >
                                                         <div class="d-flex align-items-center justify-content-between w-100">
                                                             <div class="viewlistIcon d-flex align-items-center">
-                                                                <span class="d-flex align-items-center justify-content-center border-radius-6-px mr-20px bg-white border-gray view__activeproject-name">
-                                                                    <img :src="view?.keyName ? activeTab === view.keyName ? projectComponentsIcons(view?.keyName)?.activeIcon || '' : projectComponentsIcons(view?.keyName)?.icon || '' : icons?.[view?.type] || ''" alt="view.icon" class="mr-0">
+                                                                <span class="d-flex align-items-center justify-content-center border-radius-6-px mr-20px view__activeproject-name">
+                                                                    <span v-if="projectComponentsIcons(view?.keyName)?.icon" class="ah-mask-icon" :style="maskOf(projectComponentsIcons(view.keyName).icon)" aria-hidden="true"></span>
+                                                                    <img v-else-if="icons?.[view?.type]" :src="icons[view.type]" alt="" class="mr-0">
                                                                 </span>
-                                                                <span class="font-size-16 font-weight-500 text-ellipsis d-inline-block gray81 mw-66" @click="handleViewName(view.name)">{{ $t(`ViewList.${view.name}`) }}</span>
+                                                                <span class="projects-font-size-16 projects-font-weight-500 text-ellipsis d-inline-block mw-66" @click="handleViewName(view.name)">{{ view.title || viewLabel(view.name) }}</span>
+                                                                <span v-if="view.isPrivate" class="phone-view__mark" role="img" :aria-label="$t('Projects.private_view')" :title="$t('Projects.private_view')">
+                                                                    <ShellIcon name="lock" :size="13" />
+                                                                </span>
                                                             </div>
-                                                            <span v-if="view.setAsDefault" class="mobile-defaultview-text font-size-12 font-weight-400 darkblue"><img class="list_make_as_defaultimg" :src="viewDefaultIcon"/>
+                                                            <span v-if="view.setAsDefault" class="mobile-defaultview-text projects-font-size-12 projects-font-weight-400">
+                                                                <ShellIcon name="home" :size="12" />
                                                                 {{ $t('Projects.default_view') }}
                                                             </span>
-                                                            <img class="ml-20px activeTab-tick" v-if="activeTab === view.keyName" :src="viewDefaultActive"/>
+                                                            <ShellIcon v-if="isPhoneViewActive(view)" name="check" :size="14" class="ml-20px activeTab-tick" />
                                                         </div>
                                                     </DropDownOption>
-                                                    <DropDownOption class="position-sti border d-flex justify-content-center addview__dropdown" @click="$refs[projectView].click(), $refs.all_views_dd.click()">
-                                                        <div class="blue font-size-18 font-weight-700">
+                                                    <DropDownOption class="position-sti border d-flex justify-content-center addview__dropdown" @click="$refs[projectView].click(), $refs.bottomModals.openAllViews()">
+                                                        <div class="addview__label projects-font-size-18 projects-font-weight-700">
                                                             + {{ $t('Projects.add_view') }}
                                                         </div>
                                                     </DropDownOption>
@@ -120,56 +111,42 @@
                                         </div>
                                     </div>
                                     <div class="key-wapper" v-if="clientWidth > 767">
-                                        <span class="text-ellipsis border-left font-size-13 text-uppercase key-text pl-11px pr-10px GunPowder" :title="projectData.ProjectCode">
+                                        <span class="text-ellipsis border-left projects-font-size-13 text-uppercase key-text pl-11px pr-10px GunPowder" :title="projectData.ProjectCode">
                                             {{ projectData?.ProjectCode }}
                                         </span>
                                     </div>
                                     <img :src="publicFolder" class="vertical-middle" alt="public-folder" v-if="clientWidth > 767 && !projectData.isPrivateSpace"/>
-                                </div>
-                            </div>
-                            <ProjectActionsBar
-                                :projectData="projectData"
-                                :clientWidth="clientWidth"
-                                :users="users"
-                                :teams="teams"
-                                @openSidebar="open"
-                                @openWatcher="openProjectWatcher = true"
-                                @changeAssignee="(type, $event) => changeAssignee(type, $event)"
-                                @openPermissionSidebar="openPermissionSidebar"
-                                @startEditName="projectName.value = projectData?.ProjectName; editProject = true"
-                                @openColorAvatar="showColorAvatar = true; assignAvatarData({id: projectData._id, name: projectData.ProjectName, icon: projectData?.projectIcon})"
-                                @archiveProject="(val) => { showSidebar = true; archive = val }"
-                            />
-                        </div>
-                        <div class="project-views-row" id="projectview_driver">
+                            </template>
+                            <template #views>
+                                <div class="project-views-row" id="projectview_driver">
                                     <template v-if="clientWidth > 765">
-                                        <div class="d-flex align-items-center overflow-x-auto view_list_scroll h-100">
-                                            <ViewsList
-                                                v-for="(view, index) in (viewsListArray)"
-                                                :key="view._id"
-                                                :id="view.keyName"
-                                                :item="view"
-                                                :active="activeTab === view.keyName"
-                                                :firstChild="index === 0"
-                                                :isDeleteDisabled="viewsListArray.length == 1"
-                                                :commentCount="view.keyName === 'Comments' ? myCounts?.[`project_${projectData._id}_comments`] || 0 : 0"
-                                                @click="activeTab = view.keyName,$router.replace({query: {tab: view.keyName}})"
-                                            />
+                                        <div class="d-flex view_list_scroll h-100">
+                                            <div class="ph2__tablist" role="group" :aria-label="$t('Projects.views_tablist')">
+                                                <ViewsList
+                                                    v-for="view in viewsListArray"
+                                                    :key="viewKeyOf(view)"
+                                                    :item="view"
+                                                    :active="isActiveView(view)"
+                                                    :isDeleteDisabled="viewsListArray.length == 1"
+                                                    :commentCount="view.keyName === 'Comments' ? myCounts?.[`project_${projectData._id}_comments`] || 0 : 0"
+                                                    @click="selectView(view)"
+                                                />
+                                            </div>
                                             <div class="project__requirementcomponent-wrapper" v-if="projectData?.ProjectRequiredComponent && (embedViews).length">
-                                                <DropDown :bodyClass="{'dropdown-width':true}" @isVisible="(val)=> !val? (renameValue = {name:'',id:''}) :''">
+                                                <DropDown mode="listbox" :bodyClass="{'dropdown-width':true}" @isVisible="(val)=> !val? (renameValue = {name:'',id:''}) :''">
                                                     <template #button>
                                                         <div class="d-flex p9x-13px" ref="project_tabs_components" :class="{'bg-light-gray':activeTab == 'EmbedView'}">
                                                             <img :src="!selectedEmbedView ? icons[embedViews[0].type] : icons[selectedEmbedView.type]" alt="" class="list_make_as_defaultimg">
-                                                            <span class="font-size-14 text-ellipsis gray81 mw-50 ml-10px">{{!selectedEmbedView ? embedViews[0].name : selectedEmbedView.name}}</span>
+                                                            <span class="projects-font-size-14 text-ellipsis gray81 mw-50 ml-10px">{{!selectedEmbedView ? embedViews[0].name : selectedEmbedView.name}}</span>
                                                             <div class="view-count">
                                                                 {{ (embedViews).length }}
-                                                                <img :src="whiteDownArrow" class="ml-2px">
+                                                                <img :src="whiteDownArrow" alt="" class="ml-2px">
                                                             </div>
                                                         </div>
                                                     </template>
                                                     <template #options>
                                                         <template v-for="(element, index) in (embedViews)" :key="index">
-                                                            <div class="cursor-pointer d-flex embed-option justify-content-between" @click="openEmbedView(element),$refs['project_tabs_components'].click()">
+                                                            <div class="cursor-pointer d-flex embed-option justify-content-between" role="option" tabindex="-1" :aria-selected="String(activeTab === 'EmbedView' && selectedEmbedView?.id === element.id)" @click="openEmbedView(element),$refs['project_tabs_components'].click()">
                                                                 <div class="align-items-center d-flex" v-if="element.id != renameValue.id">
                                                                     <img class="embed_view_dropdown mr-10-px" :src="icons[element.type]" alt="">
                                                                     <span class="d-block text-ellipsis embeded__element-name" :title="element.name">{{ element.name }}</span>
@@ -179,25 +156,25 @@
                                                                 </div>
                                                                 <div v-if="element.id != renameValue.id" class="d-flex align-items-center p5x-0px" @click.stop="">
                                                                     <img :src="require('@/assets/images/svg/active-pin.svg')" v-if="element?.isPin && element.isPin" class="ml-10px active__pin-img">
-                                                                    <span class="notification-tick blinking position-sti ml-7px" v-if="element?.isPrivate"></span>
-                                                                    <DropDown :id="Uid">
+                                                                    <span class="projects-notification-tick blinking position-sti ml-7px" v-if="element?.isPrivate"></span>
+                                                                    <DropDown mode="menu" :id="`${Uid}_${index}`">
                                                                         <template #button>
-                                                                            <img :src="threedots" :ref="Uid" class="vertical-middle"/>
+                                                                            <img :src="threedots" :ref="Uid" :alt="$t('Projects.embed_view_actions')" class="vertical-middle"/>
                                                                         </template>
                                                                         <template #options>
                                                                             <div>
-                                                                                <ul class="p-0 m-0 justify-content-start cursor-pointer">
-                                                                                    <li class="embed-edit-options" @click.stop="renameValue = {name:element.name,id:element.id}">
-                                                                                        <img :src="renameImage" class="inner-tagedit-list-item embed__options"/>
+                                                                                <ul class="p-0 m-0 justify-content-start cursor-pointer" role="none">
+                                                                                    <li class="embed-edit-options" role="menuitem" tabindex="-1" @click.stop="renameValue = {name:element.name,id:element.id}">
+                                                                                        <img :src="renameImage" alt="" class="inner-tagedit-list-item embed__options"/>
                                                                                         <span>{{ $t('Projects.rename') }}</span>
                                                                                     </li>
-                                                                                    <li class="embed-edit-options" @click="copyToClipboard(element.id),$refs[Uid][index].click()">
-                                                                                        <img :src="copy" class="inner-tagedit-list-item embed__options">
+                                                                                    <li class="embed-edit-options" role="menuitem" tabindex="-1" @click="copyToClipboard(element.id)">
+                                                                                        <img :src="copy" alt="" class="inner-tagedit-list-item embed__options">
                                                                                         <span>{{ $t('Projects.copy_link') }}</span>
                                                                                     </li>
-                                                                                    <li class="embed-edit-options cursor-pointer" @click.stop="openDelete = {flag:true,data:element},$refs[Uid][index].click(),$refs.project_tabs_components.click()">
-                                                                                        <img :src="deleteImage" class="inner-tagedit-list-item embed__options"/>
-                                                                                        <span class="red">{{ $t('Projects.delete') }}</span>
+                                                                                    <li class="embed-edit-options cursor-pointer" role="menuitem" tabindex="-1" @click.stop="openDelete = {flag:true,data:element},$refs[Uid][index].click(),$refs.project_tabs_components.click()">
+                                                                                        <img :src="deleteImage" alt="" class="inner-tagedit-list-item embed__options"/>
+                                                                                        <span class="projects-red">{{ $t('Projects.delete') }}</span>
                                                                                     </li>
                                                                                 </ul>
                                                                             </div>
@@ -216,7 +193,7 @@
                                                 <ConfirmationSidebar
                                                     v-model="openDelete.flag"
                                                     :title="$t('Projects.deleteview')"
-                                                    :message="`${$t('Filters.are_you_sure')} ${openDelete.data.name} ${$t('Projects.view')}?`"
+                                                    :message="`${$t('Filters.are_you_sure')} ${escapeHtml(openDelete.data.name)} ${$t('Projects.view')}?`"
                                                     acceptButtonClass="btn-danger"
                                                     @confirm="() => deleteEmbedView()"
                                                     :acceptButton="$t('Projects.delete')"
@@ -228,21 +205,29 @@
                                             </div>
                                         </div>
                                         <div class="d-flex align-items-center text-nowrap border-top-radius-10-px cursor-pointer view-list-wrapper h-100">
-                                            <DropDown v-if="checkPermission('project.view_list',projectData.isGlobalPermission) === true" maxHeight="80vh" :bodyClass="{'embed__dropdown':true}" id="embeddropdown">
-                                                <template #button>
-                                                    <div ref="embeddropdown" id="embeddropdown_button" class="d-flex align-items-center justify-content-center font-size-14 view-list-title p0x-10px">
-                                                        <img :src="addIcon" alt="addIcon" class="mr-10px">
-                                                        <span>{{ $t('Projects.view') }}</span>
-                                                    </div>
-                                                </template>
-                                                <template #options>
-                                                    <ViewsDropdown :projectData="projectData" @closeDropdown="$refs['embeddropdown'].click()" :tourId="'projectviewlist_driver'"/>
-                                                </template>
-                                            </DropDown>
+                                            <AddViewMenu v-if="checkPermission('project.view_list',projectData.isGlobalPermission) === true" :projectData="projectData" :activeView="activeTab" tourId="projectviewlist_driver" @added="selectView"/>
                                         </div>
                                     </template>
                                 </div>
-                        <div v-if="showLoader" class="d-flex box-shadow-6 position-fi z-index-10 right-22px bottom-22px bg-white p-10px border-radius-5-px align-items-center">
+                            </template>
+                            <template #actions>
+                            <NewInProjectMenu ref="newInProject" :projectData="projectData" />
+                            <ProjectActionsBar
+                                :projectData="projectData"
+                                :clientWidth="clientWidth"
+                                :users="users"
+                                :teams="teams"
+                                @openSidebar="open"
+                                @openWatcher="openProjectWatcher = true"
+                                @changeAssignee="(type, $event) => changeAssignee(type, $event)"
+                                @openPermissionSidebar="openPermissionSidebar"
+                                @startEditName="projectName.value = projectData?.ProjectName; editProject = true"
+                                @openColorAvatar="showColorAvatar = true; assignAvatarData({id: projectData._id, name: projectData.ProjectName, icon: projectData?.projectIcon})"
+                                @archiveProject="(val) => { showSidebar = true; archive = val }"
+                            />
+                            </template>
+                        </ProjectHeader>
+                        <div v-if="showLoader" class="d-flex box-shadow-6 position-fi z-index-10 right-22px bottom-22px projects-bg-white p-10px border-radius-5-px align-items-center">
                             <div class="progress-container d-flex align-items-center position-re">
                                 <div class="progress-circle" :style="circleStyle">
                                     <span class="progress-text">{{ currentProgress }}%</span>
@@ -252,7 +237,7 @@
                                 <span>{{ $t('importTaskButton.import_processing') }}</span>
                             </div>
                         </div>
-                        <div :class="[`list-view-body bg-light-gray`,(clientWidth <= 767 && activeTab === 'ProjectDetail') ? 'overflow-auto' : '',
+                        <div :class="['list-view-body', bodyOnTokens ? 'list-view-body--detail' : 'bg-light-gray', (clientWidth <= 767 && activeTab === 'ProjectDetail') ? 'overflow-auto' : '',
                                 {
                                 'd-flex': activeTab !== 'ProjectListView' &&
                                             activeTab !== 'Calendar' &&
@@ -273,9 +258,9 @@
                                 },
                                 {'board-veiw-main-parent': activeTab === 'ProjectKanban'}
                             ]"
-                            :style="{height: clientWidth > 767 ? 'calc(100% - 80px)' : 'calc(100% - 62px)'}"
                         >
                             <ProjectFiltersToolbar
+                                :data-density="toolbarDensity"
                                 :activeTab="activeTab"
                                 :projectData="projectData"
                                 :clientWidth="clientWidth"
@@ -286,9 +271,12 @@
                                 v-model:taskKeySearch="taskKeySearch"
                                 v-model:taskDescriptionSearch="taskDescriptionSearch"
                                 :filterUsers="filterUsers"
+                                :doneBy="doneBy"
+                                :agentWorking="agentWorking"
                                 v-model:userSidebar="userSidebar"
                                 v-model:collapsed="collapsed"
-                                v-model:groupBy="groupBy"
+                                :groupBy="shownGroupBy"
+                                @update:groupBy="(value) => groupBy = value"
                                 :groupByOptions="groupByOptions"
                                 :users="users"
                                 :teams="teams"
@@ -302,6 +290,8 @@
                                 @search="searchMongoDB"
                                 @toggleSearch="toggleSearch"
                                 @manageFilterUsers="manageFilterUsers"
+                                @update:doneBy="setDoneBy"
+                                @update:agentWorking="setAgentWorking"
                                 @changeAssignee="(type, $event) => changeAssignee(type, $event)"
                                 @openAi="openAiSidebar = true"
                                 @openAiAssist="openAiTaskCreator()"
@@ -312,16 +302,43 @@
                                 @nextMonth="nextMonth"
                                 @defaultMonth="defaultMonth"
                             />
+                            <SavedViewBar
+                                v-if="viewDirty"
+                                :canSaveShared="canSaveSharedView"
+                                :isPrivate="Boolean(activeView?.isPrivate)"
+                                :saving="viewSaving"
+                                @save="settleView(saveView, 'SavedViews.saved')"
+                                @saveForMe="settleView(saveViewForMe, 'SavedViews.saved')"
+                                @saveAsNew="(choice) => settleView(() => saveViewAsNew(choice), 'SavedViews.created')"
+                                @reset="resetView"
+                            />
                             <!-- AI Assist (AHE-3777): project-level AI task generation, opened from the toolbar. -->
                             <AiTaskCreator v-if="projectData && projectData._id" v-model="showAiTaskCreator" :projectId="String(projectData._id)" :sprints="aiSprints" :activeSprintId="aiActiveSprintId" @done="onAiTasksCreated" />
+                            <ArchivedLists v-if="showArchived && archivedLists.length" :project="projectData" :lists="archivedLists" />
+                            <FolderGoneState v-if="folderGone" :project="projectData" @open="openProjectOfGoneFolder" />
+                            <FolderEmptyState
+                                v-else-if="folderWithNoLists"
+                                :project="projectData"
+                                :folders="projectData.sprintsfolders"
+                                :folder="folderWithNoLists"
+                                @create="newInProject?.start('sprint')"
+                            />
+                            <EmptyState
+                                v-else-if="searchFailed"
+                                role="alert"
+                                :title="$t('Projects.search_failed_title')"
+                                :message="$t('Projects.search_failed_msg')"
+                                :actionLabel="$t('Projects.search_try_again')"
+                                @action="searchMongoDB"
+                            />
                             <component
-                                v-if="(clientWidth <= 767 && isVisible == true && isRuleData == false) || (clientWidth > 767 && isRuleData == false)"
+                                v-else-if="(clientWidth <= 767 && isVisible == true && isRuleData == false) || (clientWidth > 767 && isRuleData == false)"
                                 :class="[{'showProjectDetailRight':activeTab !== 'ProjectListView' && activeTab !== 'Calendar' && activeTab != 'EmbedViewItem' && activeTab !== 'Workload' && activeTab !== 'ProjectKanban' && activeTab !== 'TableView' && activeTab !== 'Reports' && activeTab !== 'GanttView' && activeTab !== 'RecurringTasks' && activeTab !== 'TimelineView' && activeTab !== 'MindMapView' && activeTab !== 'WhiteboardView' && activeTab !== 'CanvasView' && activeTab !== 'MapView' && activeTab !== 'ProjectDashboard' && activeTab !== 'DocsView' && activeTab !== 'FormsView'}]"
                                 :is="getView(activeTab)"
                                 :data="selectedEmbedView"
                                 :sprints="sprints"
                                 :projectData="projectData"
-                                :grouped="groupBy"
+                                :grouped="shownGroupBy"
                                 :billingPeriod="billingPer"
                                 :startDate="projectStartDate"
                                 :userIds="projectData?.isPrivateSpace ? (projectData?.AssigneeUserId || []) : users?.map((x) => x._id)"
@@ -344,24 +361,12 @@
                             <div>
                                 <div>
                                     <img src="@/assets/images/Frame.png" alt="fram_img"/>
-                                    <h3 class="font-size-22 font-weight-700 text-center line-height-33 black">
-                                        Project is currently archived
+                                    <h3 class="projects-font-size-22 projects-font-weight-700 text-center projects-line-height-33 black">
+                                        {{ $t('Projects.archived_notice') }}
                                     </h3>
                                 </div>
                             </div>
                         </div>
-                    </div>
-                    <div>
-                        <TaskDetail
-                            v-if="isTaskDetail && selectedTask"
-                            :companyId="companyId"
-                            :projectId="projectData._id"
-                            :sprintId="selectedTask.sprintId"
-                            :taskId="selectedTask.id"
-                            :isTaskDetailSideBar="isTaskDetail"
-                            :selectedTask="selectedTask"
-                            @toggleTaskDetail="toggleTaskDetail"
-                        />
                     </div>
 
                     <ProjectSidebars
@@ -385,7 +390,7 @@
                 </template>
                 <template v-else>
                     <template v-if="projectData?.isRestrict === true">
-                        <div class="section-right bg-white" :class="[{'position-re': projectData?.isRestrict === true}]">
+                        <div class="section-right projects-bg-white" :class="[{'position-re': projectData?.isRestrict === true}]">
                             <UpgradYourPlanComponent
                                 v-if="projectData?.isRestrict === true"
                                 :buttonText="$t('Upgrades.upgrade_your_plan')"
@@ -396,9 +401,7 @@
                             />
                         </div>
                     </template>
-                    <div v-else class="d-flex bg-light-gray align-items-center justify-content-center w-100 h-100">
-                        <img :src="accessDenied" alt="accessDenied">
-                    </div>
+                    <AppState v-else kind="forbidden" />
                 </template>
             </template>
             <template v-else>
@@ -415,6 +418,7 @@
         </template>
 
         <ProjectBottomModals
+            ref="bottomModals"
             :clientWidth="clientWidth"
             :projectAddView="projectAddView"
             :projectData="projectData"
@@ -436,37 +440,37 @@
             @tourModalAccept="currentVideoUrl == 0 ? updateTourStatusInUser('isProjectAndNavbarTour') : ''"
             @tourModalClose="closeModal"
             @closeAiSidebar="openAiSidebar = false"
+            @viewAdded="selectView"
         />
     </div>
-    <div v-else class="d-flex align-items-center justify-content-center w-100 h-100">
-        <img :src="accessDenied" alt="accessDenied">
-    </div>
-    <!-- Multi-select bulk action bar — renders only when tasks are selected -->
-    <BulkActionBar />
+    <AppState v-else kind="forbidden" />
 </template>
 
 <script setup>
+import AppState from '@/components/molecules/AppState/AppState.vue';
 // PACKAGES
 import { computed, defineComponent, inject, onMounted, provide, ref, watch, onUnmounted, nextTick } from 'vue';
+import { escapeHtml } from '@/utils/notificationHtml';
 import isEqual from 'lodash/isEqual';
+import { inList } from '@/store/ProjectData/listMembership';
 import { useStore } from 'vuex';
 import { useRoute, useRouter } from 'vue-router';
 import { useI18n } from 'vue-i18n';
 import { useCustomComposable, useGetterFunctions } from '@/composable';
 import { useValidation } from '@/composable/Validation';
-import { projectComponentsIcons } from '@/composable/commonFunction';
+import { projectComponentsIcons, buildFilterQuery } from '@/composable/commonFunction';
+import { useToast } from 'vue-toast-notification';
+import { canUseAi } from '@/composable/aiAvailability';
 
 // COMPONENTS
 import ConfirmationSidebar from '@/components/molecules/ConfirmationSidebar/ConfirmationSidebar.vue';
-import BulkActionBar from '@/components/molecules/BulkActionBar/BulkActionBar.vue';
 import WasabiImage from '@/components/atom/WasabiIamgeCompp/WasabiIamgeCompp.vue';
-import ProjectListing from './ProjectsListing/ProjectListing.vue';
-import ViewsDropdown from '@/components/molecules/ProjectViews/ViewsDropdown.vue';
+import AddViewMenu from '@/components/molecules/ProjectViews/AddViewMenu.vue';
 import UpgradYourPlanComponent from '@/components/atom/UpgradYourPlanComponent/UpgradYourPlanComponent.vue';
 import ProjectDetailRightSide from '@/components/organisms/ProjectDetailRightSide/ProjectDetailRightSide.vue';
 import DropDown from '@/components/molecules/DropDown/DropDown.vue';
 import DropDownOption from '@/components/molecules/DropDownOption/DropDownOption.vue';
-import TaskDetail from '@/views/TaskDetail/TaskDetail.vue';
+import { openTask, overlayState } from '@/components/organisms/TaskDetailOverlay/useTaskOverlay';
 import ViewsList from '@/components/atom/ViewsList/ViewsList.vue';
 import InputText from '@/components/atom/InputText/InputText.vue';
 
@@ -490,27 +494,52 @@ const CanvasViewComp = defineAsyncComponent(() => import(/* webpackChunkName: "p
 const MapViewComp = defineAsyncComponent(() => import(/* webpackChunkName: "project-map" */ '@/views/Projects/MapView/MapView.vue'));
 const DashboardViewComp = defineAsyncComponent(() => import(/* webpackChunkName: "project-dashboard" */ './DashboardView/DashboardView.vue'));
 const DocsViewComp = defineAsyncComponent(() => import(/* webpackChunkName: "project-docs" */ '@/views/Projects/DocsView/DocsView.vue'));
+/* The tabs whose body is the theme canvas; every other tab keeps the legacy light grey until its view is converted. */
+const TOKEN_BODY_TABS = ['ProjectDetail', 'Comments', 'ActivityLog'];
 const FormsViewComp = defineAsyncComponent(() => import(/* webpackChunkName: "project-forms" */ '@/views/Projects/FormsView/FormsView.vue'));
 import NotFound from '../NotFound.vue';
 
 // EXTRACTED PIECES
 import ProjectActionsBar from './components/ProjectActionsBar.vue';
+import ProjectHeader from './components/ProjectHeader.vue';
+import ProjectTreePanel from './components/ProjectTreePanel.vue';
+import FavouriteStar from '@/components/atom/FavouriteStar/FavouriteStar.vue';
+import NewInProjectMenu from './components/NewInProjectMenu.vue';
 import ProjectFiltersToolbar from './components/ProjectFiltersToolbar.vue';
+import { agentWorkCountIn } from './composables/agentWork';
+import SavedViewBar from './components/SavedViewBar.vue';
+import { useProjectAgents } from './Kanban/useProjectAgents';
 import AiTaskCreator from '@/components/organisms/AiTaskCreator/AiTaskCreator.vue';
 import ProjectSidebars from './components/ProjectSidebars.vue';
 import ProjectBottomModals from './components/ProjectBottomModals.vue';
 import ProjectEmptyState from './components/ProjectEmptyState.vue';
+import FolderEmptyState from './components/FolderEmptyState.vue';
+import ArchivedLists from './components/ArchivedLists.vue';
+import FolderGoneState from './components/FolderGoneState.vue';
+import EmptyState from '@/components/atom/EmptyState/EmptyState.vue';
 import { useProjectCalendar } from './composables/useProjectCalendar';
 import { useProjectRules } from './composables/useProjectRules';
+import { archivedListsIn, folderIsGone, folderSprintList, folderWithoutLists, headerLocation, movedListRoute, projectSprintList } from './folderSprints';
+import { folderPathLabel, isLiveFolder } from '@/utils/folderTree';
 import { useProjectNameEdit } from './composables/useProjectNameEdit';
 import { useProjectAssignee } from './composables/useProjectAssignee';
 import { useEmbedViews } from './composables/useEmbedViews';
 import { useProjectLifecycle } from './composables/useProjectLifecycle';
 import { useProjectAvatar } from './composables/useProjectAvatar';
 import { useProjectSearch } from './composables/useProjectSearch';
-import { useProjectTour } from './composables/useProjectTour';
+import { useProjectTree } from './composables/useProjectTree';
+import { useStoredProjectViews } from './liveProjects';
+import { splitProjectViews } from './composables/projectViewBar';
+import { useSavedViews } from './composables/useSavedViews';
+import { viewKeyOf } from './composables/savedViewSettings';
+import { maskOf } from '@/utils/iconMask';
+import ShellIcon from '@/components/organisms/Shell/ShellIcon.vue';
+import { provideViewSettings } from './composables/viewSettingsContext';
+import { VIEW_FILTER_ROWS } from './composables/taskFilterSignal';
+import { useGroupByOptions } from './composables/groupByOptions';
 
 import { useProjectsHelper } from './helper';
+import { isOwnerOrAdmin } from "@/utils/roles";
 
 // UTILS
 const { checkErrors } = useValidation();
@@ -522,7 +551,6 @@ const { projects, filteredProjects, dispatchProjects } = useProjectsHelper();
 const showArchivedProjects = ref(false);
 const isAdvanceFilterApplied = ref(false);
 const isFilterHasData = ref(false);
-const sprintLoading = ref(false);
 provide('showArchivedProjects', showArchivedProjects);
 
 const currentVideoUrl = ref(0);
@@ -573,12 +601,11 @@ const buildAiSprints = () => {
     // Root-level sprints first, so the common case stays at the top.
     Object.values(project.sprintsObj || {}).forEach((s) => push(s, ''));
 
-    // Then each folder's sprints. Folders are keyed by id, and a deleted folder's
-    // sprints are not offered.
-    Object.values(project.sprintsfolders || {}).forEach((folder) => {
-        if (!isLive(folder)) return;
-        const folderName = folder.name || 'Folder';
-        Object.values(folder.sprintsObj || {}).forEach((s) => push(s, folderName));
+    const folders = project.sprintsfolders || {};
+    Object.values(folders).forEach((folder) => {
+        if (!isLiveFolder(folders, folder)) return;
+        const folderPath = folderPathLabel(folders, folder) || 'Folder';
+        Object.values(folder.sprintsObj || {}).forEach((s) => push(s, folderPath));
     });
 
     return out;
@@ -619,7 +646,7 @@ provide('showLoader', showLoader);
 const currentProgress = ref(0);
 
 const circleStyle = computed(() => ({
-    background: `conic-gradient(#4caf50 0% ${currentProgress.value}%, #ddd ${currentProgress.value}% 100%)`,
+    background: `conic-gradient(var(--ok) 0% ${currentProgress.value}%, var(--track) ${currentProgress.value}% 100%)`,
 }));
 
 watch(progress, (newVal) => {
@@ -648,10 +675,6 @@ const companyUserDetail = computed(() => getters['settings/companyUserDetail']);
 const myCounts = computed(() => getters['users/myCounts']?.data || {});
 
 const userId = inject('$userId');
-// template ref: bound via ref="embeddropdown" in the View list DropDown,
-// accessed via $refs in @closeDropdown handler.
-// eslint-disable-next-line no-unused-vars
-const embeddropdown = ref(null);
 const isVisible = ref(true);
 const isVisibleProjectDetial = ref(true);
 // `visible` was a separate ref in the original (initialized false) and
@@ -669,23 +692,14 @@ const filterFavorites = ref(localStorage.getItem('favoriteFilter') == 'true');
 const clientWidth = inject('$clientWidth');
 const route = useRoute();
 const router = useRouter();
-const responseWidth = 1300;
-const sidebarArrowIcon = require('@/assets/images/svg/sidebarclose_arrow.svg');
-const projectStar = require('@/assets/images/svg/start13.svg');
-const blankStar = require('@/assets/images/svg/blankStar.svg');
-const viewDefaultIcon = require('@/assets/images/svg/list_home_icon.svg');
-const viewDefaultActive = require('@/assets/images/svg/blue_tick.svg');
-const projectList = ref();
 
 const companyId = inject('$companyId');
 const { checkPermission, makeUniqueId } = useCustomComposable();
 const { getUser } = useGetterFunctions();
 
 // IMAGES
-const accessDenied = require('@/assets/images/access_denied_img.png');
 const listDropIcon = require('@/assets/images/svg/list_view_dropicon.svg');
 const publicIcon = require('@/assets/images/svg/public_folder.svg');
-const addIcon = require('@/assets/images/Shape 614.png');
 const publicFolder = require('@/assets/images/public_folder.png');
 const whiteDownArrow = require('@/assets/images/svg/embed_drop_arrow.svg');
 const deleteImage = require('@/assets/images/svg/delete-red.svg');
@@ -704,10 +718,12 @@ const { calendartoggle, rangeObject, calendarDate, calenderSelectDate, prevMonth
 const { isRuleData, rulePermission, getProjectRule } = useProjectRules();
 const { editProject, projectName, updateProjectName } = useProjectNameEdit(projectData);
 const { changeAssignee } = useProjectAssignee(projectData);
-const { archive, showSidebar, showSpinner, updateProject, markProjectFavourite } = useProjectLifecycle(projectData);
+const { archive, showSidebar, showSpinner, updateProject } = useProjectLifecycle(projectData);
 const { showColorAvatar, savingAvatar, formData, resetFormData, assignAvatarData, updateImageValue, saveProjectAvatar } = useProjectAvatar(projectData);
-const { taskSearch, taskNameSearch, taskKeySearch, taskDescriptionSearch, filterUsers, searchTask, collapsed, groupBy, userSidebar, resetFilters, toggleSearch, searchMongoDB, manageFilterUsers, applyFilter, clearFilter } = useProjectSearch(projectData, showArchived);
-const { runProjectStartupTours, hanldeBlankProjectTour, hanldeProjectTaktypeTour, hanldeProjectLastStep } = useProjectTour();
+const projectSearch = useProjectSearch(projectData, showArchived, { buildFilterQuery });
+const { taskSearch, taskNameSearch, taskKeySearch, taskDescriptionSearch, filterUsers, filterRows, searchTask, searchFailed, collapsed, groupBy, userSidebar, clearAllFilters, toggleSearch, searchMongoDB, manageFilterUsers, applyFilter, clearFilter, doneBy, setDoneBy, agentWorking, setAgentWorking } = projectSearch;
+const { sprintLoading, loadSprintFolderData, selectProject } = useProjectTree(projectData);
+useStoredProjectViews(projectData);
 
 const Uid = ref('embed' + makeUniqueId(6));
 const renameValue = ref('');
@@ -734,9 +750,49 @@ const openEmbedView = (item) => {
 
 provide('taskCollapsed', collapsed);
 provide('searchedTask', searchTask);
+provide('clearTaskFilters', clearAllFilters);
+provide('refreshTaskSearch', searchMongoDB);
 provide('showArchived', showArchived);
 provide('selectedProject', projectData);
 provide('isSupport', ref(false));
+provide(VIEW_FILTER_ROWS, filterRows);
+
+const toast = useToast();
+const canSaveSharedView = computed(() => ['project.view_list', 'project.project_details'].some((key) => checkPermission(key, projectData.value?.isGlobalPermission) === true));
+
+const selectView = (view) => {
+    activeTab.value = view.keyName;
+    router.replace({ query: { tab: view.keyName, view: viewKeyOf(view) } });
+};
+
+const savedViews = useSavedViews({
+    project: projectData,
+    activeTab,
+    views: viewsListArray,
+    requestedViewKey: computed(() => route.query.view),
+    companyUser,
+    search: projectSearch,
+    canSaveShared: canSaveSharedView,
+    onSelect: selectView,
+});
+provideViewSettings(savedViews);
+const DENSITY_TABS = ['ProjectListView', 'TableView'];
+const toolbarDensity = computed(() => (DENSITY_TABS.includes(activeTab.value) ? savedViews.density.value : undefined));
+const { activeView, dirty: viewDirty, saving: viewSaving, save: saveView, saveForMe: saveViewForMe, saveAsNew: saveViewAsNew, reset: resetView } = savedViews;
+
+const isActiveView = (view) => (activeView.value ? viewKeyOf(view) === viewKeyOf(activeView.value) : activeTab.value === view.keyName);
+
+/* The phone's view switcher lists what the desktop tab bar and its embed menu list, private views included. */
+const phoneViews = computed(() => [...viewsListArray.value, ...embedViews.value]);
+const isPhoneViewActive = (view) => (activeTab.value === 'EmbedView' ? !view?.keyName && view.name === embedViewName.value : Boolean(view?.keyName) && isActiveView(view));
+const shownView = computed(() => activeView.value || viewsListArray.value.find((view) => view.keyName === activeTab.value));
+
+const settleView = (task, message) => task()
+    .then(() => toast.success(t(message), { position: 'top-right' }))
+    .catch((error) => {
+        console.error('ERROR in saving the view: ', error);
+        toast.error(t('SavedViews.failed'), { position: 'top-right' });
+    });
 
 const icons = ref({
     Anything_url: require('@/assets/images/svg/anything.svg'),
@@ -746,11 +802,27 @@ const icons = ref({
     Youtube: require('@/assets/images/svg/Youtube.svg'),
     Figma: require('@/assets/images/svg/figma.svg'),
 });
-const groupByOptions = ref([
-    { label: 'status', image: require('@/assets/images/groupbySattus.png'), id: 0 },
-    { label: 'priority', image: require('@/assets/images/groupbyFlag.png'), id: 2 },
-    { label: 'due_date', image: require('@/assets/images/calendar_month.png'), id: 3 },
-]);
+const BUILT_IN_GROUP_ICONS = {
+    status: require('@/assets/images/groupbySattus.png'),
+    assignee: require('@/assets/images/svg/person.svg'),
+    priority: require('@/assets/images/groupbyFlag.png'),
+    due_date: require('@/assets/images/calendar_month.png'),
+};
+const CUSTOM_GROUP_ICONS = {
+    dropdown: require('@/assets/images/svg/CustomFieldsIcons/CustomFieldDropdownGrey.svg'),
+    checkbox: require('@/assets/images/svg/CustomFieldsIcons/CustomFieldCheckboxGrey.svg'),
+    date: require('@/assets/images/svg/CustomFieldsIcons/CustomFieldDateGrey.svg'),
+    people: require('@/assets/images/svg/person.svg'),
+    rating: require('@/assets/images/svg/blankStar.svg'),
+    number: require('@/assets/images/svg/CustomFieldsIcons/CustomFieldNumberGrey.svg'),
+    money: require('@/assets/images/svg/CustomFieldsIcons/CustomFieldMoneyGrey.svg'),
+    progress: require('@/assets/images/svg/CustomFieldsIcons/CustomFieldNumberGrey.svg'),
+    voting: require('@/assets/images/svg/CustomFieldsIcons/CustomFieldNumberGrey.svg'),
+    relationship: require('@/assets/images/svg/CustomFieldsIcons/CustomFieldDropdownGrey.svg'),
+};
+const groupChoices = useGroupByOptions(projectData);
+const groupByOptions = computed(() => groupChoices.options.value.map((option) => ({ ...option, image: BUILT_IN_GROUP_ICONS[option.label] || CUSTOM_GROUP_ICONS[option.fieldType] })));
+const shownGroupBy = computed(() => groupChoices.shown(groupBy.value));
 
 const projectDetailPermission = computed(() => checkPermission('project.project_details', projectData.value.isGlobalPermission, { gettersVal: getters }));
 
@@ -762,7 +834,6 @@ watch(projectData, (newVal, oldVal) => {
         if (!showArchivedProjects.value) {
             showArchived.value = false;
         }
-        resetFilters();
     }
     getChange();
 });
@@ -774,6 +845,9 @@ watch(() => companyUserData, () => {
 watch(route, (newVal) => {
     if (newVal.query.tab === 'comment') {
         activeTab.value = `Comments`;
+    }
+    if (newVal.query.tab === 'ProjectDetail' && newVal.query.section === 'github') {
+        activeTab.value = 'ProjectDetail';
     }
 });
 
@@ -834,7 +908,7 @@ const openAiCreator = () => {
 // (totals.sprints from the 'done' event); each rendered sprint loads its tasks.
 async function onAiTasksCreated(totals) {
     const proj = projectData.value;
-    if (!proj || !proj._id || !projectList.value || typeof projectList.value.getSprintFolderData !== 'function') return;
+    if (!proj || !proj._id) return;
     const pid = String(proj._id);
     const sprintCount = () => {
         const p = getters['projectData/projects']?.data?.find((x) => x._id === pid);
@@ -844,7 +918,7 @@ async function onAiTasksCreated(totals) {
     const target = sprintCount() + expectedNew;
     let prev = -1;
     for (let attempt = 0; attempt < 10; attempt++) {
-        await projectList.value.getSprintFolderData(pid, true, true);
+        await loadSprintFolderData(pid, true, true);
         const fresh = getters['projectData/projects']?.data?.find((p) => p._id === pid);
         if (fresh) projectData.value = { ...fresh };
         const now = sprintCount();
@@ -871,26 +945,11 @@ async function onAiProjectCreated({ projectId }) {
         const projectsData = (getters['projectData/projects'] && getters['projectData/projects'].data) || [];
         const newProject = projectsData.find((p) => String(p._id) === String(projectId));
 
-        // Re-use the sidebar's selection flow. `mutateCurrentProjectDetails`
-        // does ALL the work clicking a project in the left sidebar does:
-        //   - expands the project in the sidebar
-        //   - computes the correct `?tab=` query from the project's
-        //     ProjectRequiredComponent (falls back to 'ProjectListView')
-        //   - pushes the route with full params + query
-        //   - commits the project to Vuex (`projectData/mutateCurrentProjectDetails`)
-        //   - emits `update:projectData` up to this component, whose existing
-        //     watcher then loads sprints + tasks
-        //
-        // Plain `router.push` alone skips the Vuex commit and the
-        // update:projectData emit, so the main panel renders before the
-        // active-project state is set and the user sees "No Data Found"
-        // until they manually click the project in the sidebar.
-        if (newProject && projectList.value && typeof projectList.value.mutateCurrentProjectDetails === 'function') {
-            projectList.value.mutateCurrentProjectDetails(newProject, true, true);
+        // A plain router.push skips the Vuex commit, and the panel would show
+        // "No Data Found" until the project is selected by hand.
+        if (newProject) {
+            selectProject(newProject, true);
         } else {
-            // Defensive fallback: at minimum get the user to the right URL
-            // with the tab query even if we couldn't reach the sidebar
-            // component (e.g. it failed to mount).
             const cid = (currentCompany.value && currentCompany.value._id) || route.params.cid;
             router.push({
                 name: 'Project',
@@ -907,17 +966,11 @@ const getChange = () => {
     const userTabs = (companyUser.value?.ProjectRequiredComponent)
         ? (Object.entries(companyUser.value?.ProjectRequiredComponent)).map((element) => ({ uniqueId: element[0], ...element[1] })).filter((item) => item.projectId === projectData.value._id)
         : [];
-    const Tabs2 = projectData.value.ProjectRequiredComponent?.filter((item) => item._id.length > 6);
-    const ids = projectData.value.ProjectRequiredComponent?.map((item) => item._id);
-    viewsListArray.value = [...(userTabs.filter((element) => element.id.length > 6 && (!ids.includes(element.id)))), ...Tabs2].sort((a, b) => !(a.isPin) ? 0 : (a.isPin == b.isPin ? 0 : (((!a.isPin && b.isPin) ? 1 : -1))));
-    // Drop the dead legacy 'Gantt'/'Timeline' keyNames (replaced by 'GanttView'/'TimelineView').
-    // getView() has no case for them so they render NotFound; older projects may still carry the
-    // stale entry. The "+ View" catalog already hides them, so mirror that filter in the tab bar.
-    viewsListArray.value = viewsListArray.value.filter((item) => item.keyName !== 'Timeline' && item.keyName !== 'Gantt');
-    embedViews.value = ([...projectData.value.ProjectRequiredComponent.filter((item) => item._id.length == 6), ...(userTabs.filter((element) => element.id.length == 6))].sort((a, b) => (a.name.toLowerCase() < b.name.toLowerCase()) ? -1 : ((b.name.toLowerCase() < a.name.toLowerCase()) ? 1 : 0))).sort((a, b) => !(a.isPin) ? 0 : (a.isPin == b.isPin ? 0 : (((!a.isPin && b.isPin) ? 1 : -1))));
-    if (projectDetailPermission.value === null) {
-        viewsListArray.value = viewsListArray.value.filter((item) => item.keyName !== 'ProjectDetail');
-    }
+    const { views, embeds } = splitProjectViews(projectData.value.ProjectRequiredComponent, userTabs);
+    viewsListArray.value = projectDetailPermission.value === null
+        ? views.filter((item) => item.keyName !== 'ProjectDetail')
+        : views;
+    embedViews.value = embeds;
 };
 
 function checkSprint(sprintData) {
@@ -957,10 +1010,6 @@ watch([() => getters['projectData/projects'], showArchivedProjects, route, filte
 }, { deep: true });
 
 onMounted(() => {
-    if (clientWidth.value <= 1300) {
-        visible.value = true;
-        projectList.value.toggleSidebar(true);
-    }
     loadingProjects.value = true;
     dispatchProjects()
         .then(() => {
@@ -992,10 +1041,12 @@ onMounted(() => {
         assignProjects(getters['projectData/projects'].data);
     }
     setTimeout(() => {
-        runProjectStartupTours(projects.value.length);
     }, 1500);
 });
 onUnmounted(() => {
+    // The shell now renders when the socket never connected, so leaving a project must not
+    // depend on having one — there is no room to leave in that case anyway.
+    if (!socket.value) return;
     socket.value.emit('getRoomList', socket.value.id, (rooms) => {
         const currentSocketRooms = rooms.find((x) => x.includes(socket.value.id) && x.includes('project_sprint_'));
         if (currentSocketRooms) {
@@ -1043,6 +1094,37 @@ watch(route, () => {
 
 const sprints = ref([]);
 
+// Header (10b): the sprint in view, the star, the agent chip and the "+ Task"
+// request the views listen for.
+const headerPlace = computed(() => headerLocation({ folders: projectData.value?.sprintsfolders, sprints: sprints.value, folderId: route.params?.folderId }));
+const headerSprint = computed(() => headerPlace.value.sprint);
+const headerFolders = computed(() => headerPlace.value.folders);
+
+/* The task views can only say that no task shows; on the page of a folder that holds no list, the missing thing is a list. */
+const TASK_VIEWS = ['ProjectListView', 'ProjectKanban', 'TableView'];
+const newInProject = ref(null);
+const archivedLists = computed(() => archivedListsIn(getters['projectData/projects']?.data, projectData.value?._id)
+    .filter((list) => isOwnerOrAdmin(companyUserDetail.value?.roleType) || !list.private || list.AssigneeUserId?.includes(userId.value)));
+const folderGone = computed(() => !sprintLoading.value && folderIsGone(getters['projectData/folders']?.[projectData.value?._id], route.params?.folderId));
+const openProjectOfGoneFolder = () => router.replace({ name: 'Project', params: { cid: route.params?.cid, id: projectData.value?._id }, query: { tab: route.query?.tab } });
+const folderWithNoLists = computed(() => (route.params?.folderId && !route.params?.sprintId && !showArchived.value && !sprintLoading.value && TASK_VIEWS.includes(activeTab.value)
+    ? folderWithoutLists(projectData.value?.sprintsfolders, route.params.folderId)
+    : null));
+/* An empty state is drawn in theme ink, and it replaces the view: a legacy view still needs the light body. */
+const bodyOnTokens = computed(() => TOKEN_BODY_TABS.includes(activeTab.value) || Boolean(folderGone.value || folderWithNoLists.value || searchFailed.value));
+const canAiAssist = computed(() => canUseAi({ project: projectData.value, permitted: checkPermission('task.task_create', projectData.value?.isGlobalPermission) === true }));
+// Only shown where a view actually answers the request (the board injects
+// `addTaskRequest`); other views opt in by injecting it too.
+const ADD_TASK_VIEWS = ['ProjectKanban'];
+const canAddTask = computed(() => ADD_TASK_VIEWS.includes(activeTab.value) && checkPermission('task.task_create', projectData.value?.isGlobalPermission) === true);
+const addTaskRequest = ref(0);
+provide('addTaskRequest', addTaskRequest);
+
+const { start: startAgentWatch, stop: stopAgentWatch, summary: agentSummary } = useProjectAgents();
+watch(() => projectData.value?._id, (id) => { if (id) startAgentWatch(id); }, { immediate: true });
+onUnmounted(stopAgentWatch);
+
+
 // UPDATE/FILTER SPRINTS ARRAY FOR LISTING
 watch([projectData, route, () => getters['projectData/searchedTasks']], () => {
     if (skipWatcher.value) return;
@@ -1059,68 +1141,27 @@ watch([projectData, route, () => getters['projectData/searchedTasks']], () => {
 
     if (!project) return;
 
+    const moved = movedListRoute({ route, project });
+    if (moved) {
+        router.replace(moved);
+        return;
+    }
+
     try {
         if (route.name === 'Projects' || route.name === 'Project') {
-            tmp = project?.sprintsObj && Object.values(project?.sprintsObj).length ? Object.values(project.sprintsObj).filter((x) => checkSprint(x)) : [];
-            Object.values(project.sprintsfolders || {}).forEach((value) => {
-                try {
-                    if (showArchived.value && value?.deletedStatusKey === 2) {
-                        tmp.push({
-                            name: value.name,
-                            id: value.folderId,
-                            isExpanded: false,
-                            items: [],
-                            archivedSprintList: value.sprintsObj || {},
-                            deletedStatusKey: 2,
-                            isFolder: true,
-                        });
-                    } else if (showArchived.value && !value?.deletedStatusKey) {
-                        tmp = [
-                            ...tmp,
-                            ...(Object.values(value?.sprintsObj || {})?.length ? Object.values(value.sprintsObj || {}).filter((x) => checkSprint(x)) : []),
-                        ];
-                    } else if (!showArchived.value && !value?.deletedStatusKey) {
-                        tmp = [
-                            ...tmp,
-                            ...(Object.values(value?.sprintsObj || {})?.length ? Object.values(value?.sprintsObj || {}).filter((x) => checkSprint(x)) : []),
-                        ];
-                    }
-                } catch (error) {
-                    console.error('ERROR: ', error, value);
-                }
-            });
+            tmp = projectSprintList({ project, showArchived: showArchived.value, includeSprint: checkSprint });
         } else if (route.name.includes('ProjectFolder')) {
-            if (route.params.sprintId && !project?.sprintsfolders?.[route.params.folderId]?.deletedStatusKey) {
-                const sprintIndex = Object.values(project?.sprintsfolders?.[route.params.folderId]?.sprintsObj || {})?.findIndex((x) => x.id === route.params.sprintId);
-                if (sprintIndex !== -1) {
-                    tmp = [Object.values(project.sprintsfolders[route.params.folderId].sprintsObj)[sprintIndex]];
-                } else {
-                    tmp = [];
-                }
-            } else {
-                if (project.sprintsfolders?.[route.params.folderId]?.deletedStatusKey === 2) {
-                    if (showArchived.value) {
-                        const val = project.sprintsfolders?.[route.params.folderId];
-                        tmp = [{
-                            name: val.name,
-                            id: val.folderId,
-                            isExpanded: false,
-                            archivedSprintList: project?.sprintsfolders?.[route.params.folderId]?.sprintsObj || {},
-                            items: [],
-                            deletedStatusKey: 2,
-                            isFolder: true,
-                        }];
-                    } else {
-                        tmp = [];
-                    }
-                } else {
-                    tmp = Object.values(project.sprintsfolders[route.params.folderId]?.sprintsObj || {})?.length ? Object.values(project.sprintsfolders[route.params.folderId].sprintsObj).filter((x) => checkSprint(x)) : [];
-                }
-            }
+            tmp = folderSprintList({
+                folders: project.sprintsfolders,
+                folderId: route.params.folderId,
+                sprintId: route.params.sprintId,
+                showArchived: showArchived.value,
+                includeSprint: checkSprint,
+            });
         } else if (route.name.includes('ProjectSprint')) {
             const sprintsArray = Object.values(project?.sprintsObj || {});
             const sprintIndex = sprintsArray.findIndex((x) => x.id === route.params.sprintId && (!showArchived.value ? (x?.deletedStatusKey === 0 || x?.deletedStatusKey === undefined) : true));
-            if ((companyUserDetail.value.roleType === 1 || companyUserDetail.value.roleType === 2) || (sprintIndex !== -1 && (!sprintsArray[sprintIndex]?.private || sprintsArray[sprintIndex]?.AssigneeUserId?.includes(userId.value)))) {
+            if (isOwnerOrAdmin(companyUserDetail.value.roleType) || (sprintIndex !== -1 && (!sprintsArray[sprintIndex]?.private || sprintsArray[sprintIndex]?.AssigneeUserId?.includes(userId.value)))) {
                 tmp = sprintIndex !== -1 ? [sprintsArray[sprintIndex]] : [];
             } else {
                 tmp = [];
@@ -1130,7 +1171,7 @@ watch([projectData, route, () => getters['projectData/searchedTasks']], () => {
         console.error(error, 'Error');
     }
 
-    if (companyUserDetail.value.roleType !== 1 && companyUserDetail.value.roleType !== 2) {
+    if (!isOwnerOrAdmin(companyUserDetail.value.roleType)) {
         tmp = tmp.filter((x) => !x?.private || x?.AssigneeUserId?.includes(userId.value));
     }
 
@@ -1139,9 +1180,9 @@ watch([projectData, route, () => getters['projectData/searchedTasks']], () => {
     if (searchTask.value) {
         if (getters['projectData/searchedTasks']?.length) {
             if (showArchived.value) {
-                tmp = tmp?.filter((x) => getters['projectData/searchedTasks'].filter((y) => y.sprintId === x.id || x.isFolder === true || x.deletedStatusKey === 2).length) || [];
+                tmp = tmp?.filter((x) => getters['projectData/searchedTasks'].filter((y) => inList(y, x.id) || x.isFolder === true || x.deletedStatusKey === 2).length) || [];
             } else {
-                tmp = tmp?.filter((x) => getters['projectData/searchedTasks'].filter((y) => y.sprintId === x.id || x.isFolder === true).length) || [];
+                tmp = tmp?.filter((x) => getters['projectData/searchedTasks'].filter((y) => inList(y, x.id) || x.isFolder === true).length) || [];
             }
         } else {
             tmp = tmp?.filter((x) => x.isFolder || x.deletedStatusKey === 2);
@@ -1249,51 +1290,21 @@ function getView(val) {
     }
 }
 
-// Task Detail
-const isTaskDetail = ref(false);
-const selectedTask = ref({});
-
-watch(() => route.params.taskId, (taskId) => {
-    if (taskId && !isTaskDetail.value) {
-        selectedTask.value = { id: taskId, sprintId: route.params.sprintId };
-        isTaskDetail.value = true;
-    } else if (!taskId) {
-        isTaskDetail.value = false;
-        selectedTask.value = {};
-    }
-}, { immediate: true });
-
-const toggleTaskDetail = async (task) => {
-    skipWatcher.value = true;
-    const routeObj = {
-        cid: companyId.value,
-        id: task.ProjectID,
+// Task detail opens as the global overlay; the route only changes for deep links.
+const toggleTaskDetail = (task, close = false, isComment = false) => {
+    if (!task || !task._id) return;
+    if (close || overlayState.current?.taskId === task._id) return;
+    openTask({
+        companyId: companyId.value,
+        projectId: task.ProjectID || projectData.value?._id,
         sprintId: task.sprintId,
-    };
-    if (task.folderObjId) {
-        routeObj.folderId = task.folderObjId;
-    }
-
-    if (!isTaskDetail.value) {
-        routeObj.taskId = task._id;
-        const taskDetail = { ...task, sprintName: task?.sprintArray?.name, folderName: task?.sprintArray?.folderName, id: task._id };
-        selectedTask.value = taskDetail;
-        isTaskDetail.value = true;
-        await router.push({ name: task.folderObjId?.length ? 'ProjectFolderSprint' : 'ProjectSprint', params: routeObj });
-        await router.push({ name: task.folderObjId?.length ? 'ProjectFolderSprintTask' : 'ProjectSprintTask', params: routeObj, query: { ...route.query, detailTab: 'task-detail-tab' } });
-    } else {
-        isTaskDetail.value = false;
-        selectedTask.value = {};
-        await router.push({ name: task.folderObjId?.length ? 'ProjectFolderSprint' : 'ProjectSprint', params: routeObj, query: { tab: route.query.tab } });
-    }
-    await nextTick();
-    skipWatcher.value = false;
+        folderId: task.folderObjId || task.sprintArray?.folderId || '',
+        taskId: task._id,
+        tab: isComment ? 'activity' : ''
+    });
 };
 provide('toggleTaskDetail', toggleTaskDetail);
 provide('isRouteRequired', true);
-provide('hanldeBlankProjectTour', hanldeBlankProjectTour);
-provide('hanldeProjectTaktypeTour', hanldeProjectTaktypeTour);
-provide('hanldeProjectLastStep', hanldeProjectLastStep);
 
 const users = computed(() => getters['users/users']);
 const teams = computed(() => getters['settings/teams']);
@@ -1353,12 +1364,14 @@ function openPermissionSidebar() {
     permissionSidebar.value = true;
 }
 const handleView = (view) => {
+    if (!view?.keyName) return;
     activeTab.value = view.keyName;
-    if (route.query.tab !== view.keyName) {
+    if (route.query.tab !== view.keyName || route.query.view !== viewKeyOf(view)) {
         router.push({
             query: {
                 ...route.query,
                 tab: view.keyName,
+                view: viewKeyOf(view),
             },
         });
     }
@@ -1380,14 +1393,6 @@ function closeModal() {
 </script>
 <style scoped>
 @import "./style.css";
-
-.show-archived-active {
-    width: 100%;
-    background-color: #FBE6D3 !important;
-    height: 44px;
-    padding: 0px 20px;
-}
-
 </style>
 <style>
 .viewlist-mobile-dropdown-new .dropdown_option{
@@ -1396,16 +1401,13 @@ function closeModal() {
 .project__components li{
     list-style: none !important;
 }
-.mark__project-favourite{
-    width: 13.6px;
-    height: 13px;
-}
 .mobile-projectlist-icon{
     margin-left: 6px;
     width: 28px;
     height: 28px;
 }
 .project__requirement{
+    color: var(--ink-2);
     padding: 0px 10px 0 2px;
 }
 .project__requirement img{
@@ -1423,10 +1425,33 @@ function closeModal() {
 .view__activeproject-name{
     width:35px;
     height:35px;
+    border: 1px solid var(--border);
+    background: var(--surface);
+    color: var(--ink-2);
+}
+.phone-view__mark{
+    display: inline-flex;
+    flex: none;
+    margin-left: 8px;
+    color: var(--ink-2);
+}
+.ah-mask-icon.phone-view__icon{
+    width: 12px;
+    height: 12px;
+    vertical-align: middle;
+}
+.mobile-defaultview-text{
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    color: var(--brand);
+}
+.addview__label{
+    color: var(--brand);
 }
 .addview__dropdown{
-    border-color: #2F3990;
-    background-color: white !important;
+    border-color: var(--brand);
+    background-color: var(--surface) !important;
     margin-bottom: 0px !important;
     bottom: 0px;
 }
@@ -1460,12 +1485,9 @@ function closeModal() {
     height: 30px;
     width: 30px;
 }
-.task-filtersearchassignee-wrapper{
-    padding: 14px 20px 14px 20px;
-}
 .board-veiw-main-parent.list-view-body,
 .board-veiw-main-parent .task-filtersearchassignee-wrapper {
-    background-color: #FFF;
+    background-color: var(--surface);
 }
 .board-veiw-main-parent .task-assigneesearch-groupbywrapper {
     margin-bottom: 0;
@@ -1477,16 +1499,10 @@ function closeModal() {
 .search__in{
     line-height: 19px;
 }
-.current__dropdown{
-   padding: 5px 10px 5px 2.58px;
-}
-.manage__filter-users{
-    height: 30px;
-}
 .saving__avtar-div{
     top: 0px;
     left: 0px;
-    background-color: #FFFFFFde !important;
+    background-color: color-mix(in srgb, var(--surface) 87%, transparent) !important;
 }
 .skelaton__option{
     height: 35px;
@@ -1505,29 +1521,13 @@ function closeModal() {
     background: transparent;
     border: none;
     font-size: 16px;
-    color: #2F3990;
+    color: var(--brand);
     cursor: pointer;
 }
 .projecttour_driver_modal .btn-primary {
     font-size: 16px;
     width: 100px;
 }
-.ai_button{
-    height: 30px;
-    background: linear-gradient(270deg, #F241CD 0%, #4B5DEE 100%);
-    border: 0px solid transparent;
-    border-radius: 8px;
-    color: #FFFFFF;
-    box-shadow: 0px 5px 10px 0px #9941F24D;
-    padding: 0px 15px 0px 15px;
-    font-size: 13px;
-}
-.main_ai_image{
-    top: 2px;
-    right: 8px;
-    position: relative;
-}
-
 .progress-container {
   width: 75px;
   height: 75px;
@@ -1545,7 +1545,7 @@ function closeModal() {
   content: "";
   width: 85%;
   height: 85%;
-  background-color: #fff;
+  background-color: var(--surface);
   border-radius: 50%;
   position: absolute;
 }
@@ -1553,9 +1553,55 @@ function closeModal() {
   position: absolute;
   font-size: 1.3em;
 }
-@media(max-width: 1024px){
-.task-filter-assignee .ai_button.btn{
-    margin-left: 0px;
-  }
+</style>
+
+<style scoped>
+.projects-red {
+    color: var(--danger-ink);
+}
+.projects-bg-white {
+    background-color: var(--surface);
+}
+.projects-font-weight-400 {
+    font-weight: 400 !important;
+}
+.projects-font-weight-500 {
+    font-weight: 500 !important;
+}
+.projects-font-weight-700 {
+    font-weight: 700 !important;
+}
+.projects-font-size-11 {
+    font-size: 11px;
+}
+.projects-font-size-12 {
+    font-size: 12px;
+}
+.projects-font-size-13 {
+    font-size: 13px;
+}
+.projects-font-size-14 {
+    font-size: 14px;
+}
+.projects-font-size-16 {
+    font-size: 16px;
+}
+.projects-font-size-18 {
+    font-size: 18px !important;
+}
+.projects-font-size-22 {
+    font-size: 22px;
+}
+.projects-notification-tick {
+    position: absolute;
+    width: 6px;
+    height: 6px;
+    background-color: var(--danger);
+    border-radius: 6px;
+    left: 14px;
+    top: -6px;
+}
+.projects-line-height-33 {
+    line-height: 33px;
 }
 </style>

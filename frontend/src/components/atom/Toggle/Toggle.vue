@@ -2,12 +2,12 @@
 	<div
 		class="toggle"
 		:style="`width: ${width}px; height: ${width%2 === 0 ? (width/2) : (width/2 + 1)}px; ${modelValue ? activeColor ? `background-color: ${activeColor}` : '' : inActiveColor ? `background-color: ${inActiveColor}` :''}`"
-		:class="{'bg-lowlight-gray': !modelValue, 'bg-green': modelValue}"
+		:class="{'toggle-bg-lowlight-gray': !modelValue, 'toggle-bg-green': modelValue}"
 		@click.stop="toggle(), $emit('click', modelValue)"
 	>
 		<slot name="body">
 			<div
-				class="toggle-button bg-white"
+				class="toggle-button toggle-bg-white"
 				:style="{
 					'width': (width%2 === 0 ? (width/2 - 2) : (width/2 - 1))+'px',
 					'height': (width%2 === 0 ? (width/2 - 2) : (width/2 - 1))+'px',
@@ -70,4 +70,16 @@ function toggle() {
 
 <style>
 @import "./style.css";
+</style>
+
+<style scoped>
+.toggle-bg-lowlight-gray {
+    background: var(--border);
+}
+.toggle-bg-green {
+    background-color: var(--ok);
+}
+.toggle-bg-white {
+    background-color: var(--surface);
+}
 </style>

@@ -6,7 +6,38 @@ const sendEmailNotification = require("../../Template/sendEmailNotification.js")
 const { formatNotificationDate } = require('../../../utils/dateHelpers');
 const { Notification_key, TemplateType } = require("../../../Config/notificationKey");
 const { removeDocument, UpdateDocument } = require("../notification-middleware/push-controllerV2")
+const { isCommentNotice, commentNoticeEmail } = require("./commentNoticeEmail")
+const { isDocMention, docMentionEmail } = require("./docMentionEmail")
+const { urlSegment } = require("../../Template/emailText")
+
+const noticeBuilderFor = (key) => {
+  if (isCommentNotice(key)) return commentNoticeEmail
+  if (isDocMention(key)) return docMentionEmail
+  return null
+}
+
+const sendNoticeEmail = (EmailDetails, build) => new Promise((resolve, reject) => {
+  const notice = build(EmailDetails)
+  if (!notice) {
+    removeDocument(EmailDetails.notification).catch(() => null)
+    resolve(false)
+    return
+  }
+  Promise.resolve(sendMail.SendNotificationEmail(notice.subject, notice.html, [EmailDetails.notification.Employee_Email], true, (result) => {
+    if (!result.status) {
+      logger.error(`send notice email not sent`)
+      reject({ message: result.error, status: false })
+      return
+    }
+    removeDocument(EmailDetails.notification).catch(() => null)
+    UpdateDocument(EmailDetails.notification).catch(() => null)
+    resolve(true)
+  })).catch((error) => reject({ message: error.message, status: false }))
+})
+
 exports.sendEmailHandlerSingle = (EmailDetails) => {
+  const build = noticeBuilderFor(EmailDetails?.notification?.key)
+  if (build) return sendNoticeEmail(EmailDetails, build)
   return new Promise(async (resolve, reject) => {
     try {
       let email = [EmailDetails.notification.Employee_Email]
@@ -27,32 +58,6 @@ exports.sendEmailHandlerSingle = (EmailDetails) => {
 
     } catch (error) {
       reject({ message: error.message })
-    }
-  })
-
-}
-exports.sendEmailHandlerSingleApi = (req, res) => {
-  return new Promise(async (resolve, reject) => {
-    try {
-      var EmailDetails = req.body
-      let email = [EmailDetails.notification.Employee_Email]
-      var action_url = await actionForOpenTask(EmailDetails.notification)
-      this.manageEmailData(EmailDetails).then(async response => {
-        let mail = await sendEmailNotification({ bodyData: { ...response, action_url: action_url }, type: EmailDetails.notification.key, isSingle: false, defaultMessage: EmailDetails.notification.message, action_url: action_url });
-        await sendMail.SendNotificationEmail(`${config.APP_NAME} - ${"Update: Stay Informed About Recent Changes"}`, mail, email, true, (result) => {
-          if (!result.status) {
-            logger.error(`send Email Handler Single Not Send`)
-            reject({ message: error.message })
-          } else {
-            removeDocument(EmailDetails.notification)
-            UpdateDocument(EmailDetails.notification)
-            resolve(true)
-          }
-        })
-      })
-
-    } catch (error) {
-       reject({ message: error.message })
     }
   })
 
@@ -185,7 +190,7 @@ function manageEmailTemplateBody(EmailDetails) {
       }
       if (requireField.includes(TemplateType.COMMENTS)) {
 
-        var createObj = []
+        createObj = []
         if (EmailDetails?.comments?.length > 0) {
           EmailDetails.comments.map(item => {
             createObj.push({
@@ -200,7 +205,7 @@ function manageEmailTemplateBody(EmailDetails) {
         body.push({ key: TemplateType.COMMENTS, data: createObj })
       }
       if (requireField.includes(TemplateType.UPDATES)) {
-        var createObj = []
+        createObj = []
         if (EmailDetails?.tasks?.length > 0) {
           EmailDetails.tasks.map(item => {
             createObj.push({
@@ -295,8 +300,6 @@ function checkRequiredDetails(type) {
       return [TemplateType.CREATE]
     case Notification_key.PROJECT_FOLDER_CREATE:
       return [TemplateType.CREATE]
-    case Notification_key.PROJECT_CLOSE:
-      return [TemplateType.UPDATES]
     default:
       return []
   }
@@ -374,20 +377,20 @@ function actionForOpenTask(body) {
   if (body.type.toLowerCase() === "project") {
     if (folderId !== undefined && folderId !== null && folderId !== '') {
       if (sprintId !== undefined && sprintId !== null && sprintId !== '') {
-        actionUrl = `${body.companyId}/project/${projectId}/fs/${folderId}/${sprintId}`
+        actionUrl = `${urlSegment(body.companyId)}/project/${urlSegment(projectId)}/fs/${urlSegment(folderId)}/${urlSegment(sprintId)}`
       } else {
-        actionUrl = `${body.companyId}/project/${projectId}/f/${folderId}`
+        actionUrl = `${urlSegment(body.companyId)}/project/${urlSegment(projectId)}/f/${urlSegment(folderId)}`
       }
     } else if (sprintId !== undefined && sprintId !== null && sprintId !== '') {
-      actionUrl = `${body.companyId}/project/${projectId}/s/${sprintId}`
+      actionUrl = `${urlSegment(body.companyId)}/project/${urlSegment(projectId)}/s/${urlSegment(sprintId)}`
     } else {
-      actionUrl = `${body.companyId}/project/${projectId}/p?tab=ProjectDetail`
+      actionUrl = `${urlSegment(body.companyId)}/project/${urlSegment(projectId)}/p?tab=ProjectDetail`
     }
   } else {
     if (folderId !== undefined && folderId !== null && folderId !== '') {
-      actionUrl = `${body.companyId}/project/${projectId}/fs/${folderId}/${sprintId}/${taskId}${body.key === "logged_hours_notification" ? '?tab=ProjectListView&taskTab=TimeLog' : body.key === "comments_I'm_@mentioned_in" ? '?tab=ProjectListView&taskTab=comment' : ''}`
+      actionUrl = `${urlSegment(body.companyId)}/project/${urlSegment(projectId)}/fs/${urlSegment(folderId)}/${urlSegment(sprintId)}/${urlSegment(taskId)}${body.key === "logged_hours_notification" ? '?tab=ProjectListView&taskTab=TimeLog' : body.key === "comments_I'm_@mentioned_in" ? '?tab=ProjectListView&taskTab=comment' : ''}`
     } else {
-      actionUrl = `${body.companyId}/project/${projectId}/s/${sprintId}/${taskId}${body.key === "logged_hours_notification" ? '?tab=ProjectListView&taskTab=TimeLog' : body.key === "comments_I'm_@mentioned_in" ? '?tab=ProjectListView&taskTab=comment' : ''}`
+      actionUrl = `${urlSegment(body.companyId)}/project/${urlSegment(projectId)}/s/${urlSegment(sprintId)}/${urlSegment(taskId)}${body.key === "logged_hours_notification" ? '?tab=ProjectListView&taskTab=TimeLog' : body.key === "comments_I'm_@mentioned_in" ? '?tab=ProjectListView&taskTab=comment' : ''}`
     }
   }
 

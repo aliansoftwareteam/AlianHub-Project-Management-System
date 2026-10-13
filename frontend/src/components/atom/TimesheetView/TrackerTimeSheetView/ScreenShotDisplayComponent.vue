@@ -9,7 +9,7 @@
                 <WasabiImage v-else class="screenShotDisplay__innerImageTimelog" :data="{url: trackshotI.image} " :thumbnail='thumbnailSize' @click="previewScreenShot()"/>
             </div>
             <div class="screenShotDisplay__timecheckbox">
-                <span class="screenShotDisplay__timedispalyImg GunPowder d-flex align-items-center justify-content-between" v-if="trackshotI.time">{{trackshotI.time?._seconds ? getDateType(parseInt(trackshotI.time._seconds * 1000)) : getDateType(parseInt(trackshotI.time))}}</span>
+                <span class="screenShotDisplay__timedispalyImg screen-shot-display-component-GunPowder d-flex align-items-center justify-content-between" v-if="trackshotI.time">{{trackshotI.time?._seconds ? getDateType(parseInt(trackshotI.time._seconds * 1000)) : getDateType(parseInt(trackshotI.time))}}</span>
                 <span class="screenShotDisplay__screenshotActivity"><ScreenShotActivityBar v-if="trackshotI.trackShots.strokes !== undefined" :data="trackshotI.trackShots" :widthData="57" :heightData="3"/></span>
                 <UserProfile
                     :showDot="false"
@@ -88,3 +88,9 @@ const clearTimeout = () => {
 }
 </script>
 <style scoped src="./ScreenShotDisplayComponent.css"></style>
+
+<style scoped>
+.screen-shot-display-component-GunPowder {
+    color: var(--ink-2);
+}
+</style>

@@ -31,7 +31,7 @@
                     :class="[{'selected-blue-border-img border-radius-10-px': usersFilterIDsArray.includes(user.id)}]"
                     @click="usersFilter(user)"
                 />
-                <DropDown :id="'timeloguser_'+makeUniqueId(6)" v-if="userData.length > 4" :bodyClass="{'timelog-usercount-dropdown' : true}">
+                <DropDown :id="'timeloguser_'+makeUniqueId(6)" v-if="userData.length > 4" mode="listbox" multiselectable :bodyClass="{'timelog-usercount-dropdown' : true}">
                     <template #button>
                         <div class="d-flex align-items-center justify-content-center profile-image GunPowder blue text-nowrap border-2px-blue" :style="{width: '30px', height: '30px'}">
                             +{{userData.length - 4}}
@@ -41,11 +41,12 @@
                         <DropDownOption
                             v-for="(user, index) in userData.filter((x, index) => index >= 4).map((x) => ({...x,label: x.Employee_Name, image: x.profileImage}))"
                             :key="'user'+index"
+                            :selected="usersFilterIDsArray.includes(user.id)"
                             @click="usersFilter(user)"
                         >
                             <div class="d-flex align-items-center" :title="user.label">
                                 <input type="checkbox" :id="'checkbox'+user.id" v-model="user.isChecked" :class="[{'checkboxBlue' : user.isChecked}]"/>
-                                <UserProfile
+                                <UserProfile decorative
                                     :showDot="false"
                                     :data="{
                                         image: user.image,
@@ -55,7 +56,6 @@
                                     class="cursor-pointer profile-image"
                                     :class="[{'selected-blue-border-img border-radius-10-px': usersFilterIDsArray.includes(user.id)}]"
                                 />
-                                <!-- <img :src="user.image" class="profile-image" alt="user image" :class="[{'selected-blue-border-img border-radius-10-px': usersFilterIDsArray.includes(user.id)}]"> -->
                                 <span  class="userfilter-list" :class="{'font-size-16' : clientWidth <=767}">{{ user.label }}</span>
                             </div>
                         </DropDownOption>
@@ -67,20 +67,20 @@
             <div class="logdetailview-header-time-container">
                 <div class="d-flex">
                     <div class="circlegreen"></div>
-                    <div class="time-title">Tracked</div>
+                    <div class="time-title">{{ $t('TimeTracker.tracked') }}</div>
                 </div>
-                <div class="time-number">{{convertedTimeString(trackTime,'update') ? convertedTimeString(trackTime,'update') : 0}} hrs</div>
+                <div class="time-number">{{ $t('TimeTracker.hours_value', { time: convertedTimeString(trackTime,'update') ? convertedTimeString(trackTime,'update') : 0 }) }}</div>
             </div>
             <div class="logdetailview-header-time-container">
                 <div class="d-flex">
                     <div class="circlePurple"></div>
-                    <div  class="time-title">Manual</div>
+                    <div  class="time-title">{{ $t('TimeTracker.manual') }}</div>
                 </div>
-                <div class="time-number">{{convertedTimeString(maualTime,'update') ? convertedTimeString(maualTime,'update') : 0}} hrs</div>
+                <div class="time-number">{{ $t('TimeTracker.hours_value', { time: convertedTimeString(maualTime,'update') ? convertedTimeString(maualTime,'update') : 0 }) }}</div>
             </div>
             <div class="logdetailview-header-time-container">
                 <div  class="time-title">{{$t("TimeTracker.total")}}</div>
-                <div class="time-total">{{convertedTimeString(totalTime,'update') ? convertedTimeString(totalTime,'update') : 0}} hrs</div>
+                <div class="time-total">{{ $t('TimeTracker.hours_value', { time: convertedTimeString(totalTime,'update') ? convertedTimeString(totalTime,'update') : 0 }) }}</div>
             </div>
         </div>
     </div>
@@ -164,7 +164,7 @@
 .circlegreen {
   width: 10px;
   height: 10px;
-  background-color: #1CB303;
+  background-color: var(--ok);
   border-radius: 50%;
   margin-right:6px;
   margin-top:4px;
@@ -172,7 +172,7 @@
 .circlePurple {
   width: 10px;
   height: 10px;
-  background-color: #7367F0;
+  background-color: var(--agent);
   border-radius: 50%;
   margin-right:6px;
   margin-top:4px;
@@ -186,9 +186,9 @@
     padding: 20px;
 }
 .logdetailview-calender-wrapper{
-    border:1px solid #DFE1E6;
+    border:1px solid var(--border);
     height: 30px;
-    background-color: #FFFFFF;
+    background-color: var(--surface);
 }
 .logdetailview-header-time-wrapper{
     width: 375px;
@@ -214,8 +214,8 @@
     font-weight: 700;
 }
 .checkboxBlue {
-    background-color: #2F3990 !important;
-    border: 1px solid #2F3990 !important;
+    background-color: var(--brand) !important;
+    border: 1px solid var(--brand) !important;
 }
 .logdetailview__wrapper{
     width:200px;

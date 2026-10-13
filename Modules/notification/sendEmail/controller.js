@@ -91,7 +91,7 @@ function manageEmailTemplateBody(EmailDetails) {
     }
     if (requireField.includes(TemplateType.COMMENTS)) {
 
-      var createObj = []
+      createObj = []
       if (EmailDetails.comments.length > 0) {
         EmailDetails.comments.map(item => {
           createObj.push({
@@ -106,7 +106,7 @@ function manageEmailTemplateBody(EmailDetails) {
       body.push({ key: TemplateType.COMMENTS, data: createObj })
     }
     if (requireField.includes(TemplateType.UPDATES)) {
-      var createObj = []
+      createObj = []
       if (EmailDetails.tasks.length > 0) {
         EmailDetails.tasks.map(item => {
           createObj.push({

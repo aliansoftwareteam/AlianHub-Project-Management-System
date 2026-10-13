@@ -1,5 +1,5 @@
 <template>
-    <div class="d-flex justify-content-center outh-item-gap">
+    <div class="auth__providers">
         <div v-if="isAuthWithGoogle && isAuthWithGoogle === 'true'">
             <oAuthWithGoogle :mode="mode" :companyID="companyID" :companyUserDocID="companyUserDocID"/>
         </div>
@@ -13,7 +13,8 @@
 </template>
 
 <script setup>
-import { ref, defineProps } from "vue";
+import { publicConfig } from "@/config/publicConfig";
+import { computed, defineProps } from "vue";
 
 defineProps({
     mode: {
@@ -30,9 +31,9 @@ defineProps({
     }
 });
 
-const isAuthWithGoogle = ref(process.env.VUE_APP_IS_GOOGLE_LOGIN || null);
-const isAuthWithGithub = ref(process.env.VUE_APP_IS_GITHUB_LOGIN || null);
-const isAuthWithGitlab = ref(process.env.VUE_APP_IS_GITLAB_LOGIN || null);
+const isAuthWithGoogle = computed(() => (publicConfig.auth.google.enabled ? "true" : null));
+const isAuthWithGithub = computed(() => (publicConfig.auth.github.enabled ? "true" : null));
+const isAuthWithGitlab = computed(() => (publicConfig.auth.gitlab.enabled ? "true" : null));
 </script>
 
 <style>
@@ -43,8 +44,8 @@ const isAuthWithGitlab = ref(process.env.VUE_APP_IS_GITLAB_LOGIN || null);
 .oauth-spinner {
     width: 20px;
     height: 20px;
-    border: 2px solid #ccc;
-    border-top: 2px solid #333;
+    border: 2px solid var(--border);
+    border-top: 2px solid var(--ink);
     border-radius: 50%;
     animation: spin 0.6s linear infinite;
 }

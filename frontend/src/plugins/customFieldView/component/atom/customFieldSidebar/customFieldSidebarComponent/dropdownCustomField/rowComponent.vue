@@ -25,7 +25,7 @@
                 <div v-else>
                     <CustomFieldInputComponent
                         :type="'text'"
-                        :placeHolder="$t('PlaceHolder.Enter_option')"
+                        :placeholder="$t('PlaceHolder.Enter_option')"
                         :validations="'required:trim'"
                         :bindValue="fieldValue.label"
                         :validationVisibility="'blur'"

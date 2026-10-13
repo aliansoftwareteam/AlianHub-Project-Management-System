@@ -157,6 +157,8 @@
           return 'Your screen was locked, so tracking' + t + ' was stopped.';
         case 'suspended':
           return 'Your computer went to sleep, so tracking' + t + ' was stopped.';
+        case 'elsewhere':
+          return 'This timer was stopped somewhere else, so tracking' + t + ' has ended here too.';
         default:
           return 'Time tracking' + t + ' has stopped.';
       }

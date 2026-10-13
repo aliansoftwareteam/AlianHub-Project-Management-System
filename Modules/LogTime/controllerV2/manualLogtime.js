@@ -2,31 +2,50 @@ const { DateTime } = require('luxon');
 const hlp = require("../../Tasks/helpers/helper");
 const notiTemp = require("../../Tasks/helpers/notificationTemplate")
 const { HandleBothNotification } = require("../../Tasks/helpers/handleNotification");
-// BUG-042 / #96 — replaced `moment` with luxon. logTime/controllerV2.js
-// already imports `DateTime` above; the helper centralises the
-// "format a JS Date as YYYY-MM-DD" call this file used moment for.
 const { formatDate } = require("../../../utils/dateHelpers");
 const logger = require("../../../Config/loggerConfig");
 const { SCHEMA_TYPE } = require("../../../Config/schemaType")
 const { MongoDbCrudOpration } = require("../../../utils/mongo-handler/mongoQueries");
 const mongoose = require("mongoose")
-
-const fs = require("fs");
-const { updateUserFun } = require('../../Users/controller');
-const { myCache } = require('../../../Config/config');
-const { updateProjectInternal } = require('../../Project/controller/updateProject');
-const loggerConfig = require('../../../Config/loggerConfig');
-const socketEmitter = require('../../../event/socketEventEmitter.js');
-const { handleFileUploadForTrackerSS,handleuploadMainFileForbase64Thumbnail } = require(`../../../common-storage/common-${process.env.STORAGE_TYPE}.js`);
-/**
- * Add and Edit Manual Log Time
- * @param {Objcet} req
- * @param {Object} res
- * @returns
- */
 const { updateProjectForTimelog, findAndUpdateProjectOrTaskStartDate, updateRemainingTime } = require('./helpers');
-const { isPeriodLocked } = require('../../TimesheetApproval/helpers/lockGuard');
+const { isPeriodLocked, PERIOD_LOCKED } = require('../../TimesheetApproval/helpers/lockGuard');
+const { pinSessionTenant } = require('../../../Config/tenant');
+const { resolveSheetScope, opensProject, SHEET_PERMISSION } = require('../../TimeSheet/helpers/timeScope');
+const { actingUser } = require('../../Sprints/helpers/actingUser');
+const { escapeHtml } = require('../../../utils/escapeHtml');
+const { namedPeopleRefusal } = require('../../../Config/projectPeople');
+const { getRoleType, isPrivileged } = require('../../../Config/permissionGuard');
+const { companyOwnerOf } = require('../../Company/helpers/companyOwner');
+
+const OBJECT_ID = /^[0-9a-fA-F]{24}$/;
+const NOT_YOUR_TIME = "You can't log or change time for this person.";
+const SIGNED_IN_REQUIRED = 'A signed-in user is required.';
+const NEW_ENTRY_LOCKED = "This timesheet period is approved and locked — time can't be added to it.";
+
+/* Another person's time is writable only where the timesheet screens would show it to the
+ * caller, the same test timesheet.read applies to reading it. */
+const mayWriteTimeOf = async (companyId, uid, entries) => {
+    const others = entries.filter((entry) => entry && entry.person && String(entry.person) !== uid);
+    if (!others.length) return true;
+    if (others.some(({ person }) => !OBJECT_ID.test(String(person)))) return false;
+    const sheet = await resolveSheetScope(companyId, uid, SHEET_PERMISSION.user);
+    return sheet.everyone && others.every(({ projectId }) => opensProject(sheet, projectId));
+};
+
+const refuse = (res, status, statusText) => res.status(status).send({ status: false, statusText, message: statusText });
+
+/* A page that has not loaded the owner yet sends none; the entry is still written and the owner is looked up. */
+const ownerToNotify = async (companyId, body) => body.companyOwnerId || companyOwnerOf(companyId);
+
+const findEntry = (companyId, type, timeSheetId) => (OBJECT_ID.test(String(timeSheetId || ''))
+    ? MongoDbCrudOpration(companyId, { type, data: [{ _id: new mongoose.Types.ObjectId(String(timeSheetId)) }] }, "findOne")
+    : Promise.resolve(null));
+
+const entryDay = (entry) => new Date((Number(entry.LogStartTime) || 0) * 1000);
+
 exports.manualLogTime = async (req, res) => {
+    const companyId = pinSessionTenant(req, res);
+    if (!companyId) return;
     if (!(req.body && req.body.logTimeDate)) {
         res.send({
             status: false,
@@ -76,21 +95,6 @@ exports.manualLogTime = async (req, res) => {
         })
         return;
     }
-    if (!(req.body && req.body.companyId)) {
-        res.send({
-            status: false,
-            // BUG-028 / #82 fix: was copy-paste error "ProjectId is required".
-            statusText: "CompanyId is required"
-        })
-        return;
-    }
-    if (!(req.body && req.body.userId)) {
-        res.send({
-            status: false,
-            statusText: "UserId is required"
-        })
-        return;
-    }
     if ((!req.body || req.body.isEdit === undefined || typeof req.body.isEdit !== "boolean")) {
         res.send({
             status: false,
@@ -114,13 +118,6 @@ exports.manualLogTime = async (req, res) => {
             })
             return;
         }
-    }
-    if (!(req.body && req.body.userName)) {
-        res.send({
-            status: false,
-            statusText: "userName is required"
-        });
-        return;
     }
     if (!(req.body && req.body.dateFormat)) {
         res.send({
@@ -150,13 +147,6 @@ exports.manualLogTime = async (req, res) => {
         });
         return;
     }
-    if (!(req.body && req.body.companyOwnerId)) {
-        res.send({
-            status: false,
-            statusText: "companyOwnerId is required"
-        });
-        return;
-    }
     if (!(req.body && req.body.timeZone)) {
         res.send({
             status: false,
@@ -164,17 +154,36 @@ exports.manualLogTime = async (req, res) => {
         });
         return;
     }
-    const { type = SCHEMA_TYPE.TIMESHEET } = req.body;
-    // BUG-029 / #83 fix: the existing validation at line 53 only blocks
-    // falsy timeDuration. A non-string value (number, array, object) or a
-    // string without a colon (e.g. "1") would crash here with a TypeError
-    // or silently store NaN in the DB. Validate the shape explicitly.
+    const type = SCHEMA_TYPE.TIMESHEET;
     if (typeof req.body.timeDuration !== 'string' || !/^\d+:\d+$/.test(req.body.timeDuration)) {
         res.send({
             status: false,
             statusText: "timeDuration must be a string in HH:MM format"
         });
         return;
+    }
+    const actor = await actingUser(req);
+    if (!actor) return refuse(res, 401, SIGNED_IN_REQUIRED);
+    const uid = actor.id;
+    const companyOwnerId = await ownerToNotify(companyId, req.body);
+    const storedEntry = req.body.isEdit === true ? await findEntry(companyId, type, req.body.timeSheetId) : null;
+    const owner = String(req.body.userId || (storedEntry && storedEntry.Loggeduser) || uid);
+    const allowed = await mayWriteTimeOf(companyId, uid, [
+        { person: owner, projectId: req.body.projectId },
+        storedEntry && { person: storedEntry.Loggeduser, projectId: storedEntry.ProjectId },
+    ]);
+    if (!allowed) {
+        logger.warn(`manualLogtime refused: ${uid} for ${owner} in ${companyId}`);
+        return refuse(res, 403, NOT_YOUR_TIME);
+    }
+    /* Editing a colleague's entry keeps its person. Putting time on someone else is an owner's or an admin's, and
+     * time lands on someone else only in a project that person can open. */
+    const newlyNamed = owner !== uid && !(storedEntry && String(storedEntry.Loggeduser) === owner);
+    const movedProject = owner !== uid && Boolean(storedEntry) && String(storedEntry.ProjectId) !== String(req.body.projectId);
+    if (newlyNamed && !isPrivileged(await getRoleType(companyId, uid))) return refuse(res, 403, NOT_YOUR_TIME);
+    if (newlyNamed || movedProject) {
+        const refusal = await namedPeopleRefusal(companyId, req.body.projectId, [owner]);
+        if (refusal) return refuse(res, 400, refusal);
     }
     const diffArr = req.body.timeDuration.split(':');
     const diffMin = (+diffArr[0]) * 60 + (+diffArr[1]);
@@ -184,7 +193,7 @@ exports.manualLogTime = async (req, res) => {
         LogEndTime: getTimeStamp(req.body.timeZone, req.body.logTimeDate, req.body.endLogTime),
         LogTimeDuration: diffMin,
         LogDescription: req.body.description,
-        Loggeduser: req.body.userId,
+        Loggeduser: owner,
         logAddType : 0,
         billable: req.body.billable !== false
     }
@@ -193,16 +202,14 @@ exports.manualLogTime = async (req, res) => {
     }
 
     if (req.body.isEdit === true) {
-       // TIME-03: block editing an entry whose day falls in an approved (locked) period.
-       const lockedCheckEntry = await MongoDbCrudOpration(req.body.companyId, {
-           type, data: [{ _id: new mongoose.Types.ObjectId(req.body.timeSheetId) }],
-       }, "findOne");
-       if (lockedCheckEntry) {
-           const entryDate = new Date((Number(lockedCheckEntry.LogStartTime) || 0) * 1000);
-           const locked = await isPeriodLocked({ companyId: req.body.companyId, userId: lockedCheckEntry.Loggeduser || req.body.userId, date: entryDate });
+       if (storedEntry) {
+           const locked = await isPeriodLocked({ companyId, userId: storedEntry.Loggeduser || owner, date: entryDay(storedEntry) });
            if (locked) {
                return res.send({ status: false, statusText: "This timesheet period is approved and locked — the entry can't be edited." });
            }
+       }
+       if (await isPeriodLocked({ companyId, userId: owner, date: entryDay(data) })) {
+           return res.send({ status: false, statusText: "This timesheet period is approved and locked — time can't be added to it.", code: 'period_locked' });
        }
        let obj = {
             type: type,
@@ -214,19 +221,19 @@ exports.manualLogTime = async (req, res) => {
                 {new : true}
             ]
         }
-        MongoDbCrudOpration(req.body.companyId, obj, "findOneAndUpdate")
+        MongoDbCrudOpration(companyId, obj, "findOneAndUpdate")
             .then((response) => {
                 let historyObj = {
-                    'message': `<b>${req.body.userName}</b> has edited <b>${req.body.timeDuration} hrs (DATE_${new Date(req.body.logTimeDate).getTime()} from TIMESTAMP_${data.LogStartTime * 1000} to TIMESTAMP_${data.LogEndTime * 1000}) </b> logged hours`,
+                    'message': `<b>${escapeHtml(actor.Employee_Name)}</b> has edited <b>${req.body.timeDuration} hrs (DATE_${new Date(req.body.logTimeDate).getTime()} from TIMESTAMP_${data.LogStartTime * 1000} to TIMESTAMP_${data.LogEndTime * 1000}) </b> logged hours`,
                     'key': 'TimeLog',
                     sprintId: req.body.sprintId
                 }
                 let userData = {
-                    id: req.body.userId
+                    id: uid
                 }
-                hlp.HandleHistory("Logtask", req.body.companyId, req.body.projectId, req.body.ticketId, historyObj, userData).then(() => {
+                hlp.HandleHistory("Logtask", companyId, req.body.projectId, req.body.ticketId, historyObj, userData).then(() => {
                     let notiObj = {
-                        userName: req.body.userName,
+                        userName: actor.Employee_Name,
                         timeDuration: req.body.timeDuration,
                         logTimeDate: req.body.logTimeDate,
                         TaskName: req.body.taskName,
@@ -238,12 +245,12 @@ exports.manualLogTime = async (req, res) => {
                         message: notiTemp.loggedHoursUpdated(notiObj),
                     };
                     let userDataNoti = {
-                        id: req.body.userId,
-                        companyOwnerId: req.body.companyOwnerId,
+                        id: uid,
+                        companyOwnerId,
                     }
                     HandleBothNotification({
                         type: 'task',
-                        companyId: req.body.companyId,
+                        companyId,
                         projectId: req.body.projectId,
                         taskId: req.body.taskId,
                         folderId: req.body.folderId ? req.body.folderId : "",
@@ -254,8 +261,8 @@ exports.manualLogTime = async (req, res) => {
                         .catch((error) => {
                             logger.error(`Notification Set Error: ${error}`);
                         })
-                    updateProjectForTimelog(req.body.companyId, req.body.projectId, true, Math.floor(new Date().getTime() / 1000));
-                    updateRemainingTime(req.body.companyId,req.body.ticketId);
+                    updateProjectForTimelog(companyId, req.body.projectId, true, Math.floor(new Date().getTime() / 1000));
+                    updateRemainingTime(companyId,req.body.ticketId);
                     res.send({
                         status: true,
                         statusText: "Logtime added successfully",
@@ -275,26 +282,29 @@ exports.manualLogTime = async (req, res) => {
                 res.send({ status: false, message: err.message })
             });
     } else {
+        if (await isPeriodLocked({ companyId, userId: owner, date: entryDay(data) })) {
+            return res.send({ status: false, statusText: NEW_ENTRY_LOCKED, code: PERIOD_LOCKED });
+        }
         let obj = {
             type: type,
             data: data
         }
-        MongoDbCrudOpration(req.body.companyId, obj, "save")
+        MongoDbCrudOpration(companyId, obj, "save")
             .then((response) => {
-                findAndUpdateProjectOrTaskStartDate({companyId:req.body.companyId,userId:req.body.userId,projectId:req.body.projectId,taskId:req.body.ticketId,startDateForProjectOrTask:new Date(req.body.logTimeDate)});
+                findAndUpdateProjectOrTaskStartDate({companyId,userId:owner,projectId:req.body.projectId,taskId:req.body.ticketId,startDateForProjectOrTask:new Date(req.body.logTimeDate)});
                 let historyObj = {
-                    'message': `<b>${req.body.userName}</b> has added <b>${req.body.timeDuration} hrs (DATE_${new Date(req.body.logTimeDate).getTime()} from TIMESTAMP_${data.LogStartTime * 1000} to TIMESTAMP_${data.LogEndTime * 1000}) </b> logged hours
+                    'message': `<b>${escapeHtml(actor.Employee_Name)}</b> has added <b>${req.body.timeDuration} hrs (DATE_${new Date(req.body.logTimeDate).getTime()} from TIMESTAMP_${data.LogStartTime * 1000} to TIMESTAMP_${data.LogEndTime * 1000}) </b> logged hours
                 `,
                     'key': 'TimeLog',
                     sprintId: req.body.sprintId
                 }
                 let userData = {
-                    id: req.body.userId
+                    id: uid
                 }
-                hlp.HandleHistory("Logtask", req.body.companyId, req.body.projectId, req.body.ticketId, historyObj, userData).then(() => {
+                hlp.HandleHistory("Logtask", companyId, req.body.projectId, req.body.ticketId, historyObj, userData).then(() => {
 
                     let notiObj = {
-                        userName: req.body.userName,
+                        userName: actor.Employee_Name,
                         timeDuration: req.body.timeDuration,
                         logTimeDate: req.body.logTimeDate,
                         TaskName: req.body.taskName,
@@ -307,13 +317,13 @@ exports.manualLogTime = async (req, res) => {
                     };
 
                     let userDataNoti = {
-                        id: req.body.userId,
-                        companyOwnerId: req.body.companyOwnerId,
+                        id: uid,
+                        companyOwnerId,
                     }
 
                     HandleBothNotification({
                         type: 'task',
-                        companyId: req.body.companyId,
+                        companyId,
                         projectId: req.body.projectId,
                         taskId: req.body.taskId,
                         folderId: req.body.folderId ? req.body.folderId : "",
@@ -325,8 +335,8 @@ exports.manualLogTime = async (req, res) => {
                         logger.error(`Notification Set Error: ${error}`);
 
                     })
-                    updateProjectForTimelog(req.body.companyId, req.body.projectId, true, Math.floor(new Date().getTime() / 1000));
-                    updateRemainingTime(req.body.companyId,req.body.ticketId);
+                    updateProjectForTimelog(companyId, req.body.projectId, true, Math.floor(new Date().getTime() / 1000));
+                    updateRemainingTime(companyId,req.body.ticketId);
                     res.send({
                         status: true,
                         statusText: "Logtime added successfully",
@@ -368,13 +378,8 @@ const getTimeStamp = (timezone, date, time) => {
  */
 
 exports.deleteManualLogtime = async (req, res) => {
-    if (!(req.body && req.body.companyId)) {
-        res.send({
-            status: false,
-            statusText: "CompanyId is required"
-        })
-        return;
-    }
+    const companyId = pinSessionTenant(req, res);
+    if (!companyId) return;
     if (!(req.body && req.body.timeSheetId)) {
         res.send({
             status: false,
@@ -431,31 +436,10 @@ exports.deleteManualLogtime = async (req, res) => {
         })
         return;
     }
-    if (!(req.body && req.body.userId)) {
-        res.send({
-            status: false,
-            statusText: "userId is required"
-        })
-        return;
-    }
-    if (!(req.body && req.body.userName)) {
-        res.send({
-            status: false,
-            statusText: "userName is required"
-        })
-        return;
-    }
     if (!(req.body && req.body.sprintId)) {
         res.send({
             status: false,
             statusText: "sprintId is required"
-        })
-        return;
-    }
-    if (!(req.body && req.body.companyOwnerId)) {
-        res.send({
-            status: false,
-            statusText: "companyOwnerId is required"
         })
         return;
     }
@@ -473,16 +457,25 @@ exports.deleteManualLogtime = async (req, res) => {
         })
         return;
     }
-    let companyId = req.body.companyId
-    let type = req.body.type || SCHEMA_TYPE.TIMESHEET
+    const type = SCHEMA_TYPE.TIMESHEET;
 
-    // TIME-03: block deleting an entry whose day falls in an approved (locked) period.
-    const lockedDelEntry = await MongoDbCrudOpration(companyId, {
-        type, data: [{ _id: new mongoose.Types.ObjectId(req.body.timeSheetId) }],
-    }, "findOne");
-    if (lockedDelEntry) {
-        const entryDate = new Date((Number(lockedDelEntry.LogStartTime) || 0) * 1000);
-        const locked = await isPeriodLocked({ companyId, userId: lockedDelEntry.Loggeduser || req.body.userId, date: entryDate });
+    const actor = await actingUser(req);
+    if (!actor) return refuse(res, 401, SIGNED_IN_REQUIRED);
+    const uid = actor.id;
+    const companyOwnerId = await ownerToNotify(companyId, req.body);
+    const storedEntry = await findEntry(companyId, type, req.body.timeSheetId);
+    const owner = String(req.body.userId || (storedEntry && storedEntry.Loggeduser) || uid);
+    const allowed = await mayWriteTimeOf(companyId, uid, [
+        { person: owner, projectId: req.body.projectId },
+        storedEntry && { person: storedEntry.Loggeduser, projectId: storedEntry.ProjectId },
+    ]);
+    if (!allowed) {
+        logger.warn(`deleteManualLogtime refused: ${uid} for ${owner} in ${companyId}`);
+        return refuse(res, 403, NOT_YOUR_TIME);
+    }
+
+    if (storedEntry) {
+        const locked = await isPeriodLocked({ companyId, userId: storedEntry.Loggeduser || owner, date: entryDay(storedEntry) });
         if (locked) {
             return res.send({ status: false, statusText: "This timesheet period is approved and locked — the entry can't be deleted." });
         }
@@ -504,16 +497,16 @@ exports.deleteManualLogtime = async (req, res) => {
             const hoursStr = String(hours).padStart(2, '0');
             const minutesStr = String(remainingMinutes).padStart(2, '0');
             let historyObj = {
-                'message': `<b>${req.body.userName}</b> has deleted <b>${`${hoursStr}:${minutesStr}`} hrs (DATE_${new Date(req.body.logTimeDate).getTime()} from TIMESTAMP_${req.body.LogStartTime * 1000} to TIMESTAMP_${req.body.LogEndTime * 1000}) </b> logged hours`,
+                'message': `<b>${escapeHtml(actor.Employee_Name)}</b> has deleted <b>${`${hoursStr}:${minutesStr}`} hrs (DATE_${new Date(req.body.logTimeDate).getTime()} from TIMESTAMP_${req.body.LogStartTime * 1000} to TIMESTAMP_${req.body.LogEndTime * 1000}) </b> logged hours`,
                 'key': 'TimeLog',
                 sprintId: req.body.sprintId
             }
             let userData = {
-                id: req.body.userId
+                id: uid
             }
-            hlp.HandleHistory("Logtask", req.body.companyId, req.body.projectId, req.body.ticketId, historyObj, userData).then(() => {
+            hlp.HandleHistory("Logtask", companyId, req.body.projectId, req.body.ticketId, historyObj, userData).then(() => {
                 let notiObj = {
-                    userName: req.body.userName,
+                    userName: actor.Employee_Name,
                     strtLogTime: req.body.startLogTime,
                     endLogTime: req.body.endLogTime,
                     TaskName: req.body.taskName,
@@ -524,12 +517,12 @@ exports.deleteManualLogtime = async (req, res) => {
                     message: notiTemp.loggedHoursDeleted(notiObj),
                 };
                 let userDataNoti = {
-                    id: req.body.userId,
-                    companyOwnerId: req.body.companyOwnerId,
+                    id: uid,
+                    companyOwnerId,
                 }
                 HandleBothNotification({
                     type: 'task',
-                    companyId: req.body.companyId,
+                    companyId,
                     projectId: req.body.projectId,
                     taskId: req.body.ticketId,
                     folderId: req.body.folderId ? req.body.folderId : "",
@@ -540,8 +533,8 @@ exports.deleteManualLogtime = async (req, res) => {
                     .catch((error) => {
                         logger.error(`Notification Set Error: ${error}`);
                     })
-                updateProjectForTimelog(req.body.companyId, req.body.projectId, true, Math.floor(new Date().getTime() / 1000));
-                updateRemainingTime(req.body.companyId,req.body.ticketId);
+                updateProjectForTimelog(companyId, req.body.projectId, true, Math.floor(new Date().getTime() / 1000));
+                updateRemainingTime(companyId,req.body.ticketId);
                 res.send({
                     status: true,
                     statusText: "Logtime deleted successfully"

@@ -1,4 +1,5 @@
 const { SCHEMA_TYPE } = require('../../Config/schemaType');
+const { hiddenSprintFilter } = require('../Sprints/helpers/sprintVisibility');
 const { MongoDbCrudOpration } = require('../../utils/mongo-handler/mongoQueries');
 const logger = require('../../Config/loggerConfig');
 const { evaluatePermission } = require('../../Config/permissionGuard');
@@ -9,7 +10,7 @@ const { isOverdue } = require('../Portfolio/helpers/portfolioRules');
 // 'close' only. A 'done' status is NOT counted as completed.
 const isClosed = (statusType) => String(statusType || '').toLowerCase() === 'close';
 
-const companyOf = (req) => req.headers['companyid'] || (req.body && req.body.companyId) || (req.query && req.query.companyId);
+const { sessionTenantOf, TenantError } = require('../../Config/tenant');
 
 // GET /api/v1/project-dashboard/:projectId
 // The project metric cards + a per-person breakdown. Role-scoped, server-authoritative:
@@ -19,8 +20,7 @@ const companyOf = (req) => req.headers['companyid'] || (req.body && req.body.com
 // Identity (req.uid) and role come from the authenticated session, never the body.
 exports.getProjectDashboard = async (req, res) => {
     try {
-        const companyId = companyOf(req);
-        if (!companyId) return res.status(400).json({ status: false, statusText: 'companyId is required.' });
+        const companyId = sessionTenantOf(req);
         const projectId = String(req.params.projectId || '');
         if (!projectId) return res.status(400).json({ status: false, statusText: 'projectId is required.' });
 
@@ -41,8 +41,10 @@ exports.getProjectDashboard = async (req, res) => {
         const filter = {
             ProjectID: projectId,
             deletedStatusKey: { $in: [0, undefined] },
+            mainChat: { $ne: true },
         };
         if (!seeAll) filter.AssigneeUserId = String(req.uid);
+        Object.assign(filter, await hiddenSprintFilter(companyId, req.uid, [String(projectId)]));
 
         const tasks = await MongoDbCrudOpration(companyId, {
             type: SCHEMA_TYPE.TASKS,
@@ -185,6 +187,7 @@ exports.getProjectDashboard = async (req, res) => {
             },
         });
     } catch (e) {
+        if (e instanceof TenantError) return res.status(e.statusCode).json({ status: false, statusText: e.message });
         logger.error(`getProjectDashboard: ${e.message}`);
         return res.status(500).json({ status: false, statusText: e.message });
     }

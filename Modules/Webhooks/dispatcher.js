@@ -1,9 +1,15 @@
-const axios = require('axios');
-const mongoose = require('mongoose');
+const { AsyncResource } = require('async_hooks');
 const { SCHEMA_TYPE } = require('../../Config/schemaType');
 const { MongoDbCrudOpration } = require('../../utils/mongo-handler/mongoQueries');
+const { memberProfiles } = require('../../utils/companyMembers');
 const logger = require('../../Config/loggerConfig');
 const socketEmitter = require('../../event/socketEventEmitter');
+const { supersedesPending } = require('../../event/domainEventBus');
+const { createSnapshotStore, isNotAnEdit } = require('../../utils/entityEvents');
+const { safeFetch } = require('../Agents/engine/safeFetch');
+const { webhookAllowlist } = require('./helpers/privateHostAllowlist');
+const { signingSecretOf, NEEDS_ATTENTION } = require('./helpers/signingSecret');
+const { hooksThatMayCarry } = require('./helpers/hookAudience');
 const { subscribesTo, classifyTaskEvent, shouldDeliverTask, normalizeChangedFields, trimTaskForDelivery, signPayload, formatForTarget } = require('./helpers/webhookRules');
 
 // Webhook dispatcher. Piggybacks on the namespaced socketEmitter events that
@@ -13,8 +19,9 @@ const { subscribesTo, classifyTaskEvent, shouldDeliverTask, normalizeChangedFiel
 // - Tenant resolution: task documents carry CompanyId (required on the
 //   schema), which is also the per-company database name.
 // - Debounce: one mutation often fires several emits (counters, indexes…).
-//   Events for the same company+task+event collapse within a short window
-//   and deliver once with the latest document.
+//   The first emit for a company+task+event opens a fixed window; later emits
+//   inside it merge (latest document, union of changed fields) without
+//   extending it. A field moving to a new value flushes the window early.
 // - Delivery: POST with an HMAC-SHA256 signature header; one retry after
 //   30s on network errors / 5xx. Every attempt is logged to webhookLogs.
 
@@ -22,26 +29,18 @@ const LOG_PREFIX = '[webhooks]';
 const DEBOUNCE_MS = 2000;
 const RETRY_DELAY_MS = 30000;
 const DELIVERY_TIMEOUT_MS = 8000;
+const RESPONSE_CAP_BYTES = 256 * 1024;
 const CACHE_TTL_MS = 60000;
 
 // companyId -> { at, hooks } — tiny cache so a burst of task updates doesn't
 // query the webhooks collection per event.
 const hookCache = new Map();
-// `${companyId}:${taskId}:${event}` -> { timer, payload }
+// `${companyId}:${taskId}:${event}` -> { event, companyId, doc, changed, timer }
 const pending = new Map();
 
 // taskId -> the last delivered snapshot (trimmed + name-enriched `data`). Lets a
-// delivery diff against the prior state to render "from → to". Bounded FIFO so a
-// long-lived process can't grow it without limit.
-const taskSnapshots = new Map();
-const MAX_SNAPSHOTS = 5000;
-function rememberSnapshot(taskId, data) {
-    taskSnapshots.delete(taskId); // re-insert to move it to the newest position
-    taskSnapshots.set(taskId, data);
-    if (taskSnapshots.size > MAX_SNAPSHOTS) {
-        taskSnapshots.delete(taskSnapshots.keys().next().value);
-    }
-}
+// delivery diff against the prior state to render "from → to".
+const taskSnapshots = createSnapshotStore({ max: 5000 });
 
 let started = false;
 
@@ -79,23 +78,47 @@ async function logDelivery(companyId, webhookId, entry) {
     }
 }
 
+async function markAttention(companyId, hook, needsAttention) {
+    if ((hook.needsAttention || '') === needsAttention) return;
+    const change = needsAttention ? { $set: { needsAttention } } : { $unset: { needsAttention: '' } };
+    await MongoDbCrudOpration(companyId, { type: SCHEMA_TYPE.WEBHOOKS, data: [{ _id: hook._id }, change] }, 'updateOne').catch(() => {});
+    invalidateCompanyCache(companyId);
+}
+
 async function deliverToHook(companyId, hook, body, attempt) {
     // Shape the payload for the hook's target (raw json / Slack / Discord).
     // The signature covers exactly what we send; body.event is kept for logging.
     const bodyString = JSON.stringify(formatForTarget(hook.format, body));
     const startedAt = Date.now();
+    const secret = await signingSecretOf(companyId, hook);
+    if (!secret) {
+        await logDelivery(companyId, hook._id, {
+            event: body.event,
+            success: false,
+            durationMs: Date.now() - startedAt,
+            attempt,
+            error: 'The signing secret is revoked or unavailable, so the delivery was not sent.',
+        });
+        await markAttention(companyId, hook, NEEDS_ATTENTION);
+        return;
+    }
+    await markAttention(companyId, hook, '');
     try {
-        const response = await axios.post(hook.url, bodyString, {
-            timeout: DELIVERY_TIMEOUT_MS,
+        // A stored url was checked at save time, but DNS and the owner's allowlist can
+        // change since: safeFetch resolves again and revalidates every redirect.
+        const response = await safeFetch(hook.url, {
+            allowlist: webhookAllowlist(),
+            method: 'post',
+            data: bodyString,
+            timeoutMs: DELIVERY_TIMEOUT_MS,
+            maxBytes: RESPONSE_CAP_BYTES,
             headers: {
                 'Content-Type': 'application/json',
                 'User-Agent': 'AlianHub-Webhooks/1.0',
                 'X-AlianHub-Event': body.event,
                 'X-AlianHub-Delivery-Attempt': String(attempt),
-                'X-AlianHub-Signature': signPayload(hook.secret, bodyString),
+                'X-AlianHub-Signature': signPayload(secret, bodyString),
             },
-            // Treat any HTTP response as a response — classify below.
-            validateStatus: () => true,
         });
         const success = response.status >= 200 && response.status < 300;
         await logDelivery(companyId, hook._id, {
@@ -127,23 +150,12 @@ async function deliverToHook(companyId, hook, body, attempt) {
     }
 }
 
-// Resolve user ids → display names. Users live in the 'global' DB. Best-effort:
-// any miss or error just yields an empty map (caller falls back to a count).
-async function resolveUserNames(ids) {
-    const list = (Array.isArray(ids) ? ids : [ids]).filter(Boolean);
-    if (!list.length) return {};
-    const objectIds = [];
-    list.forEach((id) => {
-        try { objectIds.push(new mongoose.Types.ObjectId(String(id))); } catch (e) { /* skip non-ObjectId ids */ }
-    });
-    if (!objectIds.length) return {};
+// Best-effort: any miss or error just yields an empty map (caller falls back to a count).
+async function resolveUserNames(companyId, ids) {
     try {
-        const users = await MongoDbCrudOpration(SCHEMA_TYPE.GOLBAL, {
-            type: SCHEMA_TYPE.USERS,
-            data: [{ _id: { $in: objectIds } }, { Employee_Name: 1 }],
-        }, 'find');
+        const users = await memberProfiles(companyId, Array.isArray(ids) ? ids : [ids], { Employee_Name: 1 });
         const map = {};
-        (users || []).forEach((u) => { if (u && u._id) map[String(u._id)] = u.Employee_Name; });
+        users.forEach((u) => { if (u && u._id) map[String(u._id)] = u.Employee_Name; });
         return map;
     } catch (error) {
         logger.error(`${LOG_PREFIX} could not resolve user names: ${error.message}`);
@@ -153,8 +165,8 @@ async function resolveUserNames(ids) {
 
 async function flush(companyId, event, doc, changedKeys) {
     const hooks = await getCompanyWebhooks(companyId);
-    const targets = hooks.filter((hook) => subscribesTo(hook, event));
-    if (!targets.length) return;
+    const subscribed = hooks.filter((hook) => subscribesTo(hook, event));
+    if (!subscribed.length) return;
 
     // Task socket payloads can be partial (only the changed fields), which would
     // deliver a payload missing the key/name/priority and a status with no
@@ -165,10 +177,8 @@ async function flush(companyId, event, doc, changedKeys) {
     // NON-task document under module:'task' (the project counter bump fires
     // { data: <project>, updatedFields: {} }). Its _id is a project id, so the
     // task lookup finds nothing — and we must not deliver a project as a phantom
-    // task.updated. shouldDeliverTask drops that case; a transient read error
-    // still falls back to best-effort delivery with the socket doc.
+    // task.updated. shouldDeliverTask drops that case, and a read that failed.
     let fullDoc = null;
-    let readErrored = false;
     try {
         const fresh = await MongoDbCrudOpration(companyId, {
             type: SCHEMA_TYPE.TASKS,
@@ -176,12 +186,13 @@ async function flush(companyId, event, doc, changedKeys) {
         }, 'findOne');
         if (fresh && fresh._id) fullDoc = fresh;
     } catch (error) {
-        readErrored = true;
         logger.error(`${LOG_PREFIX} could not re-read task ${doc._id}: ${error.message}`);
     }
 
-    if (!shouldDeliverTask(fullDoc, readErrored)) return;
-    if (!fullDoc) fullDoc = doc; // transient read error → best-effort with the socket payload
+    if (!shouldDeliverTask(fullDoc)) return;
+
+    const targets = await hooksThatMayCarry(companyId, subscribed, fullDoc);
+    if (!targets.length) return;
 
     const data = trimTaskForDelivery(fullDoc);
 
@@ -191,14 +202,14 @@ async function flush(companyId, event, doc, changedKeys) {
     const userIds = [];
     if (Array.isArray(fullDoc.AssigneeUserId)) userIds.push(...fullDoc.AssigneeUserId);
     if (fullDoc.Task_Leader) userIds.push(fullDoc.Task_Leader);
-    const nameMap = userIds.length ? await resolveUserNames(userIds) : {};
+    const nameMap = userIds.length ? await resolveUserNames(companyId, userIds) : {};
     data.assigneeNames = (Array.isArray(fullDoc.AssigneeUserId) ? fullDoc.AssigneeUserId : [])
         .map((id) => nameMap[String(id)]).filter(Boolean);
     if (fullDoc.Task_Leader) data.leadName = nameMap[String(fullDoc.Task_Leader)] || null;
 
     // before→after: diff against the last state we delivered for this task.
     const taskId = String(fullDoc._id);
-    const previous = taskSnapshots.get(taskId) || null;
+    const previous = taskSnapshots.get(taskId);
 
     const body = {
         event,
@@ -209,39 +220,53 @@ async function flush(companyId, event, doc, changedKeys) {
     };
     if (previous) body.previous = previous;
 
-    rememberSnapshot(taskId, data);
+    taskSnapshots.remember(taskId, data);
     targets.forEach((hook) => { deliverToHook(companyId, hook, body, 1); });
 }
+
+function deliverPending(key, entry) {
+    flush(entry.companyId, entry.event, entry.doc, entry.changed).catch((error) => {
+        logger.error(`${LOG_PREFIX} flush failed for ${key}: ${error.message}`);
+    });
+}
+
+/* A delivery is made for the hook's owner, and a window is opened by whichever request wrote first: bound here, where
+ * no request is running, the delivery and its retry run under no token's project list, no agent's mark and no request. */
+const deliverOutsideAnyRequest = AsyncResource.bind(deliverPending);
 
 function onTaskEvent(type) {
     return (payload) => {
         try {
             const doc = payload?.data;
-            if (!doc || !doc.CompanyId || !doc._id) return;
+            // A conversation is kept in the tasks collection and sends the same emits; it is never posted to a webhook.
+            if (!doc || !doc.CompanyId || !doc._id || doc.mainChat === true || isNotAnEdit(payload)) return;
             const companyId = String(doc.CompanyId);
             const event = classifyTaskEvent({ type, doc, updatedFields: payload?.updatedFields });
             if (!event) return;
 
             const key = `${companyId}:${String(doc._id)}:${event}`;
+            const changedNow = normalizeChangedFields(payload?.updatedFields);
             const existing = pending.get(key);
-            if (existing) clearTimeout(existing.timer);
-            // Accumulate the changed field names across every emit collapsed into
-            // this debounce window, so the delivered notification reflects the
-            // whole burst (e.g. status then priority changed back to back).
-            const changed = new Set(existing ? existing.changed : []);
-            normalizeChangedFields(payload?.updatedFields).forEach((field) => changed.add(field));
-            pending.set(key, {
-                doc,
-                changed,
-                timer: setTimeout(() => {
-                    const entry = pending.get(key);
-                    pending.delete(key);
-                    if (!entry) return; // key already replaced/cleaned up — nothing to flush
-                    flush(companyId, event, entry.doc, entry.changed).catch((error) => {
-                        logger.error(`${LOG_PREFIX} flush failed: ${error.message}`);
-                    });
-                }, DEBOUNCE_MS),
-            });
+            if (supersedesPending(existing, doc, changedNow)) {
+                clearTimeout(existing.timer);
+                pending.delete(key);
+                deliverOutsideAnyRequest(key, existing);
+            }
+            const open = pending.get(key);
+            if (open) {
+                // The window is fixed from its first emit: re-arming here would let a
+                // steady stream of emits hold delivery back indefinitely.
+                open.doc = doc;
+                changedNow.forEach((field) => open.changed.add(field));
+                return;
+            }
+            const entry = { event, companyId, doc, changed: new Set(changedNow) };
+            entry.timer = setTimeout(() => {
+                if (pending.get(key) !== entry) return;
+                pending.delete(key);
+                deliverOutsideAnyRequest(key, entry);
+            }, DEBOUNCE_MS);
+            pending.set(key, entry);
         } catch (error) {
             logger.error(`${LOG_PREFIX} event handling failed: ${error.message}`);
         }
@@ -259,4 +284,5 @@ function start() {
 module.exports = {
     start,
     invalidateCompanyCache,
+    deliverToHook,
 };

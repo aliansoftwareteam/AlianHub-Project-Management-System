@@ -1,36 +1,44 @@
 <template>
-	<div v-if="!underMaintainance">
+	<div>
+		<SkipLink/>
 		<OfflineBanner/>
+		<UpdateReadyNotice/>
 		<DemoBanner/>
-		<template v-if="$route.meta.requiresAuth">
-			<template v-if="logged && (rules && Object.keys(rules).length && companyUserDetail && Object.keys(companyUserDetail).length) && socket">
+		<MaintenanceBanner/>
+		<MaintenanceCard v-if="maintenanceBlocksPage"/>
+		<OfflineStart v-else-if="pageUnavailable"/>
+		<template v-else-if="$route.meta.requiresAuth">
+			<template v-if="shellReady">
                 <!-- Mounted at the root so an incoming call rings wherever the user is,
                      not only when the conversation that called them is on screen. -->
                 <CallOverlay />
-                <HeaderComponent v-if="!$route.meta.hideHeader" @change="changeCompany($event)" @filter="handleFilter"/>
-                <div :style="`height: calc(100dvh - ${$route.meta.hideHeader ? '0' : '46'}px);`" class="billing__history-wrapper style-scroll overflow-auto">
-                    <AdvanceSearchModal
-                        v-if="!$route.meta.preventAdvanceSearch"
-                        headerClasses="border-0"
-                        :modelValue="isAdvanceSearch"
-                        :header="false"
-                        :footer="false"
-                        :showCloseIcon="false"
-                        :className="`advance_search_modal advanced__model-css`"
-                        @removeListners="removeKeyListner"
-                    >
-                        <template #body>
-                            <MainSearchComponent @closeModel="removeKeyListner"/>
-                        </template>
-                    </AdvanceSearchModal>
-                    <router-view/>
-                    <TourCom ref="mainTour"/>
-                    <FirstRunChecklist/>
+                <div class="ah-app">
+                    <GlobalRail v-if="!$route.meta.hideHeader" @change="changeCompany($event)" />
+                    <main class="ah-app__main" id="ah-main">
+                        <CommandPalette v-if="!$route.meta.preventAdvanceSearch" :open="isAdvanceSearch" @close="isAdvanceSearch = false"/>
+                        <QuickCreateTask />
+                        <KeyboardShortcuts />
+                        <TaskTemplateDialogHost />
+                        <AiFieldFillDialog />
+                        <div class="ah-app__view billing__history-wrapper style-scroll">
+                            <AiOffPage v-if="aiGated"/>
+                            <router-view v-else/>
+                        </div>
+                        <TourCom ref="mainTour"/>
+                        <TaskDetailOverlay />
+                        <!-- Handoff 28b surface 4. Mounted here rather than on the AI pages so
+                             the rail's running count is true everywhere, not only after a visit
+                             to /ai. Renders nothing when no one is live. -->
+                        <AgentLiveStrip />
+                    </main>
+                    <MobileTabBar v-if="!$route.meta.hideHeader" />
+                    <ShellPanels v-if="!$route.meta.hideHeader" />
                 </div>
 			</template>
 			<div v-else-if="!companyId?.length && $route.name === 'Create_Company'" class="d-flex align-items-center justify-content-center lds-roller h-100dvh">
 				<router-view/>
 			</div>
+			<OfflineStart v-else-if="away"/>
 			<div v-else class="d-flex align-items-center justify-content-center lds-roller h-100dvh">
 				<img :src="logo" alt="logo" class="position-ab z-index-1 company__logo">
 				<div class="spinner"></div>
@@ -42,25 +50,6 @@
         <template v-if="userId && showReviewModal">
             <ReviewPromptModal/>
         </template>
-        <!-- NOTIFICATION REQUEST MODAL -->
-        <Modal
-            v-if="requestPermission"
-            v-model="requestPermission"
-            :title="$t('Home.Notification_Request')"
-            :cancelButtonText="$t('Home.no')"
-            :acceptButtonText="$t('Home.yes')"
-            :close-on-backdrop="false"
-            :closeIcon="false"
-            className="topAligned"
-            @close="requestPermission = false;showReviewModal=true;"
-            @accept="notificationPermissionRequest(), requestPermission = false;showReviewModal=true;"
-        >
-            <template #body>
-                <div class="d-flex align-items-center flex-column px-2">
-                    {{$t('Home.are_you_sure')}}
-                </div>
-            </template>
-        </Modal>
         <UpgradeProcessModel 
             v-if="openReleaseNoteModel === true" 
             :openReleaseNoteModel="openReleaseNoteModel"
@@ -68,24 +57,29 @@
             @closeReleaseNoteModel="(val) => {openReleaseNoteModel = val}" >
         </UpgradeProcessModel>
 	</div>
-	<div v-else class="d-flex align-items-center justify-content-center w-100vw h-100dvh">
-		<img :src="underMaintainanceImg" alt="underMaintainance">
-	</div>
 </template>
 <script setup>
 // PACKAGES
-import { computed, defineComponent, onMounted, provide, ref, watch, inject} from 'vue'
+import { computed, defineAsyncComponent, defineComponent, onMounted, provide, ref, watch, inject} from 'vue'
 // COMPONENTS
 import TourCom from "@/components/organisms/Tour/TourComponet.vue"
-import FirstRunChecklist from "@/components/molecules/FirstRunChecklist/FirstRunChecklist.vue"
-import HeaderComponent from '@/components/organisms/Header/Header.vue'
+import MaintenanceBanner from "@/views/Settings/Instance/MaintenanceBanner.vue"
+import MaintenanceCard from "@/views/Settings/Instance/MaintenanceCard.vue"
+import { maintenanceOn } from "@/composable/maintenanceState"
+import GlobalRail from '@/components/organisms/Shell/GlobalRail.vue'
+import MobileTabBar from '@/components/organisms/Shell/MobileTabBar.vue'
+import ShellPanels from '@/components/organisms/Shell/ShellPanels.vue'
+import TaskDetailOverlay from '@/components/organisms/TaskDetailOverlay/TaskDetailOverlay.vue'
+import AgentLiveStrip from '@/views/Ai/AgentLiveStrip.vue'
+import '@/components/organisms/Shell/style.css'
 import CallOverlay from '@/components/organisms/CallOverlay/CallOverlay.vue'
-import AdvanceSearchModal from '@/components/atom/Modal/Modal.vue'
-import Modal from "@/components/atom/Modal/Modal.vue"
-import MainSearchComponent from '@/components/molecules/AdvanceSearch/MainComponent.vue'
+import KeyboardShortcuts from '@/components/organisms/KeyboardShortcuts/KeyboardShortcuts.vue'
+import SkipLink from '@/components/atom/SkipLink/SkipLink.vue'
+import { PALETTE_OPEN_EVENT, isPaletteShortcut } from '@/components/molecules/AdvanceSearch/paletteKeys'
+import { recordRouteVisit } from '@/components/molecules/RecentVisits/routeVisits'
 import { useStore } from 'vuex';
 import axios from 'axios'
-import { fcmToken } from '@/composable/commonFunction';
+import { refreshWebPush } from '@/composable/browserNotifications';
 import { useToast } from "vue-toast-notification"
 
 // COMPOSABLES
@@ -97,38 +91,39 @@ const paymentInit = inject("paymentInit");
 // IMAGES
 // import logo from '@/assets/images/png/logo.png'
 const logo = "/api/v1/getlogo?key=logo&type=desktop";
-import underMaintainanceImg from '@/assets/images/under_maintenance.png'
 import { useRoute, useRouter } from 'vue-router';
-import { languageTranslateHelper } from './composable/index';
+import { applyStoredLocale } from '@/locales/main';
+import { warmWorkspaceChunks } from '@/config/warmChunks';
 import {socketHelper} from './composable/socketHelper';
-import { useCustomComposable } from '@/composable';
+import { useFieldDefinitionsSync } from '@/plugins/customFieldView/fieldDefinitionsSync';
+import { useAgentChangeNotice } from '@/views/Ai/agentChangeNotice';
+import { useLiveProjects } from '@/views/Projects/liveProjects';
+import { useLiveLists } from '@/views/Projects/liveLists';
 import { apiRequest,apiRequestWithoutCompnay } from './services';
 import OfflineBanner from '@/components/offline/OfflineBanner.vue';
-import { initOffline } from '@/offline';
+import OfflineStart from '@/components/offline/OfflineStart.vue';
+import UpdateReadyNotice from '@/components/molecules/UpdateReadyNotice/UpdateReadyNotice.vue';
+import { away, initOffline, pageUnavailable } from '@/offline';
+import { dropWorkerRuntimeCaches } from '@/serviceWorker/registration';
 import * as env from '@/config/env';
 import {tabSyncHelper} from '@/utils/tabSyncs.js';
-import Cookies from 'js-cookie'
+import { adoptAccountPrefs } from '@/views/Settings/Language/localePrefs';
+import { followClockPrefs } from '@/utils/clockText';
+import { CommandPalette, QuickCreateTask, TaskTemplateDialogHost, AiFieldFillDialog } from '@/config/shellParts';
+const AiOffPage = defineAsyncComponent(() => import(/* webpackChunkName: "ai" */ '@/views/Ai/AiOffPage.vue'));
+import { aiAvailability, loadAiAvailability, trackAiPlan } from '@/composable/aiAvailability';
+import { AI_GATE, aiGateFor } from '@/router/ai/gate';
+import { opensWithoutWorkspace } from '@/router/withoutWorkspace';
 const {tabSync} = tabSyncHelper();
 const mainTour = ref();
 
-// COMPONENT
 defineComponent({
-    name: 'App',
-
-	components: {
-        HeaderComponent,
-        AdvanceSearchModal
-	}
+    name: 'App'
 })
 
-const {selectedLanguageCode, changeLanguage} = languageTranslateHelper();
-const { locale, setLocaleMessage } = useI18n();
-const { checkPermission } = useCustomComposable();
 
 const companyId = ref(localStorage.getItem('selectedCompany') !== null ? localStorage.getItem('selectedCompany') : "")
-const underMaintainance = ref(false);
 const logged = ref(false);
-const requestPermission = ref(false);
 const showReviewModal = ref(false);
 const showSpinner = ref(true);
 const clientWidth = ref(document.documentElement.clientWidth);
@@ -140,15 +135,27 @@ const isAdvanceSearch = ref(false);
 const openReleaseNoteModel = ref(false);
 const defaultImageUser = require("@/assets/images/default_user.png")
 const socket = ref(null);
+// The shell waits for the connect attempt to settle, not for it to succeed — live updates
+// are a transport, and the data behind this UI arrives over HTTP either way.
+const socketSettled = ref(false);
 const defaultTaskStatus = require("@/assets/images/defaut_task_status_img.png");
 const defaultGhostCustomUser = `${env.API_URI}/api/v1/getlogo?key=ghostuser`;
 
 const rules = ref({});
-const projectList = computed(() => checkPermission('project.project_list'));
-const taskList = computed(() => checkPermission('task.task_list'));
-const currentCompany = computed(() => getters["settings/selectedCompany"]);
 const {connectServer} = socketHelper();
 const currentUser = computed(() => getters["users/currentUser"]);
+const currentCompany = computed(() => getters["settings/selectedCompany"]);
+const aiGated = computed(() => aiGateFor(route.name, aiAvailability.state) === AI_GATE.PAGE);
+
+watch(() => [logged.value, currentCompany.value?._id], ([isLogged, cid]) => {
+    if (isLogged && cid) loadAiAvailability(cid);
+}, { immediate: true });
+
+watch(() => currentCompany.value?.planFeature, trackAiPlan, { immediate: true, deep: true });
+
+watch(() => [currentUser.value?.Time_Format, getters['settings/companyDateFormat']?.dateFormat], ([timeFormat, dateFormat]) => {
+    followClockPrefs({ timeFormat, dateFormat });
+}, { immediate: true });
 
 watch(() => currentUser.value, (val) => {
     if(val?.isVesionUpdate){
@@ -157,25 +164,26 @@ watch(() => currentUser.value, (val) => {
 })
 
 
-watch(() => projectList.value, (val) => {
-    projectList.value = val;
-})
-watch(() => taskList.value, (val) => {
-    taskList.value = val;
-})
 watch(() => getters['settings/rules'], (val) => {
 	rules.value = val;
 })
+// A mail's link opens with no workspace; from any other page a person without one is sent to name it.
+const askForWorkspace = async () => {
+    await router.isReady().catch(() => {});
+    if (!opensWithoutWorkspace(router.currentRoute.value)) router.push({name : 'Create_Company'});
+};
+
 watch(route, (newVal) => {
-	const token = Cookies.get('accessToken') || '';
+	const hasSession = !!localStorage.getItem("userId");
+    if(opensWithoutWorkspace(newVal)) return;
     if(newVal?.name === 'Support'){
-        if(token && !companyId.value){
+        if(hasSession && !companyId.value){
             return router.push({name : 'Create_Company'});
         }
         return;
     } else if(newVal.params.cid && newVal.params.cid !== companyId.value){
         changeCompany(newVal.params.cid);
-    } else if(!companyId.value && token){
+    } else if(!companyId.value && hasSession){
         router.push({name : 'Create_Company'});
     }
 })
@@ -193,7 +201,7 @@ function checkUserCompany (uid,forDisable = false) {
                         localStorage.removeItem("selectedCompany");
                         commit("settings/mutateSelectedCompany", companyId.value);
                         companyId.value = '';
-                        router.push('/business');
+                        askForWorkspace();
                         return;
                     }else{
                         if(forDisable){
@@ -242,6 +250,16 @@ watch(() => getters['settings/companyUserDetail'], async(val) => {
 	companyUserDetail.value = val;
 })
 
+const shellReady = computed(() => Boolean(logged.value && rules.value && Object.keys(rules.value).length && companyUserDetail.value && Object.keys(companyUserDetail.value).length && socketSettled.value));
+// A page that loaded before maintenance began keeps its content under the banner; one whose boot calls were refused would otherwise stay blank or spin forever.
+const maintenanceBlocksPage = computed(() => maintenanceOn.value && (route.meta.requiresAuth ? !shellReady.value : !route.matched.length));
+
+watch(shellReady, (ready) => { if (ready) warmWorkspaceChunks(); }, { immediate: true });
+
+watch(() => [route.fullPath, shellReady.value, companyId.value], () => {
+	if (shellReady.value && route.params.cid && route.params.cid === companyId.value) recordRouteVisit(route);
+}, { immediate: true });
+
 watch(() => getters['settings/selectedCompany'], async(val) => {
     if(val.isDisable === true){
         await checkUserCompany(userId.value,true).then((response) => {
@@ -285,11 +303,19 @@ async function getFirebaseData() {
                     userData = userResult.data;
                 }
 
-                if(userData.languageCode){
-                    localStorage.setItem('language', userData.languageCode);
-                    const updateLanguage = await changeLanguage(userData.languageCode);
-                    locale.value = userData.languageCode;
-                    setLocaleMessage(userData.languageCode, updateLanguage || "en");
+                // Without the profile, an upload could overwrite an account copy we never read.
+                const { language, upload } = userData._id ? adoptAccountPrefs(userData) : {};
+                if(language){
+                    localStorage.setItem('language', language);
+                    await applyStoredLocale();
+                }
+                if(upload){
+                    apiRequestWithoutCompnay("put", env.USER_UPATE, {
+                        userId: userId.value,
+                        updateObject: { $set: { localePreferences: upload } }
+                    }).catch((error) => {
+                        console.error("ERROR in saving locale preferences: ", error);
+                    });
                 }
 
                 await dispatch('settings/setCompanies', userData?.AssignCompany)
@@ -304,11 +330,11 @@ async function getFirebaseData() {
                         if(findCompany.length > 0){
                             await changeCompany(findCompany[0]._id)
                         }else{
-                            router.push('/business');
+                            askForWorkspace();
                         }
                     }
                 }else{
-                    router.push('/business');
+                    askForWorkspace();
                 }
 
 
@@ -324,13 +350,6 @@ async function getFirebaseData() {
                     logged.value = true;
                     console.error("ERROR in setUsers: ", error);
                 }); 
-                if (getters['ToursData/Tours'] && !(getters['ToursData/Tours'])?.length) {
-                      dispatch('ToursData/getTours',userData.tour)
-                         .catch((error) => {
-                         console.error('ERROR in getTours:', error);
-                         });
-                      } 
-
 
                 if(getters['settings/rules'] && !getters['settings/rules'].length) {
                     dispatch("settings/setRules", companyId.value).then(() => {
@@ -373,6 +392,12 @@ async function getFirebaseData() {
                             dispatch('settings/setCompanyUsers', {companyName: companyId.value, userId: userId.value}).then(async()=>{
                                     if (userId.value !== null && companyId.value) {
                                         handleSocketsConnection();
+                                        // The legacy dashboard used to load this on mount; the new
+                                        // shell lands on Home, which only reads the store.
+                                        if (!getters['projectData/allProjects']?.data?.length) {
+                                            dispatch('projectData/setProjects', { roleType: getters['settings/companyUserDetail']?.roleType, uid: userId.value })
+                                                .catch((error) => console.error('setProjects', error));
+                                        }
                                         if (process.env.VUE_APP_AFFILIATEON == 'true') {
                                             dispatch('settings/setCompanyRefferal',companyId.value).catch((error)=>{
                                                 console.error(error);
@@ -490,18 +515,8 @@ async function getFirebaseData() {
                     })
                 }
 
-                if ('Notification' in window) {
-                    if(Notification.permission === "default") {
-                        requestPermission.value = true;
-                    } else if(Notification.permission === "granted") {
-                        generateFcmToken();
-                        showReviewModal.value = true;
-                    } else {
-                        showReviewModal.value = true;
-                    }
-                } else {
-                    showReviewModal.value = true;
-                }
+                refreshWebPush(userId.value);
+                showReviewModal.value = true;
             }
         } else {
             logged.value = false;
@@ -512,28 +527,15 @@ async function getFirebaseData() {
 }
 async function changeCompany(cid) {
     try {
+        dropWorkerRuntimeCaches();
         const uid = userId.value || localStorage.getItem("userId");
         const companyDetail = getters['settings/companies'].find((x) => x._id === cid)
-		const token = Cookies.get('accessToken') || '';
-        if(!companyDetail && !getters['settings/companies'].length && token){
+        if(!companyDetail && !getters['settings/companies'].length && uid){
             router.push({name : 'Create_Company'});
             return;
         }
         let checkCompany = companyDetail?.isDisable || false;
         const userDataRes = await apiRequest('get',`${env.USER_UPATE}/${uid}`);
-        if(uid){
-            const updateObject = {
-                $set: {
-                    'lastSelectedCompany': cid
-                }
-            }
-            apiRequestWithoutCompnay("put",env.USER_UPATE,{
-                userId: uid,
-                updateObject : updateObject
-            }).catch((error)=>{
-                console.error(error);
-            });
-        }
         let userData = {}
         if(userDataRes.status === 200){
             userData = userDataRes.data;
@@ -543,6 +545,14 @@ async function changeCompany(cid) {
             let routeObj = {name: route.name, params: {cid: companyId.value}};
             router.replace(routeObj);
             return;
+        }
+        if(uid){
+            apiRequestWithoutCompnay("put",env.USER_UPATE,{
+                userId: uid,
+                updateObject : { $set: { lastSelectedCompany: cid } }
+            }).catch((error)=>{
+                console.error(error);
+            });
         }
         if(checkCompany === false){
             companyId.value = cid;
@@ -557,7 +567,7 @@ async function changeCompany(cid) {
             router.replace(routeObj)
             .then(async() => {
                 try {
-                    await apiRequest("post",env.CACHECLEAR,{cacheKey: `UserProjectData:${uid}`});
+                    await apiRequest("post",env.CACHECLEAR,{cacheKey: `UserProjectData:${cid}:${uid}`});
                     await apiRequest("post",env.CACHECLEAR,{cacheKey: `dashboard_${uid}`});
                 } catch (error) {
                     console.error("Error in cacheClear",error);
@@ -583,134 +593,12 @@ async function changeCompany(cid) {
 const handleFilter = () => {
     isAdvanceSearch.value = true;
 }
-// This function is used for the handle advance search modal key press event
-const _keyListener = (e) => {
-    if (e.key === "k" && (e.ctrlKey)) {
-        if(checkPermission('task.advance_search') !== true) {
-            return;
-        }
-        if(!currentCompany.value?.planFeature?.advanceFilterCtrlK) {
-            $toast.error(t('Toast.advance_search_feature_upgrade_message'),{position: 'top-right'});
-        }
-        else if(taskList.value !== null && projectList.value !== null && currentCompany.value?.planFeature?.advanceFilterCtrlK){
-            e.preventDefault();
-            isAdvanceSearch.value = true;
-        }
-        else{
-            $toast.error(t("Toast.Access_Denied"),{position: 'top-right'});
-        }
-    }
-    if(e.key === "Escape"){
-        isAdvanceSearch.value = false;
-    }
+const onPaletteKey = (e) => {
+    if (!logged.value || !route.meta.requiresAuth || route.meta.preventAdvanceSearch || !isPaletteShortcut(e)) return;
+    e.preventDefault();
+    isAdvanceSearch.value = !isAdvanceSearch.value;
 }
 
-// This function is used for the remove event listners for the advance search modal on modal close
-const removeKeyListner = () => {
-  isAdvanceSearch.value = false;
-  document.removeEventListener('keydown', _keyListener);
-  document.addEventListener('keydown', _keyListener);
-}
-
-function notificationPermissionRequest() {
-    if ('Notification' in window) {
-        if (Notification.permission === 'granted') {
-            generateFcmToken();
-        } else if (Notification.permission === 'denied') {
-            generateFcmToken(true);
-        } else {
-            Notification.requestPermission()
-            .then(permission => {
-                if (permission === 'granted') {
-                    generateFcmToken();
-                } else {
-                    generateFcmToken(true);
-                }
-            })
-            .catch(error => {
-                console.error('Error occurred while requesting notification permission:', error);
-            });
-        }
-    } else {
-        $toast.error(t("Toast.notification_permission"),{position: 'top-right'});
-        // generateFcmToken();
-    }
-}
-
-function generateFcmToken(type=false) {
-    try{
-        if(type == false) {
-            const userData = apiRequestWithoutCompnay('get',`${env.USER_UPATE}/${userId.value}`)
-            userData.then((user) => {
-                if(user.status !== 200 || !user.data) {
-                    return;
-                }
-                fcmToken().then((result) => {
-                    if(result.status && result.token !== '') {
-                        if(localStorage.getItem('webTokens') == null) {
-                            const updateObject = {
-                                webToken: result.token
-                            }
-                            apiRequestWithoutCompnay("put",env.UPDATE_SESSION,{
-                                userId: userId.value,
-                                updateObject:updateObject
-                            }).then(()=>{
-                                localStorage.setItem('webTokens',result.token);
-                            }).catch((err)=>{
-                                console.error("ERROR: ", err);
-                            });
-                        } else if((localStorage.getItem('webTokens') && localStorage.getItem('webTokens') !== result.token)) {
-                            let token = localStorage.getItem('webTokens');
-                            if(token) {
-                                const updateObject = {
-                                    webToken: result.token
-                                };
-                                apiRequestWithoutCompnay("put",env.UPDATE_SESSION,{
-                                    userId: userId.value,
-                                    updateObject:updateObject
-                                }).then(()=>{
-                                    localStorage.setItem('webTokens',result.token);
-                                }).catch((err)=>{
-                                    console.error("ERROR: ", err);
-                                });
-                            }
-                        }
-                    }
-                })
-            })
-        } 
-        else {
-            let token = localStorage.getItem('webTokens');
-            if(token) {
-                const updateObject = {
-                    webToken: ""
-                };
-                apiRequestWithoutCompnay("put",env.UPDATE_SESSION,{
-                    userId: userId.value,
-                    updateObject:updateObject
-                }).then(()=>{
-                    localStorage.removeItem('webTokens',token);
-                }).catch((err)=>{
-                    console.error("ERROR: ", err);
-                });
-            }
-        }
-    } catch(e) {
-        console.error(e);
-    }
-}
-
-watch(underMaintainance, (newVal, oldVal) => {
-	if(newVal !== oldVal && newVal === false)  {
-		window.location.reload();
-	}
-})
-
-const changeLanguageHandler = async () => {
-    const updateLanguage = await changeLanguage(selectedLanguageCode.value);
-    locale.value = selectedLanguageCode.value;
-    setLocaleMessage(selectedLanguageCode.value, updateLanguage || "en");
-}
 
 const handleSocketsConnection = async () => {
     try {
@@ -726,8 +614,17 @@ const handleSocketsConnection = async () => {
         });
         const serverURL = env.API_URI;
         const namespace = `userid_${companyId.value}_${userId.value}`;
-        socket.value = await connectServer(serverURL,namespace,{userRole: getters['settings/companyUserDetail'].roleType});
-        commit("settings/mutateSocketInstance", socket.value);
+        // A failed connect must not abort the rest of this function: the visibilitychange
+        // listener registered below is the only in-session path back to a live socket.
+        try {
+            socket.value = await connectServer(serverURL,namespace,{userRole: getters['settings/companyUserDetail'].roleType});
+        } catch (error) {
+            console.error("ERROR in socket connect: ", error);
+        } finally {
+            socketSettled.value = true;
+        }
+        // socketInstanceWatcher (store/index.js) calls Object.keys on this on every mutation.
+        if (socket.value) commit("settings/mutateSocketInstance", socket.value);
         dispatch("users/myCounts", {uid: userId.value})
         .catch((error) => {
             console.error("ERROR in myCounts: ", error);
@@ -737,49 +634,59 @@ const handleSocketsConnection = async () => {
             console.error("ERROR in set socket company: ", error);
         });
         window.addEventListener("beforeunload", () => {
-            socket.value.emit('disconnectNameSpace',socket.value.id);
+            socket.value?.emit('disconnectNameSpace',socket.value.id);
         });
         let debounceTimeout;
         document.addEventListener('visibilitychange', async () => {
             clearTimeout(debounceTimeout);
             debounceTimeout = setTimeout(async () => {
                 if (document.hidden) {
-                    socket.value.emit('getRoomList', socket.value.id, (rooms) => {
+                    socket.value?.emit('getRoomList', socket.value.id, (rooms) => {
                         sessionStorage.setItem('joinedRooms', JSON.stringify(rooms));
                     });
                     const timeStamp = await apiRequestWithoutCompnay("get", `/api/v1/getTime?zone=${Intl.DateTimeFormat().resolvedOptions().timeZone}`);
-                    sessionStorage.setItem('tableaveTime',new Date(timeStamp.data).getTime());
-                    socket.value.emit('disconnectNameSpace',socket.value.id);
+                    sessionStorage.setItem('tableaveTime',new Date(timeStamp.data.data).getTime());
+                    socket.value?.emit('disconnectNameSpace',socket.value.id);
                 } else {
                     if (userId.value !== null && companyId.value) {
-                        socket.value = await connectServer(serverURL,namespace,{userRole: getters['settings/companyUserDetail'].roleType});
-                        commit("settings/mutateSocketInstance", socket.value);
-                        dispatch("users/myCounts", {uid: userId.value})
+                        // Keep the socket we already have if the retry fails, rather than
+                        // trading a working connection for null.
+                        const nextSocket = await connectServer(serverURL,namespace,{userRole: getters['settings/companyUserDetail'].roleType})
                         .catch((error) => {
-                            console.error("ERROR in myCounts: ", error);
+                            console.error("ERROR in socket reconnect: ", error);
+                            return null;
                         });
-                        dispatch("settings/setSocketCompanies", {companyId: companyId.value})
-                        .catch((error) => {
-                            console.error("ERROR in set socket company: ", error);
-                        });
-                        tabSync();
+                        if (nextSocket) {
+                            socket.value = nextSocket;
+                            commit("settings/mutateSocketInstance", nextSocket);
+                            dispatch("users/myCounts", {uid: userId.value})
+                            .catch((error) => {
+                                console.error("ERROR in myCounts: ", error);
+                            });
+                            dispatch("settings/setSocketCompanies", {companyId: companyId.value})
+                            .catch((error) => {
+                                console.error("ERROR in set socket company: ", error);
+                            });
+                            tabSync();
+                        }
                     }
                 }
             },1000)
         });
     } catch (error) {
         console.error(error);
+        socketSettled.value = true;
     }
 }
 
 onMounted(() => {
-    changeLanguageHandler()
     localStorage.removeItem('ForgotEmail');
     if(getters['brandSettingTab/brandSettings'] && !(getters['brandSettingTab/brandSettings']).length){
         dispatch('brandSettingTab/setBrandSettings').catch((error) =>{
             console.error('ERROR in set Set Brand Settings',error)
         })
     }
+    dispatch('brandSettingTab/setPublicConfig');
     getFirebaseData();
     initOffline();
     userId.value = localStorage.getItem("userId") !== null ? localStorage.getItem("userId") :  '';
@@ -791,7 +698,8 @@ onMounted(() => {
 	window.onresize = (e) => {
 		clientWidth.value = e.target.innerWidth;
 	}
-	document.addEventListener('keydown', _keyListener);
+	document.addEventListener('keydown', onPaletteKey);
+	window.addEventListener(PALETTE_OPEN_EVENT, handleFilter);
 })
 
 const urlRegex = ref(/(https?|ftp):\/\/[^\s/$.?#].[^\s]*/g)
@@ -811,12 +719,15 @@ provide("$defaultGhostCustomUserImg", defaultGhostCustomUser);
 provide("$currentLoggedInUserDetails", '');
 provide("$mainTour", mainTour);
 provide("$socket",socket);
+useFieldDefinitionsSync(socket);
+useAgentChangeNotice(socket, companyId);
+useLiveProjects(socket, companyId);
+useLiveLists(socket, companyId);
 
 </script>
 
 <style>
 #app {
-  font-family: 'Roboto', sans-serif;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
   color: #2c3e50;
@@ -826,28 +737,10 @@ body {
   margin: 0px;
 }
 
-nav {
-  padding: 30px;
-}
-
-nav a {
-  font-weight: bold;
-  color: #2c3e50;
-}
-
-nav a.router-link-exact-active {
-  color: #42b983;
-}
 .company__logo{
     width: 150px; 
     height: 150px; 
     border: 2px solid #2F399035;
     border-radius: 50%;
-}
-.advanced__model-css{
-    width:100%; 
-    height:100%; 
-    max-width: 100%!important; 
-    border-radius:0!important;
 }
 </style>

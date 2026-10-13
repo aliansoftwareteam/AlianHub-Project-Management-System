@@ -5,13 +5,13 @@
                 <AudioComp :audioSrc="audioObject" :key="audioObject.id"/>
             </div>
             <div class="d-flex audio_files-wave justify-content-between w-100">
-                <span v-if="audioObject.getFrom == 'comments'" class="text-ellipsis" :title="audioObject.fileName"><a :href='audioObject.attached' target=”_blank” class="font-size-14 font-weight-500 text-decoration-none w-100 d-inline-block text-ellipsis black pr-5px">{{audioObject.fileName}}</a></span>
-                <span class="text-ellipsis" v-else><a href='javascript:void(0)' :title="audioObject.fileName" class="font-size-14 font-weight-500 text-ellipsis text-decoration-none w-100 d-inline-block black pr-5px">{{audioObject.fileName}}</a></span>
-                <span class="font-size-14 font-weight-500 gray81">{{audioObject.size}}</span>
+                <span v-if="audioObject.getFrom == 'comments'" class="text-ellipsis" :title="audioObject.fileName"><a :href='audioObject.attached' target=”_blank” class="audio-file-comp-font-size-14 audio-file-comp-font-weight-500 text-decoration-none w-100 d-inline-block text-ellipsis audio-file-comp-black pr-5px">{{audioObject.fileName}}</a></span>
+                <span class="text-ellipsis" v-else><a href='javascript:void(0)' :title="audioObject.fileName" class="audio-file-comp-font-size-14 audio-file-comp-font-weight-500 text-ellipsis text-decoration-none w-100 d-inline-block audio-file-comp-black pr-5px">{{audioObject.fileName}}</a></span>
+                <span class="audio-file-comp-font-size-14 audio-file-comp-font-weight-500 audio-file-comp-gray81">{{audioObject.size}}</span>
             </div>
             <div class="d-flex align-items-end justify-content-between w-100 pb-2px">
-                <h4 class="font-size-14 font-weight-500 m-0 gray81">{{audioObject.userDetail.Employee_Name}}</h4>
-                <span class="font-size-13 gray81 font-weight-400">{{getDateAndTime(audioObject.createTime)}}</span>
+                <h4 class="audio-file-comp-font-size-14 audio-file-comp-font-weight-500 m-0 audio-file-comp-gray81">{{audioObject.userDetail.Employee_Name}}</h4>
+                <span class="audio-file-comp-font-size-13 audio-file-comp-gray81 audio-file-comp-font-weight-400">{{getDateAndTime(audioObject.createTime)}}</span>
             </div>
         </div>
     </li>
@@ -28,6 +28,27 @@ defineProps({
     },
 })
 </script>
+<style scoped>
+.audio-file-comp-font-size-13 {
+    font-size: 13px;
+}
+.audio-file-comp-font-size-14 {
+    font-size: 14px;
+}
+.audio-file-comp-font-weight-400 {
+    font-weight: 400 !important;
+}
+.audio-file-comp-font-weight-500 {
+    font-weight: 500 !important;
+}
+.audio-file-comp-gray81 {
+    color: var(--ink-2);
+}
+.audio-file-comp-black {
+    color: var(--ink);
+}
+</style>
+
 <style scoped>
 .list-style-none{
     list-style: none;

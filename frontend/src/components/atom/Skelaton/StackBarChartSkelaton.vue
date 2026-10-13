@@ -32,7 +32,7 @@ defineComponent({
 .skeleton-bar {
     width: 100%;
     height: 60px;
-    background: linear-gradient(90deg, #f0f0f0 25%, #e0e0e0 50%, #f0f0f0 75%);
+    background: linear-gradient(90deg, var(--fill) 25%, var(--track) 50%, var(--fill) 75%);
     background-size: 200% 100%;
     animation: loading 1.5s infinite ease-in-out;
     border-radius: 4px;
@@ -50,7 +50,7 @@ defineComponent({
     width: 80px;
     height: 14px;
     border-radius: 5px;
-    background: linear-gradient(90deg, #f0f0f0 25%, #e0e0e0 50%, #f0f0f0 75%);
+    background: linear-gradient(90deg, var(--fill) 25%, var(--track) 50%, var(--fill) 75%);
     background-size: 400% 400%;
     animation: loading 1.5s infinite ease-in-out;
 }

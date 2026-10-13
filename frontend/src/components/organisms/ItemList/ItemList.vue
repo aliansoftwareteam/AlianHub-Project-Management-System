@@ -30,7 +30,7 @@
                                     :addUser="false"
                                     class="mr-5px"
                                 />
-                                <h5 v-if="clientWidth > 767" class="text-ellipse item-title font-size-14" :style="`color: ${item.textColor ? item.textColor : '#3a3a3a'}; background-color: ${item.backColor ? item.backColor : 'transparent'};`">
+                                <h5 v-if="clientWidth > 767" class="text-ellipse item-title item-list-font-size-14" :style="`color: ${item.textColor ? item.textColor : '#3a3a3a'}; background-color: ${item.backColor ? item.backColor : 'transparent'};`">
                                     <span v-for="(user, userIndex) in item.users" :key="userIndex">
                                         {{userIndex !== 0 ? ", " : "" }}{{user.Employee_Name}}
                                     </span>
@@ -41,16 +41,16 @@
                                 <h5 class="text-ellipse item-title" :style="`color: ${item.textColor ? item.textColor : '#818181'}; background-color: ${item.backColor ? item.backColor : 'transparent'}; margin-left: 5px;`">{{$t('general.unassigned')}}</h5>
                             </div>
                             <!-- <span>{{getTaskCount(item)}} Tasks</span> -->
-                            <span class="font-size-14 ml-6px dark-gray">{{searchedTask ? filteredTasksGetter.length : tasksFound}} {{$t('Projects.tasks')}}<template v-if="pointsTotal"> · {{pointsTotal}} pts</template></span>
+                            <span class="item-list-font-size-14 ml-6px item-list-dark-gray">{{searchedTask ? filteredTasksGetter.length : tasksFound}} {{$t('Projects.tasks')}}<template v-if="pointsTotal"> · {{ $t('Projects.points_total', { n: pointsTotal }) }}</template></span>
                         </template>
                         <template v-else>
                             <img src="@/assets/images/svg/triangleBlack.svg" alt="traingle" class="mr-5px" :style="`transform: rotateZ(${item.isExpanded ? 90 : 0}deg); width: 6px;`">
-                            <span class="text-ellipse status-sprint font-weight-500 d-flex align-items-center" :style="`color: ${item.textColor ? item.textColor : ''}; background-color: ${item.bgColor ? item.bgColor : 'transparent'}`">
+                            <span class="text-ellipse status-sprint item-list-font-weight-500 d-flex align-items-center" :style="`color: ${item.textColor ? item.textColor : ''}; background-color: ${item.bgColor ? item.bgColor : 'transparent'}`">
                                 <WasabiImage v-if="item.image" :data="{url: item.image, title: item.name}" class="mr-5px"/>
                                 {{item.name}}
                             </span>
                             <!-- <span>{{getTaskCount(item)}} Tasks</span> -->
-                            <span class="dark-gray font-size-13 font-weight-400 ml-6px tasks__title">{{searchedTask ? filteredTasksGetter.length : tasksFound}} {{$t('Projects.tasks')}}<template v-if="pointsTotal"> · {{pointsTotal}} pts</template></span>
+                            <span class="item-list-dark-gray item-list-font-size-13 item-list-font-weight-400 ml-6px tasks__title">{{searchedTask ? filteredTasksGetter.length : tasksFound}} {{$t('Projects.tasks')}}<template v-if="pointsTotal"> · {{ $t('Projects.points_total', { n: pointsTotal }) }}</template></span>
                         </template>
                     </div>
                 </div>
@@ -60,7 +60,7 @@
                             <template #item="{element: head}">
                                 <span
                                     :title="head.label"
-                                    class="task_right dark-gray font-weight-500 font-size-12 text-ellipse"
+                                    class="task_right item-list-dark-gray item-list-font-weight-500 item-list-font-size-12 text-ellipse"
                                     :class="{
                                         'item-head-draggable-div' : false,
                                         'custom__field_list_view':head.key !== 'AssigneeUserId' && head.key !== 'commentCounts' && head.key !== 'DueDate' && head.key !== 'Task_Priority' && head.key !== 'TaskKey' && head.key !== 'created_date' && head.key !== 'created_by'
@@ -74,27 +74,29 @@
                             </template>
                         </draggable>
                         <span class="span_wrapper task_right cursor-pointer custom_sticky" v-if="!projectData?.deletedStatusKey && checkPermission('task.list_view_column',project?.isGlobalPermission) == true">
-                            <DropDown>
+                            <DropDown mode="listbox" multiselectable v-if="props.statusIndex === 0">
                                 <template #button>
-                                    <img :src="addCustomField" :alt="addCustomField" v-if="props.statusIndex === 0" />
+                                    <img :src="addCustomField" :alt="$t('ProjectDetails.show_hide_columns')" />
+                                </template>
+                                <template #search>
+                                    <div class="d-flex align-items-center text-nowrap drop-down-item item-list-gray81 p-7px" :class="clientWidth <= 767 ? 'item-list-bg-gray91 border-radius-8-px' : 'border-radius-4-px'">
+                                        <input type="text" class="customfield__form-control" :placeHolder="$t('PlaceHolder.search')" v-model="search" @input="handleInput">
+                                    </div>
                                 </template>
                                 <template #options>
-                                    <DropDownOption>
-                                        <input type="text" class="customfield__form-control" :placeHolder="$t('PlaceHolder.search')" v-model="search" @input="handleInput">
-                                    </DropDownOption>
-                                    <DropDownOption v-if="checkPermission('task.task_custom_field',project?.isGlobalPermission) !== null && checkApps('CustomFields') && isCustomFields()">
-                                        <span class="font-weight-500 line-height-19 font-roboto-sans blue" @click="isCustomField = true">+ {{$t('CustomField.custom_field')}}</span>
+                                    <DropDownOption v-if="checkPermission('task.task_custom_field',project?.isGlobalPermission) !== null && checkApps('CustomFields') && isCustomFields()" @click="isCustomField = true">
+                                        <span class="item-list-font-weight-500 item-list-line-height-19 font-ui item-list-blue">+ {{$t('CustomField.custom_field')}}</span>
                                     </DropDownOption>
                                     <template v-if="headerHideShow && headerHideShow.length">
                                         <DropDownOption
                                             v-for="(obj, index) in headerHideShow.filter((head)=> (head.funcPermission ? checkPermission(head.funcPermission,projectData.isGlobalPermission) !== null : true ) && (head.appPermission ? checkApps(head.appPermission) : true ))"
                                             :key="index"
+                                            :selected="Boolean(obj.show)"
+                                            @click="obj.show = !obj.show, toggleButton(obj.show,obj.key,obj)"
                                         >
                                             <div class="d-flex align-items-center justify-content-between w-100">
-                                                <span class="font-weight-400 line-height-19 font-roboto-sans">
+                                                <span class="item-list-font-weight-400 item-list-line-height-19 font-ui">
                                                     {{ obj.label }}
-                                                    <!--option DropDown Name-->
-
                                                 </span>
                                                 <span>
                                                     <Toggle
@@ -210,7 +212,7 @@
                                 :addUser="false"
                                 class="mr-5px"
                             />
-                            <h5 v-if="clientWidth > 767" class="text-ellipse item-title font-size-14" :style="`color: ${item.textColor ? item.textColor : '#3a3a3a'}; background-color: ${item.backColor ? item.backColor : 'transparent'};`">
+                            <h5 v-if="clientWidth > 767" class="text-ellipse item-title item-list-font-size-14" :style="`color: ${item.textColor ? item.textColor : '#3a3a3a'}; background-color: ${item.backColor ? item.backColor : 'transparent'};`">
                                 <span v-for="(user, userIndex) in item.users" :key="userIndex">
                                     {{userIndex !== 0 ? ", " : "" }}{{user.Employee_Name}}
                                 </span>
@@ -221,16 +223,16 @@
                             <h5 class="text-ellipse item-title" :style="`color: ${item.textColor ? item.textColor : '#818181'}; background-color: ${item.backColor ? item.backColor : 'transparent'}; margin-left: 5px;`">{{$t('general.unassigned')}}</h5>
                         </div>
                         <!-- <span>{{getTaskCount(item)}} Tasks</span> -->
-                        <span class="font-size-14 ml-6px dark-gray">{{searchedTask ? filteredTasksGetter.length : tasksFound}} {{$t('Notification.tasks')}}</span>
+                        <span class="item-list-font-size-14 ml-6px item-list-dark-gray">{{searchedTask ? filteredTasksGetter.length : tasksFound}} {{$t('Notification.tasks')}}</span>
                     </template>
                     <template v-else>
                         <img src="@/assets/images/svg/triangleBlack.svg" alt="traingle" class="mr-5px" :style="`transform: rotateZ(${item.isExpanded ? 90 : 0}deg); width: 6px;`">
-                        <span class="text-ellipse status-sprint font-weight-500" :style="`color: ${item.textColor ? item.textColor : ''}; background-color: ${item.bgColor ? item.bgColor : 'transparent'}`">
+                        <span class="text-ellipse status-sprint item-list-font-weight-500" :style="`color: ${item.textColor ? item.textColor : ''}; background-color: ${item.bgColor ? item.bgColor : 'transparent'}`">
                             <WasabiImage v-if="item.image" :data="{url: item.image, title: item.name}" class="mr-5px"/>
                             {{item.name}}
                         </span>
                         <!-- <span>{{getTaskCount(item)}} Tasks</span> -->
-                        <span class="dark-gray font-size-13 font-weight-400 ml-6px tasks__title">{{searchedTask ? filteredTasksGetter.length : tasksFound}} {{$t('Notification.tasks')}}</span>
+                        <span class="item-list-dark-gray item-list-font-size-13 item-list-font-weight-400 ml-6px tasks__title">{{searchedTask ? filteredTasksGetter.length : tasksFound}} {{$t('Notification.tasks')}}</span>
                     </template>
                 </div>
             </div>
@@ -240,7 +242,7 @@
                         <template #item="{element: head}">
                             <span
                                 :title="head.label"
-                                class="task_right dark-gray font-weight-500 font-size-12 text-ellipse"
+                                class="task_right item-list-dark-gray item-list-font-weight-500 item-list-font-size-12 text-ellipse"
                                 :class="{
                                     'item-head-draggable-div' : false,
                                     'custom__field_list_view':head.key !== 'AssigneeUserId' && head.key !== 'commentCounts' && head.key !== 'DueDate' && head.key !== 'Task_Priority' && head.key !== 'TaskKey' && head.key !== 'created_date' && head.key !== 'created_by'
@@ -252,24 +254,28 @@
                         </template>
                     </draggable>
                     <span class="span_wrapper task_right cursor-pointer" v-if="!projectData?.deletedStatusKey && checkPermission('task.list_view_column',project?.isGlobalPermission) == true">
-                        <DropDown>
+                        <DropDown mode="listbox" multiselectable v-if="props.statusIndex === 0">
                             <template #button>
-                                <img :src="addCustomField" :alt="addCustomField" v-if="props.statusIndex === 0" />
+                                <img :src="addCustomField" :alt="$t('ProjectDetails.show_hide_columns')" />
+                            </template>
+                            <template #search>
+                                <div class="d-flex align-items-center text-nowrap drop-down-item item-list-gray81 p-7px" :class="clientWidth <= 767 ? 'item-list-bg-gray91 border-radius-8-px' : 'border-radius-4-px'">
+                                    <input type="text" class="customfield__form-control" :placeholder="$t('PlaceHolder.search')" v-model="search" @input="handleInput">
+                                </div>
                             </template>
                             <template #options>
-                                <DropDownOption>
-                                    <input type="text" class="customfield__form-control" placeholder="search" v-model="search" @input="handleInput">
-                                </DropDownOption>
-                                <DropDownOption v-if="checkPermission('task.task_custom_field',project?.isGlobalPermission) !== null && checkApps('CustomFields')">
-                                    <span class="font-weight-500 line-height-19 font-roboto-sans blue" @click="isCustomField = true">+ {{$t('CustomField.custom_field')}}</span>
+                                <DropDownOption v-if="checkPermission('task.task_custom_field',project?.isGlobalPermission) !== null && checkApps('CustomFields')" @click="isCustomField = true">
+                                    <span class="item-list-font-weight-500 item-list-line-height-19 font-ui item-list-blue">+ {{$t('CustomField.custom_field')}}</span>
                                 </DropDownOption>
                                 <template v-if="headerHideShow && headerHideShow.length">
                                     <DropDownOption
                                         v-for="(obj, index) in headerHideShow.filter((head)=> (head.funcPermission ? checkPermission(head.funcPermission,projectData.isGlobalPermission) !== null : true ) && (head.appPermission ? checkApps(head.appPermission) : true ))"
                                         :key="index"
+                                        :selected="Boolean(obj.show)"
+                                        @click="obj.show = !obj.show, toggleButton(obj.show,obj.key,obj)"
                                     >
                                         <div class="d-flex align-items-center justify-content-between w-100">
-                                            <span class="font-weight-400 line-height-19 font-roboto-sans">
+                                            <span class="item-list-font-weight-400 item-list-line-height-19 font-ui">
                                                 {{obj.label}}
                                             </span>
                                             <span>
@@ -301,7 +307,7 @@
         @closeSidebar="handleCloseSidebar"
         :componentDetail="{}"
         :customFieldObject="{}"
-        :isCustomField="isCustomField"
+        v-model:isCustomField="isCustomField"
         @handleClose="handleClose()"
     />
 </template>
@@ -315,9 +321,9 @@ import { useCustomComposable } from '@/composable';
 import { useTaskSelection } from '@/composable/useTaskSelection.js';
 import { taskListHelper, useUpdateTasks } from '@/views/Projects/helper';
 import taskClass from "@/utils/TaskOperations";
+import { tabUpdateMarker } from '@/utils/taskUpdateMarker';
 
 // COMPONENTS
-import Cookies from 'js-cookie';
 import Task from '../Task/Task.vue';
 import { useToast } from 'vue-toast-notification';
 import Toggle from "@/components/atom/Toggle/Toggle.vue";
@@ -330,6 +336,9 @@ import DropDownOption from '@/components/molecules/DropDownOption/DropDownOption
 
 const {isCustomFields} = customField();
 import * as env from '@/config/env';
+import { indexRepairBody, indexRepairRows, plainGroupValue } from "@/views/Projects/composables/taskGroupIndex";
+import { childrenWereRead } from "@/store/ProjectData/taskTree";
+import { convertToTaskRequest } from "@/views/Projects/composables/taskPlacement";
 import { useI18n } from "vue-i18n";
 import { apiRequest } from "../../../services";
 import Skelaton from "@/components/atom/Skelaton/AiSkelaton.vue"
@@ -693,9 +702,8 @@ function toggleTask(task,e) {
         subObserver[task._id] = null;
     }
 
-    if(task.isExpanded === true && (!task.subtaskArray || task.subtaskArray.length < 25)) {
-        let fetchNew = currentProjectTasks.value?.[props.projectId]?.[props.sprintId].index[`${task._id}_${props.item.searchKey}_${props.item.searchValue}`] === undefined;
-        fetchSubTask(task, fetchNew);
+    if(task.isExpanded === true) {
+        fetchSubTask(task, !childrenWereRead(currentProjectTasks.value?.[props.projectId]?.[props.sprintId], task._id, props.item));
     }
 }
 
@@ -826,24 +834,14 @@ function updateItem(type,e, item) {
             });
         }else if(type === "task" && checkPermission('task.convert_to_task', props.project?.isGlobalPermission) === true) {
             if(e?.added?.element.isParentTask === false){
-                taskClass.convertToTask({
+                taskClass.convertToTask(convertToTaskRequest({
                     companyId: companyId.value,
-                    projectData: {
-                        id:pid
-                    },
-                    taskId : e?.added?.element._id,
-                    parentTaskId:e?.added?.element.ParentTaskId,
-                    sprintObj: props.sprintObject,
-                    oldSprintObj :{
-                        id:props.sprintObject.id,
-                        folderId:null
-                    },
-                    oldProject: {
-                        id : pid,
-                        taskTypeCounts : props.project.taskTypeCounts,
-                        taskStatusData : props.project.taskStatusData
-                    }
-                }).then(() => {
+                    destination: props.project,
+                    sprint: props.sprintObject,
+                    task: e.added.element,
+                    oldSprint: { id: props.sprintObject.id, folderId: null },
+                    source: props.project
+                })).then(() => {
                     commit("projectData/mutateUpdateFirebaseTasks",{
                         snap, 
                         op: "removed",
@@ -962,14 +960,14 @@ function updateItem(type,e, item) {
                     status: updatedStatus,
                     'statusType': item.type,
                     'statusKey': item.key,
-                    'updateToken': {user: Cookies.get('accessToken'),timeStamp: uniqueeTime},
+                    'updateToken': tabUpdateMarker(uniqueeTime),
                     'islocalSnapStop': true
                 }
             }
             if (props.groupType ===2) {
                 UpdateData ={
                     Task_Priority : item.value,
-                    'updateToken': {user: localStorage.getItem('updateToken'),timeStamp: uniqueeTime},
+                    'updateToken': tabUpdateMarker(uniqueeTime),
                     'islocalSnapStop': true,
                     Updated_At: new Date()
                 }
@@ -977,14 +975,14 @@ function updateItem(type,e, item) {
             if (props.groupType === 1) {
                 UpdateData = {
                     AssigneeUserId : item.value !== '' ? item.value.split("_") : [],
-                    'updateToken': {user: localStorage.getItem('updateToken'),timeStamp: uniqueeTime},
+                    'updateToken': tabUpdateMarker(uniqueeTime),
                     'islocalSnapStop': true
                 }
             }
             if (props.groupType === 3) {
                 UpdateData = {
                     DueDate: item.searchValue ? new Date(item.searchValue * 1000) : null,
-                    'updateToken': {user: localStorage.getItem('updateToken'),timeStamp: uniqueeTime},
+                    'updateToken': tabUpdateMarker(uniqueeTime),
                     Updated_At: new Date(),
                     'islocalSnapStop': true
                 }
@@ -1000,7 +998,7 @@ function updateItem(type,e, item) {
                 isFirstWithRecord: (index === 0 && taskDt.length !== 1 && taskDt.length !== 0) ? true : false,
                 indexName: item.indexName,
                 sprintId: findTask.sprintId,
-                relevantKey: item.searchValue,
+                relevantKey: plainGroupValue(item.searchValue),
                 searchKey: item.searchKey,
                 taskKey: findTask.TaskKey,
                 updateData: UpdateData
@@ -1045,7 +1043,7 @@ function fetchSubTask(task, fetchNew = false) {
         userId: userId.value,
         fetchNew: fetchNew,
         projectData: projectData.value,
-        parentId: task.isParentTask ? task._id : ""
+        parentId: String(task._id)
     })
 }
 
@@ -1190,51 +1188,27 @@ const setHeader = (customFieldArray) => {
 }
 
 
-function prepareIndexData () {    
-    // setTimeout(() => {
-    let taskWithoutFilter = []
-    let taskArray = [];
-    let withoutIndexTask = items.value?.filter((data) => {
-        return (data[props.item.indexName] === undefined || data[props.item.indexName] === null) && data.TaskKey !== '--'
-    })
-    if (withoutIndexTask?.length > 0) {
-        withoutIndexTask.map((x) => taskWithoutFilter.push({data: x._id, item: props.item, taskKey: x.TaskKey}))
-        withoutIndexTask.map((x) => taskArray.push(x));
-    }    
-    if (!(taskWithoutFilter.length === 0 && taskArray.length === 0)) {
-        var newObj = {pid: projectData.value._id, sprintId: items.value[0].sprintId, tasksArray: taskArray, indexName: items.value[0].indexName};
-        commit("projectData/mutateTaskIndex",newObj)
-        let count = 0;
-        if (taskArray.length !== 1) {
-            isLoading.value = true;
-        }
-        let countFunction = (row) => {
-            if (count >= taskWithoutFilter.length) {
-                isLoading.value = false;
-                return;
-            } else {
-                if (row.taskKey != '--') {
-                    apiRequest("post", env.ONLOAD_UPDATE_TASK_INDEX, {
-                        taskUpdate : row,
-                        companyId: companyId.value,
-                    }).then(()=>{
-                        count++;
-                        countFunction(taskWithoutFilter[count])
-                    })
-                    .catch((error) => {
-                        console.error("ERROR in update project history: ", error);
-                        count++;
-                        countFunction(taskWithoutFilter[count])
-                    })
-                } else {
-                    count++;
-                    countFunction(taskWithoutFilter[count]);
-                }
-            }
-        }
-        countFunction(taskWithoutFilter[count])
+function prepareIndexData () {
+    const rows = indexRepairRows(items.value, props.item, checkPermission('task.task_list', projectData.value?.isGlobalPermission));
+    if (!rows.length) return;
+
+    commit("projectData/mutateTaskIndex", {pid: projectData.value._id, sprintId: items.value[0].sprintId, tasksArray: rows.map((row) => ({ _id: row.data })), indexName: props.item.indexName});
+    if (rows.length !== 1) {
+        isLoading.value = true;
     }
-    // }, 2000);
+    const next = (index) => {
+        if (index >= rows.length) {
+            isLoading.value = false;
+            return;
+        }
+        apiRequest("post", env.ONLOAD_UPDATE_TASK_INDEX, indexRepairBody(rows[index], companyId.value))
+            .then(() => next(index + 1))
+            .catch((error) => {
+                console.error("ERROR in update task index: ", error);
+                next(index + 1);
+            });
+    };
+    next(0);
 }
 const handleClose = () => {
     isCustomField.value = false;
@@ -1266,5 +1240,38 @@ const handleClose = () => {
 }
 .create__task-id{
     margin: 0px 0px 10px 20px !important;
+}
+</style>
+
+<style scoped>
+.item-list-blue {
+    color: var(--brand) !important;
+}
+.item-list-dark-gray {
+    color: var(--ink);
+}
+.item-list-gray81 {
+    color: var(--ink-2);
+}
+.item-list-bg-gray91 {
+    background-color: var(--fill);
+}
+.item-list-font-weight-400 {
+    font-weight: 400 !important;
+}
+.item-list-font-weight-500 {
+    font-weight: 500 !important;
+}
+.item-list-font-size-12 {
+    font-size: 12px;
+}
+.item-list-font-size-13 {
+    font-size: 13px;
+}
+.item-list-font-size-14 {
+    font-size: 14px;
+}
+.item-list-line-height-19 {
+    line-height: 19px;
 }
 </style>

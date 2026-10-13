@@ -1,0 +1,297 @@
+// The gather readers behind READER_CATALOGUE. Every function takes companyId
+// first and goes through MongoDbCrudOpration; a data skill never sees a
+// database handle, only the value a reader returns.
+
+const mongoose = require('mongoose');
+const { SCHEMA_TYPE } = require('../../../Config/schemaType');
+const { MongoDbCrudOpration } = require('../../../utils/mongo-handler/mongoQueries');
+const { idForms } = require('../../../utils/mongo-handler/objectIdKeys');
+const { reviewState } = require('../../Pages/helpers/pageRules');
+const { DONE_STATUS_TYPES } = require('../registry');
+const memoryStore = require('../memory');
+const taint = require('../taint');
+const { READER_CATALOGUE, plain } = require('./catalogues');
+const externalReads = require('./externalReads');
+const { readDeclared } = require('../engine/agentFetch');
+const replay = require('../../AICore/replay');
+const projectScope = require('../scope');
+const { hiddenSprintFilter } = require('../../Sprints/helpers/sprintVisibility');
+const { plainTextOf } = require('../../Tasks/helpers/cleanRichText');
+
+const DAY_MS = 24 * 60 * 60 * 1000;
+const BLOCKED = /hold|block|wait/i;
+
+const oid = (id) => { try { return new mongoose.Types.ObjectId(String(id)); } catch (e) { return null; } };
+const isDone = (t) => DONE_STATUS_TYPES.includes(String(t.statusType || (t.status && t.status.type) || '').toLowerCase());
+const dueMs = (t) => (t.DueDate ? Date.parse(t.DueDate) : NaN);
+const row = (t) => `${t.TaskKey || '—'} ${String(t.TaskName || '').slice(0, 70)}${t.status && t.status.text ? ` [${t.status.text}]` : ''}${t.DueDate ? ` due ${String(t.DueDate).slice(0, 10)}` : ''}${Array.isArray(t.AssigneeUserId) && t.AssigneeUserId.length ? '' : ' [unassigned]'}`;
+
+const planRows = (tasks, rowsPerSprint) => {
+    const bySprint = new Map();
+    tasks.forEach((t) => {
+        const name = (t.sprintArray && t.sprintArray.name) || 'No sprint';
+        if (!bySprint.has(name)) bySprint.set(name, []);
+        bySprint.get(name).push(t);
+    });
+    return [...bySprint.entries()].map(([sprint, items]) => {
+        const open = items.filter((t) => !isDone(t));
+        return [`${sprint}: ${open.length} open, ${items.length - open.length} done`, ...open.slice(0, rowsPerSprint).map((t) => `  - ${row(t)}`)].join('\n');
+    }).join('\n');
+};
+
+const nextOpen = (open) => {
+    const soonest = [...open].sort((a, b) => (Number.isFinite(dueMs(a)) ? dueMs(a) : Infinity) - (Number.isFinite(dueMs(b)) ? dueMs(b) : Infinity))[0];
+    return soonest ? `${soonest.TaskKey || ''} ${soonest.TaskName || ''}`.trim() : '';
+};
+
+/* Params are filled from the catalogue defaults and clamped to its bounds, so
+ * a stored skill cannot ask a reader for more than the catalogue allows. */
+const paramsFor = (reader, given = {}) => {
+    const spec = READER_CATALOGUE[reader].params;
+    const out = {};
+    Object.entries(spec).forEach(([name, rule]) => {
+        const raw = given[name];
+        if (rule.type === 'number') {
+            const n = Number(raw);
+            out[name] = Number.isFinite(n) ? Math.min(rule.max, Math.max(rule.min, Math.round(n))) : rule.default;
+        } else if (rule.type === 'boolean') {
+            out[name] = typeof raw === 'boolean' ? raw : rule.default;
+        } else if (raw !== undefined || rule.default !== undefined) {
+            out[name] = raw !== undefined ? raw : rule.default;
+        }
+    });
+    return out;
+};
+
+const MAX_DIFF_CHARS = 30000;
+
+const stepHosts = (params) => [params.host, ...(params.hosts || [])];
+
+/* A link comes from the task, not from the skill's author, so a link the skill cannot read skips the run. */
+const linkTarget = (params, input) => {
+    let url;
+    try { url = new URL(String(input[params.link] || '')); } catch (e) { return { skip: `the ${params.link} is not a valid URL` }; }
+    const port = Number(url.port || 443);
+    if (url.protocol !== 'https:' || !externalReads.namesHost(stepHosts(params), url.hostname, port)) {
+        return { skip: `the link points at ${url.host}, which this skill does not read; it reads ${stepHosts(params).join(', ')}` };
+    }
+    return { url: url.href };
+};
+
+const targetOf = (params, { task, input }) => {
+    if (params.link) return linkTarget(params, input);
+    try {
+        return { url: externalReads.buildUrl(params, { task, input }) };
+    } catch (e) {
+        throw externalReads.refusal(externalReads.CODE.INVALID_PATH, e.message);
+    }
+};
+
+const asDiff = (body) => {
+    const stripped = String(body).replace(/<script[\s\S]*?<\/script>/gi, '').replace(/<[^>]+>/g, ' ');
+    return { text: stripped.slice(0, MAX_DIFF_CHARS), truncated: stripped.length > MAX_DIFF_CHARS };
+};
+
+const unlistedSkip = (e) => (e && e.code === externalReads.CODE.HOST_NOT_ALLOWED
+    ? { skip: String(e.message).replace(`${externalReads.CODE.HOST_NOT_ALLOWED}: `, '') }
+    : null);
+
+/* An error status or a body that is not the JSON the read declared skips the run rather than hand the model
+ * something it was not written for. */
+const declaredRead = (reader) => async (companyId, { task, input, declaredHosts, startedBy, runId }, params) => {
+    if (!externalReads.enabled()) throw externalReads.notAvailable(reader);
+    const target = targetOf(params, { task, input });
+    if (target.skip) return { skip: target.skip };
+    const url = params.format === 'diff' ? externalReads.forgeDiffUrl(target.url) : target.url;
+    const started = Date.now();
+    let res;
+    try {
+        res = await readDeclared({
+            companyId, actor: startedBy, url, declaredHosts, credential: params.credential,
+            maxBytes: params.maxBytes, timeoutMs: params.timeoutMs, maxRedirects: params.maxRedirects,
+        });
+    } catch (e) {
+        const skipped = params.link && unlistedSkip(e);
+        if (skipped) return skipped;
+        throw e;
+    }
+    const { host, pathname } = new URL(url);
+    if (runId) {
+        await replay.recordFetch({
+            companyId, runId, host, path: pathname, status: res.status, bytes: res.bytes, hops: res.hops,
+            sha256: res.sha256, body: res.body, taintSources: res.taint, durationMs: Date.now() - started,
+        });
+    }
+    if (res.status < 200 || res.status >= 300) return { skip: `the read of ${host} answered HTTP ${res.status}` };
+    const out = { status: res.status, text: res.body, bytes: res.bytes, taint: res.taint };
+    if (params.format === 'diff') return { ...out, ...asDiff(res.body) };
+    if (params.format !== 'json') return out;
+    try {
+        return { ...out, json: JSON.parse(res.body) };
+    } catch (e) {
+        return { skip: `the read of ${host} did not answer JSON` };
+    }
+};
+
+const READERS = Object.freeze({
+    async task(companyId, { task }, params) {
+        const brief = plain(task.description || task.rawDescription || '');
+        return { key: task.TaskKey || '', title: task.TaskName || '', brief: brief.slice(0, params.maxChars), chars: brief.length };
+    },
+
+    async project(companyId, { task, startedBy }, params) {
+        const projectId = oid(task.ProjectID);
+        if (!projectId) return { skip: 'the task has no project' };
+        if (params.asStarter && !startedBy) return { skip: 'no person to read as' };
+        if (params.asStarter && !(await projectScope.visibleProjectIds(companyId, startedBy)).includes(String(projectId))) {
+            return { skip: 'the person who asked cannot open this project' };
+        }
+        const project = await MongoDbCrudOpration(companyId, {
+            type: SCHEMA_TYPE.PROJECTS,
+            data: [{ _id: projectId, deletedStatusKey: { $ne: 1 } }, { ProjectName: 1, aiGuide: 1, description: 1, descriptionBlock: 1 }],
+        }, 'findOne');
+        if (!project) return { skip: 'the project was not found' };
+        const guide = project.aiGuide && project.aiGuide.markdown ? String(project.aiGuide.markdown).slice(0, params.maxChars) : '';
+        if (!guide && params.requireGuide) return { skip: `${project.ProjectName || 'this project'} has no stored guide yet — generate one from the project page first` };
+        const description = (plain(project.description) || plainTextOf(project.descriptionBlock)).slice(0, params.maxChars);
+        return { name: project.ProjectName || '', guide, hasGuide: Boolean(guide), description };
+    },
+
+    async 'project.tasks'(companyId, { task, startedBy }, params) {
+        const projectId = String(task.ProjectID || '');
+        if (!projectId) return { skip: 'the task has no project' };
+        if (params.asStarter && !startedBy) return { skip: 'no person to read as' };
+        const hidden = params.asStarter ? await hiddenSprintFilter(companyId, startedBy, [projectId]) : {};
+        const tasks = (await MongoDbCrudOpration(companyId, {
+            type: SCHEMA_TYPE.TASKS,
+            data: [{ ProjectID: projectId, deletedStatusKey: { $ne: 1 }, isParentTask: true, ...hidden },
+                   { TaskKey: 1, TaskName: 1, status: 1, statusType: 1, DueDate: 1, AssigneeUserId: 1, updatedAt: 1, sprintArray: 1, origin: 1 },
+                   { limit: 400, sort: { DueDate: 1 } }],
+        }, 'find')) || [];
+        if (!tasks.length && params.requireTasks) return { skip: 'the project has no tasks yet' };
+        const now = Date.now();
+        const open = tasks.filter((t) => !isDone(t));
+        const statusIs = (re) => (t) => re.test(String((t.status && t.status.text) || ''));
+        const buckets = {
+            overdue: open.filter((t) => Number.isFinite(dueMs(t)) && dueMs(t) < now - DAY_MS),
+            dueSoon: open.filter((t) => Number.isFinite(dueMs(t)) && dueMs(t) >= now - DAY_MS && dueMs(t) < now + 2 * DAY_MS),
+            blocked: open.filter(statusIs(BLOCKED)),
+            inReview: open.filter(statusIs(/review/i)),
+            unassigned: open.filter((t) => !(Array.isArray(t.AssigneeUserId) && t.AssigneeUserId.length)),
+            moved: tasks.filter((t) => t.updatedAt && Date.parse(t.updatedAt) > now - DAY_MS),
+        };
+        const listed = (params.openOnly ? open : tasks).slice(0, params.limit);
+        const rows = (items) => items.slice(0, params.rowsPerBucket).map((t) => `- ${row(t)}`).join('\n');
+        const counted = {
+            count: tasks.length,
+            open: open.length,
+            done: tasks.length - open.length,
+            ...Object.fromEntries(Object.entries(buckets).map(([name, items]) => [name, items.length])),
+        };
+        const singledOut = Object.values(buckets).flat();
+        return {
+            ...counted,
+            list: listed.map((t) => `- ${row(t)}`).join('\n'),
+            overdueList: rows(buckets.overdue),
+            dueSoonList: rows(buckets.dueSoon),
+            blockedList: rows(buckets.blocked),
+            inReviewList: rows(buckets.inReview),
+            unassignedList: rows(buckets.unassigned),
+            plan: planRows(tasks, params.rowsPerBucket),
+            next: nextOpen(open),
+            keys: [...new Set(singledOut.map((t) => String(t.TaskKey || '')).filter(Boolean))],
+            counts: Object.values(counted).map(String),
+            taint: taint.fromRows(tasks),
+        };
+    },
+
+    async memory(companyId, { task, memory, startedBy }, params) {
+        const text = typeof memory === 'string' ? memory : await memoryStore.contextFor({ companyId, projectId: String(task.ProjectID || ''), userId: startedBy, maxChars: params.maxChars });
+        return { text: String(text || '').slice(0, params.maxChars) };
+    },
+
+    async linked_doc(companyId, { task }, params) {
+        const taskId = oid(task._id);
+        if (!taskId) return { skip: 'the task has no id' };
+        const page = await MongoDbCrudOpration(companyId, {
+            type: SCHEMA_TYPE.PAGES,
+            data: [{ linkedTasks: taskId, visibility: { $ne: 'private' }, deletedStatusKey: { $ne: 1 } }, { title: 1, rawText: 1, origin: 1 }, { sort: { updatedAt: -1 } }],
+        }, 'findOne');
+        if (!page) return { skip: 'no document is attached to this task' };
+        // A page a member or an agent wrote is the workspace's own; only an inbound origin marks the run.
+        return { title: page.title || '', text: plain(page.rawText || '').slice(0, params.maxChars), taint: taint.fromTask(page) };
+    },
+
+    async 'task.ai_fields'(companyId, { task }, params) {
+        const projectId = String(task.ProjectID || '');
+        if (!projectId) return { skip: 'the task has no project' };
+        const { aiConfigOf } = require('../../CustomField/aiFields/config');
+        const { appliesToProject } = require('../../CustomField/aiFields/fill');
+        const definitions = (await MongoDbCrudOpration(companyId, {
+            type: SCHEMA_TYPE.CUSTOM_FIELDS,
+            data: [{ 'fieldAi.enabled': true, isDelete: { $ne: false } }, { fieldTitle: 1, fieldType: 1, fieldAi: 1, global: 1, projectId: 1 }],
+        }, 'find')) || [];
+        const fields = definitions.filter((d) => aiConfigOf(d) && appliesToProject(d, projectId)).slice(0, params.limit);
+        if (!fields.length) return { skip: 'no AI field applies to this task\'s project' };
+        const stored = await MongoDbCrudOpration(companyId, { type: SCHEMA_TYPE.TASKS, data: [{ _id: oid(task._id) }, { customField: 1 }] }, 'findOne');
+        const values = (stored && stored.customField) || {};
+        const hasValue = (id) => {
+            const v = values[id] && values[id].fieldValue;
+            return Array.isArray(v) ? v.length > 0 : String(v === undefined || v === null ? '' : v).trim() !== '';
+        };
+        const rows = fields.map((d) => ({ id: String(d._id), title: String(d.fieldTitle || '').slice(0, 80), template: aiConfigOf(d).template, filled: hasValue(String(d._id)) }));
+        return {
+            count: rows.length,
+            empty: rows.filter((r) => !r.filled).length,
+            list: rows.map((r) => `- ${r.id}: ${r.title} (${r.template}, ${r.filled ? 'has a value' : 'empty'})`).join('\n'),
+            ids: rows.map((r) => r.id),
+        };
+    },
+
+    async 'project.pages'(companyId, { task }, params) {
+        const projectId = String(task.ProjectID || '');
+        if (!projectId) return { skip: 'the task has no project' };
+        const pages = (await MongoDbCrudOpration(companyId, {
+            type: SCHEMA_TYPE.PAGES,
+            data: [{ ProjectID: { $in: idForms(projectId) }, visibility: { $ne: 'private' }, deletedStatusKey: { $ne: 1 }, agentStatus: { $ne: 'draft' } },
+                   { title: 1, isWiki: 1, reviewDate: 1, reviewedAt: 1, updatedAt: 1, rawText: 1, origin: 1 },
+                   { sort: { updatedAt: 1 }, limit: 400 }],
+        }, 'find')) || [];
+        if (!pages.length) return { skip: 'the project has no shared pages yet' };
+        const now = Date.now();
+        const day = (value) => new Date(value).toISOString().slice(0, 10);
+        const why = (page) => {
+            const state = reviewState(page);
+            if (state === 'due' || state === 'stale') return `wiki review ${state}${page.reviewDate ? ` since ${day(page.reviewDate)}` : ''}`;
+            const updated = Date.parse(page.updatedAt);
+            return Number.isFinite(updated) && updated < now - params.staleDays * DAY_MS ? `not updated since ${day(updated)}` : '';
+        };
+        const stale = pages.map((page) => ({ page, reason: why(page) })).filter((s) => s.reason);
+        if (!stale.length) return { skip: `no page in the project is past its review date or older than ${params.staleDays} days` };
+        const listed = stale.slice(0, params.limit);
+        const excerpt = (page) => plain(page.rawText || '').slice(0, params.excerptChars);
+        return {
+            count: pages.length,
+            stale: stale.length,
+            list: listed.map(({ page, reason }) => `- ${String(page.title || 'Untitled').slice(0, 120)} [${reason}]${excerpt(page) ? `: ${excerpt(page)}` : ''}`).join('\n'),
+            titles: listed.map(({ page }) => String(page.title || 'Untitled')),
+            taint: taint.fromRows(listed.map(({ page }) => page)),
+        };
+    },
+
+    'slack.channel'(companyId, { runId, actor, allowedActions }, params) {
+        return require('../connectors/slackRead').read({ companyId, runId, actor, allowedActions, params });
+    },
+
+    url: declaredRead('url'),
+
+    api: declaredRead('api'),
+});
+
+const read = (reader, companyId, scope, params) => {
+    const fn = READERS[reader];
+    if (!fn) throw Object.assign(new Error(`unknown reader "${reader}"`), { deterministic: true });
+    return fn(companyId, scope, paramsFor(reader, params));
+};
+
+module.exports = { read, paramsFor, READERS };

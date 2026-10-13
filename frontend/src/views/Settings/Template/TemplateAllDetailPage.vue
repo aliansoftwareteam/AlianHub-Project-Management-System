@@ -4,11 +4,11 @@
 ========================================================================================== -->
 <template>
 <div id="project-step-container" class="ProjectShareGraphicModel addProjectEnabale borderChange mobile-project-taskstatus-section">
-    <div class="modalHeader bg-light-gray mb-28px"
+    <div class="modalHeader template-all-detail-page-bg-light-gray mb-28px"
     :style="[{padding : clientWidth > 767 ? '16.5px' : '18.5px'}]"
     :class="{'border-radius-5-px': clientWidth > 767 , 'border-radius-8-px': clientWidth <= 767}"
     >
-        <h3 class="m-0" :class="{'task-heading-desktop': clientWidth > 767 , 'task-heading-mobile': clientWidth <= 767}">{{$t('Templates.all_good')}} ?</h3>
+        <h3 class="m-0" :class="{'template-all-detail-page-task-heading-desktop': clientWidth > 767 , 'task-heading-mobile': clientWidth <= 767}">{{$t('Templates.all_good')}} ?</h3>
     </div>
     <div class="Allgood">
         <div class="d-flex justify-content-between align-items-center allgoodproject allgoodprojectvalue">
@@ -115,4 +115,17 @@ import { projectComponentsIcons } from '@/composable/commonFunction';
 </script>
 <style scoped>
 @import "./style.css";
+</style>
+
+<style scoped>
+.template-all-detail-page-bg-light-gray {
+    background-color: var(--surface-2);
+}
+.template-all-detail-page-task-heading-desktop {
+    font-weight: 700 !important;
+    font-size: 18px !important;
+    line-height: 27px !important;
+    color: var(--ink) !important;
+    text-align: center !important;
+}
 </style>

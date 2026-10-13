@@ -7,6 +7,8 @@ import { useToast } from "vue-toast-notification";
 import Store from '@/store/index'
 import { storageQueryBuilder } from "@/utils/storageQueryBuild";
 import { i18n } from "@/locales/main";
+import { isBundledPriorityImage } from "@/composable/commonFunction";
+import { isOwnerOrAdmin } from "@/utils/roles";
 const t = i18n.global.t;
 const urlRegex = ref(/(https?|ftp):\/\/[^\s/$.?#].[^\s]*/g)
 
@@ -65,7 +67,7 @@ export function useCustomComposable() {
                 return null;
             }
     
-            if(user.value.roleType === 1 || user.value.roleType === 2) {
+            if(isOwnerOrAdmin(user.value.roleType)) {
                 return true;
             } else if(user.value.roleType === null) {
                 console.error("2nd parameter is required");
@@ -384,6 +386,13 @@ export function useCustomComposable() {
     function getWasabiImageLink(companyId,path) {
         return new Promise((resolve, reject) => {
             try {
+                // Bundled icons have no stored object to sign — getPriority returns '' for every
+                // seeded priority — and the signing route answers an empty path with a 400, which
+                // used to reject the caller's whole priority update.
+                if (!path) {
+                    resolve('');
+                    return;
+                }
                 let reqAPi;
                 if(env.STORAGE_TYPE && env.STORAGE_TYPE==='server') {
                     let axiousObject = storageQueryBuilder('get',companyId,path);
@@ -698,7 +707,7 @@ export function useGetterFunctions() {
             const priorityIndex = priorities.value.findIndex((x) => x.value === val)
 
             if(priorityIndex !== -1) {
-                obj.image = priorities.value[priorityIndex].statusImage
+                obj.image = isBundledPriorityImage(priorities.value[priorityIndex].statusImage) ? '' : priorities.value[priorityIndex].statusImage
                 obj.name = priorities.value[priorityIndex].name
                 obj.value = priorities.value[priorityIndex].value
             }
@@ -738,6 +747,9 @@ export function useConvertDate() {
     function convertDateFormat(dueDate, format = '', options = {showDayName: true, minuteDifference: false}) {
         const getters  = Store.getters;
 
+        // moment(undefined) is *now*, so an absent date used to render as today.
+        if (!dueDate) return '';
+
         try {
             if (format === '') {
                 format = getters['settings/companyDateFormat'].dateFormat;
@@ -774,26 +786,6 @@ export function useConvertDate() {
     }
 }
 
-export function useHistoryNotification() {
-
-    function addHistory(obj) {
-        apiRequest("post", env.HANDLE_HISTORY, obj)
-        .catch((error) => {
-            console.error("ERROR in addHistory: ", error);
-        })
-    }
-    function addNotification(obj) {
-        apiRequest("post", env.HANDLE_NOTIFICATION, obj)
-        .catch((error) => {
-            console.error("ERROR in notification: ", error);
-        })
-    }
-
-    return {
-        addHistory,
-        addNotification
-    }
-}
 export function draggble() {
     function generateOrder (prev, next) {
         try{
@@ -832,20 +824,7 @@ export function draggble() {
 
 
 export function languageTranslateHelper() {
-    const storedLanguage = localStorage.getItem('language');
-    const selectedLanguageCode = ref(storedLanguage ? storedLanguage : 'en');
+    const selectedLanguageCode = ref(localStorage.getItem('language') || 'en');
 
-    const changeLanguage = async (selectedLanguage = "en") => {
-        try {
-            const module = await import(`../locales/${selectedLanguage}.js`);
-            console.log("Loaded language file:", selectedLanguage);
-            return module.default;
-        } catch (error) {
-            console.error("Language file not found:", error);
-            return null;
-        }
-    };
-    
-
-    return { selectedLanguageCode, changeLanguage };
+    return { selectedLanguageCode };
 }

@@ -1,42 +1,9 @@
 <template>
     <div class="task-detail-right-side">
         <div>
-            <div class="start-in-tracker-wrap" v-if="isAssignee && !isTaskCompleted">
-                <button
-                    type="button"
-                    class="start-in-tracker-btn"
-                    @click="startInTracker"
-                    title="Start this task in the AlianHub desktop tracker"
-                >
-                    <svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z" /></svg>
-                    Start Tracker
-                </button>
-            </div>
-
-            <Modal
-                :modelValue="showTrackerModal"
-                title="Start Tracker"
-                acceptButtonText="Start tracking"
-                bodyClasses="tracker-modal-body"
-                @close="showTrackerModal = false"
-                @accept="confirmStartTracker"
-            >
-                <template #body>
-                    <div class="tracker-modal-task">{{ task?.TaskKey }} · {{ task?.TaskName }}</div>
-                    <label class="tracker-modal-label">What are you working on?</label>
-                    <textarea
-                        v-model="trackerComment"
-                        rows="4"
-                        class="tracker-modal-textarea"
-                        placeholder="Add a comment for this session…"
-                        @input="trackerCommentError = ''"
-                    ></textarea>
-                    <div class="tracker-modal-error" v-if="trackerCommentError">{{ trackerCommentError }}</div>
-                </template>
-            </Modal>
-            <h4 class="details-heading">{{$t('ProjectDetails.details')}}</h4>
+            <h3 class="details-heading">{{$t('ProjectDetails.details')}}</h3>
             <div class="d-flex task-detail-right-side-label" v-if="checkPermission('task.task_list',project?.isGlobalPermission)!==null && checkPermission('task.task_status',project?.isGlobalPermission) !== null">
-                <h4>{{$t('ProjectDetails.status')}}</h4>
+                <div class="task-detail-field-name">{{$t('ProjectDetails.status')}}</div>
                 <Skelaton v-if="(task?.statusKey === undefined || task?.statusKey === null || task?.statusKey === '') && isMainSpinner" :style="{ height: clientWidth <= 767 ? '38px' : '23px', width: clientWidth <= 767 ? '160px' : '70px' }"  class="border-radius-7-px"/>
                 <TaskStatus
                     v-else
@@ -48,30 +15,36 @@
                     class="d-flex taskdetail-label task-detail-right-wrapper"
                     :taskStatusIndex="props.taskStatusIndex"
                 />
+                <slot name="status" />
             </div>
             <div class="d-flex task-detail-right-side-label" v-if="checkPermission('task.task_assignee',project?.isGlobalPermission) !== null">
-                <h4>{{$t('ProjectDetails.assignee')}}</h4>
+                <div class="task-detail-field-name">{{$t('ProjectDetails.assignee')}}</div>
                 <Skelaton v-if="task?.AssigneeUserId?.length <= 0 && isMainSpinner" style="height: 30px;" class="w-30px border-radius-50-per"/>
                 <template v-else>
                     <Assignee
                         v-if="checkPermission('task.task_assignee',project?.isGlobalPermission) === true && checkPermission('task.task_list',project?.isGlobalPermission) == true"
                         class="taskdetail-label task-detail-right-wrapper ml-5px"
                         :numOfUsers="2"
+                        showName
                         :users="task.AssigneeUserId"
                         :addUser="checkPermission('task.task_assignee',project?.isGlobalPermission) === true"
                         :options="permittedOptions"
+                        :agents="runnableAgents"
                         @selected="updateAssignee($event, checkApps('MultipleAssignees',project) ? 'add' : 'replace')"
                         @removed="updateAssignee($event, 'remove')"
+                        @agent="startAgent"
                         imageWidth="30px"
                         :showAddUser="true"
                         :zIndexAssigne="props.zIndexAssigne"
                         :isDisplayTeam="true"
                         :multiSelect="checkApps('MultipleAssignees')"
+                        :emptyLabel="$t('TaskPanel.empty')"
                     />
                     <Assignee
                         v-else
                         class="taskdetail-label task-detail-right-wrapper ml-5px"
                         :numOfUsers="2"
+                        showName
                         :showAddUser="true"
                         @selected="updateAssignee($event, checkApps('MultipleAssignees',project) ? 'add' : 'replace')"
                         @removed="updateAssignee($event, 'remove')"
@@ -81,11 +54,22 @@
                         :zIndexAssigne="props.zIndexAssigne"
                         :isDisplayTeam="true"
                         :multiSelect="checkApps('MultipleAssignees')"
+                        :emptyLabel="$t('TaskPanel.empty')"
                     />
                 </template>
             </div>
+            <TaskAssignmentSuggestion
+                v-if="task?._id && checkPermission('task.task_assignee',project?.isGlobalPermission) !== null"
+                :task="task"
+                :canAssign="checkPermission('task.task_assignee',project?.isGlobalPermission) === true"
+            />
+            <TaskRoleSuggestion
+                v-if="task?._id && checkPermission('task.task_assignee',project?.isGlobalPermission) !== null"
+                :task="task"
+                :canDecide="checkPermission('project.project_details',project?.isGlobalPermission) === true"
+            />
             <div class="d-flex task-detail-right-side-label">
-                <h4>{{$t('Comment.created_by')}}</h4>
+                <div class="task-detail-field-name">{{$t('Comment.created_by')}}</div>
                 <Skelaton v-if="!task?.Task_Leader && isMainSpinner" style="height: 30px;" class="w-30px border-radius-50-per"/>
                 <template v-else>
                     <!-- Editable picker — gated by the same permission as Assignee. -->
@@ -97,7 +81,7 @@
                             :numOfUsers="1"
                             :users="task.Task_Leader ? [task.Task_Leader] : []"
                             :addUser="true"
-                            :options="permittedOptions"
+                            :options="leaderOptions"
                             @selected="updateTaskLeader($event)"
                             imageWidth="30px"
                             :showAddUser="false"
@@ -106,15 +90,15 @@
                             :multiSelect="false"
                         />
                         <span
-                            class="black text-ellipsis task-created-by ml-5px"
-                            :class="{'font-size-13 font-weight-400' : clientWidth > 767, 'font-size-16' : clientWidth <=767}"
+                            class="task-detail-right-side-black text-ellipsis task-created-by ml-5px"
+                            :class="{'task-detail-right-side-font-size-13 task-detail-right-side-font-weight-400' : clientWidth > 767, 'task-detail-right-side-font-size-16' : clientWidth <=767}"
                             :title="taskLeaderData?.Employee_Name || 'N/A'">
                             {{ taskLeaderData?.Employee_Name || 'N/A' }}
                         </span>
                     </div>
                     <!-- Read-only display — original behaviour for users without permission. -->
                     <div v-else class="d-flex align-items-center">
-                        <UserProfile
+                        <UserProfile decorative
                             :data="{
                                 image: taskLeaderData.Employee_profileImageURL,
                                 title: taskLeaderData.Employee_Name
@@ -124,8 +108,8 @@
                             :thumbnail="'30x30'"
                         />
                         <span
-                            class="black text-ellipsis task-created-by"
-                            :class="{'font-size-13 font-weight-400' : clientWidth > 767, 'font-size-16' : clientWidth <=767}"
+                            class="task-detail-right-side-black text-ellipsis task-created-by"
+                            :class="{'task-detail-right-side-font-size-13 task-detail-right-side-font-weight-400' : clientWidth > 767, 'task-detail-right-side-font-size-16' : clientWidth <=767}"
                             :title="taskLeaderData?.Employee_Name || 'N/A'">
                             {{ taskLeaderData?.Employee_Name || 'N/A' }}
                         </span>
@@ -133,7 +117,7 @@
                 </template>
             </div>
             <div class="d-flex task-detail-right-side-label" v-if="checkPermission('task.task_priority',project?.isGlobalPermission) !== null && checkApps('Priority')">
-                <h4>{{$t('Projects.priority')}}</h4>
+                <div class="task-detail-field-name">{{$t('Projects.priority')}}</div>
                 <Skelaton v-if="!task.Task_Priority && isMainSpinner" style="height: 36px;" class="w-100px border-radius-7-px"/>
                 <PriorityComp
                     v-else
@@ -147,23 +131,26 @@
             </div>
             <!-- Story Points: permission gate removed — free for anyone to view + edit. -->
             <div class="d-flex task-detail-right-side-label">
-                <h4>Story Points</h4>
+                <div class="task-detail-field-name">{{ $t('TaskPanel.story_points') }}</div>
                 <StoryPoints
                     :pointsVal="task.points"
                     :estimationScale="project?.estimationScale || 'fibonacci'"
                     :permission="true"
+                    :emptyLabel="$t('TaskPanel.empty')"
                     @select="updatePoints($event)"
                     class="taskdetail-label task-detail-right-wrapper ml-0"
                 />
             </div>
             <div class="d-flex task-detail-right-side-label" v-if="isSupport === false && checkPermission('task.task_start_date',project?.isGlobalPermission) !== null">
-                <h4>{{$t('Milestone.start_date')}}</h4>
+                <div class="task-detail-field-name">{{$t('Milestone.start_date')}}</div>
                 <Skelaton v-if="!task?.startDate && isMainSpinner" style="height: 36px;" class="w-100px border-radius-7-px"/>
                 <template v-else>
                     <DueDateCompo
                         id="due-date-task"
                         class="taskdetail-label task-detail-right-wrapper"
                         :displyDate="task?.startDate? task.startDate : ''"
+                        :label="$t('Milestone.start_date')"
+                        :emptyText="$t('TaskPanel.empty')"
                         :isShowDateAndicon="true"
                         @SelectedDate="($event) => updateStartDate($event)"
                         :position="`right`"
@@ -171,18 +158,20 @@
                     />
                     <template v-else>
                         <span v-if="task.startDate">{{convertDateFormat(task.startDate,'',{showDayName:false})}}</span>
-                        <span v-else>{{$t('ProjectDetails.no_start_date')}}</span>
+                        <span v-else class="task-detail-empty">{{$t('TaskPanel.empty')}}</span>
                     </template>
                 </template>
             </div>
             <div class="d-flex task-detail-right-side-label" v-if="checkPermission('task.task_due_date',project?.isGlobalPermission) !== null">
-                <h4>{{$t('Projects.due_date')}}</h4>
+                <div class="task-detail-field-name">{{$t('Projects.due_date')}}</div>
                 <Skelaton v-if="!task?.DueDate && isMainSpinner" style="height: 36px;" class="w-100px border-radius-7-px"/>
                 <template v-else>
                     <DueDateCompo
                         id="due-date-task"
                         class="taskdetail-label task-detail-right-wrapper"
                         :displyDate="task.DueDate? task.DueDate : ''"
+                        :label="$t('Projects.due_date')"
+                        :emptyText="$t('TaskPanel.empty')"
                         :isShowDateAndicon="true"
                         :disabledDates="task.dueDateDeadLine"
                         @SelectedDate="($event) => updateDueDate($event)"
@@ -191,12 +180,13 @@
                     />
                     <template v-else>
                         <span v-if="task.DueDate">{{convertDateFormat(task.DueDate,'',{showDayName:false})}}</span>
-                        <span v-else>{{$t('ProjectDetails.no_due_date')}}</span>
+                        <span v-else class="task-detail-empty">{{$t('TaskPanel.empty')}}</span>
                     </template>
                 </template>
             </div>
+            <TaskRepeatControl v-if="task?._id && !isSupport" :task="task" :project="project" />
              <div class="d-flex task-detail-right-side-label" v-if="checkApps('TimeEstimates') && checkPermission('task.task_estimated_hours',project?.isGlobalPermission) !== null">
-                <h4>{{$t('UserTimesheet.estimated')}}</h4>
+                <div class="task-detail-field-name">{{$t('UserTimesheet.estimated')}}</div>
                 <Skelaton v-if="isMainSpinner" style="height: 24px;" class="w-100px border-radius-7-px"/>
                 <div v-if="Object.keys(task || {}).length && !isMainSpinner" class="d-flex align-items-center estimated-with-ai">
                     <EstimatedTimeInput
@@ -204,31 +194,41 @@
                         :editable="canEditEstimatedHours"
                         @update:totalEstimatedTime="(val) => updateTotalEstimatedTime(val)"
                     />
-                    <!--
-                      Icon-only AI estimator trigger. Tooltip via the native
-                      title attribute matches the project's existing tooltip
-                      convention (see BulkActionBar.vue / CheckList.vue).
-                      Disabled + spinner state while a request is in flight.
-                      Hidden unless the user can actually write the estimate:
-                      the old gate was `=== true`, which wrongly excluded the
-                      Own/Everyone values too and so was dropped; this uses the
-                      correct writable test instead of no test at all.
-                    -->
                     <button
-                        v-if="canEditEstimatedHours"
+                        v-if="canUseAi({ project, permitted: canEditEstimatedHours })"
+                        ref="aiEstimateTrigger"
                         type="button"
                         class="ai-estimate-btn"
                         :class="{ 'is-loading': isAiEstimateLoading }"
                         :disabled="isAiEstimateLoading"
-                        :title="isAiEstimateLoading ? 'Generating estimate…' : 'Generate estimate using AI'"
-                        :aria-label="isAiEstimateLoading ? 'Generating estimate' : 'Generate estimate using AI'"
+                        :title="isAiEstimateLoading ? $t('TaskPanel.ai_estimate_generating') : $t('TaskPanel.ai_estimate_suggest_hint')"
+                        :aria-label="isAiEstimateLoading ? $t('TaskPanel.ai_estimate_generating_label') : $t('TaskPanel.ai_estimate_suggest_hint')"
                         @click.stop="generateAiEstimate"
                     >
                         <span v-if="isAiEstimateLoading" class="ai-estimate-spinner" aria-hidden="true"></span>
                         <img v-else :src="aiEstimateIcon" alt="" class="ai-estimate-icon" />
+                        <span class="ai-estimate-label">{{ $t('TaskPanel.ai_estimate_suggest') }}</span>
                     </button>
                 </div>
             </div>
+            <AiResultPreview
+                v-if="aiEstimate"
+                class="ai-estimate-preview"
+                :title="$t('TaskPanel.ai_estimate_preview_title')"
+                :busy="isAiEstimateLoading"
+                :replace-label="$t('TaskPanel.ai_estimate_apply')"
+                :return-focus="() => aiEstimateTrigger"
+                :feedback="{ feature: 'task_estimate' }"
+                @replace="applyAiEstimate"
+                @retry="generateAiEstimate"
+                @cancel="aiEstimate = null"
+            >
+                <p class="ai-estimate-preview__lead">{{ $t('TaskPanel.ai_estimate_suggests', { time: formatMinutes(aiEstimate.minutes) }) }}</p>
+                <p v-if="aiEstimate.optimistic && aiEstimate.pessimistic && aiEstimate.optimistic !== aiEstimate.pessimistic" class="ai-estimate-preview__range">
+                    {{ $t('TaskPanel.ai_estimate_range', { low: formatMinutes(aiEstimate.optimistic), high: formatMinutes(aiEstimate.pessimistic) }) }}
+                </p>
+                <p v-if="aiEstimate.reasoning" class="ai-estimate-preview__reason">{{ aiEstimate.reasoning }}</p>
+            </AiResultPreview>
             <!-- AHE — reason required when RE-updating an already-set estimate; the
                  reason is written to the task Activity Log by the backend. -->
             <Modal
@@ -240,21 +240,21 @@
                 @close="cancelEstimateReason"
             >
                 <template #header>
-                    <h3 class="m-0 font-size-16 font-weight-600 black">Reason for changing estimated hours</h3>
+                    <h3 class="m-0 task-detail-right-side-font-size-16 task-detail-right-side-font-weight-600 task-detail-right-side-black">{{ $t('TaskPanel.estimate_reason_title') }}</h3>
                 </template>
                 <template #body>
                     <textarea
                         v-model.trim="estimateReasonText"
-                        class="w-100 border-radius-6-px font-size-14"
-                        style="min-height:90px; resize:vertical; border:1px solid #DFE1E6; outline:none; padding:8px;"
-                        placeholder="Why are you changing the estimated hours?"
+                        class="w-100 border border-radius-6-px task-detail-right-side-font-size-14"
+                        style="min-height:90px; resize:vertical; outline:none; padding:8px;"
+                        :placeholder="$t('TaskPanel.estimate_reason_ph')"
                         @input="estimateReasonError = false"
                     ></textarea>
-                    <span v-if="estimateReasonError" class="red font-size-12">Please enter a reason.</span>
+                    <span v-if="estimateReasonError" class="task-detail-right-side-red task-detail-right-side-font-size-12">{{ $t('TaskPanel.estimate_reason_required') }}</span>
                 </template>
             </Modal>
             <div class="d-flex task-detail-right-side-label" v-if="checkApps('TimeEstimates') && checkPermission('task.task_estimated_hours',project?.isGlobalPermission) !== null">
-                <h4>{{$t('UserTimesheet.task_planning')}}</h4>
+                <div class="task-detail-field-name">{{$t('UserTimesheet.task_planning')}}</div>
                 <Skelaton v-if="isMainSpinner" style="height: 24px;" class="w-100px border-radius-7-px"/>
                 <EstimateHours
                     v-if="Object.keys(task || {}).length && !isMainSpinner"
@@ -268,7 +268,7 @@
                 />
             </div>
                <div class="d-flex task-detail-right-side-label" v-if="checkApps('TimeEstimates') && checkPermission('task.task_estimated_hours',project?.isGlobalPermission) !== null">
-                <h4>{{$t('UserTimesheet.task_remaining_planning')}}</h4>
+                <div class="task-detail-field-name">{{$t('UserTimesheet.task_remaining_planning')}}</div>
                 <Skelaton v-if="isMainSpinner" style="height: 24px;" class="w-100px border-radius-7-px"/>
                 <div v-if="Object.keys(task || {}).length && !isMainSpinner" class="remaining-estimate-text">{{displayTime(task.remainingHours)}}</div>
             </div>
@@ -296,12 +296,17 @@ import { useI18n } from "vue-i18n";
 import Skelaton from '@/components/atom/Skelaton/Skelaton.vue';
 import { apiRequest } from '@/services';
 import * as env from '@/config/env';
-import { openInTracker, isTrackerCapableDevice } from '@/utils/trackerDeepLink';
+import { permittedAssignees, scopedAssignees, selfAssignable } from '@/utils/assigneeOptions';
 import Modal from '@/components/atom/Modal/Modal.vue';
+import { showUndoToast } from '@/composable/useUndoToast';
+import { fetchOwnAi, fetchRunnableAgents, pickAgent } from '@/views/Ai/useRunnableAgents';
+import AiResultPreview from '@/components/molecules/AiPreview/AiResultPreview.vue';
+import { useEscapeLayer } from '@/composable/useEscapeLayer';
+import TaskRepeatControl from '@/components/organisms/TaskDetailOverlay/TaskRepeatControl.vue';
+import TaskAssignmentSuggestion from '@/components/organisms/TaskDetailOverlay/TaskAssignmentSuggestion.vue';
+import TaskRoleSuggestion from '@/components/organisms/TaskDetailOverlay/TaskRoleSuggestion.vue';
+import { canUseAi } from "@/composable/aiAvailability";
 
-// Icon for the "Generate estimate using AI" sidebar button. Same asset
-// the SubTasks / Checklist / Sprints components use for their AI actions
-// so the visual language stays consistent.
 const aiEstimateIcon = require("@/assets/images/svg/ai_image.svg");
 const { t } = useI18n();
 
@@ -354,70 +359,39 @@ const props = defineProps({
     clientWidth: Number,
 })
 
-// Only assignees of the task can start tracking it.
-const isAssignee = computed(() => (props.task?.AssigneeUserId || []).includes(userId.value));
+const emit = defineEmits(["agent-run", "agent-handed"]);
 
-// Only OPEN tasks can be tracked — hide "Start Tracker" on completed/closed
-// tasks. A task is completed when its status type is 'close' (the same rule the
-// per-task completion checks use in Task.vue / TaskDetail.vue + bucketForStatus).
-const isTaskCompleted = computed(() => {
-    const ty = props.task?.status?.type || props.task?.statusType || '';
-    return ty === 'close';
-});
+const runnableAgents = ref([]);
+watch(() => props.task?._id, async (taskId) => {
+    const agents = (await Promise.all([fetchRunnableAgents(taskId), fetchOwnAi(taskId)])).flat();
+    if (taskId === props.task?._id) runnableAgents.value = agents;
+}, { immediate: true });
 
-// Start Tracker modal (project Modal component) — collects a comment, then deep-links.
-const showTrackerModal = ref(false);
-const trackerComment = ref('');
-const trackerCommentError = ref('');
+async function startAgent(option) {
+    const taskId = props.task._id;
+    try {
+        const { handed } = await pickAgent(option, taskId);
+        if (!handed) {
+            $toast.success(t('TaskPanel.agent_assigned', { name: option.label }), { position: 'top-right' });
+            emit('agent-run');
+            return;
+        }
+        $toast.success(t('TaskPanel.agent_handed', { name: option.shownAs }), { position: 'top-right' });
+        if (taskId === props.task?._id) runnableAgents.value = runnableAgents.value.filter((agent) => !agent.connected);
+        emit('agent-handed');
+    } catch (error) {
+        $toast.error(error?.response?.data?.statusText || error.message || t(option.connected ? 'TaskPanel.agent_hand_failed' : 'TaskPanel.agent_assign_failed'), { position: 'top-right' });
+    }
+}
 
-const startInTracker = () => {
-    if (!isTrackerCapableDevice()) {
-        $toast.warning('Open this on a desktop with the AlianHub Tracker installed.');
-        return;
-    }
-    trackerComment.value = '';
-    trackerCommentError.value = '';
-    showTrackerModal.value = true;
-};
-
-const confirmStartTracker = () => {
-    const comment = (trackerComment.value || '').trim();
-    if (!comment) {
-        trackerCommentError.value = 'Please enter a comment';
-        return;
-    }
-    const res = openInTracker({
-        taskId: props.task?._id,
-        projectId: props.task?.ProjectID,
-        sprintId: props.task?.sprintId,
-        folderId: props.task?.folderObjId || '',
-        comment,
-    }, {
-        // If the tracker doesn't come to the foreground shortly, it's either not
-        // installed or too old to support the myapp:// deep link — one generic
-        // toast covers both (the web can't tell them apart).
-        onNotOpened: () => $toast.warning(t('Toast.tracker_not_opened')),
-    });
-    showTrackerModal.value = false;
-    if (res.ok) {
-        $toast.success('Opening the tracker…');
-        return;
-    }
-    if (res.reason === 'unsupported') {
-        $toast.warning('Open this on a desktop with the AlianHub Tracker installed.');
-    } else if (res.reason === 'missing') {
-        $toast.error('Task details are incomplete to start the tracker.');
-    } else {
-        $toast.error('Could not open the tracker.');
-    }
-};
 //ref
 const taskLeaderData = ref(getUser(props.task?.Task_Leader));
 const assigneeInProgress = ref({});
 const isSpinner = ref(false);
-// In-flight flag for the manual AI-estimate request — drives both the
-// button's spinner state and the click-debounce.
 const isAiEstimateLoading = ref(false);
+const aiEstimate = ref(null);
+const aiEstimateTrigger = ref(null);
+useEscapeLayer(() => Boolean(aiEstimate.value), () => { aiEstimate.value = null; });
 
 // task_estimated_hours is a "selection field" permission, so its stored value
 // is null (None) | false (Read) | 1 (Own) | 2 (Everyone) | true (Read & Write).
@@ -445,61 +419,18 @@ const sprintData = computed(() => {
     return sprintData || null;
 });
 
-const permittedOptions = computed(() => {
-    let users = [];
-    if(sprintData.value) {
-        if(props.task.isParentTask) {
-            if(sprintData.value?.private) {
-                users = sprintData.value?.AssigneeUserId || [];
-            } else {
-                if(project.value?.isPrivateSpace) {
-                    users = project.value?.AssigneeUserId || [];
-                } else {
-                    users = companyUsers.value;
-                }
-            }
-        } else {
-            if(sprintData.value?.private) {
-                users = (props.parentTask?.AssigneeUserId || []).filter((x) => sprintData.value?.AssigneeUserId?.includes(x))
-            } else {
-                users = (props.parentTask?.AssigneeUserId || [])
-            }
-        }
-    }
-    if(project.value?.isPrivateSpace) {
-        users = users.filter((x) => project.value?.AssigneeUserId.includes(x));
-        return Array.from(new Set([...users, ...(props.task?.AssigneeUserId || [])]));
-    } else {
-        return users;
-    }
-})
-const nonPermittedOptions = computed(() => {
-    let users = [];
-    if(sprintData.value) {
-        if(props.task.isParentTask) {
-            if(sprintData.value?.private) {
-                users = (sprintData.value?.AssigneeUserId || []).filter((x) => x === userId.value);
-            } else {
-                if(project.value?.isPrivateSpace) {
-                    users = (project.value?.AssigneeUserId || []).filter((x) => x === userId.value);
-                } else {
-                    users = [userId.value];
-                }
-            }
-        } else {
-            users = (props.parentTask?.AssigneeUserId || [])?.filter((x) => x === userId.value)
-            if(sprintData.value?.private) {
-                users = users.filter((x) => sprintData.value?.AssigneeUserId?.includes(x))
-            }
-        }
-    }
-    if(project.value?.isPrivateSpace) {
-        users = users.filter((x) => project.value?.AssigneeUserId.includes(x));
-        return users;
-    } else {
-        return users;
-    }
-})
+const assigneeInput = computed(() => ({
+    task: props.task,
+    sprint: sprintData.value,
+    project: project.value,
+    parentAssignees: props.parentTask ? (props.parentTask.AssigneeUserId || []) : undefined,
+    companyUsers: companyUsers.value
+}));
+const permittedOptions = computed(() => permittedAssignees(assigneeInput.value));
+const nonPermittedOptions = computed(() => selfAssignable({ ...assigneeInput.value, userId: userId.value }));
+// Created-by keeps its old list: the current-assignee union exists so an assignee stays
+// removable, which has no meaning for the task's creator.
+const leaderOptions = computed(() => (project.value?.isPrivateSpace ? permittedOptions.value : scopedAssignees(assigneeInput.value)));
 
 function getUserData() {
     const user = getUser(userId.value);
@@ -510,25 +441,27 @@ function getUserData() {
     };
 }
 
-const updateAssignee = (event, type) =>{
+const ASSIGNEE_OPERATION = { add: "assigneeAdd", remove: "assigneRemove", replace: "replace" };
+
+function undoneToast() {
+    $toast.success(t('TaskPanel.change_undone'), { position: 'top-right' });
+}
+
+function assigneeUndo(type, id, before) {
+    if (type === 'add') return () => updateAssignee({ id }, 'remove', { undoing: true });
+    if (type === 'remove') return () => updateAssignee({ id }, 'add', { undoing: true });
+    const previous = before.find((uid) => uid !== id);
+    return previous
+        ? () => updateAssignee({ id: previous }, 'replace', { undoing: true })
+        : () => updateAssignee({ id }, 'remove', { undoing: true });
+}
+
+const updateAssignee = (event, type, { undoing = false } = {}) =>{
     try {
         if(assigneeInProgress.value[event?.id] && assigneeInProgress.value[event?.id] === type) return;
         assigneeInProgress.value[event?.id] = type;
         const userData = getUserData();
-
-        let operation = ""
-
-        if(type === "add") {
-            operation = "assigneeAdd"
-        } else if(type === 'remove') {
-            operation = "assigneRemove"
-        } else if(type === 'replace') {
-            operation = "replace"
-        }
-
-        let updateObject = {
-            AssigneeUserId : event.id
-        }
+        const before = [...(props.task.AssigneeUserId || [])];
 
         const projectData = {
             _id: project.value._id,
@@ -539,21 +472,25 @@ const updateAssignee = (event, type) =>{
         }
 
         taskClass.updateAssignee({
-            firebaseObj: updateObject,
+            firebaseObj: { AssigneeUserId: event.id },
             projectData: projectData,
             taskData: props.task,
             employeeName: getUser(event.id).Employee_Name,
-            type: operation,
-            userData
+            type: ASSIGNEE_OPERATION[type] || "",
+            userData,
+            announce: true
         })
         .then(() => {
             delete assigneeInProgress.value[event?.id];
-            $toast.success(t(`Toast.Assignee ${type === "add" || type === "replace"? 'added' : 'removed'} successfully`),{position: 'top-right'});
+            if (undoing) return undoneToast();
+            showUndoToast({
+                message: t(`Toast.Assignee ${type === "add" || type === "replace"? 'added' : 'removed'} successfully`),
+                undo: assigneeUndo(type, event.id, before)
+            });
         })
         .catch((error) => {
             delete assigneeInProgress.value[event?.id];
             console.error("ERROR in updateAssignee: ", error);
-            $toast.error(t('Toast.Assignee_not_updated'),{position: 'top-right'});
         })
     } catch (error) {
         console.error(error);
@@ -599,13 +536,15 @@ const updateTaskLeader = (event) => {
     }
 }
 
-const updatePriority = async(val) => {
+function priorityOption(value) {
+    const priority = getPriority(value) || {};
+    return { value, name: priority.name, statusImage: priority.image };
+}
+
+const updatePriority = (val, { undoing = false, from = null } = {}) => {
     try {
         const userData = getUserData();
-
-        let updateObj = {
-            Task_Priority : val.value
-        }
+        const previousValue = from ? from.value : props.task.Task_Priority;
 
         let projectData = {
             '_id': project.value._id ? project.value._id : "",
@@ -613,26 +552,34 @@ const updatePriority = async(val) => {
             "CompanyId": project.value.CompanyId,
         }
 
+        const priority = getPriority(previousValue) || {};
 
-        const priority = getPriority(props.task.Task_Priority)
-
-        let priorityObj = {
-            'statusImage' : await getWasabiImageLink(project.value.CompanyId,priority.image),
+        const taskId = props.task._id;
+        const taskName = props.task.TaskName;
+        const priorityObj = Promise.all([
+            getWasabiImageLink(project.value.CompanyId,priority.image),
+            getWasabiImageLink(project.value.CompanyId,val.statusImage)
+        ]).then(([statusImage, newStatusImage]) => ({
+            'statusImage' : statusImage,
             'priorityName' : priority.name,
-            'taskId': props.task._id,
-            'taskName': props.task.TaskName,
+            'taskId': taskId,
+            'taskName': taskName,
             'userName' : userData.Employee_Name,
-            'newStatusImage' : await getWasabiImageLink(project.value.CompanyId,val.statusImage),
+            'newStatusImage' : newStatusImage,
             'newPriorityName' : val.name
-        }
+        }));
 
-        taskClass.updatePriority({firebaseObj: updateObj, projectData: projectData, taskData: props.task, priorityObj, userData})
+        taskClass.updatePriority({firebaseObj: { Task_Priority: val.value }, projectData: projectData, taskData: props.task, priorityObj, userData, announce: true})
         .then(() => {
-            $toast.success(t('Toast.Priority_updated_successfully'),{position: 'top-right'});
+            if (undoing) return undoneToast();
+            if (!previousValue) return $toast.success(t('Toast.Priority_updated_successfully'),{position: 'top-right'});
+            showUndoToast({
+                message: t('Toast.Priority_updated_successfully'),
+                undo: () => updatePriority(priorityOption(previousValue), { undoing: true, from: val })
+            });
         })
         .catch((error) => {
             console.error("ERROR in update priority: ", error);
-            $toast.error(t('Toast.Priority_not_updated'),{position: 'top-right'});
         })
     } catch (error) {
         console.error('updatePriority error', error);
@@ -651,19 +598,19 @@ const updatePoints = (val) => {
         const updateObj = { points: (val === null || val === undefined || val === '') ? null : Number(val) };
         taskClass.updatePoints({ firebaseObj: updateObj, projectData, taskData: props.task, userData })
         .then(() => {
-            $toast.success('Story points updated', { position: 'top-right' });
+            $toast.success(t('TaskPanel.story_points_updated'), { position: 'top-right' });
         })
         .catch((error) => {
             console.error("ERROR in update points: ", error);
-            $toast.error('Story points not updated', { position: 'top-right' });
+            $toast.error(t('TaskPanel.story_points_not_updated'), { position: 'top-right' });
         });
     } catch (error) {
         console.error('updatePoints error', error);
-        $toast.error('Story points not updated', { position: 'top-right' });
+        $toast.error(t('TaskPanel.story_points_not_updated'), { position: 'top-right' });
     }
 }
 
-const updateStatus = (oldVal, newval) => {
+const updateStatus = (oldVal, newval, { undoing = false } = {}) => {
     try {
         const userData = getUserData();
         const prev = {
@@ -697,12 +644,16 @@ const updateStatus = (oldVal, newval) => {
             ProjectName: project.value.ProjectName,
             ProjectCode: project.value.ProjectCode
         }
-        taskClass.updateStatus({ newStatus, prevStatus, projectData: projectData, task: props.task, userData})
+        taskClass.updateStatus({ newStatus, prevStatus, projectData: projectData, task: props.task, userData, announce: true})
         .then(() => {
-            $toast.success(t('Toast.Status_updated_successfully'),{position: 'top-right'});
+            if (undoing) return undoneToast();
+            showUndoToast({
+                message: t('Toast.Status_updated_successfully'),
+                undo: () => updateStatus(newval, oldVal, { undoing: true })
+            });
         })
-        .catch(() => {
-            $toast.error(t('Toast.Status_not_updated'),{position: 'top-right'});
+        .catch((error) => {
+            console.error("ERROR in updateStatus: ", error);
         })
     } catch (error) {
         console.error('updateStatus error', error);
@@ -714,6 +665,10 @@ const updateDueDate = (event) => {
     try {
         isSpinner.value = true;
         const userData = getUserData();
+        const before = {
+            DueDate: props.task.DueDate || null,
+            dueDateDeadLine: (props.task.dueDateDeadLine || []).map((x) => ({ date: x.date }))
+        };
         let newdueDateDeadLine = [];
         if(props.task.dueDateDeadLine.length > 0) {
             props.task.dueDateDeadLine.forEach((date) => {
@@ -759,15 +714,18 @@ const updateDueDate = (event) => {
             project: projectData,
             task: props.task,
             obj: notificationObj,
-            userData
+            userData,
+            announce: true
         }).then(() => {
-            $toast.success(t('Toast.Due_date_updated_successfully'),{position: 'top-right'});
+            showUndoToast({
+                message: t('Toast.Due_date_updated_successfully'),
+                undo: () => restoreDueDate(before, event.dateVal)
+            });
             nextTick(() => {
                 isSpinner.value = false;
             });
         }).catch((error) => {
             console.error("ERROR in updateDueDate: ", error);
-            $toast.error(t('Toast.Due_date_not_updated'),{position: 'top-right'});
             isSpinner.value = false;
         })
     } catch (error) {
@@ -775,6 +733,49 @@ const updateDueDate = (event) => {
         $toast.error(t('Toast.Due_date_not_updated'),{position: 'top-right'});
         isSpinner.value = false;
     }
+}
+
+const asDate = (value) => (value && value.seconds ? new Date(value.seconds * 1000) : new Date(value));
+
+// Undo puts back the exact date and deadline list, including no date at all.
+function restoreDueDate(before, changedTo) {
+    const userData = getUserData();
+    const firebaseObj = {
+        DueDate: before.DueDate ? asDate(before.DueDate) : null,
+        dueDateDeadLine: before.dueDateDeadLine.map((x) => ({ date: asDate(x.date) }))
+    };
+    let notificationObj = {};
+    if (before.DueDate) {
+        notificationObj = {
+            key: "task_due_date",
+            projectId: props.task.ProjectID,
+            taskId: props.task._id,
+            sprintId: props.task.sprintId,
+            message: taskDueDateChange({
+                ProjectName: project.value.ProjectName,
+                TaskName: props.task.TaskName,
+                previousDate: changeDateFormate(asDate(changedTo)),
+                changedDate: changeDateFormate(firebaseObj.DueDate)
+            })
+        };
+    }
+    return taskClass.updateDueDate({
+        commonDateFormatString: dateFormat.value,
+        firebaseObj,
+        project: {
+            _id: project.value._id,
+            CompanyId: project.value.CompanyId,
+            lastTaskId: project.value.lastTaskId,
+            ProjectName: project.value.ProjectName,
+            ProjectCode: project.value.ProjectCode
+        },
+        task: props.task,
+        obj: notificationObj,
+        userData,
+        announce: true
+    }).then(undoneToast).catch((error) => {
+        console.error("ERROR in restoreDueDate: ", error);
+    });
 }
 
 const updateStartDate = (event) => {
@@ -854,7 +855,7 @@ const updateTotalEstimatedTime = (value) => {
     persistEstimate(value);
 }
 
-const persistEstimate = (value, reason = '') => {
+const persistEstimate = (value, reason = '', { silent = false } = {}) => {
     const userData = getUserData();
 
     const firebaseObj = {
@@ -873,12 +874,14 @@ const persistEstimate = (value, reason = '') => {
         ProjectCode: project.value.ProjectCode
     }
 
-    taskClass.updateTotalEstimatedTime({firebaseObj, projectData, taskData: props.task, obj, userData})
+    return taskClass.updateTotalEstimatedTime({firebaseObj, projectData, taskData: props.task, obj, userData})
     .then(() => {
-        $toast.success(t('Toast.Task_total_estimate_update_succesfull'), {position: "top-right"})
+        if (!silent) $toast.success(t('Toast.Task_total_estimate_update_succesfull'), {position: "top-right"})
+        return true;
     })
     .catch((err) => {
         console.error(err);
+        return false;
     })
 }
 
@@ -909,49 +912,86 @@ const displayTime = (time) => {
   return `${String(hours).padStart(2, '0')}h ${String(minutes).padStart(2, '0')}m`
 }
 
-// Manual AI-estimate trigger. Posts to the EstimatedTime route which
-// loads the canonical task doc server-side, runs the LLM estimator with
-// force=true (so it overwrites any existing value), persists to
-// `totalEstimatedTime`, and emits a Socket.io `task` update — so other
-// connected clients see the new value without a refresh. We don't need
-// to patch local state here because the socket update flows back through
-// the same channel that drives `props.task`.
+const formatMinutes = (total) => {
+    const minutes = Math.max(0, Math.round(Number(total) || 0));
+    const hours = Math.floor(minutes / 60);
+    const rest = minutes % 60;
+    if (!hours) return `${rest}m`;
+    return rest ? `${hours}h ${rest}m` : `${hours}h`;
+}
+
+const AI_REASON_LIMIT = 300;
+
 const generateAiEstimate = async () => {
     if (isAiEstimateLoading.value) return;
-    // The trigger is hidden without write access; this also blocks the request
-    // itself, since it writes the estimate straight through the API.
     if (!canEditEstimatedHours.value) return;
     const taskId = props.task && props.task._id;
     if (!taskId) {
-        $toast.error('Task is not available', { position: 'top-right' });
+        $toast.error(t('TaskPanel.task_unavailable'), { position: 'top-right' });
         return;
     }
     isAiEstimateLoading.value = true;
     try {
-        // Send the logged-in user so the estimator can attribute the
-        // "updated estimated time" activity-log entry to whoever clicked
-        // (and so the required HISTORY.UserId is never blank).
-        const userData = getUserData();
-        const response = await apiRequest('post', `${env.ESTIMATED_TIME}/ai/${taskId}`, {
-            userName: userData.Employee_Name,
-            userId: userData.id,
-        });
-        if (response && response.data && response.data.status) {
-            $toast.success('Estimate generated', { position: 'top-right' });
+        const response = await apiRequest('post', `${env.ESTIMATED_TIME}/ai/${taskId}/propose`, {});
+        const payload = response && response.data;
+        if (payload && payload.status && payload.data && Number(payload.data.minutes) > 0) {
+            aiEstimate.value = payload.data;
         } else {
-            const msg = (response && response.data && response.data.statusText)
-                || 'Could not generate estimate';
-            $toast.error(msg, { position: 'top-right' });
+            $toast.error((payload && payload.statusText) || t('TaskPanel.ai_estimate_failed'), { position: 'top-right' });
         }
     } catch (err) {
         const msg = (err && err.response && err.response.data && err.response.data.statusText)
-            || (err && err.message)
-            || 'Could not generate estimate';
+            || t('TaskPanel.ai_estimate_failed');
         $toast.error(msg, { position: 'top-right' });
     } finally {
         isAiEstimateLoading.value = false;
     }
 }
+
+const applyAiEstimate = async () => {
+    const proposal = aiEstimate.value;
+    if (!proposal || !canEditEstimatedHours.value) return;
+    const previous = Number(props.task.totalEstimatedTime) || 0;
+    const reasoning = String(proposal.reasoning || '').slice(0, AI_REASON_LIMIT);
+    aiEstimate.value = null;
+    const reason = reasoning ? t('TaskPanel.ai_estimate_reason', { reasoning }) : t('TaskPanel.ai_estimate_preview_title');
+    const saved = await persistEstimate(proposal.minutes, reason, { silent: true });
+    if (!saved) {
+        $toast.error(t('TaskPanel.ai_estimate_not_applied'), { position: 'top-right' });
+        return;
+    }
+    showUndoToast({
+        message: t('TaskPanel.ai_estimate_applied', { time: formatMinutes(proposal.minutes) }),
+        undo: () => persistEstimate(previous, t('TaskPanel.ai_estimate_undo_reason'), { silent: true }).then((undone) => undone && undoneToast())
+    });
+}
 </script>
 <style scoped src='./style.css'>
+</style>
+
+<style scoped>
+.task-detail-right-side-black {
+    color: var(--ink);
+}
+.task-detail-right-side-red {
+    color: var(--danger-ink);
+}
+.task-detail-right-side-font-weight-400 {
+    font-weight: 400 !important;
+}
+.task-detail-right-side-font-weight-600 {
+    font-weight: 600 !important;
+}
+.task-detail-right-side-font-size-12 {
+    font-size: 12px;
+}
+.task-detail-right-side-font-size-13 {
+    font-size: 13px;
+}
+.task-detail-right-side-font-size-14 {
+    font-size: 14px;
+}
+.task-detail-right-side-font-size-16 {
+    font-size: 16px;
+}
 </style>

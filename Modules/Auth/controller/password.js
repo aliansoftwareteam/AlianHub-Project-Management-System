@@ -1,6 +1,5 @@
 const mongoC = require("../../../utils/mongo-handler/mongoQueries")
 const { dbCollections } = require('../../../Config/collections');
-const bcrypt = require('bcrypt');
 const config = require("../../../Config/config");
 const logger = require("../../../Config/loggerConfig");
 const serviceCtr = require("../../serviceFunction.js")
@@ -12,14 +11,21 @@ const mongoose = require("mongoose");
 const { removeCache } = require("../../../utils/commonFunctions.js");
 const { updateUserFun } = require("../../Users/controller.js");
 
+const { ACCOUNT_MAIL_ANSWER } = require("../helpers/accountMail");
+const { PASSWORD_RULE_MESSAGE, meetsPasswordRule } = require("../helpers/passwordRule");
+const { hashPassword, verifyPassword } = require("../helpers/passwordHash");
+const { signedInPersonOnly } = require("../helpers/accountSecurity");
 
-
-const { sendForgotPassword } = require('./authHelpers');
 exports.changePassword = async (req, res) => {
     try {
+        if (!(await signedInPersonOnly(req, res))) return;
         const reqData = req.body;
         if (!(req.params && req.params.id)) {
             res.status(400).json({message: "user id is require"});
+            return;
+        }
+        if (String(req.params.id) !== String(req.uid)) {
+            res.status(403).json({message: "You can only change your own password."});
             return;
         }
         if (!(reqData && reqData.oldPassword)) {
@@ -28,6 +34,10 @@ exports.changePassword = async (req, res) => {
         }
         if (!(reqData && reqData.newPassword)) {
             res.status(400).json({message: "New Password is require"});
+            return;
+        }
+        if (!meetsPasswordRule(reqData.newPassword)) {
+            res.status(400).json({message: PASSWORD_RULE_MESSAGE});
             return;
         }
         let obj = {
@@ -42,17 +52,15 @@ exports.changePassword = async (req, res) => {
                 res.status(400).json({message: "user not found"});
                 return;
             }
-            const checkOldPass = resUserData._id + reqData.oldPassword;
-            const isValid = await bcrypt.compare(checkOldPass, resUserData.passwordHash);
+            const isValid = await verifyPassword(resUserData._id + reqData.oldPassword, resUserData);
             if (!isValid) {
                 res.status(400).json({message: "Auth.previous_wasnot_valid"});
                 return;
             }
 
-            const salt = await bcrypt.genSalt(10);
             const checkNewPass = resUserData._id + reqData.newPassword;
-            const passwordHash = await bcrypt.hash(checkNewPass, salt);
-            const isNewValid = await bcrypt.compare(checkNewPass, passwordHash);
+            const stored = await hashPassword(checkNewPass);
+            const isNewValid = await verifyPassword(checkNewPass, stored);
             if (!isNewValid) {
                 res.status(400).json({message: "Auth.password_wasnot_valid"});
                 return;
@@ -63,9 +71,7 @@ exports.changePassword = async (req, res) => {
                     {
                         _id: req.params.id
                     },
-                    {
-                        passwordHash: passwordHash
-                    }
+                    stored
                 ]
             }
             mongoC.MongoDbCrudOpration(dbCollections.GLOBAL, object, "findOneAndUpdate").then(()=>{
@@ -84,17 +90,33 @@ exports.changePassword = async (req, res) => {
     }
 };
 
-exports.forgotPassword = (req, res, next) => {
-    try {
-        const reqData = req.body;
-        if (!(reqData && reqData.email)) {
-            res.status(400).json({message: `email is required`});
-            return;
-        }
-        sendForgotPassword(req, res, next);
-    } catch (error) {
-        res.status(400).json({message: error.message ? error.message : error});
+const sendResetLink = async (email, isAdmin) => {
+    const token = generateToken(600);
+    const account = await mongoC.MongoDbCrudOpration(dbCollections.GLOBAL, {
+        type: dbCollections.USER_AUTH,
+        data: [{ email }, { token }]
+    }, "findOneAndUpdate");
+    if (!(account && account._id)) return;
+    const link = `${config.WEBURL}${isAdmin ? '/admin' : ''}/#/reset-password/${token}`;
+    const mail = require("../../Template/forgotPassword")(email, link);
+    sendMail.SendEmail(mail.subject, mail.mail, email, true, (result) => {
+        if (!result.status) logger.error(`Forgot password email: ${result.error}`);
+    });
+};
+
+/* The same answer whether or not the address has an account; the answer does not wait for the mail. */
+exports.forgotPassword = (req, res) => {
+    const email = req.body && req.body.email;
+    if (!email) {
+        res.status(400).json({message: `email is required`});
+        return;
     }
+    if (typeof email === 'string') {
+        sendResetLink(email, req.body.key === "admin").catch((error) => {
+            logger.error(`Forgot password: ${serviceCtr.mongoErrorMessage(error)}`);
+        });
+    }
+    res.status(200).json({ status: true, message: ACCOUNT_MAIL_ANSWER });
 };
 
 
@@ -167,10 +189,14 @@ exports.resetPassword = async (req, res, next) => {
             next();
             return;
         }
-        const salt = await bcrypt.genSalt(10);
+        if (!meetsPasswordRule(reqData.password)) {
+            req.errorMessageObject = {message: PASSWORD_RULE_MESSAGE};
+            next();
+            return;
+        }
         const setNewPass = reqData.id + reqData.password;
-        const passwordHash = await bcrypt.hash(setNewPass, salt);
-        const isNewValid = await bcrypt.compare(setNewPass, passwordHash);
+        const stored = await hashPassword(setNewPass);
+        const isNewValid = await verifyPassword(setNewPass, stored);
         if (!isNewValid) {
             req.errorMessageObject = {message: "Auth.password_wasnot_valid"};
             next();
@@ -183,7 +209,7 @@ exports.resetPassword = async (req, res, next) => {
                     _id: reqData.id
                 },
                 {
-                    passwordHash: passwordHash,
+                    ...stored,
                     token: ""
                 }
             ]

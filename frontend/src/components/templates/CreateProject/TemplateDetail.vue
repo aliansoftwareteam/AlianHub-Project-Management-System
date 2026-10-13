@@ -6,8 +6,8 @@
 <div>
     <div v-if="!manageTemplate" class="setting_templateDetail_wrapper">
         <h4 class="text-blue" :class="[{'useTemplateDetailArrow':route.name !== 'Template'}]">
-            <button v-if="route.name == 'Template'" type="button"  @click="$emit('click:updateSidebarVal',false)" class="backButtonTemplateList d-flex align-items-center cursor-pointer">
-                <span class="d-flex align-items-center font-size-16 font-roboto-sans cursor-pointer blue"><img :src="back_arrow" class="mr-6px">{{$t('UserTimesheet.back')}}</span>
+            <button v-if="route.name == 'Template'" type="button" @click="$emit('click:updateSidebarVal',false)" class="ah-btn ah-btn--ghost ah-btn--sm backButtonTemplateList">
+                <img :src="back_arrow" alt="">{{$t('UserTimesheet.back')}}
             </button>
         </h4>
        <div class="template-backdelete-wrapper">
@@ -18,7 +18,7 @@
             </h4> -->
         </div>
         <div v-if="templateView && Object.keys(templateView).length > 0" class="template-scroll-wrapper overflow-x-hidden style-scroll">
-            <button v-if="route.name === 'Template' && currentSelectedKey == 0" type="button" @click="deleteSelectedTemplate(templateView)" class="deleteTemplateBtn cursor-pointer" >{{ $t('Templates.delete_template') }}</button>
+            <button v-if="canManageTemplates && route.name === 'Template' && currentSelectedKey == 0" type="button" @click="deleteSelectedTemplate(templateView)" class="ah-btn ah-btn--ghost ah-btn--sm deleteTemplateBtn">{{ $t('Templates.delete_template') }}</button>
             <ConfirmModal
                 :modelValue="showConfirmModal"
                 :acceptButtonText="$t('Home.Confirm')"
@@ -51,7 +51,7 @@
             </div>
             <div class="templateName_detail_wrapper">
             <div class="templateName_detail">
-                <span class="text-capitalize">{{templateView.TemplateName}}</span>
+                <span >{{templateView.TemplateName}}</span>
             </div>
             <div class="templateName_detail pr-20px pt-3px">
                 <p v-if="templateView.Description !== undefined" :class="[{'para-overflow': (templateView.Description.length > 496 && showMore)}]">{{showMore ? templateView.Description.slice(0,496) : templateView.Description}}
@@ -120,7 +120,7 @@
 </div>
 </template>
 <script setup>
-import { ref, inject, watch } from 'vue';
+import { ref, inject, watch, computed } from 'vue';
 import TemplateAllDetail from '@/components/templates/CreateProject/TemplateAllDetail.vue';
 import ConfirmModal from '@/components/atom/Modal/Modal.vue';
 import { useRoute } from "vue-router";
@@ -133,10 +133,12 @@ import { projectComponentsIcons,getImageUrl } from '@/composable/commonFunction'
 import { storageQueryBuilder } from '@/utils/storageQueryBuild';
 import { useI18n } from "vue-i18n";
 import * as env from '@/config/env';
+import { isOwnerOrAdmin } from '@/utils/roles';
 const { t } = useI18n();
 
 const $toast = useToast();
-const { commit } = useStore();
+const { commit, getters } = useStore();
+const canManageTemplates = computed(() => isOwnerOrAdmin(Number(getters['settings/companyUserDetail']?.roleType)));
  const route = useRoute()
     const props = defineProps({
         modelValue: {
@@ -218,6 +220,8 @@ const { commit } = useStore();
     top: 9px;
     right: 105px;
 }
+.ah-btn.deleteTemplateBtn { color: var(--danger-ink); }
+.ah-btn.deleteTemplateBtn:hover:not(:disabled) { color: var(--danger-ink); background: var(--danger-bg); }
 .taskdetail__img{
     width:14px !important;
     height: 14px !important;

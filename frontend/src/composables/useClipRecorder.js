@@ -1,6 +1,6 @@
 // Shared, module-scoped singleton state for the GLOBAL clip recorder.
 //
-// The recorder is mounted ONCE at the app shell (Header.vue) so an in-progress
+// The recorder is mounted ONCE at the app shell (ShellPanels.vue) so an in-progress
 // recording survives in-app navigation (opening/closing a task, route changes).
 // Any component can drive it through these helpers — they all share the one
 // reactive `state` object below because the module is evaluated only once.

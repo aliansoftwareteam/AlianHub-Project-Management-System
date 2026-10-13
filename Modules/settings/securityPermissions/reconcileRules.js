@@ -1,45 +1,16 @@
 const logger = require('../../../Config/loggerConfig');
 const { removeCache } = require('../../../utils/commonFunctions');
 
-// The permission catalogue in utils/data.js is seeded once, when a company is created, and never
-// revisited. So a company drifts behind the product: a permission added to the catalogue today
-// never reaches a company that already exists, and the permission screen — which renders whatever
-// is stored — quietly shows a different list to every customer.
-//
-// Measured rather than assumed, on two live companies: `task_total_estimate` is defined in the
-// current catalogue and present in neither, and both carry `export_tasks` and `import_tasks`, which
-// no longer exist in the product and control nothing.
-//
-// Re-running importCompanyRules is what repairs it, and it is safe: it reads the existing rules
-// first and copies each role's saved choices back onto the defaults before writing, so an owner's
-// configuration survives. Verified with a harness — an owner who had taken task deletion away from
-// Member still had it taken away afterwards.
-//
-// It is NOT run unconditionally, because the re-seed deletes the collection before re-inserting it
-// and a permission check landing in that window would fail closed. It runs only when a sentinel is
-// actually absent.
+// The permission catalogue in utils/data.js is seeded when a company is created and never
+// revisited, so a company drifts behind the product. importCompanyRules repairs it and keeps
+// each role's saved choices, but it deletes the collection before re-inserting, so it may only
+// run while nobody is served: migrations/003-permission-catalogue.js calls this before the
+// server listens.
 //
 // MAINTENANCE: when a permission key is added to the catalogue in utils/data.js, add it here too.
-// That one line is what lets existing companies pick it up.
 const SENTINEL_KEYS = [
     'task_total_estimate',
 ];
-
-// Off unless a deployment asks for it. The repair deletes the rules collection before it
-// re-inserts it, so on an installation with real traffic a permission check landing in that
-// window fails closed for everyone, and a re-insert that dies halfway leaves nobody with any
-// permissions at all. That is a fine trade on a fresh install and a bad one on a live company
-// with a hundred people in it, so the operator decides, not us.
-//
-// A company created from this version does not need it: it is seeded from the current
-// catalogue. This exists for a company that predates a catalogue entry. Set
-// PERMISSION_RECONCILE=true, restart, open Settings > Security & Permissions once as an admin,
-// then turn it back off.
-const reconcileEnabled = () => process.env.PERMISSION_RECONCILE === 'true';
-
-// Once per company per process. The cache this hangs off lives a week, so this is rare; and because
-// the repair is idempotent there is nothing to persist and no version number to keep in step.
-const attempted = new Set();
 
 function findMissingSentinels(rules) {
     const present = new Set(
@@ -50,50 +21,25 @@ function findMissingSentinels(rules) {
     return SENTINEL_KEYS.filter((k) => !present.has(k));
 }
 
-// Never rejects and never blocks the caller's own result. Returns the rules it was given, either
-// unchanged or freshly re-read after a repair.
-async function reconcileCompanyRules(companyId, rules) {
-    try {
-        if (!reconcileEnabled()) return rules;
-        if (!companyId || attempted.has(String(companyId))) return rules;
+async function repairCompanyRules(companyId) {
+    // Required late: utils/data.js pulls in a large part of the app.
+    const { importCompanyRules } = require('../../../utils/data');
+    const { SCHEMA_TYPE } = require('../../../Config/schemaType');
+    const { MongoDbCrudOpration } = require('../../../utils/mongo-handler/mongoQueries');
 
-        // An empty collection means seeding never finished, or is running right now. Re-seeding on
-        // top of that would race the original, so leave it alone.
-        if (!Array.isArray(rules) || rules.length === 0) return rules;
+    const rules = await MongoDbCrudOpration(companyId, { type: SCHEMA_TYPE.RULES, data: [] }, 'find');
+    // An empty collection means seeding never finished; re-seeding on top would race it.
+    if (!Array.isArray(rules) || rules.length === 0) return { repaired: false, skipped: 'unseeded' };
+    const missing = findMissingSentinels(rules);
+    if (!missing.length) return { repaired: false };
 
-        const missing = findMissingSentinels(rules);
-        if (!missing.length) {
-            attempted.add(String(companyId));
-            return rules;
-        }
-
-        attempted.add(String(companyId));
-        logger.info(`reconcileCompanyRules: ${companyId} is missing ${missing.join(', ')} — repairing`);
-
-        // Required late: utils/data.js pulls in a large part of the app, and this file is loaded
-        // from a request path.
-        const { importCompanyRules } = require('../../../utils/data');
-        const { SCHEMA_TYPE } = require('../../../Config/schemaType');
-        const { MongoDbCrudOpration } = require('../../../utils/mongo-handler/mongoQueries');
-
-        await importCompanyRules(companyId);
-        removeCache(`rules:${companyId}`);
-
-        const repaired = await MongoDbCrudOpration(companyId, { type: SCHEMA_TYPE.RULES, data: [] }, 'find');
-        const stillMissing = findMissingSentinels(repaired);
-        if (stillMissing.length) {
-            logger.error(`reconcileCompanyRules: ${companyId} still missing ${stillMissing.join(', ')} after repair`);
-            return rules;
-        }
-
-        logger.info(`reconcileCompanyRules: ${companyId} repaired, ${repaired.length} rules`);
-        return repaired;
-    } catch (error) {
-        logger.error(`reconcileCompanyRules failed for ${companyId}: ${error && error.message}`);
-        return rules;
-    }
+    logger.info(`repairCompanyRules: ${companyId} is missing ${missing.join(', ')} — repairing`);
+    await importCompanyRules(companyId);
+    removeCache(`rules:${companyId}`);
+    const repaired = await MongoDbCrudOpration(companyId, { type: SCHEMA_TYPE.RULES, data: [] }, 'find');
+    const stillMissing = findMissingSentinels(repaired);
+    if (stillMissing.length) throw new Error(`still missing ${stillMissing.join(', ')} after repair`);
+    return { repaired: true, missing, rules: repaired.length };
 }
 
-module.exports = {
-    reconcileCompanyRules, SENTINEL_KEYS, findMissingSentinels, reconcileEnabled,
-};
+module.exports = { SENTINEL_KEYS, findMissingSentinels, repairCompanyRules };

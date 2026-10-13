@@ -1,29 +1,27 @@
 const { handleProfileGetForUser, handleTaskTypeImageGet } = require(`../../../common-storage/common-${process.env.STORAGE_TYPE}.js`);
 const ctrl = require('./controller');
 const { upload, validatePath } = require('./helpers/bucket.helper');
+const { requireInstanceAdmin } = require('../../Instance/guard');
+const { requireStoredFileRead } = require('../downloadScope');
+const { REMOVE, UPLOAD, requireStoredFileChange } = require('../changeScope');
+const { USER_PROFILES_BUCKET, requireOwnBucket, requireBucketWrite, requireBucketRemoval, requireBucketRead, requireProfileImageRead, requireSafeObjectPath, bucketIdParam, bodyField, queryField } = require('../bucketAccess');
 
 exports.init = (app) => {
-    //Create Bucket Route
-    app.post('/api/v1/createBucket', ctrl.createBucketOnStorage);
-    //Update Bucket Route
-    app.patch('/api/v1/updateBucket/:bucketId', ctrl.updateBucketOnStorage);
-    //Get Bucket Route
-    app.get('/api/v1/getBucket/:bucketId', ctrl.getBucketOnStorage);
-    //Remove Bucket Route
-    app.delete('/api/v1/removeBucket/:bucketId', ctrl.removeBucketOnStorage);
-    //Get Bucket Size with bucket Id
-    app.get('/api/v1/getBucketSize/:bucketId', ctrl.getBucketSizeOnStorage);
+    const ownBucket = requireOwnBucket(bucketIdParam);
 
-    //Create Bucket Route
-    app.post('/api/v1/storage/uploadFile',upload.single("file"),validatePath, ctrl.uploadFileOnStorage);
-    //Generate Signed or public url
-    app.get('/api/v1/generateSignedUrl/:bucketId', ctrl.getSignedUrlFile);
-    //Download File Route
+    // No app screen manages buckets: a company's bucket is created with the company.
+    app.post('/api/v1/createBucket', requireInstanceAdmin, requireOwnBucket(bodyField('bucketId')), ctrl.createBucketOnStorage);
+    app.patch('/api/v1/updateBucket/:bucketId', requireInstanceAdmin, ownBucket, ctrl.updateBucketOnStorage);
+    app.get('/api/v1/getBucket/:bucketId', ownBucket, ctrl.getBucketOnStorage);
+    app.delete('/api/v1/removeBucket/:bucketId', requireInstanceAdmin, ownBucket, ctrl.removeBucketOnStorage);
+    app.get('/api/v1/getBucketSize/:bucketId', ownBucket, ctrl.getBucketSizeOnStorage);
+
+    app.post('/api/v1/storage/uploadFile', upload.single("file"), validatePath, ctrl.uploadFileOnStorage);
+    app.get('/api/v1/generateSignedUrl/:bucketId', requireSafeObjectPath(queryField('filepath')), requireBucketRead(bucketIdParam, queryField('filepath')), requireStoredFileRead(bucketIdParam, queryField('filepath'), { storage: 'server', skipBucket: (bucketId) => bucketId === USER_PROFILES_BUCKET }), ctrl.getSignedUrlFile);
     app.get('/api/v1/download/:bucketId/*', ctrl.handleFileRequest);
-    //Remove file from storage]
-    app.delete('/api/v1/storage/removeFile/:bucketId', ctrl.removeFileFromStorage);
+    app.delete('/api/v1/storage/removeFile/:bucketId', requireBucketRemoval(bucketIdParam, queryField('filepath')), requireSafeObjectPath(queryField('filepath')), requireStoredFileChange(REMOVE, queryField('filepath'), { storage: 'server' }), ctrl.removeFileFromStorage);
 
-    app.post("/api/v1/getUserProfile", handleProfileGetForUser);
-    app.post("/api/v1/getTaskTypeImage", handleTaskTypeImageGet);
-    app.post('/api/v1/storage/uploadFileBase64',ctrl.uploadBase64FileOnServerStorage);
+    app.post("/api/v1/getUserProfile", requireSafeObjectPath(bodyField('path')), requireProfileImageRead(bodyField('path')), handleProfileGetForUser);
+    app.post("/api/v1/getTaskTypeImage", requireOwnBucket(bodyField('companyId')), requireSafeObjectPath(bodyField('path')), requireStoredFileRead(bodyField('companyId'), bodyField('path'), { storage: 'server' }), handleTaskTypeImageGet);
+    app.post('/api/v1/storage/uploadFileBase64', requireBucketWrite(bodyField('companyId'), bodyField('path')), requireSafeObjectPath(bodyField('path')), requireStoredFileChange(UPLOAD, bodyField('path'), { storage: 'server' }), ctrl.uploadBase64FileOnServerStorage);
 }

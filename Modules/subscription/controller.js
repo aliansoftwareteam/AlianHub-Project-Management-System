@@ -1,6 +1,15 @@
 const { SCHEMA_TYPE } = require("../../Config/schemaType.js");
 const { replaceObjectKey } = require("../Auth/helper");
 const { MongoDbCrudOpration } = require("../../utils/mongo-handler/mongoQueries.js");
+const { verifyCompanyMembership } = require("../../Config/jwt");
+const { isInstanceOwner } = require("../Instance/guard");
+
+// A subscription row belongs to one workspace; an API token stands for the workspace it was issued in.
+const mayReadSubscription = async (req, subscription) => {
+    const companyId = String(subscription.companyId || '');
+    if (req.apiToken) return companyId === String(req.aud || '');
+    return (await verifyCompanyMembership(String(req.uid), companyId)) || isInstanceOwner(req.uid);
+};
 
 exports.getSubscriptions = async(req, res) => {
     try {
@@ -20,7 +29,7 @@ exports.getSubscriptions = async(req, res) => {
         };
         const subscription = await MongoDbCrudOpration(SCHEMA_TYPE.GOLBAL, subscriptionObj, 'findOne');
 
-        if (!subscription) {
+        if (!subscription || !(await mayReadSubscription(req, subscription))) {
             return res.status(404).json({ message: "subscription not found" });
         }
         return res.status(200).json(subscription);

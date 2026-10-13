@@ -9,7 +9,7 @@
         <template #head-left>
             <span class="aipg-head-title">
                 <span class="aipg-spark" aria-hidden="true">✨</span>
-                Create project with AI
+                {{ $t('AiProject.title') }}
             </span>
         </template>
         <template #head-right>
@@ -22,33 +22,37 @@
         </template>
         <template #body>
             <div class="aipg-wrapper">
-                <!-- Stepper -->
                 <ol class="aipg-stepper" role="list">
                     <li class="aipg-step" :class="stepClass('input')">
                         <span class="aipg-step-dot">{{ stepDoneDot('input', '1') }}</span>
-                        <span class="aipg-step-label">Describe</span>
+                        <span class="aipg-step-label">{{ $t('AiProject.step_describe') }}</span>
                     </li>
                     <li class="aipg-step-line" :class="{ 'done': isStepDone('input') }"></li>
                     <li class="aipg-step" :class="stepClass('clarify')">
                         <span class="aipg-step-dot">{{ stepDoneDot('clarify', '2') }}</span>
-                        <span class="aipg-step-label">Clarify</span>
+                        <span class="aipg-step-label">{{ $t('AiProject.step_clarify') }}</span>
                     </li>
                     <li class="aipg-step-line" :class="{ 'done': isStepDone('clarify') }"></li>
+                    <li class="aipg-step" :class="stepClass('brief')">
+                        <span class="aipg-step-dot">{{ stepDoneDot('brief', '3') }}</span>
+                        <span class="aipg-step-label">{{ $t('AiProject.step_brief') }}</span>
+                    </li>
+                    <li class="aipg-step-line" :class="{ 'done': isStepDone('brief') }"></li>
                     <li class="aipg-step" :class="stepClass('preview')">
-                        <span class="aipg-step-dot">{{ stepDoneDot('preview', '3') }}</span>
-                        <span class="aipg-step-label">Review plan</span>
+                        <span class="aipg-step-dot">{{ stepDoneDot('preview', '4') }}</span>
+                        <span class="aipg-step-label">{{ $t('AiProject.step_plan') }}</span>
                     </li>
                     <li class="aipg-step-line" :class="{ 'done': isStepDone('preview') }"></li>
                     <li class="aipg-step" :class="stepClass('executing', 'done')">
-                        <span class="aipg-step-dot">{{ step === 'done' ? '✓' : '4' }}</span>
-                        <span class="aipg-step-label">Create</span>
+                        <span class="aipg-step-dot">{{ step === 'done' ? '✓' : '5' }}</span>
+                        <span class="aipg-step-label">{{ $t('AiProject.step_create') }}</span>
                     </li>
                 </ol>
 
                 <!-- STEP 1: INPUT -->
                 <section v-if="step === 'input'" class="aipg-section">
                     <div class="aipg-card">
-                        <label class="aipg-field-label">What is the project about?</label>
+                        <label class="aipg-field-label">{{ $t('AiProject.describe_label') }}</label>
                         <textarea
                             v-model="description"
                             class="aipg-textarea"
@@ -57,14 +61,14 @@
                             :disabled="loading"></textarea>
                         <div class="aipg-helper-row">
                             <span class="aipg-helper" :class="{ 'aipg-helper-ok': description.length >= 20 }">
-                                {{ description.length }} / 20 minimum characters
+                                {{ $t('AiProject.min_chars', { count: description.length, min: 20 }) }}
                             </span>
                         </div>
                     </div>
 
                     <div class="aipg-card">
-                        <label class="aipg-field-label">Workspace</label>
-                        <p class="aipg-helper">Choose who can see this project once it's created.</p>
+                        <label class="aipg-field-label">{{ $t('AiProject.workspace_label') }}</label>
+                        <p class="aipg-helper">{{ $t('AiProject.workspace_hint') }}</p>
                         <div class="aipg-privacy-row">
                             <button
                                 type="button"
@@ -74,8 +78,8 @@
                                 @click="isPrivateSpace = false">
                                 <span class="aipg-privacy-icon" aria-hidden="true">🌐</span>
                                 <span class="aipg-privacy-text">
-                                    <strong>Public</strong>
-                                    <span class="aipg-privacy-sub">Everyone in the workspace can view</span>
+                                    <strong>{{ $t('AiProject.privacy_public') }}</strong>
+                                    <span class="aipg-privacy-sub">{{ $t('AiProject.privacy_public_sub') }}</span>
                                 </span>
                             </button>
                             <button
@@ -86,8 +90,8 @@
                                 @click="isPrivateSpace = true">
                                 <span class="aipg-privacy-icon" aria-hidden="true">🔒</span>
                                 <span class="aipg-privacy-text">
-                                    <strong>Private</strong>
-                                    <span class="aipg-privacy-sub">Only you and invited members</span>
+                                    <strong>{{ $t('AiProject.privacy_private') }}</strong>
+                                    <span class="aipg-privacy-sub">{{ $t('AiProject.privacy_private_sub') }}</span>
                                 </span>
                             </button>
                         </div>
@@ -106,6 +110,7 @@
                         <div class="aipg-skills-select">
                             <ProjectSourceSelect v-model="source"/>
                         </div>
+                        <p v-if="!hasSource" class="aipg-helper" data-test="source-required">{{ $t('AiProject.source_required') }}</p>
 
                         <label class="aipg-field-label aipg-field-label-stacked">
                             {{ $t('ProjectDetails.proposal_id') }}
@@ -123,22 +128,22 @@
                     </div>
 
                     <div class="aipg-card">
-                        <label class="aipg-field-label">Attach a brief <span class="aipg-muted">— optional</span></label>
-                        <p class="aipg-helper">PDF, DOCX, TXT, or MD — up to 10 MB.</p>
+                        <label class="aipg-field-label">{{ $t('AiProject.attach_brief') }} <span class="aipg-muted">{{ $t('AI.ai_optional') }}</span></label>
+                        <p class="aipg-helper">{{ $t('AiProject.attach_hint') }}</p>
                         <label class="aipg-file-drop" :class="{ 'is-disabled': loading || briefUploading }">
                             <input ref="fileInput" type="file" accept=".pdf,.docx,.txt,.md" @change="onFileChosen" :disabled="loading || briefUploading"/>
                             <span v-if="briefUploading" class="aipg-file-drop-inner">
                                 <span class="aipg-spinner aipg-spinner-sm" aria-hidden="true"></span>
-                                Reading file…
+                                {{ $t('AiProject.reading_file') }}
                             </span>
                             <span v-else-if="briefId" class="aipg-file-drop-inner aipg-file-drop-ok">
                                 <span class="aipg-tick" aria-hidden="true">✓</span>
                                 {{ briefFile?.name }}
-                                <button class="aipg-btn-link" type="button" :disabled="loading" @click.prevent="clearBrief">Remove</button>
+                                <button class="aipg-btn-link" type="button" :disabled="loading" @click.prevent="clearBrief">{{ $t('AiProject.remove') }}</button>
                             </span>
                             <span v-else class="aipg-file-drop-inner aipg-muted">
                                 <span class="aipg-upload-icon" aria-hidden="true">↑</span>
-                                Click to choose a file
+                                {{ $t('AiProject.choose_file') }}
                             </span>
                         </label>
                     </div>
@@ -146,22 +151,21 @@
                     <transition name="aipg-fade">
                         <div v-if="error" class="aipg-alert aipg-alert-danger">
                             <div>{{ error }}</div>
-                            <p class="aipg-alert-hint">Click <strong>Generate plan</strong> again — the AI will retry from your description.</p>
+                            <i18n-t keypath="AiProject.retry_hint" tag="p" class="aipg-alert-hint">
+                                <template #action><strong>{{ $t('AiProject.continue') }}</strong></template>
+                            </i18n-t>
                         </div>
                     </transition>
 
-                    <!-- AI working status — visible while any LLM call is in flight -->
                     <transition name="aipg-fade">
                         <div v-if="clarifyLoading || loading" class="aipg-status-panel" role="status" aria-live="polite">
                             <span class="aipg-spinner aipg-status-spinner" aria-hidden="true"></span>
                             <div class="aipg-status-panel-text">
                                 <p class="aipg-status-panel-title">
-                                    {{ clarifyLoading ? 'Analyzing your brief…' : 'Generating project plan…' }}
+                                    {{ clarifyLoading ? $t('AiProject.analyzing') : $t('AiProject.generating_plan') }}
                                 </p>
                                 <p class="aipg-status-panel-sub">
-                                    {{ clarifyLoading
-                                        ? 'The AI is reading your requirements. This takes a moment.'
-                                        : 'Building your sprints and tasks — usually 15–30 seconds. Please wait.' }}
+                                    {{ clarifyLoading ? $t('AiProject.analyzing_sub') : $t('AiProject.generating_plan_sub') }}
                                 </p>
                             </div>
                         </div>
@@ -170,66 +174,55 @@
                     <div v-if="hasGeneratedPlan" class="aipg-actions aipg-actions-split">
                         <button
                             class="aipg-btn aipg-btn-ghost"
-                            :disabled="!canGenerate || loading || briefUploading || clarifyLoading"
+                            :disabled="!canGenerate || !hasSource || loading || briefUploading || clarifyLoading"
                             @click="onGeneratePlan">
                             <span v-if="loading || clarifyLoading" class="aipg-spinner aipg-spinner-sm" aria-hidden="true"></span>
-                            {{ clarifyLoading ? 'Analyzing brief…' : (loading ? 'Generating plan…' : 'Re-Generate Plan') }}
+                            {{ clarifyLoading ? $t('AiProject.analyzing') : (loading ? $t('AiProject.generating_plan') : $t('AiProject.regenerate_plan')) }}
                         </button>
                         <button
                             class="aipg-btn aipg-btn-primary"
-                            :disabled="loading || briefUploading || clarifyLoading"
+                            :disabled="!hasSource || loading || briefUploading || clarifyLoading"
                             @click="onNextWithExistingPlan">
-                            Next →
+                            {{ $t('AiProject.next') }}
                         </button>
                     </div>
                     <div v-else-if="hasGeneratedQuestions" class="aipg-actions aipg-actions-split">
-                        <!--
-                            User came back to Step 1 after generating questions
-                            but before generating a plan. Offer a cheap "Next →"
-                            that reuses the cached questions (zero LLM cost),
-                            plus a "Re-Generate Questions" escape if they want a
-                            fresh set after editing the brief.
-                        -->
                         <button
                             class="aipg-btn aipg-btn-ghost"
-                            :disabled="!canGenerate || loading || briefUploading || clarifyLoading"
+                            :disabled="!canGenerate || !hasSource || loading || briefUploading || clarifyLoading"
                             @click="onRegenerateQuestions">
                             <span v-if="clarifyLoading || loading" class="aipg-spinner aipg-spinner-sm" aria-hidden="true"></span>
-                            {{ clarifyLoading ? 'Analyzing brief…' : (loading ? 'Generating plan…' : 'Re-Generate Questions') }}
+                            {{ clarifyLoading ? $t('AiProject.analyzing') : (loading ? $t('AiProject.generating_plan') : $t('AiProject.regenerate_questions')) }}
                         </button>
                         <button
                             class="aipg-btn aipg-btn-primary"
-                            :disabled="loading || briefUploading || clarifyLoading"
+                            :disabled="!hasSource || loading || briefUploading || clarifyLoading"
                             @click="onNextWithExistingQuestions">
-                            Next →
+                            {{ $t('AiProject.next') }}
                         </button>
                     </div>
                     <div v-else class="aipg-actions">
                         <button
                             class="aipg-btn aipg-btn-primary"
-                            :disabled="!canGenerate || loading || briefUploading || clarifyLoading"
+                            data-test="start"
+                            :disabled="!canGenerate || !hasSource || loading || briefUploading || clarifyLoading"
                             @click="onGeneratePlan">
                             <span v-if="loading || clarifyLoading" class="aipg-spinner aipg-spinner-sm" aria-hidden="true"></span>
-                            {{ clarifyLoading ? 'Analyzing brief…' : (loading ? 'Generating plan…' : (error ? 'Try again' : 'Generate plan')) }}
+                            {{ clarifyLoading ? $t('AiProject.analyzing') : (loading ? $t('AiProject.generating_plan') : (error ? $t('AiProject.try_again') : $t('AiProject.continue'))) }}
                         </button>
                     </div>
                 </section>
 
                 <!-- STEP 2: CLARIFY -->
                 <section v-else-if="step === 'clarify'" class="aipg-section">
-                    <!-- Plan-generation status — shows while LLM builds the plan
-                         after the user submits their answers. ClarifyStep dims
-                         itself (opacity + pointer-events) but this panel makes
-                         the wait state unmissable. -->
-                    <transition name="aipg-fade">
-                        <div v-if="loading" class="aipg-status-panel" role="status" aria-live="polite">
-                            <span class="aipg-spinner aipg-status-spinner" aria-hidden="true"></span>
-                            <div class="aipg-status-panel-text">
-                                <p class="aipg-status-panel-title">Generating project plan…</p>
-                                <p class="aipg-status-panel-sub">Building your sprints and tasks — usually 15–30 seconds. Please wait.</p>
-                            </div>
-                        </div>
-                    </transition>
+                    <div v-if="coverage" class="aipg-card aipg-coverage-card" data-test="coverage">
+                        <label class="aipg-field-label-sm">{{ $t('AiProject.coverage_title') }}</label>
+                        <CoverageChips :coverage="coverage"/>
+                        <p class="aipg-helper aipg-coverage-hint">
+                            {{ $t('AiProject.round_of', { round: clarifyRound, max: clarifyMaxRounds }) }}
+                            · {{ $t('AiProject.unknown_hint') }}
+                        </p>
+                    </div>
                     <ClarifyStep
                         :loading="clarifyLoading"
                         :generating="loading"
@@ -243,7 +236,33 @@
                     />
                 </section>
 
-                <!-- STEP 3: PREVIEW -->
+                <!-- STEP 3: BRIEF -->
+                <section v-else-if="step === 'brief'" class="aipg-section">
+                    <div v-if="coverage" class="aipg-card aipg-coverage-card">
+                        <label class="aipg-field-label-sm">{{ $t('AiProject.coverage_title') }}</label>
+                        <CoverageChips :coverage="coverage"/>
+                    </div>
+                    <BriefStep
+                        :original="description"
+                        :draft="briefMarkdown"
+                        :assumptions="briefAssumptions"
+                        :approved="briefApproved"
+                        :edited-since-approval="briefEditedSinceApproval"
+                        :loading="briefLoading"
+                        :generating="loading"
+                        :error-message="briefError"
+                        :plan-error="error"
+                        @update:draft="onBriefEdit"
+                        @approve="onApproveBrief"
+                        @generate="onGenerateFromBrief"
+                        @regenerate="startBrief"
+                        @retry="startBrief"
+                        @skip="onSkipBrief"
+                        @back="onBriefBack"
+                    />
+                </section>
+
+                <!-- STEP 4: PREVIEW -->
                 <section v-else-if="step === 'preview'" class="aipg-section">
                     <div class="aipg-plan-header">
                         <div class="aipg-plan-head-row">
@@ -259,24 +278,58 @@
                                 :disabled="loading"/>
                             <code class="aipg-code-pill">{{ plan.project.ProjectCode }}</code>
                             <span class="aipg-ml-auto aipg-helper">
-                                {{ totals.sprints }} sprints · {{ totals.tasks }} tasks
+                                {{ $t('AiProject.sprint_count', { n: keptTotals.sprints }, keptTotals.sprints) }} · {{ $t('AiProject.task_count', { n: keptTotals.tasks }, keptTotals.tasks) }}
                                 <!-- Cost is omitted, not zeroed, when the model
                                      has no price on file — a wrong number is
                                      worse than no number. -->
                                 <template v-if="runUsage">
                                     ·
                                     <span class="aipg-usage" :title="usageTooltip">
-                                        {{ formatTokens(runUsage.totalTokens) }} tokens<template
+                                        {{ $t('AiProject.token_count', { n: formatTokens(runUsage.totalTokens) }, runUsage.totalTokens) }}<template
                                             v-if="runUsage.costUsd !== null"> · {{ formatCost(runUsage.costUsd) }}</template>
                                     </span>
                                 </template>
                             </span>
                         </div>
                         <p class="aipg-plan-description">{{ plan.project.description }}</p>
+                        <p v-if="splitSummary" class="aipg-split-summary" data-test="split-summary">
+                            {{ $t('AiProject.split_summary', splitSummary) }}
+                        </p>
                         <div class="aipg-plan-skills">
                             <label class="aipg-field-label-sm">{{ $t('ProjectDetails.skills') }}</label>
                             <SkillsSelect v-model="skills" :bordered="true" :showAll="true"/>
                         </div>
+                    </div>
+
+                    <IntentPreview
+                        v-if="planCard"
+                        :preview="planCard"
+                        choosable
+                        :left-out="leftOut"
+                        :disabled="loading"
+                        data-test="plan-card"
+                        @update:left-out="(parts) => leftOut = parts"/>
+
+                    <div v-if="(plan.rulesDropped || []).length" class="aipg-card">
+                        <PlanRules
+                            :notes="plan.rulesDropped || []"
+                            :notes-title="$t('AiProject.rules_dropped_title')"/>
+                    </div>
+
+                    <div v-if="planAssumptions.length" class="aipg-card aipg-card-accent" data-test="plan-assumptions">
+                        <label class="aipg-field-label">{{ $t('AiProject.assumptions_title') }}</label>
+                        <ul class="aipg-assumption-list">
+                            <li v-for="(a, i) in planAssumptions" :key="i">
+                                <span v-if="a.point" class="aipg-chip aipg-chip-app aipg-chip-xs">{{ $t(`AiProject.point_${a.point}`) }}</span>
+                                {{ a.text }}
+                            </li>
+                        </ul>
+                    </div>
+
+                    <div v-if="(plan.viewsDropped || []).length" class="aipg-card">
+                        <PlanViews
+                            :notes="plan.viewsDropped || []"
+                            :notes-title="$t('AiProject.views_dropped_title')"/>
                     </div>
 
                     <div class="aipg-folder-list">
@@ -284,6 +337,7 @@
                             v-for="(sprint, si) in plan.sprints"
                             :key="'s-'+si"
                             class="aipg-folder"
+                            :class="{ 'is-left-out': isLeftOut('lists:' + si) }"
                             :open="si === 0">
                             <summary class="aipg-folder-summary">
                                 <span class="aipg-chevron" aria-hidden="true">›</span>
@@ -293,28 +347,32 @@
                                     maxlength="80"
                                     :disabled="loading"
                                     @click.stop/>
-                                <span class="aipg-pill aipg-ml-auto">{{ sprint.tasks.length }} tasks</span>
+                                <span v-if="isLeftOut('lists:' + si)" class="aipg-pill aipg-ml-auto" data-test="left-out">{{ $t('AiProject.left_out') }}</span>
+                                <span v-else class="aipg-pill aipg-ml-auto">{{ $t('AiProject.task_count', { n: sprint.tasks.length }, sprint.tasks.length) }}</span>
                             </summary>
                             <ul class="aipg-task-list">
-                                <li v-for="(task, ti) in sprint.tasks" :key="'t-'+si+'-'+ti" class="aipg-task">
-                                    <input
-                                        v-model="task.TaskName"
-                                        class="aipg-input-plain aipg-task-name"
-                                        maxlength="200"
-                                        :disabled="loading"/>
+                                <li v-for="(task, ti) in sprint.tasks" :key="'t-'+si+'-'+ti" class="aipg-task" :class="{ 'is-left-out': isLeftOut(taskKey(si, ti)) }">
+                                    <div class="aipg-task-row">
+                                        <input
+                                            v-model="task.TaskName"
+                                            class="aipg-input-plain aipg-task-name"
+                                            maxlength="200"
+                                            :disabled="loading"/>
+                                        <span v-if="isLeftOut(taskKey(si, ti))" class="aipg-pill" data-test="left-out">{{ $t('AiProject.left_out') }}</span>
+                                        <SplitBadge :split="task.split"/>
+                                    </div>
                                     <details class="aipg-task-desc">
                                         <summary class="aipg-task-desc-trigger">
                                             <span class="aipg-chevron aipg-chevron-sm" aria-hidden="true">›</span>
-                                            Description
+                                            {{ $t('AiProject.task_description') }}
                                         </summary>
                                         <pre class="aipg-task-desc-body">{{ renderTaskDescription(task) }}</pre>
                                     </details>
-                                    <!-- Sub-tasks and hours were generated but never shown, so a split
-                                         task looked identical to a flat one until after creation. -->
                                     <span v-if="task.estimatedHours" class="aipg-task-est">{{ formatHours(task.estimatedHours) }}</span>
                                     <div v-if="task.subtasks && task.subtasks.length" class="aipg-subs">
                                         <div v-for="(st, sti) in task.subtasks" :key="'st-'+si+'-'+ti+'-'+sti" class="aipg-sub">
                                             ↳ {{ st.TaskName }}<span v-if="st.estimatedHours" class="aipg-sub-est">{{ formatHours(st.estimatedHours) }}</span>
+                                            <SplitBadge :split="st.split"/>
                                         </div>
                                     </div>
                                 </li>
@@ -322,43 +380,63 @@
                         </details>
                     </div>
 
+                    <GuidePreview
+                        v-if="approvedBrief"
+                        :guide="guide"
+                        :markdown="guideMarkdown"
+                        :loading="guideLoading"
+                        :error-message="guideError"
+                        @retry="loadGuide"
+                        @update:markdown="(v) => guideMarkdown = v"
+                    />
+
                     <transition name="aipg-fade">
-                        <div v-if="error" class="aipg-alert aipg-alert-danger">{{ error }}</div>
+                        <div v-if="error" class="aipg-alert aipg-alert-danger">
+                            <div>{{ error }}</div>
+                            <button
+                                v-if="planExpired"
+                                type="button"
+                                class="aipg-btn aipg-btn-ghost"
+                                data-test="generate-again"
+                                :disabled="loading"
+                                @click="onGenerateAgain"
+                            >{{ $t('AiProject.generate_again') }}</button>
+                        </div>
                     </transition>
 
                     <div class="aipg-actions aipg-actions-split">
-                        <button class="aipg-btn aipg-btn-ghost" @click="step = 'input'; error = ''" :disabled="loading">
-                            ← Back
+                        <button class="aipg-btn aipg-btn-ghost" @click="onPreviewBack" :disabled="loading">
+                            {{ $t('AiProject.back') }}
                         </button>
-                        <button class="aipg-btn aipg-btn-primary" :disabled="loading" @click="onApprovePlan">
+                        <button class="aipg-btn aipg-btn-primary" :disabled="loading" data-test="create-everything" @click="onApprovePlan">
                             <span v-if="loading" class="aipg-spinner aipg-spinner-sm" aria-hidden="true"></span>
-                            {{ loading ? 'Starting…' : '✓ Create everything' }}
+                            {{ loading ? $t('AiProject.starting') : $t('AiProject.create_everything') }}
                         </button>
                     </div>
                 </section>
 
-                <!-- STEP 3: EXECUTING / DONE -->
+                <!-- STEP 5: EXECUTING / DONE -->
                 <section v-else-if="step === 'executing' || step === 'done'" class="aipg-section">
                     <div class="aipg-exec-head">
                         <span v-if="step === 'executing'" class="aipg-spinner" aria-hidden="true"></span>
                         <span v-else class="aipg-success-tick" aria-hidden="true">✓</span>
-                        <h4 class="aipg-exec-title">{{ step === 'done' ? 'All done!' : 'Building your project…' }}</h4>
+                        <h4 class="aipg-exec-title">{{ step === 'done' ? $t('AiProject.all_done') : $t('AiProject.building') }}</h4>
                     </div>
                     <div class="aipg-progress-list">
                         <div class="aipg-progress-row" :class="rowClass('project')">
                             <span class="aipg-progress-icon"><span v-html="stepIcon('project')" /></span>
-                            <span class="aipg-progress-label">Project</span>
+                            <span class="aipg-progress-label">{{ $t('AiProject.progress_project') }}</span>
                             <span class="aipg-progress-status">{{ stepStatusLabel('project') }}</span>
                         </div>
                         <div class="aipg-progress-row" :class="rowClass('sprint')">
                             <span class="aipg-progress-icon"><span v-html="stepIcon('sprint')" /></span>
-                            <span class="aipg-progress-label">Sprints</span>
+                            <span class="aipg-progress-label">{{ $t('AiProject.progress_sprints') }}</span>
                             <span class="aipg-progress-status">{{ progress.sprintsDone }} / {{ progress.totalSprints || '…' }}</span>
                         </div>
                         <div class="aipg-progress-row" :class="rowClass('tasks')">
                             <span class="aipg-progress-icon"><span v-html="stepIcon('tasks')" /></span>
-                            <span class="aipg-progress-label">Tasks</span>
-                            <span class="aipg-progress-status">{{ progress.tasksDone }} / {{ progress.totalTasks || '…' }}</span>
+                            <span class="aipg-progress-label">{{ $t('AiProject.progress_tasks') }}</span>
+                            <span class="aipg-progress-status" data-test="progress-tasks">{{ progress.tasksDone }} / {{ progress.totalTasks || '…' }}</span>
                         </div>
                     </div>
 
@@ -366,9 +444,46 @@
                         {{ progress.lastEvent }}
                     </p>
 
+                    <div v-if="step === 'done' && hasOutcome" class="aipg-card aipg-outcome" data-test="outcome">
+                        <p v-if="outcome.runsQueued > 0" class="aipg-outcome-line">
+                            <span class="aipg-chip aipg-chip-app">⚡ {{ $t('AiProject.runs_queued', { n: outcome.runsQueued }, outcome.runsQueued) }}</span>
+                        </p>
+                        <div v-if="outcome.runsRefused.length" class="aipg-outcome-refused" data-test="runs-refused">
+                            <label class="aipg-field-label-sm">{{ $t('AiProject.runs_refused_title') }}</label>
+                            <ul class="aipg-assumption-list">
+                                <li v-for="(r, i) in outcome.runsRefused" :key="i">
+                                    <strong v-if="r.taskName || r.title">{{ r.taskName || r.title }}</strong>
+                                    <span v-if="r.reason"> — {{ r.reason }}</span>
+                                </li>
+                            </ul>
+                        </div>
+                        <PlanViews
+                            :views="outcome.viewsMade"
+                            :notes="outcome.viewsNotMade"
+                            :title="$t('AiProject.views_made_title')"
+                            :notes-title="$t('AiProject.views_not_made_title')"/>
+                        <button
+                            v-if="outcome.guideAgentId"
+                            type="button"
+                            class="aipg-btn-link aipg-outcome-guide"
+                            data-test="open-guide"
+                            @click="onOpenGuideAgent">
+                            {{ $t('AiProject.open_guide_agent') }}
+                        </button>
+                    </div>
+
+                    <div v-if="step === 'done' && (ruleOutcome.made.length || ruleOutcome.notMade.length)" class="aipg-card" data-test="rules-outcome">
+                        <PlanRules
+                            :rules="ruleOutcome.made"
+                            :notes="ruleOutcome.notMade"
+                            :title="$t('AiProject.rules_made_title')"
+                            :notes-title="$t('AiProject.rules_not_made_title')"
+                            :hint="$t('AiProject.rules_turn_on')"/>
+                    </div>
+
                     <div v-if="step === 'done'" class="aipg-actions">
-                        <button class="aipg-btn aipg-btn-primary" @click="onOpenProject">
-                            Open project →
+                        <button class="aipg-btn aipg-btn-primary" data-test="open-project" @click="onOpenProject">
+                            {{ $t('AiProject.open_project') }}
                         </button>
                     </div>
                 </section>
@@ -376,13 +491,13 @@
                 <section v-else-if="step === 'error'" class="aipg-section">
                     <div class="aipg-exec-head">
                         <span class="aipg-error-tick" aria-hidden="true">!</span>
-                        <h4 class="aipg-exec-title">Something went wrong</h4>
+                        <h4 class="aipg-exec-title">{{ $t('AiProject.error_title') }}</h4>
                     </div>
-                    <div class="aipg-alert aipg-alert-danger">{{ error || 'Unknown error' }}</div>
-                    <p v-if="rolledBack" class="aipg-helper">All partial creates have been rolled back.</p>
+                    <div class="aipg-alert aipg-alert-danger">{{ error || $t('AiProject.unknown_error') }}</div>
+                    <p v-if="rolledBack" class="aipg-helper">{{ $t('AiProject.rolled_back') }}</p>
                     <div class="aipg-actions aipg-actions-split">
-                        <button class="aipg-btn aipg-btn-ghost" @click="onClose">Close</button>
-                        <button class="aipg-btn aipg-btn-primary" @click="onRetry">Back to plan</button>
+                        <button class="aipg-btn aipg-btn-ghost" @click="onClose">{{ $t('AiProject.close') }}</button>
+                        <button class="aipg-btn aipg-btn-primary" @click="onRetry">{{ $t('AiProject.back_to_plan') }}</button>
                     </div>
                 </section>
             </div>
@@ -394,8 +509,19 @@
 import { ref, reactive, computed, onBeforeUnmount, inject, defineComponent } from 'vue';
 import Sidebar from '@/components/molecules/Sidebar/Sidebar.vue';
 import ClarifyStep from './clarify/ClarifyStep.vue';
+import CoverageChips from './brief/CoverageChips.vue';
+import BriefStep from './brief/BriefStep.vue';
+import SplitBadge from './plan/SplitBadge.vue';
+import GuidePreview from './plan/GuidePreview.vue';
+import PlanViews from './plan/PlanViews.vue';
+import PlanRules from './plan/PlanRules.vue';
+import { POINTS } from './brief/points';
+import { cardOf, keptLists } from './plan/planCard';
+import IntentPreview from '@/components/molecules/IntentPreview/IntentPreview.vue';
+import { chosenParts } from '@/components/molecules/IntentPreview/planPicks';
 import { useAiProjectGenerator } from '@/composable/aiProjectGenerator';
 import { useStore } from 'vuex';
+import { useRoute, useRouter } from 'vue-router';
 import SkillsSelect from '@/components/molecules/SkillsSelect/SkillsSelect.vue';
 import ProjectSourceSelect from '@/components/molecules/ProjectSourceSelect/ProjectSourceSelect.vue';
 import { PROJECT_SOURCES, checkProposalId } from '@/utils/projectSource';
@@ -403,7 +529,7 @@ import { useI18n } from 'vue-i18n';
 
 export default defineComponent({
     name: 'AiProjectCreator',
-    components: { Sidebar, ClarifyStep, SkillsSelect, ProjectSourceSelect },
+    components: { Sidebar, ClarifyStep, CoverageChips, BriefStep, SplitBadge, GuidePreview, PlanViews, PlanRules, IntentPreview, SkillsSelect, ProjectSourceSelect },
     props: {
         visible: { type: Boolean, default: false },
     },
@@ -412,26 +538,47 @@ export default defineComponent({
         const clientWidth = inject('$clientWidth') || ref(window.innerWidth);
         const api = useAiProjectGenerator();
         const store = useStore();
+        const route = useRoute();
+        const router = useRouter();
         const { t } = useI18n();
 
-        const step = ref('input'); // input | clarify | preview | executing | done | error
+        const step = ref('input'); // input | clarify | brief | preview | executing | done | error
         const loading = ref(false);
         const briefUploading = ref(false);
         const error = ref('');
         const rolledBack = ref(false);
 
-        // ── Clarify step state ───────────────────────────────────────────
-        // The Clarify step is OPTIONAL. If the brief is already detailed
-        // enough the LLM returns zero questions and we skip it. If the
-        // /clarify call fails we also skip it — the user can still finish
-        // the flow with the existing plan generation.
-        const clarifyLoading = ref(false);   // true while we're fetching questions
-        const clarifyQuestions = ref([]);    // [{id, category, question, type, options, recommended, ...}]
-        const clarifyUnderstanding = ref('');// short "here's what I heard" line from the LLM
-        const clarifyError = ref('');        // error message inside the clarify step (recoverable)
-        // The answers/skips the user submitted from the Clarify step,
-        // sent verbatim into /plan as the `clarifications` array.
+        // Clarify is optional: zero questions (coverage all met) or a failed
+        // /clarify call both skip it, so the wizard never depends on it.
+        const clarifyLoading = ref(false);
+        const clarifyQuestions = ref([]);
+        const clarifyUnderstanding = ref('');
+        const clarifyError = ref('');
+        // Sent verbatim into /plan as `clarifications`; also the `answers` /brief gets.
         const clarifications = ref(null);
+        const coverage = ref(null);
+        const clarifyRound = ref(0);
+        const clarifyMaxRounds = ref(2);
+        // Answers accumulate across rounds; a round asks only about points still missing.
+        const answers = ref([]);
+
+        const briefLoading = ref(false);
+        const briefError = ref('');
+        const briefDraft = ref(null);
+        const briefMarkdown = ref('');
+        const briefApproved = ref(false);
+        const briefEditedSinceApproval = ref(false);
+        // Frozen at approval: what /plan, /guide and /execute receive. Editing after
+        // approval clears it so the plan can never be built from unapproved text.
+        const approvedBrief = ref('');
+
+        const guide = ref(null);
+        const guideMarkdown = ref('');
+        const guideLoading = ref(false);
+        const guideError = ref('');
+
+        const outcome = reactive({ guideAgentId: null, runsQueued: 0, runsRefused: [], viewsMade: [], viewsNotMade: [] });
+        const ruleOutcome = reactive({ made: [], notMade: [] });
 
         // True when ANY in-flight operation owns the modal — brief upload,
         // clarify LLM call, plan LLM call, or the orchestrator's execute
@@ -460,6 +607,7 @@ export default defineComponent({
 
         const plan = ref(null);
         const planId = ref(null);
+        const planExpired = ref(false);
         const editableProjectName = computed({
             get: () => (plan.value ? plan.value.project.ProjectName : ''),
             set: (v) => { if (plan.value) plan.value.project.ProjectName = String(v || '').slice(0, 80); },
@@ -479,9 +627,10 @@ export default defineComponent({
         });
         const createdProjectId = ref(null);
 
-        const placeholderText = 'e.g. "A 3-month SaaS launch for a 5-person team building an invoicing tool with Stripe billing. Kanban workflow. GitHub + Slack integrations. MVP in 6 weeks; full launch in 12."';
+        const placeholderText = computed(() => t('AiProject.describe_placeholder'));
 
         const canGenerate = computed(() => description.value.trim().length >= 20);
+        const hasSource = computed(() => PROJECT_SOURCES.includes(source.value));
 
         // True once a plan has been produced and is still held in memory.
         // Drives the dual-button layout on Step 1 (Next + Re-Generate)
@@ -537,21 +686,85 @@ export default defineComponent({
         }
 
         const totals = computed(() => {
-            if (!plan.value || !Array.isArray(plan.value.sprints)) return { sprints: 0, tasks: 0 };
-            let t = 0;
-            for (const sp of plan.value.sprints) t += (sp.tasks || []).length;
-            return { sprints: plan.value.sprints.length, tasks: t };
+            if (!plan.value || !Array.isArray(plan.value.sprints)) return { sprints: 0, tasks: 0, taskDocs: 0 };
+            let tasks = 0;
+            let taskDocs = 0;
+            for (const sp of plan.value.sprints) {
+                for (const task of sp.tasks || []) {
+                    tasks += 1;
+                    taskDocs += 1 + (Array.isArray(task.subtasks) ? task.subtasks.length : 0);
+                }
+            }
+            return { sprints: plan.value.sprints.length, tasks, taskDocs };
         });
+
+        const leftOut = ref([]);
+        const planCard = computed(() => cardOf(plan.value, { withGuide: Boolean(approvedBrief.value || guide.value) }));
+        const keptTotals = computed(() => {
+            const picks = planCard.value ? chosenParts(planCard.value, leftOut.value) : null;
+            if (!picks) return totals.value;
+            const keep = (part) => new Set(Array.isArray(picks[part]) ? picks[part] : []);
+            const [lists, tasks] = [keep('lists'), keep('tasks')];
+            let at = 0;
+            let taskDocs = 0;
+            let kept = 0;
+            (plan.value.sprints || []).forEach((sprint, list) => (sprint.tasks || []).forEach((task) => {
+                if (!tasks.has(at++) || !lists.has(list)) return;
+                kept += 1;
+                taskDocs += 1 + (Array.isArray(task.subtasks) ? task.subtasks.length : 0);
+            }));
+            return { sprints: lists.size, tasks: kept, taskDocs };
+        });
+        const isLeftOut = (key) => leftOut.value.includes(key) || (planCard.value?.locked || []).includes(key);
+        const taskKey = (si, ti) => 'tasks:' + ((plan.value?.sprints || []).slice(0, si).reduce((n, sprint) => n + (sprint.tasks || []).length, 0) + ti);
+
+        const briefAssumptions = computed(() => {
+            const list = briefDraft.value && Array.isArray(briefDraft.value.assumptions) ? briefDraft.value.assumptions : [];
+            return list.filter((a) => a && a.text);
+        });
+
+        const planAssumptions = computed(() => {
+            const echoed = plan.value && Array.isArray(plan.value.assumptions) ? plan.value.assumptions.filter((a) => a && a.text) : [];
+            return echoed.length ? echoed : briefAssumptions.value;
+        });
+
+        // Older plans carry no split at all; counting the labels ourselves keeps the
+        // summary honest when the server forgot the totals but not the labels.
+        const splitSummary = computed(() => {
+            const p = plan.value;
+            if (!p) return null;
+            const s = p.splitSummary;
+            if (s && typeof s === 'object') {
+                return { agent: Number(s.agent) || 0, agentAfter: Number(s.agentAfter) || 0, person: Number(s.person) || 0 };
+            }
+            const counts = { agent: 0, agentAfter: 0, person: 0 };
+            let labelled = 0;
+            for (const sp of p.sprints || []) {
+                for (const task of sp.tasks || []) {
+                    const label = task.split && task.split.label;
+                    if (!label) continue;
+                    labelled += 1;
+                    if (label === 'agent') counts.agent += 1;
+                    else if (label === 'agent-after') counts.agentAfter += 1;
+                    else counts.person += 1;
+                }
+            }
+            return labelled ? counts : null;
+        });
+
+        const hasOutcome = computed(() => outcome.runsQueued > 0 || outcome.runsRefused.length > 0 || !!outcome.guideAgentId
+            || outcome.viewsMade.length > 0 || outcome.viewsNotMade.length > 0);
 
         // What this run cost. One wizard run can be two LLM calls — the clarify
         // round and the plan itself — so both are collected and added up;
         // reporting only the plan would undercount every run that asked
         // questions first.
         const clarifyUsage = ref(null);
+        const briefUsage = ref(null);
         const planUsage = ref(null);
 
         const runUsage = computed(() => {
-            const parts = [clarifyUsage.value, planUsage.value].filter(Boolean);
+            const parts = [clarifyUsage.value, briefUsage.value, planUsage.value].filter(Boolean);
             if (!parts.length) return null;
             const totalTokens = parts.reduce((sum, u) => sum + (Number(u.totalTokens) || 0), 0);
             if (!totalTokens) return null;
@@ -574,9 +787,9 @@ export default defineComponent({
         const usageTooltip = computed(() => {
             const u = runUsage.value;
             if (!u) return '';
-            const parts = [`${formatTokens(u.inputTokens)} in · ${formatTokens(u.outputTokens)} out`];
+            const parts = [t('AiProject.usage_split', { input: formatTokens(u.inputTokens), output: formatTokens(u.outputTokens) })];
             if (u.model) parts.push(u.model);
-            if (u.costUsd === null) parts.push('no price on file for this model');
+            if (u.costUsd === null) parts.push(t('AiProject.usage_no_price'));
             return parts.join(' — ');
         });
 
@@ -620,10 +833,7 @@ export default defineComponent({
         }
 
         function isStepDone(name) {
-            // Order includes the new 'clarify' step between input and preview.
-            // Steps not in this list (e.g. 'error') treat the step as not done,
-            // matching the existing behavior.
-            const order = ['input', 'clarify', 'preview', 'executing', 'done'];
+            const order = ['input', 'clarify', 'brief', 'preview', 'executing', 'done'];
             return order.indexOf(name) < order.indexOf(step.value);
         }
 
@@ -657,9 +867,9 @@ export default defineComponent({
 
         function stepStatusLabel(name) {
             const state = progress[name] || (name === 'tasks' ? progress.tasksState : progress[`${name}State`]);
-            if (state === 'done') return 'Done';
-            if (state === 'active') return 'In progress';
-            return 'Pending';
+            if (state === 'done') return t('AiProject.status_done');
+            if (state === 'active') return t('AiProject.status_in_progress');
+            return t('AiProject.status_pending');
         }
 
         async function onFileChosen(evt) {
@@ -676,7 +886,7 @@ export default defineComponent({
                     briefStats.charCount = result.charCount;
                     briefStats.truncated = result.truncated;
                 } else {
-                    error.value = (result && result.statusText) || 'Brief upload failed';
+                    error.value = (result && result.statusText) || t('AiProject.upload_failed');
                 }
             } catch (e) {
                 error.value = friendlyErr(e);
@@ -695,92 +905,211 @@ export default defineComponent({
             if (el) el.value = '';
         }
 
-        // Entry point from Step 1's "Generate plan" button. Tries to fetch
-        // clarifying questions first; if any are returned the user is sent
-        // into the Clarify step. If the LLM returns zero questions, or if
-        // the clarify call fails for any reason, we skip Q&A and run plan
-        // generation directly — the wizard MUST stay functional even if
-        // the Q&A feature is broken.
+        function resetBriefFlow() {
+            clarifications.value = null;
+            coverage.value = null;
+            clarifyRound.value = 0;
+            answers.value = [];
+            briefDraft.value = null;
+            briefMarkdown.value = '';
+            briefApproved.value = false;
+            briefEditedSinceApproval.value = false;
+            approvedBrief.value = '';
+            briefError.value = '';
+            guide.value = null;
+            guideMarkdown.value = '';
+            guideError.value = '';
+        }
+
+        function applyClarifyResponse(res) {
+            if (res && res.usage) clarifyUsage.value = res.usage;
+            if (res && res.coverage && typeof res.coverage === 'object') coverage.value = res.coverage;
+            if (res && Number(res.maxRounds) > 0) clarifyMaxRounds.value = Number(res.maxRounds);
+            const questions = res && res.status && Array.isArray(res.questions) ? res.questions : [];
+            if (!questions.length) return false;
+            clarifyRound.value = Number(res.round) > 0 ? Number(res.round) : clarifyRound.value + 1;
+            clarifyQuestions.value = questions;
+            clarifyUnderstanding.value = res.understanding || '';
+            return true;
+        }
+
+        // Entry point from Step 1. Questions come back only for points the brief
+        // misses; none at all (or a failed call) goes straight to the brief draft.
         async function onGeneratePlan() {
-            if (!canGenerate.value) return;
+            if (!canGenerate.value || !hasSource.value) return;
             error.value = '';
             clarifyError.value = '';
-            clarifications.value = null;
-            // Stay on Step 1 during the clarify call — the "Generate plan"
-            // button shows "Analyzing brief…" via the clarifyLoading flag.
-            // We transition to the Clarify wizard ONLY if the LLM returns
-            // questions; if it returns `[]` (or fails) we go straight to
-            // plan generation without ever showing the wizard skeleton.
+            resetBriefFlow();
             clarifyLoading.value = true;
             try {
                 const res = await api.generateClarifyingQuestions({
                     description: description.value.trim(),
                     briefId: briefId.value,
                 });
-                if (res && res.usage) clarifyUsage.value = res.usage;
-                if (res && res.status && Array.isArray(res.questions) && res.questions.length) {
-                    // Questions came back — NOW move into the Clarify step.
-                    clarifyQuestions.value = res.questions;
-                    clarifyUnderstanding.value = res.understanding || '';
-                    clarifyLoading.value = false;
+                clarifyLoading.value = false;
+                if (applyClarifyResponse(res)) {
                     step.value = 'clarify';
-                    return; // user now answers; submit will call runPlanGeneration
+                    return;
                 }
-                // Empty array, status:false, or malformed — skip Q&A and
-                // go straight to plan generation. User never sees the
-                // wizard. clarifyLoading stays true → loading flips to
-                // `loading` inside runPlanGeneration, so the button text
-                // smoothly transitions from "Analyzing brief…" to
-                // "Generating plan…" without a state gap.
-                clarifyLoading.value = false;
-                await runPlanGeneration(null);
+                await startBrief();
             } catch (e) {
-                // Clarify failed — graceful fallback to plan generation.
-                // User stays on Step 1; runPlanGeneration handles its own
-                // error surfacing via error.value.
                 clarifyLoading.value = false;
-                await runPlanGeneration(null);
+                await startBrief();
             }
         }
 
-        // The actual plan-generation call. Separated from onGeneratePlan so
-        // both the post-clarify submit and the "skip clarify" fallback can
-        // share it without duplicating the SSE-wait + error handling.
         async function runPlanGeneration(clarificationsPayload) {
             loading.value = true;
             error.value = '';
+            const retryStep = approvedBrief.value ? 'brief' : 'input';
             try {
                 const result = await api.generatePlan({
                     description: description.value.trim(),
                     briefId: briefId.value,
                     isPrivateSpace: isPrivateSpace.value,
                     clarifications: clarificationsPayload,
-                    // Picked in step 1 and, until now, only used when saving the
-                    // finished project. The plan has to be built for the chosen
-                    // technology, not merely tagged with it afterwards.
+                    // The plan has to be built for the chosen technology, not
+                    // merely tagged with it afterwards.
                     skills: skills.value,
+                    approvedBrief: approvedBrief.value || null,
+                    assumptions: briefAssumptions.value,
                 });
                 if (!result || !result.status) {
-                    error.value = (result && result.statusText) || 'Plan generation failed. Please try again.';
-                    step.value = 'input'; // back to Step 1 so user can retry
+                    error.value = (result && result.statusText) || t('AiProject.plan_failed');
+                    step.value = retryStep;
                     return;
                 }
                 if (!result.plan) {
-                    error.value = 'The AI did not return a plan. Please try again.';
-                    step.value = 'input';
+                    error.value = t('AiProject.plan_empty');
+                    step.value = retryStep;
                     return;
                 }
                 plan.value = result.plan;
+                leftOut.value = [];
                 planId.value = result.planId;
+                planExpired.value = false;
                 planUsage.value = result.usage || null;
                 mergeSuggestedSkills(result.plan);
                 step.value = 'preview';
+                if (approvedBrief.value) loadGuide();
             } catch (e) {
                 error.value = friendlyErr(e);
-                step.value = 'input';
+                step.value = retryStep;
             } finally {
                 loading.value = false;
             }
+        }
+
+        async function startBrief() {
+            step.value = 'brief';
+            error.value = '';
+            briefError.value = '';
+            briefApproved.value = false;
+            briefEditedSinceApproval.value = false;
+            approvedBrief.value = '';
+            briefLoading.value = true;
+            try {
+                const res = await api.generateBrief({
+                    description: description.value.trim(),
+                    briefId: briefId.value,
+                    answers: answers.value,
+                });
+                if (res && res.usage) briefUsage.value = res.usage;
+                if (res && res.coverage && typeof res.coverage === 'object') coverage.value = res.coverage;
+                const draft = res && res.status && res.brief;
+                if (!draft || typeof draft.markdown !== 'string' || !draft.markdown.trim()) {
+                    briefError.value = (res && res.statusText) || t('AiProject.brief_failed');
+                    return;
+                }
+                briefDraft.value = draft;
+                briefMarkdown.value = draft.markdown;
+            } catch (e) {
+                briefError.value = friendlyErr(e);
+            } finally {
+                briefLoading.value = false;
+            }
+        }
+
+        function onBriefEdit(text) {
+            briefMarkdown.value = text;
+            if (briefApproved.value) {
+                briefApproved.value = false;
+                briefEditedSinceApproval.value = true;
+            }
+            approvedBrief.value = '';
+        }
+
+        function onApproveBrief() {
+            if (!briefMarkdown.value.trim()) return;
+            approvedBrief.value = briefMarkdown.value;
+            briefApproved.value = true;
+            briefEditedSinceApproval.value = false;
+        }
+
+        async function onGenerateFromBrief() {
+            if (!briefApproved.value || !approvedBrief.value) return;
+            await runPlanGeneration(clarifications.value);
+        }
+
+        // Escape hatch when /brief is unavailable: the plan is built the old way.
+        async function onSkipBrief() {
+            approvedBrief.value = '';
+            briefApproved.value = false;
+            await runPlanGeneration(clarifications.value);
+        }
+
+        function onBriefBack() {
+            error.value = '';
+            step.value = hasGeneratedQuestions.value ? 'clarify' : 'input';
+        }
+
+        async function onGenerateAgain() {
+            planExpired.value = false;
+            error.value = '';
+            await runPlanGeneration(clarifications.value);
+        }
+
+        function onPreviewBack() {
+            error.value = '';
+            step.value = approvedBrief.value ? 'brief' : 'input';
+        }
+
+        async function loadGuide() {
+            if (!approvedBrief.value || !plan.value) return;
+            guideLoading.value = true;
+            guideError.value = '';
+            try {
+                const res = await api.generateGuide({
+                    planId: planId.value,
+                    approvedBrief: approvedBrief.value,
+                    assumptions: planAssumptions.value,
+                    plan: plan.value,
+                });
+                const g = res && res.status && res.guide;
+                if (!g || typeof g !== 'object') {
+                    guideError.value = (res && res.statusText) || t('AiProject.guide_failed');
+                    return;
+                }
+                guide.value = g;
+                guideMarkdown.value = typeof g.markdown === 'string' ? g.markdown : '';
+            } catch (e) {
+                guideError.value = friendlyErr(e);
+            } finally {
+                guideLoading.value = false;
+            }
+        }
+
+        function applyOutcome(payload) {
+            if (!payload || typeof payload !== 'object') return;
+            const rules = payload.rules || {};
+            if (Array.isArray(rules.made)) ruleOutcome.made = rules.made.filter(Boolean);
+            if (Array.isArray(rules.notMade)) ruleOutcome.notMade = rules.notMade.filter(Boolean);
+            if (payload.guideAgentId) outcome.guideAgentId = payload.guideAgentId;
+            if (typeof payload.runsQueued === 'number') outcome.runsQueued = payload.runsQueued;
+            if (Array.isArray(payload.runsRefused)) outcome.runsRefused = payload.runsRefused.filter(Boolean);
+            const views = payload.views || {};
+            if (Array.isArray(views.made)) outcome.viewsMade = views.made.filter(Boolean);
+            if (Array.isArray(views.notMade)) outcome.viewsNotMade = views.notMade.filter(Boolean);
         }
 
         // User's picks first, then the model's — known slugs only, mirroring the
@@ -800,26 +1129,44 @@ export default defineComponent({
             skills.value = merged;
         }
 
-        // ── Clarify step handlers ────────────────────────────────────────
-        // Submitted from the ClarifyStep component with the full
-        // clarifications array (one entry per question, including skipped).
-        async function onClarifySubmit(clarificationsPayload) {
-            clarifications.value = clarificationsPayload;
-            await runPlanGeneration(clarificationsPayload);
+        // A second round is worth a call only while a missing point was never asked
+        // about; an answered, skipped or "don't know" point is settled for this brief.
+        function pointsStillUnasked(roundAnswers) {
+            const cov = coverage.value || {};
+            const asked = new Set(roundAnswers.map((a) => a.point).filter(Boolean));
+            const everAsked = new Set(answers.value.map((a) => a.point).filter(Boolean));
+            return POINTS.filter((p) => cov[p] === 'missing' && !asked.has(p) && !everAsked.has(p));
         }
 
-        // User clicked "← Back" on the Clarify step — return to Step 1 but
-        // KEEP the generated questions + answers in memory. Step 1 then
-        // shows the dual-button layout ("Re-Generate Questions" / "Next →")
-        // so the user can hop back into the Clarify step without paying
-        // for another LLM call. We only clear `clarifyError` since that's
-        // tied to a transient panel state, not to the questions themselves.
+        async function onClarifySubmit(roundAnswers) {
+            const list = Array.isArray(roundAnswers) ? roundAnswers : [];
+            const unasked = pointsStillUnasked(list);
+            answers.value = [...answers.value, ...list];
+            clarifications.value = answers.value;
+            if (clarifyRound.value < clarifyMaxRounds.value && unasked.length) {
+                clarifyLoading.value = true;
+                try {
+                    const res = await api.generateClarifyingQuestions({
+                        description: description.value.trim(),
+                        briefId: briefId.value,
+                        previousAnswers: answers.value,
+                    });
+                    clarifyLoading.value = false;
+                    if (applyClarifyResponse(res)) return;
+                } catch (e) {
+                    clarifyLoading.value = false;
+                }
+            }
+            await startBrief();
+        }
+
+        // Back keeps the questions and answers so Step 1 can re-enter Clarify
+        // without another LLM call.
         function onClarifyBack() {
             step.value = 'input';
             clarifyError.value = '';
         }
 
-        // Retry button inside the Clarify step's error panel.
         async function onClarifyRetry() {
             clarifyError.value = '';
             clarifyLoading.value = true;
@@ -827,25 +1174,18 @@ export default defineComponent({
                 const res = await api.generateClarifyingQuestions({
                     description: description.value.trim(),
                     briefId: briefId.value,
+                    previousAnswers: answers.value,
                 });
-                if (res && res.usage) clarifyUsage.value = res.usage;
-                if (res && res.status && Array.isArray(res.questions) && res.questions.length) {
-                    clarifyQuestions.value = res.questions;
-                    clarifyUnderstanding.value = res.understanding || '';
-                } else {
-                    // Still empty — just skip and generate.
-                    await runPlanGeneration(null);
-                }
-            } catch (e) {
-                clarifyError.value = friendlyErr(e);
-            } finally {
                 clarifyLoading.value = false;
+                if (!applyClarifyResponse(res)) await startBrief();
+            } catch (e) {
+                clarifyLoading.value = false;
+                clarifyError.value = friendlyErr(e);
             }
         }
 
-        // "Skip and generate plan" button inside the Clarify error panel.
         async function onClarifySkipAll() {
-            await runPlanGeneration(null);
+            await startBrief();
         }
 
         function buildEdits() {
@@ -859,14 +1199,13 @@ export default defineComponent({
                     sprintName: s.sprintName,
                     tasks: (s.tasks || []).map((t) => ({ TaskName: t.TaskName })),
                 })),
+                ...(guide.value && guideMarkdown.value ? { guideMarkdown: guideMarkdown.value } : {}),
             };
         }
 
         async function onApprovePlan() {
             if (!plan.value) return;
-            // Enforced here rather than before plan generation: the AI doesn't
-            // need either value, so blocking step 1 would be friction for nothing.
-            if (!PROJECT_SOURCES.includes(source.value)) {
+            if (!hasSource.value) {
                 error.value = t('Projects.source_required');
                 step.value = 'input';
                 return;
@@ -876,11 +1215,17 @@ export default defineComponent({
                 step.value = 'input';
                 return;
             }
+            const picks = planCard.value ? chosenParts(planCard.value, leftOut.value) : null;
+            if (keptLists(picks) === 0) {
+                error.value = t('AiProject.keep_one_list');
+                return;
+            }
             loading.value = true;
             error.value = '';
             try {
                 const result = await api.execute({
-                    plan: plan.value,
+                    planId: planId.value,
+                    picks,
                     edits: buildEdits(),
                     userName: '',
                     isPrivateSpace: isPrivateSpace.value,
@@ -888,14 +1233,20 @@ export default defineComponent({
                     source: source.value,
                     skills: skills.value,
                 });
-                if (!result || !result.status || !result.jobId) {
-                    error.value = (result && result.statusText) || 'Execute failed';
+                if (result && result.expired) {
+                    planExpired.value = true;
+                    error.value = t('AiProject.plan_expired');
                     return;
                 }
+                if (!result || !result.status || !result.jobId) {
+                    error.value = (result && result.statusText) || t('AiProject.execute_failed');
+                    return;
+                }
+                applyOutcome(result);
                 jobId.value = result.jobId;
                 step.value = 'executing';
-                progress.totalSprints = totals.value.sprints;
-                progress.totalTasks = totals.value.tasks;
+                progress.totalSprints = keptTotals.value.sprints;
+                progress.totalTasks = keptTotals.value.taskDocs;
                 subscribe();
             } catch (e) {
                 error.value = friendlyErr(e);
@@ -923,8 +1274,9 @@ export default defineComponent({
                     } else if (payload.step === 'tasks') {
                         progress.sprintState = 'done';
                         progress.tasksState = payload.status === 'done' ? 'done' : 'active';
+                        // The server's `total` counts parent tasks only while `completed`
+                        // includes subtasks; the plan-derived taskDocs total is the one that matches.
                         if (typeof payload.completed === 'number') progress.tasksDone = payload.completed;
-                        if (typeof payload.total === 'number') progress.totalTasks = payload.total;
                     }
                 } else if (payload.event === 'complete') {
                     progress.project = 'done';
@@ -933,10 +1285,12 @@ export default defineComponent({
                     progress.sprintsDone = (payload.totals && payload.totals.sprints) || progress.sprintsDone;
                     progress.tasksDone = (payload.totals && payload.totals.tasks) || progress.tasksDone;
                     createdProjectId.value = payload.projectId;
+                    applyOutcome(payload);
+                    // `created` waits for "Open project": parents close the sidebar on
+                    // it, which would hide the queued-runs summary and the guide link.
                     step.value = 'done';
-                    emit('created', { projectId: payload.projectId });
                 } else if (payload.event === 'error') {
-                    error.value = payload.error || 'Execution failed';
+                    error.value = payload.error || t('AiProject.execute_failed');
                     rolledBack.value = !!payload.rolledBack;
                     step.value = 'error';
                 }
@@ -946,6 +1300,14 @@ export default defineComponent({
         function onOpenProject() {
             if (createdProjectId.value) emit('created', { projectId: createdProjectId.value });
             onClose();
+        }
+
+        function onOpenGuideAgent() {
+            const id = outcome.guideAgentId;
+            if (!id) return;
+            const cid = route && route.params ? route.params.cid : undefined;
+            onClose();
+            router.push({ name: 'AiAgent', params: { cid, id } });
         }
 
         function onRetry() {
@@ -979,7 +1341,9 @@ export default defineComponent({
             briefStats.truncated = false;
             briefStats.charCount = 0;
             plan.value = null;
+            leftOut.value = [];
             planId.value = null;
+            planExpired.value = false;
             jobId.value = null;
             createdProjectId.value = null;
             progress.project = 'pending';
@@ -998,20 +1362,29 @@ export default defineComponent({
             skills.value = [];
             clarifyUsage.value = null;
             planUsage.value = null;
-            // Reset clarify state too so re-opening the modal is a clean slate.
+            briefUsage.value = null;
             clarifyLoading.value = false;
             clarifyQuestions.value = [];
             clarifyUnderstanding.value = '';
             clarifyError.value = '';
-            clarifications.value = null;
+            briefLoading.value = false;
+            guideLoading.value = false;
+            resetBriefFlow();
+            ruleOutcome.made = [];
+            ruleOutcome.notMade = [];
+            outcome.guideAgentId = null;
+            outcome.runsQueued = 0;
+            outcome.runsRefused = [];
+            outcome.viewsMade = [];
+            outcome.viewsNotMade = [];
             emit('close');
         }
 
         function friendlyErr(e) {
-            if (!e) return 'Unknown error';
+            if (!e) return t('AiProject.unknown_error');
             if (e.response && e.response.data && e.response.data.statusText) return e.response.data.statusText;
             if (e.message) return e.message;
-            try { return String(e); } catch (_e) { return 'Unknown error'; }
+            try { return String(e); } catch (_e) { return t('AiProject.unknown_error'); }
         }
 
         onBeforeUnmount(() => {
@@ -1021,19 +1394,25 @@ export default defineComponent({
         return {
             clientWidth, step, loading, briefUploading, error, rolledBack,
             description, isPrivateSpace, proposalId, source, skills, briefFile, briefId, briefStats,
-            plan, planId, editableProjectName,
+            plan, planId, planExpired, onGenerateAgain, editableProjectName, planCard, leftOut, keptTotals, isLeftOut, taskKey,
             jobId, progress, createdProjectId,
             placeholderText,
-            canGenerate, hasGeneratedPlan, hasGeneratedQuestions, totals, isBusy,
+            canGenerate, hasSource, hasGeneratedPlan, hasGeneratedQuestions, totals, isBusy,
             runUsage, usageTooltip, formatTokens, formatCost, formatHours,
             renderTaskDescription, isStepDone, stepClass, stepDoneDot, rowClass, stepIcon, stepStatusLabel,
             onFileChosen, clearBrief,
             onGeneratePlan, onNextWithExistingPlan,
             onRegenerateQuestions, onNextWithExistingQuestions,
-            onApprovePlan, onOpenProject, onRetry, onClose, onSidebarVisibleChange,
-            // Clarify step
+            onApprovePlan, onOpenProject, onOpenGuideAgent, onRetry, onClose, onSidebarVisibleChange, onPreviewBack,
             clarifyLoading, clarifyQuestions, clarifyUnderstanding, clarifyError,
+            coverage, clarifyRound, clarifyMaxRounds,
             onClarifySubmit, onClarifyBack, onClarifyRetry, onClarifySkipAll,
+            briefLoading, briefError, briefMarkdown, briefApproved, briefEditedSinceApproval, briefAssumptions, approvedBrief,
+            onBriefEdit, onApproveBrief, onGenerateFromBrief, onSkipBrief, onBriefBack, startBrief,
+            planAssumptions, splitSummary,
+            guide, guideMarkdown, guideLoading, guideError, loadGuide,
+            ruleOutcome,
+            outcome, hasOutcome,
         };
     },
 });
@@ -1044,26 +1423,26 @@ export default defineComponent({
    Design tokens
    ───────────────────────────────────────────────────────────────────── */
 .aipg-wrapper {
-    --aipg-bg: #ffffff;
-    --aipg-bg-subtle: #f8fafc;
-    --aipg-bg-muted: #f1f5f9;
-    --aipg-border: #e5e7eb;
-    --aipg-border-strong: #cbd5e1;
-    --aipg-text: #0f172a;
-    --aipg-text-muted: #64748b;
-    --aipg-text-helper: #94a3b8;
-    --aipg-primary: #2F3990;
-    --aipg-primary-hover: #252D75;
-    --aipg-primary-soft: #eef2ff;
-    --aipg-success: #15803d;
-    --aipg-success-soft: #dcfce7;
-    --aipg-danger: #b91c1c;
-    --aipg-danger-soft: #fee2e2;
+    --aipg-bg: var(--surface);
+    --aipg-bg-subtle: var(--surface-2);
+    --aipg-bg-muted: var(--fill);
+    --aipg-border: var(--hairline);
+    --aipg-border-strong: var(--border);
+    --aipg-text: var(--ink);
+    --aipg-text-muted: var(--ink-2);
+    --aipg-text-helper: var(--ink-2);
+    --aipg-primary: var(--brand);
+    --aipg-primary-hover: var(--brand-deep);
+    --aipg-primary-soft: var(--brand-tint);
+    --aipg-success: var(--ok-ink);
+    --aipg-success-soft: var(--ok-bg);
+    --aipg-danger: var(--danger-ink);
+    --aipg-danger-soft: var(--danger-bg);
     --aipg-radius-sm: 6px;
     --aipg-radius: 10px;
     --aipg-radius-lg: 14px;
-    --aipg-shadow-sm: 0 1px 2px rgba(15, 23, 42, 0.04);
-    --aipg-shadow: 0 2px 12px rgba(15, 23, 42, 0.06);
+    --aipg-shadow-sm: 0 1px 2px var(--shadow-ink);
+    --aipg-shadow: 0 2px 12px var(--shadow-ink);
 
     padding: 20px 22px 28px;
     color: var(--aipg-text);
@@ -1078,7 +1457,7 @@ export default defineComponent({
 .aipg-head-title {
     font-size: 16px;
     font-weight: 700;
-    color: var(--aipg-text, #0f172a);
+    color: var(--aipg-text, var(--ink));
     display: inline-flex;
     align-items: center;
     gap: 6px;
@@ -1110,7 +1489,7 @@ export default defineComponent({
     align-items: center;
     gap: 8px;
     font-size: 13px;
-    color: #94a3b8;
+    color: var(--ink-2);
     transition: color 0.2s ease;
 }
 .aipg-step-dot {
@@ -1121,8 +1500,8 @@ export default defineComponent({
     align-items: center;
     justify-content: center;
     font-weight: 600;
-    background: #f1f5f9;
-    color: #94a3b8;
+    background: var(--fill);
+    color: var(--ink-2);
     border: 1.5px solid transparent;
     transition: background 0.2s ease, color 0.2s ease, border-color 0.2s ease;
 }
@@ -1130,21 +1509,21 @@ export default defineComponent({
 .aipg-step-line {
     flex: 1;
     height: 2px;
-    background: #e5e7eb;
+    background: var(--fill);
     border-radius: 2px;
     transition: background 0.2s ease;
 }
-.aipg-step-line.done { background: #2F3990; }
-.aipg-step-active { color: #2F3990; }
+.aipg-step-line.done { background: var(--brand); }
+.aipg-step-active { color: var(--brand); }
 .aipg-step-active .aipg-step-dot {
-    background: #eef2ff;
-    color: #2F3990;
-    border-color: #2F3990;
+    background: var(--brand-tint);
+    color: var(--brand);
+    border-color: var(--brand);
 }
-.aipg-step-done { color: #15803d; }
+.aipg-step-done { color: var(--ok-ink); }
 .aipg-step-done .aipg-step-dot {
-    background: #dcfce7;
-    color: #15803d;
+    background: var(--ok-bg);
+    color: var(--ok-ink);
 }
 
 /* ─────────────────────────────────────────────────────────────────────
@@ -1153,20 +1532,20 @@ export default defineComponent({
 .aipg-section { display: flex; flex-direction: column; gap: 16px; }
 
 .aipg-card {
-    background: #ffffff;
-    border: 1px solid #e5e7eb;
+    background: var(--surface);
+    border: 1px solid var(--hairline);
     border-radius: 14px;
     padding: 16px 18px;
-    box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04);
+    box-shadow: 0 1px 2px var(--shadow-ink);
     transition: border-color 0.2s ease, box-shadow 0.2s ease;
 }
 .aipg-card:focus-within {
-    border-color: #c7d2fe;
-    box-shadow: 0 0 0 4px rgba(79, 70, 229, 0.08);
+    border-color: var(--brand-border);
+    box-shadow: 0 0 0 4px var(--brand-tint);
 }
 .aipg-card-accent {
-    background: #f5f3ff;
-    border-color: #ddd6fe;
+    background: var(--brand-tint);
+    border-color: var(--brand-border);
 }
 
 /* ─────────────────────────────────────────────────────────────────────
@@ -1175,49 +1554,49 @@ export default defineComponent({
 .aipg-field-label {
     display: block;
     font-weight: 600;
-    color: #0f172a;
+    color: var(--ink);
     margin-bottom: 8px;
     font-size: 14px;
 }
 .aipg-field-label-sm {
     display: block;
     font-size: 12px;
-    color: #64748b;
+    color: var(--ink-2);
     font-weight: 500;
     margin-bottom: 4px;
 }
 .aipg-helper {
-    color: #94a3b8;
+    color: var(--ink-2);
     font-size: 12px;
     margin: 0;
 }
 .aipg-helper-row { margin-top: 8px; }
-.aipg-helper-ok { color: #15803d; }
+.aipg-helper-ok { color: var(--ok-ink); }
 .aipg-helper-center { text-align: center; }
-.aipg-muted { color: #94a3b8; }
+.aipg-muted { color: var(--ink-2); }
 .aipg-ml-auto { margin-left: auto; }
 
 .aipg-textarea {
     width: 100%;
-    border: 1px solid #e5e7eb;
+    border: 1px solid var(--hairline);
     border-radius: 10px;
     padding: 12px 14px;
     font: inherit;
     font-size: 14px;
-    color: #0f172a;
-    background: #ffffff;
+    color: var(--ink);
+    background: var(--surface);
     resize: vertical;
     min-height: 180px;
     transition: border-color 0.15s ease, box-shadow 0.15s ease;
 }
 .aipg-textarea:focus {
     outline: none;
-    border-color: #2F3990;
-    box-shadow: 0 0 0 4px rgba(79, 70, 229, 0.12);
+    border-color: var(--brand);
+    box-shadow: 0 0 0 4px var(--brand-ring);
 }
 .aipg-textarea:disabled {
-    background: #f8fafc;
-    color: #94a3b8;
+    background: var(--surface-2);
+    color: var(--ink-2);
     cursor: not-allowed;
 }
 .aipg-textarea-sm { min-height: 100px; }
@@ -1226,21 +1605,21 @@ export default defineComponent({
     width: 100%;
     margin-top: 10px;   /* same helper-to-control gap as .aipg-file-drop */
     padding: 8px 12px;
-    border: 1px solid #e5e7eb;
+    border: 1px solid var(--hairline);
     border-radius: 8px;
     font-size: 14px;
-    background: #ffffff;
-    color: #0f172a;
+    background: var(--surface);
+    color: var(--ink);
     transition: border-color 0.15s ease, box-shadow 0.15s ease;
 }
 .aipg-input:focus {
     outline: none;
-    border-color: #2F3990;
-    box-shadow: 0 0 0 3px rgba(79, 70, 229, 0.12);
+    border-color: var(--brand);
+    box-shadow: 0 0 0 3px var(--brand-ring);
 }
 .aipg-input:disabled {
-    background: #f8fafc;
-    color: #94a3b8;
+    background: var(--surface-2);
+    color: var(--ink-2);
     cursor: not-allowed;
 }
 .aipg-range { width: 100%; margin-top: 10px; }
@@ -1256,9 +1635,9 @@ export default defineComponent({
     align-items: center;
     gap: 10px;
     padding: 12px 14px;
-    border: 1.5px solid #e5e7eb;
+    border: 1.5px solid var(--hairline);
     border-radius: 10px;
-    background: #ffffff;
+    background: var(--surface);
     text-align: left;
     cursor: pointer;
     transition: background 0.15s ease, border-color 0.15s ease, box-shadow 0.15s ease;
@@ -1266,13 +1645,13 @@ export default defineComponent({
     color: inherit;
 }
 .aipg-privacy-option:hover:not(:disabled) {
-    border-color: #c7d2fe;
-    background: #fafbff;
+    border-color: var(--brand-border);
+    background: var(--surface-2);
 }
 .aipg-privacy-option-active {
-    border-color: #2F3990;
-    background: #eef2ff;
-    box-shadow: 0 0 0 3px rgba(79, 70, 229, 0.08);
+    border-color: var(--brand);
+    background: var(--brand-tint);
+    box-shadow: 0 0 0 3px var(--brand-tint);
 }
 .aipg-privacy-option:disabled { cursor: not-allowed; opacity: 0.6; }
 .aipg-privacy-icon {
@@ -1280,24 +1659,24 @@ export default defineComponent({
     width: 32px;
     height: 32px;
     border-radius: 8px;
-    background: #f8fafc;
+    background: var(--surface-2);
     display: inline-flex;
     align-items: center;
     justify-content: center;
 }
 .aipg-privacy-option-active .aipg-privacy-icon {
-    background: #ffffff;
+    background: var(--surface);
 }
 .aipg-privacy-text { display: inline-flex; flex-direction: column; gap: 2px; min-width: 0; }
-.aipg-privacy-text strong { font-size: 14px; color: #0f172a; }
-.aipg-privacy-sub { font-size: 12px; color: #64748b; }
-.aipg-privacy-option-active .aipg-privacy-sub { color: #252D75; }
+.aipg-privacy-text strong { font-size: 14px; color: var(--ink); }
+.aipg-privacy-sub { font-size: 12px; color: var(--ink-2); }
+.aipg-privacy-option-active .aipg-privacy-sub { color: var(--brand); }
 .aipg-target-count {
     display: inline-block;
     margin-left: 8px;
     padding: 2px 10px;
-    background: #eef2ff;
-    color: #2F3990;
+    background: var(--brand-tint);
+    color: var(--brand);
     border-radius: 999px;
     font-size: 13px;
     font-weight: 700;
@@ -1313,14 +1692,14 @@ export default defineComponent({
     transition: background 0.15s ease, border-color 0.15s ease;
 }
 .aipg-input-plain:hover:not(:disabled) {
-    background: #f8fafc;
-    border-color: #e5e7eb;
+    background: var(--surface-2);
+    border-color: var(--hairline);
 }
 .aipg-input-plain:focus {
     outline: none;
-    background: #ffffff;
-    border-color: #2F3990;
-    box-shadow: 0 0 0 3px rgba(79, 70, 229, 0.12);
+    background: var(--surface);
+    border-color: var(--brand);
+    box-shadow: 0 0 0 3px var(--brand-ring);
 }
 .aipg-input-plain:disabled { cursor: not-allowed; opacity: 0.7; }
 
@@ -1342,7 +1721,7 @@ export default defineComponent({
 .aipg-chevron {
     display: inline-block;
     transition: transform 0.2s ease;
-    color: #94a3b8;
+    color: var(--ink-2);
     font-weight: 700;
 }
 details[open] > .aipg-disclosure-summary .aipg-chevron,
@@ -1364,17 +1743,17 @@ details[open] > .aipg-task-desc-trigger .aipg-chevron { transform: rotate(90deg)
 .aipg-file-drop {
     margin-top: 10px;
     display: block;
-    border: 1.5px dashed #cbd5e1;
+    border: 1.5px dashed var(--border);
     border-radius: 12px;
     padding: 16px;
-    background: #f8fafc;
+    background: var(--surface-2);
     cursor: pointer;
     transition: border-color 0.15s ease, background 0.15s ease;
     text-align: center;
 }
 .aipg-file-drop:hover:not(.is-disabled) {
-    border-color: #2F3990;
-    background: #eef2ff;
+    border-color: var(--brand);
+    background: var(--brand-tint);
 }
 .aipg-file-drop.is-disabled { cursor: not-allowed; opacity: 0.7; }
 .aipg-file-drop input[type=file] { display: none; }
@@ -1386,10 +1765,10 @@ details[open] > .aipg-task-desc-trigger .aipg-chevron { transform: rotate(90deg)
     flex-wrap: wrap;
     justify-content: center;
 }
-.aipg-file-drop-ok { color: #15803d; }
+.aipg-file-drop-ok { color: var(--ok-ink); }
 .aipg-tick {
-    background: #dcfce7;
-    color: #15803d;
+    background: var(--ok-bg);
+    color: var(--ok-ink);
     width: 22px;
     height: 22px;
     border-radius: 999px;
@@ -1399,27 +1778,27 @@ details[open] > .aipg-task-desc-trigger .aipg-chevron { transform: rotate(90deg)
     font-weight: 700;
 }
 .aipg-upload-icon {
-    background: #ffffff;
-    border: 1px solid #cbd5e1;
+    background: var(--surface);
+    border: 1px solid var(--border);
     width: 22px;
     height: 22px;
     border-radius: 999px;
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    color: #64748b;
+    color: var(--ink-2);
 }
 .aipg-btn-link {
     background: none;
     border: none;
-    color: #2F3990;
+    color: var(--brand);
     cursor: pointer;
     padding: 0 4px;
     font: inherit;
     text-decoration: underline;
 }
-.aipg-btn-link:hover:not(:disabled) { color: #252D75; }
-.aipg-btn-link:disabled { color: #cbd5e1; cursor: not-allowed; text-decoration: none; }
+.aipg-btn-link:hover:not(:disabled) { color: var(--brand); }
+.aipg-btn-link:disabled { color: var(--ink-2); cursor: not-allowed; text-decoration: none; }
 
 /* ─────────────────────────────────────────────────────────────────────
    Clarification questions
@@ -1428,7 +1807,7 @@ details[open] > .aipg-task-desc-trigger .aipg-chevron { transform: rotate(90deg)
     margin: 0 0 12px;
     font-size: 14px;
     font-weight: 600;
-    color: #2F3990;
+    color: var(--brand);
 }
 .aipg-q-row + .aipg-q-row { margin-top: 12px; }
 
@@ -1436,11 +1815,11 @@ details[open] > .aipg-task-desc-trigger .aipg-chevron { transform: rotate(90deg)
    Plan preview header
    ───────────────────────────────────────────────────────────────────── */
 .aipg-plan-header {
-    background: #ffffff;
-    border: 1px solid #e5e7eb;
+    background: var(--surface);
+    border: 1px solid var(--hairline);
     border-radius: 14px;
     padding: 16px 18px;
-    box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04);
+    box-shadow: 0 1px 2px var(--shadow-ink);
 }
 .aipg-plan-head-row {
     display: flex;
@@ -1455,9 +1834,9 @@ details[open] > .aipg-task-desc-trigger .aipg-chevron { transform: rotate(90deg)
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    color: #ffffff;
+    color: var(--on-brand);
     font-size: 18px;
-    box-shadow: 0 2px 6px rgba(15, 23, 42, 0.08);
+    box-shadow: 0 2px 6px var(--shadow-ink);
 }
 .aipg-project-name {
     font-size: 18px;
@@ -1471,12 +1850,12 @@ details[open] > .aipg-task-desc-trigger .aipg-chevron { transform: rotate(90deg)
 .aipg-usage {
     font-variant-numeric: tabular-nums;
     cursor: help;
-    border-bottom: 1px dotted #cbd5e1;
+    border-bottom: 1px dotted var(--border);
 }
 
 .aipg-subs { margin: 2px 0 4px 12px; }
 .aipg-sub {
-    font-size: 12px; color: #6b7488; padding: 2px 0;
+    font-size: 12px; color: var(--ink-2); padding: 2px 0;
     overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
 }
 /* The estimate is the number a reader scans for, so it gets the same quiet
@@ -1488,8 +1867,8 @@ details[open] > .aipg-task-desc-trigger .aipg-chevron { transform: rotate(90deg)
     margin-left: 8px;
     padding: 1px 7px;
     border-radius: 999px;
-    background: #f1f5f9;
-    color: #475569;
+    background: var(--fill);
+    color: var(--ink-2);
     font-size: 11px;
     font-weight: 600;
     font-variant-numeric: tabular-nums;
@@ -1497,8 +1876,8 @@ details[open] > .aipg-task-desc-trigger .aipg-chevron { transform: rotate(90deg)
 }
 
 .aipg-code-pill {
-    background: #f1f5f9;
-    color: #475569;
+    background: var(--fill);
+    color: var(--ink-2);
     padding: 3px 10px;
     border-radius: 999px;
     font-size: 12px;
@@ -1508,10 +1887,10 @@ details[open] > .aipg-task-desc-trigger .aipg-chevron { transform: rotate(90deg)
 }
 .aipg-plan-description {
     margin: 10px 0 12px;
-    color: #475569;
+    color: var(--ink-2);
     font-size: 13px;
 }
-.aipg-required { color: #dc2626; }
+.aipg-required { color: var(--danger-ink); }
 /* Second field in a shared card: separated by space, not another border. */
 .aipg-field-label-stacked { margin-top: 18px; }
 .aipg-plan-skills,
@@ -1531,20 +1910,46 @@ details[open] > .aipg-task-desc-trigger .aipg-chevron { transform: rotate(90deg)
     font-size: 12px;
     font-weight: 500;
 }
-.aipg-chip-app { background: #eef2ff; color: #252D75; }
+.aipg-chip-app { background: var(--brand-tint); color: var(--brand); }
+.aipg-chip-xs { padding: 1px 8px; font-size: 11px; margin-right: 6px; }
+
+.aipg-coverage-card { display: flex; flex-direction: column; gap: 8px; }
+.aipg-coverage-hint { line-height: 1.5; }
+.aipg-split-summary {
+    margin: 8px 0 0;
+    font-size: 13px;
+    font-weight: 500;
+    color: var(--brand);
+}
+.aipg-assumption-list {
+    margin: 4px 0 0;
+    padding-left: 18px;
+    font-size: 13px;
+    line-height: 1.5;
+    color: var(--ink);
+}
+.aipg-assumption-list li + li { margin-top: 4px; }
+.aipg-task-row { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.aipg-task-row .aipg-task-name { flex: 1 1 200px; }
+.aipg-outcome { display: flex; flex-direction: column; gap: 10px; }
+.aipg-outcome-line { margin: 0; }
+.aipg-outcome-refused .aipg-assumption-list { color: var(--ink-2); }
+.aipg-outcome-guide { align-self: flex-start; font-size: 13px; }
 
 /* ─────────────────────────────────────────────────────────────────────
    Folder / sprint / task tree
    ───────────────────────────────────────────────────────────────────── */
 .aipg-folder-list { display: flex; flex-direction: column; gap: 10px; }
 .aipg-folder {
-    background: #ffffff;
-    border: 1px solid #e5e7eb;
+    background: var(--surface);
+    border: 1px solid var(--hairline);
     border-radius: 12px;
     padding: 4px 14px;
     transition: border-color 0.15s ease;
 }
-.aipg-folder[open] { border-color: #c7d2fe; }
+.aipg-folder[open] { border-color: var(--brand-border); }
+.aipg-folder.is-left-out .aipg-folder-name,
+.aipg-task.is-left-out .aipg-task-name { color: var(--ink-2); text-decoration: line-through; }
 .aipg-folder-summary {
     list-style: none;
     cursor: pointer;
@@ -1563,8 +1968,8 @@ details[open] > .aipg-task-desc-trigger .aipg-chevron { transform: rotate(90deg)
     min-width: 0;
 }
 .aipg-pill {
-    background: #f1f5f9;
-    color: #475569;
+    background: var(--fill);
+    color: var(--ink-2);
     padding: 2px 10px;
     border-radius: 999px;
     font-size: 12px;
@@ -1573,7 +1978,7 @@ details[open] > .aipg-task-desc-trigger .aipg-chevron { transform: rotate(90deg)
 .aipg-pill-sm { padding: 1px 8px; font-size: 11px; }
 
 .aipg-sprint {
-    border-left: 2px solid #e2e8f0;
+    border-left: 2px solid var(--hairline);
     padding: 8px 0 8px 16px;
     margin: 4px 4px 10px 8px;
 }
@@ -1582,13 +1987,13 @@ details[open] > .aipg-task-desc-trigger .aipg-chevron { transform: rotate(90deg)
 .aipg-task-list { list-style: none; padding: 0; margin: 8px 0 0; }
 .aipg-task {
     padding: 6px 0;
-    border-bottom: 1px solid #f1f5f9;
+    border-bottom: 1px solid var(--hairline);
 }
 .aipg-task:last-child { border-bottom: none; }
 .aipg-task-name {
     width: 100%;
     font-size: 13px;
-    color: #0f172a;
+    color: var(--ink);
 }
 .aipg-task-desc { margin-top: 4px; }
 .aipg-task-desc-trigger {
@@ -1597,7 +2002,7 @@ details[open] > .aipg-task-desc-trigger .aipg-chevron { transform: rotate(90deg)
     display: inline-flex;
     align-items: center;
     gap: 4px;
-    color: #64748b;
+    color: var(--ink-2);
     font-size: 12px;
     user-select: none;
 }
@@ -1606,14 +2011,14 @@ details[open] > .aipg-task-desc-trigger .aipg-chevron { transform: rotate(90deg)
 .aipg-task-desc-body {
     white-space: pre-wrap;
     word-break: break-word;
-    background: #f8fafc;
-    border: 1px solid #e5e7eb;
+    background: var(--surface-2);
+    border: 1px solid var(--hairline);
     border-radius: 8px;
     padding: 10px 12px;
     font-size: 12px;
     line-height: 1.5;
     margin: 6px 0 0;
-    color: #334155;
+    color: var(--ink);
 }
 
 /* ─────────────────────────────────────────────────────────────────────
@@ -1627,8 +2032,8 @@ details[open] > .aipg-task-desc-trigger .aipg-chevron { transform: rotate(90deg)
 }
 .aipg-exec-title { margin: 0; font-size: 16px; font-weight: 700; }
 .aipg-success-tick {
-    background: #dcfce7;
-    color: #15803d;
+    background: var(--ok-bg);
+    color: var(--ok-ink);
     width: 28px;
     height: 28px;
     border-radius: 999px;
@@ -1638,8 +2043,8 @@ details[open] > .aipg-task-desc-trigger .aipg-chevron { transform: rotate(90deg)
     font-weight: 700;
 }
 .aipg-error-tick {
-    background: #fee2e2;
-    color: #b91c1c;
+    background: var(--danger-bg);
+    color: var(--danger-ink);
     width: 28px;
     height: 28px;
     border-radius: 999px;
@@ -1656,9 +2061,9 @@ details[open] > .aipg-task-desc-trigger .aipg-chevron { transform: rotate(90deg)
     gap: 10px;
     padding: 10px 14px;
     border-radius: 10px;
-    background: #f8fafc;
-    border: 1px solid #e5e7eb;
-    color: #64748b;
+    background: var(--surface-2);
+    border: 1px solid var(--hairline);
+    color: var(--ink-2);
     font-size: 13px;
     transition: background 0.15s ease, border-color 0.15s ease, color 0.15s ease;
 }
@@ -1666,34 +2071,34 @@ details[open] > .aipg-task-desc-trigger .aipg-chevron { transform: rotate(90deg)
     width: 22px;
     height: 22px;
     border-radius: 999px;
-    background: #e5e7eb;
-    color: #64748b;
+    background: var(--fill);
+    color: var(--ink-2);
     display: inline-flex;
     align-items: center;
     justify-content: center;
     font-weight: 700;
     font-size: 13px;
 }
-.aipg-progress-label { font-weight: 500; color: #0f172a; }
-.aipg-progress-status { color: #94a3b8; font-size: 12px; }
+.aipg-progress-label { font-weight: 500; color: var(--ink); }
+.aipg-progress-status { color: var(--ink-2); font-size: 12px; }
 .aipg-progress-row-active {
-    background: #eef2ff;
-    border-color: #c7d2fe;
+    background: var(--brand-tint);
+    border-color: var(--brand-border);
 }
 .aipg-progress-row-active .aipg-progress-icon {
-    background: #c7d2fe;
-    color: #252D75;
+    background: var(--brand-tint);
+    color: var(--brand);
 }
-.aipg-progress-row-active .aipg-progress-status { color: #2F3990; }
+.aipg-progress-row-active .aipg-progress-status { color: var(--brand); }
 .aipg-progress-row-done {
-    background: #f0fdf4;
-    border-color: #bbf7d0;
+    background: var(--ok-bg);
+    border-color: var(--ok);
 }
 .aipg-progress-row-done .aipg-progress-icon {
-    background: #bbf7d0;
-    color: #15803d;
+    background: var(--ok-bg);
+    color: var(--ok-ink);
 }
-.aipg-progress-row-done .aipg-progress-status { color: #15803d; }
+.aipg-progress-row-done .aipg-progress-status { color: var(--ok-ink); }
 
 /* ─────────────────────────────────────────────────────────────────────
    Alerts + actions
@@ -1704,7 +2109,7 @@ details[open] > .aipg-task-desc-trigger .aipg-chevron { transform: rotate(90deg)
     font-size: 13px;
     line-height: 1.45;
 }
-.aipg-alert-danger { background: #fee2e2; color: #b91c1c; }
+.aipg-alert-danger { background: var(--danger-bg); color: var(--danger-ink); }
 .aipg-alert-hint { margin: 6px 0 0; font-size: 12px; opacity: 0.85; }
 
 .aipg-actions {
@@ -1735,29 +2140,29 @@ details[open] > .aipg-task-desc-trigger .aipg-chevron { transform: rotate(90deg)
 }
 .aipg-btn:focus-visible {
     outline: none;
-    box-shadow: 0 0 0 4px rgba(79, 70, 229, 0.18);
+    box-shadow: 0 0 0 4px var(--brand-ring);
 }
 .aipg-btn:active:not(:disabled) { transform: translateY(1px); }
 .aipg-btn:disabled { cursor: not-allowed; opacity: 0.55; }
 
 .aipg-btn-primary {
-    background: #2F3990;
-    color: #ffffff;
-    border-color: #2F3990;
+    background: var(--brand);
+    color: var(--on-brand);
+    border-color: var(--brand);
 }
 .aipg-btn-primary:hover:not(:disabled) {
-    background: #252D75;
-    border-color: #252D75;
+    background: var(--brand-deep);
+    border-color: var(--brand-deep);
 }
 
 .aipg-btn-ghost {
-    background: #ffffff;
-    color: #0f172a;
-    border-color: #e5e7eb;
+    background: var(--surface);
+    color: var(--ink);
+    border-color: var(--hairline);
 }
 .aipg-btn-ghost:hover:not(:disabled) {
-    background: #f8fafc;
-    border-color: #cbd5e1;
+    background: var(--surface-2);
+    border-color: var(--border);
 }
 
 /* ─────────────────────────────────────────────────────────────────────
@@ -1768,17 +2173,17 @@ details[open] > .aipg-task-desc-trigger .aipg-chevron { transform: rotate(90deg)
     align-items: center;
     gap: 14px;
     padding: 14px 16px;
-    background: #eef2ff;
-    border: 1px solid #c7d2fe;
+    background: var(--brand-tint);
+    border: 1px solid var(--brand-border);
     border-radius: 12px;
-    box-shadow: 0 2px 8px rgba(47, 57, 144, 0.07);
+    box-shadow: 0 2px 8px var(--shadow-ink);
 }
 .aipg-status-spinner {
     flex-shrink: 0;
     width: 22px !important;
     height: 22px !important;
-    border: 2.5px solid rgba(47, 57, 144, 0.18) !important;
-    border-top-color: #2F3990 !important;
+    border: 2.5px solid var(--brand-border) !important;
+    border-top-color: var(--brand) !important;
 }
 .aipg-status-panel-text {
     display: flex;
@@ -1790,12 +2195,12 @@ details[open] > .aipg-task-desc-trigger .aipg-chevron { transform: rotate(90deg)
     margin: 0;
     font-size: 14px;
     font-weight: 600;
-    color: #2F3990;
+    color: var(--brand);
 }
 .aipg-status-panel-sub {
     margin: 0;
     font-size: 12px;
-    color: #4338ca;
+    color: var(--brand);
     opacity: 0.8;
 }
 
@@ -1806,15 +2211,15 @@ details[open] > .aipg-task-desc-trigger .aipg-chevron { transform: rotate(90deg)
     display: inline-block;
     width: 18px;
     height: 18px;
-    border: 2px solid rgba(79, 70, 229, 0.2);
-    border-top-color: #2F3990;
+    border: 2px solid var(--brand-border);
+    border-top-color: var(--brand);
     border-radius: 999px;
     animation: aipg-spin 0.7s linear infinite;
     vertical-align: middle;
 }
 .aipg-btn-primary .aipg-spinner {
-    border: 2px solid rgba(255, 255, 255, 0.35);
-    border-top-color: #ffffff;
+    border: 2px solid color-mix(in srgb, var(--on-brand) 35%, transparent);
+    border-top-color: var(--surface);
 }
 .aipg-spinner-sm { width: 14px; height: 14px; border-width: 2px; }
 .aipg-spinner-xs { width: 11px; height: 11px; border-width: 2px; }

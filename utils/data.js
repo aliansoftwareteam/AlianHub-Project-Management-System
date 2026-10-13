@@ -13,82 +13,16 @@ const { settingsCollectionDocs } = require('../Config/collections');
 const logger = require("../Config/loggerConfig");
 const { MongoDbCrudOpration } = require("./mongo-handler/mongoQueries");
 const { SCHEMA_TYPE } = require("../Config/schemaType");
+const { COMMENT_NOTICE_ITEMS, DOC_NOTICE_SECTION, docNoticeSection, GOAL_NOTICE_SECTION, goalNoticeSection } = require("../Config/notificationKey");
 const {defaultCustomFields} = require("../utils/Tempates/customFields");
 const {defaultProjectTours} = require("../utils/Tempates/projectTours");
 const { addSprintFun } = require('../Modules/Sprints/controller');
 const { updateMainChat } = require('../Modules/MainChats/controller');
 const { toSlug } = require('../Modules/settings/ProjectSkills/skillRules');
-
-// Safe to hardcode here and nowhere else: importCompanyRoles below is what creates role key 3 as
-// "Member", so at seed time the number and the role are the same thing. Runtime code must never
-// assume it — a company can rename or add roles afterwards.
-const MEMBER_ROLE_TYPE = 3;
-
-// What a brand-new company gives the Member role. Before this existed the rules were seeded with
-// empty role lists, so an invited teammate saw a product with almost everything hidden and the
-// owner had to set ~100 switches by hand before anyone could work.
-//
-// These are not invented. Two established companies were read and compared: where both owners had
-// independently made the same choice, that choice is the default; where they differed, the more
-// restrictive of the two is used, never below Read if both allowed at least Read. Keys absent from
-// this map get nothing, so anything unlisted or newly added fails closed.
-//
-// false = Read, true = Read & Write, a number = the "Own (1) / Everyone (2)" selection fields.
-const MEMBER_DEFAULT_PERMISSIONS = {
-    // Sections. `settings` and `artificial_intelligence` are deliberately absent.
-    project: false,
-    task: true,
-    chat: true,
-    sheet_settings: false,
-
-    // Projects: members work inside them, they do not administer them.
-    project_list: false,
-    public_projects: false,
-    private_projects: 1,
-    project_details: false,
-
-    // Tasks: the day-to-day job, so this group is open.
-    task_list: true,
-    task_create: true,
-    sub_task_create: true,
-    task_name_edit: true,
-    task_total_estimate: true,
-    task_status: true,
-    task_assignee: true,
-    task_priority: true,
-    task_due_date: true,
-    task_start_date: true,
-    task_description: true,
-    task_checklist: true,
-    task_checklist_assign_remove: true,
-    task_attachments: true,
-    task_tag: true,
-    task_type: true,
-    task_comment: true,
-    task_details: true,
-    task_duplicate: true,
-    task_move: true,
-    task_merge: true,
-    task_archive: true,
-    task_delete: true,
-    task_convert_to_list: true,
-    task_convert_to_subtask: true,
-    convert_to_task: true,
-    task_activity_log: false,
-    task_estimated_hours: 1,
-    show_tasks: 1,
-    queue_list: true,
-    list_view_column: true,
-    advance_search: true,
-
-    // Chat.
-    one_to_one_chat: true,
-    chat_category: true,
-    chat_channel: true,
-
-    // Timesheets: their own only.
-    user_timesheet: 1,
-};
+const { MEMBER_DEFAULT_PERMISSIONS } = require('../Modules/settings/securityPermissions/memberDefaults');
+const { ROLE_GUEST, ROLE_OWNER, ROLE_ADMIN, ROLE_MEMBER } = require('../Config/roleTypes');
+const { addMissingViews } = require('../Modules/projectTabs/catalogue');
+const { templatesProblem, templateWritesOf } = require('../Modules/ImportSettings/templateWrite');
 
 //IMPORT CURRENCY
 exports.importCurrency = (companyName) => {
@@ -213,22 +147,22 @@ exports.importProjectPriorities = (companyName) => {
         {
             'name': "High",
             'value': "HIGH",
-            "image": 'taskPriorities/priority_high.png',
-            'statusImage': 'taskPriorities/priority_high.png',
+            "image": '',
+            'statusImage': '',
             'isDeleted': false
         },
         {
             'name': "Medium",
             'value': "MEDIUM",
-            "image": 'taskPriorities/priority_medium.png',
-            'statusImage': 'taskPriorities/priority_medium.png',
+            "image": '',
+            'statusImage': '',
             'isDeleted': false
         },
         {
             'name': "Low",
             'value': "LOW",
-            "image":'taskPriorities/priority_low.png',
-            'statusImage': 'taskPriorities/priority_low.png',
+            "image": '',
+            'statusImage': '',
             'isDeleted': false
         }
     ]
@@ -1191,8 +1125,8 @@ exports.importCompanyRules = async(companyName,type,projectId) => {
 
                 const applyDefaultRoles = (rule) => {
                     let roles = rule.roles || []
-                    let guest = roles.find((y) => y.key === 0) || null
-                    let member = roles.find((y) => y.key === MEMBER_ROLE_TYPE) || null
+                    let guest = roles.find((y) => y.key === ROLE_GUEST) || null
+                    let member = roles.find((y) => y.key === ROLE_MEMBER) || null
                     const filterRole = globalRulesMap && Object?.keys(globalRulesMap)?.length ? globalRulesMap?.[rule?.key] || null : null;
                     if (filterRole && Object?.keys(filterRole)?.length) {
                         const globalRule = filterRole;
@@ -1214,13 +1148,13 @@ exports.importCompanyRules = async(companyName,type,projectId) => {
                     } else if(!guest) {
                         if(roles.length) {
                             roles.push({
-                                key: 0,
+                                key: ROLE_GUEST,
                                 permission: selectionFieldRules.includes(rule.key) ? 1 : false,
                             })
                         } else {
                             roles = [
                                 {
-                                    key: 0,
+                                    key: ROLE_GUEST,
                                     permission: selectionFieldRules.includes(rule.key) ? 1 : false,
                                 }
                             ]
@@ -1230,7 +1164,7 @@ exports.importCompanyRules = async(companyName,type,projectId) => {
                     // has a key-3 row here, so re-seeding can never overwrite what an owner chose.
                     if (!member && MEMBER_DEFAULT_PERMISSIONS[rule.key] !== undefined) {
                         roles.push({
-                            key: MEMBER_ROLE_TYPE,
+                            key: ROLE_MEMBER,
                             permission: MEMBER_DEFAULT_PERMISSIONS[rule.key],
                         })
                     }
@@ -1426,38 +1360,28 @@ exports.importCompanyRules = async(companyName,type,projectId) => {
     });
 }
 
-// IMPORT COMPANY OWNER
-exports.importCompanyUserOwner = (companyName, obj) => {
-    return new Promise((resolve, reject) => {
-        try {
-            MongoDbCrudOpration(companyName, obj, "findOneAndUpdate")
-            .then(() => {
-                resolve();
-            })
-        } catch (error) {
-            reject(error);
-        }
-    });
-}
+exports.importCompanyUserOwner = async (companyName, obj) => {
+    await MongoDbCrudOpration(companyName, obj, "findOneAndUpdate");
+};
 
 // IMPORT COMPANY ROLES
 exports.importCompanyRoles = (companyName) => {
     let roles = [
         {
             name: "Guest",
-            key: 0,
+            key: ROLE_GUEST,
         },
         {
             name: "Owner",
-            key: 1,
+            key: ROLE_OWNER,
         },
         {
             name: "Admin",
-            key: 2,
+            key: ROLE_ADMIN,
         },
         {
             name: "Member",
-            key: 3,
+            key: ROLE_MEMBER,
         }
     ];
     let dataObj = {
@@ -1790,7 +1714,8 @@ exports.importUserNotifications = async (companyName, uid) => {
                 browser: true,
                 mobile: true,
                 key: "task_estimated_hours"
-            }
+            },
+            ...COMMENT_NOTICE_ITEMS.map((item) => ({ ...item }))
         ]
     }
 
@@ -1823,6 +1748,8 @@ exports.importUserNotifications = async (companyName, uid) => {
                 $set: { [project.key]: project,
                     [tasks.key]: tasks,
                     [chat.key]:chat,
+                    [DOC_NOTICE_SECTION.key]: docNoticeSection(),
+                    [GOAL_NOTICE_SECTION.key]: goalNoticeSection(),
                     userId: uid }
             },
             { upsert: true }
@@ -1845,202 +1772,13 @@ exports.importUserNotifications = async (companyName, uid) => {
     });
 }
 
-// PROJECT DEFAULT TAB COMPONENT 88888888
-exports.importProjectTabComponents = (companyName) => {
-    let data = [
-        {
-            name: "List",
-            sortIndex: 1,
-            keyName: "ProjectListView",
-            value: "list",
-            setAsDefault: false,
-            viewStatus: false
-        },
-        {
-            name: "Board",
-            sortIndex: 2,
-            keyName: "ProjectKanban",
-            value: "ProjectKanban",
-            setAsDefault: false,
-            viewStatus: false
-        },
-        {
-            name: "Project Details",
-            sortIndex: 3,
-            keyName: "ProjectDetail",
-            value: "projectDetails",
-            setAsDefault: false,
-            viewStatus: false
-        },
-        {
-            name: "Comments",
-            sortIndex: 4,
-            keyName: "Comments",
-            value: "comments",
-            setAsDefault: false,
-            viewStatus: false
-        },
-        {
-            name: "Calendar",
-            sortIndex: 5,
-            keyName: "Calendar",
-            value: "calendar",
-            setAsDefault: false,
-            viewStatus: false
-        },
-        {
-            name: "Activity",
-            sortIndex: 6,
-            keyName: "ActivityLog",
-            value: "activitylog",
-            setAsDefault: false,
-            viewStatus: false
-        },
-        {
-            name: "Workload",
-            sortIndex: 7,
-            keyName: "Workload",
-            value: "workload",
-            setAsDefault: false,
-            viewStatus: false
-        },
-        {
-            name: "Dashboard",
-            sortIndex: 8,
-            keyName: "ProjectDashboard",
-            value: "dashboard",
-            setAsDefault: false,
-            viewStatus: false
-        },
-        {
-            name: "Table",
-            sortIndex: 9,
-            keyName: "TableView",
-            value: "TableView",
-            setAsDefault: false,
-            viewStatus: false
-        },
-        {
-            name: "Embed",
-            sortIndex: 11,
-            keyName: "Embed",
-            value: "embed",
-            setAsDefault: false,
-            viewStatus: false
-        },
-        {
-            name: "Reports",
-            sortIndex: 12,
-            keyName: "Reports",
-            value: "reports",
-            setAsDefault: false,
-            viewStatus: false
-        },
-        {
-            name: "Gantt View",
-            sortIndex: 12,
-            keyName: "GanttView",
-            value: "ganttview",
-            setAsDefault: false,
-            viewStatus: false
-        },
-        {
-            name: "Recurring Tasks",
-            sortIndex: 12,
-            keyName: "RecurringTasks",
-            value: "recurringtasks",
-            setAsDefault: false,
-            viewStatus: false
-        },       
-        {
-            name: "Timeline View",
-            sortIndex: 12,
-            keyName: "TimelineView",
-            value: "timelineview",
-            setAsDefault: false,
-            viewStatus: false
-        },
-        {
-            name: "Mind Map View",
-            sortIndex: 13,
-            keyName: "MindMapView",
-            value: "mindmapview",
-            setAsDefault: false,
-            viewStatus: false
-        },
-        {
-            name: "Whiteboard View",
-            sortIndex: 14,
-            keyName: "WhiteboardView",
-            value: "whiteboardview",
-            setAsDefault: false,
-            viewStatus: false
-        },
-        {
-            name: "Canvas View",
-            sortIndex: 15,
-            keyName: "CanvasView",
-            value: "canvasview",
-            setAsDefault: false,
-            viewStatus: false
-        },
-        {
-            name: "Map View",
-            sortIndex: 16,
-            keyName: "MapView",
-            value: "mapview",
-            setAsDefault: false,
-            viewStatus: false
-        },
-        {
-            name: "Docs",
-            sortIndex: 17,
-            keyName: "DocsView",
-            value: "docsview",
-            setAsDefault: false,
-            viewStatus: false
-        },
-        {
-            name: "Forms",
-            sortIndex: 20,
-            keyName: "FormsView",
-            value: "formsview",
-            setAsDefault: false,
-            viewStatus: false
-        }
-    ];
-    return new Promise(async (resolve, reject) => {
-        try {
-            await MongoDbCrudOpration(companyName, {
-                type: SCHEMA_TYPE.PROJECT_TAB_COMPONENTS,data:[{}]
-            }, "deleteMany");
-
-            // Add new data after removing old data
-            const savePromises = data.map(async (item) => {
-                try {
-                    let obj = {
-                        data : {
-                            ...item,
-                            default: true
-                        },
-                        type : SCHEMA_TYPE.PROJECT_TAB_COMPONENTS
-                    }
-                    await MongoDbCrudOpration(companyName, obj, "save");
-                } catch (error) {
-                    console.log(error,"error");
-                }
-            });
-
-            await Promise.allSettled(savePromises).then(() => {
-                resolve();
-            }).catch((error) => {
-                reject(error);
-            });
-
-        } catch (error) {
-            console.error("ERROR in importProjectStatusTemplate:", error);
-        }
-    });
+exports.importProjectTabComponents = async (companyName) => {
+    try {
+        await addMissingViews(companyName);
+    } catch (error) {
+        logger.error(`ERROR in importProjectTabComponents: ${error.message || error}`);
+        throw error;
+    }
 }
 
 // PROJECT DEFAULT TAB COMPONENT 88888888
@@ -2229,55 +1967,21 @@ exports.importTaskTypeTemplate = (companyName) => {
     });
 }
 
-exports.importSettingTemplate = (templates, cb) =>{
-    try {
-        let path = `${SCHEMA_TYPE.PROJECT_TEMPLATES}`;
-        let promisesArray = [];
-        templates.forEach((item) => {
-            item.Updated_At = new Date();
-            item.Created_At = new Date();
-            let obj = {
-                 type : path,
-                 data : item
-            }
-            promisesArray.push(
-                new Promise((resolve2, reject2) => {
-                    try {
-                        MongoDbCrudOpration(companyName, obj, "findOneAndUpdate")
-                        .then(() => {
-                            resolve2();
-                        })
-                    } catch (error) {
-                        logger.error(`Send Catch Error 1: ${error.messge}`);
-                        reject2.send({status: false, statusText: error.message});
-                        reject2(error);
-                    }
-                })
-            )
-        })
-        Promise.allSettled(promisesArray)
-        .then(() => {
-            cb({
-                status: true
-            });
-        })
+/* Each write's filter and update come from templateWritesOf; nothing a caller sends is used as either. */
+exports.importSettingTemplate = (companyId, templates, cb) => {
+    const problem = templatesProblem(templates);
+    if (problem) {
+        cb({ status: false, statusText: problem });
+        return;
+    }
+    templateWritesOf(companyId, templates)
+        .then((writes) => Promise.all(writes.map(({ method, data }) => MongoDbCrudOpration(companyId, { type: SCHEMA_TYPE.PROJECT_TEMPLATES, data }, method))))
+        .then((stored) => cb({ status: true, statusText: 'Templates imported.', data: stored.filter(Boolean).map((row) => ({ _id: row._id, TemplateName: row.TemplateName })) }))
         .catch((error) => {
-            logger.error(`Send Catch Error 2: ${error.messge}`);
-            cb({
-                status: false,
-                error: error
-            });
-        })
-
-    }
-    catch(error){
-        logger.error(`Send Catch Error 3: ${error.messge}`);
-        cb({
-            status: false,
-            error: error
+            logger.error(`import templates: ${error && error.message}`);
+            cb({ status: false, statusText: 'The templates could not be imported.' });
         });
-    }
-}
+};
 
 exports.createDefaultMainChats = (companyId) => {
     return new Promise((resolve, reject) => {

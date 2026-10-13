@@ -3,7 +3,7 @@
         <!-- FOLDER NAME LEGEND -->
         <div
             v-if="sprint"
-            class="cursor-default black position-ab bg-white border border-radius-5-px text-capitalize color52 p0x-10px sprint__foldername"
+            class="cursor-default black position-ab bg-white border border-radius-5-px color52 p0x-10px sprint__foldername"
         >
             {{sprint.projectName}} {{sprint.folderName ? `/ ${sprint.folderName}` : '' }}
         </div>
@@ -15,7 +15,7 @@
                         <img v-if="sprint.deletedStatusKey === 0 || sprint.deletedStatusKey === undefined" :src="triangleBlack" alt="traingle" :style="`transform: rotateZ(${sprint.isExpanded ? 90 : 0}deg); width: 6px;`" class="cursor-pointer">
                         <img v-if="sprint.deletedStatusKey === 2" :src="inventory_2" class="pr-10px" />
                         <img v-if="sprint.isFolder === true" :src="folder">
-                        <span class="text-ellipse font-weight-bold text-capitalize ml-10px cursor-pointer font-size-14 color52" :title="sprint.name">{{ sprint.name }}</span>
+                        <span class="text-ellipse font-weight-bold ml-10px cursor-pointer font-size-14 color52" :title="sprint.name">{{ sprint.name }}</span>
                     </div>
                 </div>
             </div>
@@ -79,6 +79,7 @@ import { useStore } from 'vuex';
 import { useRoute } from 'vue-router';
 import { apiRequest } from '../../../../../services/index'
 import { useI18n } from "vue-i18n";
+import { applyFolderStatusResult } from '@/views/Projects/folderActions';
 const { t } = useI18n();
 
 // UTILS
@@ -189,6 +190,18 @@ function getUserData() {
     return userData;
 }
 
+// The sprint/folder PATCH answers a refusal as prose in `statusText`, and the scrum
+// lifecycle refusals are only phrased server-side — so the raw text stays the fallback
+// and only the refusals that have a translation are mapped.
+const REFUSAL_KEYS = {
+    "Sprint not found": "Toast.Sprint_not_found",
+    "Folder not found": "Toast.Folder_not_found",
+};
+
+const refusalMessage = (statusText) => (REFUSAL_KEYS[statusText]
+    ? t(REFUSAL_KEYS[statusText])
+    : (statusText || t("Toast.something_went_wrong")));
+
 function updateItem(value = null) {
     showSpinner.value = true;
 
@@ -238,11 +251,11 @@ function updateItem(value = null) {
             close.value = false;
             showSidebar.value = false;
             showSpinner.value = false;
-            $toast.error(res?.data?.statusText || t(`Toast.something_went_wrong`), {position: "top-right"});
+            $toast.error(refusalMessage(res?.data?.statusText), {position: "top-right"});
             return;
         }
         if (props.sprint.isFolder) {
-            commit("projectData/mutateFolders",{op:'modified',data:{...res?.data?.data}});
+            applyFolderStatusResult({ commit, getters }, res.data);
         }
         else{
             commit("projectData/mutateSprints",{op:'modified',data:{...res?.data?.data}});
@@ -318,19 +331,6 @@ function updateSprintAPICALL(updateData = null,historyObj) {
             .then((resp) => {
                 if(resp.data.status) {
                     commit('projectData/mutateSprints', {op: "modified", data: resp.data.data});
-                    // let historyObj = {
-                    //     message: `<b>${userData.Employee_Name}</b> has ${type} <b>${props.sprint.name}</b> sprint ${props.sprint?.folderId === null ? '' : `in <b>${props.sprint.isFolder ? props.sprint?.folderName : ""}</b> folder`} in <b>${project.value.ProjectName}</b> project.`,
-                    //     key: "project_sprint_removed",
-                    //     sprintId: props.sprint._id,
-                    // }
-                    // apiRequest("post", env.HANDLE_HISTORY, {
-                    //     "type": 'project',
-                    //     "companyId": companyId.value,
-                    //     "projectId": props.projectData._id,
-                    //     "taskId": null,
-                    //     "object": historyObj,
-                    //     "userData": userData
-                    // })
                     $toast.success(t(`Toast.Sprint updated successfully`), {position: "top-right"})
                 }
                 assigneeInProgress.value = false;

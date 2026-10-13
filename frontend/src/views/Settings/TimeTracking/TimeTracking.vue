@@ -9,18 +9,19 @@
                     <p>{{ $t('TimeTracker.smooth') }}</p>
                 </div>
             </div>
-            <div class="d-flex justify-content-center download-links-wappermain">
+            <p v-if="loaded && !dataobj.length" class="tt-empty">{{ $t('TimeTracker.no_builds') }}</p>
+            <div v-if="dataobj.length" class="d-flex justify-content-center download-links-wappermain">
                 <div class="download-links-wapper cursor-pointer" v-for="(item , index) in dataobj" :key="index" @click="selectedData = item" :class="{'active':(item == selectedData),'border-primary':(item == selectedData)}" >
                     <div class="download-links-img">
                         <img :src="item.image">
                     </div>
                     <div>
-                        <span class="d-block black ostype">{{item.type}}</span>
-                        <span class="gray osversion">{{ item.version }}</span>
+                        <span class="d-block time-tracking-black ostype">{{item.type}}</span>
+                        <span class="time-tracking-gray osversion">{{ item.version }}</span>
                     </div>
                 </div>
             </div>
-            <div class="d-flex justify-content-center download-lable-wapper">
+            <div v-if="dataobj.length" class="d-flex justify-content-center download-lable-wapper">
                 <div class="d-flex  download-links-lable cursor-pointer" @click="$refs.anchor.click()">
                     <div class="d-flex download-content-wapper">
                     <div class="d-flex align-items-center download__icon-wrapper"> 
@@ -32,7 +33,7 @@
                     </div>
                     </div>  
                 </div>
-                <a :href="selectedData?.downloadUrl" ref="anchor" download hidden >click</a>
+                <a :href="selectedData?.downloadUrl" ref="anchor" download hidden >{{ $t('TimeTracker.click') }}</a>
             </div>
         </div>
     </div>
@@ -53,18 +54,20 @@ const selectedData = ref('')
 const arrobj = computed(() => getters['settings/TimeTracker']);
 const companyId = inject("$companyId");
 const dataobj = ref([]);
+const loaded = ref(false);
 					
 onMounted(() => {
     if(arrobj.value && !arrobj.value.length) {
             dispatch('settings/setTimeTrackerDownload', companyId.value).then((res)=>{                        
-            dataobj.value = (res).map((element) =>{return {...element , image:imageObj.value[element.type]}})
+            dataobj.value = (res || []).map((element) =>{return {...element , image:imageObj.value[element.type]}})
             selectedData.value = dataobj.value[0]
             }) .catch((error) => {
                      console.error("ERROR in set setTimeTrackerDownload: ", error)
-            })
+            }).finally(() => { loaded.value = true; })
     }else{
-        dataobj.value = (arrobj.value).map((element) =>{return {...element , image:imageObj.value[element.type]}})
+        dataobj.value = (arrobj.value || []).map((element) =>{return {...element , image:imageObj.value[element.type]}})
         selectedData.value = dataobj.value[0]
+        loaded.value = true;
     }
 });
 
@@ -72,4 +75,13 @@ onMounted(() => {
 
 <style scoped>
 @import './style.css';
+</style>
+
+<style scoped>
+.time-tracking-black {
+    color: var(--ink);
+}
+.time-tracking-gray {
+    color: var(--ink-2);
+}
 </style>

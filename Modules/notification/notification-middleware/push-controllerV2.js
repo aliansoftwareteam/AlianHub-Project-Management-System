@@ -6,6 +6,7 @@ const { SCHEMA_TYPE } = require("../../../Config/schemaType")
 const { MongoDbCrudOpration } = require("../../../utils/mongo-handler/mongoQueries");
 const mongoose = require("mongoose")
 const { sendFCMNotification } = require("./sendNotification")
+const { CHAT_THREAD_REPLY, chatThreadPath } = require("../../Comments/helpers/chatThreads")
 const fs = require('fs');
 const path = require('path');
 var brandSettings = null; 
@@ -56,7 +57,12 @@ exports.sendNotificationBody = (body) => {
             const topicName = "fcmNotification"
             let actionUrl = "";
             var { folderId = "", sprintId = "", projectId = "", companyId = '', taskId = "" } = body
-            if (body?.type?.toLowerCase() === "project") {
+            if (body?.changeType === CHAT_THREAD_REPLY) {
+                actionUrl = chatThreadPath(body)
+            } else if (body?.type === "docs") {
+                actionUrl = `${encodeURIComponent(companyId)}/pages/${encodeURIComponent(String(body.changeData?.pageId || ''))}`
+                if (body.changeData?.commentId) actionUrl += `?comment=${encodeURIComponent(String(body.changeData.commentId))}`
+            } else if (body?.type?.toLowerCase() === "project") {
                 if (folderId !== undefined && folderId !== null && folderId !== '') {
                     if (sprintId !== undefined && sprintId !== null && sprintId !== '') {
                         actionUrl = `${body.companyId}/project/${projectId}/fs/${folderId}/${sprintId}`
@@ -80,7 +86,7 @@ exports.sendNotificationBody = (body) => {
 
             if (body?.type === "project" && body.key === "comments_I'm_@mentioned_in") {
                 actionUrl = `${body.companyId}/project/${projectId}/p?tab=Comments`;
-            } 
+            }
             var payload = {}
             if (body?.type == "chat") {
                 let Image;
@@ -108,7 +114,7 @@ exports.sendNotificationBody = (body) => {
                     sound: 'default',
                 }
             } else {
-                var notificationTitle = body.type === 'project' ? 'Project Notification' : 'Task Notification'
+                var notificationTitle = body.type === 'project' ? 'Project Notification' : body.type === 'docs' ? 'Docs Notification' : 'Task Notification'
                 payload = {
                     notification: {
                         title: `${brandSettings && brandSettings.productName ? brandSettings.productName :'Alian Hub'} - ${notificationTitle}`,

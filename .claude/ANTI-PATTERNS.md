@@ -515,3 +515,71 @@ const result = await MongoDbCrudOpration(companyId, mongoObj, 'findOne');
 // git log --all -S "oldWay"
 ```
 
+
+---
+
+## Agents and MCP
+
+Details and the steps to add an action are in [AGENTS-AND-MCP.md](AGENTS-AND-MCP.md).
+
+### ❌ Anti-Pattern: A second road for an agent's change
+
+**Don't:** write to the database from a tool, or call a handler without `actions.perform()`.
+
+**Why:** the registry, the person's permissions, `ask()`, the audit row and the undo all live in `perform()`.
+
+**✅ Do:** add a registry entry and an executor that runs the web app's own handler as the person.
+
+### ❌ Anti-Pattern: Registering an action on the never-list
+
+**Don't:** add `project.delete`, `task.delete`, `billing.*`, `deploy.production`, `git.merge`, `member.remove`, `permissions.edit` or `status.set("Done")` to any registry group.
+
+**Why:** these are absent on purpose, so a token has nothing to switch on. `indexActions()` throws.
+
+### ❌ Anti-Pattern: An action with no permission or no rating
+
+**Don't:** register an action without `permission` or without a `RATINGS` entry.
+
+**Why:** the person behind the agent is held to that permission, and the rating decides whether the agent may act alone.
+
+### ❌ Anti-Pattern: Sending something outside AlianHub on an agent's own
+
+**Don't:** let an agent send a message, an email or a calendar event directly.
+
+**✅ Do:** mark the action `proposeOnly` so it waits for a person, with the exact text and destination.
+
+### ❌ Anti-Pattern: A tool that decides, or a route that lets a token decide
+
+**Don't:** add an MCP tool that approves, declines or undoes a proposal or keeps a standing approval. Don't mount a deciding route without `personDecides()` or `decidedByPerson()`.
+
+**Why:** a decision needs a signed-in person.
+
+### ❌ Anti-Pattern: Turning a new tool on by default
+
+**Don't:** register a group with no flag, or a flag that defaults to on.
+
+**✅ Do:** put it behind a flag that reads one variable on every call and defaults to `off`.
+
+### ❌ Anti-Pattern: A query or event that does not name the workspace
+
+**Don't:** read `companyId` from the request body, query a collection without `companyId` first, or emit an event without `companyId`.
+
+**✅ Do:** take it from `tenantOf(req)` and pass it to `MongoDbCrudOpration` and into every event payload.
+
+### ❌ Anti-Pattern: Technical words in tool text
+
+**Don't:** put setting names, ids, `scope`, `token` or `payload` in a tool description, a refusal or an instruction a person reads.
+
+**✅ Do:** say what the person would say: list, doc, task.
+
+### ❌ Anti-Pattern: A long `instructions.js`
+
+**Don't:** grow `Modules/Mcp/instructions.js` past `MAX_LENGTH` (4000 characters) or name a tool the connection is not offered.
+
+### ❌ Anti-Pattern: A helper on a `taskMongo` mixin
+
+**Don't:** add a helper method to a mixin in `Modules/Tasks/helpers/taskMongo/`.
+
+**Why:** `PATCH /api/v2/tasks` and `POST /api/v2/tasks/bulk` call `taskMongo[action]` by name, so every method there is a route and needs a permission mapping.
+
+**✅ Do:** put the helper in its own file.

@@ -1,84 +1,83 @@
 /**
- * Clarifier — LLM call for generating clarifying questions.
+ * The three LLM calls that run BEFORE plan generation:
  *
- * Runs BEFORE plan generation. Reads the brief (description, additional
- * requirements, uploaded brief text) and asks the model to return a small
- * structured list of clarifying questions it would ask a freelance client
- * to pin down the gaps.
+ *   scoreCoverage             — scores the brief against the five points
+ *   generateClarifyingQuestions — asks only about the missing ones (≤ 3 per
+ *                               round, ≤ 2 rounds, ≤ 6 in total)
+ *   draftBrief                — rewrites description + upload + answers into
+ *                               the five sections plus assumptions
  *
- * Architecturally a sibling to controller.js#callLlmForPlan but with:
- *   - smaller token budget (questions are short)
- *   - JSON mode + the same tolerant parse + one repair pass
- *   - a separate Zod schema (ClarifyQuestionsSchema) so the contract is
- *     strict
- *
- * The plan call is unaffected. If this call fails for any reason, the
- * controller catches and falls back to going straight to plan generation
- * without Q&A — so the existing flow never breaks.
+ * Each is a JSON-mode call with the same tolerant parse + one repair pass as
+ * controller.js#callLlmForPlan, against its own Zod schema. If any of them
+ * fails the controller reports it; the plan call is unaffected.
  */
 'use strict';
 
 const logger = require('../../Config/loggerConfig');
-const { getProvider } = require('./llmProvider');
-const { usageFromResult, addUsage, summarize } = require('./usage');
-const { ClarifyQuestionsSchema, tryParseJson } = require('./schemaValidator');
+const memoryStore = require('../Agents/memory');
+const { detectIgnoredInstructions, fresh: freshGuard } = require('../AICore/instructionGuard');
+const { getProvider } = require('../AICore/llmProvider');
+const { FEATURES } = require('../AICore/features');
+const { usageFromResult, addUsage, summarize } = require('../AICore/usage');
+const { COVERAGE_POINTS, CoverageSchema, ClarifyQuestionsSchema, BriefDraftSchema, tryParseJson } = require('./schemaValidator');
 const {
+    COVERAGE_POINT_LABELS,
+    buildCoverageSystemPrompt,
+    buildCoverageUserMessage,
     buildClarifySystemPrompt,
     buildClarifyUserMessage,
+    buildBriefSystemPrompt,
+    buildBriefUserMessage,
     buildRepairPrompt,
 } = require('./promptBuilder');
 
-// Smaller than the plan call but generous enough for tech-heavy briefs
-// that fan out into per-stack-layer questions. ~14 rich questions with
-// named-product options and descriptions land around 5–6k tokens, so
-// 6000 is the safe default. Configurable via LLM_MAX_TOKENS_CLARIFY.
-const DEFAULT_MAX_TOKENS = 6000;
+const MAX_QUESTIONS_PER_ROUND = 3;
+const MAX_ROUNDS = 2;
+const MAX_TOTAL_QUESTIONS = 6;
 
-/**
- * Run the clarify LLM call.
- *
- * @param {object} args
- * @param {string} args.description           - Project description (≥20 chars upstream)
- * @param {string} [args.additionalRequirements]
- * @param {string} [args.briefText]           - Extracted text from an uploaded brief
- * @returns {Promise<{ understanding: string, questions: Array, tokens: number, model: string }>}
- */
-async function generateClarifyingQuestions({ description, additionalRequirements, briefText }) {
+// When more points are missing than a round may ask about, the plan depends
+// on these most, in this order; the rest become assumptions.
+const ASK_PRIORITY = ['what_for_whom', 'done_when', 'constraints', 'existing', 'team'];
+
+const COVERAGE_MAX_TOKENS = 1200;
+// ~3 rich questions with named options and descriptions land around 2k
+// tokens; the headroom covers a verbose model without inviting a 14-question
+// answer.
+const CLARIFY_MAX_TOKENS = 6000;
+const BRIEF_MAX_TOKENS = 4000;
+
+async function callJson({ label, systemPrompt, userMessage, schema, check, maxTokens, temperature, truncatedMessage, companyId, userId }) {
     const provider = getProvider();
-    const systemPrompt = buildClarifySystemPrompt();
-    const userMessage = buildClarifyUserMessage({ description, additionalRequirements, briefText });
-    const maxTokens = DEFAULT_MAX_TOKENS;
+    const spend = { feature: FEATURES.CLARIFIER, companyId, userId };
+
+    const tryValidate = (raw) => {
+        const parsed = tryParseJson(raw);
+        if (!parsed.ok) return { ok: false, error: `JSON parse failed: ${parsed.error}` };
+        const result = schema.safeParse(parsed.value);
+        if (!result.success) {
+            const issues = result.error.issues.map((i) => `${i.path.join('.')}: ${i.message}`).join('\n');
+            return { ok: false, error: issues };
+        }
+        const extra = check ? check(result.data) : null;
+        if (extra) return { ok: false, error: extra, value: result.data };
+        return { ok: true, value: result.data };
+    };
+
+    const truncatedError = () => {
+        const err = new Error(truncatedMessage || `The AI ran out of token budget while ${label}.`);
+        err.code = 'LLM_TRUNCATED';
+        return err;
+    };
 
     const firstAttempt = await provider.chat({
         systemPrompt,
         messages: [{ role: 'user', content: userMessage }],
         jsonMode: true,
         maxTokens,
-        // Slightly warmer than plan (0.4) since "what to ask" benefits from
-        // a touch more variety. Still well below creative-writing range.
-        temperature: 0.5,
+        temperature,
+        spend,
     });
-
-    if (firstAttempt.truncated) {
-        // Unlikely at 4k tokens for ≤8 questions, but guard anyway.
-        const err = new Error(
-            'The AI ran out of token budget while drafting clarifying questions. '
-            + `Raise DEFAULT_MAX_TOKENS (currently ${maxTokens}) in your .env.`,
-        );
-        err.code = 'LLM_TRUNCATED';
-        throw err;
-    }
-
-    const tryValidate = (raw) => {
-        const parsed = tryParseJson(raw);
-        if (!parsed.ok) return { ok: false, error: `JSON parse failed: ${parsed.error}` };
-        const result = ClarifyQuestionsSchema.safeParse(parsed.value);
-        if (!result.success) {
-            const issues = result.error.issues.map((i) => `${i.path.join('.')}: ${i.message}`).join('\n');
-            return { ok: false, error: issues };
-        }
-        return { ok: true, value: result.data };
-    };
+    if (firstAttempt.truncated) throw truncatedError();
 
     let validated = tryValidate(firstAttempt.content);
     // Split kept, not collapsed — output tokens cost several times what input
@@ -87,7 +86,7 @@ async function generateClarifyingQuestions({ description, additionalRequirements
     let repairAttempt = null;
 
     if (!validated.ok) {
-        logger.warn(`AIPG clarify first-pass validation failed: ${validated.error}`);
+        logger.warn(`AIPG ${label} first-pass validation failed: ${validated.error}`);
         repairAttempt = await provider.chat({
             systemPrompt,
             messages: [
@@ -98,35 +97,288 @@ async function generateClarifyingQuestions({ description, additionalRequirements
             jsonMode: true,
             maxTokens,
             temperature: 0.0,
+            spend,
         });
         // Counted before the guards below: a failed repair still burned tokens.
         usage = addUsage(usage, usageFromResult(repairAttempt));
+        if (repairAttempt.truncated) throw truncatedError();
 
-        if (repairAttempt.truncated) {
-            const err = new Error('The AI ran out of token budget on the clarify repair attempt.');
-            err.code = 'LLM_TRUNCATED';
-            throw err;
-        }
-
-        validated = tryValidate(repairAttempt.content);
-        if (!validated.ok) {
-            const err = new Error(`Clarify output failed validation after repair: ${validated.error}`);
+        const repaired = tryValidate(repairAttempt.content);
+        if (!repaired.ok && !repaired.value) {
+            const err = new Error(`${label} output failed validation after repair: ${repaired.error}`);
             err.code = 'LLM_INVALID_OUTPUT';
-            err.details = validated.error;
+            err.details = repaired.error;
             throw err;
         }
+        // A shape-valid answer that still fails the semantic check is kept:
+        // the caller fills the gap deterministically rather than failing the
+        // whole step on a third try.
+        validated = { ok: true, value: repaired.value, incomplete: !repaired.ok ? repaired.error : null };
     }
 
     const modelId = (repairAttempt && repairAttempt.model) || firstAttempt.model || '';
     return {
-        understanding: validated.value.understanding || '',
-        questions: validated.value.questions || [],
-        usage: summarize(usage, modelId),
-        provider: (provider && provider.name) || 'unknown',
+        value: validated.value,
+        incomplete: validated.incomplete || null,
+        usage,
         model: modelId || (provider && provider.name) || 'unknown',
+        provider: (provider && provider.name) || 'unknown',
+    };
+}
+
+/**
+ * Score the brief (and any answers so far) against the five points.
+ *
+ * @returns {Promise<{ coverage: object, notes: object, usage: object, model: string, provider: string }>}
+ */
+async function scoreCoverage({ description, additionalRequirements, briefText, previousAnswers, companyId, userId, projectId, memory }) {
+    const block = memory !== undefined ? memory : await memoryStore.contextFor({ companyId, userId, projectId });
+    const result = await callJson({
+        label: 'coverage', companyId, userId,
+        systemPrompt: buildCoverageSystemPrompt(),
+        userMessage: buildCoverageUserMessage({ description, additionalRequirements, briefText, previousAnswers, memory: block }),
+        schema: CoverageSchema,
+        maxTokens: COVERAGE_MAX_TOKENS,
+        temperature: 0.0,
+        truncatedMessage: 'The AI ran out of token budget while scoring the brief.',
+    });
+    return {
+        coverage: result.value.coverage,
+        notes: result.value.notes || {},
+        memory: block,
+        usage: result.usage,
+        model: result.model,
+        provider: result.provider,
+    };
+}
+
+function missingPoints(coverage) {
+    return COVERAGE_POINTS.filter((p) => !coverage || coverage[p] !== 'met');
+}
+
+function gaveUp(answer) {
+    return !!(answer && (answer.skipped || answer.unknown));
+}
+
+/**
+ * Decide what a round may ask, from the coverage verdict and the earlier
+ * answers. Pure, so the rules are testable without a provider.
+ *
+ * @returns {{ round: number, askPoints: string[], maxQuestions: number }}
+ */
+function planRound({ coverage, previousAnswers, round }) {
+    const answers = Array.isArray(previousAnswers) ? previousAnswers : [];
+    const thisRound = Number(round) || (answers.length ? 2 : 1);
+    const gaveUpPoints = new Set(answers.filter(gaveUp).map((a) => a.point).filter(Boolean));
+
+    const askPoints = ASK_PRIORITY
+        .filter((p) => missingPoints(coverage).includes(p))
+        .filter((p) => !gaveUpPoints.has(p));
+
+    const remaining = Math.max(0, MAX_TOTAL_QUESTIONS - answers.length);
+    const maxQuestions = thisRound > MAX_ROUNDS ? 0 : Math.min(MAX_QUESTIONS_PER_ROUND, remaining, askPoints.length);
+
+    return { round: thisRound, askPoints: askPoints.slice(0, maxQuestions), maxQuestions };
+}
+
+/**
+ * Run coverage scoring, then ask only about the missing points.
+ *
+ * @param {object} args
+ * @param {string} args.description
+ * @param {string} [args.additionalRequirements]
+ * @param {string} [args.briefText]
+ * @param {Array}  [args.previousAnswers] - [{ id, point, question, answer, skipped, unknown }]
+ * @param {number} [args.round]
+ */
+async function generateClarifyingQuestions({ description, additionalRequirements, briefText, previousAnswers, round, companyId, userId, projectId }) {
+    const memory = await memoryStore.contextFor({ companyId, userId, projectId });
+    const scored = await scoreCoverage({ description, additionalRequirements, briefText, previousAnswers, memory });
+    const plan = planRound({ coverage: scored.coverage, previousAnswers, round });
+    const base = {
+        coverage: scored.coverage,
+        notes: scored.notes,
+        round: plan.round,
+        maxRounds: MAX_ROUNDS,
+        provider: scored.provider,
+        model: scored.model,
+    };
+
+    if (!plan.askPoints.length) {
+        return { ...base, understanding: '', questions: [], usage: summarize(scored.usage, scored.model) };
+    }
+
+    const asked = await callJson({
+        label: 'clarify', companyId, userId,
+        systemPrompt: buildClarifySystemPrompt(),
+        userMessage: buildClarifyUserMessage({
+            description,
+            additionalRequirements,
+            briefText,
+            coverage: scored.coverage,
+            notes: scored.notes,
+            previousAnswers,
+            askPoints: plan.askPoints,
+            round: plan.round,
+            maxQuestions: plan.maxQuestions,
+            memory,
+        }),
+        schema: ClarifyQuestionsSchema,
+        maxTokens: CLARIFY_MAX_TOKENS,
+        // Slightly warmer than plan (0.4) since "what to ask" benefits from a
+        // touch more variety. Still well below creative-writing range.
+        temperature: 0.5,
+        truncatedMessage: 'The AI ran out of token budget while drafting clarifying questions.',
+    });
+
+    const allowed = new Set(plan.askPoints);
+    const seenPoints = new Set();
+    const questions = [];
+    for (const q of asked.value.questions || []) {
+        if (!allowed.has(q.point) || seenPoints.has(q.point)) continue;
+        seenPoints.add(q.point);
+        questions.push({ ...q, required: false, allowUnknown: true });
+        if (questions.length >= plan.maxQuestions) break;
+    }
+
+    const modelId = asked.model || scored.model;
+    return {
+        ...base,
+        understanding: asked.value.understanding || '',
+        questions,
+        usage: summarize(addUsage(scored.usage, asked.usage), modelId),
+        model: modelId,
+    };
+}
+
+function requiredAssumptionsFor({ answers, coverage, notes }) {
+    const required = [];
+    const coveredPoints = new Set();
+    for (const a of Array.isArray(answers) ? answers : []) {
+        if (!gaveUp(a)) continue;
+        required.push({
+            questionId: a.id,
+            point: a.point || 'other',
+            question: a.question,
+            reason: a.unknown
+                ? `the owner does not know yet: "${a.question}"`
+                : `the owner skipped: "${a.question}"`,
+        });
+        if (a.point) coveredPoints.add(a.point);
+    }
+    for (const point of missingPoints(coverage)) {
+        if (coveredPoints.has(point)) continue;
+        const note = notes && notes[point] ? String(notes[point]).trim() : 'nothing was stated';
+        required.push({ point, reason: `still missing after the questions — ${note}` });
+    }
+    return required;
+}
+
+// Each assumption may satisfy one requirement: by question id first, else by
+// point for an entry the model left unkeyed.
+function coversRequired(assumptions, required) {
+    const claimed = new Set();
+    const claim = (pick) => {
+        const index = assumptions.findIndex((a, i) => !claimed.has(i) && pick(a));
+        if (index < 0) return false;
+        claimed.add(index);
+        return true;
+    };
+    const missing = [];
+    for (const r of required) {
+        const byId = r.questionId && claim((a) => a.questionId === r.questionId);
+        const byPoint = !byId && claim((a) => !a.questionId && a.point === r.point);
+        if (!byId && !byPoint) missing.push(r);
+    }
+    return missing;
+}
+
+function fallbackAssumption(r) {
+    const label = COVERAGE_POINT_LABELS[r.point] || 'this point';
+    if (r.questionId) {
+        return { point: r.point, questionId: r.questionId, text: `No answer to "${r.question}"; the plan will use a sensible default for ${label.toLowerCase()}.` };
+    }
+    return { point: r.point, text: `No ${label.toLowerCase()} given; the plan will use a sensible default.` };
+}
+
+function renderBriefMarkdown(sections, assumptions) {
+    const lines = [];
+    for (const point of COVERAGE_POINTS) {
+        lines.push(`## ${COVERAGE_POINT_LABELS[point]}`);
+        lines.push(String((sections && sections[point]) || '').trim() || '_Not stated._');
+        lines.push('');
+    }
+    lines.push('## Assumptions');
+    if (Array.isArray(assumptions) && assumptions.length) {
+        for (const a of assumptions) lines.push(`- ${String(a.text || '').trim()}`);
+    } else {
+        lines.push('- None.');
+    }
+    return lines.join('\n').trim() + '\n';
+}
+
+/**
+ * Rewrite description + upload + answers into the five sections plus one
+ * assumption per skipped/unknown answer and per point still missing.
+ */
+async function draftBrief({ description, additionalRequirements, briefText, answers, companyId, userId, projectId }) {
+    const memory = await memoryStore.contextFor({ companyId, userId, projectId });
+    const scored = await scoreCoverage({ description, additionalRequirements, briefText, previousAnswers: answers, memory });
+    const required = requiredAssumptionsFor({ answers, coverage: scored.coverage, notes: scored.notes });
+
+    const drafted = await callJson({
+        label: 'brief', companyId, userId,
+        systemPrompt: buildBriefSystemPrompt(),
+        userMessage: buildBriefUserMessage({
+            description,
+            additionalRequirements,
+            briefText,
+            answers,
+            coverage: scored.coverage,
+            notes: scored.notes,
+            requiredAssumptions: required,
+            memory,
+        }),
+        schema: BriefDraftSchema,
+        check: (value) => {
+            const missing = coversRequired(value.assumptions, required);
+            if (!missing.length) return null;
+            return 'assumptions: missing required entries for '
+                + missing.map((r) => (r.questionId ? `questionId "${r.questionId}"` : `point "${r.point}"`)).join(', ');
+        },
+        maxTokens: BRIEF_MAX_TOKENS,
+        temperature: 0.3,
+        truncatedMessage: 'The AI ran out of token budget while drafting the brief.',
+    });
+
+    const assumptions = [...drafted.value.assumptions];
+    for (const r of coversRequired(assumptions, required)) assumptions.push(fallbackAssumption(r));
+    await freshGuard();
+    for (const note of detectIgnoredInstructions(description, additionalRequirements, briefText)) {
+        const already = assumptions.some((a) => a.point === 'other' && /ignored/i.test(a.text));
+        if (!already) assumptions.push(note);
+    }
+
+    const sections = drafted.value.sections;
+    const modelId = drafted.model || scored.model;
+    return {
+        brief: { sections, assumptions, markdown: renderBriefMarkdown(sections, assumptions) },
+        coverage: scored.coverage,
+        notes: scored.notes,
+        usage: summarize(addUsage(scored.usage, drafted.usage), modelId),
+        model: modelId,
+        provider: drafted.provider || scored.provider,
     };
 }
 
 module.exports = {
+    MAX_QUESTIONS_PER_ROUND,
+    MAX_ROUNDS,
+    MAX_TOTAL_QUESTIONS,
+    scoreCoverage,
+    planRound,
     generateClarifyingQuestions,
+    draftBrief,
+    renderBriefMarkdown,
+    detectIgnoredInstructions,
 };

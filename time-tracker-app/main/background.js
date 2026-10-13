@@ -3,6 +3,7 @@ import serve from 'electron-serve'
 import { createWindow } from './helpers'
 const path = require('node:path')
 const fs = require('fs')
+const nodeCrypto = require('node:crypto')
 const isProd = process.env.NODE_ENV === 'production'
 // Prod: assets are packaged into app/ (see electron-builder.yml). Dev: read from source resources/.
 const assetPath = (name) => isProd ? path.join(__dirname, name) : path.join(__dirname, '..', 'resources', name)
@@ -470,6 +471,14 @@ ipcMain.on('estimate:limit', (event, data) => {
   } catch (e) { /* notifications are best-effort */ }
 })
 
+// A capture was refused because the timer was stopped or trimmed somewhere else. The renderer
+// has already ended the session locally; this only tells the person why.
+ipcMain.on('tracker:stopped-elsewhere', (event, data) => {
+  try {
+    showTrackerStoppedAlert({ reason: 'elsewhere', taskName: (data && data.taskName) || (lastTaskCtx && lastTaskCtx.taskName) || '' })
+  } catch (e) { /* best-effort */ }
+})
+
 // AHE-3835 — the renderer reports the actively-tracked task so the stop alert can
 // name it (lock/sleep) and Resume knows what to restart. Read-only: this never
 // changes tracking behaviour.
@@ -506,6 +515,14 @@ ipcMain.handle('idle:get-threshold', () => ({ seconds: idleThresholdSec, minutes
 
 ipcMain.on("open-external-url", (event, url) => {
   shell.openExternal(url)
+})
+
+// PKCE for the browser sign-in: the verifier never leaves this machine, only its
+// SHA-256 challenge travels through the browser, so a sign-in code picked up by
+// anything else on the myapp:// scheme cannot be exchanged for a session.
+ipcMain.handle('tracker:pkce', () => {
+  const verifier = nodeCrypto.randomBytes(32).toString('base64url')
+  return { verifier, challenge: nodeCrypto.createHash('sha256').update(verifier).digest('base64url') }
 })
 
 ipcMain.on('minimize-app', () => {

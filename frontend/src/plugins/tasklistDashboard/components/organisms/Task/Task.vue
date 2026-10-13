@@ -137,7 +137,7 @@
         <ConfirmationSidebar
             v-model="showSidebar"
             :title="`${archive ? $t('Projects.archive') : $t('Projects.delete')}`"
-            :message="archive ? $t('conformationmsg.archive') : $t('conformationmsg.delete')"
+            :message="$t(taskRemovalMessageKey(task, archive))"
             :confirmationString="`${archive ? 'archive' : 'delete'}`"
             :acceptButtonClass="archive ? 'btn-primary': 'btn-danger'"
             :acceptButton="`${archive ? $t('Projects.archive') : $t('Projects.delete')}`"
@@ -148,7 +148,7 @@
 
 <script setup>
 // PACKAGES
-import { ref, watch, defineProps, inject, defineEmits, defineComponent, computed, onMounted, provide } from "vue"
+import { ref, watch, defineProps, inject, defineEmits, defineComponent, computed, onMounted } from "vue"
 
 // COMPONENTS
 import Assignee from "@/components/molecules/Assignee/Assignee.vue"
@@ -156,12 +156,14 @@ import Priority from "@/components/molecules/PriorityCompo/PriorityComp.vue"
 import TaskStatus from "@/components/atom/TaskStatus/TaskStatus.vue"
 import ProjectTaskType from "@/components/atom/TaskTypeSelection/TaskTypeSelection.vue"
 import ConfirmationSidebar from "@/components/molecules/ConfirmationSidebar/ConfirmationSidebar.vue"
+import { taskRemovalMessageKey } from "@/utils/taskRemovalWords";
 // UTILS
 import taskClass from "@/utils/TaskOperations";
 import { useConvertDate, useCustomComposable, useGetterFunctions } from "@/composable";
 import { useStore } from "vuex";
 import { useToast } from "vue-toast-notification"
 import { useUpdateTasks } from "@/views/Projects/helper"
+import { permittedAssignees, removePerson, selfAssignable } from "@/utils/assigneeOptions"
 import {customField} from '../../../../customFieldView/helper.js';
 import { useI18n } from "vue-i18n";
 const { t } = useI18n();
@@ -177,7 +179,6 @@ const {convertDateFormat} = useConvertDate();
 const {checkPermission, checkApps} = useCustomComposable();
 const showArchiveVar = inject("showArchived");
 const $toast = useToast()
-const {updateTaskByGroup} = useUpdateTasks();
 
 // IMAGES
 const triangleBlack = require("@/assets/images/svg/triangleBlack.svg");
@@ -244,7 +245,9 @@ const customFieldList = computed(() => (getters['settings/finalCustomFields'] &&
 const companyUsers = computed(() => getters["settings/companyUsers"]?.map((x) => x.userId))
 
 const projectData = ref(props.projectObject)
-provide("selectedProject", {});
+// Pass the row's own project: on the dashboard the nearest selectedProject provider is
+// HomePage's placeholder {}, which has no .value for the helper to read.
+const {updateTaskByGroup} = useUpdateTasks(projectData);
 
 const companyOwner = computed(() => {
     return getters["settings/companyOwnerDetail"];
@@ -272,62 +275,15 @@ const taskType = computed(() => {
 const sprintData = computed(() => {
     return props.sprintObject || null;
 })
-const permittedOptions = computed(() => {
-    let users = [];
-    if(sprintData.value) {
-        if(props.data.isParentTask) {
-            if(sprintData.value?.private) {
-                users = sprintData.value?.AssigneeUserId || [];
-            } else {
-                if(projectData.value?.isPrivateSpace) {
-                    users = projectData.value?.AssigneeUserId || [];
-                } else {
-                    users = companyUsers.value;
-                }
-            }
-        } else {
-            if(sprintData.value?.private) {
-                users = props.parentAssignee.filter((x) => sprintData.value?.AssigneeUserId?.includes(x))
-            } else {
-                users = props.parentAssignee
-            }
-        }
-    }
-
-    if(projectData.value?.isPrivateSpace) {
-        users = users.filter((x) => projectData.value?.AssigneeUserId.includes(x));
-        return Array.from(new Set([...users, ...(props.data?.AssigneeUserId || [])]));
-    } else {
-        return users;
-    }
-})
-const nonPermittedOptions = computed(() => {
-    let users = [];
-    if(sprintData.value) {
-        if(props.data.isParentTask) {
-            if(sprintData.value?.private) {
-                users = (sprintData.value?.AssigneeUserId || []).filter((x) => x === userId.value);
-            } else {
-                if(projectData.value?.isPrivateSpace) {
-                    users = (projectData.value?.AssigneeUserId || []).filter((x) => x === userId.value);
-                } else {
-                    users = [userId.value];
-                }
-            }
-        } else {
-            users = (props.parentAssignee || [])?.filter((x) => x === userId.value)
-            if(sprintData.value?.private) {
-                users = users.filter((x) => sprintData.value?.AssigneeUserId?.includes(x))
-            }
-        }
-    }
-    if(projectData.value?.isPrivateSpace) {
-        users = users.filter((x) => projectData.value?.AssigneeUserId.includes(x));
-        return users;
-    } else {
-        return users;
-    }
-})
+const assigneeInput = computed(() => ({
+    task: props.data,
+    sprint: sprintData.value,
+    project: projectData.value,
+    parentAssignees: props.parentAssignee,
+    companyUsers: companyUsers.value
+}))
+const permittedOptions = computed(() => permittedAssignees(assigneeInput.value))
+const nonPermittedOptions = computed(() => selfAssignable({ ...assigneeInput.value, userId: userId.value }))
 
 watch(() => props.data, (newVal, oldVal) => {
     if(JSON.stringify(newVal) !== JSON.stringify(oldVal)) {
@@ -444,8 +400,7 @@ function changeAssignee(type, value) {
     })
     .then(() => {
         if(operation === "assigneRemove"){
-           let index = task.value.AssigneeUserId.findIndex((x) => x === value.id);
-            task.value.AssigneeUserId.splice(index,1);
+            removePerson(task.value.AssigneeUserId, value.id);
             commit("projectData/mutateSearchTask", {op:"modified", data: [task.value]});
         }
         delete assigneeInProgress.value[value?.id];
@@ -460,7 +415,8 @@ function changeAssignee(type, value) {
 // CHANGE PRIORITY
 function updatePriority(val = null) {
     if(!val) return;
-    updateTaskByGroup(props.data, val, 2);
+    updateTaskByGroup(props.data, val, 2)
+    .catch((error) => console.error("ERROR in updatePriority: ", error));
 }
 
 const myCounts = computed(() => {

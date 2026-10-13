@@ -1,58 +1,166 @@
 <template>
-  <div class="gantt-view">
-    <div class="gantt-view__bar">
-      <div class="gantt-view__zoom">
-        <button
-          v-for="z in zoomLevels"
-          :key="z"
-          type="button"
-          :class="{ active: zoom === z }"
-          @click="setZoom(z)"
-        >{{ z }}</button>
-      </div>
-      <span v-if="readOnly" class="gantt-view__ro">View only</span>
-      <span class="gantt-view__count">
-        {{ scheduled.length }} scheduled<template v-if="unscheduled.length"> · {{ unscheduled.length }} unscheduled</template>
-      </span>
-    </div>
-
-    <div class="gantt-view__main">
-      <div v-if="loadError" class="gantt-view__msg">
-        Couldn't load the Gantt module. Install the dependency and reload:
-        <code>cd frontend &amp;&amp; npm install</code>
-      </div>
-      <template v-else>
-        <div ref="ganttEl" class="gantt-view__chart"></div>
-        <div v-if="!scheduled.length && !loading" class="gantt-view__empty">
-          No scheduled tasks yet — give a task a start &amp; due date (or use the Unscheduled tray) to see it on the timeline.
+    <div class="ah-page gv">
+        <div v-if="isMobile" class="gv__mobile">
+            <div class="ah-empty gv__mobile-card">
+                <div class="gv__mobile-title">{{ $t('Views.desktop_only_title') }}</div>
+                <p class="gv__mobile-text">{{ $t('Views.desktop_only_gantt') }}</p>
+            </div>
         </div>
-      </template>
 
-      <aside v-if="unscheduled.length" class="gantt-view__tray">
-        <h4 class="gantt-view__tray-title">Unscheduled ({{ unscheduled.length }})</h4>
-        <ul class="gantt-view__tray-list">
-          <li v-for="t in unscheduled" :key="t._id" class="gantt-view__tray-item">
-            <span class="gantt-view__tray-name" :title="t.TaskName">{{ t.TaskName || t.TaskKey }}</span>
-            <button v-if="!readOnly" type="button" class="gantt-view__tray-btn" @click="schedule(t)">Schedule</button>
-          </li>
-        </ul>
-      </aside>
+        <template v-else>
+            <div class="gv__bar">
+                <div class="ah-tabs gv__zoom">
+                    <button
+                        v-for="z in zoomLevels"
+                        :key="z.key"
+                        type="button"
+                        class="ah-tab"
+                        :class="{ 'is-on': zoom === z.key }"
+                        @click="setZoom(z.key)"
+                    >{{ z.label }}</button>
+                </div>
+                <button
+                    type="button"
+                    class="ah-btn ah-btn--sm gv__toggle"
+                    :class="showCritical ? 'ah-btn--outline' : 'ah-btn--secondary'"
+                    :aria-pressed="showCritical"
+                    @click="toggleCritical"
+                >{{ $t('Views.critical_path') }}</button>
+                <button
+                    type="button"
+                    class="ah-btn ah-btn--sm gv__toggle"
+                    :class="showBaseline ? 'ah-btn--outline' : 'ah-btn--secondary'"
+                    :aria-pressed="showBaseline"
+                    @click="toggleBaseline"
+                >{{ $t('Views.baseline') }}</button>
+                <span v-if="readOnly" class="ah-chip ah-chip--warn">{{ $t('Views.view_only') }}</span>
+                <div class="ah-toolbar__spacer"></div>
+                <span class="ah-mono gv__count">
+                    {{ $t('Views.scheduled_count', { n: scheduled.length }) }}
+                    <template v-if="unscheduled.length"> · {{ $t('Views.unscheduled_count', { n: unscheduled.length }) }}</template>
+                </span>
+                <button type="button" class="ah-btn ah-btn--outline ah-btn--sm" @click="replanOpen = !replanOpen">
+                    <ShellIcon name="calendar" :size="13" class="gv__spark" /> {{ $t('Views.replan') }}
+                </button>
+            </div>
+
+            <div class="gv__main">
+                <div v-if="loadError" class="gv__msg ah-empty">
+                    {{ $t('Views.gantt_module_missing') }}
+                    <code>cd frontend &amp;&amp; npm install</code>
+                </div>
+                <template v-else>
+                    <div ref="ganttEl" class="gv__chart"></div>
+                    <EmptyState
+                        v-if="!scheduled.length && !loading"
+                        class="gv__empty"
+                        compact
+                        illustration="tasks"
+                        data-test="gantt-empty"
+                        :title="$t(noTasks ? 'Views.gantt_no_tasks_title' : 'Views.gantt_empty_title')"
+                        :message="$t(noTasks ? 'Views.gantt_no_tasks_msg' : 'Views.gantt_empty')"
+                        :actionLabel="noTasks ? $t('Views.add_a_task') : ''"
+                        :actionAllowed="canAddFirstTask"
+                        @action="goToList"
+                    />
+                </template>
+
+                <aside v-if="unscheduled.length" class="gv__tray ah-scroll">
+                    <div class="gv__tray-head">
+                        <span class="ah-label">{{ $t('Views.unscheduled') }}</span>
+                        <span class="ah-mono gv__tray-count">{{ unscheduled.length }}</span>
+                    </div>
+                    <div v-for="t in unscheduled" :key="t._id" class="gv__tray-item" @click="open(t)">
+                        <span class="gv__tray-name" :title="t.TaskName">{{ t.TaskName || t.TaskKey }}</span>
+                        <button v-if="!readOnly" type="button" class="ah-btn ah-btn--ghost ah-btn--sm" @click.stop="schedule(t)">
+                            {{ $t('Views.schedule') }}
+                        </button>
+                    </div>
+                </aside>
+
+                <div v-if="replanOpen" class="gv__replan">
+                    <button type="button" class="gv__replan-close" :aria-label="$t('Views.close')" @click="replanOpen = false">×</button>
+                    <p v-for="(line, i) in replanLines" :key="i" class="gv__replan-line">
+                        <span v-if="i === 0" class="gv__replan-tag">{{ $t('Views.replan') }}:</span> {{ line }}
+                    </p>
+                    <p v-for="p in proposals" :key="p._id" class="gv__replan-line">
+                        <span class="gv__replan-tag">✦ {{ p.agentName }}:</span> {{ proposalTitle(t, p) }}
+                        <router-link class="gv__replan-link" :to="{ name: 'AiInbox', params: { cid: companyId } }">{{ $t('Views.review') }}</router-link>
+                    </p>
+                </div>
+
+                <div
+                    v-if="shiftPreview"
+                    ref="shiftEl"
+                    class="gv__shift"
+                    role="dialog"
+                    aria-labelledby="gv-shift-title"
+                    @keydown.esc="cancelShift"
+                >
+                    <p id="gv-shift-title" class="gv__shift-title">{{ $t('Views.shift_title', { task: taskLabel(shiftPreview.task) }) }}</p>
+                    <template v-if="shiftRows.length">
+                        <p class="gv__shift-text">{{ $t('Views.shift_intro', { n: shiftRows.length }, shiftRows.length) }}</p>
+                        <ul class="gv__shift-list ah-scroll">
+                            <li v-for="row in shiftRows" :key="row.id" class="gv__shift-row">
+                                <span class="gv__shift-name" :title="row.name">{{ row.name }}</span>
+                                <span class="ah-mono gv__shift-days">{{ $t(shiftDaysKey, { n: row.days }, row.days) }}</span>
+                                <span class="ah-mono gv__shift-range">{{ row.range }}</span>
+                            </li>
+                        </ul>
+                    </template>
+                    <template v-if="conflictRows.length">
+                        <p class="gv__shift-text">{{ $t('Views.shift_locked') }}</p>
+                        <ul class="gv__shift-list ah-scroll">
+                            <li v-for="row in conflictRows" :key="row.id" class="gv__shift-row">
+                                <span class="gv__shift-name" :title="row.name">{{ row.name }}</span>
+                                <span class="ah-mono gv__shift-days">{{ $t('Views.shift_needs', { days: $t(shiftDaysKey, { n: row.days }, row.days) }) }}</span>
+                            </li>
+                        </ul>
+                    </template>
+                    <p v-if="cycleChain" class="gv__shift-warn">{{ $t('Views.shift_cycle', { chain: cycleChain }) }}</p>
+                    <p v-if="!everyDayWorks" class="gv__shift-note">{{ $t('Views.shift_working_note', { days: workingDayNames }) }}</p>
+                    <p class="gv__shift-note">{{ $t('Views.shift_earlier') }}</p>
+                    <div class="gv__shift-actions">
+                        <button
+                            v-if="shiftRows.length"
+                            type="button"
+                            class="ah-btn ah-btn--primary ah-btn--sm"
+                            :disabled="shiftBusy"
+                            @click="applyShift"
+                        >{{ $t('Views.shift_apply') }}</button>
+                        <button type="button" class="ah-btn ah-btn--outline ah-btn--sm" :disabled="shiftBusy" @click="moveOnly">{{ $t('Views.shift_only') }}</button>
+                        <button type="button" class="ah-btn ah-btn--ghost ah-btn--sm" :disabled="shiftBusy" @click="cancelShift">{{ $t('Views.shift_cancel') }}</button>
+                    </div>
+                </div>
+            </div>
+        </template>
     </div>
-  </div>
 </template>
-
-<script>
-export default { name: 'GanttView' };
-</script>
 
 <script setup>
 import { ref, computed, watch, onMounted, onBeforeUnmount, inject, nextTick } from 'vue';
+import ShellIcon from '@/components/organisms/Shell/ShellIcon.vue';
 import { useStore } from 'vuex';
-import { useCustomComposable } from '@/composable';
+import { useI18n } from 'vue-i18n';
+import { proposalTitle } from '@/views/Ai/plainLabels';
+import { useCustomComposable, useGetterFunctions } from '@/composable';
 import { apiRequest } from '@/services';
 import * as env from '@/config/env';
 import taskClass from '@/utils/TaskOperations';
+import { readLookLength } from '@/utils/lookTokens';
 import { taskListHelper } from '@/views/Projects/helper.js';
+import { criticalPath } from '@/views/Projects/composables/criticalPath';
+import { fsCollisionLinks } from '@/views/Projects/composables/ganttCollisions';
+import { shiftDependants } from '@ganttShift';
+import { workingDaysFor, countsEveryDay } from '@workingDays';
+import { openTask } from '@/components/organisms/TaskDetailOverlay/useTaskOverlay';
+import { showUndoToast } from '@/composable/useUndoToast';
+import { snappedBack } from './dragSnap';
+import EmptyState from '@/components/atom/EmptyState/EmptyState.vue';
+import { useAddFirstTask } from '@/views/Projects/composables/useAddFirstTask';
+import { useToast } from 'vue-toast-notification';
+
+defineOptions({ name: 'GanttView' });
 
 const props = defineProps({
     projectData: { type: Object, default: () => ({}) },
@@ -60,52 +168,138 @@ const props = defineProps({
 });
 
 const { getters } = useStore();
+const { t } = useI18n();
 const { checkPermission } = useCustomComposable();
+const { getUser } = useGetterFunctions();
 const { groupBy } = taskListHelper();
+const toast = useToast();
 const selectedProject = inject('selectedProject', ref({}));
+const { canAddFirstTask, goToList } = useAddFirstTask(selectedProject);
+const companyId = inject('$companyId', ref(''));
+const clientWidth = inject('$clientWidth', ref(1440));
 
 const ganttEl = ref(null);
 const loadError = ref(false);
 const loading = ref(true);
 const milestones = ref([]);
-const zoomLevels = ['Day', 'Week', 'Month'];
+const proposals = ref([]);
+const zoomLevels = computed(() => [
+    { key: 'Day', label: t('Views.zoom_days') },
+    { key: 'Week', label: t('Views.zoom_weeks') },
+    { key: 'Month', label: t('Views.zoom_months') },
+]);
 const zoom = ref('Week');
+const showCritical = ref(true);
+const showBaseline = ref(true);
+const replanOpen = ref(false);
+const shiftPreview = ref(null);
+const shiftBusy = ref(false);
+const shiftEl = ref(null);
 
 let gantt = null;     // dhtmlx instance (lazy-loaded)
 let ready = false;    // init complete
 let suppress = false; // guard: programmatic re-renders must not fire write handlers
 let eventIds = [];
+let baselineLayer = null;
+
+const isMobile = computed(() => Number(clientWidth.value || 0) > 0 && Number(clientWidth.value) < 768);
 
 /* ----------------------- data in: from the live Vuex store ----------------------- */
 // Same task source the List/Table views use, so socket-driven updates flow in for free.
-const sprintId = computed(() => props.sprints?.[0]?.id || props.sprints?.[0]?._id || '');
+const sprintIds = computed(() => (props.sprints || []).map((s) => String((s && (s.id || s._id)) || '')).filter(Boolean));
 
 function pickTasks(map) {
     const pid = props.projectData?._id;
-    const sid = sprintId.value;
-    if (!pid || !sid || !map || !map[pid] || !map[pid][sid]) return null;
-    const node = map[pid][sid];
-    return Array.isArray(node.tasks) ? node.tasks : null;
+    if (!pid || !map || !map[pid]) return [];
+    const byProject = map[pid];
+    const ids = sprintIds.value.length ? sprintIds.value : Object.keys(byProject);
+    return ids.reduce((all, sid) => {
+        const node = byProject[sid];
+        return Array.isArray(node?.tasks) ? all.concat(node.tasks) : all;
+    }, []);
 }
-const tasks = computed(() =>
-    pickTasks(getters['projectData/tasks']) || pickTasks(getters['projectData/tableTasks']) || []
-);
+const tasks = computed(() => {
+    const merged = [...pickTasks(getters['projectData/tasks']), ...pickTasks(getters['projectData/tableTasks'])];
+    const seen = new Set();
+    return merged.filter((task) => {
+        const id = String(task?._id || '');
+        if (!id || seen.has(id)) return false;
+        seen.add(id);
+        return true;
+    });
+});
 
 // active = not deleted (0 active, 2 archived, undefined legacy)
-const activeTasks = computed(() => tasks.value.filter((t) => t && [0, 2, undefined, null].includes(t.deletedStatusKey)));
-const scheduled = computed(() => activeTasks.value.filter((t) => t.startDate && t.DueDate));
-const unscheduled = computed(() => activeTasks.value.filter((t) => !(t.startDate && t.DueDate)));
+const activeTasks = computed(() => tasks.value.filter((task) => task && [0, 2, undefined, null].includes(task.deletedStatusKey)));
+const noTasks = computed(() => !activeTasks.value.length);
+const scheduled = computed(() => activeTasks.value.filter((task) => task.startDate && task.DueDate));
+const unscheduled = computed(() => activeTasks.value.filter((task) => !(task.startDate && task.DueDate)));
 
 const readOnly = computed(() =>
     checkPermission('task.task_due_date', selectedProject.value?.isGlobalPermission ?? props.projectData?.isGlobalPermission) !== true
 );
 
+const sprintName = (id) => {
+    const hit = (props.sprints || []).find((s) => String(s.id || s._id) === String(id));
+    return (hit && (hit.name || hit.sprintName)) || t('Views.sprint_fallback');
+};
+
+const blocksOf = (task) => (task.relations || []).filter((r) => r.type === 'blocks').map((r) => String(r.taskId));
+
+const workingDays = computed(() => workingDaysFor(getters['settings/selectedCompany'], props.projectData));
+const everyDayWorks = computed(() => countsEveryDay(workingDays.value));
+const shiftDaysKey = computed(() => (everyDayWorks.value ? 'Views.shift_days' : 'Views.shift_working_days'));
+const WEEKDAY_KEYS = ['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat'];
+const MONDAY_FIRST = [1, 2, 3, 4, 5, 6, 0];
+const workingDayNames = computed(() => MONDAY_FIRST.filter((day) => workingDays.value.includes(day))
+    .map((day) => t(`weekName.${WEEKDAY_KEYS[day]}`)).join(', '));
+/* Only the day scale has a column per day; a week column cannot be a day off. */
+const dayOffClass = (date) => (zoom.value === 'Day' && !workingDays.value.includes(date.getDay()) ? 'gv-off' : '');
+
+const critical = computed(() => criticalPath(scheduled.value.map((task) => ({
+    id: String(task._id), startDate: task.startDate, DueDate: task.DueDate, blocks: blocksOf(task),
+})), { workingDays: workingDays.value }));
+// The toggle decides what is painted, not what is known: Replan reads the chain either way.
+const criticalIds = computed(() => (showCritical.value ? new Set(critical.value.path) : new Set()));
+const collisionLinks = computed(() => fsCollisionLinks(scheduled.value.map((task) => ({
+    id: String(task._id), startDate: task.startDate, DueDate: task.DueDate, blocks: blocksOf(task),
+}))));
+
+const shortDate = (value) => new Date(value).toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
+const taskLabel = (task) => (task && (task.TaskName || task.TaskKey)) || t('Views.untitled');
+const labelOf = (id) => taskLabel(findTask(id));
+const shiftRows = computed(() => (shiftPreview.value?.shifts || []).map((shift) => ({
+    id: shift.id,
+    name: labelOf(shift.id),
+    days: shift.days,
+    range: `${shortDate(shift.to.startDate)} – ${shortDate(shift.to.DueDate)}`,
+})));
+const conflictRows = computed(() => (shiftPreview.value?.conflicts || []).map((conflict) => ({ id: conflict.id, name: labelOf(conflict.id), days: conflict.days })));
+const cycleChain = computed(() => (shiftPreview.value?.cycle || []).map(labelOf).join(' → '));
+
+/* The last dated plan the task carried before this one. Only a real earlier date
+ * counts — an invented baseline would read as a slip that never happened. */
+const baselineEnd = (task) => {
+    const history = Array.isArray(task.dueDateDeadLine) ? task.dueDateDeadLine : [];
+    const first = history
+        .map((entry) => {
+            const value = typeof entry === 'string' ? (() => { try { return JSON.parse(entry); } catch (e) { return null; } })() : entry;
+            const date = value && (value.date || value);
+            const time = date ? new Date(date.seconds ? date.seconds * 1000 : date).getTime() : NaN;
+            return Number.isNaN(time) ? null : time;
+        })
+        .filter(Boolean)
+        .sort((a, b) => a - b)[0];
+    if (!first) return null;
+    return first < new Date(task.DueDate).getTime() ? new Date(first) : null;
+};
+
 // Re-render only when something the chart actually shows has changed.
 const signature = computed(() =>
-    JSON.stringify(scheduled.value.map((t) => [
-        t._id, t.TaskName, t.startDate, t.DueDate, t.ParentTaskId || 0,
-        t.status?.type || t.statusType || '',
-        (t.relations || []).filter((r) => r.type === 'blocks').map((r) => r.taskId),
+    JSON.stringify(scheduled.value.map((task) => [
+        task._id, task.TaskName, task.startDate, task.DueDate, task.ParentTaskId || 0, task.sprintId || '',
+        task.status?.type || task.statusType || '', task.Task_Leader || '',
+        blocksOf(task),
     ]))
 );
 
@@ -116,7 +310,7 @@ function progressOf(task) {
     if (type === 'inprogress') return 0.5;
     return 0;
 }
-function findTask(id) { return activeTasks.value.find((t) => String(t._id) === String(id)); }
+function findTask(id) { return activeTasks.value.find((task) => String(task._id) === String(id)); }
 function buildProjectData() {
     const p = props.projectData || {};
     return { _id: p._id, ProjectName: p.ProjectName, CompanyId: p.CompanyId };
@@ -126,28 +320,63 @@ function buildUserData() {
     const me = (getters['users/users'] || []).find((u) => String(u._id) === String(uid)) || {};
     return { Employee_Name: me.Employee_Name || '', id: uid, companyOwnerId: getters['settings/companyOwnerDetail']?.userId || '' };
 }
+function open(task) {
+    if (!task || !task._id) return;
+    openTask({
+        companyId: companyId.value,
+        projectId: task.ProjectID || props.projectData?._id,
+        sprintId: task.sprintId,
+        folderId: task.folderObjId || task.sprintArray?.folderId || '',
+        taskId: task._id,
+    });
+}
 
 function toGanttData() {
-    const data = scheduled.value.map((t) => ({
-        id: String(t._id),
-        text: t.TaskName || t.TaskKey || 'Untitled',
-        start_date: new Date(t.startDate),
-        end_date: new Date(t.DueDate),
-        parent: (t.ParentTaskId && String(t.ParentTaskId)) || 0,
-        progress: progressOf(t),
-        open: true,
-    }));
+    const data = scheduled.value.map((task) => {
+        const parent = task.ParentTaskId ? String(task.ParentTaskId) : '';
+        const sprintGroup = task.sprintId ? `sp_${task.sprintId}` : 0;
+        const line = baselineEnd(task);
+        return {
+            id: String(task._id),
+            text: task.TaskName || task.TaskKey || t('Views.untitled'),
+            start_date: new Date(task.startDate),
+            end_date: new Date(task.DueDate),
+            sprintGroup,
+            parent: parent || sprintGroup,
+            progress: progressOf(task),
+            open: true,
+            owner: task.Task_Leader || (Array.isArray(task.AssigneeUserId) ? task.AssigneeUserId[0] : '') || '',
+            baseline_end: line,
+            critical: criticalIds.value.has(String(task._id)),
+        };
+    });
     const ids = new Set(data.map((d) => d.id));
-    // drop parent refs pointing outside the visible set (else dhtmlx throws)
-    data.forEach((d) => { if (d.parent && !ids.has(String(d.parent))) d.parent = 0; });
+    // A parent outside the visible set would make dhtmlx throw; the task falls back
+    // to its sprint band.
+    data.forEach((d) => {
+        if (d.parent && !String(d.parent).startsWith('sp_') && !ids.has(String(d.parent))) {
+            d.parent = d.sprintGroup || 0;
+        }
+    });
+    // Sprint bands exist only where something actually sits under them — an empty
+    // project row has no dates to derive and dhtmlx renders it as NaN.
+    const groups = [...new Set(data.map((d) => d.parent).filter((p) => String(p).startsWith('sp_')))]
+        .map((groupId) => ({
+            id: groupId,
+            text: sprintName(String(groupId).slice(3)),
+            type: gantt?.config?.types?.project || 'project',
+            open: true,
+            parent: 0,
+            readonly: true,
+        }));
 
     // dependency arrows: only emit from the 'blocks' side (relations are stored
     // bidirectionally, so this avoids duplicate links). 'blocks' => finish-to-start ('0').
     const links = [];
-    scheduled.value.forEach((t) => {
-        (t.relations || []).forEach((rel) => {
-            if (rel.type === 'blocks' && ids.has(String(t._id)) && ids.has(String(rel.taskId))) {
-                links.push({ id: `${t._id}_${rel.taskId}`, source: String(t._id), target: String(rel.taskId), type: '0' });
+    scheduled.value.forEach((task) => {
+        blocksOf(task).forEach((target) => {
+            if (ids.has(String(task._id)) && ids.has(target)) {
+                links.push({ id: `${task._id}_${target}`, source: String(task._id), target, type: '0' });
             }
         });
     });
@@ -156,7 +385,7 @@ function toGanttData() {
         if (m && m.date) {
             data.push({
                 id: `ms_${m._id}`,
-                text: m.milestoneName || 'Milestone',
+                text: m.milestoneName || t('Views.milestone'),
                 start_date: new Date(m.date),
                 type: (gantt && gantt.config && gantt.config.types ? gantt.config.types.milestone : 'milestone'),
                 readonly: true,
@@ -164,7 +393,7 @@ function toGanttData() {
             });
         }
     });
-    return { data, links };
+    return { data: groups.concat(data), links };
 }
 
 function renderData() {
@@ -173,24 +402,105 @@ function renderData() {
     try {
         gantt.clearAll();
         gantt.parse(toGanttData());
+        placeToday();
     } finally {
         suppress = false;
     }
 }
 
-/* ------------------------------------ writes ------------------------------------ */
-function persistDates(id) {
-    if (suppress) return;
-    const g = gantt.getTask(id);
-    const task = findTask(id);
-    if (!g || !task) return;
+let todayMarker = null;
+function placeToday() {
+    if (!gantt || typeof gantt.addMarker !== 'function') return;
+    try {
+        if (todayMarker) gantt.deleteMarker(todayMarker);
+        todayMarker = gantt.addMarker({ start_date: new Date(), css: 'gv-today', text: t('Views.today') });
+    } catch (e) { /* markers are decoration */ }
+}
+
+function saveDates(task, dates) {
     taskClass.updateDates({
-        firebaseObj: { startDate: g.start_date, DueDate: g.end_date },
+        firebaseObj: dates,
         projectData: buildProjectData(),
         taskData: task,
         userData: buildUserData(),
     }).catch((e) => console.error('Gantt: updateDates failed', e));
 }
+
+/* The batch write leaves archived tasks out, so they are never offered as shiftable. */
+const mayShift = (id) => !readOnly.value && findTask(id)?.deletedStatusKey !== 2;
+
+function onTaskDragged(id) {
+    if (suppress) return;
+    const g = gantt.getTask(id);
+    const task = findTask(id);
+    if (!g || !task) return;
+    if (zoom.value !== 'Day' && snappedBack(task, g)) {
+        toast.info(t('Views.drag_snapped_back'));
+        return;
+    }
+    const to = { startDate: g.start_date, DueDate: g.end_date };
+    const plan = shiftDependants(
+        scheduled.value.map((row) => ({ id: String(row._id), startDate: row.startDate, DueDate: row.DueDate })),
+        scheduled.value.flatMap((row) => blocksOf(row).map((target) => ({ source: String(row._id), target }))),
+        String(id),
+        to,
+        { canEdit: mayShift, workingDays: workingDays.value },
+    );
+    if (!plan.shifts.length && !plan.conflicts.length && !plan.cycle.length) {
+        saveDates(task, to);
+        return;
+    }
+    shiftPreview.value = { id: String(id), task, to, ...plan };
+    nextTick(() => shiftEl.value?.querySelector('button')?.focus());
+}
+
+function writeDates(rows) {
+    return taskClass.updateDatesBatch({ rows, userData: buildUserData() });
+}
+
+function restoreDates(before) {
+    const rows = before.map(({ id, startDate, DueDate }) => ({ task: findTask(id), startDate, DueDate })).filter((row) => row.task);
+    return writeDates(rows).catch((e) => {
+        console.error('Gantt: undo shift failed', e);
+        toast.error(t('Views.shift_undo_failed'));
+    });
+}
+
+async function applyShift() {
+    const plan = shiftPreview.value;
+    if (!plan || shiftBusy.value) return;
+    shiftBusy.value = true;
+    const rows = [{ task: plan.task, ...plan.to }, ...plan.shifts.map((shift) => ({ task: findTask(shift.id), ...shift.to }))].filter((row) => row.task);
+    const before = rows.map(({ task }) => ({ id: String(task._id), startDate: task.startDate, DueDate: task.DueDate }));
+    try {
+        await writeDates(rows);
+        showUndoToast({
+            message: t('Views.shift_done', { task: taskLabel(plan.task), n: plan.shifts.length }, plan.shifts.length),
+            undo: () => restoreDates(before),
+        });
+    } catch (e) {
+        console.error('Gantt: shift failed', e);
+        toast.error(t('Views.shift_failed'));
+        renderData();
+    } finally {
+        shiftBusy.value = false;
+        shiftPreview.value = null;
+    }
+}
+
+function moveOnly() {
+    const plan = shiftPreview.value;
+    if (!plan || shiftBusy.value) return;
+    shiftPreview.value = null;
+    saveDates(plan.task, plan.to);
+}
+
+function cancelShift() {
+    if (shiftBusy.value) return;
+    shiftPreview.value = null;
+    renderData();
+}
+
 function persistLinkAdd(id, link) {
     if (suppress) return;
     apiRequest('post', '/api/v2/tasks/relations', {
@@ -224,9 +534,12 @@ function schedule(task) {
 }
 
 /* ------------------------------------- zoom ------------------------------------- */
+// dhtmlx lays its rows out in pixels: the List's row height for the look, 36px where a look names none.
+const lookRowHeight = () => readLookLength('--row-h', 36);
+
 function applyScales(level) {
     if (!gantt) return;
-    gantt.config.scale_height = 50;
+    gantt.config.scale_height = lookRowHeight() - 2;
     if (level === 'Day') {
         gantt.config.scales = [
             { unit: 'day', step: 1, format: '%d %M' },
@@ -238,10 +551,7 @@ function applyScales(level) {
             { unit: 'week', step: 1, format: 'W%W' },
         ];
     } else {
-        gantt.config.scales = [
-            { unit: 'week', step: 1, format: 'Week #%W' },
-            { unit: 'day', step: 1, format: '%D' },
-        ];
+        gantt.config.scales = [{ unit: 'week', step: 1, format: '%M %d' }];
     }
 }
 function setZoom(level) {
@@ -249,6 +559,33 @@ function setZoom(level) {
     applyScales(level);
     if (ready && gantt) gantt.render();
 }
+function toggleCritical() {
+    showCritical.value = !showCritical.value;
+    renderData();
+}
+function toggleBaseline() {
+    showBaseline.value = !showBaseline.value;
+    if (ready && gantt) gantt.render();
+}
+
+/* --------------------------------- replan panel --------------------------------- */
+const replanLines = computed(() => {
+    const path = critical.value.path || [];
+    if (!path.length) return [t('Views.replan_none')];
+    const chain = path.map((id) => findTask(id)).filter(Boolean);
+    const last = chain[chain.length - 1];
+    const end = last ? new Date(last.DueDate) : null;
+    const span = critical.value.durationDays;
+    const lines = [t(everyDayWorks.value ? 'Views.replan_chain' : 'Views.replan_chain_working', {
+        n: chain.length,
+        days: t(everyDayWorks.value ? 'Views.days_count' : 'Views.working_days_count', { n: span }, span),
+        date: end ? end.toLocaleDateString(undefined, { month: 'short', day: 'numeric' }) : '',
+    }, chain.length)];
+    const now = Date.now();
+    const late = chain.find((task) => new Date(task.DueDate).getTime() < now && (task.status?.type || task.statusType) !== 'close');
+    if (late) lines.push(t('Views.replan_late', { task: late.TaskName || late.TaskKey }));
+    return lines;
+});
 
 /* ----------------------------------- lifecycle ---------------------------------- */
 // Ensure the project's task list is in the store. Other views (List/Table/Board) trigger
@@ -266,8 +603,18 @@ function ensureTasksLoaded() {
     }
 }
 
+function ownerCell(task) {
+    if (!task || String(task.id).startsWith('sp_') || String(task.id).startsWith('ms_')) return '';
+    if (!task.owner) return `<span class="gv-unassigned">${t('Views.unassigned')}</span>`;
+    const user = getUser(task.owner) || {};
+    const name = user.Employee_Name || '';
+    return `<span class="gv-owner" title="${name.replace(/"/g, '')}">${(name.trim().charAt(0) || '?').toUpperCase()}</span>`;
+}
+
 onMounted(async () => {
+    if (isMobile.value) { loading.value = false; return; }
     ensureTasksLoaded();
+    loadProposals();
     let mod;
     try {
         mod = await import(/* webpackChunkName: "dhtmlx-gantt" */ 'dhtmlx-gantt');
@@ -289,6 +636,9 @@ onMounted(async () => {
     if (!ganttEl.value || !gantt) { loading.value = false; return; }
 
     try {
+        // 'auto' probes with new Function and, where nothing blocks it, builds its date formatters with it,
+        // so a report-only content security policy would log an eval on every Gantt view.
+        gantt.config.csp = true;
         gantt.config.date_format = '%Y-%m-%d %H:%i';
         gantt.config.readonly = readOnly.value;
         gantt.config.drag_move = !readOnly.value;
@@ -296,18 +646,57 @@ onMounted(async () => {
         gantt.config.drag_links = !readOnly.value;
         gantt.config.drag_progress = false;
         gantt.config.fit_tasks = true;
+        gantt.config.row_height = lookRowHeight();
+        gantt.config.bar_height = 16;
+        gantt.config.show_markers = true;
         gantt.config.columns = [
-            { name: 'text', label: 'Task', tree: true, width: 220, resize: true },
-            { name: 'start_date', label: 'Start', align: 'center', width: 90 },
-            { name: 'duration', label: 'Days', align: 'center', width: 54 },
+            { name: 'text', label: t('Views.col_task'), tree: true, width: 236, resize: true },
+            { name: 'owner', label: '', align: 'center', width: 48, template: ownerCell },
         ];
+        gantt.templates.task_text = () => '';
+        gantt.templates.task_class = (start, end, task) => {
+            const classes = [];
+            if (String(task.id).startsWith('sp_')) classes.push('gv-group');
+            if (task.critical) classes.push('gv-critical');
+            return classes.join(' ');
+        };
+        gantt.templates.grid_row_class = (start, end, task) => (String(task.id).startsWith('sp_') ? 'gv-grid-group' : '');
+        gantt.templates.link_class = (link) => {
+            const classes = [];
+            if (criticalIds.value.has(String(link.source)) && criticalIds.value.has(String(link.target))) classes.push('gv-link-critical');
+            if (collisionLinks.value.has(`${link.source}_${link.target}`)) classes.push('gv-link-collision');
+            return classes.join(' ');
+        };
+        gantt.templates.timeline_cell_class = (task, date) => dayOffClass(date);
+        gantt.templates.scale_cell_class = (date) => dayOffClass(date);
         applyScales(zoom.value);
 
         gantt.init(ganttEl.value);
 
-        eventIds.push(gantt.attachEvent('onAfterTaskDrag', (id) => persistDates(id)));
+        // Baseline runs as its own layer so the actual bar keeps dhtmlx's own drag maths.
+        if (typeof gantt.addTaskLayer === 'function') {
+            baselineLayer = gantt.addTaskLayer((task) => {
+                if (!showBaseline.value || !task.baseline_end || !task.start_date) return false;
+                const el = document.createElement('div');
+                el.className = 'gv-baseline';
+                const left = gantt.posFromDate(task.start_date);
+                const right = gantt.posFromDate(task.baseline_end);
+                el.style.left = `${Math.min(left, right)}px`;
+                el.style.width = `${Math.max(2, Math.abs(right - left))}px`;
+                el.style.top = `${gantt.getTaskTop(task.id) + gantt.getTaskHeight() - 4}px`;
+                return el;
+            });
+        }
+
+        eventIds.push(gantt.attachEvent('onBeforeTaskDrag', () => !shiftPreview.value));
+        eventIds.push(gantt.attachEvent('onAfterTaskDrag', (id) => onTaskDragged(id)));
         eventIds.push(gantt.attachEvent('onAfterLinkAdd', (id, link) => persistLinkAdd(id, link)));
         eventIds.push(gantt.attachEvent('onAfterLinkDelete', (id, link) => persistLinkDelete(link)));
+        eventIds.push(gantt.attachEvent('onTaskDblClick', (id) => {
+            const task = findTask(id);
+            if (task) open(task);
+            return false;
+        }));
 
         ready = true;
         renderData();
@@ -331,7 +720,20 @@ onMounted(async () => {
     } catch (e) { /* milestones optional */ }
 });
 
+async function loadProposals() {
+    try {
+        const res = await apiRequest('get', `${env.AGENT_PROPOSALS}?status=pending`);
+        const rows = res?.data?.status ? (res.data.data || []) : [];
+        const pid = String(props.projectData?._id || '');
+        proposals.value = rows.filter((p) => !pid || String(p.projectId || '') === pid).slice(0, 2);
+    } catch (e) {
+        proposals.value = [];
+    }
+}
+
 watch(signature, () => { if (ready && !suppress) renderData(); });
+watch(criticalIds, () => { if (ready && !suppress) renderData(); });
+watch(workingDays, () => { if (ready && gantt) gantt.render(); });
 
 watch(readOnly, (ro) => {
     if (!ready || !gantt) return;
@@ -349,36 +751,19 @@ onBeforeUnmount(() => {
     try {
         if (gantt) {
             eventIds.forEach((id) => gantt.detachEvent(id));
+            if (baselineLayer && typeof gantt.removeTaskLayer === 'function') gantt.removeTaskLayer(baselineLayer);
+            if (todayMarker && typeof gantt.deleteMarker === 'function') gantt.deleteMarker(todayMarker);
             gantt.clearAll();
             // Intentionally NOT calling gantt.destructor() — destructing the shared
             // singleton breaks re-init when the Gantt tab is reopened (tasksStore undefined).
         }
     } catch (e) { /* ignore */ }
     eventIds = [];
+    baselineLayer = null;
+    todayMarker = null;
     gantt = null;
     ready = false;
 });
 </script>
 
-<style scoped>
-.gantt-view { display: flex; flex-direction: column; width: 100%; height: 100%; background: #fff; }
-.gantt-view__bar { display: flex; align-items: center; gap: 14px; padding: 8px 12px; border-bottom: 1px solid #eee; flex: 0 0 auto; }
-.gantt-view__zoom { display: inline-flex; border: 1px solid #d8d8e0; border-radius: 6px; overflow: hidden; }
-.gantt-view__zoom button { border: none; background: #fff; color: #555; padding: 5px 14px; font-size: 13px; cursor: pointer; }
-.gantt-view__zoom button + button { border-left: 1px solid #d8d8e0; }
-.gantt-view__zoom button.active { background: #2F3990; color: #fff; }
-.gantt-view__ro { font-size: 12px; color: #b06a00; background: #fff5e6; border: 1px solid #ffd591; border-radius: 4px; padding: 2px 8px; }
-.gantt-view__count { margin-left: auto; font-size: 12px; color: #888; }
-.gantt-view__main { position: relative; flex: 1 1 auto; display: flex; min-height: 360px; }
-.gantt-view__chart { flex: 1 1 auto; height: 100%; min-height: 360px; }
-.gantt-view__empty,
-.gantt-view__msg { position: absolute; top: 48px; left: 0; right: 0; text-align: center; color: #999; font-size: 14px; padding: 20px; pointer-events: none; }
-.gantt-view__msg code { background: #f3f3f7; padding: 2px 6px; border-radius: 4px; pointer-events: auto; }
-.gantt-view__tray { width: 210px; flex: 0 0 auto; border-left: 1px solid #eee; padding: 10px; overflow: auto; background: #fafafe; }
-.gantt-view__tray-title { font-size: 12px; text-transform: uppercase; color: #999; margin: 0 0 8px; letter-spacing: .04em; }
-.gantt-view__tray-list { list-style: none; margin: 0; padding: 0; }
-.gantt-view__tray-item { display: flex; align-items: center; gap: 6px; padding: 6px 0; border-bottom: 1px dashed #eee; }
-.gantt-view__tray-name { flex: 1 1 auto; font-size: 13px; color: #444; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.gantt-view__tray-btn { border: 1px solid #2F3990; color: #2F3990; background: #fff; border-radius: 5px; font-size: 12px; padding: 3px 8px; cursor: pointer; white-space: nowrap; }
-.gantt-view__tray-btn:hover { background: #2F3990; color: #fff; }
-</style>
+<style scoped src="./style.css"></style>

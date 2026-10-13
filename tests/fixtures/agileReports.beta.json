@@ -1,0 +1,1710 @@
+{
+  "source": "origin/beta fea5e063184a8e4e9c2804c80a0dd4313354830c Modules/AgileReports/velocity.js and cfd.js",
+  "velocity": {
+    "owner, limit 50": {
+      "status": true,
+      "statusText": "Velocity computed.",
+      "data": {
+        "sprints": [
+          {
+            "sprintId": "6f0000000000000000000e21",
+            "name": "Sprint 3",
+            "startDate": "2026-07-14T12:00:00.000Z",
+            "endDate": "2026-07-27T12:00:00.000Z",
+            "committed": 8,
+            "completed": 7,
+            "completedHuman": 5,
+            "completedAgent": 2,
+            "unchecked": 0,
+            "byPattern": {
+              "HUMAN": {
+                "tasks": 1,
+                "points": 5,
+                "hours": 2
+              },
+              "AGENT": {
+                "tasks": 1,
+                "points": 2,
+                "hours": 1
+              },
+              "MIXED": {
+                "tasks": 0,
+                "points": 0,
+                "hours": 0
+              },
+              "UNCHECKED": {
+                "tasks": 0,
+                "points": 0,
+                "hours": 0
+              }
+            },
+            "rollingAvg": 7
+          },
+          {
+            "sprintId": "6f0000000000000000000e22",
+            "name": "Sprint 4",
+            "startDate": "2026-07-28T12:00:00.000Z",
+            "endDate": "2026-08-10T12:00:00.000Z",
+            "committed": 5,
+            "completed": 3,
+            "completedHuman": 0,
+            "completedAgent": 3,
+            "unchecked": 1,
+            "byPattern": {
+              "HUMAN": {
+                "tasks": 0,
+                "points": 0,
+                "hours": 0
+              },
+              "AGENT": {
+                "tasks": 0,
+                "points": 0,
+                "hours": 0
+              },
+              "MIXED": {
+                "tasks": 0,
+                "points": 0,
+                "hours": 0
+              },
+              "UNCHECKED": {
+                "tasks": 1,
+                "points": 3,
+                "hours": 1
+              }
+            },
+            "rollingAvg": 5
+          },
+          {
+            "sprintId": "6f0000000000000000000e23",
+            "name": "Security",
+            "startDate": "2026-08-12T12:00:00.000Z",
+            "endDate": "2026-08-25T12:00:00.000Z",
+            "committed": 5,
+            "completed": 5,
+            "completedHuman": 5,
+            "completedAgent": 0,
+            "unchecked": 0,
+            "byPattern": {
+              "HUMAN": {
+                "tasks": 1,
+                "points": 5,
+                "hours": 2
+              },
+              "AGENT": {
+                "tasks": 0,
+                "points": 0,
+                "hours": 0
+              },
+              "MIXED": {
+                "tasks": 0,
+                "points": 0,
+                "hours": 0
+              },
+              "UNCHECKED": {
+                "tasks": 0,
+                "points": 0,
+                "hours": 0
+              }
+            },
+            "rollingAvg": 5
+          }
+        ],
+        "skipped": 1
+      }
+    },
+    "owner, default limit": {
+      "status": true,
+      "statusText": "Velocity computed.",
+      "data": {
+        "sprints": [
+          {
+            "sprintId": "6f0000000000000000000e21",
+            "name": "Sprint 3",
+            "startDate": "2026-07-14T12:00:00.000Z",
+            "endDate": "2026-07-27T12:00:00.000Z",
+            "committed": 8,
+            "completed": 7,
+            "completedHuman": 5,
+            "completedAgent": 2,
+            "unchecked": 0,
+            "byPattern": {
+              "HUMAN": {
+                "tasks": 1,
+                "points": 5,
+                "hours": 2
+              },
+              "AGENT": {
+                "tasks": 1,
+                "points": 2,
+                "hours": 1
+              },
+              "MIXED": {
+                "tasks": 0,
+                "points": 0,
+                "hours": 0
+              },
+              "UNCHECKED": {
+                "tasks": 0,
+                "points": 0,
+                "hours": 0
+              }
+            },
+            "rollingAvg": 7
+          },
+          {
+            "sprintId": "6f0000000000000000000e22",
+            "name": "Sprint 4",
+            "startDate": "2026-07-28T12:00:00.000Z",
+            "endDate": "2026-08-10T12:00:00.000Z",
+            "committed": 5,
+            "completed": 3,
+            "completedHuman": 0,
+            "completedAgent": 3,
+            "unchecked": 1,
+            "byPattern": {
+              "HUMAN": {
+                "tasks": 0,
+                "points": 0,
+                "hours": 0
+              },
+              "AGENT": {
+                "tasks": 0,
+                "points": 0,
+                "hours": 0
+              },
+              "MIXED": {
+                "tasks": 0,
+                "points": 0,
+                "hours": 0
+              },
+              "UNCHECKED": {
+                "tasks": 1,
+                "points": 3,
+                "hours": 1
+              }
+            },
+            "rollingAvg": 5
+          },
+          {
+            "sprintId": "6f0000000000000000000e23",
+            "name": "Security",
+            "startDate": "2026-08-12T12:00:00.000Z",
+            "endDate": "2026-08-25T12:00:00.000Z",
+            "committed": 5,
+            "completed": 5,
+            "completedHuman": 5,
+            "completedAgent": 0,
+            "unchecked": 0,
+            "byPattern": {
+              "HUMAN": {
+                "tasks": 1,
+                "points": 5,
+                "hours": 2
+              },
+              "AGENT": {
+                "tasks": 0,
+                "points": 0,
+                "hours": 0
+              },
+              "MIXED": {
+                "tasks": 0,
+                "points": 0,
+                "hours": 0
+              },
+              "UNCHECKED": {
+                "tasks": 0,
+                "points": 0,
+                "hours": 0
+              }
+            },
+            "rollingAvg": 5
+          }
+        ],
+        "skipped": 1
+      }
+    },
+    "member, limit 50": {
+      "status": true,
+      "statusText": "Velocity computed.",
+      "data": {
+        "sprints": [
+          {
+            "sprintId": "6f0000000000000000000e21",
+            "name": "Sprint 3",
+            "startDate": "2026-07-14T12:00:00.000Z",
+            "endDate": "2026-07-27T12:00:00.000Z",
+            "committed": 8,
+            "completed": 7,
+            "completedHuman": 5,
+            "completedAgent": 2,
+            "unchecked": 0,
+            "byPattern": {
+              "HUMAN": {
+                "tasks": 1,
+                "points": 5,
+                "hours": 2
+              },
+              "AGENT": {
+                "tasks": 1,
+                "points": 2,
+                "hours": 1
+              },
+              "MIXED": {
+                "tasks": 0,
+                "points": 0,
+                "hours": 0
+              },
+              "UNCHECKED": {
+                "tasks": 0,
+                "points": 0,
+                "hours": 0
+              }
+            },
+            "rollingAvg": 7
+          },
+          {
+            "sprintId": "6f0000000000000000000e22",
+            "name": "Sprint 4",
+            "startDate": "2026-07-28T12:00:00.000Z",
+            "endDate": "2026-08-10T12:00:00.000Z",
+            "committed": 5,
+            "completed": 3,
+            "completedHuman": 0,
+            "completedAgent": 3,
+            "unchecked": 1,
+            "byPattern": {
+              "HUMAN": {
+                "tasks": 0,
+                "points": 0,
+                "hours": 0
+              },
+              "AGENT": {
+                "tasks": 0,
+                "points": 0,
+                "hours": 0
+              },
+              "MIXED": {
+                "tasks": 0,
+                "points": 0,
+                "hours": 0
+              },
+              "UNCHECKED": {
+                "tasks": 1,
+                "points": 3,
+                "hours": 1
+              }
+            },
+            "rollingAvg": 5
+          }
+        ],
+        "skipped": 1
+      }
+    },
+    "other, limit 2": {
+      "status": true,
+      "statusText": "Velocity computed.",
+      "data": {
+        "sprints": [
+          {
+            "sprintId": "6f0000000000000000000e22",
+            "name": "Sprint 4",
+            "startDate": "2026-07-28T12:00:00.000Z",
+            "endDate": "2026-08-10T12:00:00.000Z",
+            "committed": 5,
+            "completed": 3,
+            "completedHuman": 0,
+            "completedAgent": 3,
+            "unchecked": 1,
+            "byPattern": {
+              "HUMAN": {
+                "tasks": 0,
+                "points": 0,
+                "hours": 0
+              },
+              "AGENT": {
+                "tasks": 0,
+                "points": 0,
+                "hours": 0
+              },
+              "MIXED": {
+                "tasks": 0,
+                "points": 0,
+                "hours": 0
+              },
+              "UNCHECKED": {
+                "tasks": 1,
+                "points": 3,
+                "hours": 1
+              }
+            },
+            "rollingAvg": 3
+          },
+          {
+            "sprintId": "6f0000000000000000000e23",
+            "name": "Security",
+            "startDate": "2026-08-12T12:00:00.000Z",
+            "endDate": "2026-08-25T12:00:00.000Z",
+            "committed": 5,
+            "completed": 5,
+            "completedHuman": 5,
+            "completedAgent": 0,
+            "unchecked": 0,
+            "byPattern": {
+              "HUMAN": {
+                "tasks": 1,
+                "points": 5,
+                "hours": 2
+              },
+              "AGENT": {
+                "tasks": 0,
+                "points": 0,
+                "hours": 0
+              },
+              "MIXED": {
+                "tasks": 0,
+                "points": 0,
+                "hours": 0
+              },
+              "UNCHECKED": {
+                "tasks": 0,
+                "points": 0,
+                "hours": 0
+              }
+            },
+            "rollingAvg": 4
+          }
+        ],
+        "skipped": 1
+      }
+    },
+    "empty project": {
+      "status": true,
+      "statusText": "No completed sprints yet.",
+      "data": {
+        "sprints": [],
+        "skipped": 0
+      }
+    }
+  },
+  "flow": {
+    "owner, August": {
+      "status": true,
+      "statusText": "CFD computed.",
+      "data": {
+        "days": [
+          {
+            "date": "2026-08-01",
+            "open": 0,
+            "inprogress": 2,
+            "onhold": 0,
+            "close": 2
+          },
+          {
+            "date": "2026-08-02",
+            "open": 0,
+            "inprogress": 3,
+            "onhold": 0,
+            "close": 2
+          },
+          {
+            "date": "2026-08-03",
+            "open": 0,
+            "inprogress": 3,
+            "onhold": 0,
+            "close": 2
+          },
+          {
+            "date": "2026-08-04",
+            "open": 0,
+            "inprogress": 3,
+            "onhold": 0,
+            "close": 2
+          },
+          {
+            "date": "2026-08-05",
+            "open": 0,
+            "inprogress": 3,
+            "onhold": 1,
+            "close": 2
+          },
+          {
+            "date": "2026-08-06",
+            "open": 0,
+            "inprogress": 2,
+            "onhold": 1,
+            "close": 3
+          },
+          {
+            "date": "2026-08-07",
+            "open": 0,
+            "inprogress": 2,
+            "onhold": 1,
+            "close": 3
+          },
+          {
+            "date": "2026-08-08",
+            "open": 0,
+            "inprogress": 2,
+            "onhold": 1,
+            "close": 3
+          },
+          {
+            "date": "2026-08-09",
+            "open": 0,
+            "inprogress": 2,
+            "onhold": 1,
+            "close": 3
+          },
+          {
+            "date": "2026-08-10",
+            "open": 0,
+            "inprogress": 2,
+            "onhold": 1,
+            "close": 3
+          },
+          {
+            "date": "2026-08-11",
+            "open": 0,
+            "inprogress": 2,
+            "onhold": 1,
+            "close": 3
+          },
+          {
+            "date": "2026-08-12",
+            "open": 0,
+            "inprogress": 3,
+            "onhold": 1,
+            "close": 3
+          },
+          {
+            "date": "2026-08-13",
+            "open": 0,
+            "inprogress": 3,
+            "onhold": 1,
+            "close": 3
+          },
+          {
+            "date": "2026-08-14",
+            "open": 0,
+            "inprogress": 2,
+            "onhold": 1,
+            "close": 4
+          },
+          {
+            "date": "2026-08-15",
+            "open": 0,
+            "inprogress": 2,
+            "onhold": 1,
+            "close": 4
+          },
+          {
+            "date": "2026-08-16",
+            "open": 0,
+            "inprogress": 2,
+            "onhold": 1,
+            "close": 4
+          },
+          {
+            "date": "2026-08-17",
+            "open": 0,
+            "inprogress": 2,
+            "onhold": 1,
+            "close": 4
+          },
+          {
+            "date": "2026-08-18",
+            "open": 0,
+            "inprogress": 2,
+            "onhold": 1,
+            "close": 4
+          },
+          {
+            "date": "2026-08-19",
+            "open": 0,
+            "inprogress": 2,
+            "onhold": 1,
+            "close": 4
+          },
+          {
+            "date": "2026-08-20",
+            "open": 1,
+            "inprogress": 2,
+            "onhold": 1,
+            "close": 4
+          },
+          {
+            "date": "2026-08-21",
+            "open": 1,
+            "inprogress": 1,
+            "onhold": 1,
+            "close": 5
+          },
+          {
+            "date": "2026-08-22",
+            "open": 1,
+            "inprogress": 1,
+            "onhold": 1,
+            "close": 5
+          },
+          {
+            "date": "2026-08-23",
+            "open": 1,
+            "inprogress": 1,
+            "onhold": 1,
+            "close": 5
+          },
+          {
+            "date": "2026-08-24",
+            "open": 1,
+            "inprogress": 1,
+            "onhold": 1,
+            "close": 5
+          },
+          {
+            "date": "2026-08-25",
+            "open": 1,
+            "inprogress": 1,
+            "onhold": 1,
+            "close": 5
+          },
+          {
+            "date": "2026-08-26",
+            "open": 1,
+            "inprogress": 1,
+            "onhold": 1,
+            "close": 5
+          },
+          {
+            "date": "2026-08-27",
+            "open": 1,
+            "inprogress": 1,
+            "onhold": 1,
+            "close": 5
+          },
+          {
+            "date": "2026-08-28",
+            "open": 1,
+            "inprogress": 1,
+            "onhold": 1,
+            "close": 5
+          },
+          {
+            "date": "2026-08-29",
+            "open": 1,
+            "inprogress": 1,
+            "onhold": 1,
+            "close": 5
+          },
+          {
+            "date": "2026-08-30",
+            "open": 1,
+            "inprogress": 1,
+            "onhold": 1,
+            "close": 5
+          },
+          {
+            "date": "2026-08-31",
+            "open": 1,
+            "inprogress": 1,
+            "onhold": 1,
+            "close": 5
+          },
+          {
+            "date": "2026-09-01",
+            "open": 1,
+            "inprogress": 1,
+            "onhold": 1,
+            "close": 5
+          }
+        ]
+      }
+    },
+    "member, August": {
+      "status": true,
+      "statusText": "CFD computed.",
+      "data": {
+        "days": [
+          {
+            "date": "2026-08-01",
+            "open": 0,
+            "inprogress": 2,
+            "onhold": 0,
+            "close": 2
+          },
+          {
+            "date": "2026-08-02",
+            "open": 0,
+            "inprogress": 3,
+            "onhold": 0,
+            "close": 2
+          },
+          {
+            "date": "2026-08-03",
+            "open": 0,
+            "inprogress": 3,
+            "onhold": 0,
+            "close": 2
+          },
+          {
+            "date": "2026-08-04",
+            "open": 0,
+            "inprogress": 3,
+            "onhold": 0,
+            "close": 2
+          },
+          {
+            "date": "2026-08-05",
+            "open": 0,
+            "inprogress": 3,
+            "onhold": 1,
+            "close": 2
+          },
+          {
+            "date": "2026-08-06",
+            "open": 0,
+            "inprogress": 2,
+            "onhold": 1,
+            "close": 3
+          },
+          {
+            "date": "2026-08-07",
+            "open": 0,
+            "inprogress": 2,
+            "onhold": 1,
+            "close": 3
+          },
+          {
+            "date": "2026-08-08",
+            "open": 0,
+            "inprogress": 2,
+            "onhold": 1,
+            "close": 3
+          },
+          {
+            "date": "2026-08-09",
+            "open": 0,
+            "inprogress": 2,
+            "onhold": 1,
+            "close": 3
+          },
+          {
+            "date": "2026-08-10",
+            "open": 0,
+            "inprogress": 2,
+            "onhold": 1,
+            "close": 3
+          },
+          {
+            "date": "2026-08-11",
+            "open": 0,
+            "inprogress": 2,
+            "onhold": 1,
+            "close": 3
+          },
+          {
+            "date": "2026-08-12",
+            "open": 0,
+            "inprogress": 2,
+            "onhold": 1,
+            "close": 3
+          },
+          {
+            "date": "2026-08-13",
+            "open": 0,
+            "inprogress": 2,
+            "onhold": 1,
+            "close": 3
+          },
+          {
+            "date": "2026-08-14",
+            "open": 0,
+            "inprogress": 1,
+            "onhold": 1,
+            "close": 4
+          },
+          {
+            "date": "2026-08-15",
+            "open": 0,
+            "inprogress": 1,
+            "onhold": 1,
+            "close": 4
+          },
+          {
+            "date": "2026-08-16",
+            "open": 0,
+            "inprogress": 1,
+            "onhold": 1,
+            "close": 4
+          },
+          {
+            "date": "2026-08-17",
+            "open": 0,
+            "inprogress": 1,
+            "onhold": 1,
+            "close": 4
+          },
+          {
+            "date": "2026-08-18",
+            "open": 0,
+            "inprogress": 1,
+            "onhold": 1,
+            "close": 4
+          },
+          {
+            "date": "2026-08-19",
+            "open": 0,
+            "inprogress": 1,
+            "onhold": 1,
+            "close": 4
+          },
+          {
+            "date": "2026-08-20",
+            "open": 1,
+            "inprogress": 1,
+            "onhold": 1,
+            "close": 4
+          },
+          {
+            "date": "2026-08-21",
+            "open": 1,
+            "inprogress": 1,
+            "onhold": 1,
+            "close": 4
+          },
+          {
+            "date": "2026-08-22",
+            "open": 1,
+            "inprogress": 1,
+            "onhold": 1,
+            "close": 4
+          },
+          {
+            "date": "2026-08-23",
+            "open": 1,
+            "inprogress": 1,
+            "onhold": 1,
+            "close": 4
+          },
+          {
+            "date": "2026-08-24",
+            "open": 1,
+            "inprogress": 1,
+            "onhold": 1,
+            "close": 4
+          },
+          {
+            "date": "2026-08-25",
+            "open": 1,
+            "inprogress": 1,
+            "onhold": 1,
+            "close": 4
+          },
+          {
+            "date": "2026-08-26",
+            "open": 1,
+            "inprogress": 1,
+            "onhold": 1,
+            "close": 4
+          },
+          {
+            "date": "2026-08-27",
+            "open": 1,
+            "inprogress": 1,
+            "onhold": 1,
+            "close": 4
+          },
+          {
+            "date": "2026-08-28",
+            "open": 1,
+            "inprogress": 1,
+            "onhold": 1,
+            "close": 4
+          },
+          {
+            "date": "2026-08-29",
+            "open": 1,
+            "inprogress": 1,
+            "onhold": 1,
+            "close": 4
+          },
+          {
+            "date": "2026-08-30",
+            "open": 1,
+            "inprogress": 1,
+            "onhold": 1,
+            "close": 4
+          },
+          {
+            "date": "2026-08-31",
+            "open": 1,
+            "inprogress": 1,
+            "onhold": 1,
+            "close": 4
+          },
+          {
+            "date": "2026-09-01",
+            "open": 1,
+            "inprogress": 1,
+            "onhold": 1,
+            "close": 4
+          }
+        ]
+      }
+    },
+    "owner, 153 days clamped": {
+      "status": true,
+      "statusText": "CFD computed.",
+      "data": {
+        "days": [
+          {
+            "date": "2026-05-04",
+            "open": 0,
+            "inprogress": 0,
+            "onhold": 0,
+            "close": 0
+          },
+          {
+            "date": "2026-05-05",
+            "open": 0,
+            "inprogress": 0,
+            "onhold": 0,
+            "close": 0
+          },
+          {
+            "date": "2026-05-06",
+            "open": 0,
+            "inprogress": 0,
+            "onhold": 0,
+            "close": 0
+          },
+          {
+            "date": "2026-05-07",
+            "open": 0,
+            "inprogress": 0,
+            "onhold": 0,
+            "close": 0
+          },
+          {
+            "date": "2026-05-08",
+            "open": 0,
+            "inprogress": 0,
+            "onhold": 0,
+            "close": 0
+          },
+          {
+            "date": "2026-05-09",
+            "open": 0,
+            "inprogress": 0,
+            "onhold": 0,
+            "close": 0
+          },
+          {
+            "date": "2026-05-10",
+            "open": 0,
+            "inprogress": 0,
+            "onhold": 0,
+            "close": 0
+          },
+          {
+            "date": "2026-05-11",
+            "open": 0,
+            "inprogress": 0,
+            "onhold": 0,
+            "close": 0
+          },
+          {
+            "date": "2026-05-12",
+            "open": 0,
+            "inprogress": 0,
+            "onhold": 0,
+            "close": 0
+          },
+          {
+            "date": "2026-05-13",
+            "open": 0,
+            "inprogress": 0,
+            "onhold": 0,
+            "close": 0
+          },
+          {
+            "date": "2026-05-14",
+            "open": 0,
+            "inprogress": 0,
+            "onhold": 0,
+            "close": 0
+          },
+          {
+            "date": "2026-05-15",
+            "open": 0,
+            "inprogress": 0,
+            "onhold": 0,
+            "close": 0
+          },
+          {
+            "date": "2026-05-16",
+            "open": 0,
+            "inprogress": 0,
+            "onhold": 0,
+            "close": 0
+          },
+          {
+            "date": "2026-05-17",
+            "open": 0,
+            "inprogress": 0,
+            "onhold": 0,
+            "close": 0
+          },
+          {
+            "date": "2026-05-18",
+            "open": 0,
+            "inprogress": 0,
+            "onhold": 0,
+            "close": 0
+          },
+          {
+            "date": "2026-05-19",
+            "open": 0,
+            "inprogress": 0,
+            "onhold": 0,
+            "close": 0
+          },
+          {
+            "date": "2026-05-20",
+            "open": 0,
+            "inprogress": 0,
+            "onhold": 0,
+            "close": 0
+          },
+          {
+            "date": "2026-05-21",
+            "open": 0,
+            "inprogress": 0,
+            "onhold": 0,
+            "close": 0
+          },
+          {
+            "date": "2026-05-22",
+            "open": 0,
+            "inprogress": 0,
+            "onhold": 0,
+            "close": 0
+          },
+          {
+            "date": "2026-05-23",
+            "open": 0,
+            "inprogress": 0,
+            "onhold": 0,
+            "close": 0
+          },
+          {
+            "date": "2026-05-24",
+            "open": 0,
+            "inprogress": 0,
+            "onhold": 0,
+            "close": 0
+          },
+          {
+            "date": "2026-05-25",
+            "open": 0,
+            "inprogress": 0,
+            "onhold": 0,
+            "close": 0
+          },
+          {
+            "date": "2026-05-26",
+            "open": 0,
+            "inprogress": 0,
+            "onhold": 0,
+            "close": 0
+          },
+          {
+            "date": "2026-05-27",
+            "open": 0,
+            "inprogress": 0,
+            "onhold": 0,
+            "close": 0
+          },
+          {
+            "date": "2026-05-28",
+            "open": 0,
+            "inprogress": 0,
+            "onhold": 0,
+            "close": 0
+          },
+          {
+            "date": "2026-05-29",
+            "open": 0,
+            "inprogress": 0,
+            "onhold": 0,
+            "close": 0
+          },
+          {
+            "date": "2026-05-30",
+            "open": 0,
+            "inprogress": 0,
+            "onhold": 0,
+            "close": 0
+          },
+          {
+            "date": "2026-05-31",
+            "open": 0,
+            "inprogress": 0,
+            "onhold": 0,
+            "close": 0
+          },
+          {
+            "date": "2026-06-01",
+            "open": 0,
+            "inprogress": 0,
+            "onhold": 0,
+            "close": 0
+          },
+          {
+            "date": "2026-06-02",
+            "open": 0,
+            "inprogress": 0,
+            "onhold": 0,
+            "close": 0
+          },
+          {
+            "date": "2026-06-03",
+            "open": 0,
+            "inprogress": 0,
+            "onhold": 0,
+            "close": 0
+          },
+          {
+            "date": "2026-06-04",
+            "open": 0,
+            "inprogress": 0,
+            "onhold": 0,
+            "close": 0
+          },
+          {
+            "date": "2026-06-05",
+            "open": 0,
+            "inprogress": 0,
+            "onhold": 0,
+            "close": 0
+          },
+          {
+            "date": "2026-06-06",
+            "open": 0,
+            "inprogress": 0,
+            "onhold": 0,
+            "close": 0
+          },
+          {
+            "date": "2026-06-07",
+            "open": 0,
+            "inprogress": 0,
+            "onhold": 0,
+            "close": 0
+          },
+          {
+            "date": "2026-06-08",
+            "open": 0,
+            "inprogress": 0,
+            "onhold": 0,
+            "close": 0
+          },
+          {
+            "date": "2026-06-09",
+            "open": 0,
+            "inprogress": 0,
+            "onhold": 0,
+            "close": 0
+          },
+          {
+            "date": "2026-06-10",
+            "open": 0,
+            "inprogress": 0,
+            "onhold": 0,
+            "close": 0
+          },
+          {
+            "date": "2026-06-11",
+            "open": 0,
+            "inprogress": 0,
+            "onhold": 0,
+            "close": 0
+          },
+          {
+            "date": "2026-06-12",
+            "open": 0,
+            "inprogress": 0,
+            "onhold": 0,
+            "close": 0
+          },
+          {
+            "date": "2026-06-13",
+            "open": 0,
+            "inprogress": 0,
+            "onhold": 0,
+            "close": 0
+          },
+          {
+            "date": "2026-06-14",
+            "open": 0,
+            "inprogress": 0,
+            "onhold": 0,
+            "close": 0
+          },
+          {
+            "date": "2026-06-15",
+            "open": 0,
+            "inprogress": 0,
+            "onhold": 0,
+            "close": 0
+          },
+          {
+            "date": "2026-06-16",
+            "open": 0,
+            "inprogress": 0,
+            "onhold": 0,
+            "close": 0
+          },
+          {
+            "date": "2026-06-17",
+            "open": 0,
+            "inprogress": 0,
+            "onhold": 0,
+            "close": 0
+          },
+          {
+            "date": "2026-06-18",
+            "open": 0,
+            "inprogress": 0,
+            "onhold": 0,
+            "close": 0
+          },
+          {
+            "date": "2026-06-19",
+            "open": 0,
+            "inprogress": 0,
+            "onhold": 0,
+            "close": 0
+          },
+          {
+            "date": "2026-06-20",
+            "open": 0,
+            "inprogress": 0,
+            "onhold": 0,
+            "close": 0
+          },
+          {
+            "date": "2026-06-21",
+            "open": 0,
+            "inprogress": 0,
+            "onhold": 0,
+            "close": 0
+          },
+          {
+            "date": "2026-06-22",
+            "open": 0,
+            "inprogress": 0,
+            "onhold": 0,
+            "close": 0
+          },
+          {
+            "date": "2026-06-23",
+            "open": 0,
+            "inprogress": 0,
+            "onhold": 0,
+            "close": 0
+          },
+          {
+            "date": "2026-06-24",
+            "open": 0,
+            "inprogress": 0,
+            "onhold": 0,
+            "close": 0
+          },
+          {
+            "date": "2026-06-25",
+            "open": 0,
+            "inprogress": 0,
+            "onhold": 0,
+            "close": 0
+          },
+          {
+            "date": "2026-06-26",
+            "open": 0,
+            "inprogress": 0,
+            "onhold": 0,
+            "close": 0
+          },
+          {
+            "date": "2026-06-27",
+            "open": 0,
+            "inprogress": 0,
+            "onhold": 0,
+            "close": 0
+          },
+          {
+            "date": "2026-06-28",
+            "open": 0,
+            "inprogress": 0,
+            "onhold": 0,
+            "close": 0
+          },
+          {
+            "date": "2026-06-29",
+            "open": 0,
+            "inprogress": 0,
+            "onhold": 0,
+            "close": 0
+          },
+          {
+            "date": "2026-06-30",
+            "open": 0,
+            "inprogress": 0,
+            "onhold": 0,
+            "close": 0
+          },
+          {
+            "date": "2026-07-01",
+            "open": 0,
+            "inprogress": 0,
+            "onhold": 0,
+            "close": 0
+          },
+          {
+            "date": "2026-07-02",
+            "open": 0,
+            "inprogress": 0,
+            "onhold": 0,
+            "close": 0
+          },
+          {
+            "date": "2026-07-03",
+            "open": 0,
+            "inprogress": 0,
+            "onhold": 0,
+            "close": 0
+          },
+          {
+            "date": "2026-07-04",
+            "open": 0,
+            "inprogress": 0,
+            "onhold": 0,
+            "close": 0
+          },
+          {
+            "date": "2026-07-05",
+            "open": 0,
+            "inprogress": 0,
+            "onhold": 0,
+            "close": 0
+          },
+          {
+            "date": "2026-07-06",
+            "open": 0,
+            "inprogress": 0,
+            "onhold": 0,
+            "close": 0
+          },
+          {
+            "date": "2026-07-07",
+            "open": 0,
+            "inprogress": 0,
+            "onhold": 0,
+            "close": 0
+          },
+          {
+            "date": "2026-07-08",
+            "open": 0,
+            "inprogress": 0,
+            "onhold": 0,
+            "close": 0
+          },
+          {
+            "date": "2026-07-09",
+            "open": 0,
+            "inprogress": 0,
+            "onhold": 0,
+            "close": 0
+          },
+          {
+            "date": "2026-07-10",
+            "open": 0,
+            "inprogress": 0,
+            "onhold": 0,
+            "close": 0
+          },
+          {
+            "date": "2026-07-11",
+            "open": 0,
+            "inprogress": 0,
+            "onhold": 0,
+            "close": 0
+          },
+          {
+            "date": "2026-07-12",
+            "open": 0,
+            "inprogress": 0,
+            "onhold": 0,
+            "close": 0
+          },
+          {
+            "date": "2026-07-13",
+            "open": 0,
+            "inprogress": 0,
+            "onhold": 0,
+            "close": 0
+          },
+          {
+            "date": "2026-07-14",
+            "open": 0,
+            "inprogress": 0,
+            "onhold": 0,
+            "close": 0
+          },
+          {
+            "date": "2026-07-15",
+            "open": 0,
+            "inprogress": 2,
+            "onhold": 0,
+            "close": 0
+          },
+          {
+            "date": "2026-07-16",
+            "open": 0,
+            "inprogress": 2,
+            "onhold": 0,
+            "close": 0
+          },
+          {
+            "date": "2026-07-17",
+            "open": 0,
+            "inprogress": 2,
+            "onhold": 0,
+            "close": 0
+          },
+          {
+            "date": "2026-07-18",
+            "open": 0,
+            "inprogress": 2,
+            "onhold": 0,
+            "close": 0
+          },
+          {
+            "date": "2026-07-19",
+            "open": 0,
+            "inprogress": 2,
+            "onhold": 0,
+            "close": 0
+          },
+          {
+            "date": "2026-07-20",
+            "open": 0,
+            "inprogress": 1,
+            "onhold": 0,
+            "close": 1
+          },
+          {
+            "date": "2026-07-21",
+            "open": 0,
+            "inprogress": 1,
+            "onhold": 0,
+            "close": 1
+          },
+          {
+            "date": "2026-07-22",
+            "open": 0,
+            "inprogress": 0,
+            "onhold": 0,
+            "close": 2
+          },
+          {
+            "date": "2026-07-23",
+            "open": 0,
+            "inprogress": 0,
+            "onhold": 0,
+            "close": 2
+          },
+          {
+            "date": "2026-07-24",
+            "open": 0,
+            "inprogress": 0,
+            "onhold": 0,
+            "close": 2
+          },
+          {
+            "date": "2026-07-25",
+            "open": 0,
+            "inprogress": 0,
+            "onhold": 0,
+            "close": 2
+          },
+          {
+            "date": "2026-07-26",
+            "open": 0,
+            "inprogress": 0,
+            "onhold": 0,
+            "close": 2
+          },
+          {
+            "date": "2026-07-27",
+            "open": 0,
+            "inprogress": 0,
+            "onhold": 0,
+            "close": 2
+          },
+          {
+            "date": "2026-07-28",
+            "open": 0,
+            "inprogress": 0,
+            "onhold": 0,
+            "close": 2
+          },
+          {
+            "date": "2026-07-29",
+            "open": 0,
+            "inprogress": 2,
+            "onhold": 0,
+            "close": 2
+          },
+          {
+            "date": "2026-07-30",
+            "open": 0,
+            "inprogress": 2,
+            "onhold": 0,
+            "close": 2
+          },
+          {
+            "date": "2026-07-31",
+            "open": 0,
+            "inprogress": 2,
+            "onhold": 0,
+            "close": 2
+          },
+          {
+            "date": "2026-08-01",
+            "open": 0,
+            "inprogress": 2,
+            "onhold": 0,
+            "close": 2
+          },
+          {
+            "date": "2026-08-02",
+            "open": 0,
+            "inprogress": 3,
+            "onhold": 0,
+            "close": 2
+          },
+          {
+            "date": "2026-08-03",
+            "open": 0,
+            "inprogress": 3,
+            "onhold": 0,
+            "close": 2
+          },
+          {
+            "date": "2026-08-04",
+            "open": 0,
+            "inprogress": 3,
+            "onhold": 0,
+            "close": 2
+          },
+          {
+            "date": "2026-08-05",
+            "open": 0,
+            "inprogress": 3,
+            "onhold": 1,
+            "close": 2
+          },
+          {
+            "date": "2026-08-06",
+            "open": 0,
+            "inprogress": 2,
+            "onhold": 1,
+            "close": 3
+          },
+          {
+            "date": "2026-08-07",
+            "open": 0,
+            "inprogress": 2,
+            "onhold": 1,
+            "close": 3
+          },
+          {
+            "date": "2026-08-08",
+            "open": 0,
+            "inprogress": 2,
+            "onhold": 1,
+            "close": 3
+          },
+          {
+            "date": "2026-08-09",
+            "open": 0,
+            "inprogress": 2,
+            "onhold": 1,
+            "close": 3
+          },
+          {
+            "date": "2026-08-10",
+            "open": 0,
+            "inprogress": 2,
+            "onhold": 1,
+            "close": 3
+          },
+          {
+            "date": "2026-08-11",
+            "open": 0,
+            "inprogress": 2,
+            "onhold": 1,
+            "close": 3
+          },
+          {
+            "date": "2026-08-12",
+            "open": 0,
+            "inprogress": 3,
+            "onhold": 1,
+            "close": 3
+          },
+          {
+            "date": "2026-08-13",
+            "open": 0,
+            "inprogress": 3,
+            "onhold": 1,
+            "close": 3
+          },
+          {
+            "date": "2026-08-14",
+            "open": 0,
+            "inprogress": 2,
+            "onhold": 1,
+            "close": 4
+          },
+          {
+            "date": "2026-08-15",
+            "open": 0,
+            "inprogress": 2,
+            "onhold": 1,
+            "close": 4
+          },
+          {
+            "date": "2026-08-16",
+            "open": 0,
+            "inprogress": 2,
+            "onhold": 1,
+            "close": 4
+          },
+          {
+            "date": "2026-08-17",
+            "open": 0,
+            "inprogress": 2,
+            "onhold": 1,
+            "close": 4
+          },
+          {
+            "date": "2026-08-18",
+            "open": 0,
+            "inprogress": 2,
+            "onhold": 1,
+            "close": 4
+          },
+          {
+            "date": "2026-08-19",
+            "open": 0,
+            "inprogress": 2,
+            "onhold": 1,
+            "close": 4
+          },
+          {
+            "date": "2026-08-20",
+            "open": 1,
+            "inprogress": 2,
+            "onhold": 1,
+            "close": 4
+          },
+          {
+            "date": "2026-08-21",
+            "open": 1,
+            "inprogress": 1,
+            "onhold": 1,
+            "close": 5
+          },
+          {
+            "date": "2026-08-22",
+            "open": 1,
+            "inprogress": 1,
+            "onhold": 1,
+            "close": 5
+          },
+          {
+            "date": "2026-08-23",
+            "open": 1,
+            "inprogress": 1,
+            "onhold": 1,
+            "close": 5
+          },
+          {
+            "date": "2026-08-24",
+            "open": 1,
+            "inprogress": 1,
+            "onhold": 1,
+            "close": 5
+          },
+          {
+            "date": "2026-08-25",
+            "open": 1,
+            "inprogress": 1,
+            "onhold": 1,
+            "close": 5
+          },
+          {
+            "date": "2026-08-26",
+            "open": 1,
+            "inprogress": 1,
+            "onhold": 1,
+            "close": 5
+          },
+          {
+            "date": "2026-08-27",
+            "open": 1,
+            "inprogress": 1,
+            "onhold": 1,
+            "close": 5
+          },
+          {
+            "date": "2026-08-28",
+            "open": 1,
+            "inprogress": 1,
+            "onhold": 1,
+            "close": 5
+          },
+          {
+            "date": "2026-08-29",
+            "open": 1,
+            "inprogress": 1,
+            "onhold": 1,
+            "close": 5
+          },
+          {
+            "date": "2026-08-30",
+            "open": 1,
+            "inprogress": 1,
+            "onhold": 1,
+            "close": 5
+          },
+          {
+            "date": "2026-08-31",
+            "open": 1,
+            "inprogress": 1,
+            "onhold": 1,
+            "close": 5
+          }
+        ]
+      }
+    },
+    "empty project": {
+      "status": true,
+      "statusText": "No tasks yet.",
+      "data": {
+        "days": []
+      }
+    }
+  }
+}

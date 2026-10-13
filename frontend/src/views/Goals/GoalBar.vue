@@ -1,0 +1,25 @@
+<template>
+    <span class="glb" :class="{ 'is-full': pct >= 100 }" role="progressbar" :aria-label="label" aria-valuemin="0" aria-valuemax="100" :aria-valuenow="pct">
+        <span class="glb__fill" :style="{ width: `${pct}%` }"></span>
+    </span>
+</template>
+
+<script setup>
+import { computed } from "vue";
+
+defineOptions({ name: "GoalBar" });
+
+const props = defineProps({
+    value: { type: Number, default: 0 },
+    label: { type: String, required: true }
+});
+
+const pct = computed(() => Math.min(100, Math.max(0, Math.round(Number(props.value) || 0))));
+</script>
+
+<style scoped>
+.glb { display: block; flex: 1; min-width: 40px; height: 6px; border-radius: 999px; background: var(--track); overflow: hidden; }
+.glb__fill { display: block; height: 100%; border-radius: inherit; background: var(--brand); transition: width var(--t-state) var(--ease); }
+.glb.is-full .glb__fill { background: var(--ok); }
+@media (prefers-reduced-motion: reduce) { .glb__fill { transition: none; } }
+</style>

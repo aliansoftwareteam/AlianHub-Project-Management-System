@@ -37,8 +37,8 @@ const deployUrl = DEPLOY_URL;
     justify-content: center;
     flex-wrap: wrap;
     gap: 6px 16px;
-    background: #2f3990;
-    color: #fff;
+    background: var(--brand);
+    color: var(--on-brand);
     font-size: 12.5px;
     line-height: 1.3;
     padding: 6px 14px;
@@ -54,7 +54,7 @@ const deployUrl = DEPLOY_URL;
     white-space: nowrap;
 }
 .demo-banner__links a {
-    color: #fff;
+    color: var(--on-brand);
     text-decoration: underline;
     font-weight: 600;
 }

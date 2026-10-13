@@ -10,8 +10,8 @@
                 :message="$t('Upgrades.the_feature_not_available')"
             />
         </div>
-        <div class="fix-milestone-wrapper" :class="[{'bg-colorlightgray pointer-event-none opacity-5 blur-3-px':!props.planCondition}]">
-            <table class="table-responsive hourly_milestone" :class="[{'bg-colorlightgray':!props.planCondition,'bg-light-gray':props.planCondition}]">
+        <div class="fix-milestone-wrapper" :class="[{'is-locked pointer-event-none opacity-5 blur-3-px':!props.planCondition}]">
+            <table class="table-responsive hourly_milestone">
                 <SpinnerComp :is-spinner="isSpinner" />
                 <thead :class="[{'pointer-event-none':isSpinner}]">
                     <tr>

@@ -2,14 +2,14 @@
   <div class="agile-report">
     <div class="agile-report__bar">
       <select v-model="selectedSprintId" class="agile-report__select" @change="load">
-        <option value="">Select a sprint…</option>
+        <option value="">{{ $t('Reports.burndown_select_sprint') }}</option>
         <option v-for="s in sprintOptions" :key="s._id" :value="s._id">{{ s.name }}</option>
       </select>
       <div class="agile-report__toggle">
-        <button :class="{ active: metric === 'points' }" @click="metric = 'points'">Points</button>
-        <button :class="{ active: metric === 'count' }" @click="metric = 'count'">Tasks</button>
+        <button :class="{ active: metric === 'points' }" @click="metric = 'points'">{{ $t('Reports.burndown_points') }}</button>
+        <button :class="{ active: metric === 'count' }" @click="metric = 'count'">{{ $t('Reports.burndown_tasks') }}</button>
       </div>
-      <button class="agile-report__pdf" :disabled="!hasData" @click="exportPdf">Export PDF</button>
+      <button class="agile-report__pdf" :disabled="!hasData" @click="exportPdf">{{ $t('Reports.export_pdf') }}</button>
     </div>
     <!-- Only a real sprint has a box to name. A plain list charts from its
          oldest task to today and has nothing to say here. -->
@@ -18,9 +18,9 @@
       <span class="agile-report__range">{{ box.range }}</span>
       <span v-if="box.goal" class="agile-report__goal">{{ box.goal }}</span>
     </div>
-    <div v-if="loading" class="agile-report__msg">Loading…</div>
-    <div v-else-if="!selectedSprintId" class="agile-report__msg">Pick a sprint to see its burndown.</div>
-    <div v-else-if="!hasData" class="agile-report__msg">{{ emptyMsg || 'No data for this sprint yet.' }}</div>
+    <div v-if="loading" class="agile-report__msg">{{ $t('Reports.loading') }}</div>
+    <div v-else-if="!selectedSprintId" class="agile-report__msg">{{ $t('Reports.burndown_pick_sprint') }}</div>
+    <div v-else-if="!hasData" class="agile-report__msg">{{ emptyMsg || $t('Reports.burndown_no_data') }}</div>
     <ApexChart v-else ref="chartRef" type="line" height="360" :options="chartOptions" :series="series" />
   </div>
 </template>
@@ -31,14 +31,17 @@ export default { name: 'BurndownChart' };
 
 <script setup>
 import { ref, computed, onMounted } from 'vue';
+import { useI18n } from 'vue-i18n';
 import { apiRequest } from '@/services';
 import { downloadReportPdf, chartImage } from './reportsPdf';
+import { sprintChoices } from './composables/agileReports';
 
 const props = defineProps({
     projectData: { type: Object, default: () => ({}) },
     sprints: { type: Array, default: () => [] },
 });
 
+const { t } = useI18n();
 const selectedSprintId = ref('');
 const metric = ref('points'); // 'points' | 'count'
 const loading = ref(false);
@@ -46,18 +49,7 @@ const emptyMsg = ref('');
 const data = ref(null); // { sprintName, totalCount, totalPoints, days:[...] }
 const chartRef = ref(null);
 
-/* The picker is fed the project's whole sprint list, which also carries folders,
-   the backlog and anything else living in that collection. A burndown of the
-   backlog is not wrong so much as meaningless — it has no time box and no end,
-   so the chart would run from its oldest task to today forever. A folder is not
-   a task container at all. Plain lists DO stay: they chart, just without a box. */
-const sprintOptions = computed(() =>
-    (props.sprints || [])
-        .filter((s) => s && s._id)
-        .filter((s) => !s.isFolder && !s.isBacklog && s.mainChat !== true)
-        .filter((s) => s.deletedStatusKey !== 1)
-        .map((s) => ({ _id: s._id, name: s.name || s.sprintName || 'Sprint' }))
-);
+const sprintOptions = computed(() => sprintChoices(props.sprints).map((s) => ({ ...s, name: s.name || t('Reports.sprint') })));
 
 const hasData = computed(() => !!(data.value && data.value.days && data.value.days.length));
 
@@ -85,9 +77,9 @@ const idealKey = computed(() => (metric.value === 'points' ? 'idealPoints' : 'id
 const series = computed(() => {
     const days = (data.value && data.value.days) || [];
     return [
-        { name: 'Ideal', data: days.map((d) => Number(d[idealKey.value]) || 0) },
+        { name: t('Reports.burndown_ideal'), data: days.map((d) => Number(d[idealKey.value]) || 0) },
         {
-            name: metric.value === 'points' ? 'Remaining points' : 'Remaining tasks',
+            name: metric.value === 'points' ? t('Reports.burndown_remaining_points') : t('Reports.burndown_remaining_tasks'),
             // null = a day the sprint has not reached. Coercing it to 0 would
             // draw a running sprint as finished for the rest of its box.
             data: days.map((d) => (d[actualKey.value] === null || d[actualKey.value] === undefined ? null : Number(d[actualKey.value]))),
@@ -97,13 +89,15 @@ const series = computed(() => {
 
 const chartOptions = computed(() => ({
     chart: { id: 'burndown', toolbar: { show: false }, animations: { enabled: false } },
+    // Ideal vs actual are data series, not theme colours: they stay literal so the
+    // two lines never collapse into the same hue.
     colors: ['#bdbdbd', '#2F3990'],
     stroke: { curve: 'straight', width: [2, 3], dashArray: [6, 0] },
     markers: { size: 0 },
     xaxis: { categories: categories.value, labels: { rotate: -45, hideOverlappingLabels: true } },
-    yaxis: { min: 0, title: { text: metric.value === 'points' ? 'Points remaining' : 'Tasks remaining' } },
+    yaxis: { min: 0, title: { text: metric.value === 'points' ? t('Reports.burndown_points_remaining') : t('Reports.burndown_tasks_remaining') } },
     legend: { position: 'top' },
-    title: { text: data.value && data.value.sprintName ? `Burndown — ${data.value.sprintName}` : 'Sprint burndown' },
+    title: { text: data.value && data.value.sprintName ? t('Reports.burndown_chart_title', { sprint: data.value.sprintName }) : t('Reports.burndown_chart_title_default') },
 }));
 
 const load = async () => {
@@ -117,11 +111,11 @@ const load = async () => {
             if (!hasData.value) emptyMsg.value = res.data.statusText || '';
         } else {
             data.value = null;
-            emptyMsg.value = (res.data && res.data.statusText) || 'Could not load burndown.';
+            emptyMsg.value = (res.data && res.data.statusText) || t('Reports.burndown_load_failed');
         }
     } catch (e) {
         data.value = null;
-        emptyMsg.value = 'Could not load burndown.';
+        emptyMsg.value = t('Reports.burndown_load_failed');
     } finally {
         loading.value = false;
     }
@@ -131,14 +125,13 @@ const exportPdf = async () => {
     const image = await chartImage(chartRef);
     const isPoints = metric.value === 'points';
     await downloadReportPdf('burndown', {
-        title: 'Sprint Burndown',
+        title: t('Reports.burndown_pdf_title'),
         subtitle: (data.value && data.value.sprintName) || '',
         filename: `burndown-${(data.value && data.value.sprintName) || 'sprint'}`,
         image,
-        meta: [
-            `Metric: ${isPoints ? 'Story points' : 'Task count'}`,
-            `Total ${isPoints ? 'points' : 'tasks'}: ${isPoints ? (data.value && data.value.totalPoints) || 0 : (data.value && data.value.totalCount) || 0}`,
-        ],
+        meta: isPoints
+            ? [t('Reports.burndown_pdf_metric_points'), t('Reports.burndown_pdf_total_points', { n: (data.value && data.value.totalPoints) || 0 })]
+            : [t('Reports.burndown_pdf_metric_tasks'), t('Reports.burndown_pdf_total_tasks', { n: (data.value && data.value.totalCount) || 0 })],
     });
 };
 
@@ -153,19 +146,20 @@ onMounted(() => {
 <style scoped>
 .agile-report { padding: 12px; }
 .agile-report__bar { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-bottom: 12px; }
-.agile-report__select { border: 1px solid #d9d9d9; border-radius: 6px; padding: 6px 10px; font-size: 13px; min-width: 200px; background: #fff; }
-.agile-report__toggle button { border: 1px solid #d9d9d9; background: #fff; padding: 5px 12px; font-size: 12px; cursor: pointer; }
-.agile-report__toggle button:first-child { border-radius: 6px 0 0 6px; }
-.agile-report__toggle button:last-child { border-radius: 0 6px 6px 0; border-left: none; }
-.agile-report__toggle button.active { background: #2F3990; color: #fff; border-color: #2F3990; }
-.agile-report__pdf { margin-left: auto; border: 1px solid #2F3990; color: #2F3990; background: #fff; border-radius: 6px; padding: 6px 14px; font-size: 13px; cursor: pointer; }
+.agile-report__select { border: 1px solid var(--border); border-radius: var(--r-input); padding: 6px 10px; font-size: 13px; min-width: 200px; background: var(--surface); color: var(--ink); }
+.agile-report__toggle button { border: 1px solid var(--border); background: var(--surface); color: var(--ink); padding: 5px 12px; font-size: 12px; cursor: pointer; }
+.agile-report__toggle button:first-child { border-radius: var(--r-chip) 0 0 var(--r-chip); }
+.agile-report__toggle button:last-child { border-radius: 0 var(--r-chip) var(--r-chip) 0; border-left: none; }
+/* --surface, not white: dark --brand is a light lavender that white sits on at 2.6:1. */
+.agile-report__toggle button.active { background: var(--brand); color: var(--on-brand); border-color: var(--brand); }
+.agile-report__pdf { margin-left: auto; border: 1px solid var(--brand); color: var(--brand); background: var(--surface); border-radius: var(--r-chip); padding: 6px 14px; font-size: 13px; cursor: pointer; }
 .agile-report__pdf:disabled { opacity: 0.5; cursor: not-allowed; }
-.agile-report__msg { color: #888; font-size: 14px; padding: 40px; text-align: center; }
+.agile-report__msg { color: var(--ink-2); font-size: 14px; padding: 40px; text-align: center; }
 .agile-report__box { display: flex; align-items: center; gap: 10px; margin: -4px 0 10px; }
-.agile-report__state { padding: 2px 8px; border-radius: 10px; font-size: 11px; font-weight: 600; text-transform: uppercase; background: #eceef7; color: #4b5162; }
-.agile-report__state.is-active { background: #e4f0e8; color: #1c7a43; }
-.agile-report__state.is-overdue { background: #fdece7; color: #b0431f; }
-.agile-report__state.is-closed { background: #eceef7; color: #8b90a0; }
-.agile-report__range { font-size: 12.5px; color: #6b7280; font-variant-numeric: tabular-nums; }
-.agile-report__goal { font-size: 12.5px; font-style: italic; color: #8b90a0; }
+.agile-report__state { padding: 2px 8px; border-radius: 10px; font-size: 11px; font-weight: 600; text-transform: uppercase; background: var(--fill); color: var(--ink-label); }
+.agile-report__state.is-active { background: var(--ok-bg); color: var(--ok-ink); }
+.agile-report__state.is-overdue { background: var(--warn-bg); color: var(--warn-ink); }
+.agile-report__state.is-closed { background: var(--fill); color: var(--ink-2); }
+.agile-report__range { font-size: 12.5px; color: var(--ink-2); font-variant-numeric: tabular-nums; }
+.agile-report__goal { font-size: 12.5px; font-style: italic; color: var(--ink-2); }
 </style>

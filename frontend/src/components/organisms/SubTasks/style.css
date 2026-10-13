@@ -5,8 +5,8 @@
     align-items: center;
     justify-content: center;
     background-color: transparent;
-    border: 1px solid red;
-    color: red;
+    border: 1px solid var(--danger);
+    color: var(--danger);
     padding: 0 5px;
     padding: 0 3.05px;
     border-radius: 3px;
@@ -20,7 +20,7 @@
 }
 .table-span-wrapper .due-date span {
     font-size: 13px;
-    color: #3B3B3B;
+    color: var(--ink);
     font-weight: 400;
     line-height: 20px;
 }
@@ -44,7 +44,7 @@
 .sub__task-item{
     max-height: 350px; 
     min-width: 1127px;
-    border: 1px solid #ececec; 
+    border: 1px solid var(--hairline); 
     border-radius: 8px;
 }
 .subtask__item-input{
@@ -56,9 +56,9 @@
     background-color: #b3b3b3!important;
 }
 .ai-generate-subtask-div{
-    border-left: 1px solid #ececec;
+    border-left: 1px solid var(--hairline);
     border-radius: 8px;
-    border-right: 1px solid #ececec;
+    border-right: 1px solid var(--hairline);
 }
 @media(max-width:1199px){
     /* .subtask-mobile-width{

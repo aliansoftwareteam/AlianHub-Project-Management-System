@@ -1,0 +1,119 @@
+.cv {
+    display: flex;
+    flex-direction: row;
+    height: 100%;
+    min-height: 0;
+    background: var(--surface);
+    color: var(--ink);
+    font-family: var(--font-ui);
+    position: relative;
+}
+.cv-upgrade { height: 100%; display: flex; align-items: center; justify-content: center; }
+.cv-main {
+    flex: 1;
+    min-width: 0;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+    position: relative;
+}
+.cv-back {
+    width: var(--control-h-lg, 36px); height: var(--control-h-lg, 36px); flex: none;
+    display: inline-flex; align-items: center; justify-content: center;
+    border: 0; border-radius: var(--r-input); background: transparent; color: var(--ink-2); cursor: pointer;
+}
+.cv-back:hover { background: var(--surface-hover); color: var(--ink); }
+
+.cv-busy { flex: 1; padding: var(--sp-9) var(--sp-8); display: flex; flex-direction: column; gap: var(--sp-5); }
+.cv-skel { display: block; height: 14px; border-radius: var(--r-chip); background: var(--surface-hover); width: 60%; }
+.cv-skel--head { height: 22px; width: 32%; }
+.cv-skel--short { width: 40%; }
+
+.cv-empty { flex: 1; display: flex; align-items: center; justify-content: center; padding: var(--sp-9); background: var(--canvas); }
+.cv-empty-card {
+    display: flex; flex-direction: column; align-items: center; gap: var(--sp-4);
+    max-width: 420px; text-align: center; padding: calc(var(--sp-9) + 4px) var(--sp-9);
+    background: var(--surface); border: 1px dashed var(--border); border-radius: var(--r-card); color: var(--ink-2);
+}
+.cv-empty-card .ah-h2 { margin-top: var(--sp-1); }
+
+/* ---------- context sidebar ---------- */
+.cs {
+    width: var(--sidebar-w);
+    flex: none;
+    display: flex;
+    flex-direction: column;
+    border-right: 1px solid var(--hairline);
+    background: var(--surface);
+    min-height: 0;
+}
+.cs-top { height: var(--toolbar-h); display: flex; align-items: center; gap: var(--sp-3); padding: 0 var(--sp-4) 0 var(--page-pad-x, 16px); flex: none; }
+.cs-title { font: var(--fw-title, 600) var(--fs-lg, 13.5px)/var(--lh-tight, 1.2) var(--font-ui); color: var(--ink); flex: 1; }
+.cs-icon {
+    width: var(--control-h, 28px); height: var(--control-h, 28px); flex: none;
+    display: inline-flex; align-items: center; justify-content: center;
+    border: 0; border-radius: var(--r-md, 7px); background: transparent; color: var(--ink-2); cursor: pointer;
+    transition: background var(--t-state) var(--ease), color var(--t-state) var(--ease);
+}
+.cs-icon:hover, .cs-icon.is-on { background: var(--brand-tint); color: var(--brand); }
+.cs-icon--sm { width: var(--hit-min); height: var(--hit-min); }
+.cs-search {
+    display: flex; align-items: center; gap: var(--sp-3); margin: 0 var(--sp-4) var(--sp-3);
+    box-sizing: border-box; height: var(--control-h-lg, 34px); padding: 0 var(--sp-4); border: 1px solid var(--border); border-radius: var(--r-input);
+    color: var(--ink-2); background: var(--surface); flex: none;
+}
+.cs-search:focus-within { border-color: var(--brand); box-shadow: var(--focus); }
+.cs-search-input { flex: 1; align-self: stretch; min-width: 0; border: 0; outline: 0; background: transparent; color: var(--ink); font: 400 var(--fs-md, 12.5px)/1 var(--font-ui); }
+.cs-search-input::placeholder { color: var(--ink-2); }
+.cs-list { flex: 1; min-height: 0; overflow-y: auto; padding: var(--sp-1) var(--sp-4) var(--sp-7); display: flex; flex-direction: column; gap: var(--sp-6); }
+.cs-group { display: flex; flex-direction: column; gap: 1px; }
+.cs-group-head { display: flex; align-items: center; justify-content: space-between; padding: 0 calc(var(--sp-3) + 1px) var(--sp-1); }
+.cs-cat { display: flex; flex-direction: column; gap: 1px; }
+.cs-cat-name { display: block; padding: var(--sp-2) calc(var(--sp-3) + 1px) 2px; font: var(--fw-strong, 500) var(--fs-sm, 11px)/var(--lh-tight, 1.2) var(--font-ui); color: var(--ink-2); }
+/* As tall as a row of the project tree: one step under the look's List row, never under a target. */
+.cs-row {
+    display: flex; align-items: center; gap: calc(var(--sp-2) + 1px); width: 100%;
+    min-height: max(var(--hit-min), calc(var(--row-h) - var(--sp-2))); padding: var(--sp-2) calc(var(--sp-3) + 1px); border: 0; border-radius: var(--r-md, 7px); background: transparent;
+    color: var(--ink-label); font: 400 var(--fs-md, 12.5px)/var(--lh-tight, 1.2) var(--font-ui); text-align: left; cursor: pointer;
+    transition: background var(--t-state) var(--ease), color var(--t-state) var(--ease);
+}
+.cs-row:hover { background: var(--surface-hover); color: var(--ink); }
+.cs-row.is-active { background: var(--brand-tint); color: var(--brand); font-weight: 600; }
+.cs-row.has-unread { color: var(--ink); font-weight: 600; }
+.cs-row--muted { color: var(--ink-2); }
+.cs-row:focus-visible { outline: none; box-shadow: var(--focus); }
+.cs-hash { color: inherit; opacity: .75; width: 9px; text-align: center; flex: none; }
+.cs-row-name { flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.cs-row-dnd { font-weight: 400; color: var(--ink-2); }
+.cs-agent { flex: none; width: 16px; height: 16px; font-size: var(--fs-2xs, 9px); }
+.cs-agent-tag {
+    flex: none; font: 600 var(--fs-2xs, 9px)/1 var(--font-mono); padding: 2px 5px; border-radius: var(--r-sm, 4px);
+    background: var(--brand-tint); color: var(--brand); letter-spacing: .04em;
+}
+.cs-lock { color: var(--ink-2); flex: none; }
+.cs-count { font: 700 var(--fs-xs, 11px)/1 var(--font-mono); color: var(--ink); flex: none; }
+.cs-row.is-active .cs-count { color: var(--brand); }
+.cs-new {
+    display: inline-flex; align-items: center; gap: var(--sp-2); margin: 0 var(--sp-1);
+    height: var(--control-h, 30px); padding: 0 calc(var(--sp-3) + 1px); border: 0; border-radius: var(--r-md, 7px); background: transparent;
+    color: var(--brand); font: 600 var(--fs-md, 12.5px)/1 var(--font-ui); cursor: pointer; text-align: left;
+}
+.cs-new:hover { background: var(--brand-tint); }
+.cs-empty { margin: var(--sp-1) calc(var(--sp-3) + 1px); font: 400 var(--fs-sm, 12px)/var(--lh-body, 1.45) var(--font-ui); color: var(--ink-2); }
+
+@media (max-width: 767px) {
+    .cv--mobile .cs { width: 100%; border-right: 0; }
+    .cv--mobile .cs-row { min-height: max(var(--hit-min), 44px); font-size: var(--fs-lg, 14px); }
+    .cv--mobile .cs-search { height: var(--hit-min); }
+    .cv--mobile .cs-search-input { font-size: var(--fs-lg, 14px); }
+    .cv-back, .cs-icon, .cs-icon--sm { width: var(--hit-min); height: var(--hit-min); }
+    .cs-new { height: var(--hit-min); }
+}
+
+/* The meeting notes page (CallNotes.vue) styles itself; this root only keeps the page a flex box. */
+.cn {
+    display: flex; height: 100%; min-height: 0; background: var(--surface); color: var(--ink); font-family: var(--font-ui);
+}
+@media (max-width: 767px) {
+    .cn { flex-direction: column; }
+}

@@ -3,26 +3,37 @@ const mongoose = require('mongoose');
 const logger = require('../../Config/loggerConfig');
 const { myCache } = require('../../Config/config');
 const { dbCollections } = require('../../Config/collections');
+const { ACTIVE_SEAT } = require('../../Config/seatStatus');
 const { MongoDbCrudOpration } = require('../../utils/mongo-handler/mongoQueries');
 
-const multer = require('multer');
+const multer = require('../../utils/contextMulter');
 
-const { getProvider, isAnyProviderConfigured } = require('./llmProvider');
-const { PlanSchema, ClarifyResponseSchema, TasksPlanSchema, TasksResponseSchema, TasksOnlyPlanSchema, TasksOnlyResponseSchema, SprintsOnlyPlanSchema, SprintsOnlyResponseSchema, sanitizeMemberIds, sanitizeTaskPlanMemberIds, tryParseJson } = require('./schemaValidator');
+const { getProvider, isAnyProviderConfigured } = require('../AICore/llmProvider');
+const { isProviderError } = require('../AICore/providerError');
+const { FEATURES } = require('../AICore/features');
+const { COVERAGE_POINTS, PlanSchema, ClarifyResponseSchema, TasksPlanSchema, TasksResponseSchema, TasksOnlyPlanSchema, TasksOnlyResponseSchema, SprintsOnlyPlanSchema, SprintsOnlyResponseSchema, sanitizeMemberIds, sanitizeTaskPlanMemberIds, tryParseJson } = require('./schemaValidator');
 const { buildSystemPrompt, buildUserMessage, buildRepairPrompt, buildTasksSystemPrompt, buildTasksUserMessage } = require('./promptBuilder');
 const { briefUpload, extractFromFile, safeUnlink, MAX_BRIEF_BYTES } = require('./briefExtractor');
-const { usageFromResult, addUsage, summarize } = require('./usage');
+const { attachSplit } = require('./planSplit');
+const planAutomations = require('./planAutomations');
+const { usageFromResult, addUsage, summarize } = require('../AICore/usage');
 const planRules = require('./planRules');
+const planViews = require('./planViews');
+const planPicks = require('./planPicks');
 const sseEmitter = require('./sseEmitter');
+const { PLAN_TTL_SECONDS, PLAN_EXPIRED, cacheKey, rememberPlan, storedPlan, storedGuide, claimPlan, releasePlan, forgetPlan } = require('./planStash');
 const orchestrator = require('./orchestrator');
 const clarifier = require('./clarifier');
+const memoryStore = require('../Agents/memory');
+const { resolveProjectId, canEditProject } = require('./projectAccess');
 const { resolveProjectSkills, getActiveSkillSlugs } = require('../settings/ProjectSkills/helper');
 const { normaliseSource, cleanProposalId, numericProposalId, validateProposalId } = require('../Project/helpers/projectSourceRules');
 const { normalizePlanColors } = orchestrator;
+const { sessionTenantOf, TenantError } = require('../../Config/tenant');
 
-const PLAN_TTL_SECONDS = 15 * 60;        // 15 min
 const BRIEF_TTL_SECONDS = 30 * 60;       // 30 min
 const OBJECT_ID_PATTERN = /^[a-f0-9]{24}$/i;
+const MAX_GUIDE_MARKDOWN_CHARS = 20000;
 
 // AI task-creation modes (AHE-3777 enhancement):
 //   'full'    — sprints + tasks (original behavior)
@@ -30,6 +41,21 @@ const OBJECT_ID_PATTERN = /^[a-f0-9]{24}$/i;
 //   'sprints' — sprint names only, no tasks
 function normalizeTasksMode(raw) {
     return (raw === 'tasks' || raw === 'sprints') ? raw : 'full';
+}
+const MODE_PERMISSIONS = {
+    sprints: ['project.project_sprint_create'],
+    tasks: ['task.task_create'],
+    full: ['project.project_sprint_create', 'task.task_create'],
+};
+
+/* Answers the response and returns false when the caller may not add this mode's
+ * work to the project. A project they cannot open is 404, so its existence is not
+ * confirmed. */
+async function guardTaskTarget(res, { companyId, uid, projectId, mode }) {
+    const access = await canEditProject({ companyId, uid, projectId, permissions: MODE_PERMISSIONS[mode] });
+    if (access.hidden) { sendError(res, 404, 'Project not found'); return false; }
+    if (access.forbidden) { sendError(res, 403, 'You do not have permission to add work to this project'); return false; }
+    return true;
 }
 function tasksPlanSchemaForMode(mode) {
     if (mode === 'tasks') return TasksOnlyPlanSchema;
@@ -46,70 +72,40 @@ function token() {
     return crypto.randomBytes(12).toString('hex');
 }
 
-function cacheKey(kind, uid, id) {
-    return `aipg:${kind}:${uid}:${id}`;
-}
-
-function audIncludes(aud, companyId) {
-    if (!aud || !companyId) return false;
-    const list = Array.isArray(aud) ? aud : String(aud).split(',');
-    return list.some((entry) => String(entry).trim() === String(companyId).trim());
-}
-
 function sendError(res, status, message) {
     return res.status(status).send({ status: false, statusText: message });
 }
 
-/**
- * Maps LLM provider error codes to appropriate HTTP status codes so the
- * client receives a meaningful status rather than a generic 500.
- *
- * LLM_RATE_LIMITED   → 429  (client should back off and retry — resolves in ~60s)
- * LLM_QUOTA_EXCEEDED → 402  (account out of credits — owner must add balance)
- * LLM_AUTH_FAILED    → 503  (server config issue, not a client mistake)
- * LLM_UNAVAILABLE    → 503  (upstream temporarily down)
- * LLM_TIMEOUT        → 504  (gateway timeout)
- * LLM_BAD_REQUEST    → 400  (bad model config / invalid params)
- * LLM_INVALID_OUTPUT → 502  (model returned unparseable output)
- * anything else      → 500
- */
+/* A provider's auth failure is the server's configuration, never the caller's
+ * credentials, so it must not surface as a 401 the client would log out on. */
+const PROVIDER_ERROR_HTTP = {
+    rate_limit: 429, quota: 402, auth: 503, permission: 503, overloaded: 503, server: 503, network: 503,
+    timeout: 504, invalid_request: 400, context_length: 400, content_filter: 400, not_found: 400,
+};
+
 function llmErrorToHttpStatus(error) {
-    const map = {
-        LLM_RATE_LIMITED: 429,
-        LLM_QUOTA_EXCEEDED: 402,
-        LLM_AUTH_FAILED: 503,
-        LLM_UNAVAILABLE: 503,
-        LLM_TIMEOUT: 504,
-        LLM_BAD_REQUEST: 400,
-        LLM_INVALID_OUTPUT: 502,
-    };
-    return (error && error.code && map[error.code]) || 500;
+    if (isProviderError(error)) return PROVIDER_ERROR_HTTP[error.type] || 500;
+    return error && error.code === 'LLM_INVALID_OUTPUT' ? 502 : 500;
 }
 
 function resolveCompanyId(req) {
-    // Prefer the JWT-verified header (set by verifyJWTTokenWithCV2 upstream)
-    // but accept body.companyId/CompanyId for flexibility. We always
-    // cross-check against req.aud before trusting any of them.
-    const candidates = [
-        req.headers && req.headers.companyid,
-        req.body && req.body.companyId,
-        req.body && req.body.CompanyId,
-    ].filter(Boolean);
-    for (const c of candidates) {
-        const s = String(c).trim();
-        if (OBJECT_ID_PATTERN.test(s) && audIncludes(req.aud, s)) return s;
+    if (!req.aud) return null;
+    try {
+        return sessionTenantOf(req);
+    } catch (error) {
+        if (error instanceof TenantError) return null;
+        throw error;
     }
-    return null;
 }
 
 async function loadActiveMembers(companyId) {
     try {
         const result = await MongoDbCrudOpration(companyId, {
             type: dbCollections.COMPANY_USERS,
-            data: [{ status: { $ne: 'inactive' } }, { _id: 1, userId: 1, Employee_Name: 1, email: 1, role: 1, designation: 1 }],
+            data: [{ ...ACTIVE_SEAT }, { _id: 1, userId: 1, Employee_Name: 1, email: 1, role: 1, designation: 1 }],
         }, 'find');
-        return Array.isArray(result) ? result.map((m) => ({
-            id: String(m.userId || m._id),
+        return Array.isArray(result) ? result.filter((m) => m.userId).map((m) => ({
+            id: String(m.userId),
             name: m.Employee_Name || m.email || 'Unknown',
             role: m.role || m.designation || '',
         })) : [];
@@ -119,10 +115,12 @@ async function loadActiveMembers(companyId) {
     }
 }
 
-async function callLlmForPlan({ description, additionalRequirements, briefText, members, clarifications, availableSkills, selectedSkills }) {
+async function callLlmForPlan({ description, additionalRequirements, briefText, members, clarifications, availableSkills, selectedSkills, approvedBrief, assumptions, companyId, userId }) {
     const provider = getProvider();
+    const spend = { feature: FEATURES.PROJECT_PLAN, companyId, userId };
     const systemPrompt = buildSystemPrompt();
-    const userMessage = buildUserMessage({ description, additionalRequirements, briefText, members, clarifications, availableSkills, selectedSkills });
+    const memory = await memoryStore.contextFor({ companyId, userId });
+    const userMessage = buildUserMessage({ description, additionalRequirements, briefText, members, clarifications, availableSkills, selectedSkills, approvedBrief, assumptions, memory });
     // A generous ask, not a target: each provider clamps this to its own output
     // ceiling, so requesting more than a given model supports is harmless. The
     // old 32000 predated tasks carrying estimates and sub-tasks — every
@@ -136,6 +134,7 @@ async function callLlmForPlan({ description, additionalRequirements, briefText, 
         jsonMode: true,
         maxTokens,
         temperature: 0.4,
+        spend,
     });
 
     // Truncation short-circuit: if the model hit max_tokens, the JSON is
@@ -181,6 +180,7 @@ async function callLlmForPlan({ description, additionalRequirements, briefText, 
             jsonMode: true,
             maxTokens,
             temperature: 0.2,
+            spend,
         });
         // Counted before the guards below: a repair pass that then fails still
         // consumed tokens, and the user is still billed for them.
@@ -215,7 +215,7 @@ async function callLlmForPlan({ description, additionalRequirements, briefText, 
     };
 }
 
-async function generatePlanForJob({ jobId, uid, companyId, description, additionalRequirements, briefText, isPrivateSpace, clarifications, selectedSkills }) {
+async function generatePlanForJob({ jobId, uid, companyId, description, additionalRequirements, briefText, isPrivateSpace, clarifications, selectedSkills, approvedBrief, assumptions }) {
     const emit = (payload) => sseEmitter.emit(jobId, payload);
 
     try {
@@ -228,7 +228,7 @@ async function generatePlanForJob({ jobId, uid, companyId, description, addition
         // returned a job id, so slow LLM responses no longer trip the proxy.
         emit({ event: 'progress', phase: 'plan', step: 'ai', status: 'started' });
         const { result, usage, model, provider } = await callLlmForPlan({
-            description, additionalRequirements, briefText, members, clarifications, availableSkills, selectedSkills,
+            description, additionalRequirements, briefText, members, clarifications, availableSkills, selectedSkills, approvedBrief, assumptions, companyId, userId: String(uid),
         });
 
         let { plan } = result;
@@ -267,6 +267,12 @@ async function generatePlanForJob({ jobId, uid, companyId, description, addition
             plan.project.isPrivateSpace = isPrivateSpace;
         }
 
+        if (plan && typeof plan === 'object') {
+            const trimmed = planAutomations.trimRules(plan.rules, plan.project);
+            plan.rules = trimmed.kept;
+            plan.rulesDropped = trimmed.dropped;
+        }
+
         // Re-validate after sanitization, then normalize status colors so the
         // preview chips look identical to the saved project (same "bg = text + 35"
         // convention the orchestrator applies at save time). We deliberately
@@ -277,14 +283,13 @@ async function generatePlanForJob({ jobId, uid, companyId, description, addition
             const issues = reCheck.error.issues.map((i) => `${i.path.join('.')}: ${i.message}`).join('\n');
             throw new Error(`Plan failed final validation: ${issues}`);
         }
-        plan = normalizePlanColors(reCheck.data);
+        plan = await attachSplit(normalizePlanColors(reCheck.data), { companyId, assumptions });
+        const { kept, dropped } = planViews.trimViews(plan.views);
+        plan.views = kept;
+        plan.viewsDropped = dropped;
+        Object.assign(plan, planPicks.marksOf(await planPicks.locksFor({ companyId, uid, plan })));
 
-        const planId = token();
-        myCache.set(cacheKey('plan', uid, planId), {
-            companyId,
-            plan,
-            createdAt: Date.now(),
-        }, PLAN_TTL_SECONDS);
+        const planId = rememberPlan({ uid, companyId, plan, approvedBrief, assumptions });
 
         emit({
             event: 'complete',
@@ -338,16 +343,24 @@ function briefUploadMiddleware(req, res, next) {
     });
 }
 
+/* What needs no file is asked before one is read. The company is asked again once the fields of the request are in. */
+function briefAsked(req, res, next) {
+    if (!isAnyProviderConfigured()) return sendError(res, 503, 'AI provider is not configured');
+    if (!req.uid) return sendError(res, 401, 'Unauthorized');
+    if (!resolveCompanyId(req)) return sendError(res, 403, 'Company access denied');
+    return next();
+}
+
 exports.uploadBrief = [
+    briefAsked,
     briefUploadMiddleware,
     async (req, res) => {
-        if (!isAnyProviderConfigured()) {
-            return sendError(res, 503, 'AI provider is not configured');
-        }
         const uid = req.uid;
-        if (!uid) return sendError(res, 401, 'Unauthorized');
         const companyId = resolveCompanyId(req);
-        if (!companyId) return sendError(res, 403, 'Company access denied');
+        if (!companyId) {
+            if (req.file) safeUnlink(req.file.path);
+            return sendError(res, 403, 'Company access denied');
+        }
         if (!req.file) return sendError(res, 400, 'No file uploaded (field name: file)');
 
         try {
@@ -389,7 +402,11 @@ exports.plan = async (req, res) => {
         if (!companyId) return sendError(res, 403, 'Company access denied');
 
         const description = String((req.body && req.body.description) || '').trim();
-        if (description.length < 20) return sendError(res, 400, 'Description must be at least 20 characters');
+        // The approved brief supersedes the description; a client that sends
+        // only the brief is not asked for a description it no longer needs.
+        const approvedBrief = String((req.body && req.body.approvedBrief) || '').trim().slice(0, MAX_APPROVED_BRIEF_CHARS);
+        if (approvedBrief.length < 20 && description.length < 20) return sendError(res, 400, 'Description must be at least 20 characters');
+        const assumptions = sanitizeAssumptions(req.body && req.body.assumptions);
 
         // "Additional requirements" textarea from Step 1 of the wizard — the
         // single biggest "match my requirements" lever. Capped at 2000 chars
@@ -436,6 +453,8 @@ exports.plan = async (req, res) => {
                 isPrivateSpace: !!(req.body && req.body.isPrivateSpace),
                 clarifications,
                 selectedSkills,
+                approvedBrief,
+                assumptions,
             }).catch((error) => {
                 logger.error(`AIPG plan job outer error: ${error && error.message ? error.message : error}`);
                 sseEmitter.emit(jobId, {
@@ -478,16 +497,33 @@ exports.clarify = async (req, res) => {
             if (stash && stash.companyId === companyId) briefText = stash.text;
         }
 
-        const { understanding, questions, usage, model, provider } = await clarifier.generateClarifyingQuestions({
+        const previousAnswers = sanitizeClarifications(req.body && req.body.previousAnswers);
+        const round = Number(req.body && req.body.round) || undefined;
+        const project = await resolveProjectId({ companyId, uid, projectId: req.body && req.body.projectId });
+        if (project.hidden) return sendError(res, 404, 'Project not found');
+
+        const result = await clarifier.generateClarifyingQuestions({
             description,
             additionalRequirements,
             briefText,
+            previousAnswers,
+            round,
+            companyId,
+            userId: String(uid),
+            projectId: project.projectId,
         });
+        const { understanding, questions, coverage, maxRounds, usage, model, provider } = result;
 
+        // Top-level fields are what the existing wizard reads; `data` is the
+        // agreed contract shape for the new steps.
         return res.send({
             status: true,
             understanding,
             questions,
+            coverage,
+            round: result.round,
+            maxRounds,
+            data: { coverage, round: result.round, maxRounds, questions, understanding },
             tokensUsed: usage.totalTokens,
             usage,
             model,
@@ -521,14 +557,83 @@ function sanitizeClarifications(raw) {
         out.push({
             id,
             question,
+            point: COVERAGE_POINTS.includes(entry.point) ? entry.point : undefined,
             category: typeof entry.category === 'string' ? entry.category.slice(0, 40) : 'misc',
             type: typeof entry.type === 'string' ? entry.type.slice(0, 40) : 'text',
             answer: entry.answer === undefined ? null : entry.answer,
             skipped: !!entry.skipped,
+            unknown: !!entry.unknown,
         });
     }
     return out.length ? out : null;
 }
+
+const MAX_APPROVED_BRIEF_CHARS = 20000;
+
+function sanitizeAssumptions(raw) {
+    if (!Array.isArray(raw) || !raw.length) return [];
+    const out = [];
+    for (const entry of raw.slice(0, 30)) {
+        const text = typeof entry === 'string' ? entry : (entry && typeof entry.text === 'string' ? entry.text : '');
+        if (!text.trim()) continue;
+        const point = entry && COVERAGE_POINTS.includes(entry.point) ? entry.point : 'other';
+        out.push({ point, text: text.trim().slice(0, 500) });
+    }
+    return out;
+}
+
+// /brief rewrites description + upload + answers into the five headed
+// sections plus assumptions. The markdown it returns is what the user edits
+// and approves, and what /plan then receives as `approvedBrief`.
+exports.brief = async (req, res) => {
+    if (!isAnyProviderConfigured()) {
+        return sendError(res, 503, 'AI provider is not configured');
+    }
+    try {
+        const uid = req.uid;
+        if (!uid) return sendError(res, 401, 'Unauthorized');
+        const companyId = resolveCompanyId(req);
+        if (!companyId) return sendError(res, 403, 'Company access denied');
+
+        const description = String((req.body && req.body.description) || '').trim();
+        if (description.length < 20) return sendError(res, 400, 'Description must be at least 20 characters');
+
+        const additionalRequirements = String((req.body && req.body.additionalRequirements) || '').trim().slice(0, 2000);
+        let briefText = '';
+        if (req.body && req.body.briefId) {
+            const stash = myCache.get(cacheKey('brief', uid, req.body.briefId));
+            if (stash && stash.companyId === companyId) briefText = stash.text;
+        }
+        const answers = sanitizeClarifications(req.body && req.body.answers) || [];
+        const project = await resolveProjectId({ companyId, uid, projectId: req.body && req.body.projectId });
+        if (project.hidden) return sendError(res, 404, 'Project not found');
+
+        const { brief, coverage, usage, model, provider } = await clarifier.draftBrief({
+            description,
+            additionalRequirements,
+            briefText,
+            answers,
+            companyId,
+            userId: String(uid),
+            projectId: project.projectId,
+        });
+
+        return res.send({
+            status: true,
+            data: { brief, coverage },
+            brief,
+            coverage,
+            tokensUsed: usage.totalTokens,
+            usage,
+            model,
+            provider,
+        });
+    } catch (error) {
+        logger.error(`AIPG brief error: ${error && error.message ? error.message : error}`);
+        const httpCode = llmErrorToHttpStatus(error);
+        return sendError(res, httpCode, error && error.message ? error.message : 'Could not draft the brief. Please try again.');
+    }
+};
 
 exports.execute = async (req, res) => {
     try {
@@ -537,15 +642,14 @@ exports.execute = async (req, res) => {
         const companyId = resolveCompanyId(req);
         if (!companyId) return sendError(res, 403, 'Company access denied');
 
-        // The plan travels in the request body. We deliberately do NOT rely
-        // on an in-memory cache here — a nodemon restart between /plan and
-        // /execute would otherwise lose it. The client always has the full
-        // plan (it was returned from /plan and shown in the preview), so
-        // it just sends it back.
-        let plan = req.body && req.body.plan;
-        if (!plan || typeof plan !== 'object') return sendError(res, 400, 'plan required in request body');
+        const planId = req.body && req.body.planId;
+        const stored = storedPlan({ uid, companyId, planId });
+        if (!stored) return planExpired(res);
+        let plan = JSON.parse(JSON.stringify(stored.plan));
+        const { approvedBrief, assumptions } = stored;
+        const guide = editedGuide(storedGuide({ uid, companyId, planId }), req.body && req.body.edits);
+        const withGuide = Boolean((approvedBrief && String(approvedBrief).trim()) || guide);
 
-        // Apply optional inline edits (renames the user made in the preview).
         const editsRaw = req.body && req.body.edits;
         if (editsRaw && typeof editsRaw === 'object') {
             plan = applyEdits(plan, editsRaw);
@@ -557,6 +661,9 @@ exports.execute = async (req, res) => {
             plan.project.isPrivateSpace = req.body.isPrivateSpace;
         }
 
+        plan.rules = planAutomations.trimRules(plan.rules, plan.project).kept;
+        delete plan.rulesDropped;
+
         // Always re-validate server-side — never trust a client-supplied plan.
         const reCheck = PlanSchema.safeParse(plan);
         if (!reCheck.success) {
@@ -564,6 +671,12 @@ exports.execute = async (req, res) => {
             return sendError(res, 400, `Plan failed validation: ${issues}`);
         }
         plan = normalizePlanColors(reCheck.data);
+        plan.views = planViews.trimViews(plan.views).kept;
+
+        const locks = await planPicks.locksFor({ companyId, uid, plan: stored.plan });
+        const picked = planPicks.narrow(plan, req.body && req.body.picks, { withGuide, locks });
+        if (picked.error) return sendError(res, 400, picked.error);
+        plan = picked.plan;
 
         // Applied *after* validation on purpose: `proposalId` is not in
         // ProjectSchema, so zod strips whatever the LLM emitted and only the
@@ -591,14 +704,14 @@ exports.execute = async (req, res) => {
         // attributed to the real person who triggered the run — matching the
         // manual flow — instead of a generic label.
         let currentUserName = '';
+        let allowed = new Set();
         try {
             const members = await loadActiveMembers(companyId);
-            const allowed = new Set(members.map((m) => String(m.id)));
+            allowed = new Set(members.map((m) => String(m.id)));
             const me = members.find((m) => String(m.id) === String(uid));
             if (me && me.name) currentUserName = me.name;
-            const sanitized = sanitizeMemberIds(plan, allowed);
-            plan = sanitized.plan;
-        } catch (_e) { /* leave as-is */ }
+        } catch (_e) { /* a roster that cannot be read names nobody */ }
+        plan = sanitizeMemberIds(plan, allowed).plan;
 
         const userData = {
             id: String(uid),
@@ -609,6 +722,7 @@ exports.execute = async (req, res) => {
             companyOwnerId: companyId,
         };
 
+        if (!claimPlan({ uid, planId })) return planExpired(res);
         const jobId = token();
 
         // Reply right away with the jobId; client opens SSE on /execute/events/:jobId.
@@ -617,8 +731,10 @@ exports.execute = async (req, res) => {
         // Tiny delay so the client has time to attach the SSE listener before
         // we start emitting (otherwise an instant-success run can race).
         setTimeout(() => {
-            orchestrator.executePlan({ plan, companyId, uid: String(uid), userData, jobId })
+            orchestrator.executePlan({ plan, companyId, uid: String(uid), userData, jobId, approvedBrief, assumptions, guide, withGuideAgent: picked.withGuideAgent })
+                .then((out) => (out && out.ok ? forgetPlan({ uid, planId }) : releasePlan({ uid, planId })))
                 .catch((e) => {
+                    releasePlan({ uid, planId });
                     logger.error(`AIPG execute error: ${e && e.message ? e.message : e}`);
                 });
         }, 200);
@@ -627,6 +743,15 @@ exports.execute = async (req, res) => {
         return sendError(res, 500, error && error.message ? error.message : 'Execute failed');
     }
 };
+
+const planExpired = (res) => res.status(410).send({ status: false, statusText: PLAN_EXPIRED, code: 'PLAN_EXPIRED' });
+
+/* The Guide's text is the person's to reword before the project is made; the guide itself stays the server's. */
+function editedGuide(guide, edits) {
+    if (!guide) return null;
+    const markdown = edits && typeof edits.guideMarkdown === 'string' ? edits.guideMarkdown.slice(0, MAX_GUIDE_MARKDOWN_CHARS) : '';
+    return markdown.trim() ? { ...guide, markdown } : guide;
+}
 
 function applyEdits(plan, edits) {
     const next = JSON.parse(JSON.stringify(plan));
@@ -659,10 +784,11 @@ function applyEdits(plan, edits) {
 // EXISTING project via orchestrator.executeTasksIntoProject. Mirrors
 // callLlmForPlan / generatePlanForJob / exports.plan / exports.execute.
 
-async function callLlmForTasksPlan({ project, additionalRequirements, briefText, members, clarifications, mode, targetSprintName, features }) {
+async function callLlmForTasksPlan({ project, additionalRequirements, briefText, members, clarifications, mode, targetSprintName, features, memory, companyId, userId }) {
     const provider = getProvider();
+    const spend = { feature: FEATURES.PROJECT_TASKS, companyId, userId };
     const systemPrompt = buildTasksSystemPrompt();
-    const userMessage = buildTasksUserMessage({ project, additionalRequirements, briefText, members, clarifications, mode, targetSprintName, features });
+    const userMessage = buildTasksUserMessage({ project, additionalRequirements, briefText, members, clarifications, mode, targetSprintName, features, memory });
     const ResponseSchema = tasksResponseSchemaForMode(mode);
     // Same generous ask as the plan stage — see the note there. This path needs
     // it more, not less: AI-Assist's sub-tasks option is the setting that
@@ -675,6 +801,7 @@ async function callLlmForTasksPlan({ project, additionalRequirements, briefText,
         jsonMode: true,
         maxTokens,
         temperature: 0.4,
+        spend,
     });
     if (firstAttempt.truncated) {
         const err = new Error(
@@ -711,6 +838,7 @@ async function callLlmForTasksPlan({ project, additionalRequirements, briefText,
             jsonMode: true,
             maxTokens,
             temperature: 0.2,
+            spend,
         });
         usage = addUsage(usage, usageFromResult(repairAttempt));
         if (repairAttempt.truncated) {
@@ -751,14 +879,15 @@ async function generateTasksPlanForJob({ jobId, uid, companyId, projectId, addit
             description: projectDoc.description || '',
             taskStatusNames: (projectDoc.taskStatusData || []).map((s) => s.name).filter(Boolean),
             taskTypes: (projectDoc.taskTypeCounts || []).map((t) => ({ key: t.key, name: t.name })),
-            sprintNames: Object.values(projectDoc.sprintsObj || {}).map((s) => s && s.name).filter(Boolean),
+            sprintNames: await orchestrator.loadSprintNamesForProject(companyId, projectId, uid),
         };
         const members = await loadActiveMembers(companyId);
+        const memory = await memoryStore.contextFor({ companyId, userId: String(uid), projectId });
         emit({ event: 'progress', phase: 'plan', step: 'context', status: 'done' });
 
         emit({ event: 'progress', phase: 'plan', step: 'ai', status: 'started' });
         const { result, usage, model, provider } = await callLlmForTasksPlan({
-            project, additionalRequirements, briefText, members, clarifications, mode, targetSprintName, features,
+            project, additionalRequirements, briefText, members, clarifications, mode, targetSprintName, features, memory, companyId, userId: String(uid),
         });
 
         let plan = result.plan;
@@ -826,6 +955,9 @@ exports.tasksPlan = async (req, res) => {
         const projectId = String((req.params && req.params.projectId) || '').trim();
         if (!OBJECT_ID_PATTERN.test(projectId)) return sendError(res, 400, 'Valid projectId required');
 
+        const mode = normalizeTasksMode(req.body && req.body.mode);
+        if (!(await guardTaskTarget(res, { companyId, uid, projectId, mode }))) return;
+
         const additionalRequirements = String((req.body && req.body.additionalRequirements) || '').trim().slice(0, 2000);
         let briefText = '';
         if (req.body && req.body.briefId) {
@@ -833,7 +965,6 @@ exports.tasksPlan = async (req, res) => {
             if (stash && stash.companyId === companyId) briefText = stash.text;
         }
         const clarifications = sanitizeClarifications(req.body && req.body.clarifications);
-        const mode = normalizeTasksMode(req.body && req.body.mode);
         const targetSprintName = String((req.body && req.body.targetSprintName) || '').trim().slice(0, 80);
         const features = (req.body && typeof req.body.features === 'object' && req.body.features) || {};
 
@@ -888,15 +1019,17 @@ exports.tasksExecute = async (req, res) => {
             return sendError(res, 400, `Plan failed validation: ${issues}`);
         }
         plan = reCheck.data;
+        if (!(await guardTaskTarget(res, { companyId, uid, projectId, mode }))) return;
 
         let currentUserName = '';
+        let allowed = new Set();
         try {
             const members = await loadActiveMembers(companyId);
-            const allowed = new Set(members.map((m) => String(m.id)));
+            allowed = new Set(members.map((m) => String(m.id)));
             const me = members.find((m) => String(m.id) === String(uid));
             if (me && me.name) currentUserName = me.name;
-            plan = sanitizeTaskPlanMemberIds(plan, allowed).plan;
-        } catch (_e) { /* leave as-is */ }
+        } catch (_e) { /* a roster that cannot be read names nobody */ }
+        plan = sanitizeTaskPlanMemberIds(plan, allowed).plan;
 
         const userData = {
             id: String(uid),
@@ -920,3 +1053,4 @@ exports.tasksExecute = async (req, res) => {
 };
 
 exports.events = (req, res) => sseEmitter.handleEvents(req, res);
+exports.loadActiveMembers = loadActiveMembers;

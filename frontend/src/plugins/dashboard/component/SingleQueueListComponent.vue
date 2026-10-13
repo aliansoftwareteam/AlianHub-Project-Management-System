@@ -1,7 +1,7 @@
 <template>
     <div class="queue__list-taskdetail-wrapper d-flex align-items-center position-re cursor-pointer" @click.stop.prevent="openInNewTab(Taskdata)">
         <div class="queue__list-taskdetail d-flex align-items-center justify-content-between position-re border-radius-3-px">
-            <span class="font-size-14 font-weight-400 GunPowder d-block w-95">
+            <span class="single-queue-list-component-font-size-14 single-queue-list-component-font-weight-400 single-queue-list-component-GunPowder d-block w-95">
                 <div class="d-flex align-items-center">
                     <span v-if="Taskdata.statusType !== 'close'" :style="[{'background-color':(allTaskStatusArray && allTaskStatusArray.settings.length) ? allTaskStatusArray.settings.find((ut)=> ut.key === Taskdata.statusKey)?.textColor : '','width':'10px','height':'10px','margin-right': '9.5px','min-width':'10px'}]"></span>
                     <img v-else :src="greenCheck" class="greencheck__img">
@@ -35,3 +35,15 @@ const removeFromQueueList = (obj) => {
 }
 </script>
 <style scoped src="../css/style.css"></style>
+
+<style scoped>
+.single-queue-list-component-font-size-14 {
+    font-size: 14px;
+}
+.single-queue-list-component-font-weight-400 {
+    font-weight: 400 !important;
+}
+.single-queue-list-component-GunPowder {
+    color: var(--ink-2);
+}
+</style>

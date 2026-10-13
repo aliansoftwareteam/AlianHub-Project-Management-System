@@ -2,77 +2,43 @@
     max-width: 375px;
     width: 100%;
     padding: 15px 13px 15px 17px;
-    border-left: 1px solid #DFE1E6;
+    border-left: 1px solid var(--hairline);
 }
 .task-detail-right-side-label {
     padding-top: 9px;
     padding-bottom: 9px;
     align-items: center;
 }
-.task-detail-right-side-label h4{
+.task-detail-right-side-label .task-detail-field-name{
     padding: 0px;
     margin: 0px;
     width: 40.5%;
     line-height: 21px;
     font-size: 14px;
     font-weight: 500;
-    color: #000000;
+    color: var(--ink-2);
     margin-bottom: 0px;
-    font-family: 'Roboto';
+    font-family: var(--font-ui);
     font-style: normal;
-}
-
-.task-detail-right-side-label span {
-    border-radius: 7px;
-    border-width: 2px;
-    height: 24px;
-    font-size: 13px;
-    font-family: 'Roboto';
-    font-style: normal;
-    font-weight: 400;
-    line-height: 23px;
-    padding: 3px 8px 0px 8px;
 }
 .details-heading {
-    font-family: 'Roboto';
+    font-family: var(--font-ui);
     font-style: normal;
     font-weight: 700;
     font-size: 14px;
     line-height: 21px;
-    color: #000000;
+    color: var(--ink);
     margin: 0px 0px 12px 0px
-}
-
-.reporter-img{
-    vertical-align: middle;
-    width:25px;
-    height:25px;
-    border-radius: 30px;
-    border: 2px solid #fff;
-}
-
-.priority-comp span{
-    border-radius: 7px;
-    border-width: 2px;
-    height: 24px;
-    font-size: 13px;
-    font-family: 'Roboto';
-    font-style: normal;
-    font-weight: 400;
-    line-height: 23px;
-    padding: 0px 8px 3px 8px;
 }
 .taskdetail-label{
     font-weight: 400;
-    font-size: 13px !important;
     line-height: 19px !important;
-    color: #000000;
+    color: var(--ink);
 }
 .priority-comp:hover {
-    background-color: #dfe1e6;
+    background-color: var(--fill);
     cursor: pointer;
     padding-left: 10px;
-    color: #818181;
     position: relative;
     left: 0px;
     width: 65%;
@@ -83,14 +49,9 @@
     padding: 8.5px 10px;
 }
 .due-date.taskdetail-label:hover {
-    background-color: #dfe1e6;
+    background-color: var(--fill);
 }
 .due-date.taskdetail-label{
-    /* padding: 8.5px 10px;
-    max-width: 189px;
-    width: 100%;
-    border-radius: 4px;
-    cursor: pointer; */
     padding: 8.5px 10px;
     border-radius: 4px;
     cursor: pointer;
@@ -104,12 +65,11 @@
 }
 
 .remaining-estimate-text{
-    font-size: 13px;
-    font-family: 'Roboto';
+    font-family: var(--font-ui);
 }
 @media(max-width: 1199px){
     .task-detail-right-side {max-width: 310px;}
-    .task-detail-right-side-label h4{width: 46%;}
+    .task-detail-right-side-label .task-detail-field-name{width: 46%;}
     .due-date.taskdetail-label {width: 60%;}
     .priority-comp:hover,.priority-comp.taskdetail-label {width: 59%;}
 }
@@ -117,29 +77,29 @@
     .task-detail-right-side {max-width: 288px;}
 }
 @media(max-width: 767px){
-    h4.details-heading {font-size: 16px;font-weight: 600 !important;}
+    .task-detail-right-side .details-heading {font-size: 16px;font-weight: 600 !important;}
     .due-date.taskdetail-label:hover {background-color: transparent;}
-    .task-detail-right-side {max-width: 100%; background-color: #fff;padding:0;margin-top: 20px;padding: 10px;}
+    .task-detail-right-side {max-width: 100%; background-color: var(--surface);padding:0;margin-top: 20px;padding: 10px;}
     .due-date.taskdetail-label {width: calc(100% - 35%);text-align: right;padding: 0 !important;}
-    .task-detail-right-side-label{margin-bottom: 0;height: 50px;border-bottom: 1px solid #DFE1E6;justify-content: space-between;}
+    .task-detail-right-side-label{margin-bottom: 0;height: 50px;border-bottom: 1px solid var(--hairline);justify-content: space-between;}
     .task-detail-right-wrapper{justify-content: flex-end;text-align: right;width: auto;width: calc(100% - 35%);display: flex;}
     .priority-comp:hover,.priority-comp.taskdetail-label {text-align: right;width: calc(100% - 35%);justify-content: end;display: flex;}
-    .task-detail-right-side-label h4{width: 35%;font-size: 16px;font-weight: 400;}
+    .task-detail-right-side-label .task-detail-field-name{width: 35%;font-size: 16px;font-weight: 400;}
     .taskdetail-label, .task-esitmate-hours{font-size: 16px !important;padding-right: 0 !important;}
 }
 
-/* AI-estimate icon button — sits inline with the EstimatedTimeInput on
-   the right of the "Estimated" row. Sized to match the inline time
-   value's visual height (24px) so the row stays balanced. */
 .estimated-with-ai {
     gap: 6px;
+    flex-wrap: wrap;
 }
 .ai-estimate-btn {
-    width: 24px;
+    min-width: 24px;
     height: 24px;
-    padding: 0;
+    padding: 0 6px;
+    gap: 4px;
     border: none;
     background: transparent;
+    color: var(--brand);
     border-radius: 4px;
     cursor: pointer;
     display: inline-flex;
@@ -148,7 +108,33 @@
     transition: background-color 0.15s ease-in-out;
 }
 .ai-estimate-btn:hover:not(:disabled) {
-    background-color: rgba(100, 115, 232, 0.10);
+    background-color: var(--brand-tint);
+}
+.ai-estimate-btn:focus-visible {
+    outline: 2px solid var(--brand);
+    outline-offset: 1px;
+}
+.ai-estimate-btn .ai-estimate-label {
+    height: auto;
+    padding: 0;
+    border-radius: 0;
+    font: 500 12.5px/1 var(--font-ui);
+    color: var(--brand);
+}
+.ai-estimate-preview {
+    margin: 4px 0 10px;
+}
+.ai-estimate-preview__lead {
+    margin: 0 0 4px;
+    font: 600 13px/1.45 var(--font-ui);
+    color: var(--ink);
+}
+.ai-estimate-preview__range,
+.ai-estimate-preview__reason {
+    margin: 0 0 4px;
+    font: 400 12.5px/1.5 var(--font-ui);
+    color: var(--ink-2);
+    white-space: pre-wrap;
 }
 .ai-estimate-btn:disabled {
     cursor: progress;
@@ -159,13 +145,6 @@
     height: 16px;
     pointer-events: none;
 }
-/* Inline ring spinner. The `.task-detail-right-side-label span` rule
-   above (lines 25-35) targets every <span> inside the label container
-   and forces height/padding/border-radius/line-height on it — which
-   squashes the spinner into a pill if we don't override it. We bump
-   specificity with the `.ai-estimate-btn` ancestor selector (which
-   wins against the bare-element rule) and explicitly reset every
-   property the parent rule touches. */
 .ai-estimate-btn .ai-estimate-spinner {
     display: inline-block;
     box-sizing: border-box;
@@ -173,73 +152,12 @@
     height: 14px;
     padding: 0;
     line-height: 0;
-    border: 2px solid #E2E6FA;
-    border-top-color: #6473E8;
+    border: 2px solid var(--brand-tint);
+    border-top-color: var(--brand);
     border-radius: 50%;
     font-size: 0;
     animation: ai-estimate-spin 0.7s linear infinite;
 }
 @keyframes ai-estimate-spin {
     to { transform: rotate(360deg); }
-}
-
-.start-in-tracker-wrap {
-    padding-bottom: 14px;
-    margin-bottom: 14px;
-    border-bottom: 1px solid #E5E7EB;
-}
-.start-in-tracker-btn {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    gap: 8px;
-    width: 100%;
-    padding: 10px 12px;
-    background: #2F3990;
-    color: #fff;
-    border: none;
-    border-radius: 8px;
-    font-size: 14px;
-    font-weight: 600;
-    cursor: pointer;
-    transition: background 0.15s;
-}
-.start-in-tracker-btn:hover {
-    background: #26317a;
-}
-
-/* Start Tracker modal body */
-.tracker-modal-task {
-    font-size: 13px;
-    color: #6b7280;
-    background: #f4f5f7;
-    border-radius: 6px;
-    padding: 8px 10px;
-    margin-bottom: 12px;
-    overflow-wrap: break-word;
-}
-.tracker-modal-label {
-    display: block;
-    font-size: 13px;
-    font-weight: 500;
-    color: #374151;
-    margin-bottom: 6px;
-}
-.tracker-modal-textarea {
-    width: 100%;
-    border: 1px solid #D1D5DB;
-    border-radius: 6px;
-    padding: 8px 10px;
-    font-size: 14px;
-    font-family: inherit;
-    resize: none;
-    outline: none;
-}
-.tracker-modal-textarea:focus {
-    border-color: #2F3990;
-}
-.tracker-modal-error {
-    color: #dc2626;
-    font-size: 12px;
-    margin-top: 6px;
 }

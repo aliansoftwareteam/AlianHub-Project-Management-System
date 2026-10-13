@@ -1,12 +1,12 @@
 <template>
     <div>
-        <DropDown title="All Views" :ref="projectAddView" :bodyClass="{'viewlist-mobile-dropdown-new' : true}" maxHeight="unset" v-if="clientWidth <= 768">
-            <template #button>
-                <span ref="all_views_dd"></span>
+        <DropDown mode="dialog" themed :aria-label="$t('Projects.all_views')" :title="$t('Projects.all_views')" :ref="projectAddView" :bodyClass="{'viewlist-mobile-dropdown-new' : true}" maxHeight="unset" v-if="clientWidth <= 768">
+            <template #button="{ triggerAttrs }">
+                <span ref="allViewsTrigger" v-bind="triggerAttrs" aria-hidden="true"></span>
             </template>
             <template #options>
                 <div>
-                    <ViewsDropdown @handleCloseDropdown="$refs.all_views_dd.click()" :projectData="projectData"/>
+                    <ViewsDropdown @handleCloseDropdown="allViewsTrigger?.click()" @added="$emit('viewAdded', $event)" :projectData="projectData"/>
                 </div>
             </template>
         </DropDown>
@@ -78,7 +78,7 @@
 </template>
 
 <script setup>
-import { defineProps, defineEmits } from 'vue';
+import { defineProps, defineEmits, defineExpose, ref } from 'vue';
 import DropDown from '@/components/molecules/DropDown/DropDown.vue';
 import ViewsDropdown from '@/components/molecules/ProjectViews/ViewsDropdown.vue';
 import ProjectWatcher from '@/components/organisms/ProjectWatcher/ProjectWatcher.vue';
@@ -117,7 +117,13 @@ defineEmits([
     'tourModalAccept',
     'tourModalClose',
     'closeAiSidebar',
+    'viewAdded',
 ]);
+
+const allViewsTrigger = ref(null);
+// The sheet has no visible trigger of its own; the view switcher in Projects.vue opens it through this.
+const openAllViews = () => allViewsTrigger.value?.click();
+defineExpose({ openAllViews });
 
 const cancelIconForTour = require('@/assets/images/cancel_icon.png');
 const tourModalImage = require('@/assets/images/tourmodalimage.png');

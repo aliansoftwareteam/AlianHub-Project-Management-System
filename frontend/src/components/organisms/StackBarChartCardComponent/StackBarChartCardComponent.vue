@@ -12,7 +12,7 @@
         />
     </template>
     <template v-else-if="chartData.length === 0 && !isLoading">
-        <span class="font-size-14">No data found</span>
+        <span class="stack-bar-chart-card-component-font-size-14">{{ $t('dashboardCard.no_data_found') }}</span>
     </template>
 </template>
 
@@ -33,6 +33,7 @@ import { apiRequest } from "@/services";
 import env from '@/config/env';
 import { useGetterFunctions } from "@/composable";
 import { buildFilterQuery, teamIdToUserId } from "@/composable/commonFunction";
+import { isOwnerOrAdmin } from "@/utils/roles";
 const { getUser } = useGetterFunctions()
 const { getters } = useStore();
 const teamsArr = getters["settings/teams"];
@@ -119,7 +120,7 @@ const getQuery = (componentId) => {
                     $in:[0]
                 },
                 ...(filterQuery.value && { ...filterQuery.value }),
-                ...(![1, 2].includes(roleType) && { AssigneeUserId: { $in: [userId.value] } }),
+                ...(!isOwnerOrAdmin(roleType) && { AssigneeUserId: { $in: [userId.value] } }),
             };
 
             let taskAssigneefindQuery = [
@@ -212,3 +213,9 @@ watch(() => props.filterData, (newValue) => {
     }
 }, { immediate: true, deep: true });
 </script>
+
+<style scoped>
+.stack-bar-chart-card-component-font-size-14 {
+    font-size: 14px;
+}
+</style>

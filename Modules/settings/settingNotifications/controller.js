@@ -3,6 +3,12 @@ const { removeCache } = require("../../../utils/commonFunctions");
 const { dbCollections } = require("../../../Config/collections");
 const { MongoDbCrudOpration } = require("../../../utils/mongo-handler/mongoQueries");
 const mongoose = require("mongoose");
+const { ensureNotificationDefaults } = require("../../notification/defaults");
+const { ensureCommentNoticeItems } = require("../../Comments/helpers/noticeItems");
+const { ensureDocNoticeSection } = require("../../notification/docNotices");
+const { ensureGoalNoticeSection } = require("../../notification/goalNotices");
+
+const OBJECT_ID_RE = /^[0-9a-f]{24}$/i;
 
 exports.updateNotifications = async (req, res) => {
     try {
@@ -14,7 +20,6 @@ exports.updateNotifications = async (req, res) => {
                 error: "Company ID is required in headers."
             });
         }
-        // Validate parameters
         if (!id || !key || !fieldToUpdate || !elementKey || !userId) {
             return res.status(400).json({
                 message: "An error occurred while updating the notifications.",
@@ -22,7 +27,6 @@ exports.updateNotifications = async (req, res) => {
             });
         }
 
-        // Validate body keys
         const allowedKeys = ["id","key","fieldToUpdate","elementKey","valueToUpdate","userId","refreshToken"];
         const invalidKeys = Object.keys(req.body).filter((key) => !allowedKeys.includes(key));
         if (invalidKeys.length > 0) {
@@ -32,17 +36,23 @@ exports.updateNotifications = async (req, res) => {
             });
         }
 
-        // MongoDB query
+        if (String(userId) !== String(req.uid || '')) {
+            return res.status(403).json({
+                status: false,
+                statusText: "You can only change your own notification settings.",
+                message: "Forbidden"
+            });
+        }
+
         const query = {
             type: dbCollections.NOTIFICATIONS_SETTINGS,
             data: [
-                { _id: new mongoose.Types.ObjectId(id) },
+                { _id: new mongoose.Types.ObjectId(id), userId: String(userId) },
                 { $set: { [`${key}.items.$[element].${fieldToUpdate}`]: valueToUpdate } },
                 { arrayFilters: [{ "element.key": elementKey }] }
             ]
         };
 
-        // Execute query
         const response = await MongoDbCrudOpration(companyId, query, "updateOne");
         removeCache(`notification:${userId}:${companyId}`);
         return res.status(200).json(response);
@@ -65,7 +75,16 @@ exports.getNotifications = async (req, res) => {
                 error: "Company ID and User Id is required."
             });
         }
-        
+        if (!OBJECT_ID_RE.test(id)) {
+            return res.status(400).json({ status: false, message: "A valid user id is required." });
+        }
+        if (id !== String(req.uid || "")) {
+            return res.status(403).json({ status: false, message: "You can only read your own notification settings." });
+        }
+
+        await ensureCommentNoticeItems(companyId, [id]);
+        await ensureDocNoticeSection(companyId, [id]);
+        await ensureGoalNoticeSection(companyId, [id]);
         const cacheKey = `notification:${id}:${companyId}`;
         const value = myCache.get(cacheKey);
 
@@ -86,7 +105,7 @@ exports.getNotifications = async (req, res) => {
             ]
         };
 
-        const response = await MongoDbCrudOpration(companyId, query, "findOne");
+        const response = (await MongoDbCrudOpration(companyId, query, "findOne")) || (await ensureNotificationDefaults(companyId, id));
         myCache.set( cacheKey, JSON.stringify(response || {}), 604800 );
         return res.status(200).json(response || {});
     } catch (error) {

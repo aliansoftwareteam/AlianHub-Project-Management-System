@@ -1,10 +1,24 @@
 <template lang="">
     <div class="d-flex taglist__dropdown-mobile__margin" @click="(e)=>{e.stopPropagation()}" :class="[{'pointer-none' : (tagChipArray.length >= 3 && isTaskList) || !checkApps('tags') }]">
-        <DropDown @isVisible="tagClosed">   
-        <template  #button>
-            <div v-show="(tagChipArray.length < 3 || !isTaskList) && checkApps('tags') && checkPermission('task.task_tag',project?.isGlobalPermission) === true" class="d-flex " ref="clickDropDown" >
-                <img id="openTagDropdown" :src="!isTaskList? tag:tag2"  class="cursor-pointer tag-div">
-            </div>
+        <DropDown mode="listbox" @isVisible="tagClosed">
+        <template  #button="{ triggerAttrs }">
+            <button
+                v-show="(tagChipArray.length < 3 || !isTaskList) && checkApps('tags') && checkPermission('task.task_tag',project?.isGlobalPermission) === true"
+                type="button"
+                class="d-flex taglist__add-btn"
+                :aria-label="$t('Tags.add_tag')"
+                ref="clickDropDown"
+                v-bind="triggerAttrs"
+            >
+                <svg v-if="!isTaskList" id="openTagDropdown" class="cursor-pointer tag-div" width="24" height="24" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+                    <path class="taglist__add-disc taglist__add-ring" d="M12 23.5C18.3513 23.5 23.5 18.3513 23.5 12C23.5 5.64873 18.3513 0.5 12 0.5C5.64873 0.5 0.5 5.64873 0.5 12C0.5 18.3513 5.64873 23.5 12 23.5Z"/>
+                    <path class="taglist__add-glyph" d="M13.1327 16.7121C12.9408 16.904 12.703 17 12.4193 17C12.1356 17 11.8978 16.904 11.7059 16.7121L7.30038 12.3066C7.20859 12.2149 7.13567 12.1064 7.0816 11.9812C7.0272 11.8561 7 11.7226 7 11.5807V8.00125C7 7.72591 7.09812 7.49011 7.29437 7.29387C7.49028 7.09796 7.72591 7 8.00125 7H11.5807C11.7226 7 11.8561 7.02703 11.9812 7.0811C12.1064 7.1355 12.2149 7.20859 12.3066 7.30038L16.7121 11.7184C16.904 11.9103 17 12.1459 17 12.4253C17 12.705 16.904 12.9408 16.7121 13.1327L13.1327 16.7121ZM12.4193 16.0113L15.9987 12.4318L11.5807 8.00125H8.00125V11.5807L12.4193 16.0113ZM9.25282 10.0038C9.46141 10.0038 9.63863 9.93066 9.78448 9.78448C9.93066 9.63863 10.0038 9.46141 10.0038 9.25282C10.0038 9.04422 9.93066 8.867 9.78448 8.72115C9.63863 8.57497 9.46141 8.50188 9.25282 8.50188C9.04422 8.50188 8.867 8.57497 8.72115 8.72115C8.57497 8.867 8.50188 9.04422 8.50188 9.25282C8.50188 9.46141 8.57497 9.63863 8.72115 9.78448C8.867 9.93066 9.04422 10.0038 9.25282 10.0038Z"/>
+                </svg>
+                <svg v-else id="openTagDropdown" class="cursor-pointer tag-div" width="27" height="23" viewBox="0 0 27 23" aria-hidden="true" focusable="false">
+                    <rect class="taglist__add-ring" x="0.699219" y="1.49805" width="25" height="21" rx="3.5" fill="none"/>
+                    <path class="taglist__add-glyph" d="M14.5584 17.6526C14.3281 17.8829 14.0428 17.998 13.7023 17.998C13.3619 17.998 13.0766 17.8829 12.8463 17.6526L7.55967 12.366C7.44953 12.2559 7.36202 12.1257 7.29714 11.9755C7.23186 11.8253 7.19922 11.6651 7.19922 11.4949V7.19955C7.19922 6.86914 7.31697 6.58618 7.55246 6.35069C7.78755 6.11559 8.07031 5.99805 8.40072 5.99805H12.6961C12.8663 5.99805 13.0265 6.03049 13.1767 6.09537C13.3269 6.16065 13.457 6.24836 13.5672 6.3585L18.8538 11.6601C19.0841 11.8904 19.1992 12.1732 19.1992 12.5084C19.1992 12.844 19.0841 13.127 18.8538 13.3572L14.5584 17.6526ZM13.7023 16.8116L17.9977 12.5162L12.6961 7.19955H8.40072V11.4949L13.7023 16.8116ZM9.9026 9.60255C10.1529 9.60255 10.3656 9.51484 10.5406 9.33942C10.716 9.1644 10.8037 8.95174 10.8037 8.70143C10.8037 8.45111 10.716 8.23845 10.5406 8.06343C10.3656 7.88801 10.1529 7.8003 9.9026 7.8003C9.65229 7.8003 9.43962 7.88801 9.2646 8.06343C9.08918 8.23845 9.00147 8.45111 9.00147 8.70143C9.00147 8.95174 9.08918 9.1644 9.2646 9.33942C9.43962 9.51484 9.65229 9.60255 9.9026 9.60255Z"/>
+                </svg>
+            </button>
         </template>
         <template #head>
             <div class="tagInputwrapper">
@@ -21,7 +35,7 @@
             <div class="chipDiv-wrapper" v-if="checkApps('tags')"> 
                 <SpinnerComp :is-spinner="isSpinner || isChipSpinner"/>  
                 <div v-for="(item, index) in tagChipArray" :key="index" class="tagList">
-                    <TagChip :data="item" :isBorder="false" :ids="ids" :tagsArray="project.tagsArray" :prjectGlobalPermission="project?.isGlobalPermission" :taskId="task.id" :sprintId="task.sprintId" :taskName="task.TaskName" @isSpinner="(val)=> isChipSpinner = val"/>
+                    <TagChip :data="item" :isBorder="false" :ids="ids" :tagsArray="project.tagsArray" :prjectGlobalPermission="project?.isGlobalPermission" :taskId="task.id" :sprintId="task.sprintId" :taskName="task.TaskName" light-surface @isSpinner="(val)=> isChipSpinner = val"/>
                 </div>
             </div>
                 <div class="chipDiv-hr"></div>
@@ -43,7 +57,7 @@
                             <h5 v-if="renameErrorMessage" class="red" >{{renameErrorMessage}}</h5>
                         </div>
                             <div class="change-color-wrapper" v-else-if="editStatus && editStatus.key === 'isColor' && editStatus.uid === item.uid">
-                                <span class="changeColorTextTagName" :title="item.tagName" :style="{color:item.tagColor}">{{item.tagName}}</span>
+                                <span class="changeColorTextTagName" :title="item.tagName" :style="{color: tagChipColors(item).color}">{{item.tagName}}</span>
                                 <input
                                     type="color"
                                     v-model.trim="tagColor"
@@ -52,34 +66,34 @@
                                 <img :src="saveimage" class="saveTagColorImage cursor-pointer" @click="()=>HandleColors('save',index,item)"/>
                                 <img :src="cancelimage" class="deleteTagImage cursor-pointer ml-5px" @click="()=>HandleColors('cancel',index)"/>
                             </div>
-                            <div class="d-flex justify-content-between w-100" v-else @click="addTag(item.uid,item.tagName)">
-                                <span class="tag_name"  :title="item.tagName" :style="{color:item.tagColor}" >{{item.tagName}}</span>
-                                <span @click.stop="()=>dropdown(item)"><img  :src="threedots" class="cursor-pointer p0x-5px ml-auto mt-7px tagname__threedots" :class="[{'threedots': clientWidth > 767}]" alt=""/> </span> 
+                            <div class="d-flex justify-content-between w-100" v-else role="option" aria-selected="false" @click="addTag(item.uid)">
+                                <span class="tag_name"  :title="item.tagName" :style="{color: tagChipColors(item).color}" >{{item.tagName}}</span>
+                                <DropDown mode="menu" :id="`${tagActionsId}_${item.uid}`" v-if="checkPermission('task.task_tag',project?.isGlobalPermission) === true" @isVisible="(open) => open && (dataItem = item)">
+                                    <template #button="{ triggerAttrs }">
+                                        <button type="button" class="taglist__add-btn d-block" :aria-label="$t('Tags.tag_actions', { name: item.tagName })" data-option-action v-bind="triggerAttrs">
+                                            <img :src="threedots" class="cursor-pointer p0x-5px ml-auto mt-7px tagname__threedots" :class="[{'threedots': clientWidth > 767}]" alt=""/>
+                                        </button>
+                                    </template>
+                                    <template #options>
+                                        <div class="">
+                                            <ul class="tag-edit-option justify-content-start" role="none">
+                                                <li class="mainDiv justify-content-start" role="menuitem" @click="EditChips('isRename')">
+                                                    <img :src="renameimage" class="inner-tagedit-list-item"/>
+                                                    <span>{{$t("Projects.rename")}}</span>
+                                                </li>
+                                                <li class="mainDiv justify-content-start" role="menuitem" @click="EditChips('isColor')">
+                                                    <img :src="colorimage" class="inner-tagedit-list-item"/>
+                                                    <span>{{$t("Tags.change_color")}}</span>
+                                                </li>
+                                                <li class="mainDiv justify-content-start" role="menuitem" @click="EditChips('isDelete'),showSidebar = true,sendMethod()">
+                                                    <img :src="deleteimage" class="inner-tagedit-list-item"/>
+                                                    <span class="red">{{$t("Projects.delete")}}</span>
+                                                </li>
+                                            </ul>
+                                        </div>
+                                    </template>
+                                </DropDown>
                             </div>
-
-                            <DropDown :id="Did" v-if="checkPermission('task.task_tag',project?.isGlobalPermission) === true">
-                                <template #button>
-                                    <button id="EditTag" hidden :ref="Did"></button>
-                                </template>
-                                <template #options>
-                                    <div class="">
-                                        <ul class="tag-edit-option justify-content-start">
-                                            <li class="mainDiv justify-content-start" @click=" $refs[Did][0].click(),EditChips('isRename')">
-                                                <img :src="renameimage" class="inner-tagedit-list-item"/>
-                                                <span>{{$t("Projects.rename")}}</span>
-                                            </li>
-                                            <li class="mainDiv justify-content-start" @click=" $refs[Did][0].click(),EditChips('isColor')">
-                                                <img :src="colorimage" class="inner-tagedit-list-item"/>
-                                                <span>{{$t("Tags.change_color")}}</span>
-                                            </li>
-                                            <li class="mainDiv justify-content-start" @click=" $refs[Did][0].click(),EditChips('isDelete'),showSidebar = true,sendMethod()">
-                                                <img :src="deleteimage" class="inner-tagedit-list-item"/>
-                                                <span class="red">{{$t("Projects.delete")}}</span>
-                                            </li>
-                                        </ul>
-                                    </div>
-                                </template>
-                            </DropDown>
                     </div>
                 </div>
                 <p class="tag-instruct-text" v-if="searchtag">{{$t('Tags.note_msg')}}</p>
@@ -104,29 +118,23 @@
 </template>
 <script setup>
 
-// packages
 import {ref,watchEffect,inject} from 'vue'
 
-// components
 import DropDown from '@/components/molecules/DropDown/DropDown.vue'
 import TagChip from '@/components/atom/TagChip/TagChip.vue'
 import ConfirmationSidebar from "@/components/molecules/ConfirmationSidebar/ConfirmationSidebar.vue"
 import InputText from "@/components/atom/InputText/InputText.vue";
 import SpinnerComp from '@/components/atom/SpinnerComp/SpinnerComp.vue';
 
-// utility 
-import * as env from '@/config/env';
-import { createTag,addTaskTag,updateTag,deleteTag} from "./helper.js";
-import { useCustomComposable , useGetterFunctions } from "@/composable";
+import { createTag,addTaskTag,updateTag,deleteTag,byTagName,taskTagChips} from "./helper.js";
+import { tagChipColors } from "@/utils/statusChipColors";
+import { useCustomComposable } from "@/composable";
 import { useToast } from 'vue-toast-notification';
-import { apiRequest } from '../../../services';
 import { useI18n } from "vue-i18n";
 const { t } = useI18n();
 
 const companyId = inject("$companyId")
 const threedots = require("@/assets/images/svg/tagdots.svg")
-const tag = require("@/assets/images/svg/Tag.svg");
-const tag2 = require("@/assets/images/svg/SquareTag.svg");
 const array = ref([])
 const array2 = ref([])
 const clientWidth = inject('$clientWidth');
@@ -142,9 +150,9 @@ const tasksTagsArray = ref([])
 const tagColor = ref('#000000')
 const tagBgColor = ref('#000000')
 const toast = useToast()
-const {makeUniqueId , checkApps,sanitizeInput, checkPermission } = useCustomComposable();
+const {makeUniqueId , checkApps, checkPermission } = useCustomComposable();
 const searchtag =  ref()
-const Did = ref("custom"+makeUniqueId(5));
+const tagActionsId = "custom"+makeUniqueId(5);
 const renameimage = require("@/assets/images/editmilestone.png")
 const deleteimage = require("@/assets/images/Deletemilestone.png")
 const colorimage = require("@/assets/images/palette.png")
@@ -159,18 +167,6 @@ const clickDropDown = ref()
 const sendMethod = () =>{
     clickDropDown.value.click()
 }
-const {getUser} = useGetterFunctions();
-const userId = inject('$userId')
-const user = getUser(userId.value);
-
-const userData = {
-    id: user.id,
-    Employee_Name: user.Employee_Name,
-    companyOwnerId: user.companyOwnerId
-}
-
-
-
 defineExpose({sendMethod})
 
 const props = defineProps({
@@ -206,35 +202,15 @@ const getRandomColor = () => {
 
 projectArray.value = { ...props.project.tagsArray }
 
-const ActivityLog = (message, taskId = null) =>{
-    let historyObj =  {
-        "sprintId": taskId ? props.task?.sprintId : null,
-        'message': message,
-        'key' : taskId ? 'task' : 'Project_Name',
-    }
-    apiRequest("post", env.HANDLE_HISTORY, {
-        "type": taskId ? 'task' : 'project',
-        "companyId": companyId.value,
-        "projectId": props.project._id,
-        "taskId": taskId,
-        "object": historyObj,
-        "userData": userData
-    })
-    .catch((error) => {
-        console.error("ERROR in update project history: ", error);
-    })
-}
-
 watchEffect(()=>{
     array.value = props.project.tagsArray || [];
     tasksTagsArray.value = props.task.tagsArray || [];
     array.value = array.value.filter((item)=>{ return !(tasksTagsArray.value.includes(item['uid'])) })
-    array.value.sort((a,b) => (a.tagName.toLowerCase() < b.tagName.toLowerCase()) ? -1 : ((b.tagName.toLowerCase() < a.tagName.toLowerCase()) ? 1 : 0));  
+    array.value.sort(byTagName);
 
-    tagChipArray.value =  (props.project.tagsArray !== undefined) ? props.project.tagsArray.filter((item)=>{ return tasksTagsArray.value.includes(item['uid'])}) : []
+    tagChipArray.value = taskTagChips(props.project.tagsArray, tasksTagsArray.value)
 
     ids.value = {companyId:companyId.value,projectId:props.project._id,sprintId:props.task.sprintId,taskId:props.task._id, tagsArray: props.task.tagsArray}
-    tagChipArray.value.sort((a,b) => (a.tagName.toLowerCase() < b.tagName.toLowerCase()) ? -1 : ((b.tagName.toLowerCase() < a.tagName.toLowerCase()) ? 1 : 0));      
 
     emit("send:tagChipArray",tagChipArray.value)
     emit("send:ids",ids.value)
@@ -253,11 +229,6 @@ function tagClosed(val) {
 
 const EditChips = (key) => {
     editStatus.value = {...dataItem.value, key:key}    
-}
-
-const dropdown = (item) => {
-    document.getElementById("EditTag").click();
-    dataItem.value = item
 }
 
 //  search , create , rename tag function
@@ -286,8 +257,7 @@ const checkSameName = (e,val,state,i,item) => {
             }
             let colors = getRandomColor()   
             const obj = {tagBgColor:colors.tagBgColor , tagColor:colors.tagColor , tagName:value,uid:makeUniqueId(12)}
-            createTag(ids.value,obj)
-            addTag(obj.uid,obj.tagName)
+            createTag(ids.value,obj).then(() => addTag(obj.uid))
             toast.success(t("Toast.Tag_Created_successfully"),{position:"top-right"})
             array.value.push(obj)
             searchtag.value = ""
@@ -312,24 +282,20 @@ const checkSameName = (e,val,state,i,item) => {
                 renameErrorMessage.value = t('Tour.Tag_name_required');
                 return
             }
-            let Name = array.value[i].tagName
             array.value[i].tagName = reNameVal.value
             updateTag(ids.value, oldVal.value, {...item,tagName:reNameVal.value})
-            ActivityLog(`<b>${userData.Employee_Name}</b> has renamed the Tag from <b>  ${Name}  </b> to <b>${reNameVal.value} </b>`)
             editStatus.value = undefined
         }
     }
 }
 
-const addTag = (payload,tagName) =>{
+const addTag = (payload) =>{
     addTaskTag(ids.value,payload).then((data)=>{
         isSpinner.value = data
         errorMessage.value = ""
     }).catch((error)=>{
         toast.error(error,{position: "top-right"})
     })
-    ActivityLog(`<b>${userData.Employee_Name}</b> has added the <b> ${tagName} Tag </b> in <b>${sanitizeInput(props.task?.TaskName)}</b> Task`)
-    ActivityLog(`<b>${userData.Employee_Name}</b> has added the <b> ${tagName} Tag </b>`, props.task?._id)
 }
 
 //  Handling deletion of Tags
@@ -341,7 +307,6 @@ const deleteTags = (payload) =>{
     if (index !== -1) {
         dataArray.splice(index, 1)
     }
-    ActivityLog(`<b>${userData.Employee_Name}</b> has deleted the <b> ${payload.tagName} Tag </b>`)
 }
 
 //  Handling colors Changes
@@ -372,11 +337,18 @@ const HandleColors = (key,i,item) =>{
 .tagname__threedots{
     height:4px;
 }
+.mainDiv:focus-within .threedots{
+    display: block;
+}
+.taglist__add-btn { margin: 0; padding: 0; border: 0; background: none; font: inherit; color: inherit; }
+.taglist__add-disc { fill: var(--surface); }
+.taglist__add-ring { stroke: var(--ink-3); }
+.taglist__add-glyph { fill: var(--ink-2); }
 .edit__status-key{
     height:26px !important;
 }
 .chipDiv-hr{
-    border-bottom: 1px solid #CFCFCF;
+    border-bottom: 1px solid var(--border);
     margin: 6px 0;
 }
 </style>

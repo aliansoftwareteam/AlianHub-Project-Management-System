@@ -11,7 +11,7 @@
             @update:visible="$emit('closeSidebar', $event)" :top="clientWidth <= 767 ? '0px' : '46px'"
         >
             <template #head-left>
-                <div class="blue font-roboto-sans">{{ $t('Templates.ai_sidebar_title') }}</div>
+                <div class="blue font-ui">{{ $t('Templates.ai_sidebar_title') }}</div>
             </template>
             <template #body>
                 <div class="sidbar-bodytamplate" v-if="activeTab === 1">
@@ -419,7 +419,7 @@ const fetchProjectData = async () => {
             !["gantt", "timeline", "embed"].includes(value)
         );
 
-        projectApps.value = appsResponse.data;
+        projectApps.value = appsResponse.data?.data || [];
     } catch (error) {
         console.error("ERROR in fetchProjectData:", error);
     }
@@ -445,7 +445,7 @@ onMounted(() => {
 <style scoped>
     label {
         font-size: 14px;
-        font-family: Roboto;
+        font-family: var(--font-ui);
         font-weight: 500;
         line-height: 20.72px;
     }
@@ -468,8 +468,8 @@ onMounted(() => {
     .item-block {
         padding: 0 21px;
         height: 44px;
-        color: #535358;
-        background-color: #FFF;
+        color: var(--ink-2);
+        background-color: var(--surface);
         margin-bottom: 10px;
         border-radius: 5px;
     }
@@ -483,8 +483,8 @@ onMounted(() => {
     .btn-custom-spinner {
         width: 16px;
         height: 16px;
-        border: 2px solid #ffffff;
-        border-top: 2px solid #3498db;
+        border: 2px solid var(--surface);
+        border-top: 2px solid var(--brand);
         border-radius: 50%;
         animation: spin 0.6s linear infinite;
     }
@@ -503,11 +503,11 @@ onMounted(() => {
     .existing-data-block li {
         padding: 10px;
         border-radius: 5px;
-        background: #FFF;
+        background: var(--surface);
         font-size: 14px;
         cursor: pointer;
         width: 48%;
-        border: 1px solid #cfcfcf;
+        border: 1px solid var(--border);
     }
     .existing-data-block .template-title {
         margin: 7px 0;
@@ -520,8 +520,8 @@ onMounted(() => {
         font-size: 15px;
     }
     .existing-data-block li:hover {
-        box-shadow: rgba(100, 100, 111, 0.2) 0px 7px 29px 0px;
-        border: 1px solid #2F3990;
+        box-shadow: var(--shadow-ink) 0px 7px 29px 0px;
+        border: 1px solid var(--brand);
     }
     @keyframes spin {
         to {

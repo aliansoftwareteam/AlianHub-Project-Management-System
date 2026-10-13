@@ -5,49 +5,91 @@ const { MongoDbCrudOpration } = require("../../../utils/mongo-handler/mongoQueri
 const { default: mongoose } = require("mongoose");
 const { replaceObjectKey } = require("../../Auth/helper");
 const socketEmitter = require("../../../event/socketEventEmitter");
+const { isInstanceOwner } = require("../../Instance/guard");
+const { tenantOf, namedCompanyIds, TenantError } = require("../../../Config/tenant");
+const { OBJECT_ID_PATTERN, ownCompanyIds, allowedCompanyIds, scopeCompanyPipeline, memberCompanyView, companyUpdateKind, seatFilter } = require("../helpers/companyAccessRules");
+const { isPrivileged, ROLE_OWNER } = require("../../../Config/permissionGuard");
+const { checkCompanyDetails } = require("../helpers/companyDetails");
+const { isSignedInSession } = require("../../Agents/personDecides");
+
+const findSeat = (companyId, uid, kind) => MongoDbCrudOpration(companyId, {
+    type: SCHEMA_TYPE.COMPANY_USERS,
+    data: [seatFilter(uid, kind), { roleType: 1 }]
+}, 'findOne');
+
+const MAY_SEND = {
+    details: ({ roleType }) => isPrivileged(roleType),
+    ownerClaim: ({ roleType, req }) => roleType === ROLE_OWNER && req.body.updateObject.objId.userId === String(req.uid),
+};
+
+const ROLE_REFUSAL = {
+    ownerClaim: 'Only an owner can record themselves as the company owner.',
+};
+
+const companyWrite = (companyId, body, kind, uid) => {
+    if (kind === 'ownerClaim') {
+        return [{ _id: companyId }, { $set: { userId: new mongoose.Types.ObjectId(String(uid)) } }, { returnDocument: 'after' }];
+    }
+    return [{ _id: companyId }, { $set: body.updateObject }, { returnDocument: 'after' }];
+};
+
+/* The companies the caller holds a live seat in, split by whether they are an owner or admin there. Plan and billing
+ * records and key handles are read by a signed-in owner or admin: a token of any kind and an agent read the member
+ * fields of every company, whoever they act for. */
+const loadOwnCompanies = async (req) => {
+    const uid = req.uid;
+    const user = await MongoDbCrudOpration(SCHEMA_TYPE.GOLBAL, {
+        type: SCHEMA_TYPE.USERS,
+        data: [{ _id: new mongoose.Types.ObjectId(String(uid)) }, { AssignCompany: 1 }]
+    }, 'findOne');
+    const listed = ownCompanyIds(user);
+    const seated = await Promise.all(listed.map((companyId) => findSeat(companyId, uid).catch(() => null)));
+    const own = listed.filter((companyId, index) => Boolean(seated[index]));
+    return { own, limited: isSignedInSession(req) ? listed.filter((companyId, index) => seated[index] && !isPrivileged(seated[index].roleType)) : own };
+};
+
+const isInstanceAdminRequest = async (req) => isSignedInSession(req) && isInstanceOwner(req.uid);
+const hasSession = (req) => OBJECT_ID_PATTERN.test(String(req.uid || ''));
 
 exports.updateCompany = async(req,res) => {
     try {
-
-        const companyId = req.headers['companyid'] || req.body.companyId;
+        const named = namedCompanyIds(req);
+        if (named.length > 1) {
+            return res.status(403).json({ status: false, message: 'The request names more than one company.' });
+        }
+        if (!OBJECT_ID_PATTERN.test(named[0] || '')) {
+            return res.status(400).json({ status: false, message: 'A valid company id is required' });
+        }
+        const companyId = tenantOf(req);
 
         if (!(req.body && req.body.updateObject)) {
             return res.status(400).json({message: 'Update Object is Required'});
         }
 
-        let key;
-        let data;
-        if (req.body.key) {
-            key = req.body.key;
-            data =  [
-                { _id: companyId },
-                {   
-                    [key]: req.body.updateObject
-                },
-            ]
-        } else {
-            key = '$set'
-            data =  [
-                { _id: companyId }, 
-                {   
-                    [key]: req.body.updateObject
-                },
-                {
-                    returnDocument : 'after'
-                }
-            ]
+        const kind = companyUpdateKind(req.body);
+        if (!kind) {
+            return res.status(403).json({ status: false, message: 'Only the company details can be changed here. Plan, billing, seat, storage and usage fields are managed by the server.' });
         }
 
-        if (req.body.arrayFilters?.length) {
-            let arrObj = {arrayFilters: req.body.arrayFilters}
-            data.push(arrObj)
+        const seat = await findSeat(companyId, req.uid, kind);
+        if (!seat) {
+            return res.status(403).json({ status: false, message: 'Only active members of this company can change it.' });
+        }
+        if (!(await MAY_SEND[kind]({ roleType: seat.roleType, companyId, req }))) {
+            return res.status(403).json({ status: false, message: ROLE_REFUSAL[kind] || 'Only an owner or an admin can change the company.' });
         }
 
-        const dataConvert = replaceObjectKey(data,"objId")        
-        let mongoObj = {
+        let body = req.body;
+        if (kind === 'details') {
+            const checked = checkCompanyDetails(body.updateObject);
+            if (!checked.ok) return res.status(400).json({ status: false, message: checked.error });
+            body = { ...body, updateObject: checked.updateObject };
+        }
+
+        const mongoObj = {
             type: SCHEMA_TYPE.COMPANIES,
-            data: dataConvert
-        }
+            data: companyWrite(companyId, body, kind, req.uid)
+        };
 
         const company = await MongoDbCrudOpration('global', mongoObj, 'findOneAndUpdate');
 
@@ -56,19 +98,32 @@ exports.updateCompany = async(req,res) => {
         }
 
         removeCache(`companyData_${companyId}`,true);
+        socketEmitter.emit('update', { type: 'update', data: { data: company }, updatedFields: mongoObj.data[1].$set, module: 'companies' });
 
         return res.status(200).json(company);
     } catch (error) {
+        if (error instanceof TenantError) {
+            return res.status(403).json({ status: false, message: error.message });
+        }
         return res.status(500).json({ message: "An error occurred while updating the company",error:error });
     }
 }
 
-exports.getCompany = (req,res) => {
-    exports.getCompanyDataFun(req.body.companyIds,req.body.fetchAllCompany,req.body.condition).then((data) => {
-        res.json(data);
-    }).catch((error) => {
-        res.json(error);
-    })
+exports.getCompany = async (req,res) => {
+    try {
+        if (!hasSession(req)) return res.status(401).json({ status: false, message: 'Unauthorized' });
+        if (await isInstanceAdminRequest(req)) {
+            return res.json(await exports.getCompanyDataFun(req.body.companyIds, req.body.fetchAllCompany));
+        }
+        if (req.body.fetchAllCompany) {
+            return res.status(403).json({ status: false, message: 'Only the instance owner can list every company.' });
+        }
+        const { own, limited } = await loadOwnCompanies(req);
+        const companies = await exports.getCompanyDataFun(allowedCompanyIds(req.body.companyIds, own));
+        return res.json(companies.map((company) => (limited.includes(String(company._id)) ? memberCompanyView(company) : company)));
+    } catch (error) {
+        return res.status(500).json({ status: false, message: "An error occurred while getting the company" });
+    }
 }
 
 exports.getCompanyDataFun = async(companyIds,fetchAllCompany = false) => {
@@ -153,26 +208,35 @@ exports.updateCompanyFun = (type,companyObj,method,companyId = "",isSocketUpdate
 
 exports.getCompanyByAggregate = async(req,res) => {
     try {
+        if (!hasSession(req)) return res.status(401).json({ status: false, message: 'Unauthorized' });
         const { findQuery } = req.body;
 
         if (!findQuery) {
             return res.status(400).json({
+                status: false,
                 message: "An error occurred while getting the task.",
                 error: "Query is required."
             });
         }
         const query = replaceObjectKey(findQuery, ["objId"])
-        const cQuery = [query];
+        let pipeline = [query];
+        if (!(await isInstanceAdminRequest(req))) {
+            const toObjectIds = (ids) => ids.map((id) => new mongoose.Types.ObjectId(id));
+            const { own, limited } = await loadOwnCompanies(req);
+            const scoped = scopeCompanyPipeline(query, toObjectIds(own), toObjectIds(limited));
+            if (!scoped.ok) return res.status(403).json({ status: false, message: scoped.error });
+            pipeline = scoped.pipeline;
+        }
         const companyObj = {
             type: SCHEMA_TYPE.COMPANIES,
-            data: [cQuery]
+            data: [pipeline]
         };
 
         const response = await MongoDbCrudOpration(SCHEMA_TYPE.GOLBAL,companyObj, 'aggregate');
 
         return res.status(200).json(response);
     } catch (error) {
-        return res.status(500).json({ message: "An error occurred while fetching the company",error:error });
+        return res.status(500).json({ status: false, message: "An error occurred while fetching the company" });
     }
 }
 

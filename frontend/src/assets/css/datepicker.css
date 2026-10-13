@@ -1,0 +1,35 @@
+/* :root lifts this over the library's own .dp__theme_* block, which loads with each picker and so may come later. */
+:root .dp__theme_light,
+:root .dp__theme_dark {
+    --dp-background-color: var(--surface);
+    --dp-text-color: var(--ink);
+    --dp-hover-color: var(--fill);
+    --dp-hover-text-color: var(--ink);
+    --dp-hover-icon-color: var(--ink);
+    --dp-primary-color: var(--brand);
+    --dp-primary-disabled-color: var(--brand-border);
+    --dp-primary-text-color: var(--on-brand);
+    --dp-secondary-color: var(--ink-2);
+    --dp-border-color: var(--border);
+    --dp-menu-border-color: var(--border);
+    --dp-border-color-hover: var(--brand-border);
+    --dp-border-color-focus: var(--brand);
+    --dp-disabled-color: var(--fill);
+    --dp-disabled-color-text: var(--ink-2);
+    --dp-scroll-bar-background: var(--surface-2);
+    --dp-scroll-bar-color: var(--border);
+    --dp-success-color: var(--ok);
+    --dp-success-color-disabled: var(--ok-bg);
+    --dp-icon-color: var(--ink-2);
+    --dp-danger-color: var(--danger);
+    --dp-marker-color: var(--danger);
+    --dp-tooltip-color: var(--surface-2);
+    --dp-highlight-color: var(--brand-tint);
+    --dp-range-between-dates-background-color: var(--brand-tint);
+    --dp-range-between-dates-text-color: var(--ink);
+    --dp-range-between-border-color: transparent;
+    --dp-loader: 5px solid var(--brand);
+    --dp-border-radius: var(--r-md, 4px);
+    --dp-cell-border-radius: var(--r-sm, 4px);
+}
+:root .dp__menu { box-shadow: var(--shadow-surface, none); }

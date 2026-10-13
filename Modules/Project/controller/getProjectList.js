@@ -2,6 +2,9 @@ const { SCHEMA_TYPE } = require("../../../Config/schemaType");
 const { MongoDbCrudOpration } = require("../../../utils/mongo-handler/mongoQueries");
 const {myCache} = require('../../../Config/config');
 const { fetchRules } = require("../../settings/securityPermissions/controller");
+const { isPrivileged } = require("../../../Config/roleTypes");
+const { ACTIVE_SEAT } = require("../../../Config/seatStatus");
+const { arrangeRules, rolePermission, PRIVATE_PROJECTS, seesEveryPrivateProject } = require("../../../Config/rulePermissions");
 
 exports.getProjectList = async (req, res) => {
     try {
@@ -11,8 +14,19 @@ exports.getProjectList = async (req, res) => {
         if (!uid || !companyId) {
             return res.status(404).json({ message: "UID or companyId not found" });
         }
-        const cacheKey = `UserProjectData:${companyId}:${uid}`;
+        // Read on every call, ahead of the cache: only an active seat has a list.
+        const seat = await MongoDbCrudOpration(companyId, {
+            type: SCHEMA_TYPE.COMPANY_USERS,
+            data: [
+                { userId: uid, ...ACTIVE_SEAT },
+                { roleType: 1, _id: 0 }
+            ]
+        }, 'findOne');
+        if (!seat) {
+            return res.status(200).json([]);
+        }
 
+        const cacheKey = `UserProjectData:${companyId}:${uid}`;
         const value = myCache.get(cacheKey);
         if (value) {
             res.set({
@@ -21,55 +35,29 @@ exports.getProjectList = async (req, res) => {
             });
             return res.status(200).json(JSON.parse(value));
         }
-        const teamObj = {
+
+        const teams = await MongoDbCrudOpration(companyId, {
             type: SCHEMA_TYPE.TEAMS_MANAGEMENT,
             data: [
                 { assigneeUsersArray: { $in: [uid] } },
                 { _id: 1 }
             ]
-        };
-
-        const companyObj = {
-            type: SCHEMA_TYPE.COMPANY_USERS,
-            data: [
-                { userId: uid },
-                { roleType: 1, _id: 0 }
-            ]
-        };
-        const [teams, companyUsers] = await Promise.all([
-            MongoDbCrudOpration(companyId, teamObj, 'find'),
-            MongoDbCrudOpration(companyId, companyObj, 'findOne')
-        ]);
+        }, 'find');
 
         const teamIds = teams.map((team) => 'tId_' + team._id);
-        const roleType = companyUsers?.roleType;
+        const { roleType } = seat;
 
-        const response = await fetchRules(companyId);
-
-        const rule = response && response.length ? response?.find((x) => x?.key === 'public_projects') : {};
-        const showAllProjects = rule?.roles?.find((role) => role.key === roleType)?.permission === true;
-
-        const privateRule = response?.find((x) => x?.key === 'private_projects') || {};
-        const privatePermission = privateRule?.roles?.find((role) => role.key === roleType)?.permission;
-        
-        const isNonAdmin = roleType !== 1 && roleType !== 2;
-
-        const assigneeUserIdCondition = {
-            $in: [uid, ...teamIds]
-        };
+        // The same rule as decideProjectAccess in Config/projectAccess.js, so the list never names a project the caller cannot open.
+        const everyPrivateProject = isPrivileged(roleType)
+            || seesEveryPrivateProject(rolePermission(arrangeRules(await fetchRules(companyId)), roleType, PRIVATE_PROJECTS));
 
         const privateQuery = {
             isPrivateSpace: true,
             deletedStatusKey: { $nin: [1] },
-            ...(isNonAdmin && privatePermission === 1 && { AssigneeUserId: assigneeUserIdCondition })
+            ...(everyPrivateProject ? {} : { AssigneeUserId: { $in: [uid, ...teamIds] } })
         };
 
-        // Public projects are visible to ALL company members by design — no
-        // assignment required. (Previously filtered non-admins without the
-        // `public_projects` permission down to assigned-only; that gate is
-        // removed so "public" means visible to everyone.) Private projects
-        // remain gated by privateQuery above. Applies to web app + MCP (same
-        // endpoint).
+        // Public means visible to every member: the public_projects permission no longer narrows it.
         const publicQuery = {
             isPrivateSpace: false,
             deletedStatusKey: { $nin: [1] },
@@ -78,13 +66,9 @@ exports.getProjectList = async (req, res) => {
         const projectQuery = [
             {
                 $match: {
-                    $or: [
-                        ...(
-                            (privatePermission !== null || !isNonAdmin) && privateQuery ?
-                            [privateQuery] : []
-                        ),
-                        publicQuery
-                    ]
+                    $or: [privateQuery, publicQuery],
+                    // A personal list is private to its owner even for admins.
+                    $and: [{ $or: [{ isPersonal: { $ne: true } }, { personalOwner: uid }] }]
                 }
             },
             {

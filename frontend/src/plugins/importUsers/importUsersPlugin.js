@@ -1,7 +1,9 @@
-import ImportUsers from "./components/templates/ImportUsers.vue"
+import { defineAsyncComponent } from 'vue';
+
+export const loadImportUsers = () => import(/* webpackChunkName: "user-import" */ './components/templates/ImportUsers.vue');
 
 export default {
     install(app) {
-        app.component('ImportUsers', ImportUsers);
+        app.component('ImportUsers', defineAsyncComponent(loadImportUsers));
     }
 };

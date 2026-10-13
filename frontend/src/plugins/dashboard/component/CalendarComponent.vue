@@ -1,10 +1,10 @@
 <template>
-    <div class="calendar__detail--wrapper bg-white border-radius-10-px dashboard-calender-component-main"> 
-        <div class="calendar__component--header d-flex align-items-center justify-content-between border-bottom-serach">
+    <div class="calendar__detail--wrapper calendar-component-bg-white border-radius-10-px dashboard-calender-component-main"> 
+        <div class="calendar__component--header d-flex align-items-center justify-content-between calendar-component-border-bottom-serach">
             <div class=" d-flex align-items-center">   
                 <div class=" d-flex align-items-center" :style="[{marginRight : clientWidth > 767 ? '40px' : '15px' }]">
                     <span class="cursor-pointer"><img class="calendar_days left__days position-re z-index-1"  :src="calnedarLeft" @click="subtractDays(1)"/></span>
-                    <span class="font-size-16 black font-weight-500 due-date-home-calender-wrapper">
+                    <span class="calendar-component-font-size-16 calendar-component-black calendar-component-font-weight-500 due-date-home-calender-wrapper">
                         <DueDateCompo
                             :ref="'dueDate'"
                             class="due-date-home-cal"
@@ -21,7 +21,7 @@
                 </div>
             </div>
             <div class="d-flex align-items-center">
-                <span class="day__status font-size-14 gray81 cursor-pointer lable-status-hover" :style="[{marginLeft : clientWidth > 767 ? '20px' : '10px' }]" @click="updateDueDate({dateVal:new Date()})">{{$t('Home.Today')}}</span>
+                <span class="day__status calendar-component-font-size-14 calendar-component-gray81 cursor-pointer lable-status-hover" :style="[{marginLeft : clientWidth > 767 ? '20px' : '10px' }]" @click="updateDueDate({dateVal:new Date()})">{{$t('Home.Today')}}</span>
             </div>
         </div> 
         <div class="calendar__main-component">
@@ -410,3 +410,27 @@ watch(() => props.filterData, (newValue) => {
 </script>
 
 <style scoped src="../css/style.css"></style>
+
+<style scoped>
+.calendar-component-bg-white {
+    background-color: var(--surface);
+}
+.calendar-component-border-bottom-serach {
+    border-bottom: 1px solid var(--border);
+}
+.calendar-component-font-size-16 {
+    font-size: 16px;
+}
+.calendar-component-black {
+    color: var(--ink);
+}
+.calendar-component-font-weight-500 {
+    font-weight: 500 !important;
+}
+.calendar-component-font-size-14 {
+    font-size: 14px;
+}
+.calendar-component-gray81 {
+    color: var(--ink-2);
+}
+</style>

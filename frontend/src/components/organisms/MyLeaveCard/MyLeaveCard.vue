@@ -138,15 +138,15 @@ onMounted(load);
 
 <style scoped>
 .mlv { height: 100%; width: 100%; padding: 8px 10px; overflow: auto; }
-.mlv-msg { color: #9aa0b4; font-size: 12px; padding: 10px 0; }
+.mlv-msg { color: var(--ink-2); font-size: 12px; padding: 10px 0; }
 .mlv-table-wrap { overflow: auto; }
 .mlv-table { width: 100%; border-collapse: collapse; font-size: 12px; white-space: nowrap; }
-.mlv-table th { text-align: left; color: #6b7280; font-weight: 600; padding: 4px 6px; border-bottom: 1px solid #eef0f6; position: sticky; top: 0; background: #fff; }
-.mlv-table td { padding: 5px 6px; border-bottom: 1px solid #f4f5f9; color: #3a3f52; }
+.mlv-table th { text-align: left; color: var(--ink-2); font-weight: 600; padding: 4px 6px; border-bottom: 1px solid var(--hairline); position: sticky; top: 0; background: var(--surface); }
+.mlv-table td { padding: 5px 6px; border-bottom: 1px solid var(--hairline); color: var(--ink-label); }
 .mlv-ticket { max-width: 220px; overflow: hidden; text-overflow: ellipsis; }
 .mlv-task-link { color: #0e7490; cursor: pointer; }
 .mlv-task-link:hover { text-decoration: underline; }
 .mlv-task-link b { color: #0e7490; font-size: 11px; }
-.mlv-dates { color: #6b7280; }
-.mlv-status { display: inline-block; padding: 1px 8px; border-radius: 10px; background: #f3f4f6; font-size: 11px; }
+.mlv-dates { color: var(--ink-2); }
+.mlv-status { display: inline-block; padding: 1px 8px; border-radius: 10px; background: var(--fill); font-size: 11px; }
 </style>

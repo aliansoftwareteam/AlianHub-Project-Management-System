@@ -9,6 +9,12 @@
 .designationAssignee{
     color: #535358;
 }
+.sb-item { color: var(--ink); }
+.sb-item:hover, .sb-item.is-highlight { background: var(--surface-hover); }
+.sb-item.is-selected { background: var(--brand-tint); }
+.sb-item:focus-visible { outline: 2px solid var(--brand); outline-offset: -2px; }
+.sidebar_item_main.sb-item:hover .emp_label { color: var(--ink) !important; }
+.sb-item .designationAssignee { color: var(--ink-2); }
 .sidebar__task-image{
     height: 15px !important;
     width: 15px !important;

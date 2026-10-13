@@ -1,0 +1,138 @@
+const mongoose = require('mongoose');
+const { SCHEMA_TYPE } = require('../../../Config/schemaType');
+const { MongoDbCrudOpration } = require('../../../utils/mongo-handler/mongoQueries');
+const { getRoleType, isPrivileged } = require('../../../Config/permissionGuard');
+const { canSeeSprint, sprintIdentities } = require('./sprintVisibility');
+const { ListWriteError } = require('./listWriteError');
+const { namedInUpdate, heldIn } = require('../../../Config/companyMembers');
+const { namedOnProjectRefusal } = require('../../../Config/projectPeople');
+const { folderCascade, folderForList, refuseRestoreUnderHiddenParent, subfoldersFollowing } = require('./folderTree');
+
+const OBJECT_ID = /^[a-f0-9]{24}$/i;
+const SPRINT_STATUSES = [0, 1, 2, 5];
+const FOLDER_STATUSES = [0, 1, 2];
+const PEOPLE = ['AssigneeUserId', 'watchers'];
+const ONE_PERSON_OPERATORS = ['$addToSet', '$pull'];
+const FOLDER_CASCADE_SKIPS = [1, 2, 5];
+
+const isPlainObject = (value) => Boolean(value) && typeof value === 'object' && !Array.isArray(value);
+const isPerson = (value) => typeof value === 'string' && value.trim() !== '' && !value.startsWith('$');
+const oid = (id) => new mongoose.Types.ObjectId(String(id));
+
+const SPRINT_SET_FIELDS = {
+    deletedStatusKey: (value) => SPRINT_STATUSES.includes(value),
+    private: (value) => typeof value === 'boolean',
+    AssigneeUserId: (value) => Array.isArray(value) && value.every(isPerson),
+    folderId: (value) => value === null || (typeof value === 'string' && OBJECT_ID.test(value)),
+    folderName: (value) => typeof value === 'string',
+};
+
+const fieldsOf = (operator, fields) => {
+    if (!isPlainObject(fields) || !Object.keys(fields).length) throw new ListWriteError(`${operator} names no field.`);
+    return Object.entries(fields);
+};
+
+/*
+ * The shapes the sprint list sends: the trash key, sharing (private, members) and a move between
+ * folders under $set, and one member or watcher at a time under $addToSet / $pull. Anything else
+ * is refused before a write, so the route's permissions can be read off what is written.
+ */
+const sprintUpdateFrom = (updateObject) => {
+    if (!isPlainObject(updateObject) || !Object.keys(updateObject).length) throw new ListWriteError('Nothing to update.');
+    const update = {};
+    Object.entries(updateObject).forEach(([operator, fields]) => {
+        if (operator === '$set') {
+            fieldsOf(operator, fields).forEach(([field, value]) => {
+                if (!SPRINT_SET_FIELDS[field] || !SPRINT_SET_FIELDS[field](value)) throw new ListWriteError(`A list update cannot set ${field} to that value.`);
+            });
+        } else if (ONE_PERSON_OPERATORS.includes(operator)) {
+            fieldsOf(operator, fields).forEach(([field, value]) => {
+                if (!PEOPLE.includes(field) || !isPerson(value)) throw new ListWriteError(`${operator} takes one member or watcher at a time.`);
+            });
+        } else {
+            throw new ListWriteError(`A list update cannot use ${operator}.`);
+        }
+        update[operator] = { ...fields };
+    });
+    if (update.$set && 'folderName' in update.$set && !('folderId' in update.$set)) throw new ListWriteError('A folder name moves with its folder id.');
+    return update;
+};
+
+const writtenStatus = (update) => (update && isPlainObject(update.$set) && 'deletedStatusKey' in update.$set ? update.$set.deletedStatusKey : undefined);
+
+/* What each write needs; watching a sprint yourself needs nothing beyond the project. */
+const sprintWriteKinds = (update, uid) => {
+    const set = update.$set || {};
+    const people = ONE_PERSON_OPERATORS.flatMap((operator) => Object.entries(update[operator] || {}));
+    return {
+        status: writtenStatus(update),
+        moves: 'folderId' in set,
+        shares: 'private' in set || 'AssigneeUserId' in set || people.some(([field, value]) => field !== 'watchers' || String(value) !== String(uid)),
+    };
+};
+
+const folderUpdateFrom = (updateObject) => {
+    const set = isPlainObject(updateObject) && Object.keys(updateObject).length === 1 ? updateObject.$set : null;
+    if (!isPlainObject(set) || Object.keys(set).length !== 1 || !FOLDER_STATUSES.includes(set.deletedStatusKey)) {
+        throw new ListWriteError('A folder update only archives, deletes or restores the folder.');
+    }
+    return { $set: { deletedStatusKey: set.deletedStatusKey } };
+};
+
+const changesSharing = (update) => ['private', 'AssigneeUserId'].some((field) => field in (update.$set || {}))
+    || ONE_PERSON_OPERATORS.some((operator) => 'AssigneeUserId' in (update[operator] || {}));
+
+const findOne = (companyId, type, filter, fields) => MongoDbCrudOpration(companyId, { type, data: [filter, fields] }, 'findOne');
+
+const mayOpenSprint = async (companyId, uid, sprint) => canSeeSprint(sprint, await sprintIdentities(companyId, uid))
+    || isPrivileged(await getRoleType(String(companyId), String(uid)));
+
+/*
+ * Builds the write for PATCH /api/v1/sprint/:id type updateSprint from the stored sprint: a private
+ * sprint answers 404 to anyone it is not shared with, a move lands only in a live folder of the
+ * sprint's own project, and the project the cascades run in is the stored one. A change to who the
+ * sprint is shared with answers how it was shared before, for the people the change takes it from.
+ * Someone the change brings onto the list, as a member or a watcher, can open the list's project;
+ * a chat channel sits in a chat space, not a project, and keeps the company-member rule of its route.
+ */
+const prepareSprintUpdate = async (companyId, uid, sprintId, updateObject) => {
+    const update = sprintUpdateFrom(updateObject);
+    if (!OBJECT_ID.test(String(sprintId || ''))) throw new ListWriteError('A valid list id is required.');
+    const sprint = await findOne(companyId, SCHEMA_TYPE.SPRINTS, { _id: oid(sprintId) }, { projectId: 1, private: 1, AssigneeUserId: 1, watchers: 1 });
+    if (!sprint) return null;
+    if (!(await mayOpenSprint(companyId, uid, sprint))) throw new ListWriteError('Sprint not found.', 404);
+    const held = heldIn(sprint, PEOPLE);
+    const broughtIn = namedInUpdate(update, PEOPLE).filter((id) => !held.has(id));
+    if (broughtIn.length && !(await findOne(companyId, SCHEMA_TYPE.MAIN_CHATS, { _id: oid(sprint.projectId) }, { _id: 1 }))) {
+        const reason = await namedOnProjectRefusal(companyId, String(sprint.projectId), broughtIn);
+        if (reason) throw new ListWriteError(reason);
+    }
+    const set = update.$set || {};
+    if (set.folderId) {
+        const folder = await folderForList(companyId, sprint.projectId, set.folderId);
+        Object.assign(set, { folderId: oid(set.folderId), folderName: folder.name || '' });
+    } else if ('folderId' in set) {
+        Object.assign(set, { folderId: null, folderName: '' });
+    }
+    const sharedBefore = changesSharing(update) ? { private: sprint.private === true, AssigneeUserId: (sprint.AssigneeUserId || []).map(String) } : undefined;
+    return { update, projectId: String(sprint.projectId), sharedBefore };
+};
+
+/* An archive, delete or restore cascades onto the folder's own sprints and those of the subfolders that follow it, not the ones the client lists. */
+const prepareFolderUpdate = async (companyId, folderId, updateObject, { fromTrash = false } = {}) => {
+    const update = folderUpdateFrom(updateObject);
+    if (!OBJECT_ID.test(String(folderId || ''))) throw new ListWriteError('A valid folder id is required.');
+    const folder = await findOne(companyId, SCHEMA_TYPE.FOLDERS, { _id: oid(folderId) }, { projectId: 1, parentFolderId: 1 });
+    if (!folder) return null;
+    const status = update.$set.deletedStatusKey;
+    if (status === 0) await refuseRestoreUnderHiddenParent(companyId, folder);
+    const cascade = folderCascade(status, fromTrash);
+    const subfolders = await subfoldersFollowing(companyId, folder, cascade);
+    const sprints = await MongoDbCrudOpration(companyId, {
+        type: SCHEMA_TYPE.SPRINTS,
+        data: [{ folderId: { $in: [folderId, ...subfolders].map(oid) }, projectId: folder.projectId, deletedStatusKey: { $nin: FOLDER_CASCADE_SKIPS } }, { _id: 1 }],
+    }, 'find');
+    return { update, status, cascade, projectId: String(folder.projectId), sprints: (sprints || []).map((sprint) => String(sprint._id)), subfolders };
+};
+
+module.exports = { ListWriteError, sprintUpdateFrom, sprintWriteKinds, folderUpdateFrom, writtenStatus, prepareSprintUpdate, prepareFolderUpdate };

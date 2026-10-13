@@ -16,8 +16,8 @@
   width: 100%;
   height: 100%;
   border-radius: 50%;
-  border: 5px solid #2F399035;
-  border-top-color: #2F3990;
+  border: 5px solid color-mix(in srgb, var(--brand) 21%, transparent);
+  border-top-color: var(--brand);
   animation: spinner 1s ease-in-out infinite;
 }
 

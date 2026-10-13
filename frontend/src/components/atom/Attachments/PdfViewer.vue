@@ -610,7 +610,7 @@ defineExpose({
 
 .process-bar-container {
     height: 4px;
-    background: rgba(255, 255, 255, 0.1);
+    background: var(--rail-active);
     position: absolute;
     top: 0;
     left: 0;
@@ -621,7 +621,7 @@ defineExpose({
 
 .process-bar {
     height: 4px;
-    background: linear-gradient(90deg, #ffffff, #4CAF50);
+    background: linear-gradient(90deg, var(--rail-ink-strong), var(--rail-ok));
     position: absolute;
     top: 0;
     left: 0;
@@ -633,7 +633,7 @@ defineExpose({
     display: flex;
     align-items: center;
     padding: 8px 0px;
-    color: white;
+    color: var(--rail-ink-strong);
     flex-shrink: 0;
     transform: translateX(-50%);
     left: 50%;
@@ -647,9 +647,9 @@ defineExpose({
 
 .nav-btn {
     padding: 8px 16px;
-    background: #474c50;
-    color: white;
-    border: 1px solid #5a5f63;
+    background: var(--rail-hover);
+    color: var(--rail-ink-strong);
+    border: 1px solid var(--rail-active);
     border-radius: 4px;
     cursor: pointer;
     font-size: 14px;
@@ -657,7 +657,7 @@ defineExpose({
 }
 
 .nav-btn:hover:not(:disabled) {
-    background: #5a5f63;
+    background: var(--rail-active);
 }
 
 .nav-btn:disabled {
@@ -666,7 +666,7 @@ defineExpose({
 }
 
 .page-info, .zoom-info {
-    color: #e0e0e0;
+    color: var(--rail-ink);
     font-size: 14px;
 }
 
@@ -685,15 +685,15 @@ defineExpose({
     border-radius: 0;
     border: 0;
     padding: 0px;
-    background: #2b2b2b52;
-    color: white;
+    background: color-mix(in srgb, var(--rail) 32%, transparent);
+    color: var(--rail-ink-strong);
     font-size: 1.4rem;
 }
 
 .divider {
     width: 1px;
     height: 24px;
-    background: #5a5f63;
+    background: var(--rail-active);
     margin: 0 8px;
 }
 
@@ -736,7 +736,7 @@ defineExpose({
 }
 
 .pdf-canvas {
-    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.5);
+    box-shadow: 0 2px 10px color-mix(in srgb, var(--rail) 50%, transparent);
     background: white;
     display: block;
     margin: 0 auto;
@@ -765,7 +765,7 @@ defineExpose({
 }
 
 .text-layer :deep(::selection) {
-    background: rgba(0, 123, 255, 0.3);
+    background: var(--brand-border);
 }
 
 /* Mobile Responsive */

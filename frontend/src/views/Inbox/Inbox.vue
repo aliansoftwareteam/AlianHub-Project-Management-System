@@ -1,809 +1,1137 @@
 <template>
-    <div class="ibx">
-        <div class="ibx__tabs" role="tablist">
-            <button
-                v-for="t in visibleTabs"
-                :key="t"
-                class="ibx__tab"
-                :class="{ 'is-active': tab === t }"
-                role="tab"
-                :aria-selected="tab === t"
-                @click="switchTab(t)"
-            >
-                <span class="ibx__tab-ico" v-html="ICONS[t]"></span>
-                <span class="ibx__tab-label">{{ $t('Inbox.tab_' + t) }}</span>
-                <span v-if="counts[t]" class="ibx__count">{{ counts[t] > 99 ? '99+' : counts[t] }}</span>
-            </button>
-        </div>
-
-        <div class="ibx__bar">
-            <span class="ibx__hint">{{ $t('Inbox.tab_hint_' + tab) }}</span>
-            <div class="ibx__bar-right">
-                <!-- Archive is the one tab holding both kinds at once, so it is the one
-                     that needs narrowing. It also has no "Mark all as read" — those rows
-                     are already read — so this takes that space rather than adding any. -->
-                <div v-if="tab === 'archive'" class="ibx__seg">
-                    <button
-                        v-for="s in SOURCES"
-                        :key="s"
-                        class="ibx__seg-btn"
-                        :class="{ 'is-on': source === s }"
-                        :disabled="busy"
-                        @click="switchSource(s)"
-                    >{{ $t('Inbox.source_' + s) }}</button>
-                </div>
+    <div class="ah-page ibx" :data-density="density" @keydown="onKey">
+        <aside class="ibx__side">
+            <div class="ibx__nav" role="tablist" aria-orientation="vertical" :aria-label="$t('Inbox.tabs_label')">
                 <button
-                    v-else
-                    class="ibx__chip"
+                    v-for="(t, i) in TABS"
+                    :id="tabId('side', t)"
+                    :key="t"
+                    type="button"
+                    class="ibx__navitem"
+                    :class="{ 'is-active': tab === t }"
+                    role="tab"
+                    :data-tab="t"
+                    :aria-selected="tab === t ? 'true' : 'false'"
+                    :aria-controls="PANEL_ID"
+                    :tabindex="tab === t ? 0 : -1"
+                    @click="switchTab(t)"
+                    @keydown="onTabKey($event, i, 'side')"
+                >
+                    <span>{{ $t('Inbox.tab_' + t) }}</span>
+                    <span v-if="tabCount(t)" class="ibx__navcount">{{ tabCount(t) > 99 ? '99+' : tabCount(t) }}</span>
+                </button>
+            </div>
+
+            <div v-if="tab !== APPROVAL" class="ibx__filters">
+                <div class="ah-label ibx__label">{{ $t('Inbox.filter_label') }}</div>
+                <button
+                    v-for="k in KINDS"
+                    :key="k"
+                    type="button"
+                    class="ibx__navitem ibx__navitem--kind"
+                    :class="{ 'is-active': kind === k }"
+                    :aria-pressed="kind === k ? 'true' : 'false'"
+                    @click="switchKind(k)"
+                >{{ $t('Inbox.kind_' + k) }}</button>
+            </div>
+
+            <div class="ibx__side-foot">{{ $t('Inbox.footer_cleared') }}</div>
+        </aside>
+
+        <section class="ibx__main">
+            <div class="ah-toolbar ibx__toolbar">
+                <h1 class="ah-toolbar__title">{{ $t('Inbox.title') }}</h1>
+                <div class="ibx__tabs" role="tablist" :aria-label="$t('Inbox.tabs_label')">
+                    <button
+                        v-for="(t, i) in TABS"
+                        :id="tabId('top', t)"
+                        :key="t"
+                        type="button"
+                        class="ibx__tab"
+                        :class="{ 'is-active': tab === t }"
+                        role="tab"
+                        :data-tab="t"
+                        :aria-selected="tab === t ? 'true' : 'false'"
+                        :aria-controls="PANEL_ID"
+                        :tabindex="tab === t ? 0 : -1"
+                        @click="switchTab(t)"
+                        @keydown="onTabKey($event, i, 'top')"
+                    >{{ $t('Inbox.tab_' + t) }} <span v-if="tabCount(t)" class="ibx__tabcount">{{ tabCount(t) }}</span></button>
+                </div>
+                <span class="ah-toolbar__spacer"></span>
+                <span class="ibx__keys ah-mono" aria-hidden="true" :title="$t('Inbox.keys_hint_full')">j k ↵ r e s</span>
+                <ViewDensityControl :model-value="density" @update:model-value="setDensity" />
+                <button
+                    v-if="tab === 'primary' || tab === 'other'"
+                    type="button"
+                    class="ibx__markall"
                     :disabled="busy || !hasUnread"
                     @click="markAllRead"
                 >{{ $t('Inbox.mark_all_read') }}</button>
-                <!-- Settings live in a small dropdown off the gear, not a slide-in panel:
-                     there are three of them and each is a single switch. -->
-                <div class="ibx__cog">
-                    <button
-                        class="ibx__gear"
-                        :class="{ 'is-on': customizeOpen }"
-                        :title="$t('Inbox.customize')"
-                        @click.stop="customizeOpen = !customizeOpen"
-                        v-html="ICONS.gear"
-                    ></button>
+                <button
+                    v-if="tab !== 'cleared' && tab !== APPROVAL"
+                    type="button"
+                    class="ibx__markall"
+                    data-action="clear-all"
+                    :disabled="busy || !items.length"
+                    @click="clearAll"
+                >{{ $t('Inbox.clear_all') }}</button>
+            </div>
 
-                    <div v-if="customizeOpen" class="ibx__menu" @click.stop>
-                        <button
-                            v-for="o in OPTIONS"
-                            :key="o.key"
-                            class="ibx__menu-item"
-                            :class="{ 'is-on': prefs[o.key] }"
-                            role="menuitemcheckbox"
-                            :aria-checked="prefs[o.key]"
-                            @click="toggle(o.key)"
-                        >
-                            <span class="ibx__menu-ico" v-html="ICONS[o.icon]"></span>
-                            <span class="ibx__menu-label">{{ $t('Inbox.opt_' + o.key) }}</span>
-                            <!-- The tick is the state. A row with no tick is simply off. -->
-                            <span class="ibx__menu-tick" v-html="prefs[o.key] ? ICONS.check : ''"></span>
-                        </button>
-                    </div>
+            <div :id="PANEL_ID" ref="listEl" class="ibx__list ah-scroll" role="tabpanel" :aria-labelledby="tabId('top', tab)">
+                <div v-if="loading" class="ibx__state">{{ $t('Inbox.loading') }}</div>
+
+                <div v-else-if="loadError" class="ibx__state ibx__state--error">
+                    {{ loadError }}
+                    <button type="button" class="ah-btn ah-btn--secondary ah-btn--sm" @click="retry">{{ $t('Inbox.retry') }}</button>
                 </div>
-            </div>
-        </div>
 
-        <div class="ibx__scroll">
-            <div v-if="loading" class="ibx__state">{{ $t('Inbox.loading') }}</div>
+                <EmptyState
+                    v-else-if="!rows.length && !queue.length && !applied.length"
+                    class="ibx__zero"
+                    illustration="inbox"
+                    data-test="inbox-zero"
+                    :heading-level="2"
+                    :title="$t('Inbox.zero_' + tab)"
+                    :message="$t(ZERO_SUB[tab])"
+                    :action-label="$t('Inbox.back_to_primary')"
+                    :action-allowed="tab !== 'primary'"
+                    @action="switchTab('primary')"
+                />
 
-            <div v-else-if="loadError" class="ibx__state ibx__state--error">
-                {{ loadError }}
-                <button class="ibx__link" @click="reload">{{ $t('Inbox.retry') }}</button>
-            </div>
-
-            <div v-else-if="!items.length" class="ibx__zero">
-                <div class="ibx__zero-mark" v-html="ICONS.check"></div>
-                <h2 class="ibx__zero-title">{{ tab === 'archive' ? $t('Inbox.zero_archive') : $t('Inbox.zero') }}</h2>
-                <p class="ibx__zero-sub">{{ $t('Inbox.zero_sub') }}</p>
-            </div>
-
-            <template v-else>
-                <!-- One flat pass, with a heading before the first row of each day. -->
-                <template v-for="(it, i) in items" :key="it.sourceType + ':' + it.sourceId">
-                    <div v-if="groupByDate && it.dateGroup !== items[i - 1]?.dateGroup" class="ibx__day">
-                        {{ dayLabel(it.dateGroup) }}
-                    </div>
-
+                <template v-else>
+                    <ApprovalQueue v-if="queue.length || applied.length" :proposals="queue" :applied="applied" :stamp="stamp" @decided="onQueueDecided" @undone="onQueueUndone" @open-task="openQueueTask" />
                     <article
-                        class="ibx__row"
-                        :class="{ 'is-unread': it.unread }"
-                        @click="open(it)"
+                        v-for="(it, i) in rows"
+                        :key="rowKey(it)"
+                        class="ibx__card"
+                        :class="[`is-${it.kind}`, { 'is-cursor': i === cursor, 'is-read': !it.unread, 'is-agent': it.agent, 'is-expanded': isExpanded(it) }]"
+                        tabindex="0"
+                        @focus="cursor = i"
+                        @click="cursor = i"
                     >
-                        <span class="ibx__name" :title="it.taskName || ''">
-                            {{ it.taskName || $t('Inbox.no_task') }}
-                        </span>
-
-                        <!--
-                          Whose action this was. UserProfile rather than a bare <img>, for
-                          the same reason the bell dropdown uses it: a profile picture is
-                          often a Wasabi key, not an http URL, and a raw src on one of those
-                          404s. That is what left a row showing its type icon instead of a
-                          face. UserProfile routes those through WasabiImage and falls back
-                          to the default avatar, so a row always has a person on it.
-
-                          The type icon is kept only for a row with no actor at all.
-                        -->
-                        <span class="ibx__avatar" :class="'is-' + it.sourceType" :title="actorName(it)">
-                            <UserProfile
-                                v-if="it.actorId"
-                                :showDot="false"
-                                :isBorder="false"
-                                :data="{ image: actorImage(it), title: actorName(it) }"
-                                width="22px"
-                                thumbnail="40x40"
-                            />
-                            <span v-else v-html="it.sourceType === 'mention' ? ICONS.at : ICONS.bell"></span>
-                        </span>
-
-                        <!--
-                          v-html because these messages ARE html — the writers store <b>
-                          tags. changeText flattens mention tokens the same way the header
-                          sidebar and chat list do, so @Name reads the same everywhere.
-
-                          The name leads the line, as it does in the bell dropdown: the
-                          messages themselves say "Status of X changed" without ever naming
-                          who changed it, so without this the row does not say whose it is.
-                        -->
-                        <span class="ibx__text">
-                            <b v-if="actorName(it)" class="ibx__actor">{{ actorName(it) }}</b>
-                            <span class="ibx__msg" v-html="render(it)"></span>
-                        </span>
-
-                        <!-- Fixed-width slot: the hover button is wider than the time, and
-                             letting it size to content made every row shift on hover. -->
-                        <span class="ibx__right">
-                            <span class="ibx__resting">
-                                <time class="ibx__when" :title="it.createdAt">{{ stamp(it.createdAt) }}</time>
+                        <div class="ibx__head">
+                            <span v-if="it.kind === 'reminder'" class="ibx__glyph ibx__glyph--reminder"><ShellIcon name="reminder" :size="12" /></span>
+                            <span v-else-if="it.agent" class="ah-avatar ah-avatar--agent"><ShellIcon name="agent" :size="12" /></span>
+                            <span v-else-if="it.actorId && actorOf(it)" class="ibx__avatar" :title="actorName(it)">
+                                <UserProfile :showDot="false" :isBorder="false" :data="{ image: actorImage(it), title: actorName(it) }" width="var(--avatar-size)" thumbnail="40x40" />
                             </span>
-                            <span class="ibx__hover">
+                            <span v-else class="ibx__glyph" :class="glyphClass(it)"><ShellIcon :name="glyphIcon(it)" :size="12" /></span>
+
+                            <span class="ibx__what">
+                                <template v-if="it.kind === 'approval'">
+                                    <strong>{{ actorName(it) || $t('Inbox.someone') }}</strong> {{ $t('Inbox.requested_off', { range: dateRange(it) }) }}
+                                    <span class="ibx__dim"><span class="ibx__dot">· </span>{{ $t('Inbox.needs_your_approval') }}</span>
+                                </template>
+                                <template v-else-if="it.kind === 'reminder'">
+                                    <strong>{{ $t('Inbox.reminder') }}</strong> <span class="ibx__dim"><span class="ibx__dot">· </span>{{ it.unread ? $t('Inbox.due_now') : $t('Inbox.done') }}</span>
+                                </template>
+                                <template v-else-if="it.kind === 'mention'">
+                                    <strong>{{ actorName(it) || $t('Inbox.someone') }}</strong> {{ it.mainChat ? $t('Inbox.mentioned_you_chat') : $t('Inbox.mentioned_you') }}
+                                </template>
+                                <template v-else-if="it.kind === 'assigned' || it.key === 'comment_reply'">
+                                    <strong>{{ actorName(it) || $t('Inbox.someone') }}</strong> {{ it.kind === 'assigned' ? $t('Inbox.assigned_you_comment') : $t('Inbox.replied_in_thread') }}
+                                </template>
+                                <template v-else>
+                                    <strong v-if="actorName(it)">{{ actorName(it) }}</strong>
+                                    <span v-else-if="it.taskName" class="ibx__strong">{{ it.taskName }}</span>
+                                </template>
+                            </span>
+                            <span v-if="it.agent" class="ah-chip ah-chip--agent ibx__agent">{{ $t('Inbox.agent_tag') }}</span>
+                            <time class="ibx__when" :datetime="it.createdAt" :title="fullText(it.createdAt)">{{ stamp(it.createdAt) }}</time>
+                        </div>
+
+                        <div class="ibx__body">
+                            <template v-if="it.kind === 'approval'">
+                                <span v-if="it.ptoType" class="ah-chip ibx__chip">{{ ptoLabel(it.ptoType) }}</span>
+                                <span v-if="it.reason" class="ibx__quote">"{{ it.reason }}"</span>
+                            </template>
+                            <template v-else-if="it.kind === 'mention' || it.kind === 'assigned' || it.key === 'comment_reply'">
+                                <span class="ibx__quote">"<span v-html="render(it)"></span>"</span>
+                                <span v-if="it.taskName" class="ibx__target" @click.stop="open(it)">· {{ it.taskName }}</span>
+                            </template>
+                            <template v-else>
+                                <span v-html="render(it)"></span>
+                                <span v-if="it.taskName && it.kind !== 'reminder'" class="ibx__target" @click.stop="open(it)">· {{ it.taskName }}</span>
+                            </template>
+                        </div>
+
+                        <div v-if="tab === 'later' && (it.snoozedUntil || it.snoozeUntilChange)" class="ibx__state-line">
+                            <span class="ah-chip ibx__chip ibx__chip--snooze"><ShellIcon name="reminder" :size="11" />{{ it.snoozeUntilChange ? $t('Inbox.snoozed_until_change') : $t('Inbox.snoozed_until', { when: whenLabel(it.snoozedUntil) }) }}</span>
+                        </div>
+                        <div v-else-if="tab === 'cleared' && it.clearedAt" class="ibx__state-line">
+                            <span class="ah-chip ibx__chip">{{ $t('Inbox.cleared_on', { when: whenLabel(it.clearedAt) }) }}</span>
+                        </div>
+
+                        <div v-if="isExpanded(it)" class="ibx__reply" @click.stop>
+                            <textarea
+                                :ref="(el) => setReplyRef(it, el)"
+                                v-model="replyText"
+                                class="ah-input ah-textarea ibx__reply-input"
+                                :class="{ 'ah-input--error': replyError }"
+                                rows="2"
+                                :aria-label="$t('Inbox.reply_placeholder', { name: actorName(it) || $t('Inbox.someone') })"
+                                :placeholder="$t('Inbox.reply_placeholder', { name: actorName(it) || $t('Inbox.someone') })"
+                                @keydown.stop="onReplyKey($event, it)"
+                            ></textarea>
+                            <div v-if="replyError" class="ah-field__error">{{ replyError }}</div>
+                            <div class="ibx__reply-actions">
+                                <span class="ah-small ah-mono">⌘↵</span>
+                                <span v-if="replyMention(it)" class="ah-small ibx__reply-to" data-reply-mentions>{{ $t('Inbox.reply_mentions', { name: replyMention(it).name }) }}</span>
+                                <span class="ah-toolbar__spacer"></span>
+                                <button type="button" class="ah-btn ah-btn--ghost ah-btn--sm" @click="closeReply">{{ $t('Projects.cancel') }}</button>
+                                <button type="button" class="ah-btn ah-btn--primary ah-btn--sm" :disabled="busy || !replyText.trim()" @click="sendReply(it)">{{ $t('Inbox.send') }}</button>
+                            </div>
+                        </div>
+
+                        <div class="ibx__actions" @click.stop>
+                            <template v-if="tab === 'cleared'">
+                                <button type="button" class="ah-btn ah-btn--secondary ah-btn--sm" data-action="restore" :disabled="busy" @click="restoreRow(it)">{{ $t('Inbox.restore') }}</button>
+                            </template>
+                            <template v-else>
+                                <template v-if="it.kind === 'approval'">
+                                    <button type="button" class="ah-btn ah-btn--primary ah-btn--sm" :disabled="busy" @click="decide(it, 'approved')">{{ $t('Inbox.approve') }}</button>
+                                    <button type="button" class="ah-btn ah-btn--secondary ah-btn--sm" :disabled="busy" @click="decide(it, 'rejected')">{{ $t('Inbox.decline') }}</button>
+                                </template>
+                                <template v-else-if="it.kind === 'reminder'">
+                                    <button v-if="it.unread" type="button" class="ah-btn ah-btn--primary ah-btn--sm" :disabled="busy" @click="markDone(it)">{{ $t('Inbox.done') }}</button>
+                                    <button type="button" class="ah-btn ah-btn--secondary ah-btn--sm" @click="openReminders">{{ $t('Inbox.open_reminders') }}</button>
+                                </template>
+                                <template v-else-if="it.agent">
+                                    <button v-if="hasAiHub" type="button" class="ah-btn ah-btn--primary ah-btn--sm" @click="reviewInAiInbox">{{ $t('Inbox.review_ai_inbox') }}</button>
+                                    <button v-if="it.unread && tab !== 'later'" type="button" class="ah-btn ah-btn--secondary ah-btn--sm" :disabled="busy" @click="markDone(it)">{{ $t('Inbox.mark_done') }}</button>
+                                </template>
+                                <template v-else-if="it.kind === 'mention'">
+                                    <button v-if="!isExpanded(it) && canReply(it)" type="button" class="ah-btn ah-btn--primary ah-btn--sm" @click="openReply(it)">{{ $t('Inbox.reply_here') }}</button>
+                                    <button type="button" class="ah-btn ah-btn--secondary ah-btn--sm" @click="open(it)">{{ it.mainChat ? $t('Inbox.open_chat') : $t('Inbox.open_task') }}</button>
+                                </template>
+                                <template v-else>
+                                    <button type="button" class="ah-btn ah-btn--secondary ah-btn--sm" @click="open(it)">{{ $t('Inbox.open') }}</button>
+                                </template>
+
                                 <button
-                                    class="ibx__act"
-                                    :disabled="busy"
-                                    :title="it.unread ? $t('Inbox.mark_read') : $t('Inbox.mark_unread')"
-                                    @click.stop="toggleRead(it)"
-                                >{{ it.unread ? $t('Inbox.mark_read') : $t('Inbox.mark_unread') }}</button>
-                            </span>
-                        </span>
+                                    v-if="canSnooze(it)"
+                                    type="button"
+                                    class="ah-btn ah-btn--secondary ah-btn--sm"
+                                    data-snooze-trigger
+                                    aria-haspopup="menu"
+                                    :aria-expanded="isSnoozeOpen(it) ? 'true' : 'false'"
+                                    @click="toggleSnooze(it)"
+                                >{{ $t('Inbox.snooze') }}</button>
+                                <button v-if="tab === 'later'" type="button" class="ah-btn ah-btn--secondary ah-btn--sm" :disabled="busy" @click="unsnoozeRow(it)">{{ $t('Inbox.unsnooze') }}</button>
+                                <button v-if="canClear(it)" type="button" class="ah-btn ah-btn--ghost ah-btn--sm" :disabled="busy" @click="clearRow(it)">{{ $t('Inbox.clear') }}</button>
+                                <button v-if="it.kind !== 'approval' && it.kind !== 'reminder' && !it.agent && it.unread && tab !== 'later'" type="button" class="ah-btn ah-btn--ghost ah-btn--sm" :disabled="busy" @click="markDone(it)">{{ $t('Inbox.mark_done') }}</button>
+                                <button v-if="!it.unread && tab === 'done'" type="button" class="ah-btn ah-btn--ghost ah-btn--sm" :disabled="busy" @click="markUnread(it)">{{ $t('Inbox.mark_unread') }}</button>
+                            </template>
+                        </div>
+
+                        <div v-if="isSnoozeOpen(it)" class="ibx__snooze ah-pop" @keydown="onSnoozeKey" @click.stop>
+                            <div role="menu" :aria-label="$t('Inbox.snooze_menu')">
+                                <button
+                                    v-for="p in SNOOZE_MENU"
+                                    :key="p"
+                                    type="button"
+                                    role="menuitem"
+                                    class="ah-pop__item ibx__snooze-item"
+                                    :data-preset="p"
+                                    tabindex="-1"
+                                    @click="pickSnooze(it, p)"
+                                >
+                                    <span>{{ $t('Inbox.snooze_' + p) }}</span>
+                                    <span class="ibx__snooze-hint">{{ presetHint(p) }}</span>
+                                </button>
+                            </div>
+                            <div v-if="customOpen" class="ibx__snooze-custom">
+                                <label class="ah-label" :for="CUSTOM_ID">{{ $t('Inbox.snooze_pick_label') }}</label>
+                                <input
+                                    :id="CUSTOM_ID"
+                                    v-model="customAt"
+                                    type="datetime-local"
+                                    class="ah-input"
+                                    :class="{ 'ah-input--error': customError }"
+                                    :min="customMin"
+                                    @keydown.enter.prevent="pickCustom(it)"
+                                >
+                                <div v-if="customError" class="ah-field__error" role="alert">{{ customError }}</div>
+                                <button type="button" class="ah-btn ah-btn--primary ah-btn--sm" :disabled="busy" @click="pickCustom(it)">{{ $t('Inbox.snooze_save') }}</button>
+                            </div>
+                        </div>
                     </article>
+
+                    <button v-if="hasMore" type="button" class="ah-btn ah-btn--secondary ah-btn--sm ibx__more" :disabled="busy" @click="loadMore">
+                        {{ busy ? $t('Inbox.loading') : $t('Inbox.load_more') }}
+                    </button>
                 </template>
 
-                <button v-if="hasMore" class="ibx__more" :disabled="busy" @click="loadMore">
-                    {{ busy ? $t('Inbox.loading') : $t('Inbox.load_more') }}
-                </button>
-            </template>
-        </div>
+                <div class="ibx__foot">{{ $t('Inbox.footer_cleared') }}</div>
+            </div>
 
+            <transition name="ah-fade">
+                <div v-if="undo" class="ibx__undo" role="status">
+                    <span>{{ undo.text }}</span>
+                    <button v-if="undo.fn" type="button" class="ibx__undo-btn" @click="runUndo">{{ $t('Inbox.undo') }}</button>
+                </div>
+            </transition>
+        </section>
     </div>
 </template>
 
 <script setup>
-import { defineComponent, ref, computed, onMounted, onUnmounted, watch } from 'vue';
+import { computed, inject, nextTick, onMounted, onUnmounted, ref, watch } from 'vue';
+import { aiReachable } from "@/composable/aiAvailability";
 import { useRoute, useRouter } from 'vue-router';
 import { useI18n } from 'vue-i18n';
 import { useToast } from 'vue-toast-notification';
+import { useStore } from 'vuex';
 import { apiRequest } from '@/services';
 import * as env from '@/config/env';
-import { useStore } from 'vuex';
 import { useCustomComposable, useGetterFunctions } from '@/composable';
-import { useProjects } from '@/composable/projects';
-// The same avatar component the bell dropdown uses, so a picture that lives on Wasabi
-// resolves here too.
+import { sendProposalDecision } from '@/composable/agentProposals';
+import { dropProjects, showProjects } from '@/composable/approvedProjects';
+import { decideOne } from './approvalQueue';
 import UserProfile from '@/components/atom/UserProfile/UserProfile.vue';
-// The header's own router for notification and mention rows. Reused rather than
-// reimplemented — see open().
+import ShellIcon from '@/components/organisms/Shell/ShellIcon.vue';
+import EmptyState from '@/components/atom/EmptyState/EmptyState.vue';
 import { useHelper } from '@/components/organisms/Header/helper';
+import { openPanel } from '@/components/organisms/Shell/shellState';
+import { shortcutPrefs } from '@/composable/shortcuts';
+import { onTaskClosed, openTask, overlayState } from '@/components/organisms/TaskDetailOverlay/useTaskOverlay';
+import { noticeTextOf } from '@/views/Ai/rateAlerts';
+import { escapeHtml } from '@/utils/notificationHtml';
+import { clockText, dayText, fullText } from '@/utils/clockText';
+import { renderNotice } from './renderNotice';
+import { SNOOZE_PRESETS, formatWhen, resolveTimeZone, snoozeTarget, toZonedInput } from './snoozePresets';
+import { laterStorageKey, migrateLegacyLater } from './laterMigration';
+import { wakeTimer } from './snoozeWake';
+import { holdInView, refreshLimit, rowInView, stitchRows } from './refreshInPlace';
+import { loadInboxDensity, saveInboxDensity } from './inboxDensity';
+import ViewDensityControl from '@/views/Projects/components/columns/ViewDensityControl.vue';
+import ApprovalQueue from './ApprovalQueue.vue';
+import { AGENTS_CHANGED_EVENT, PROPOSAL_CHANGE } from '@/views/Ai/agentFeed';
 
-// vue/multi-word-component-names — the repo's convention for a single-word view, the
-// same as Chat.vue's "chat-component".
-defineComponent({ name: 'inbox-component' });
+defineOptions({ name: 'InboxPage' });
+
+const APPROVAL = 'approval';
+const TABS = [APPROVAL, 'primary', 'other', 'later', 'done', 'cleared'];
+const KINDS = ['all', 'mention', 'assigned', 'reminder', 'update'];
+const SNOOZE_MENU = [...SNOOZE_PRESETS, 'custom'];
+const ZERO_SUB = {
+    approval: 'Inbox.zero_sub_approval',
+    primary: 'Inbox.zero_sub_primary',
+    other: 'Inbox.zero_sub_other',
+    later: 'Inbox.zero_sub_later_snooze',
+    done: 'Inbox.zero_sub_done',
+    cleared: 'Inbox.zero_sub_cleared',
+};
+const PANEL_ID = 'ibx-panel';
+const CUSTOM_ID = 'ibx-snooze-at';
+const UNDO_MS = 6000;
 
 const route = useRoute();
 const router = useRouter();
-const { t } = useI18n();
+const { t, locale } = useI18n();
 const $toast = useToast();
-// The app's own mention-token flattener, shared with the header sidebar and chat list.
+const store = useStore();
+const { getters } = store;
 const { changeText } = useCustomComposable();
-// The same resolver the bell and @ dropdowns use for the face on a row. The picture is
-// looked up live from the company-user list, never taken from the notification document —
-// see actorId in Modules/Inbox/controller.js.
 const { getUser } = useGetterFunctions();
-// And its own date+time formatter — the one the mention dropdown already uses. It honours
-// the user's 12/24-hour preference, which a hardcoded toLocaleTimeString did not.
-const { getDateAndTime } = useProjects();
-// openRoute checks the project list for "deleted" and "archived" before navigating, and
-// reads it out of the store — the same getters the header hands it.
-const { getters } = useStore();
 const { openRoute } = useHelper();
+const companyId = inject('$companyId');
+const userId = inject('$userId');
 
-// One tab per thing the user already has, plus All to see them together.
-const TABS = ['all', 'notifications', 'mentions', 'archive'];
-// Archive-only: which kind of row to show. Mirrors SOURCES in Modules/Inbox/helpers.
-const SOURCES = ['all', 'notifications', 'mentions'];
-
-// Only settings that change THIS view. A switch that does nothing visible is worse than
-// no switch, so display modes and importance editors are deliberately absent.
-const OPTIONS = [
-    { key: 'showAllTab', icon: 'eye' },
-    { key: 'groupByDate', icon: 'layers' },
-    { key: 'newestFirst', icon: 'sortIcon' },
-];
-
-// Inline so the view carries no image requests and every glyph inherits currentColor.
-const ICONS = {
-    all: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>',
-    notifications: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8a6 6 0 0 0-12 0c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.7 21a2 2 0 0 1-3.4 0"/></svg>',
-    mentions: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="4"/><path d="M16 8v5a3 3 0 0 0 6 0v-1a10 10 0 1 0-3.92 7.94"/></svg>',
-    archive: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="4" rx="1"/><path d="M5 8v11a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1V8"/><line x1="10" y1="12" x2="14" y2="12"/></svg>',
-    check: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>',
-    at: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="4"/><path d="M16 8v5a3 3 0 0 0 6 0v-1a10 10 0 1 0-3.92 7.94"/></svg>',
-    bell: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8a6 6 0 0 0-12 0c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.7 21a2 2 0 0 1-3.4 0"/></svg>',
-    gear: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.6 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.6a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>',
-    close: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="6" y1="6" x2="18" y2="18"/><line x1="18" y1="6" x2="6" y2="18"/></svg>',
-    eye: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-7 11-7 11 7 11 7-4 7-11 7-11-7-11-7z"/><circle cx="12" cy="12" r="3"/></svg>',
-    layers: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="12 2 2 7 12 12 22 7 12 2"/><polyline points="2 17 12 22 22 17"/><polyline points="2 12 12 17 22 12"/></svg>',
-    sortIcon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="4" y1="6" x2="15" y2="6"/><line x1="4" y1="12" x2="12" y2="12"/><line x1="4" y1="18" x2="9" y2="18"/><polyline points="17 8 20 5 23 8"/><line x1="20" y1="5" x2="20" y2="19"/></svg>',
-};
-
-// Per-user, per-browser. These change how one person reads their own inbox, so they do
-// not belong on the server — and a failed write must never stop the inbox rendering.
-const PREFS_KEY = 'alianhub.inbox.prefs';
-const DEFAULT_PREFS = { showAllTab: true, groupByDate: true, newestFirst: true };
-const loadPrefs = () => {
-    try {
-        const raw = window.localStorage.getItem(PREFS_KEY);
-        return raw ? { ...DEFAULT_PREFS, ...JSON.parse(raw) } : { ...DEFAULT_PREFS };
-    } catch (e) {
-        // Corrupt JSON, or storage blocked entirely (private mode, strict settings).
-        return { ...DEFAULT_PREFS };
-    }
-};
-
-const prefs = ref(loadPrefs());
-const customizeOpen = ref(false);
-/**
- * Which tab to stand on, honouring the fact that All can be switched off in the gear.
- *
- * The default used to be 'all' unconditionally. With the All tab hidden, opening /inbox
- * with no ?tab= landed on a tab that is not in the strip: nothing appeared selected, so it
- * read as Notifications while actually listing notifications AND mentions together — the
- * mention rows looked like they had leaked into the wrong tab. A stale ?tab=all in the URL
- * did the same.
- */
-const resolveTab = (candidate) => {
-    const wanted = TABS.includes(candidate) ? candidate : 'all';
-    return (wanted === 'all' && !prefs.value.showAllTab) ? 'notifications' : wanted;
-};
-const tab = ref(resolveTab(route.query.tab));
-const source = ref(SOURCES.includes(route.query.source) ? route.query.source : 'all');
+// Approvals were a filter on Primary before they had a tab; an old link still lands on them.
+const askedTab = route.query.kind === APPROVAL ? APPROVAL : route.query.tab;
+const tab = ref(TABS.includes(askedTab) ? askedTab : 'primary');
+const kind = ref(KINDS.includes(route.query.kind) ? route.query.kind : 'all');
 const items = ref([]);
-const counts = ref({ all: 0, notifications: 0, mentions: 0, archive: 0 });
+const approvals = ref([]);
+const queue = ref([]);
+const applied = ref([]);
+const counts = ref({ approval: 0, primary: 0, other: 0, later: 0 });
 const loading = ref(true);
 const busy = ref(false);
+const density = ref(loadInboxDensity());
+const setDensity = (value) => { density.value = saveInboxDensity(value); };
 const loadError = ref('');
 const hasMore = ref(false);
 const nextSkip = ref(0);
+const cursor = ref(0);
+const listEl = ref(null);
+const expanded = ref('');
+const replyText = ref('');
+const replyError = ref('');
+const undo = ref(null);
+const snoozeFor = ref('');
+const customOpen = ref(false);
+const customAt = ref('');
+const customError = ref('');
+let undoTimer = null;
+let replyEl = null;
 
-const hasUnread = computed(() => items.value.some((i) => i.unread));
-const visibleTabs = computed(() => (
-    prefs.value.showAllTab ? TABS : TABS.filter((x) => x !== 'all')
-));
-const groupByDate = computed(() => prefs.value.groupByDate);
+const hasAiHub = computed(() => aiReachable.value && router.hasRoute('AiHub'));
+const timeZone = computed(() => resolveTimeZone((getUser(userId?.value) || {}).Time_Zone));
 
-const toggle = (key) => {
-    prefs.value = { ...prefs.value, [key]: !prefs.value[key] };
-    try {
-        window.localStorage.setItem(PREFS_KEY, JSON.stringify(prefs.value));
-    } catch (e) {
-        // A preference that cannot be persisted still applies for this session.
-    }
+const rowKey = (it) => `${it.sourceType}:${it.sourceId}`;
+const itemOf = (it) => ({ sourceType: it.sourceType, sourceId: it.sourceId, duplicateIds: it.duplicateIds || [] });
+const rows = computed(() => (tab.value === APPROVAL ? approvals.value : items.value));
+const hasUnread = computed(() => rows.value.some((i) => i.unread && i.kind !== 'approval'));
+const tabCount = (name) => Number(counts.value[name] || 0);
+const tabId = (group, name) => `ibx-tab-${group}-${name}`;
 
-    // Hiding the All tab while standing on it would leave no tab selected.
-    if (key === 'showAllTab' && !prefs.value.showAllTab && tab.value === 'all') {
-        switchTab('notifications');
-        return;
-    }
-    // Sort is decided by the server, so this one needs a refetch; the other two are
-    // presentation over data already loaded.
-    if (key === 'newestFirst') load(false);
-};
-
-const dayLabel = (key) => {
-    if (key === 'today') return t('Inbox.today');
-    if (key === 'yesterday') return t('Inbox.yesterday');
-    // Month names arrive already formatted from the server.
-    return key;
-};
-// Date AND time, formatted exactly as the mention dropdown formats it — same helper, so
-// the two read identically and both follow the user's 12/24-hour setting.
-const stamp = (iso) => {
-    const d = new Date(iso);
-    if (Number.isNaN(d.getTime())) return '';
-    // getDateAndTime swallows its own errors and returns undefined; fall back rather than
-    // render the word "undefined" in the column.
-    return getDateAndTime(d.getTime()) || d.toLocaleDateString();
-};
-const render = (it) => changeText(String(it.message || ''));
-
-// Who the row is FROM, resolved from the live company-user record exactly as the bell
-// dropdown resolves it. A user getUser does not know still answers — with the ghost avatar
-// and, for a removed member, their email as the name. That is the honest thing to show:
-// "a person who is no longer here did this" reads better than an anonymous row, and it is
-// what the bell already shows for the same notification.
 const actorOf = (it) => (it.actorId ? getUser(it.actorId) : null);
 const actorImage = (it) => actorOf(it)?.Employee_profileImageURL || '';
 const actorName = (it) => actorOf(it)?.Employee_Name || '';
+const alertNotice = (it) => (it.changeType === 'agent_alert' ? noticeTextOf(it.changeData) : null);
+const render = (it) => renderNotice(it, { t, changeText });
+const isExpanded = (it) => expanded.value === rowKey(it);
+const canReply = (it) => !!(it.taskId && it.projectId && it.sprintId && !it.mainChat);
+const clearable = (it) => it.sourceType === 'notification' || it.sourceType === 'mention';
+const canClear = (it) => clearable(it) && tab.value !== 'cleared';
+const canSnooze = (it) => clearable(it) && (tab.value === 'primary' || tab.value === 'other');
+const whenLabel = (iso) => formatWhen(iso, timeZone.value, locale?.value);
+
+const glyphIcon = (it) => {
+    if (it.kind === 'mention' || it.changeType === 'doc_mention') return 'at';
+    if (it.changeType === 'agent_alert') return 'alert';
+    if (it.changeType === 'goal_reached') return 'target';
+    if (it.changeType === 'credential_expiring') return 'key';
+    if (it.changeType === 'agent_report') return 'agent';
+    if (/milestone/i.test(it.key || '')) return 'alert';
+    if (/status/i.test(it.key || '')) return 'refresh';
+    if (/comment/i.test(it.key || '')) return 'chat';
+    return 'bell';
+};
+const glyphClass = (it) => (/milestone/i.test(it.key || '') && /missed|overdue/i.test(it.message || '') ? 'ibx__glyph--danger' : '');
+
+const stamp = (iso) => {
+    const d = new Date(iso);
+    if (Number.isNaN(d.getTime())) return '';
+    const now = new Date();
+    const startOf = (x) => new Date(x.getFullYear(), x.getMonth(), x.getDate()).getTime();
+    const days = Math.round((startOf(now) - startOf(d)) / 86400000);
+    if (days <= 0) return clockText(d);
+    if (days < 7) return `${days}d`;
+    return dayText(d);
+};
+const dateRange = (it) => {
+    const a = dayText(it.startDate); const b = dayText(it.endDate);
+    return a === b || !b ? a : `${a}–${b}`;
+};
+const ptoLabel = (type) => t(`Pto.types.${type}`, type);
 
 const loadCounts = async () => {
     try {
         const res = await apiRequest('get', `${env.INBOX}/counts`);
-        if (res?.data?.status) counts.value = res.data.data || counts.value;
-    } catch (e) {
-        // Badges are decoration — never surface an error for them.
-    }
+        if (res?.data?.status) {
+            counts.value = res.data.data || counts.value;
+            snoozeWake.schedule(res.data.data);
+        }
+    } catch (e) { /* badges are decoration */ }
 };
 
-const load = async (append = false) => {
-    if (!append) { loading.value = true; loadError.value = ''; }
+const blank = () => { items.value = []; approvals.value = []; queue.value = []; applied.value = []; };
+
+/* The list read again while it is on screen: the rows, the cursor, the focused row and the scroll stay where they are. */
+const showRefreshed = async (d) => {
+    const onRow = rows.value[cursor.value] ? rowKey(rows.value[cursor.value]) : '';
+    const focusInList = Boolean(listEl.value?.contains(document.activeElement));
+    const anchor = rowInView(listEl.value, '.ibx__card');
+    const fresh = d.items || [];
+    const next = stitchRows(items.value, fresh, rowKey, !!d.hasMore);
+    const keptPastRead = next.length > fresh.length;
+    items.value = next;
+    approvals.value = d.approvals || [];
+    queue.value = d.proposals || [];
+    applied.value = d.applied || [];
+    if (!keptPastRead) hasMore.value = !!d.hasMore;
+    nextSkip.value = keptPastRead ? next.length : (d.nextSkip || 0);
+    const at = onRow ? rows.value.findIndex((row) => rowKey(row) === onRow) : -1;
+    cursor.value = at >= 0 ? at : Math.min(cursor.value, Math.max(0, rows.value.length - 1));
+    await nextTick();
+    holdInView(listEl.value, anchor);
+    if (focusInList && !listEl.value?.contains(document.activeElement) && !overlayState.open) focusCursor();
+};
+
+/* Only the latest read is drawn: one that lands after the person moved to another tab, or after a newer read, is dropped. */
+let loadTurn = 0;
+const load = async (append = false, { inPlace = false, quiet = false } = {}) => {
+    const turn = ++loadTurn;
+    const refreshing = inPlace && !append;
+    if (!append && !refreshing) { loading.value = true; loadError.value = ''; }
     busy.value = true;
+    const refused = (text) => {
+        if (refreshing) {
+            if (!quiet) $toast.error(text, { position: 'top-right' });
+            return;
+        }
+        loadError.value = text;
+        if (!append) blank();
+    };
     try {
         const skip = append ? nextSkip.value : 0;
-        const sort = prefs.value.newestFirst ? 'newest' : 'oldest';
-        // source is only meaningful on Archive; the server ignores it elsewhere.
-        const res = await apiRequest('get', `${env.INBOX}?tab=${tab.value}&source=${source.value}&skip=${skip}&sort=${sort}`);
+        const q = new URLSearchParams({ tab: tab.value, kind: tab.value === APPROVAL ? 'all' : kind.value, skip: String(skip), sort: 'newest' });
+        if (refreshing) q.set('limit', String(refreshLimit(items.value.length)));
+        const res = await apiRequest('get', `${env.INBOX}?${q.toString()}`);
+        if (turn !== loadTurn) return;
         if (!res?.data?.status) {
-            // Surface the server's own message: a generic failure is undebuggable.
-            loadError.value = res?.data?.statusText || t('Inbox.load_failed');
-            if (!append) items.value = [];
+            refused(res?.data?.statusText || t('Inbox.load_failed'));
             return;
         }
         const d = res.data.data || {};
+        if (refreshing) {
+            loadError.value = '';
+            await showRefreshed(d);
+            return;
+        }
         items.value = append ? [...items.value, ...(d.items || [])] : (d.items || []);
+        if (!append) { approvals.value = d.approvals || []; queue.value = d.proposals || []; applied.value = d.applied || []; }
         hasMore.value = !!d.hasMore;
         nextSkip.value = d.nextSkip || 0;
+        if (!append) cursor.value = 0;
     } catch (e) {
-        loadError.value = e?.message || t('Inbox.load_failed');
-        if (!append) items.value = [];
+        if (turn === loadTurn) refused(e?.message || t('Inbox.load_failed'));
     } finally {
-        loading.value = false;
-        busy.value = false;
+        if (turn === loadTurn) {
+            loading.value = false;
+            busy.value = false;
+        }
     }
 };
 
-const reload = async () => { await Promise.all([load(false), loadCounts()]); };
+/* "Loading…" is for the first read of a tab. Every later read of the same tab is drawn in place. */
+const reload = async ({ quiet = false } = {}) => { await Promise.all([load(false, { inPlace: true, quiet }), loadCounts()]); };
+const retry = async () => { await Promise.all([load(false), loadCounts()]); };
 const loadMore = () => load(true);
+// Nothing that arrives here changes the approval tab's rows, so there only the counts are read.
+const refresh = () => (busy.value || tab.value === APPROVAL ? loadCounts() : reload({ quiet: true }));
+const snoozeWake = wakeTimer(refresh);
 
-/**
- * Arrive live, rather than on the next visit.
- *
- * myCounts is a stored counters document that moves over a socket the moment a
- * notification or mention is written, so watching it is the cue that something new
- * exists. The header's dot is driven from exactly this signal — which is why the dot
- * appeared instantly while the list behind it sat still.
- *
- * The counters themselves are NOT read: they drift (they are maintained by increments).
- * They are only a trigger to re-read the rows, which cannot drift.
- *
- * Debounced, because a single action can move the document more than once, and only the
- * settled state is worth a request. A page the user has paged through is reloaded from the
- * top: appending would put a new row underneath older ones, and dropping their loaded
- * pages mid-read is worse than the row appearing where it belongs.
- */
+// A new arrival moves the per-user counters document; only a rise means a new row.
 const liveCounts = computed(() => {
     const c = getters['users/myCounts']?.data || {};
     return [c.notification_counts, c.mention_counts];
 });
 let liveTimer = null;
-const scheduleLiveRefresh = () => {
-    clearTimeout(liveTimer);
-    liveTimer = setTimeout(() => {
-        // Not while a request of our own is in flight, or the two race and the loser's
-        // response overwrites the list.
-        if (busy.value) { scheduleLiveRefresh(); return; }
-        reload();
-    }, 400);
-};
-// Only when a counter goes UP. Reading a row moves this document too, and refetching after
-// every mark-as-read would undo the row we just removed by hand — with a visible flash on
-// the way. A new arrival is the only thing that increases it.
 let lastCounts = null;
 watch(liveCounts, (next) => {
     const prev = lastCounts;
     lastCounts = next;
-    if (!prev) return;
-    if (next.some((n, i) => Number(n || 0) > Number(prev[i] || 0))) scheduleLiveRefresh();
+    if (!prev || !next.some((n, i) => Number(n || 0) > Number(prev[i] || 0))) return;
+    clearTimeout(liveTimer);
+    liveTimer = setTimeout(() => { if (!busy.value) refresh(); }, 400);
 }, { immediate: true });
 
+/* A proposal filed or decided moves no counter of the person's, and it changes the approval rows as well as the counts. */
+let proposalTimer = null;
+const onAgentsChanged = (change) => {
+    if (change?.kind !== PROPOSAL_CHANGE) return;
+    clearTimeout(proposalTimer);
+    const readWhenFree = () => {
+        if (busy.value) proposalTimer = setTimeout(readWhenFree, 400);
+        else reload({ quiet: true });
+    };
+    proposalTimer = setTimeout(readWhenFree, 400);
+};
+let agentSocket = null;
+const listenToAgents = (socket) => {
+    agentSocket?.off?.(AGENTS_CHANGED_EVENT, onAgentsChanged);
+    agentSocket = socket && typeof socket.on === 'function' ? socket : null;
+    agentSocket?.on(AGENTS_CHANGED_EVENT, onAgentsChanged);
+};
+watch(() => getters['settings/getSocketInstance'], listenToAgents, { immediate: true });
+
+const syncQuery = () => router.replace({ query: { ...route.query, tab: tab.value, kind: kind.value } }).catch(() => {});
 const switchTab = (next) => {
     if (tab.value === next) return;
     tab.value = next;
-    // The filter belongs to Archive. Carrying it to a tab that is already one kind would
-    // leave it set but invisible, and it would still be applied on the way back.
-    if (next !== 'archive') source.value = 'all';
-    router.replace({ query: { ...route.query, tab: next, source: source.value } }).catch(() => {});
+    expanded.value = '';
+    snoozeFor.value = '';
+    syncQuery();
+    load(false);
+};
+const switchKind = (next) => {
+    if (kind.value === next) return;
+    kind.value = next;
+    syncQuery();
     load(false);
 };
 
-const switchSource = (next) => {
-    if (source.value === next) return;
-    source.value = next;
-    router.replace({ query: { ...route.query, source: next } }).catch(() => {});
-    load(false);
+const onTabKey = (e, index, group) => {
+    const n = TABS.length;
+    let next = -1;
+    if (e.key === 'ArrowRight' || e.key === 'ArrowDown') next = (index + 1) % n;
+    else if (e.key === 'ArrowLeft' || e.key === 'ArrowUp') next = (index - 1 + n) % n;
+    else if (e.key === 'Home') next = 0;
+    else if (e.key === 'End') next = n - 1;
+    if (next < 0) return;
+    e.preventDefault();
+    e.stopPropagation();
+    switchTab(TABS[next]);
+    nextTick(() => document.getElementById(tabId(group, TABS[next]))?.focus());
 };
 
-const post = async (path, body, okMessage) => {
+const post = async (path, body, { quiet = false } = {}) => {
     busy.value = true;
     try {
         const res = await apiRequest('post', `${env.INBOX}${path}`, body);
         if (!res?.data?.status) {
-            $toast.error(res?.data?.statusText || t('Inbox.action_failed'), { position: 'top-right' });
-            return false;
+            if (!quiet) $toast.error(res?.data?.statusText || t('Inbox.action_failed'), { position: 'top-right' });
+            return null;
         }
-        if (okMessage) $toast.success(okMessage, { position: 'top-right' });
-        return true;
+        return res.data;
     } catch (e) {
-        $toast.error(e?.message || t('Inbox.action_failed'), { position: 'top-right' });
-        return false;
+        if (!quiet) $toast.error(e?.message || t('Inbox.action_failed'), { position: 'top-right' });
+        return null;
     } finally {
         busy.value = false;
     }
 };
 
-const toggleRead = async (it) => {
-    const read = it.unread;
-    // duplicateIds carries the rows collapsed into this one. One comment can produce two
-    // mention records, and marking only the visible one read leaves its twin unread — the
-    // badge counts it again and the row never clears.
-    const payload = {
-        items: [{
-            sourceType: it.sourceType,
-            sourceId: it.sourceId,
-            duplicateIds: it.duplicateIds || [],
-        }],
-    };
-    if (!read) payload.read = 'false';
-    if (!(await post('/read', payload))) return;
+const removeRow = (it) => {
+    const at = rows.value.findIndex((x) => rowKey(x) === rowKey(it));
+    items.value = items.value.filter((x) => rowKey(x) !== rowKey(it));
+    approvals.value = approvals.value.filter((x) => rowKey(x) !== rowKey(it));
+    nextSkip.value = Math.max(0, nextSkip.value - 1);
+    if (at >= 0 && at < cursor.value) cursor.value -= 1;
+    cursor.value = Math.min(cursor.value, Math.max(0, rows.value.length - 1));
+};
+// The removed card held focus, so without this it drops to <body> and the next key does nothing.
+const refocusAfterRemove = () => {
+    const active = document.activeElement;
+    if (overlayState.open) return;
+    if (!active || active === document.body || !active.isConnected || listEl.value?.contains(active)) focusCursor();
+};
 
-    // Archive lists the rows that ARE read; every other tab lists the ones that are not
-    // (planFor, Modules/Inbox/helpers). So a row whose state just flipped no longer belongs
-    // to the tab it is on — in BOTH directions. Only the Archive half of that was handled,
-    // which left a row marked read sitting in a list of unread things until the next load.
-    const stillBelongs = tab.value === 'archive' ? read : !read;
-    if (stillBelongs) {
-        items.value = items.value.map((x) => (x.sourceId === it.sourceId ? { ...x, unread: !read } : x));
-    } else {
-        items.value = items.value.filter((x) => x.sourceId !== it.sourceId);
-        // The row left the server's result set too, so the next page starts one earlier.
-        // Without this, loading more after marking rows read steps over unseen rows.
-        nextSkip.value = Math.max(0, nextSkip.value - 1);
-    }
+const setRead = async (it, read) => {
+    const payload = { items: [itemOf(it)] };
+    if (!read) payload.read = 'false';
+    if (!(await post('/read', payload))) return false;
     loadCounts();
+    return true;
+};
+
+const markDone = async (it) => {
+    if (it.kind === 'approval') return;
+    if (!(await setRead(it, true))) return;
+    if (tab.value === 'done') items.value = items.value.map((x) => (rowKey(x) === rowKey(it) ? { ...x, unread: false } : x));
+    else removeRow(it);
+};
+const markUnread = async (it) => {
+    if (!(await setRead(it, false))) return;
+    if (tab.value === 'done') removeRow(it);
+    else items.value = items.value.map((x) => (rowKey(x) === rowKey(it) ? { ...x, unread: true } : x));
+};
+
+const showUndo = (text, fn = null) => {
+    clearTimeout(undoTimer);
+    undo.value = { text, fn };
+    undoTimer = setTimeout(() => { undo.value = null; }, UNDO_MS);
+};
+const runUndo = async () => {
+    const u = undo.value;
+    undo.value = null;
+    clearTimeout(undoTimer);
+    if (u && u.fn) await u.fn();
+};
+
+const snoozeRow = async (it, target) => {
+    if (!(await post('/snooze', { items: [itemOf(it)], ...target }))) return;
+    removeRow(it);
+    refocusAfterRemove();
+    loadCounts();
+    const text = target.untilChange ? t('Inbox.undo_snoozed_change') : t('Inbox.undo_snoozed', { when: whenLabel(target.until) });
+    showUndo(text, async () => { if (await post('/unsnooze', { items: [itemOf(it)], unread: !!it.unread })) reload(); });
+};
+const unsnoozeRow = async (it) => {
+    if (!(await post('/unsnooze', { items: [itemOf(it)] }))) return;
+    removeRow(it);
+    loadCounts();
+    showUndo(t('Inbox.restored'));
+};
+const clearRow = async (it) => {
+    if (!(await post('/clear', { items: [itemOf(it)] }))) return;
+    removeRow(it);
+    refocusAfterRemove();
+    loadCounts();
+    showUndo(t('Inbox.undo_cleared'), async () => { if (await post('/restore', { items: [itemOf(it)], unread: !!it.unread })) reload(); });
+};
+const restoreRow = async (it) => {
+    if (!(await post('/restore', { items: [itemOf(it)] }))) return;
+    removeRow(it);
+    loadCounts();
+    showUndo(t('Inbox.restored'));
+};
+const clearAll = async () => {
+    const res = await post('/clear-all', { tab: tab.value, kind: kind.value });
+    if (!res) return;
+    items.value = [];
+    hasMore.value = false;
+    nextSkip.value = 0;
+    cursor.value = 0;
+    loadCounts();
+    const { count, clearedAt, unread = [] } = res.data || {};
+    showUndo(t('Inbox.cleared_all', { n: Number(count || 0) }), clearedAt
+        ? async () => { if (await post('/restore-all', { clearedAt, unread })) reload(); }
+        : null);
 };
 
 const markAllRead = async () => {
-    if (!(await post('/read-all', { tab: tab.value }, t('Inbox.all_read_toast')))) return;
-    // read-all is scoped to the tab server-side and the server refuses it on Archive, so
-    // on any other tab there is nothing unread left for the list to hold — not just on the
-    // page that was loaded.
+    const res = await post('/read-all', { tab: tab.value });
+    if (!res) return;
     items.value = [];
     hasMore.value = false;
     nextSkip.value = 0;
     loadCounts();
+    const marked = res.data?.items || [];
+    showUndo(t('Inbox.marked_all_read', { n: marked.length }), marked.length
+        ? async () => { if (await post('/read', { items: marked, read: 'false' })) reload(); }
+        : null);
 };
 
-/**
- * Open what the row is about, marking it read on the way.
- *
- * Routing is NOT decided here. openRoute is the function the bell and the @ dropdown
- * already navigate with, and this page exists to replace those two — so a second copy of
- * the rules would only be a second place for them to drift. It is handed the row under the
- * source field names it expects, and the same `key` the sidebars pass.
- *
- * What it does that a hand-rolled task route did not:
- *   - a mention lands on the Comment tab (detailTab=comment) and jumps to that comment
- *     via #comment_id; a notification lands on task-detail-tab
- *   - a mention from a chat channel opens the channel, not a task
- *   - a project-level notification opens the project, folder or sprint
- *   - a deleted or archived project says so instead of routing into nothing
- */
+const isSnoozeOpen = (it) => snoozeFor.value === rowKey(it);
+const menuItems = () => [...(listEl.value?.querySelectorAll('.ibx__snooze [role="menuitem"]') || [])];
+const openSnooze = async (it) => {
+    const index = rows.value.findIndex((x) => rowKey(x) === rowKey(it));
+    if (index >= 0) cursor.value = index;
+    snoozeFor.value = rowKey(it);
+    customOpen.value = false;
+    customError.value = '';
+    await nextTick();
+    menuItems()[0]?.focus();
+};
+const closeSnooze = async (returnFocus = true) => {
+    snoozeFor.value = '';
+    customOpen.value = false;
+    if (returnFocus) await focusCursor();
+};
+const toggleSnooze = (it) => (isSnoozeOpen(it) ? closeSnooze() : openSnooze(it));
+const presetHint = (preset) => {
+    if (preset === 'until_change') return t('Inbox.snooze_until_change_hint');
+    if (preset === 'custom') return '';
+    const target = snoozeTarget(preset, { timeZone: timeZone.value });
+    return target && target.until ? whenLabel(target.until) : '';
+};
+const customMin = computed(() => (snoozeFor.value ? toZonedInput(new Date(), timeZone.value) : ''));
+const pickSnooze = async (it, preset) => {
+    if (preset === 'custom') {
+        const tomorrow = snoozeTarget('tomorrow', { timeZone: timeZone.value });
+        customAt.value = tomorrow ? toZonedInput(new Date(tomorrow.until), timeZone.value) : '';
+        customError.value = '';
+        customOpen.value = true;
+        await nextTick();
+        document.getElementById(CUSTOM_ID)?.focus();
+        return;
+    }
+    const target = snoozeTarget(preset, { timeZone: timeZone.value });
+    if (!target) return;
+    await closeSnooze();
+    await snoozeRow(it, target);
+};
+const pickCustom = async (it) => {
+    const target = snoozeTarget('custom', { timeZone: timeZone.value, value: customAt.value });
+    if (!target) { customError.value = t('Inbox.snooze_pick_past'); return; }
+    await closeSnooze();
+    await snoozeRow(it, target);
+};
+const onSnoozeKey = (e) => {
+    if (e.key === 'Escape') {
+        e.preventDefault();
+        e.stopPropagation();
+        closeSnooze();
+        return;
+    }
+    if (e.target?.getAttribute?.('role') !== 'menuitem') return;
+    const list = menuItems();
+    const at = list.indexOf(e.target);
+    let next = -1;
+    if (e.key === 'ArrowDown') next = (at + 1) % list.length;
+    else if (e.key === 'ArrowUp') next = (at - 1 + list.length) % list.length;
+    else if (e.key === 'Home') next = 0;
+    else if (e.key === 'End') next = list.length - 1;
+    if (next < 0) return;
+    e.preventDefault();
+    e.stopPropagation();
+    list[next].focus();
+};
+const onOutside = (e) => {
+    if (!snoozeFor.value) return;
+    const target = e.target;
+    if (target?.closest?.('.ibx__snooze') || target?.closest?.('[data-snooze-trigger]')) return;
+    closeSnooze(false);
+};
+
+const setPtoStatus = async (id, status) => {
+    busy.value = true;
+    try {
+        const res = await apiRequest('put', `${env.PTO}/${id}/status`, { status });
+        if (!res?.data?.status) { $toast.error(res?.data?.statusText || t('Inbox.action_failed'), { position: 'top-right' }); return false; }
+        return true;
+    } catch (e) {
+        $toast.error(e?.response?.data?.statusText || e?.message || t('Inbox.action_failed'), { position: 'top-right' });
+        return false;
+    } finally {
+        busy.value = false;
+    }
+};
+const decide = async (it, status) => {
+    if (!(await setPtoStatus(it.sourceId, status))) return;
+    removeRow(it);
+    loadCounts();
+    const who = actorName(it) || t('Inbox.someone');
+    showUndo(
+        status === 'approved' ? t('Inbox.undo_approved', { who }) : t('Inbox.undo_declined', { who }),
+        async () => { if (await setPtoStatus(it.sourceId, 'pending')) reload(); },
+    );
+};
+
+const setReplyRef = (it, el) => { if (isExpanded(it)) replyEl = el; };
+const openReply = async (it) => {
+    expanded.value = rowKey(it);
+    replyText.value = '';
+    replyError.value = '';
+    await nextTick();
+    if (replyEl && replyEl.focus) replyEl.focus();
+};
+const closeReply = () => { expanded.value = ''; replyText.value = ''; replyError.value = ''; };
+// Agents and people who have left get no Inbox item, so naming them would only clutter the reply.
+const replyMention = (it) => {
+    const id = String(it.actorId || '');
+    if (!id || it.agent || id === String(userId?.value || '')) return null;
+    const user = actorOf(it);
+    return user && !user.ghostUser && user.Employee_Name ? { id, name: user.Employee_Name } : null;
+};
+const withMention = (text, mention) => (mention && !text.includes(`](${mention.id})`) ? `@[${mention.name}](${mention.id}) ${text}` : text);
+const onReplyKey = (e, it) => {
+    if (e.key === 'Escape') { closeReply(); return; }
+    if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) { e.preventDefault(); sendReply(it); }
+};
+const sendReply = async (it) => {
+    const text = replyText.value.trim();
+    if (!text) { replyError.value = t('Inbox.reply_empty'); return; }
+    busy.value = true;
+    replyError.value = '';
+    const mention = replyMention(it);
+    try {
+        const objId = { projectId: it.projectId, sprintId: it.sprintId, taskId: it.taskId };
+        if (it.folderId) objId.folderId = it.folderId;
+        const res = await apiRequest('post', env.API_COMMENTS, {
+            data: {
+                message: escapeHtml(withMention(text, mention)),
+                type: 'text',
+                userId: userId?.value,
+                objId,
+                project: false,
+                mentionIds: mention ? [mention.id] : [],
+                isDeleted: false,
+                hasReply: false,
+                replyMessageId: '',
+                mediaURL: '',
+                mediaName: '',
+                mediaSize: 0,
+            },
+        });
+        if (!res?.data?.status) { replyError.value = res?.data?.statusText || t('Inbox.action_failed'); return; }
+        closeReply();
+        if (it.unread) await markDone(it);
+        $toast.success(t('Inbox.reply_sent'), { position: 'top-right' });
+    } catch (e) {
+        replyError.value = e?.message || t('Inbox.action_failed');
+    } finally {
+        busy.value = false;
+    }
+};
+
+const opensOverTheInbox = (it) => !!(it.taskId && it.projectId && it.sprintId && !it.mainChat && !alertNotice(it)
+    && (it.sourceType === 'mention' || String(it.type || '').toLowerCase() !== 'project'));
 const open = (it) => {
-    if (it.unread) toggleRead(it);
+    if (it.unread && it.kind !== 'approval') setRead(it, true).then((ok) => { if (ok && tab.value !== 'done') removeRow(it); });
+    if (it.changeType === 'agent_report' && it.changeData?.runId && router.hasRoute('AiInbox')) {
+        router.push({ name: 'AiInbox', params: { cid: companyId?.value }, query: { report: String(it.changeData.runId) } }).catch(() => {});
+        return;
+    }
+    if (it.changeType === 'doc_comment' && it.changeData?.pageId) {
+        router.push({ name: 'PageEditor', params: { cid: companyId?.value, pageId: String(it.changeData.pageId) }, query: { comment: String(it.changeData.commentId || '') } }).catch(() => {});
+        return;
+    }
+    if (['doc_mention', 'doc_shared'].includes(it.changeType) && it.changeData?.pageId) {
+        router.push({ name: 'PageEditor', params: { cid: companyId?.value, pageId: String(it.changeData.pageId) } }).catch(() => {});
+        return;
+    }
+    if (it.changeType === 'goal_reached' && it.changeData?.goalId && router.hasRoute('Goal')) {
+        router.push({ name: 'Goal', params: { cid: companyId?.value, goalId: String(it.changeData.goalId) } }).catch(() => {});
+        return;
+    }
+    if (it.changeType === 'credential_expiring' && router.hasRoute('AiAccounts')) {
+        router.push({ name: 'AiAccounts', params: { cid: companyId?.value }, query: { tab: it.changeData?.kind === 'connection' ? 'connected' : 'link' } }).catch(() => {});
+        return;
+    }
+    if (alertNotice(it) && router.hasRoute('AiHealth')) {
+        router.push({ name: 'AiHealth', params: { cid: companyId?.value } }).catch(() => {});
+        return;
+    }
+    if (opensOverTheInbox(it)) {
+        openTask({
+            companyId: it.companyId || companyId?.value,
+            projectId: it.projectId,
+            sprintId: it.sprintId,
+            folderId: it.folderId || '',
+            taskId: it.taskId,
+            tab: it.sourceType === 'mention' ? 'activity' : '',
+        });
+        return;
+    }
     openRoute(it, it.sourceType === 'notification' ? 'notifications' : 'mentions', { gettersVal: getters });
+};
+const openReminders = () => openPanel('reminders');
+const undoApprovals = async (ids) => {
+    busy.value = true;
+    const refused = [];
+    for (const id of ids) {
+        // eslint-disable-next-line no-await-in-loop
+        const result = await decideOne(sendProposalDecision, id, 'undo', {}, t('Inbox.action_failed'));
+        if (!result.ok) refused.push(result.error);
+        else if (result.left.length) refused.push(t('Inbox.queue_undo_left', { why: result.left[0] }));
+        if (result.ok) dropProjects(store, result.trashedProjects);
+    }
+    busy.value = false;
+    if (refused.length) $toast.error(refused[0], { position: 'top-right' });
+    else $toast.success(t('Inbox.queue_undone'), { position: 'top-right' });
+    loadCounts();
+};
+const onQueueDecided = ({ id, verb, undo: canUndo, madeProjects, more }) => {
+    queue.value = queue.value.filter((p) => p.proposalId !== id);
+    loadCounts();
+    // What an approval left to be made later is back in the queue as rows of its own.
+    if (more) load(false, { inPlace: true, quiet: true });
+    showProjects(store, madeProjects);
+    if (verb !== 'approve') { showUndo(t('Inbox.queue_declined')); return; }
+    // Approvals made while the bar is still up share one Undo, so approving several is undone together.
+    const approved = [...(undo.value?.approved || []), id];
+    const undoIds = [...(undo.value?.undoIds || []), ...(canUndo ? [id] : [])];
+    showUndo(t('Inbox.queue_approved', { n: approved.length }, approved.length), undoIds.length ? () => undoApprovals(undoIds) : null);
+    Object.assign(undo.value, { approved, undoIds });
+};
+const openQueueTask = (task) => openTask({ companyId: companyId?.value, projectId: task.projectId, sprintId: task.sprintId, folderId: task.folderId || '', taskId: task.taskId });
+const onQueueUndone = ({ id }) => {
+    applied.value = applied.value.filter((p) => p.proposalId !== id);
+    $toast.success(t('Inbox.always_undone'), { position: 'top-right' });
+};
+const reviewInAiInbox = () => router.push({ name: 'AiInbox', params: { cid: companyId?.value } }).catch(() => {});
+
+const typingIn = (el) => !!el && (['INPUT', 'TEXTAREA', 'SELECT'].includes(el.tagName) || el.isContentEditable);
+const isTyping = (e) => typingIn(e.target);
+const inList = (e) => !!(listEl.value && e.target && listEl.value.contains(e.target));
+const focusCursor = async () => {
+    await nextTick();
+    const el = listEl.value?.querySelectorAll('.ibx__card')[cursor.value];
+    if (el) { el.focus({ preventScroll: true }); el.scrollIntoView?.({ block: 'nearest' }); }
+};
+const moveCursor = (step) => {
+    cursor.value = Math.max(0, Math.min(rows.value.length - 1, cursor.value + step));
+    focusCursor();
+};
+// Row keys act only from inside the list, so a key pressed on a tab or a filter never clears a row out of sight.
+const onKey = (e) => {
+    if (isTyping(e) || e.metaKey || e.ctrlKey || e.altKey) return;
+    if (!shortcutPrefs.singleKeys && /^[a-z]$/.test(e.key)) return;
+    if (e.target?.closest?.('.ibx__snooze')) return;
+    const it = rows.value[cursor.value];
+    if (e.key === 'j' || e.key === 'ArrowDown') { e.preventDefault(); moveCursor(1); return; }
+    if (e.key === 'k' || e.key === 'ArrowUp') { e.preventDefault(); moveCursor(-1); return; }
+    if (!it || !inList(e)) return;
+    if (e.key === 'e') { e.preventDefault(); if (canClear(it)) clearRow(it); }
+    else if (e.key === 's') { e.preventDefault(); if (canSnooze(it)) openSnooze(it); }
+    else if (e.key === 'r') { e.preventDefault(); if (it.kind === 'mention' && canReply(it)) openReply(it); }
+    else if (e.key === 'Enter' && e.target?.classList?.contains('ibx__card')) {
+        e.preventDefault();
+        if (it.kind !== 'approval' && it.kind !== 'reminder') open(it);
+    }
+};
+
+// With focus on <body> the page's own keydown never fires, so j and k are caught here to enter the list.
+const onDocumentKey = (e) => {
+    if (e.defaultPrevented || e.metaKey || e.ctrlKey || e.altKey || overlayState.open || !shortcutPrefs.singleKeys) return;
+    if (e.target !== document.body && e.target !== document.documentElement) return;
+    if ((e.key !== 'j' && e.key !== 'k') || !rows.value.length) return;
+    e.preventDefault();
+    focusCursor();
+};
+const focusFirstCard = () => {
+    if (overlayState.open || typingIn(document.activeElement) || !rows.value.length) return;
+    cursor.value = 0;
+    focusCursor();
+};
+// The panel is still in the DOM while it animates out, and the card that opened it may already be gone.
+const stopOnTaskClosed = onTaskClosed(async () => {
+    await nextTick();
+    const active = document.activeElement;
+    if (!active || active === document.body || !active.isConnected || active.closest?.('.ah-detail')) focusCursor();
+});
+
+const migrateLater = async () => {
+    let storage = null;
+    try { storage = window.localStorage; } catch (e) { return; }
+    if (!storage) return;
+    const moved = await migrateLegacyLater({
+        storage,
+        key: laterStorageKey(companyId?.value, userId?.value),
+        snooze: async (list) => !!(await post('/snooze', { items: list, ...snoozeTarget('tomorrow', { timeZone: timeZone.value }) }, { quiet: true })),
+    });
+    if (moved) $toast.info(t('Inbox.later_migrated', { n: moved }), { position: 'top-right' });
 };
 
 watch(() => route.query.tab, (next) => {
-    if (!next) return;
-    // Through resolveTab, so a link or a back button carrying ?tab=all cannot put someone
-    // back on a tab they have switched off.
-    const wanted = resolveTab(next);
-    if (wanted !== tab.value) { tab.value = wanted; load(false); }
+    if (!next || !TABS.includes(next) || next === tab.value) return;
+    tab.value = next;
+    load(false);
 });
-
-// The gear and the panel both stop propagation, so this only fires on a genuine click
-// outside either of them.
-const onDocClick = () => { customizeOpen.value = false; };
 
 onMounted(async () => {
-    document.addEventListener('click', onDocClick);
-    // Keep the URL honest when resolveTab overrode what it asked for, so a refresh or a
-    // copied link lands where the page actually is.
-    if (route.query.tab !== tab.value) {
-        router.replace({ query: { ...route.query, tab: tab.value } }).catch(() => {});
-    }
+    document.addEventListener('mousedown', onOutside);
+    document.addEventListener('keydown', onDocumentKey);
+    await migrateLater();
     await loadCounts();
+    if (!TABS.includes(askedTab) && tabCount(APPROVAL) > 0) tab.value = APPROVAL;
+    if (route.query.tab !== tab.value) syncQuery();
     await load(false);
+    focusFirstCard();
 });
 onUnmounted(() => {
-    document.removeEventListener('click', onDocClick);
+    document.removeEventListener('mousedown', onOutside);
+    document.removeEventListener('keydown', onDocumentKey);
+    stopOnTaskClosed();
     clearTimeout(liveTimer);
+    clearTimeout(proposalTimer);
+    listenToAgents(null);
+    clearTimeout(undoTimer);
+    snoozeWake.clear();
 });
 </script>
 
 <style scoped>
+/* .ah-label, and the density control's legend, read --text-label: in the Inbox a label is set in the UI font. */
 .ibx {
-    --ibx-primary: #2F3990;
-    --ibx-primary-soft: #F0F2FF;
-    --ibx-ink: #1F212A;
-    --ibx-muted: #8A909C;
-    --ibx-line: #EDEFF5;
-
-    display: flex;
-    flex-direction: column;
-    height: 100%;
-    background: #fff;
-    overflow: hidden;
+    --text-label: 600 var(--fs-xs, 10.5px)/var(--lh-tight, 1.2) var(--font-ui);
+    display: flex; height: 100%; min-height: 0; background: var(--canvas); color: var(--ink); font-family: var(--font-ui); font-size: var(--row-font);
 }
 
-/* ── tabs ─────────────────────────────────────────────── */
-.ibx__tabs { display: flex; border-bottom: 1px solid var(--ibx-line); flex: none; }
+.ibx__side {
+    width: var(--sidebar-w); flex: none; display: flex; flex-direction: column; gap: var(--sp-6, 14px);
+    padding: var(--sp-6, 14px) var(--sp-4, 10px); background: var(--surface); border-right: 1px solid var(--hairline); font-size: var(--fs-md, 13px);
+}
+.ibx__nav, .ibx__filters { display: flex; flex-direction: column; gap: 1px; }
+.ibx__label { padding: 0 9px 4px; }
+.ibx__navitem {
+    display: flex; align-items: center; gap: 8px; width: 100%; min-height: var(--control-h, 0px);
+    padding: 6px 9px; border: 0; border-radius: var(--r-md, 7px); background: transparent; text-align: left;
+    font: 500 var(--fs-md, 13px)/var(--lh-snug, 1.3) var(--font-ui); color: var(--ink); cursor: pointer;
+    transition: background var(--t-state) var(--ease), color var(--t-state) var(--ease);
+}
+.ibx__navitem:hover { background: var(--surface-hover); }
+.ibx__navitem:focus-visible, .ibx__tab:focus-visible { outline: none; box-shadow: var(--focus); }
+.ibx__navitem.is-active { background: var(--brand-tint); color: var(--brand); font-weight: 600; }
+.ibx__navitem--kind { font-weight: 400; }
+.ibx__navcount { margin-left: auto; background: var(--brand); color: var(--on-brand); font: 700 var(--fs-2xs, 10px)/1 var(--font-mono); padding: 3px 6px; border-radius: 9px; }
+.ibx__side-foot { margin-top: auto; padding: 0 9px; font-size: var(--fs-sm, 11.5px); line-height: 1.45; color: var(--ink-2); }
+
+.ibx__main { flex: 1; min-width: 0; display: flex; flex-direction: column; position: relative; }
+.ibx .ibx__toolbar { gap: 4px; padding: 0 var(--page-pad-x, 22px); }
+/* The fallback is Home's, so the three page titles are one size in every look. */
+.ibx__toolbar .ah-toolbar__title { font: var(--fw-title, 600) var(--fs-lg, 14px)/1.2 var(--font-ui); }
+/* Six tabs do not fit a narrow toolbar, so the strip scrolls; the padding keeps a tab's focus ring inside what the scroll clips. */
+.ibx__tabs { display: flex; gap: 2px; min-width: 0; overflow-x: auto; scrollbar-width: none; padding: 4px; margin: -4px -4px -4px 6px; }
 .ibx__tab {
-    display: inline-flex;
-    align-items: center;
-    gap: 8px;
-    flex: 1 1 0;
-    min-width: 0;
-    padding: 15px 22px;
-    border: 0;
-    border-bottom: 2px solid transparent;
-    background: transparent;
-    color: var(--ibx-muted);
-    font-size: 14px;
-    font-weight: 600;
-    cursor: pointer;
-    transition: color 0.12s ease, border-color 0.12s ease;
+    min-height: var(--hit-min);
+    padding: 6px 10px; border: 0; border-bottom: 2px solid transparent; background: transparent; border-radius: 0;
+    font: 500 var(--fs-md, 12.5px)/1 var(--font-ui); color: var(--ink-2); cursor: pointer; white-space: nowrap;
+    transition: color var(--t-state) var(--ease), border-color var(--t-state) var(--ease);
 }
-.ibx__tab + .ibx__tab { border-left: 1px solid var(--ibx-line); }
-.ibx__tab:hover { color: var(--ibx-ink); }
-.ibx__tab.is-active { color: var(--ibx-primary); border-bottom-color: var(--ibx-primary); }
-.ibx__tab-ico { display: inline-flex; width: 16px; height: 16px; flex: none; }
-.ibx__tab-ico :deep(svg) { width: 100%; height: 100%; }
-.ibx__tab-label { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-/* Red, not the navy accent — it means "unread", the same thing the header's red dot
-   means, and it has to read as urgent rather than as decoration. Navy also collided with
-   the active tab's own colour, so the badge disappeared into it. */
-.ibx__count {
-    min-width: 18px; padding: 0 5px;
-    border-radius: 9px; background: #E14B4B; color: #fff;
-    font-size: 11px; font-weight: 700; line-height: 17px; text-align: center;
-}
-/* Same red on an inactive tab: the count means the same thing wherever it sits, and
-   greying it out on the tab you are NOT looking at hides exactly what you need to see. */
-.ibx__tab:not(.is-active) .ibx__count { background: #E14B4B; }
+.ibx__tab.is-active { color: var(--ink); font-weight: 600; border-bottom-color: var(--brand); }
+.ibx__tabcount { font: 500 var(--fs-2xs, 10px)/1 var(--font-mono); color: var(--ink-2); margin-left: 2px; }
+.ibx__keys { color: var(--ink-2); font-size: var(--fs-xs, 10.5px); letter-spacing: .12em; }
+.ibx__markall { min-height: var(--hit-min); border: 0; background: transparent; font: 600 var(--fs-sm, 12px)/1 var(--font-ui); color: var(--brand); cursor: pointer; padding: 0 0 0 10px; white-space: nowrap; }
+.ibx__markall:disabled { opacity: .45; cursor: default; }
 
-/* ── toolbar ──────────────────────────────────────────── */
-.ibx__bar {
-    display: flex; align-items: center; justify-content: space-between;
-    gap: 12px; padding: 12px 20px; flex: none;
-}
-.ibx__hint { font-size: 12.5px; color: var(--ibx-muted); }
-.ibx__bar-right { display: flex; align-items: center; gap: 8px; }
-.ibx__gear {
-    display: inline-flex; align-items: center; justify-content: center;
-    width: 30px; height: 30px;
-    border: 0; border-radius: 7px;
-    background: transparent; color: var(--ibx-muted);
-    cursor: pointer;
-    transition: background 0.12s ease, color 0.12s ease;
-}
-.ibx__gear :deep(svg) { width: 16px; height: 16px; }
-.ibx__gear:hover, .ibx__gear.is-on { background: var(--ibx-primary-soft); color: var(--ibx-primary); }
-.ibx__chip {
-    padding: 6px 13px;
-    border: 1px solid #DDE0EA; border-radius: 16px;
-    background: #fff; color: #2A2C39;
-    font-size: 12.5px; cursor: pointer;
-    transition: background 0.12s ease, border-color 0.12s ease;
-}
-.ibx__chip:hover:not(:disabled) { background: #F6F7FC; }
-.ibx__chip:disabled { opacity: 0.5; cursor: default; }
+.ibx__list { flex: 1; min-height: 0; overflow: auto; padding: var(--page-pad-y, 12px) var(--page-pad-x, 14px) var(--sp-8, 20px); display: flex; flex-direction: column; gap: var(--sp-3, 8px); }
+.ibx__state { padding: 40px 0; text-align: center; color: var(--ink-2); display: flex; flex-direction: column; align-items: center; gap: 10px; }
+.ibx__state--error { color: var(--danger-ink); }
+.ibx__zero.empty-state { padding-block: 48px; }
 
-/* Archive's source filter. One pill holding three options rather than three loose chips:
-   these are exclusive, and a segmented control says that where separate chips would read
-   as three independent toggles. */
-.ibx__seg {
-    display: inline-flex;
-    padding: 2px;
-    border: 1px solid #DDE0EA; border-radius: 16px;
-    background: #F6F7FC;
-}
-.ibx__seg-btn {
-    border: 0; border-radius: 14px;
-    padding: 4px 12px;
-    background: transparent; color: #6B7280;
-    font-size: 12.5px; cursor: pointer; white-space: nowrap;
-    transition: background 0.12s ease, color 0.12s ease;
-}
-.ibx__seg-btn:hover:not(:disabled):not(.is-on) { color: #2A2C39; }
-.ibx__seg-btn.is-on { background: #fff; color: var(--ibx-primary); font-weight: 600; box-shadow: 0 1px 2px rgba(42, 44, 57, 0.10); }
-.ibx__seg-btn:disabled { opacity: 0.5; cursor: default; }
-.ibx__link { border: 0; background: transparent; padding: 0; color: var(--ibx-primary); font-size: 12.5px; font-weight: 600; cursor: pointer; }
-
-/* ── list ─────────────────────────────────────────────── */
-.ibx__scroll { flex: 1 1 auto; overflow-y: auto; padding: 0 0 28px; }
-.ibx__day {
-    padding: 18px 20px 7px;
-    font-size: 11px; font-weight: 700;
-    letter-spacing: 0.05em; text-transform: uppercase;
-    color: #A0A6B4;
-}
-.ibx__day:first-child { padding-top: 6px; }
-
-.ibx__row {
-    display: grid;
-    grid-template-columns: minmax(110px, 1fr) 24px minmax(0, 2.4fr) 194px;
-    align-items: center;
-    gap: 12px;
-    /* Height is pinned so hovering swaps what is drawn, never the layout — otherwise
-       the list appears to bounce as the pointer moves down it. */
-    height: 48px;
-    padding: 0 20px 0 17px;
-    border-left: 3px solid transparent;
-    border-bottom: 1px solid var(--ibx-line);
-    background: #fff;
-    cursor: pointer;
-    transition: background 0.1s ease;
-}
-.ibx__row:hover { background: #FAFAFC; }
-
-/* Unread has to be obvious at a glance across a long list, so it carries FOUR signals,
-   not one: a filled left edge, a tinted background, bolder text, and a dot before the
-   task name. The left border alone — which is all this had — vanishes the moment the
-   eye is more than a row or two away. */
-.ibx__row.is-unread {
-    border-left-color: var(--ibx-primary);
-    background: var(--ibx-primary-soft);
-}
-.ibx__row.is-unread:hover { background: #E7EAFF; }
-.ibx__row.is-unread .ibx__name {
+/* A row of the List, opened up: the same height, padding, type and avatar tokens, so compact tightens it too. */
+.ibx__card {
     position: relative;
-    padding-left: 14px;
-    font-weight: 700;
-    color: var(--ibx-ink);
+    background: var(--surface); border: 1px solid var(--hairline); border-left: 3px solid transparent; border-radius: var(--r-lg, 10px);
+    padding: calc(var(--cell-pad-y, 9px) + 2px) var(--cell-pad-x, 13px); display: flex; flex-direction: column; gap: var(--gap-row, 7px); outline: none;
+    transition: border-color var(--t-state) var(--ease), box-shadow var(--t-state) var(--ease);
 }
-/* The dot. Small, but it is the thing that reads as "new" rather than "highlighted". */
-.ibx__row.is-unread .ibx__name::before {
-    content: "";
-    position: absolute;
-    left: 0;
-    top: 50%;
-    transform: translateY(-50%);
-    width: 7px;
-    height: 7px;
-    border-radius: 50%;
-    background: var(--ibx-primary);
-}
-.ibx__row.is-unread .ibx__text { color: #2A2C39; font-weight: 500; }
-.ibx__row.is-unread .ibx__when { color: var(--ibx-primary); font-weight: 600; }
-.ibx__row.is-unread .ibx__avatar { color: var(--ibx-primary); }
+.ibx__card.is-mention, .ibx__card.is-approval, .ibx__card.is-reminder { border-left-color: var(--brand); }
+.ibx__card.is-agent { border-left-color: var(--agent); }
+.ibx__card.is-read { border-left-color: transparent; color: var(--ink-label); }
+.ibx__card.is-cursor, .ibx__card:focus-visible { box-shadow: var(--focus); border-color: var(--brand); }
+.ibx__head { display: flex; align-items: center; gap: 8px; min-width: 0; min-height: calc(var(--row-h) - 2 * var(--cell-pad-y)); }
+.ibx__avatar { display: inline-flex; width: var(--avatar-size); height: var(--avatar-size); flex: none; }
+.ibx__avatar :deep(.profile-image) { width: var(--avatar-size); height: var(--avatar-size); border-radius: 50%; object-fit: cover; }
+.ibx__glyph { width: var(--avatar-size); height: var(--avatar-size); border-radius: var(--r-sm, 6px); display: inline-grid; place-items: center; background: var(--fill); color: var(--ink-label); flex: none; }
+.ibx__glyph--reminder { border-radius: 50%; background: var(--warn-bg); color: var(--warn-ink); }
+.ibx__glyph--danger { background: var(--danger-bg); color: var(--danger-ink); }
+.ibx__what { font-weight: 400; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ibx__what strong, .ibx__strong { font-weight: 600; color: var(--ink); }
+.ibx__dim { color: var(--ink-2); font-weight: 400; }
+.ibx__agent { height: 16px; padding: 0 4px; font-size: var(--fs-2xs, 8.5px); letter-spacing: .04em; text-transform: uppercase; }
+.ibx__when { margin-left: auto; font: 400 var(--fs-sm, 10px)/1 var(--font-ui); color: var(--ink-2); flex: none; }
+.ibx__body { color: var(--ink-label); line-height: 1.45; overflow-wrap: anywhere; }
+.ibx__body :deep(b), .ibx__body :deep(strong) { color: var(--ink); font-weight: 600; }
+.ibx__body :deep(.mentioned) { color: var(--brand); font-weight: 600; }
+.ibx__body :deep(span[style]) { display: inline-block; padding: 1px 4px; border-radius: 4px; line-height: 1.35; }
+.ibx__quote { color: var(--ink); }
+.ibx__chip { margin-right: 6px; }
+.ibx__chip--snooze { background: var(--warn-bg); color: var(--warn-ink); }
+.ibx__state-line { display: flex; flex-wrap: wrap; gap: 6px; }
+.ibx__target { font: 400 var(--fs-sm, 10.5px)/1 var(--font-ui); color: var(--ink-2); cursor: pointer; }
+.ibx__target:hover { color: var(--brand); }
+.ibx__actions { display: flex; gap: 6px; flex-wrap: wrap; }
+.ibx__actions .ah-btn--sm { height: var(--control-h, 28px); padding: 0 var(--sp-4, 10px); font-size: var(--fs-sm, 11.5px); }
+.ibx__reply { display: flex; flex-direction: column; gap: 6px; }
+.ibx__reply-input { min-height: 56px; font-size: var(--fs-md, 12.5px); }
+.ibx__reply-actions { display: flex; align-items: center; gap: 6px; }
+.ibx__reply-to { color: var(--ink-2); min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ibx__more { align-self: center; margin-top: 6px; }
+.ibx__foot { margin-top: auto; padding-top: 12px; text-align: center; font-size: var(--fs-sm, 11.5px); color: var(--ink-2); }
 
-.ibx__name {
-    font-size: 13px; font-weight: 500; color: #4A4E5C;
-    overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+.ibx__snooze {
+    position: absolute; right: 12px; top: calc(100% - 6px); z-index: 20;
+    width: 280px; display: flex; flex-direction: column; gap: 4px;
 }
-.ibx__avatar { display: inline-flex; align-items: center; justify-content: center; width: 22px; height: 22px; color: #B4B9C6; }
-/* UserProfile sizes its own wrapper and image; these only round it off and stop it being
-   squeezed by the grid column. */
-.ibx__avatar :deep(.profile-image) { width: 22px; height: 22px; border-radius: 50%; object-fit: cover; }
-.ibx__avatar :deep(svg) { width: 15px; height: 15px; }
-/* A mention is about YOU, so it gets the accent; a notification stays neutral. Same
-   distinction the two header icons make. Applies to the fallback icon only — an avatar
-   has no stroke to tint. */
-.ibx__avatar.is-mention { color: var(--ibx-primary); }
-.ibx__text {
-    font-size: 13px; color: #6B7280; line-height: 1.45;
-    overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
-}
-/* The name leads, and stays whole: it is the part that says whose row this is, so the
-   message is what gets clipped when the row runs out of width. */
-.ibx__actor { color: var(--ibx-ink); font-weight: 600; margin-right: 5px; white-space: nowrap; }
-.ibx__msg { color: inherit; }
-.ibx__text :deep(.mentioned) { color: var(--ibx-primary); font-weight: 600; }
-.ibx__text :deep(b), .ibx__text :deep(strong) { color: var(--ibx-ink); font-weight: 600; }
-/* Status and priority chips arrive as spans carrying their own background and colour —
-   the same markup the notification dropdown renders. Only the box needs settling so a
-   chip sits on the row's baseline instead of stretching its line height. */
-.ibx__text :deep(span[style]) {
-    display: inline-block;
-    padding-top: 1px;
-    padding-bottom: 1px;
-    line-height: 1.35;
-    vertical-align: baseline;
-    white-space: nowrap;
-}
+.ibx__snooze-item { justify-content: space-between; }
+.ibx__snooze-item:focus-visible { outline: none; box-shadow: var(--focus); }
+.ibx__snooze-hint { font: 400 var(--fs-sm, 11px)/1.2 var(--font-ui); color: var(--ink-2); }
+.ibx__snooze-custom { display: flex; flex-direction: column; gap: 6px; padding: 8px 10px 6px; border-top: 1px solid var(--hairline); }
+.ibx__snooze-custom .ah-btn { align-self: flex-end; }
 
-.ibx__right {
-    display: flex; align-items: center; justify-content: flex-end;
-    width: 194px; height: 26px; flex: none;
+.ibx__undo {
+    position: absolute; left: 50%; bottom: 16px; transform: translateX(-50%);
+    display: flex; align-items: center; gap: var(--sp-6, 14px); min-height: var(--control-h-lg, 33px); padding: 0 var(--sp-6, 14px);
+    background: var(--rail); color: var(--rail-ink-strong); border-radius: var(--r-lg, 9px); box-shadow: var(--shadow-pop); font-size: var(--fs-md, 12.5px); white-space: nowrap;
 }
-.ibx__resting { display: inline-flex; align-items: center; height: 100%; }
-.ibx__when { font-size: 11.5px; color: #A0A6B4; white-space: nowrap; font-variant-numeric: tabular-nums; }
-.ibx__hover { display: none; align-items: center; height: 100%; }
-.ibx__row:hover .ibx__resting { display: none; }
-.ibx__row:hover .ibx__hover { display: inline-flex; }
-.ibx__act {
-    height: 26px; padding: 0 11px;
-    border: 0; border-radius: 6px;
-    background: var(--ibx-primary); color: #fff;
-    font-size: 12px; font-weight: 600;
-    white-space: nowrap; cursor: pointer;
-}
-.ibx__act:hover:not(:disabled) { background: #262E75; }
-.ibx__act:disabled { opacity: 0.6; cursor: default; }
+.ibx__undo-btn { min-height: var(--hit-min); border: 0; background: transparent; color: var(--rail-brand); font: 600 var(--fs-md, 12.5px)/1 var(--font-ui); cursor: pointer; padding: 0; }
 
-.ibx__state { padding: 48px 0; text-align: center; color: var(--ibx-muted); font-size: 13px; }
-.ibx__state--error { color: #C0392B; }
-.ibx__zero { padding: 72px 0; text-align: center; }
-.ibx__zero-mark {
-    display: inline-flex; align-items: center; justify-content: center;
-    width: 54px; height: 54px; margin-bottom: 16px;
-    border-radius: 50%; background: #E4F5EA; color: #1B7F3B;
+.ibx__toolbar .ibx__tabs { display: none; }
+@media (max-width: 1279px) {
+    .ibx__side { display: none; }
+    .ibx__toolbar .ibx__tabs { display: flex; }
+    .ibx__foot { display: block; }
 }
-.ibx__zero-mark :deep(svg) { width: 26px; height: 26px; }
-.ibx__zero-title { font-size: 17px; font-weight: 700; color: var(--ibx-ink); margin: 0 0 6px; }
-.ibx__zero-sub { font-size: 13px; color: var(--ibx-muted); margin: 0; }
-
-.ibx__more {
-    display: block; margin: 18px auto 0;
-    border: 1px solid #DDE0EA; border-radius: 7px;
-    background: #fff; color: var(--ibx-primary);
-    font-size: 12.5px; font-weight: 600;
-    padding: 8px 18px; cursor: pointer;
-}
-.ibx__more:disabled { opacity: 0.55; cursor: default; }
-
-/* ── settings dropdown ───────────────────────────────── */
-.ibx__cog { position: relative; }
-.ibx__menu {
-    position: absolute;
-    top: calc(100% + 6px);
-    right: 0;
-    z-index: 12;
-    min-width: 212px;
-    padding: 5px;
-    background: #fff;
-    border: 1px solid #E3E6EF;
-    border-radius: 10px;
-    box-shadow: 0 12px 30px rgba(31, 33, 42, 0.13);
-}
-.ibx__menu-item {
-    display: grid;
-    grid-template-columns: 18px minmax(0, 1fr) 16px;
-    align-items: center;
-    gap: 10px;
-    width: 100%;
-    padding: 8px 9px;
-    border: 0;
-    border-radius: 7px;
-    background: transparent;
-    text-align: left;
-    cursor: pointer;
-    transition: background 0.12s ease, color 0.12s ease;
-}
-.ibx__menu-item:hover { background: #F5F6FA; }
-.ibx__menu-item.is-on .ibx__menu-label,
-.ibx__menu-item.is-on .ibx__menu-ico,
-.ibx__menu-item.is-on .ibx__menu-tick { color: var(--ibx-primary); }
-.ibx__menu-item.is-on .ibx__menu-label { font-weight: 600; }
-.ibx__menu-ico { display: inline-flex; width: 16px; height: 16px; color: #6B7280; }
-.ibx__menu-ico :deep(svg) { width: 100%; height: 100%; }
-.ibx__menu-label { font-size: 13px; color: var(--ibx-ink); }
-/* The tick column is always reserved, so rows do not shift as settings are flipped. */
-.ibx__menu-tick { display: inline-flex; align-items: center; justify-content: center; width: 16px; height: 16px; }
-.ibx__menu-tick :deep(svg) { width: 14px; height: 14px; }
-
-
-@media (max-width: 900px) {
-    .ibx__tab-label { display: none; }
-    .ibx__tab { justify-content: center; padding: 14px 8px; }
-    .ibx__row { grid-template-columns: minmax(0, 1fr) 194px; height: 44px; }
-    /* The dropdown is anchored to the gear at the right edge, so on a narrow screen it
-       would otherwise run off it. */
-    .ibx__menu { min-width: 190px; }
-    .ibx__avatar, .ibx__text { display: none; }
+@media (max-width: 767px) {
+    .ibx .ibx__toolbar { flex-wrap: wrap; height: auto; padding: 8px 12px 0; row-gap: 2px; }
+    .ibx__toolbar .ibx__tabs { order: 5; flex-basis: 100%; margin-left: -8px; }
+    .ibx__tab { height: 40px; padding: 0 10px; }
+    .ibx__keys { display: none; }
+    .ibx__list { padding: 10px; }
+    .ibx__what .ibx__dim { display: block; overflow: hidden; text-overflow: ellipsis; }
+    .ibx__dot { display: none; }
+    .ibx .ah-btn--sm { min-height: var(--hit-min); }
+    .ibx__actions .ah-btn--sm { height: 44px; padding: 0 14px; font-size: var(--fs-md, 13px); }
+    .ibx__snooze { left: 8px; right: 8px; width: auto; }
+    .ibx__snooze .ah-pop__item { min-height: 44px; }
 }
 </style>

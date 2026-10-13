@@ -46,11 +46,11 @@
 .new-col1--has-multi-select .parent__task-lastchild { margin-left: 25px; }
 
 .task-options-image {
-  border: 1px solid #97989a;
+  border: 1px solid var(--border);
   vertical-align: middle;
   padding: 4px 5px;
   border-radius: 4px;
-  color: #818181;
+  color: var(--ink-2);
   /* margin-left: 5px; */
 }
 div.task-options div {
@@ -83,7 +83,7 @@ div.task-options div:last-child div {
 }
 .edit__taskname{
   /* max-width: 80%; */
-  color: #6b6b6b;
+  color: var(--ink-2);
 }
 .img__parent-task{
   min-width:34px;
@@ -95,7 +95,7 @@ div.task-options div:last-child div {
 .sticky_options {
   position: sticky;
   right: 0;
-  background: #ffffff;
+  background: var(--surface);
   line-height: 35px;
 }
 .task_desc_icon img {

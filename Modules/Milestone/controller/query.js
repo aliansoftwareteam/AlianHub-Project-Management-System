@@ -8,6 +8,10 @@ const hlp = require("../../Tasks/helpers/helper");
 const {updateProjectInternal} = require("../../Project/controller/updateProject.js");
 const mongoose = require("mongoose")
 const { settingsCollectionDocs } = require("../../../Config/collections");
+const { idForms } = require("../../../utils/mongo-handler/objectIdKeys");
+
+const MILESTONE_WEEKLY_RANGES = ['Mon - Sun', 'Sun - Mon'];
+const WEEKLY = 'Weekly';
 
 exports.getMilestone = async (req, res) => {
     try {
@@ -23,12 +27,13 @@ exports.getMilestone = async (req, res) => {
             });
         }
 
-        const query = {
-            type: SCHEMA_TYPE.MILESTONE,
-            data: id === "Weekly" ? [{ billingPeriod: id }] : [{ projectId: id }]
-        };
+        /* The weekly-range setting asks only whether any project bills weekly; it is told that and nothing of the milestone. */
+        if (id === WEEKLY) {
+            const weekly = await MongoDbCrudOpration(companyId, { type: SCHEMA_TYPE.MILESTONE, data: [{ billingPeriod: WEEKLY }, { _id: 1 }] }, "findOne");
+            return res.status(200).json(weekly ? { billingPeriod: WEEKLY } : {});
+        }
 
-        const response = await MongoDbCrudOpration(companyId, query, "findOne");
+        const response = await MongoDbCrudOpration(companyId, { type: SCHEMA_TYPE.MILESTONE, data: [{ projectId: { $in: idForms(id) } }] }, "findOne");
 
         return res.status(200).json(response || {});
     } catch (error) {
@@ -65,7 +70,7 @@ exports.getMilestoneByProject = async (req, res) => {
 
         const query = {
             type: SCHEMA_TYPE.MILESTONE,
-            data: [{ projectId: pid }]
+            data: [{ projectId: { $in: idForms(pid) } }]
         };
 
         const response = await MongoDbCrudOpration(companyId, query, "find");
@@ -90,17 +95,21 @@ exports.updateWeeklyRangeMilestone = async (req, res) => {
                 error: "Company ID is required in headers"
             });
         }
-        // Validate body keys
-
         const allowedKeys = ["action","refreshToken"];
         const invalidKeys = Object.keys(req.body).filter((key) => !allowedKeys.includes(key));
         if (invalidKeys.length > 0) {
             return res.status(400).json({
-                message: "An error occurred while updating the currency.",
+                message: "An error occurred while updating the milestone week.",
                 error: `Invalid keys provided: ${invalidKeys.join(", ")}. Only the following keys are allowed: ${allowedKeys.join(", ")}.`
             });
         }
-        
+        if (!MILESTONE_WEEKLY_RANGES.includes(action)) {
+            return res.status(400).json({
+                message: "An error occurred while updating the milestone week.",
+                error: `action must be one of: ${MILESTONE_WEEKLY_RANGES.join(", ")}.`
+            });
+        }
+
         const query = {
             type: SCHEMA_TYPE.SETTINGS,
             data: [
@@ -162,7 +171,7 @@ exports.getMilestoneReport = async (req, res) => {
                 $and: [
                     { statusDate: { $gt: startDate } },
                     { statusDate: { $lt: endDate } },
-                    { projectId: { $in: element } },
+                    { projectId: { $in: idForms(element) } },
                     statusCondition
                 ]
             },
@@ -170,7 +179,7 @@ exports.getMilestoneReport = async (req, res) => {
                 $and: [
                     { minRefundDate: { $lt: endDate } },
                     { maxRefundDate: { $gt: startDate } },
-                    { projectId: { $in: element } },
+                    { projectId: { $in: idForms(element) } },
                     statusCondition
                 ]
             }

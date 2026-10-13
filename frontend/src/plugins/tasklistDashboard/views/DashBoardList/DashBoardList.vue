@@ -18,8 +18,8 @@
         />
     </div>
     <template v-else>
-        <div class="w-100 pr-20px pl-20px mt-20px list_view_dashboard style-scroll" v-if="isLoading || sprintLoading">
-            <div class="bg-white border-radius-8-px p-10px mb-15px">
+        <div class="w-100 pr-20px pl-20px mt-20px list_view_dashboard dash-board-list-style-scroll" v-if="isLoading || sprintLoading">
+            <div class="dash-board-list-bg-white border-radius-8-px p-10px mb-15px">
                 <div class="d-flex align-items-center mb-20px">
                     <img :src="triangleBlack" alt="triangleBlack">
                     <Skelaton class="border-radius-5-px ml-10px" style="height: 20px; width: 150px;"/>
@@ -32,7 +32,7 @@
                     </div>
                 </div>
             </div>
-            <div v-for="i in 5" :key="i" class="bg-white border-radius-8-px p-10px mb-15px">
+            <div v-for="i in 5" :key="i" class="dash-board-list-bg-white border-radius-8-px p-10px mb-15px">
                 <div class="d-flex align-items-center">
                     <img :src="triangleBlack" alt="triangleBlack">
                     <Skelaton class="border-radius-5-px ml-10px" style="height: 20px; width: 150px;"/>
@@ -44,25 +44,25 @@
                 <div class="d-flex align-items-center justify-content-start filter-list">
                     <div class="position-re task-fitler-search" id="projectviewfiltersearch_driver">
                         <input type="text" :placeHolder="$t('PlaceHolder.search')" class="form-control search-datas-das" v-model="taskSearch">
-                        <DropDown :id="cardUID" title="Search In" class="position-ab dropdown-image-horizontal" :bodyClass="{'search__in-dropdown' : true}">
+                        <DropDown mode="listbox" :id="cardUID" :title="$t('Projects.search_in')" class="position-ab dropdown-image-horizontal" :bodyClass="{'search__in-dropdown' : true}">
                         <template #head>
-                            <h4 class="black font-size-13 font-weight-500 p-10px m-0 search__in" :class="{'border-bottom': containerWidth > 767}">
+                            <h4 class="dash-board-list-black dash-board-list-font-size-13 dash-board-list-font-weight-500 p-10px m-0 search__in" :class="{'border-bottom': containerWidth > 767}">
                                 {{$t('Projects.search_in')}}
                             </h4>
                         </template>
                         <template #button>
-                            <img :ref="cardUID" :src="horizontalDots" alt="horizontalDots" class="vertical-middle" id="searchfilterdropdown_driver">
+                            <img :ref="cardUID" :src="horizontalDots" :alt="$t('Projects.search_in')" class="vertical-middle" id="searchfilterdropdown_driver">
                         </template>
                         <template #options>
-                            <DropDownOption @click="taskDescriptionSearch || taskKeySearch ? taskNameSearch = !taskNameSearch : ''" class="task-serachstatus-dropdown border-radius-4-px">
+                            <DropDownOption :selected="Boolean(taskNameSearch)" @click="taskDescriptionSearch || taskKeySearch ? taskNameSearch = !taskNameSearch : ''" class="task-serachstatus-dropdown border-radius-4-px">
                                 <span class="project-mobile-desc mr-10px">{{$t('Projects.task_name')}}</span>
                                 <Toggle  width="20" v-model="taskNameSearch" :disabled="taskNameSearch && !taskDescriptionSearch && !taskKeySearch" @change="searchMongoDB()"/>
                             </DropDownOption>
-                            <DropDownOption @click="taskKeySearch = !taskKeySearch" class="task-serachstatus-dropdown border-radius-4-px">
+                            <DropDownOption :selected="Boolean(taskKeySearch)" @click="taskKeySearch = !taskKeySearch" class="task-serachstatus-dropdown border-radius-4-px">
                                 <span class="project-mobile-desc mr-10px">{{$t('Projects.task_key')}}</span>
                                 <Toggle width="20" v-model="taskKeySearch" @change="toggleSearch(),searchMongoDB()"/>
                             </DropDownOption>
-                            <DropDownOption @click="taskDescriptionSearch = !taskDescriptionSearch" class="task-serachstatus-dropdown border-radius-4-px">
+                            <DropDownOption :selected="Boolean(taskDescriptionSearch)" @click="taskDescriptionSearch = !taskDescriptionSearch" class="task-serachstatus-dropdown border-radius-4-px">
                                 <span class="project-mobile-desc mr-10px">{{$t('ProjectDetails.description')}}</span>
                                 <Toggle width="20" v-model="taskDescriptionSearch" @change="toggleSearch(),searchMongoDB()"/>
                             </DropDownOption>
@@ -78,7 +78,7 @@
                     </div>
                 </div>
             </div>
-            <div class="list_view_dashboard style-scroll" v-if="groupedTasks.length || (!searchTask ? allTaskGetters.length : searchTaskData.length)" id="list_scroll"  @scroll="scrollFunction">
+            <div class="list_view_dashboard dash-board-list-style-scroll" v-if="groupedTasks.length || (!searchTask ? allTaskGetters.length : searchTaskData.length)" id="list_scroll"  @scroll="scrollFunction">
                 <template v-if="groupById !== 4">
                     <SprintListing
                         v-for="(sprint, index) in groupedTasks"
@@ -101,7 +101,7 @@
                         <div class="new-row item_head">
                             <div class="new-col1 colum-1-calss" :style="`${containerWidth > sideScrollWidth ? 'border:0px' : ''};`" :class="[{'new-col-mobile' : containerWidth < 768}]">
                                 <div class="common-section head heading">
-                                    <span class="font-size-12 dark-gray font-weight-500">Title</span>
+                                    <span class="dash-board-list-font-size-12 dash-board-list-dark-gray dash-board-list-font-weight-500">{{ $t('Projects.col_title') }}</span>
                                 </div>
                             </div>
                             <div class="new-col2" v-if="containerWidth > 768">
@@ -109,7 +109,7 @@
                                     <div  v-for="(head,i) in filteredHeaders" :key="i">
                                     <span
                                         :title="head.label"
-                                        class="task_right dark-gray font-weight-500 font-size-12 text-ellipse"
+                                        class="task_right dash-board-list-dark-gray dash-board-list-font-weight-500 dash-board-list-font-size-12 text-ellipse"
                                         :class="{
                                             'item-head-draggable-div' : false,
                                             'custom__field_list_view':head.key !== 'AssigneeUserId' && head.key !== 'commentCounts' && head.key !== 'DueDate' && head.key !== 'Task_Priority' && head.key !== 'TaskKey' && head.key !== 'created_date' && head.key !== 'created_by'
@@ -160,8 +160,9 @@
                 <EmptyState
                     v-if="project?.deletedStatusKey !== 2"
                     :image="noSearchResult"
-                    :title="showArchived ? $t('ProjectSlider.no_archived') : (!project?.lastTaskId ? $t('EmptyState.no_tasks_title') : $t('EmptyState.no_match_title'))"
-                    :message="showArchived ? '' : (!project?.lastTaskId ? $t('EmptyState.no_tasks_msg') : $t('EmptyState.no_match_msg'))"
+                    :title="showArchived ? $t('ProjectSlider.no_archived') : $t(`EmptyState.${emptyKind}_title`)"
+                    :message="showArchived ? '' : $t(`EmptyState.${emptyKind}_msg`)"
+                    :sentence="!showArchived && emptyKind === 'no_tasks' ? $t('EmptyState.say_tasks') : ''"
                     :helpPath="showArchived ? '' : 'tasks'"
                 />
             </div>
@@ -176,6 +177,7 @@ import { ref, defineProps, defineEmits, nextTick, inject, watch,
 } from 'vue';
 import { useStore } from 'vuex';
 import EmptyState from '@/components/atom/EmptyState/EmptyState.vue';
+import { typedSearchText } from '@/utils/searchText';
 import { useRoute } from 'vue-router';
 
 // COMPONENTS
@@ -192,6 +194,7 @@ import { useCustomComposable, useGetterFunctions } from '../../../../composable'
 import { apiRequest } from '../../../../services';
 import * as env from '@/config/env';
 import { buildFilterQuery, teamIdToUserId } from "@/composable/commonFunction";
+import { taskEmptyStateKind } from "@/views/Projects/composables/useTaskEmptyState.js";
 import { resolveCardRange } from "@/composable/useResourceWorkload";
 
 const triangleBlack = require('@/assets/images/svg/triangleBlack.svg');
@@ -286,6 +289,11 @@ const groupById = ref(0);
 // `=== 4` grouping checks work and the list loads.
 const normalizeGroupId = (g) => Number(g && typeof g === 'object' ? g.$numberLong : g) || 0;
 const searchTask = ref(false);
+const emptyKind = computed(() => taskEmptyStateKind({
+    showArchived: !!showArchived?.value,
+    lastTaskId: project?.value?.lastTaskId,
+    searched: !!searchTask.value,
+}));
 const taskNameSearch = ref(true)
 const taskKeySearch = ref(false)
 const taskDescriptionSearch = ref(false)
@@ -794,14 +802,15 @@ async function searchMongoDB(parentId = '') {
             let searchStr = taskSearch.value ? taskSearch.value.toString(): "";
             let andOr = '$or';
             query_by[andOr] = [];
+            const typedText = { $regex: typedSearchText(searchStr), $options: 'i' };
             if(taskNameSearch.value) {
-                query_by[andOr].push({'TaskName':{ $regex: searchStr, $options: 'i' }});
+                query_by[andOr].push({'TaskName': typedText});
             }
             if(taskKeySearch.value) {
-                query_by[andOr].push({'TaskKey':{ $regex: searchStr, $options: 'i' }});
+                query_by[andOr].push({'TaskKey': typedText});
             }
             if(taskDescriptionSearch.value) {
-                query_by[andOr].push({'rawDescription':{ $regex: searchStr, $options: 'i' }});
+                query_by[andOr].push({'rawDescription': typedText});
             }
             let sprintIds = groupById.value === 4 ? allSprintsFlat.value : filterSprintsId || [];
             searchTask.value = true;
@@ -1101,14 +1110,15 @@ function filterSprintsIdQuery () {
             let searchStr = taskSearch.value ? taskSearch.value.toString(): "";
             let andOr = '$or';
             query_by[andOr] = [];
+            const typedText = { $regex: typedSearchText(searchStr), $options: 'i' };
             if(taskNameSearch.value) {
-                query_by[andOr].push({'TaskName':{ $regex: searchStr, $options: 'i' }});
+                query_by[andOr].push({'TaskName': typedText});
             }
             if(taskKeySearch.value) {
-                query_by[andOr].push({'TaskKey':{ $regex: searchStr, $options: 'i' }});
+                query_by[andOr].push({'TaskKey': typedText});
             }
             if(taskDescriptionSearch.value) {
-                query_by[andOr].push({'rawDescription':{ $regex: searchStr, $options: 'i' }});
+                query_by[andOr].push({'rawDescription': typedText});
             }
 
             if (filterQuery.value && Object.keys(filterQuery.value).length > 0) {
@@ -1144,13 +1154,42 @@ function filterSprintsIdQuery () {
 .tasklist-range { gap: 6px; }
 .tasklist-range-label { font-size: 12px; font-weight: 600; color: #3a3f52; white-space: nowrap; }
 .tasklist-range-field {
-    font-size: 12px;
     height: 30px;
-    width: auto;
     min-width: 110px;
-    padding: 2px 8px;
-    border: 1px solid #e5e7eb;
     border-radius: 6px;
-    color: #3a3f52;
+}
+</style>
+
+<style scoped>
+.dash-board-list-black {
+    color: var(--ink);
+}
+.dash-board-list-dark-gray {
+    color: var(--ink);
+}
+.dash-board-list-bg-white {
+    background-color: var(--surface);
+}
+.dash-board-list-font-weight-500 {
+    font-weight: 500 !important;
+}
+.dash-board-list-font-size-12 {
+    font-size: 12px;
+}
+.dash-board-list-font-size-13 {
+    font-size: 13px;
+}
+.dash-board-list-style-scroll::-webkit-scrollbar-track {
+    background-color: var(--canvas);
+}
+.dash-board-list-style-scroll::-webkit-scrollbar {
+    width: 2px;
+    height: 2px;
+    background-color: var(--canvas);
+    border-radius: 8px;
+}
+.dash-board-list-style-scroll::-webkit-scrollbar-thumb {
+    background-color: var(--ink-3);
+    border-radius: 8px;
 }
 </style>

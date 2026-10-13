@@ -11,6 +11,9 @@ const { MongoDbCrudOpration } = require('../../../utils/mongo-handler/mongoQueri
 const { default: mongoose } = require('mongoose');
 const {myCache, requestHandler} = require('../../../Config/config');
 const { updateCompanyFun, getCompanyDataFun } = require('../../Company/controller/updateCompany.js');
+const { isProfileUpload, refuseUnverifiedBucket } = require('../bucketAccess');
+const { logUploadFailures } = require('../uploadFailures');
+const { isRowTrackshotKey } = require('../../../common-storage/taskFileKeys');
 /**
  * S3 client configuration for create bucket
  */
@@ -44,6 +47,14 @@ const formatS3UploadError = (error, context = {}) => {
         `bucket=${bucket} key=${key} requestId=${requestId || ''} message=${message}`
     );
     return `Error while upload file: ${code}: ${message}`;
+};
+
+/* Every stored name starts with the time it was stored, so an upload never lands on an existing
+ * object whatever replaceFile the request carries. */
+const timestamped = (filePath, separator) => {
+    const folders = filePath.split('/');
+    const fileName = folders.pop();
+    return `${folders.join('/')}${separator}${new Date().toISOString().replace(/[-:.]/g, '')}_${fileName}`;
 };
 
 // Used function in default data create demo saas
@@ -270,25 +281,14 @@ exports.uploadThumbnailFileFromBase64 = (base64,path,name,width,height,companyId
  * @param {String} CompanyId - CompanyId in which file is need to upload
  * @param {String} Path - Path where file is uploaded in Wasabi
  * @param {Object} Base64String - Base64String Which is need to be uploaded
- * @param {Boolean} ReplaceFile - Boolean True if you want to replace existing file in Wasabi
+ * @param {Boolean} ReplaceFile - Unused: kept so callers' argument order stays the same
  * @param {String} ThumbanilKey - Thumbnail Key For Genrate Thumbnail
  * @returns {Promise<String>} A Promise that resolves with the updated file path upon successful upload.
  *                            Rejects with an error message if any issues occur during the upload process.
  */
 exports.uploadMainFileForbase64Thumbnail = (companyId, path, base64String, replaceFile, thumbanilKey, isUserProfile = false) => {
     return new Promise((resolve, reject) => {
-        let ind;
-        let updatedFilePath = ''
-        if (!(replaceFile &&  replaceFile == false)) {
-            const currentDate = new Date();
-            const timestamp = currentDate.toISOString().replace(/[-:.]/g, '');
-            const pathComponents = path.split('/');
-            const fileName = pathComponents.pop();
-            const newFileName = `${timestamp}_${fileName}`;
-            updatedFilePath = isUserProfile ? pathComponents.join('/') + newFileName : pathComponents.join('/') + '/' + newFileName;
-        } else {
-            updatedFilePath = path
-        }
+        const updatedFilePath = timestamped(path, isUserProfile ? '' : '/');
 
         let thumInd = thumbnailArray.findIndex((data)=>{
             return data.key === thumbanilKey
@@ -347,19 +347,9 @@ exports.uploadMainFileForbase64Thumbnail = (companyId, path, base64String, repla
                 }
             }).catch((error)=>{
                 reject(formatS3UploadError(error, { bucket: bucketName, key: fileName, op: 'PutObject(base64)' }))
-                fs.unlink(file, (err) => {
-                    if (err) {
-                        logger.error(`Error deleting file: ${err}`);
-                    }
-                });
             })
         } catch (error) {
             reject(`File upload error: ${error}`)
-            fs.unlink(file, (err) => {
-                if (err) {
-                    logger.error(`Error deleting file: ${err}`);
-                }
-            });
         }
 
     });
@@ -482,13 +472,8 @@ exports.createCompanyDataWasabi =  (companyId, fileName, fileString) => {
  */
 exports.getPresignedUrl  = async (req,res) => {
     try {
-        if (!(req.body && req.body.companyId)) {
-            res.send({
-                status: false,
-                statusText: `Company Id is required`
-            })
-            return;
-        }
+        const bucketId = req.storageBucket;
+        if (!bucketId) return refuseUnverifiedBucket(res);
 
         if (!(req.body && req.body.path)) {
             res.send({
@@ -498,44 +483,30 @@ exports.getPresignedUrl  = async (req,res) => {
             return;
         }
 
-        const aud = req?.aud || "";
-        const isAllowed = aud.split(",").includes(req.body.companyId);
-
-        if (!isAllowed) {
-            res.send({
-                status: false,
-                statusText: `You don't have access to requested bucket`
-            });
-            return;
-        }
+        const command = new GetObjectCommand({
+            Bucket: bucketId,
+            Key: req.body.path,
+        });
         if (req.body.isCache === true) {
-            const cacheKey = `image:${req.body.path}`;
+            const cacheKey = `image:${command.input.Bucket}:${command.input.Key}`;
             const value = myCache.get(cacheKey);
             
             if (value) {
-                res.set('Cache-Control', 'public, max-age=43200');
+                res.set('Cache-Control', 'private, max-age=43200');
                 res.send({
                     status: true, 
                     statusText: value,
                 });
             } else {
-                const command = new GetObjectCommand({
-                    Bucket: req.body.companyId,
-                    Key: req.body.path,
-                });
                 const url = await getSignedUrl(s3Client, command, { expiresIn: 86400 });
                 myCache.set( cacheKey, url, 1200 );
-                res.set('Cache-Control', 'public, max-age=43200')
+                res.set('Cache-Control', 'private, max-age=43200')
                 res.send({
                     status: true, 
                     statusText: url,
                 });
             }
         } else {
-            const command = new GetObjectCommand({
-                Bucket: req.body.companyId,
-                Key: req.body.path,
-            });
             const url = await getSignedUrl(s3Client, command, { expiresIn: 86400 });
             res.send({
                 status: true,
@@ -570,7 +541,7 @@ exports.getUserProfilePresignedUrl  = async (req,res) => {
     const cacheKey = `imageExists:${req.params.path}`;
     const value = myCache.get(cacheKey);
     if (value) {
-        res.set('Cache-Control', 'public, max-age=86400');
+        res.set('Cache-Control', 'private, max-age=86400');
         res.send({
             status: true, 
             statusText: value,
@@ -584,7 +555,7 @@ exports.getUserProfilePresignedUrl  = async (req,res) => {
             });
             const url = await getSignedUrl(s3Client, command, { expiresIn: 86400 });
             myCache.set( cacheKey, url, 1200 );
-            res.set('Cache-Control', 'public, max-age=86400')
+            res.set('Cache-Control', 'private, max-age=86400')
             res.send({
                 status: true, 
                 statusText: url,
@@ -706,7 +677,7 @@ exports.uploadThumbnailFile = (file,x,y,path,companyId,isUserProfile = false) =>
  * @param {String} CompanyId - CompanyId in which file is need to upload
  * @param {String} Path - Path where file is uploaded in Wasabi
  * @param {Object} File - File Which is need to Upload
- * @param {Boolean} ReplaceFile - Boolean True if you want to replace existing file in Wasabi
+ * @param {Boolean} ReplaceFile - Unused: kept so callers' argument order stays the same
  * @param {Object} FileObject - File Object which is neeeded to be uploaded
  * @param {String} ThumbanilKey - Thumbnail Key For Genrate Thumbnail
  * @param {Boolean} IsUserProfile - True if it is a user profile other wise it is not required
@@ -716,21 +687,7 @@ exports.uploadThumbnailFile = (file,x,y,path,companyId,isUserProfile = false) =>
 exports.uploadFileWasabiPromise = (companyId, path, file, replaceFile, fileObject, thumbanilKey,isUserProfile = false) => {
     return new Promise(async (resolve, reject) => {
         try {
-            let updatedFilePath = ''
-            if (!isUserProfile) {
-                if (!(replaceFile &&  replaceFile == false)) {
-                    const currentDate = new Date();
-                    const timestamp = currentDate.toISOString().replace(/[-:.]/g, '');
-                    const pathComponents = path.split('/');
-                    const fileName = pathComponents.pop();
-                    const newFileName = `${timestamp}_${fileName}`;
-                    updatedFilePath = pathComponents.join('/') + '/' + newFileName;
-                } else {
-                    updatedFilePath = path
-                }
-            } else {
-                updatedFilePath = path
-            }
+            const updatedFilePath = isUserProfile ? path : timestamped(path, '/');
 
             if (thumbanilKey && thumbanilKey!== "") {
                 let thumInd = thumbnailArray.findIndex((data)=>{
@@ -880,26 +837,10 @@ exports.uploadFileWasabi = async (req,res) => {
         });
         return;
     }
-    let isUserProfile = false;
-    if (req.body && (req.body.isUserProfile == true || req.body.isUserProfile == 'true')) {
-        isUserProfile = true;
-    } else {
-        if (!(req.body && req.body.companyId)) {
-            res.send({
-                status: false,
-                statusText: 'Company id is required'
-            });
-            return;
-        }
-    }
-    if (!req.aud.split(",").includes(req.body.companyId)) {
-        res.send({
-            status: false,
-            statusText: `You don't have access to requested bucket`
-        });
-        return;
-    }
-    exports.uploadFileWasabiPromise(req.body.companyId,req.body.path,req.file.path, req.body.replaceFile,req.file,req.body.key,isUserProfile).then((fileName)=>{
+    const bucketId = req.storageBucket;
+    if (!bucketId) return refuseUnverifiedBucket(res);
+    const isUserProfile = isProfileUpload(req.body);
+    exports.uploadFileWasabiPromise(bucketId,req.body.path,req.file.path, req.body.replaceFile,req.file,req.body.key,isUserProfile).then((fileName)=>{
         res.send({
             status: true,
             statusText: fileName
@@ -921,13 +862,8 @@ exports.uploadFileWasabi = async (req,res) => {
  * @returns
  */
 exports.deleteFileWasabi = async (req, res) => {
-    if (!(req.body && req.body.companyId)) {
-        res.send({
-            status: false,
-            statusText: `Company Id is required`
-        })
-        return;
-    }
+    const bucketId = req.storageBucket;
+    if (!bucketId) return refuseUnverifiedBucket(res);
 
     if (!(req.body && req.body.path)) {
         res.send({
@@ -937,16 +873,8 @@ exports.deleteFileWasabi = async (req, res) => {
         return;
     }
 
-    if (!req.aud.split(",").includes(req.body.companyId)) {
-        res.send({
-            status: false,
-            statusText: `You don't have access to requested bucket`
-        });
-        return;
-    }
-
     const command = new DeleteObjectCommand({
-        Bucket: req.body.companyId,
+        Bucket: bucketId,
         Key: req.body.path,
     });
 
@@ -1007,30 +935,10 @@ exports.getBucketSizeCompanyWise = async(companyId) => {
     }
 }
 
-exports.getBucketSize = () => {
-    return new Promise((resolve, reject) => {
-        try {
-            let promises = [];
-
-            getCompanyDataFun([],true)
-            .then((response) => {
-                response.forEach((cmp) => {
-                    promises.push(exports.getBucketSizeCompanyWise(cmp._id))
-                })
-                Promise.allSettled(promises).then(() => {
-                    logger.info("Completed");
-                    resolve();
-                }).catch((error) => {
-                    logger.error("promises error", error);
-                    reject();
-                    return;
-                })
-            })
-        } catch (error) {
-            reject(error);
-            logger.error(`Error while getting bucket size: ${error})`)
-        }
-    })
+exports.getBucketSize = async () => {
+    const companies = await getCompanyDataFun([], true);
+    await Promise.allSettled(companies.map((cmp) => exports.getBucketSizeCompanyWise(cmp._id)));
+    logger.info("Completed");
 }
 
 exports.copyWasabiImage = async(companyId,path,destinationKey) => {
@@ -1063,53 +971,23 @@ exports.getContentType = (key) => {
     }
 };
 
-/**
- * This funcion is used to upload any public assets into wasabi
- * @param {*} path 
- * @param {*} file 
- * @returns 
- */
 exports.uploadPublicAssetsToWasabi = async (path, file) => {
-    // BUG-024 / #78 fix: async read so we don't block the event loop.
     const fileContent = await fs.promises.readFile(file);
-    const bucketName = process.env.USERPROFILEBUCKET;
     const fileName = `public_assets/${path}`;
-
-    const params = {
-        Bucket: bucketName,
+    await s3Client.send(new PutObjectCommand({
+        Bucket: process.env.USERPROFILEBUCKET,
         Key: fileName,
         Body: fileContent,
         ContentType: exports.getContentType(fileName),
         ACL: "public-read",
-    };
-
-    try {
-        await s3Client.send(new PutObjectCommand(params));
-        return fileName;
-    } catch (error) {
-        // Don’t crash server — just throw error back
-        throw new Error(`Error uploading ${fileName}: ${error.message || error}`);
-    }
+    }));
+    return fileName;
 };
 
 exports.uploadPublicAssetsImagesInWasabi = async (imageArray) => {
-    const results = await Promise.allSettled(
-        imageArray.map(x =>
-            exports.uploadPublicAssetsToWasabi(x.path, x.filePath)
-        )
-    );
-
-    // Collect successful uploads
-    const success = results.filter(r => r.status === "fulfilled").map(r => r.value);
-
-    // Collect failed uploads
-    const failed = results.filter(r => r.status === "rejected").map(r => r.reason);
-
-    if (failed.length > 0) {
-        logger.error("Some uploads failed:", failed);
-    }
-
-    return success; // return only successful public URLs
+    const results = await Promise.allSettled(imageArray.map((x) => exports.uploadPublicAssetsToWasabi(x.path, x.filePath)));
+    logUploadFailures(logger, imageArray, results);
+    return results.filter((r) => r.status === "fulfilled").map((r) => r.value);
 };
 
 exports.uploadPublicAssets = async () => {
@@ -1142,6 +1020,10 @@ exports.cleanUpTrackShotCompanyWise = async(companyId) => {
                 let updatedShots = [];
                 
                 for (const shot of ts.trackShots) {
+                    if (!isRowTrackshotKey(ts._id, shot.image)) {
+                        updatedShots.push({ ...shot, deleted: false });
+                        continue;
+                    }
                     try {
 
                         const command = new DeleteObjectCommand({

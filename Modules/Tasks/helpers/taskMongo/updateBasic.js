@@ -1,8 +1,9 @@
+const { escapeHtml } = require('../../../../utils/escapeHtml');
 const { dbCollections } = require('../../../../Config/collections')
 const { sanitizeInput } = require("../../../serviceFunction");
 const { HandleHistory,HandleTask,convertToSubTaskFunction, moveTaskFunction, convertToListSubTask,mergeSubTask, duplicateSubTaskFunction, addHistoryCollection, removeCommentCount,updateHistoryCollection, updateTimesheetCollection, updateEstimatedTimeCollection} = require("../mongo_helper")
 
-const { createTask, taskAssigneeAdd, taskAssigneeRemove,taskAssigneeReplace, taskNameEdit, taskPriorityChange, taskStatusChange, taskAttachmentAdd, taskAttachmentRemove, taskTypeChage, taskTotalEstimate } = require('../notificationTemplate')
+const { createTask, taskAssigneeAdd, taskAssigneeRemove,taskAssigneeReplace, taskNameEdit, taskPriorityChange, taskStatusChange, taskAttachmentAdd, taskAttachmentRemove, taskTypeChage, taskTotalEstimate, shownStatus, shownPriority, shownDate, taskDueDateAdd, taskDueDateChange, taskStartDateAdd, taskStartDateChange, taskStartAndDueDateChange } = require('../notificationTemplate')
 const { HandleBothNotification } = require("../handleNotification")
 const logger = require("../../../../Config/loggerConfig")
 const { addSprintFun, updateSprintFun } = require("../../../Sprints/controller")
@@ -20,16 +21,89 @@ const { emitListener } = require("../../../Company/eventController.js");
 const { createCustomFields } = require("../helper.js");
 const { removeCache } = require('../../../../utils/commonFunctions.js');
 const { updateRemainingTime } = require('../../../LogTime/controllerV2.js');
+const completionStore = require('../completionStore.js');
+
+const { recordCompletion } = require('./recordCompletion.js');
+const { importActorOf } = require('../importMark');
+const { escapeText } = require('../taskWriteFields');
+
+const DUE_DATE_NOTICE = 'task_due_date';
+
+const instantOf = (value) => {
+    const raw = value && typeof value === 'object' && !(value instanceof Date) ? value.date : value;
+    if (raw === undefined || raw === null || raw === '') return null;
+    const millis = new Date(raw).getTime();
+    return Number.isNaN(millis) ? null : millis;
+};
+
+const noticeAsked = (obj) => Boolean(obj) && typeof obj === 'object' && Object.keys(obj).length > 0;
+const dueDateHistoryMessage = (name, due) => (due === null || due === undefined || due === ''
+    ? `<b>${name}</b> has removed the <b>Due Date</b>.`
+    : `<b>${name}</b> has added <b> Due Date</b> as <b>DATE_${new Date(due).getTime()}</b>.`);
+
+/* A history-only update runs after the date was written, so the stored list may already end with it. */
+const dueDateNotice = ({ project, task, storedTask, firebaseObj, isUpdateTask, commonDateFormatString, timeZone }) => {
+    const due = instantOf(firebaseObj.DueDate);
+    if (due === null) return null;
+    const shown = (millis) => shownDate(millis, commonDateFormatString, timeZone);
+    const earlier = ((storedTask || task).dueDateDeadLine || []).map(instantOf).filter((millis) => millis !== null);
+    if (isUpdateTask === false && earlier[earlier.length - 1] === due) earlier.pop();
+    const names = { ProjectName: project.ProjectName, TaskName: task.TaskName };
+    const message = earlier.length
+        ? taskDueDateChange({ ...names, previousDate: shown(earlier[earlier.length - 1]), changedDate: shown(due) })
+        : taskDueDateAdd({ ...names, lastDate: shown(due) });
+    return { key: DUE_DATE_NOTICE, message };
+};
+
+const startDateNotice = ({ project, task, storedTask, firebaseObj, isUpdateTask, commonDateFormatString, timeZone }) => {
+    const start = instantOf(firebaseObj.startDate);
+    if (start === null) return null;
+    const shown = (millis) => shownDate(millis, commonDateFormatString, timeZone);
+    const previous = isUpdateTask === false ? null : instantOf((storedTask || task).startDate);
+    const names = { ProjectName: project.ProjectName, TaskName: task.TaskName };
+    const message = previous === null
+        ? taskStartDateAdd({ ...names, formetedStartDate: shown(start) })
+        : taskStartDateChange({ ...names, formetedStartDate: shown(previous), newDate: shown(start) });
+    return { key: DUE_DATE_NOTICE, message };
+};
+
+const lastDueOf = (heldTask) => {
+    const earlier = (heldTask.dueDateDeadLine || []).map(instantOf).filter((millis) => millis !== null);
+    return earlier.length ? earlier[earlier.length - 1] : null;
+};
+
+/* A calendar move sends both dates even when the drag changed only one, so only the dates that differ from the stored task are named. */
+const startAndDueDateNotice = ({ project, task, storedTask, firebaseObj, commonDateFormatString, timeZone }) => {
+    const heldTask = storedTask || task;
+    const start = instantOf(firebaseObj.startDate);
+    const due = instantOf(firebaseObj.DueDate);
+    const previousStart = instantOf(heldTask.startDate);
+    const previousDue = lastDueOf(heldTask);
+    const startMoved = start !== null && start !== previousStart;
+    const dueMoved = due !== null && due !== previousDue;
+    const dates = { project, task, storedTask, firebaseObj, isUpdateTask: true, commonDateFormatString, timeZone };
+    if (!startMoved) return dueMoved ? dueDateNotice(dates) : null;
+    if (!dueMoved) return startDateNotice(dates);
+    const shown = (millis) => (millis === null ? '' : shownDate(millis, commonDateFormatString, timeZone));
+    const message = taskStartAndDueDateChange({
+        ProjectName: project.ProjectName,
+        TaskName: task.TaskName,
+        previousStartDate: shown(previousStart),
+        startDate: shown(start),
+        previousDueDate: shown(previousDue),
+        dueDate: shown(due),
+    });
+    return { key: DUE_DATE_NOTICE, message };
+};
+
 module.exports = {
 
-    /* -------------- UPDATE DUE DATE FUNCTION FOR TASK -----------------*/
-
-    updateDueDate({commonDateFormatString ,firebaseObj, project, task, obj,userData, isUpdateTask}) {
+    updateDueDate({commonDateFormatString, timeZone, firebaseObj, project, task, storedTask, obj, userData, isUpdateTask}) {
         return new Promise((resolve,reject) => {
             try {
-                // MAKE CHANGES FOR DUE DATE
+                const notification = noticeAsked(obj) ? dueDateNotice({ project, task, storedTask, firebaseObj, isUpdateTask, commonDateFormatString, timeZone }) : null;
                 if (isUpdateTask === false) {
-                    if (obj && Object.keys(obj).length > 0) {
+                    if (notification) {
                         HandleBothNotification({
                             type:'tasks',
                             userData,
@@ -38,7 +112,7 @@ module.exports = {
                             taskId: task._id,
                             folderId: task.folderObjId || "",
                             sprintId: task.sprintId,
-                            object: obj
+                            object: notification
                         })
                         .catch((error) => {
                             logger.error(`ERROR in notification Update Due Date: ${error.message}`);
@@ -46,7 +120,7 @@ module.exports = {
                     }
                     var historyObj = {};
                     historyObj.key = "Project_DueDate";
-                    historyObj.message = `<b>${userData.Employee_Name}</b> has added <b> Due Date</b> as <b>DATE_${new Date(firebaseObj.DueDate).getTime()}</b>.`;
+                    historyObj.message = dueDateHistoryMessage(userData.Employee_Name, firebaseObj.DueDate);
                     historyObj.sprintId = task.sprintId;
                     HandleHistory('task',project.CompanyId, project._id,task._id,historyObj, userData).
                     catch((error) => {
@@ -68,10 +142,15 @@ module.exports = {
                     }
                     MongoDbCrudOpration(project.CompanyId,object, "findOneAndUpdate")
                     .then((result) => {
-                        socketEmitter.emit('update', { type: "update", data: result , updatedFields: firebaseObj, module: 'task' });
+                        if (!result) {
+                            resolve({ status: false, statusText: "Task not found" });
+                            return;
+                        }
+
+                        socketEmitter.emit('update', { type: "update", data: result , updatedFields: firebaseObj, module: 'task', companyId: project.CompanyId });
                         resolve({status: true, statusText: "Due Date updated successfully"});
     
-                        if (obj && Object.keys(obj).length > 0) {
+                        if (notification) {
                             HandleBothNotification({
                                 type:'tasks',
                                 userData,
@@ -80,7 +159,7 @@ module.exports = {
                                 taskId: task._id,
                                 folderId: task.folderObjId || "",
                                 sprintId: task.sprintId,
-                                object: obj
+                                object: notification
                             })
                             .catch((error) => {
                                 logger.error(`ERROR in notification Update Due Date: ${error.message}`);
@@ -88,7 +167,7 @@ module.exports = {
                         }
                         var historyObj = {};
                         historyObj.key = "Project_DueDate";
-                        historyObj.message = `<b>${userData.Employee_Name}</b> has added <b> Due Date</b> as <b>DATE_${new Date(firebaseObj.DueDate).getTime()}</b>.`;
+                        historyObj.message = dueDateHistoryMessage(userData.Employee_Name, firebaseObj.DueDate);
                         historyObj.sprintId = task.sprintId;
                         HandleHistory('task',project.CompanyId, project._id,task._id,historyObj, userData).
                         catch((error) => {
@@ -107,14 +186,12 @@ module.exports = {
         })
     },
 
-    /* -------------- UPDATE Start DATE FUNCTION FOR TASK -----------------*/
-
-    updateStartDate({commonDateFormatString ,firebaseObj, project, task, obj,userData,isUpdateTask = true,isHistory=true}) {
+    updateStartDate({commonDateFormatString, timeZone, firebaseObj, project, task, storedTask, obj, userData, isUpdateTask = true, isHistory = true}) {
         return new Promise((resolve,reject) => {
             try {
-                // MAKE CHANGES FOR START DATE
+                const notification = noticeAsked(obj) ? startDateNotice({ project, task, storedTask, firebaseObj, isUpdateTask, commonDateFormatString, timeZone }) : null;
                 if (isUpdateTask == false) {
-                    if (obj && Object.keys(obj).length > 0) {
+                    if (notification) {
                         HandleBothNotification({
                             type:'tasks',
                             userData,
@@ -123,7 +200,7 @@ module.exports = {
                             taskId: task._id,
                             folderId: task.folderObjId || "",
                             sprintId: task.sprintId,
-                            object: obj
+                            object: notification
                         })
                         .catch((error) => {
                             logger.error(`ERROR in update Start Date : ${error.message}`);
@@ -139,6 +216,7 @@ module.exports = {
                             logger.error(`ERROR in update Start Date update hostory : ${error.message}`);
                         });
                     }
+                    resolve({status: true, statusText: "Start Date updated successfully"});
                 } else {
                     firebaseObj.startDate = new Date(firebaseObj.startDate);
 
@@ -152,10 +230,15 @@ module.exports = {
                     }
                     MongoDbCrudOpration(project.CompanyId,object, "findOneAndUpdate")
                     .then((result) => {
-                        socketEmitter.emit('update', { type: "update", data: result , updatedFields: firebaseObj, module: 'task' });
+                        if (!result) {
+                            resolve({ status: false, statusText: "Task not found" });
+                            return;
+                        }
+
+                        socketEmitter.emit('update', { type: "update", data: result , updatedFields: firebaseObj, module: 'task', companyId: project.CompanyId });
                         resolve({status: true, statusText: "Start Date updated successfully"});
     
-                        if (obj && Object.keys(obj).length > 0) {
+                        if (notification) {
                             HandleBothNotification({
                                 type:'tasks',
                                 userData,
@@ -164,7 +247,7 @@ module.exports = {
                                 taskId: task._id,
                                 folderId: task.folderObjId || "",
                                 sprintId: task.sprintId,
-                                object: obj
+                                object: notification
                             })
                             .catch((error) => {
                                 logger.error(`ERROR in update Start Date : ${error.message}`);
@@ -193,23 +276,80 @@ module.exports = {
         })
     },
 
+    updateStartDateAndDueDate({commonDateFormatString, timeZone, userData, notificationObj, firebaseObj, task, storedTask, project}) {
+        return new Promise((resolve,reject)=> {
+            const notification = noticeAsked(notificationObj) ? startAndDueDateNotice({ project, task, storedTask, firebaseObj, commonDateFormatString, timeZone }) : null;
+            firebaseObj.dueDateDeadLine = firebaseObj.dueDateDeadLine.map((x) => ({date: new Date(x.date)}));
+            firebaseObj.DueDate = new Date(firebaseObj.DueDate);
+            firebaseObj.startDate = new Date(firebaseObj.startDate);
+
+            const query = {
+                type: dbCollections.TASKS,
+                data: [
+                    {
+                        _id: new mongoose.Types.ObjectId(task._id)
+                    }, {
+                        $set: {
+                            ...firebaseObj
+                        },
+                        $unset: {
+                            groupByDueDateIndex: 1
+                        },
+                    },
+                    {
+                        returnDocument: 'after'
+                    }
+                ]
+            }
+            MongoDbCrudOpration(project.CompanyId, query, "findOneAndUpdate")
+            .then((result) => {
+                socketEmitter.emit('update', { type: "update", data: result , updatedFields: {...firebaseObj}, module: 'task', companyId: project.CompanyId });
+                resolve({status: true, statusText: "Start Date And Due Date updated successfully"});
+                if (notification) {
+                    HandleBothNotification({
+                        type:'tasks',
+                        userData,
+                        companyId: project.CompanyId,
+                        projectId: project._id,
+                        taskId: task._id,
+                        folderId: task.folderObjId || "",
+                        sprintId: task.sprintId,
+                        object: notification
+                    })
+                    .catch((error) => {
+                        logger.error(`ERROR in update Start Date : ${error.message}`);
+                    })
+                }
+                var historyObj = {};
+                historyObj.key = "Project_StartDate_DueDate";
+                if (firebaseObj.dueDateDeadLine.length === 1) {
+                    historyObj.message = `<b>${userData.Employee_Name}</b> has added <b> Start Date</b> as <b>DATE_${new Date(firebaseObj.startDate).getTime()}</b> and <b> Due Date</b> as <b>DATE_${new Date(firebaseObj.DueDate).getTime()} </b>.`;
+                } else {
+                    historyObj.message = `<b>${userData.Employee_Name}</b> has Changed <b> Start Date</b> as <b>DATE_${new Date(firebaseObj.startDate).getTime()}</b> and <b> Due Date</b> as <b>DATE_${new Date(firebaseObj.DueDate).getTime()} </b>.`;
+                }
+                historyObj.sprintId = task.sprintId;
+                HandleHistory('task',project.CompanyId, project._id,task._id,historyObj, userData).
+                catch((error) => {
+                    logger.error(`ERROR in update Start Date And Due Date update hostory : ${error.message}`);
+                });
+            }).catch((error) => {
+                reject(error);
+            })
+        });
+    },
+
     /* -------------- UPDATE STATUS FUNCTION FOR TASK -----------------*/
 
-    updateStatus({newStatus, prevStatus, projectData, task, userData, isUpdateTask}) {
+    /* `recordsCompletion` is false for a caller that writes the Done record itself, under the actor it knows.
+     * `quiet` is set by an import alone, which moves many tasks at once: no one is notified and its events are marked as
+     * an import's. The task routes drop it from a body. */
+    updateStatus({newStatus, prevStatus, projectData, task, userData, isUpdateTask, recordsCompletion = true, quiet = false}) {
         return new Promise((resolve,reject) => {
             try {
                 if (isUpdateTask === false) {
                     resolve({status: true, statusText: "Status updated successfully"});
-                    let obj = {
-                        'ProjectName': projectData.ProjectName,
-                        'taskName': prevStatus.taskName,
-                        'backColor': prevStatus.backColor,
-                        'color': prevStatus.color,
-                        'statusName': prevStatus.statusName,
-                        'bgColor': prevStatus.bgColor,
-                        'textColor': prevStatus.textColor,
-                        'newStatusName': newStatus.status.text
-                    }
+                    const shown = shownStatus(prevStatus, newStatus);
+                    let obj = { 'ProjectName': projectData.ProjectName, 'taskName': prevStatus.taskName, ...shown.template }
                     let notificationObject = {
                         message: taskStatusChange(obj),
                         key: "task_status",
@@ -237,7 +377,7 @@ module.exports = {
 
                     let historyObj = {};
                     historyObj.key = "Task_Status";
-                    historyObj.message = `<b>${userData.Employee_Name}</b> has changed <b> Status</b> as <b>${prevStatus.updatedTaskName}</b>.`;
+                    historyObj.message = `<b>${userData.Employee_Name}</b> has changed <b> Status</b> as <b>${shown.updatedTaskName}</b>.`;
                     historyObj.sprintId = task.sprintId;
                     if (historyObj !== null && Object.keys(historyObj).length > 0) {
                         HandleHistory('task',projectData.CompanyId, projectData._id,prevStatus.taskId,historyObj, userData).then(async () => {})
@@ -246,11 +386,17 @@ module.exports = {
                         })
                     }
                 } else {
+                    const taskId = task && task._id;
+                    if (!taskId) {
+                        resolve({ status: false, statusText: "Task not found" });
+                        return;
+                    }
+
                     const query = {
                         type: dbCollections.TASKS,
                         data: [
                             {
-                                _id: new mongoose.Types.ObjectId(prevStatus.taskId)
+                                _id: new mongoose.Types.ObjectId(taskId)
                             }, {
                                 $set: {
                                     ...newStatus,
@@ -265,19 +411,18 @@ module.exports = {
 
                     MongoDbCrudOpration(projectData.CompanyId, query, "findOneAndUpdate")
                     .then((result) => {
-                        socketEmitter.emit('update', { type: "update", data: result , updatedFields: newStatus, module: 'task' });
-                        resolve({status: true, statusText: "Status updated successfully"});
-
-                        let obj = {
-                            'ProjectName': projectData.ProjectName,
-                            'taskName': prevStatus.taskName,
-                            'backColor': prevStatus.backColor,
-                            'color': prevStatus.color,
-                            'statusName': prevStatus.statusName,
-                            'bgColor': prevStatus.bgColor,
-                            'textColor': prevStatus.textColor,
-                            'newStatusName': newStatus.status.text
+                        if (!result) {
+                            resolve({ status: false, statusText: "Task not found" });
+                            return;
                         }
+
+                        const eventActor = quiet ? importActorOf(userData) : null;
+                        socketEmitter.emit('update', { type: "update", data: result , updatedFields: newStatus, module: 'task', companyId: projectData.CompanyId, ...(eventActor ? { actor: eventActor } : {}) });
+                        resolve({status: true, statusText: "Status updated successfully"});
+                        if (recordsCompletion) recordCompletion({ companyId: projectData.CompanyId, taskId, task, newStatus, userData, eventActor });
+
+                        const shown = shownStatus(prevStatus, newStatus);
+                        let obj = { 'ProjectName': projectData.ProjectName, 'taskName': result.TaskName, ...shown.template }
                         let notificationObject = {
                             message: taskStatusChange(obj),
                             key: "task_status",
@@ -285,7 +430,7 @@ module.exports = {
                             taskId: prevStatus.taskId,
                             sprintId: task.sprintId
                         }
-                        if (notificationObject && Object.keys(notificationObject).length > 0 && prevStatus.updatedTaskName !== prevStatus.name) {
+                        if (!quiet && notificationObject && Object.keys(notificationObject).length > 0 && prevStatus.updatedTaskName !== prevStatus.name) {
                             HandleBothNotification({
                                 type:'tasks',
                                 userData,
@@ -305,7 +450,7 @@ module.exports = {
     
                         let historyObj = {};
                         historyObj.key = "Task_Status";
-                        historyObj.message = `<b>${userData.Employee_Name}</b> has changed <b> Status</b> as <b>${prevStatus.updatedTaskName}</b>.`;
+                        historyObj.message = `<b>${userData.Employee_Name}</b> has changed <b> Status</b> as <b>${shown.updatedTaskName}</b>.`;
                         historyObj.sprintId = task.sprintId;
                         if (historyObj !== null && Object.keys(historyObj).length > 0) {
                             HandleHistory('task',projectData.CompanyId, projectData._id,prevStatus.taskId,historyObj, userData).then(async () => {})
@@ -333,14 +478,8 @@ module.exports = {
             try {
                 if (isUpdateTask === false) {
                     resolve({status: true, statusText: "Priority updated successfully"});
-                    let notificationObj = {
-                        'ProjectName' : projectData?.ProjectName,
-                        'taskName' : priorityObj?.taskName,
-                        'statusImage' : priorityObj?.statusImage,
-                        'priorityName' : priorityObj?.priorityName,
-                        'newStatusImage' : priorityObj?.newStatusImage,
-                        'newPriorityName' : priorityObj?.newPriorityName
-                    };
+                    const shown = shownPriority(priorityObj);
+                    let notificationObj = { 'ProjectName' : projectData?.ProjectName, 'taskName' : priorityObj?.taskName, ...shown.template };
                     let notificationObject = {
                         key: "task_priority",
                         message : taskPriorityChange(notificationObj),
@@ -366,16 +505,22 @@ module.exports = {
 
                     let historyObj = {
                         key: "task_priority",
-                        message : `<b>${userData.Employee_Name}</b> has changed <b> Priority</b> as <b>${priorityObj.newPriorityName}</b>.`,
+                        message : `<b>${userData.Employee_Name}</b> has changed <b> Priority</b> as <b>${shown.newPriorityName}</b>.`,
                         sprintId: taskData.sprintId
                     };
                     HandleHistory('task',projectData.CompanyId, projectData._id,priorityObj.taskId,historyObj, userData).then(async () => {});
                 } else {
+                    const taskId = taskData && taskData._id;
+                    if (!taskId) {
+                        resolve({ status: false, statusText: "Task not found" });
+                        return;
+                    }
+
                     const query = {
                         type: dbCollections.TASKS,
                         data: [
                             {
-                                _id: new mongoose.Types.ObjectId(priorityObj.taskId)
+                                _id: new mongoose.Types.ObjectId(taskId)
                             }, {
                                 $set: {
                                     ...firebaseObj,
@@ -390,16 +535,15 @@ module.exports = {
 
                     MongoDbCrudOpration(projectData.CompanyId, query, "findOneAndUpdate")
                     .then((result) => {
-                        socketEmitter.emit('update', { type: "update", data: result , updatedFields: firebaseObj, module: 'task' });
+                        if (!result) {
+                            resolve({ status: false, statusText: "Task not found" });
+                            return;
+                        }
+
+                        socketEmitter.emit('update', { type: "update", data: result , updatedFields: firebaseObj, module: 'task', companyId: projectData.CompanyId });
                         resolve({status: true, statusText: "Priority updated successfully"});
-                        let notificationObj = {
-                            'ProjectName' : projectData?.ProjectName,
-                            'taskName' : priorityObj?.taskName,
-                            'statusImage' : priorityObj?.statusImage,
-                            'priorityName' : priorityObj?.priorityName,
-                            'newStatusImage' : priorityObj?.newStatusImage,
-                            'newPriorityName' : priorityObj?.newPriorityName
-                        };
+                        const shown = shownPriority(priorityObj);
+                        let notificationObj = { 'ProjectName' : projectData?.ProjectName, 'taskName' : result.TaskName, ...shown.template };
                         let notificationObject = {
                             key: "task_priority",
                             message : taskPriorityChange(notificationObj),
@@ -425,7 +569,7 @@ module.exports = {
 
                         let historyObj = {
                             key: "task_priority",
-                            message : `<b>${userData.Employee_Name}</b> has changed <b> Priority</b> as <b>${priorityObj.newPriorityName}</b>.`,
+                            message : `<b>${userData.Employee_Name}</b> has changed <b> Priority</b> as <b>${shown.newPriorityName}</b>.`,
                             sprintId: taskData.sprintId
                         };
                         HandleHistory('task',projectData.CompanyId, projectData._id,priorityObj.taskId,historyObj, userData).then(async () => {});
@@ -457,13 +601,18 @@ module.exports = {
                 }
                 MongoDbCrudOpration(projectData.CompanyId, query, "findOneAndUpdate")
                 .then((result) => {
-                    socketEmitter.emit('update', { type: "update", data: result , updatedFields: firebaseObj, module: 'task' });
+                    if (!result) {
+                        resolve({ status: false, statusText: "Task not found" });
+                        return;
+                    }
+
+                    socketEmitter.emit('update', { type: "update", data: result , updatedFields: firebaseObj, module: 'task', companyId: projectData.CompanyId });
                     resolve({status: true, statusText: "Story points updated successfully"});
 
                     const pointsValue = (firebaseObj.points === null || firebaseObj.points === undefined || firebaseObj.points === '') ? '—' : firebaseObj.points;
                     const historyObj = {
                         key: "task_points",
-                        message: `<b>${userData.Employee_Name}</b> set <b>Story Points</b> as <b>${pointsValue}</b>.`,
+                        message: `<b>${userData.Employee_Name}</b> set <b>Story Points</b> as <b>${escapeHtml(pointsValue)}</b>.`,
                         sprintId: taskData.sprintId
                     };
                     HandleHistory('task', projectData.CompanyId, projectData._id, taskData._id, historyObj, userData)
@@ -500,11 +649,16 @@ module.exports = {
                 }
                 MongoDbCrudOpration(projectData.CompanyId, query, "findOneAndUpdate")
                 .then((result) => {
-                    socketEmitter.emit('update', { type: "update", data: result , updatedFields: firebaseObj, module: 'task' });
+                    if (!result) {
+                        resolve({ status: false, statusText: "Task not found" });
+                        return;
+                    }
+
+                    socketEmitter.emit('update', { type: "update", data: result , updatedFields: firebaseObj, module: 'task', companyId: projectData.CompanyId });
                     resolve({status: true, statusText: "Task name updated successfully"});
 
-                    const sanitizedOldTaskName = sanitizeInput(obj.previousTaskName);
-                    const sanitizedNewTaskName = sanitizeInput(firebaseObj.TaskName);
+                    const sanitizedOldTaskName = escapeText(obj.previousTaskName);
+                    const sanitizedNewTaskName = escapeText(firebaseObj.TaskName);
                     let editTaskObj = {
                         'ProjectName' : projectData.ProjectName,
                         'previousTaskName' : obj.previousTaskName,
@@ -533,7 +687,7 @@ module.exports = {
                     }
                     let historyObj = {
                         key: "task_name_edit",
-                        message : `<b>${obj.userName}</b> has changed <b> Task name</b> from <b>${sanitizedOldTaskName}</b> to <b>${sanitizedNewTaskName}</b>.`,
+                        message : `<b>${userData.Employee_Name}</b> has changed <b> Task name</b> from <b>${sanitizedOldTaskName}</b> to <b>${sanitizedNewTaskName}</b>.`,
                         sprintId: taskData.sprintId
                     };
                     HandleHistory('task',projectData.CompanyId, projectData._id,taskData._id,historyObj, userData).then(async () => {});
@@ -573,7 +727,12 @@ module.exports = {
                 }
                 MongoDbCrudOpration(projectData.CompanyId, query, "findOneAndUpdate")
                 .then((result) => {
-                    socketEmitter.emit('update', { type: "update", data: result , updatedFields: setObj, module: 'task' });
+                    if (!result) {
+                        resolve({ status: false, statusText: "Task not found" });
+                        return;
+                    }
+
+                    socketEmitter.emit('update', { type: "update", data: result , updatedFields: setObj, module: 'task', companyId: projectData.CompanyId });
                     resolve({status: true, statusText: "Dates updated successfully"});
 
                     const historyObj = {

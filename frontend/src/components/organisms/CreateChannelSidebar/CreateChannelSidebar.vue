@@ -1,18 +1,18 @@
 <template>
     <div>
-        <Sidebar :title="$t('Channel.create_channel')" :visible="visible" @update:visible="inProgress ? '' : $emit('update:visible', $event), resetValues()" width="610px;">
+        <Sidebar themed :title="$t('Channel.create_channel')" :visible="visible" @update:visible="inProgress ? '' : $emit('update:visible', $event), resetValues()" width="610px;">
             <template #body>
                 <div v-if="!allowPublicChannels && !allowPrivateChannels" class="plan-upgrade-massage">
                     <h4>{{$t('Channel.msg1')}}.</h4>
                 </div>
-                <div class="bg-light-gray h-100 p-10px" v-else>
-                    <div class="position-ab d-flex align-items-center justify-content-center z-index-7 w-100 h-100 bg-dark-gray3" v-if="inProgress">
+                <div class="cch h-100 p-10px" v-else>
+                    <div class="position-ab d-flex align-items-center justify-content-center z-index-7 w-100 h-100 create-channel-sidebar-bg-dark-gray3" v-if="inProgress">
                         <Spinner :isSpinner="true"/>
                     </div>
-                    <div class="bg-white border-radius-8-px p-15px webkit-avilable">
+                    <div class="cch__card border-radius-8-px p-15px webkit-avilable">
                         <!-- CHANNEL NAME -->
                         <div class="d-flex align-items-center">
-                            <label class="text-nowrap mr-10px">{{$t('Channel.channel_name')}}<span class="red">*</span></label>
+                            <label class="text-nowrap mr-10px">{{$t('Channel.channel_name')}}<span class="create-channel-sidebar-red">*</span></label>
                             <div class="position-re w-100">
                                 <input type="text" v-model.trim="channelName.value" :placeholder="$t(`PlaceHolder.enter_channel_name`)" class="form-control webkit-avilable"
                                     @keyup="checkErrors({'field':channelName,
@@ -21,24 +21,24 @@
                                         'type':channelName.type,
                                         'event':$event.event})"
                                 >
-                                <div class="red position-ab font-size-11 error__text-channelname" v-if="channelName.error">{{channelName.error}}</div>
+                                <div class="create-channel-sidebar-red position-ab create-channel-sidebar-font-size-11 error__text-channelname" v-if="channelName.error">{{channelName.error}}</div>
                             </div>
                         </div>
 
                         <!-- ICONS -->
                         <div>
-                            <div class="d-flex white mt-2 justify-content-between">
-                                <div class="border position-re border-radius-10-px bg-light-gray d-flex align-items-center justify-content-center mr-10px icons__wrapper-div">
+                            <div class="d-flex mt-2 justify-content-between">
+                                <div class="position-re border-radius-10-px d-flex align-items-center justify-content-center mr-10px icons__wrapper-div">
                                     <img v-if="icon && Object.keys(icon).length || uploadFileName" class="position-ab create__channel-remove" @click="icon={},uploadFileName=''" :src="deletered">
                                     <img v-if="icon?.url" :src="icon?.url" alt="icon" class="border-radius-10-px w-100 h-100 icon__img">
-                                    <FontAwesomeIcon v-if="icon?.iconName" :icon="icon" size="xl" class="gray81"/>
+                                    <FontAwesomeIcon v-if="icon?.iconName" :icon="icon" size="xl" class="cch__icon"/>
                                 </div>
                                 <div class="w-80">
-                                    <span class="black font-weight-bold">{{$t('Channel.icons')}}</span>
-                                    <div class="d-flex flex-wrap white overflow-y-scroll style-scroll" style="height: 150px;" >
+                                    <span class="create-channel-sidebar-font-weight-bold">{{$t('Channel.icons')}}</span>
+                                    <div class="d-flex flex-wrap overflow-y-scroll create-channel-sidebar-style-scroll" style="height: 150px;" >
                                     <div v-for="(item,index) in icons" :key="index" class="m-6px" :class="(icon && item?.iconName === icon?.iconName) ? ['icon_bg border-radius-5-px'] : null">
                                             <div class="d-flex justify-content-center align-items-center icon_wrapper" @click="setIcon(item)">
-                                                <FontAwesomeIcon :icon="item" size="lg" class="gray81"/>
+                                                <FontAwesomeIcon :icon="item" size="lg" class="cch__icon"/>
                                             </div>
                                         </div>
                                     </div>
@@ -58,8 +58,8 @@
                         <!-- PRIVATE CHANNEL -->
                         <div class="d-flex mt-2" :style="{'opacity': showWarning ? 0.5 : 1}">
                             <div class="w-95">
-                                <span class="font-weight-bold">{{$t('Channel.private_channel')}}</span>
-                                <span class="d-block font-size-13 mt-5px">{{$t('Channel.msg2')}}</span>
+                                <span class="create-channel-sidebar-font-weight-bold">{{$t('Channel.private_channel')}}</span>
+                                <span class="d-block create-channel-sidebar-font-size-13 mt-5px">{{$t('Channel.msg2')}}</span>
                             </div>
                             <Toggle v-model="privateChannel" width="30" activeColor="#3845B3" :disabled="isDisabled"/>
                         </div>
@@ -76,8 +76,8 @@
                         <!-- SEND MESSAGE -->
                         <div class="d-flex mt-2">
                             <div class="w-95">
-                                <span class="font-weight-bold">{{$t('Channel.send_messages')}}</span>
-                                <span class="d-block font-size-13 mt-5px">{{$t('Channel.allowmsg2')}}.</span>
+                                <span class="create-channel-sidebar-font-weight-bold">{{$t('Channel.send_messages')}}</span>
+                                <span class="d-block create-channel-sidebar-font-size-13 mt-5px">{{$t('Channel.allowmsg2')}}.</span>
                             </div>
                             <Toggle v-model="sendMessage" width="30" activeColor="#3845B3"/>
                         </div>
@@ -138,7 +138,6 @@ library.add(fas);
 dom.watch();
 
 // UTILS
-const projectData = inject("selectedProject");
 const userId = inject("$userId");
 const companyId = inject("$companyId");
 const clientWidth = inject("$clientWidth");
@@ -152,7 +151,7 @@ const showWarning = ref(false);
 const warningMessage = ref("");
 
 // EMITS
-const emit = defineEmits(["update:visible", "cancel"]);
+const emit = defineEmits(["update:visible", "cancel", 'created']);
 
 //IMAGE
 const deletered = require("@/assets/images/svg/deletered.svg");
@@ -167,7 +166,13 @@ const props = defineProps({
         type: Object,
         default: null
     },
+    project: {
+        type: Object,
+        default: null
+    },
 })
+const injectedProject = inject("selectedProject", null);
+const projectData = computed(() => props.project || (injectedProject && "value" in injectedProject ? injectedProject.value : injectedProject) || null);
 
 const icons = [...new Set([...Object.keys(far).map(key => far[key]),...Object.keys(fab).map(key => fab[key]),...Object.keys(fas).map(key => fas[key])])]
 const userGetter = computed(() => {
@@ -299,6 +304,8 @@ function createChannel() {
                     $toast.success(t(`Toast.Channel_created_successfully`), { position: "top-right" })
                     resetValues();
                     inProgress.value = false;
+                    emit('created', res.data.data || null);
+                    emit('update:visible', false);
                 } else {
                     $toast.error(res.data.statusText, { position: "top-right" })
                     resetValues();
@@ -324,8 +331,8 @@ async function createChannelFun() {
     return new Promise((resolve, reject) => {
         try {
             (async () => {
-                if(!props.folder) {
-                    $toast.error(t(`Toast.Folder_not_found`), {position: "top-right"});
+                if(!projectData.value?._id) {
+                    $toast.error(t(`Toast.something_went_wrong`), {position: "top-right"});
                     inProgress.value = false;
                     return;
                 }
@@ -425,15 +432,20 @@ async function createChannelFun() {
     bottom: -14px; 
     left: 0px;
 }
+.cch { background: var(--canvas); color: var(--ink); }
+.cch__card { background: var(--surface); }
+.cch__icon { color: var(--ink-2); }
 .icons__wrapper-div{
-    width: 62px; 
+    width: 62px;
     height: 62px;
+    border: 1px solid var(--border);
+    background: var(--fill);
 }
 .icon__img{
     object-fit: cover;
 }
 .icon_bg {
-    background-color: #ebecf4;
+    background-color: var(--brand-tint);
 }
 .icon_wrapper{
     height: 40px;
@@ -448,15 +460,15 @@ async function createChannelFun() {
 .create__channel-remove {
     right: -6px;
     top: -10px;
-    background-color: #ffd6d6;
+    background-color: var(--danger-bg);
     padding: 5px;
     border-radius: 5px;
     cursor: pointer;
 }
 .upgrade-btn-txt{
     margin: 0 auto;
-    background-color: #28C76F;
-    color: #fff;
+    background-color: var(--ok-bg);
+    color: var(--ok-ink);
     padding: 3px 14px;
     border-radius: 4px;
     width: 175px;
@@ -466,9 +478,40 @@ async function createChannelFun() {
     border-radius: 5px;
     margin-top: 20px;
     padding: 15px;
-    background-color: #FFF4D4;
+    background-color: var(--warn-bg);
 }
 .msg-color{
-    color: #996C00;
+    color: var(--warn-ink);
+}
+</style>
+
+<style scoped>
+.create-channel-sidebar-red {
+    color: var(--danger-ink);
+}
+.create-channel-sidebar-bg-dark-gray3 {
+    background-color: color-mix(in srgb, var(--surface) 84%, transparent);
+}
+.create-channel-sidebar-font-weight-bold {
+    font-weight: bold;
+}
+.create-channel-sidebar-font-size-11 {
+    font-size: 11px;
+}
+.create-channel-sidebar-font-size-13 {
+    font-size: 13px;
+}
+.create-channel-sidebar-style-scroll::-webkit-scrollbar-track {
+    background-color: var(--canvas);
+}
+.create-channel-sidebar-style-scroll::-webkit-scrollbar {
+    width: 2px;
+    height: 2px;
+    background-color: var(--canvas);
+    border-radius: 8px;
+}
+.create-channel-sidebar-style-scroll::-webkit-scrollbar-thumb {
+    background-color: var(--ink-3);
+    border-radius: 8px;
 }
 </style>

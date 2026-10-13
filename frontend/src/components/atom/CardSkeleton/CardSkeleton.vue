@@ -35,7 +35,7 @@ const ROW_WIDTHS = ['100%', '92%', '97%', '85%'];
 .cskel-counter { flex: 1; height: 56px; border-radius: 8px; }
 .cskel-row { height: 18px; border-radius: 4px; }
 .cskel-shimmer {
-    background: linear-gradient(90deg, #eef0f6 25%, #e3e7f1 37%, #eef0f6 63%);
+    background: linear-gradient(90deg, var(--fill) 25%, var(--track) 37%, var(--fill) 63%);
     background-size: 400% 100%;
     animation: cskel-shimmer 1.4s ease infinite;
 }

@@ -1,189 +1,138 @@
 const logger = require("../../../Config/loggerConfig");
 const mongoRef = require('../../../utils/mongo-handler/mongoQueries');
 const sendMailRef = require("./sendVerificationMail")
-const {generateJWTToken} = require('../../../Config/jwt');
 const { dbCollections } = require('../../../Config/collections');
 const ctr = require("../controller");
 const { SCHEMA_TYPE } = require("../../../Config/schemaType");
 const mongoose = require("mongoose");
 const { importUserNotifications } = require("../../../utils/data");
 const { addAndRemoveUserInMongodbNotificationCount } = require("../../Auth/controller");
+const { toAuthView } = require("../../Users/helpers/userAccessRules");
+const { newAccountNavPreferences } = require("../../Users/helpers/navPreferencesRules");
+const { recordInvitedOwner } = require("../../Company/helpers/recordInvitedOwner");
+const {
+    SocialSignInRefusal,
+    assertClaimedEmail,
+    findAuth,
+    findAuthByProviderId,
+    noVerifiedEmail,
+    verifySocialIdentity,
+} = require("../helpers/socialIdentity");
+const { linkTokenAccepted } = require("./invitationPreview");
+const { PASSWORD_RULE_MESSAGE, meetsPasswordRule } = require("../helpers/passwordRule");
 
 
 exports.authenticateToken = "";
 
+const OBJECT_ID_PATTERN = /^[a-f0-9]{24}$/i;
+const PENDING_INVITATION = 1;
+const ACCEPTED_INVITATION = 2;
 
-exports.addUserMongodbV2 = (data) => {
-    return new Promise((resolve, reject) => {
-        try {
-            let obj = {
-                AssignCompany: data.assignCompany ? [data.assignCompany] : [],
-                Employee_FName:  data.firstName,
-                Employee_LName:  data.lastName,
-                Employee_Email: data.email,
-                Employee_Name:  data.firstName +' '+ data.lastName,
-                Time_Format: "12",
-                isDeleted: false,
-                isActive: true,
-                isOnline: false,
-                isEmailVerified: data.isInvitation,
-            }
-            if (data.isProductOwner) {
-                obj.isProductOwner = data.isProductOwner;
-            }
-            let object = {
-                type: dbCollections.USERS,
-                data: obj
-            }
-            try {
-                ctr.insertAuthFun({email: data.email, password: data.password}, (iUserRes) => {
-                    if (iUserRes.status) {
-                        object.data._id = iUserRes.data._id;
-                        mongoRef.MongoDbCrudOpration('global',object,'save').then((res)=>{
-                            resolve({status: true, statusText: res})
-                        }).catch((error)=>{
-                            reject(error)
-                        })
-                        return;
-                    }
-                    reject(iUserRes.message);
-                });
-            } catch (error) {
-                reject(error)
-            }
-        } catch (error) {
-            reject(error);
-        }
-    })
-}
+/* The body's assignCompany used to be taken on trust, which let anyone sign up straight
+ * into any company. A company admits only an email it has a pending invitation row for. */
+exports.findPendingInvitation = async ({ companyId, email, companyUserId }) => {
+    if (!OBJECT_ID_PATTERN.test(String(companyId || '')) || !email) return null;
+    const filter = { userEmail: String(email).trim().toLowerCase(), status: PENDING_INVITATION, isDelete: { $ne: true } };
+    if (companyUserId !== undefined) {
+        if (!OBJECT_ID_PATTERN.test(String(companyUserId || ''))) return null;
+        filter._id = new mongoose.Types.ObjectId(String(companyUserId));
+    }
+    return mongoRef.MongoDbCrudOpration(String(companyId), { type: SCHEMA_TYPE.COMPANY_USERS, data: [filter] }, 'findOne').catch(() => null);
+};
+
+/* Signing up from an invitation needs the invitation id and secret token the link carries,
+ * not only the invited address: that is what marks the address verified. */
+exports.admitInvitee = async (body) => {
+    const { memberId, linkId, ...registrant } = body;
+    if (!registrant.assignCompany && !registrant.isInvitation) return { ...registrant, isInvitation: false };
+    const invitation = memberId
+        ? await exports.findPendingInvitation({ companyId: registrant.assignCompany, email: registrant.email, companyUserId: memberId })
+        : null;
+    return invitation && linkTokenAccepted(invitation.linkId, linkId)
+        ? { ...registrant, isInvitation: true }
+        : { ...registrant, assignCompany: '', isInvitation: false };
+};
 
 
-/**
- * Create User API
- * @param {Objcet} req
- * @param {Object} res
- * @returns
- */
-exports.createUserV2 = (req,res) => {
+const REGISTRANT_FIELDS = ['firstName', 'lastName', 'email', 'password', 'assignCompany', 'isInvitation', 'memberId', 'linkId'];
+const REQUIRED_SIGNUP_FIELDS = [['firstName', 'First Name'], ['lastName', 'Last Name'], ['email', 'Email'], ['password', 'Password']];
+
+/* A signup never copies ownership, verification, billing or token fields from the request:
+ * isProductOwner alone opens the Instance console. Setup grants it in its own update. */
+exports.registrantFields = (body) => REGISTRANT_FIELDS.reduce((picked, field) => {
+    if (body && Object.prototype.hasOwnProperty.call(body, field)) picked[field] = body[field];
+    return picked;
+}, {});
+
+exports.buildUserDocument = ({ firstName, lastName, email, assignCompany, isInvitation }) => ({
+    AssignCompany: assignCompany ? [assignCompany] : [],
+    Employee_FName: firstName,
+    Employee_LName: lastName,
+    Employee_Email: email,
+    Employee_Name: `${firstName} ${lastName}`,
+    Time_Format: "12",
+    isDeleted: false,
+    isActive: true,
+    isOnline: false,
+    isEmailVerified: Boolean(isInvitation),
+    navPreferences: newAccountNavPreferences(),
+});
+
+exports.addUserMongodbV2 = (data) => new Promise((resolve, reject) => {
+    const object = { type: dbCollections.USERS, data: exports.buildUserDocument(data) };
+    ctr.insertAuthFun({ email: data.email, password: data.password }, (iUserRes) => {
+        if (!iUserRes.status) return reject(iUserRes.message);
+        object.data._id = iUserRes.data._id;
+        mongoRef.MongoDbCrudOpration(dbCollections.GLOBAL, object, 'save')
+            .then((res) => resolve({ status: true, statusText: toAuthView(res) }))
+            .catch(reject);
+    });
+});
+
+const isFilledString = (value) => typeof value === 'string' && value.trim() !== '';
+
+/* The token is stored before signup answers, so no write lands on it once the client holds the
+ * account; the mail is not awaited because SMTP must neither delay nor fail a signup. */
+const startEmailVerification = async ({ _id, Employee_Email }) => {
+    const logFailure = (error) => logger.error((error && error.statusText) || error);
     try {
-        if (!(req.body && req.body.firstName)) {
-            res.send({
-                status: false,
-                statusText: `First Name is required`
-            })
+        const token = await sendMailRef.storeVerificationToken(_id);
+        sendMailRef.mailVerificationLink(_id, Employee_Email, token).catch(logFailure);
+    } catch (error) {
+        logFailure(error);
+    }
+};
+
+exports.createUserV2 = (req, res) => {
+    try {
+        const registrant = exports.registrantFields(req.body);
+        const missing = REQUIRED_SIGNUP_FIELDS.find(([field]) => !isFilledString(registrant[field]));
+        if (missing) {
+            return res.send({ status: false, statusText: `${missing[1]} is required` });
         }
-        if (!(req.body && req.body.lastName)) {
-            res.send({
-                status: false,
-                statusText: `Last Name is required`
-            })
+        if (!meetsPasswordRule(registrant.password)) {
+            return res.send({ status: false, statusText: PASSWORD_RULE_MESSAGE });
         }
-        if (!(req.body && req.body.email)) {
-            res.send({
-                status: false,
-                statusText: `Email is required`
-            })
-        }
-        if (!(req.body && req.body.password)) {
-            res.send({
-                status: false,
-                statusText: `Password is required`
-            })
-        }
-        // CALL VALIDATE LICENCE FUNCTION HERE...............
-        exports.addUserMongodbV2(req.body).then((respo)=>{
-            if (!req.body.isInvitation) {
-                sendMailRef.sendVerificationEmailPromise(respo.statusText._id,respo.statusText.Employee_Email).catch((error)=>{
-                    logger.error(error.statusText);
-                })
-            }
-            try {
-                // if (process.env.PAYMENTMETHOD) {
-                //     paymentRef.createCustomerInPayment(respo.statusText._id).then(() => {
-                //         res.send(respo);
-                //     }).catch((error)=>{
-                //         logger.error(`Error create customer chargbee: ${error}`);
-                //         res.send({
-                //             status: false,
-                //             statusText: error
-                //         });
-                //     });
-                // } else {
-                //     res.send(respo);
-                // }
-                res.send(respo);
-            } catch (error) {
-                logger.error(`Error create customer In Payment: ${error}`);
-                res.send({
-                    status: false,
-                    statusText: error.message || error
-                });
-            }
-            // res.send(respo);
-        }).catch((error)=>{
+        let admitted = registrant;
+        exports.admitInvitee(registrant).then((body) => {
+            admitted = body;
+            return exports.addUserMongodbV2(body);
+        }).then(async (respo) => {
+            if (!admitted.isInvitation) await startEmailVerification(respo.statusText);
+            res.send(respo);
+        }).catch((error) => {
             res.send({
                 status: false,
                 statusText: error
-            })
-        })
+            });
+        });
     } catch (error) {
         res.send({
             status: false,
             statusText: `Error: ${error}`
-        })
-    }
-}
-
-/**
- * Generate JWT Token Function
- * @param {Object} req 
- * @param {Object} res 
- */
-exports.generateToken = async (req, res) => {
-    try {
-
-        if (!(req.body && req.body.uid)) {
-            res.status(400).json({
-                status: false,
-                statusText: "The user id is required."
-            });
-            return;
-        }
-
-        const {uid} = req.body;
-        let object = {
-            type: dbCollections.USERS,
-            data: [
-                {
-                    _id: uid
-                }
-            ]
-        }
-        mongoRef.MongoDbCrudOpration('global', object, "findOne").then(async (response) => {
-            const companyIds = response.AssignCompany && response.AssignCompany.length ? response.AssignCompany : [];
-            const token = await generateJWTToken({uid: uid, companyIds: companyIds});
-            res.json({
-                status: true,
-                statusText: "Jwt token generate successfully.",
-                token: token
-            });
-        }).catch((error) => {
-            logger.error(`Generate Jwt Token Error: ${error}`);
-            res.status(400).json({
-                status: false, 
-                error,
-                statusText: 'User not found.',
-            });
-        })
-    } catch (error) {
-        logger.error(`Generate Jwt Token Error: ${error}`);
-        res.status(400).json({
-            status: false,
-            statusText: "Authentication failed!"
         });
     }
-};
-
+}
 
 exports.verifyToken = (req, res) => {
     res.json({
@@ -192,317 +141,96 @@ exports.verifyToken = (req, res) => {
     });
 };
 
-/**
- * Sign up with google
- * @param {*} req 
- * @param {*} res 
- * @returns 
- */
-exports.googleSignup = async (req, res) => {
+const joinInvitedCompany = async ({ companyId, invitation, userId, provider }) => {
+    const claimed = await mongoRef.MongoDbCrudOpration(companyId, {
+        type: SCHEMA_TYPE.COMPANY_USERS,
+        data: [
+            { _id: invitation._id, status: PENDING_INVITATION, linkId: invitation.linkId },
+            { $set: { status: ACCEPTED_INVITATION, linkId: '', userId } },
+        ],
+    }, 'findOneAndUpdate');
+    if (!claimed) return false;
     try {
-        const { firstName, lastName, email, googleId, assignCompany, companyUserDocID } = req.body;
+        await recordInvitedOwner({ companyId, invitation, userId });
+    } catch (error) {
+        // An owner invitation is not accepted until the company names its new owner: the seat is given back, the
+        // account is made without the company, and the same link is accepted once the person is signed in.
+        logger.error(`${provider} signup: the invited owner was not recorded, so the invitation waits again: ${error?.message || error}`);
+        await mongoRef.MongoDbCrudOpration(companyId, {
+            type: SCHEMA_TYPE.COMPANY_USERS,
+            data: [
+                { _id: invitation._id, status: ACCEPTED_INVITATION, userId },
+                { $set: { status: PENDING_INVITATION, linkId: invitation.linkId, userId: invitation.userId || '' } },
+            ],
+        }, 'findOneAndUpdate');
+        return false;
+    }
+    await importUserNotifications(companyId, userId).catch((error) => {
+        logger.error(`Import notification setting error in ${provider} signup: ${error}`);
+    });
+    await addAndRemoveUserInMongodbNotificationCount(companyId, userId, 'Add').catch((error) => {
+        logger.error(`Add user in mongodb notification count error in ${provider} signup: ${error}`);
+    });
+    return true;
+};
 
-        // Validate Required Fields
-        if (!firstName || !lastName || !email || !googleId) {
-            return res.status(400).json({
-                status: false,
-                message: "First name, last name, email, and Google ID are required",
-            });
+/* The account's email is the one the provider verified, which is also the only reason it starts
+ * verified. An invitation admits the account only when the signup presents that invitation row
+ * and the link token it was sent with; otherwise the account is made as for anyone uninvited. */
+const socialSignup = (provider) => async (req, res) => {
+    const body = req.body || {};
+    const refuse = (statusCode, message) => res.status(statusCode).json({ status: false, message });
+    try {
+        const { firstName, lastName, assignCompany, companyUserDocID, linkId } = body;
+        if (!isFilledString(firstName) || !isFilledString(lastName)) {
+            return refuse(400, 'First name and last name are required');
         }
 
-        // Check if user already exists
-        const findObj = {
+        const identity = await verifySocialIdentity(provider, body);
+        if (!identity.email) return refuse(401, noVerifiedEmail(identity));
+        assertClaimedEmail(identity, body.email);
+        const { email, idField, providerId, label } = identity;
+
+        if (await findAuthByProviderId(identity)) {
+            return refuse(409, `This ${label} account is already linked to an account. Sign in instead.`);
+        }
+        if (await findAuth({ email })) {
+            return refuse(409, 'Email already exists');
+        }
+
+        const invitation = assignCompany && companyUserDocID
+            ? await exports.findPendingInvitation({ companyId: assignCompany, email, companyUserId: companyUserDocID })
+            : null;
+        const presented = invitation && linkTokenAccepted(invitation.linkId, linkId) ? invitation : null;
+
+        const authRes = await mongoRef.MongoDbCrudOpration(dbCollections.GLOBAL, {
             type: dbCollections.USER_AUTH,
-            data: [{ email }],
-        };
+            data: { email, [idField]: providerId, isBlocked: false },
+        }, 'save');
 
-        const existingUser = await mongoRef.MongoDbCrudOpration(dbCollections.GLOBAL, findObj, "findOne");
+        const joined = presented
+            && await joinInvitedCompany({ companyId: String(assignCompany), invitation: presented, userId: authRes._id, provider });
+        const invitedCompany = joined ? String(assignCompany) : '';
 
-        if (existingUser) {
-            // If already signed up via Google or Local, just return existing user
-            return res.status(409).json({
-                status: false,
-                message: "Email already exists"
-            });
-        }
-
-        // Create Auth Document (Google Only)
-        const authDoc = {
-            email,
-            googleId,
-            isBlocked: false,
-        };
-
-        const authObj = { type: dbCollections.USER_AUTH, data: authDoc };
-        const authRes = await mongoRef.MongoDbCrudOpration(dbCollections.GLOBAL, authObj, "save");
-
-        // Update user status in company users
-        if (assignCompany) {
-            const query = {
-                type: SCHEMA_TYPE.COMPANY_USERS,
-                data: [
-                    {
-                        _id: new mongoose.Types.ObjectId(companyUserDocID)
-                    },
-                    {
-                        $set: {
-                            status: 2,
-                            userId: authRes._id
-                        }
-                    }
-                ]
-            }
-            await mongoRef.MongoDbCrudOpration(assignCompany, query, 'findOneAndUpdate');
-
-            // Import notification settings
-            await importUserNotifications(assignCompany, authRes._id).catch((error) => {
-                logger.error(`Import notification setting error in googleSignup hook: ${error}`);
-            });
-
-            // Add notification count object
-            await addAndRemoveUserInMongodbNotificationCount(assignCompany, authRes._id, "add").catch((error) => {
-                logger.error(`Add user in mongodb notification count error in googleSignup hook: ${error}`);
-            });
-        }
-
-        // Create User Document
         const userDoc = {
+            ...exports.buildUserDocument({ firstName, lastName, email, assignCompany: invitedCompany }),
             _id: authRes._id,
-            AssignCompany: assignCompany ? [assignCompany] : [],
-            Employee_FName: firstName,
-            Employee_LName: lastName,
-            Employee_Email: email,
-            Employee_Name: `${firstName} ${lastName}`,
-            Time_Format: "12",
-            isDeleted: false,
-            isActive: true,
-            isOnline: false,
-            isEmailVerified: true, // Google email is already verified
+            isEmailVerified: true,
         };
-
-        const userObj = { type: dbCollections.USERS, data: userDoc };
-        const userRes = await mongoRef.MongoDbCrudOpration(dbCollections.GLOBAL, userObj, "save");
+        const userRes = await mongoRef.MongoDbCrudOpration(dbCollections.GLOBAL, { type: dbCollections.USERS, data: userDoc }, 'save');
 
         return res.status(200).json({
             status: true,
-            message: "Google signup successful",
-            data: userRes,
+            message: `${label} signup successful`,
+            data: toAuthView(userRes),
         });
     } catch (error) {
-        logger.error(`Google Signup API Error: ${error.message}`);
-        return res.status(500).json({
-            status: false,
-            message: error.message || "Internal Server Error",
-        });
+        if (error instanceof SocialSignInRefusal) return refuse(error.statusCode, error.message);
+        logger.error(`${provider} signup error: ${error.message}`);
+        return refuse(500, error.message || 'Internal Server Error');
     }
 };
 
-/**
- * Sign up with github
- * @param {*} req 
- * @param {*} res 
- * @returns 
- */
-exports.githubSignup = async (req, res) => {
-    try {
-        const { firstName, lastName, email, githubId, assignCompany, companyUserDocID } = req.body;
-
-        // Validate Required Fields
-        if (!firstName || !lastName || !email || !githubId) {
-            return res.status(400).json({
-                status: false,
-                message: "First name, last name, email, and Github ID are required",
-            });
-        }
-
-        // Check if user already exists
-        const findObj = {
-            type: dbCollections.USER_AUTH,
-            data: [{ email }],
-        };
-
-        const existingUser = await mongoRef.MongoDbCrudOpration(dbCollections.GLOBAL, findObj, "findOne");
-
-        if (existingUser) {
-            // If already signed up via Github or Local, just return existing user
-            return res.status(409).json({
-                status: false,
-                message: "Email already exists"
-            });
-        }
-
-        // Create Auth Document (Google Only)
-        const authDoc = {
-            email,
-            githubId,
-            isBlocked: false,
-        };
-
-        const authObj = { type: dbCollections.USER_AUTH, data: authDoc };
-        const authRes = await mongoRef.MongoDbCrudOpration(dbCollections.GLOBAL, authObj, "save");
-
-        // Update user status in company users
-        if (assignCompany) {
-            const query = {
-                type: SCHEMA_TYPE.COMPANY_USERS,
-                data: [
-                    {
-                        _id: new mongoose.Types.ObjectId(companyUserDocID)
-                    },
-                    {
-                        $set: {
-                            status: 2,
-                            userId: authRes._id
-                        }
-                    }
-                ]
-            }
-            await mongoRef.MongoDbCrudOpration(assignCompany, query, 'findOneAndUpdate');
-
-            // Import notification settings
-            await importUserNotifications(assignCompany, authRes._id).catch((error) => {
-                logger.error(`Import notification setting error in githubSignup hook: ${error}`);
-            });
-
-            // Add notification count object
-            await addAndRemoveUserInMongodbNotificationCount(assignCompany, authRes._id, "add").catch((error) => {
-                logger.error(`Add user in mongodb notification count error in googleSignup hook: ${error}`);
-            });
-        }
-
-        // Create User Document
-        const userDoc = {
-            _id: authRes._id,
-            AssignCompany: assignCompany ? [assignCompany] : [],
-            Employee_FName: firstName,
-            Employee_LName: lastName,
-            Employee_Email: email,
-            Employee_Name: `${firstName} ${lastName}`,
-            Time_Format: "12",
-            isDeleted: false,
-            isActive: true,
-            isOnline: false,
-            isEmailVerified: true, // Github email is already verified
-        };
-
-        const userObj = { type: dbCollections.USERS, data: userDoc };
-        const userRes = await mongoRef.MongoDbCrudOpration(dbCollections.GLOBAL, userObj, "save");
-
-        return res.status(200).json({
-            status: true,
-            message: "Github signup successful",
-            data: userRes,
-        });
-    } catch (error) {
-        logger.error(`Github Signup API Error: ${error.message}`);
-        return res.status(500).json({
-            status: false,
-            message: error.message || "Internal Server Error",
-        });
-    }
-};
-
-/**
- * Sign up with gitlab
- * @param {*} req
- * @param {*} res
- * @returns
- */
-exports.gitlabSignup = async (req, res) => {
-    try {
-        const { firstName, lastName, email, gitlabId, assignCompany, companyUserDocID } = req.body;
-
-        // Validate Required Fields
-        if (!firstName || !lastName || !email || !gitlabId) {
-            return res.status(400).json({
-                status: false,
-                message: "First name, last name, email, and GitLab ID are required",
-            });
-        }
-
-        // Check if user already exists
-        const findObj = {
-            type: dbCollections.USER_AUTH,
-            data: [{ email }],
-        };
-
-        const existingUser = await mongoRef.MongoDbCrudOpration(dbCollections.GLOBAL, findObj, "findOne");
-
-        if (existingUser) {
-            // If already signed up via GitLab or Local, just return existing user
-            return res.status(409).json({
-                status: false,
-                message: "Email already exists"
-            });
-        }
-
-        // Create Auth Document (GitLab Only)
-        const authDoc = {
-            email,
-            gitlabId,
-            isBlocked: false,
-        };
-
-        const authObj = { type: dbCollections.USER_AUTH, data: authDoc };
-        const authRes = await mongoRef.MongoDbCrudOpration(dbCollections.GLOBAL, authObj, "save");
-
-        // Update user status in company users
-        if (assignCompany) {
-            const query = {
-                type: SCHEMA_TYPE.COMPANY_USERS,
-                data: [
-                    {
-                        _id: new mongoose.Types.ObjectId(companyUserDocID)
-                    },
-                    {
-                        $set: {
-                            status: 2,
-                            userId: authRes._id
-                        }
-                    }
-                ]
-            }
-            await mongoRef.MongoDbCrudOpration(assignCompany, query, 'findOneAndUpdate');
-
-            // Import notification settings
-            await importUserNotifications(assignCompany, authRes._id).catch((error) => {
-                logger.error(`Import notification setting error in gitlabSignup hook: ${error}`);
-            });
-
-            // Add notification count object
-            await addAndRemoveUserInMongodbNotificationCount(assignCompany, authRes._id, "add").catch((error) => {
-                logger.error(`Add user in mongodb notification count error in gitlabSignup hook: ${error}`);
-            });
-        }
-
-        // Create User Document
-        const userDoc = {
-            _id: authRes._id,
-            AssignCompany: assignCompany ? [assignCompany] : [],
-            Employee_FName: firstName,
-            Employee_LName: lastName,
-            Employee_Email: email,
-            Employee_Name: `${firstName} ${lastName}`,
-            Time_Format: "12",
-            isDeleted: false,
-            isActive: true,
-            isOnline: false,
-            isEmailVerified: true, // GitLab email is already verified
-        };
-
-        const userObj = { type: dbCollections.USERS, data: userDoc };
-        const userRes = await mongoRef.MongoDbCrudOpration(dbCollections.GLOBAL, userObj, "save");
-
-        return res.status(200).json({
-            status: true,
-            message: "Gitlab signup successful",
-            data: userRes,
-        });
-    } catch (error) {
-        logger.error(`Gitlab Signup API Error: ${error.message}`);
-        return res.status(500).json({
-            status: false,
-            message: error.message || "Internal Server Error",
-        });
-    }
-};
+exports.googleSignup = socialSignup('google');
+exports.githubSignup = socialSignup('github');
+exports.gitlabSignup = socialSignup('gitlab');

@@ -1,0 +1,685 @@
+<template>
+    <div v-if="selection.hasSelection.value" ref="bar" class="lv2-bulk" role="region" :aria-label="$t('List.bulk_region')">
+        <span class="lv2-bulk__count" data-bulk-fixed>{{ $t('List.selected', { n: selection.count.value }) }}</span>
+        <button type="button" class="lv2-bulk__clear" data-bulk-fixed :aria-label="$t('BulkActions.clear_selection')" :title="$t('BulkActions.clear_selection')" @click.stop="selection.clear()">
+            <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18" /></svg>
+        </button>
+
+        <span
+            v-for="host in hosts"
+            :key="host.key"
+            class="lv2-bulk__menu-wrap"
+            :class="{ 'lv2-bulk__more': host.more, 'is-unused': host.unused }"
+            :data-bulk-action="host.more ? null : host.key"
+            :data-bulk-more="host.more ? '' : null"
+            :aria-hidden="host.unused ? 'true' : null"
+        >
+            <button
+                type="button"
+                class="lv2-bulk__btn"
+                :class="host.tone ? `lv2-bulk__btn--${host.tone}` : null"
+                :disabled="working || !host.enabled || host.unused"
+                :aria-expanded="host.run ? null : String(Boolean(host.panel))"
+                @click.stop="activate(host)"
+            >{{ host.label }}<template v-if="!host.run && !host.plain"> ▾</template></button>
+            <div v-if="host.panel" class="lv2-bulk__menu" @click.stop>
+                <CalenderCompo
+                    v-if="host.panel.calendar"
+                    modelValue=""
+                    :hideExtraLayouts="['time', 'minutes', 'hours', 'seconds']"
+                    menuClass="calender-menu-class-duedate"
+                    @update:modelValue="pickDue"
+                >
+                    <template #trigger>
+                        <button type="button" class="lv2-bulk__item">{{ $t('List.bulk_due_pick') }}</button>
+                    </template>
+                </CalenderCompo>
+                <button
+                    v-for="option in host.panel.options"
+                    :key="option.id"
+                    type="button"
+                    class="lv2-bulk__item"
+                    :class="{ 'lv2-bulk__item--split': option.split, 'lv2-bulk__item--danger': option.danger }"
+                    :disabled="option.disabled"
+                    :title="option.title"
+                    :aria-pressed="option.pressed"
+                    v-bind="option.attrs"
+                    @click="option.action ? option.action() : host.panel.pick(option)"
+                >
+                    <span v-if="option.pressed" class="lv2-bulk__check" aria-hidden="true">{{ PRESSED_MARK[option.pressed] }}</span>
+                    <span v-if="option.color" class="lv2-bulk__dot" :style="{ background: option.color }"></span>
+                    {{ option.label }}
+                </button>
+                <p v-if="host.panel.note" class="lv2-bulk__note">{{ host.panel.note }}</p>
+                <p v-else-if="!host.panel.options.length && !host.panel.calendar" class="lv2-bulk__note">{{ $t('List.bulk_no_options') }}</p>
+            </div>
+        </span>
+
+        <span class="lv2-bulk__esc" data-bulk-fixed>{{ $t('List.esc') }}</span>
+    </div>
+    <ConfirmationSidebar
+        v-if="confirmOpen"
+        v-model="confirmOpen"
+        :title="pending === 'bulkTrash' ? $t('Projects.bulk_delete') : $t('Projects.bulk_archive')"
+        :message="$t(pending === 'bulkTrash' ? 'Projects.bulk_delete_confirm' : 'Projects.bulk_archive_confirm', { n: selection.count.value })"
+        :confirmationString="pending === 'bulkTrash' ? 'delete' : 'archive'"
+        :acceptButtonClass="pending === 'bulkTrash' ? 'btn-danger' : 'btn-primary'"
+        :acceptButton="pending === 'bulkTrash' ? $t('Projects.bulk_delete') : $t('Projects.bulk_archive')"
+        :showSpinner="working"
+        @confirm="runConfirmed"
+    />
+    <ConvertToSubTaskSidebar
+        v-if="placing"
+        :key="placing"
+        :closeSideBar="true"
+        :isMoveTask="placing !== 'subtask'"
+        :isBulkMove="placing !== 'subtask'"
+        :isOpenSubTask="placing === 'subtask'"
+        :isBulkConvert="placing === 'subtask'"
+        :task="{}"
+        :projectOptions="pickerProjects"
+        :listPicker="placing === 'list' ? listPicker : null"
+        @isConvertSubtaskOPen="placing = ''"
+        @bulkMoveConfirm="onDestinationPicked"
+        @bulkConvertConfirm="onParentPicked"
+    />
+    <div v-if="undo && !selection.hasSelection.value" class="lv2-undo" role="status">
+        <span>{{ undo.text }}</span>
+        <button v-if="undo.requests.length" type="button" class="lv2-undo__btn" :disabled="working" @click="runUndo">{{ $t('List.bulk_undo') }}</button>
+    </div>
+</template>
+
+<script setup>
+import { computed, defineAsyncComponent, inject, nextTick, onBeforeUnmount, onMounted, ref, watch } from "vue";
+import { canUseAi } from "@/composable/aiAvailability";
+import { useStore } from "vuex";
+import { useToast } from "vue-toast-notification";
+import { useI18n } from "vue-i18n";
+import { apiRequest } from "@/services";
+import * as env from "@/config/env";
+import { useCustomComposable, useGetterFunctions } from "@/composable";
+import { useTaskSelection } from "@/composable/useTaskSelection.js";
+import { useTaskSummaries } from "@/views/Projects/TableView/useTaskSummaries.js";
+import { useProjectCustomFields } from "@/views/Projects/composables/projectCustomFields";
+import { isAiField } from "@/views/Projects/composables/aiFields";
+import { openAiFill } from "@/composable/aiFieldFill";
+import { useOtherProjectRules } from "@/composable/otherProjectRules";
+import { snapshotTasks, statusPayload, undoRequests } from "./bulkUndo.js";
+import { bulkReport, convertTargets, moveTargets, parentTargets, placementActions, selectionShape } from "./bulkPlacement.js";
+import { priorityAppOn, projectHasApp } from "./listRowEdit.js";
+import { PHONE_INLINE_LIMIT, fitInline } from "./bulkBarFit.js";
+import { placedSprint } from "@/views/Projects/composables/taskPlacement";
+import { holdOwnBulkLeave } from "@/utils/taskUpdateMarker";
+import { MAX_EXTRA_LISTS, addTargets, offersAnyTask, refusalCodeOf, refusalKey } from "@/components/organisms/TaskDetailOverlay/taskLists";
+import ConfirmationSidebar from "@/components/molecules/ConfirmationSidebar/ConfirmationSidebar.vue";
+import CalenderCompo from "@/components/atom/CalenderCompo/CalenderCompo.vue";
+
+const ConvertToSubTaskSidebar = defineAsyncComponent(() => import("@/components/molecules/ConvertToSubTaskSidebar/ConvertToSubTaskSidebar.vue"));
+
+defineOptions({ name: "ListBulkBar" });
+
+const props = defineProps({
+    project: { type: Object, required: true }
+});
+
+const { t } = useI18n();
+const store = useStore();
+const { getters } = store;
+const $toast = useToast();
+const { getUser } = useGetterFunctions();
+const { checkPermission } = useCustomComposable();
+const selection = useTaskSelection();
+const summaries = useTaskSummaries();
+const userId = inject("$userId");
+
+const open = ref("");
+const working = ref(false);
+
+const can = (key) => checkPermission(key, props.project?.isGlobalPermission) === true;
+const canStatus = computed(() => can("task.task_status"));
+const canPriority = computed(() => can("task.task_priority"));
+const canAssign = computed(() => can("task.task_assignee"));
+const canDue = computed(() => can("task.task_due_date"));
+const canMove = computed(() => can("task.task_move") || canStatus.value);
+const canTag = computed(() => can("task.task_tag") || canStatus.value);
+const canArchive = computed(() => can("task.task_archive"));
+const canDelete = computed(() => can("task.task_delete"));
+const canMakeSubtasks = computed(() => can("task.task_convert_to_subtask") && can("task.sub_task_create"));
+const canMakeTasks = computed(() => can("task.convert_to_task") && can("task.task_create"));
+
+const PRESSED_MARK = { true: "✓", mixed: "–", false: "" };
+const selectedTasks = computed(() => Object.values(snapshotTasks(store.state.projectData, selection.selectedTaskIds.value)));
+function pressed(field, value) {
+    const hits = selectedTasks.value.filter((task) => (task[field] || []).includes(String(value))).length;
+    if (!hits) return "false";
+    return hits === selectedTasks.value.length ? "true" : "mixed";
+}
+
+const placement = computed(() => placementActions(
+    selectionShape(store.state.projectData, selection.selectedTaskIds.value),
+    { move: canMove.value, toSubtask: canMakeSubtasks.value, toTask: canMakeTasks.value, addToList: can("task.task_move") }
+));
+const offered = (state) => ({ disabled: !state.enabled, title: state.enabled ? null : t(state.reason) });
+
+const confirmOpen = ref(false);
+const pending = ref("");
+function ask(action) {
+    open.value = "";
+    pending.value = action;
+    confirmOpen.value = true;
+}
+async function runConfirmed() {
+    await run(pending.value, {});
+    confirmOpen.value = false;
+}
+
+const statuses = computed(() => (props.project?.taskStatusData || []).map((status) => ({
+    id: status.key, label: status.name, color: status.textColor, raw: status
+})));
+
+const people = computed(() => {
+    const ids = props.project?.isPrivateSpace
+        ? (props.project?.AssigneeUserId || [])
+        : (getters["settings/companyUsers"] || []).filter((user) => user && user.isDelete === false).map((user) => user.userId);
+    const seen = new Set();
+    return ids.reduce((list, id) => {
+        const key = String(id || "");
+        if (!key || seen.has(key)) return list;
+        seen.add(key);
+        const user = getUser(key);
+        if (!user || user.ghostUser) return list;
+        list.push({ id: key, label: user.Employee_Name || key, pressed: pressed("AssigneeUserId", key) });
+        return list;
+    }, []);
+});
+
+const sprints = computed(() => {
+    const direct = Object.values(props.project?.sprintsObj || {});
+    const inFolders = Object.values(props.project?.sprintsfolders || {})
+        .flatMap((folder) => Object.values(folder?.sprintsObj || {}));
+    const move = offered(placement.value.moveProject);
+    const here = [...direct, ...inFolders]
+        .filter((sprint) => sprint && !sprint.deletedStatusKey)
+        .map((sprint) => ({ id: sprint.id, label: sprint.name, raw: sprint, ...(placement.value.moveProject.enabled ? {} : move) }));
+    return [
+        ...here,
+        { id: "another-project", label: t("List.bulk_move_project"), split: here.length > 0, ...move, action: () => place("project") },
+        { id: "add-to-list", label: t("TaskLists.bulk_add"), split: true, ...offered(placement.value.addToList), action: () => place("list") }
+    ];
+});
+
+const tags = computed(() => (props.project?.tagsArray || []).map((tag) => {
+    const id = tag.uid || tag._id || tag.id;
+    return { id, label: tag.tagName || tag.name, raw: tag, pressed: pressed("tagsArray", id) };
+}));
+
+const conversions = computed(() => [
+    { id: "to-subtask", label: t("BulkActions.convert_subtask_title"), ...offered(placement.value.toSubtask), action: () => place("subtask") },
+    { id: "to-task", label: t("BulkActions.convert_task_title"), ...offered(placement.value.toTask), action: () => place("task") }
+]);
+
+const priorities = computed(() => getters["settings/companyPriority"] || []);
+const showPriority = computed(() => priorityAppOn(props.project, getters["settings/selectedCompany"]?.planFeature));
+
+const aiOptions = computed(() => [
+    { id: "summarise", label: t("List.ai_summarise"), action: summarise },
+    ...aiFields.value.map((field) => ({
+        id: field._id,
+        label: t("AiFields.bulk_fill", { field: field.fieldTitle, n: selection.count.value }, selection.count.value),
+        attrs: { "data-ai-field-fill": field._id },
+        action: () => fillAiField(field)
+    }))
+]);
+
+/* Every action the bar offers, defined once: the bar and its More menu both read this list.
+ * One with `run` acts at once; the others open a menu of options. */
+const actions = computed(() => [
+    { key: "status", label: t("List.status"), enabled: canStatus.value, options: statuses.value, pick: pickStatus },
+    showPriority.value && {
+        key: "priority", label: t("List.priority"), enabled: canPriority.value,
+        options: priorities.value.map((priority) => ({ id: priority.value, label: priority.name, raw: priority })), pick: pickPriority
+    },
+    { key: "assignee", label: t("List.assignee"), enabled: canAssign.value, options: people.value, pick: pickAssignee },
+    {
+        key: "due", label: t("List.due_date"), enabled: canDue.value, calendar: true,
+        options: [{ id: "clear", label: t("List.bulk_due_clear") }], pick: () => run("bulkUpdateDueDate", { DueDate: null })
+    },
+    { key: "sprint", label: t("List.sprint"), enabled: canMove.value, options: sprints.value, pick: pickSprint },
+    { key: "tags", label: t("List.tags"), enabled: canTag.value, options: tags.value, pick: pickTag },
+    { key: "convert", label: t("List.bulk_convert"), enabled: canMakeSubtasks.value || canMakeTasks.value, options: conversions.value },
+    canUseAi({ project: props.project }) && {
+        key: "ai", label: `✦ ${t("List.ask_ai")}`, tone: "ai", plain: true, enabled: true, options: aiOptions.value, note: t("List.ai_scope_note")
+    },
+    canArchive.value && { key: "archive", label: t("Projects.bulk_archive"), enabled: true, run: () => ask("bulkArchive") },
+    canDelete.value && { key: "delete", label: t("Projects.bulk_delete"), tone: "danger", enabled: true, run: () => ask("bulkTrash") }
+].filter(Boolean));
+
+const bar = ref(null);
+const clientWidth = inject("$clientWidth", ref(1280));
+const onPhone = computed(() => (clientWidth?.value || 1280) <= 767);
+/* null until the bar has been measured, and again while it is being measured: everything is in the bar then. */
+const inlineKeys = ref(null);
+const isInline = (action) => !inlineKeys.value || inlineKeys.value.includes(action.key);
+const overflow = computed(() => actions.value.filter((action) => !isInline(action)));
+
+const more = computed(() => ({
+    key: "more",
+    more: true,
+    unused: !overflow.value.length,
+    label: t("List.bulk_more"),
+    enabled: true,
+    options: overflow.value.map((action) => ({
+        id: action.key,
+        label: action.label,
+        danger: action.tone === "danger",
+        disabled: !action.enabled,
+        attrs: { "data-bulk-item": action.key },
+        action: () => activate(action)
+    }))
+}));
+
+/* More also shows the options of an action picked from its list, whose own button is not in the bar. */
+function panelFor(host) {
+    if (open.value === host.key) return host;
+    return host.more ? overflow.value.find((action) => action.key === open.value && !action.run) || null : null;
+}
+
+const hosts = computed(() => [...actions.value.filter(isInline), more.value].map((host) => ({ ...host, panel: panelFor(host) })));
+
+function toggle(key) {
+    open.value = open.value === key ? "" : key;
+}
+
+function activate(action) {
+    if (action.run) action.run();
+    else toggle(action.key);
+}
+
+/* The bar measures itself rather than the window: its width also depends on the rail and
+ * the project tree beside it. Every action is put back in the bar first, so each is laid
+ * out and has a width to read. */
+async function fit() {
+    if (!bar.value) return;
+    inlineKeys.value = null;
+    await nextTick();
+    const el = bar.value;
+    if (!el) return;
+    const style = getComputedStyle(el);
+    const gap = parseFloat(style.columnGap) || 0;
+    const fixed = [...el.querySelectorAll("[data-bulk-fixed]")].map((node) => node.offsetWidth).filter(Boolean);
+    const available = el.clientWidth
+        - (parseFloat(style.paddingLeft) || 0) - (parseFloat(style.paddingRight) || 0)
+        - fixed.reduce((total, width) => total + width, 0) - gap * Math.max(0, fixed.length - 1);
+    inlineKeys.value = fitInline(
+        [...el.querySelectorAll("[data-bulk-action]")].map((node) => ({ key: node.dataset.bulkAction, width: node.offsetWidth })),
+        { available, moreWidth: el.querySelector("[data-bulk-more]")?.offsetWidth || 0, gap, limit: onPhone.value ? PHONE_INLINE_LIMIT : Infinity }
+    );
+}
+
+function userData() {
+    const me = getUser(userId?.value);
+    return {
+        id: me?.id || String(userId?.value || ""),
+        Employee_Name: me?.Employee_Name || "",
+        companyOwnerId: getters["settings/companyOwnerDetail"]?.userId || ""
+    };
+}
+
+const UNDO_MS = 6000;
+const undo = ref(null);
+let undoTimer = null;
+
+function showUndo(text, requests) {
+    clearTimeout(undoTimer);
+    undo.value = { text, requests };
+    undoTimer = setTimeout(() => { undo.value = null; }, UNDO_MS);
+}
+
+/* Sprint badges are not socket-driven, and these actions change which sprint a task counts in. */
+const RELOCATING = new Set(["bulkMove", "bulkConvertToTask", "bulkConvertToSubTask"]);
+
+async function refreshSprintCounts() {
+    const pid = props.project?._id;
+    if (!pid) return;
+    try {
+        const res = await apiRequest("get", `/api/v1/${env.GET_SPRINT_OR_PROJECT}/${pid}?collection=sprints`);
+        (Array.isArray(res?.data) ? res.data : []).forEach((row) => {
+            store.commit("projectData/mutateSprints", { op: "modified", data: { ...row, id: row._id } });
+        });
+    } catch (error) {
+        console.error("ERROR refreshing sprint counts: ", error);
+    }
+}
+
+const nameOf = (id) => getUser(id)?.Employee_Name || "";
+
+async function run(action, payload) {
+    if (working.value) return;
+    working.value = true;
+    open.value = "";
+    const taskIds = [...selection.selectedTaskIds.value];
+    const before = snapshotTasks(store.state.projectData, taskIds);
+    const answered = holdOwnBulkLeave(action, taskIds);
+    try {
+        const response = await apiRequest("post", env.V2_TASKS_BULK, {
+            action,
+            taskIds,
+            userData: userData(),
+            ...payload
+        });
+        if (response?.data?.status === false) {
+            $toast.error(response.data.statusText || t("List.bulk_failed"));
+            return;
+        }
+        const result = response?.data?.data || {};
+        const updatedIds = Array.isArray(result.updated) ? result.updated : taskIds;
+        const report = bulkReport(result, t);
+        if (report) $toast.warning(report);
+        if (updatedIds.length) {
+            const requests = undoRequests({ action, payload, before, updatedIds, project: props.project, priorities: priorities.value, nameOf });
+            showUndo(t("List.bulk_done", { n: result.totals?.updated ?? updatedIds.length }, result.totals?.updated ?? updatedIds.length), requests);
+        }
+        selection.clear();
+        if (RELOCATING.has(action)) refreshSprintCounts();
+    } catch (error) {
+        $toast.error(error?.response?.data?.statusText || error?.message || t("List.bulk_failed"));
+    } finally {
+        answered();
+        working.value = false;
+    }
+}
+
+async function runUndo() {
+    const requests = undo.value?.requests || [];
+    clearTimeout(undoTimer);
+    undo.value = null;
+    if (!requests.length || working.value) return;
+    working.value = true;
+    try {
+        for (const request of requests) {
+            const answered = holdOwnBulkLeave(request.action, request.taskIds);
+            const response = await apiRequest("post", env.V2_TASKS_BULK, { ...request, userData: userData() }).finally(answered);
+            if (response?.data?.status === false) throw new Error(response.data.statusText);
+        }
+        $toast.success(t("List.bulk_undone"));
+        if (requests.some((request) => RELOCATING.has(request.action))) refreshSprintCounts();
+    } catch (error) {
+        $toast.error(t("List.bulk_undo_failed"));
+    } finally {
+        working.value = false;
+    }
+}
+
+function pickStatus(option) {
+    run("bulkUpdateStatus", { newStatus: statusPayload(option.raw) });
+}
+
+function pickPriority(option) {
+    const name = option.raw.name;
+    run("bulkUpdatePriority", { firebaseObj: { Task_Priority: option.raw.value }, priorityObj: { priorityName: name, newPriorityName: name } });
+}
+
+function pickDue(date) {
+    if (date) run("bulkUpdateDueDate", { DueDate: date });
+}
+
+function pickAssignee(option) {
+    const type = option.pressed === "true" ? "assigneRemove"
+        : projectHasApp(props.project, "MultipleAssignees") ? "assigneeAdd" : "replace";
+    run("bulkUpdateAssignee", { type, employeeId: [String(option.id)], employeeName: option.label });
+}
+
+function pickSprint(option) {
+    run("bulkMove", {
+        sprintObj: placedSprint(option.raw),
+        projectData: { id: props.project._id, ProjectCode: props.project.ProjectCode, ProjectName: props.project.ProjectName }
+    });
+}
+
+function pickTag(option) {
+    if (!option.id) return;
+    run("bulkUpdateTags", { tagId: option.id, operation: option.pressed === "true" ? "remove" : "add" });
+}
+
+const placing = ref("");
+const otherRules = useOtherProjectRules();
+const activeProjects = computed(() => getters["projectData/onlyActiveProjects"]?.data || []);
+const TARGETS = { project: moveTargets, subtask: parentTargets, task: convertTargets, list: addTargets };
+const listPicker = computed(() => ({ title: t("TaskLists.bulk_add"), confirm: t("TaskLists.add_confirm"), note: t("TaskLists.bulk_add_note"), offers: offersAnyTask }));
+const pickerProjects = computed(() => (placing.value ? TARGETS[placing.value](activeProjects.value, otherRules.check) : []));
+
+function place(kind) {
+    open.value = "";
+    placing.value = kind;
+    otherRules.loadAll(activeProjects.value);
+}
+
+const destinationOf = (project) => ({ id: project._id, ProjectCode: project.ProjectCode, ProjectName: project.ProjectName });
+
+function onDestinationPicked({ project: destination, sprint } = {}) {
+    const kind = placing.value;
+    placing.value = "";
+    if (!destination?._id || !sprint?.id) return;
+    if (kind === "list") {
+        addToList(sprint);
+        return;
+    }
+    run(kind === "task" ? "bulkConvertToTask" : "bulkMove", { sprintObj: placedSprint(sprint), projectData: destinationOf(destination) });
+}
+
+const commonestCode = (skipped) => {
+    const counts = new Map();
+    skipped.forEach((entry) => counts.set(entry?.code || "", (counts.get(entry?.code || "") || 0) + 1));
+    return [...counts].sort((a, b) => b[1] - a[1])[0]?.[0] || "";
+};
+
+/* Each task is judged alone by the server; the ones it leaves out come back with the rule that held them. */
+async function addToList(sprint) {
+    if (working.value) return;
+    working.value = true;
+    try {
+        const response = await apiRequest("post", env.V2_TASKS_BULK, { action: "bulkAddToList", taskIds: [...selection.selectedTaskIds.value], sprintId: String(sprint.id) });
+        if (response?.data?.status !== true) throw response;
+        const { added = [], skipped = [] } = response.data.data || {};
+        if (skipped.length) $toast.warning(t("TaskLists.bulk_skipped", { n: skipped.length, reason: t(refusalKey(commonestCode(skipped)), { max: MAX_EXTRA_LISTS }) }));
+        if (added.length) $toast.success(t("TaskLists.bulk_added", { n: added.length, list: sprint.name || "" }));
+        selection.clear();
+    } catch (error) {
+        $toast.error(t(refusalKey(refusalCodeOf(error)), { max: MAX_EXTRA_LISTS }));
+    } finally {
+        working.value = false;
+    }
+}
+
+function onParentPicked({ task } = {}) {
+    placing.value = "";
+    if (task?._id) run("bulkConvertToSubTask", { parentTaskId: String(task._id) });
+}
+
+const customFields = useProjectCustomFields(computed(() => props.project));
+const aiFields = computed(() => (customFields.canEdit.value ? customFields.defs.value.filter(isAiField) : []));
+
+function fillAiField(field) {
+    open.value = "";
+    openAiFill(field, [...selection.selectedTaskIds.value]);
+}
+
+async function summarise() {
+    open.value = "";
+    const ids = [...selection.selectedTaskIds.value];
+    const result = await summaries.generateMany(ids);
+    if (result.failed && !result.done) $toast.error(t("List.ai_unavailable"));
+    else $toast.success(t("List.ai_summarised", { n: result.done }, result.done));
+}
+
+// Pickers and menus close themselves on Esc; the selection stays.
+const OWN_LAYERS = ".dp__menu, [role=\"dialog\"], [role=\"menu\"], [role=\"listbox\"], .lv2__rename";
+
+function onKey(event) {
+    if (event.key !== "Escape" || event.defaultPrevented) return;
+    if (event.target?.closest?.(OWN_LAYERS)) return;
+    if (placing.value) return;
+    if (open.value) { open.value = ""; return; }
+    if (selection.hasSelection.value) selection.clear();
+}
+// The due-date calendar is teleported to <body>; paging its months must not close the menu that owns it.
+function onClick(event) {
+    if (event.target?.closest?.(".dp__outer_menu_wrap, .dp__menu")) return;
+    open.value = "";
+}
+
+let barObserver = null;
+watch(bar, (el) => {
+    barObserver?.disconnect();
+    barObserver = null;
+    if (!el) return;
+    fit();
+    if (typeof ResizeObserver === "undefined") return;
+    barObserver = new ResizeObserver(() => fit());
+    barObserver.observe(el);
+}, { flush: "post" });
+watch(
+    () => [onPhone.value, selection.count.value, ...actions.value.map((action) => `${action.key}:${action.label}`)].join("|"),
+    fit,
+    { flush: "post" }
+);
+
+onMounted(() => {
+    document.addEventListener("keydown", onKey);
+    document.addEventListener("click", onClick);
+});
+onBeforeUnmount(() => {
+    clearTimeout(undoTimer);
+    barObserver?.disconnect();
+    document.removeEventListener("keydown", onKey);
+    document.removeEventListener("click", onClick);
+});
+</script>
+
+<style>
+.lv2-bulk {
+    height: 40px;
+    flex: none;
+    background: var(--rail);
+    color: var(--rail-ink-strong);
+    display: flex;
+    align-items: center;
+    padding: 0 20px;
+    gap: 14px;
+    font-size: var(--fs-md, 12.5px);
+    white-space: nowrap;
+    position: relative;
+    z-index: 4;
+}
+/* Nothing shrinks or wraps: what does not fit is moved behind More by the bar itself. */
+.lv2-bulk > * { flex: none; }
+/* More keeps its place in the layout tree while unused, so its width can be read. */
+.lv2-bulk__more.is-unused { position: absolute; visibility: hidden; pointer-events: none; }
+.lv2-bulk__more .lv2-bulk__menu { left: auto; right: 0; }
+/* In flow the bar's 40px came out of the list's height, so the first checkbox click
+   moved every row out from under the pointer. Table and Board mount this same bar in
+   containers that are not positioned, so only the list takes it out of flow. */
+.lv2 > .lv2-bulk {
+    position: absolute;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    z-index: 3;
+}
+.lv2 > .lv2-bulk ~ .lv2__scroll { padding-bottom: 48px; }
+.lv2-undo {
+    position: fixed;
+    left: 50%;
+    bottom: 24px;
+    transform: translateX(-50%);
+    z-index: 50;
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    max-width: calc(100vw - 32px);
+    padding: 9px 14px;
+    background: var(--rail);
+    color: var(--rail-ink-strong);
+    border-radius: 9px;
+    box-shadow: var(--shadow-pop);
+    font-size: var(--fs-md, 12.5px);
+}
+.lv2-undo__btn {
+    border: 0; background: transparent; padding: 0;
+    color: var(--rail-brand);
+    font: 600 var(--fs-md, 12.5px)/1 var(--font-ui);
+    cursor: pointer;
+}
+.lv2-undo__btn:disabled { opacity: .4; cursor: not-allowed; }
+.lv2-bulk__count { font-weight: 600; }
+.lv2-bulk__btn {
+    background: none; border: 0; padding: 0;
+    color: var(--rail-ink);
+    font: 400 var(--fs-md, 12.5px)/1 var(--font-ui);
+    cursor: pointer;
+}
+.lv2-bulk__btn:hover:not(:disabled) { color: var(--rail-ink-strong); }
+.lv2-bulk__btn:disabled { opacity: .4; cursor: not-allowed; }
+.lv2-bulk__btn--ai { color: var(--rail-brand); font-weight: 600; }
+.lv2-bulk__btn--danger { color: var(--rail-danger); }
+.lv2-bulk__btn--danger:hover:not(:disabled) { color: color-mix(in srgb, var(--rail-danger) 65%, var(--rail-ink-strong)); }
+.lv2-bulk__esc { margin-left: auto; color: var(--rail-ink-2); }
+.lv2-bulk__menu-wrap { position: relative; }
+.lv2-bulk__menu {
+    position: absolute;
+    top: calc(100% + 8px);
+    left: 0;
+    min-width: 200px;
+    max-height: 280px;
+    overflow-y: auto;
+    white-space: normal;
+    background: var(--surface);
+    color: var(--ink);
+    border: 1px solid var(--hairline);
+    border-radius: var(--r-input);
+    box-shadow: var(--shadow-pop);
+    padding: 6px;
+    z-index: 40;
+}
+.lv2-bulk__item {
+    display: flex; align-items: center; gap: 8px;
+    width: 100%; text-align: left;
+    background: none; border: 0;
+    padding: 7px 8px; border-radius: 6px;
+    font: var(--text-small);
+    color: var(--ink);
+    cursor: pointer;
+}
+.lv2-bulk__item:hover:not(:disabled) { background: var(--surface-hover); }
+.lv2-bulk__item:disabled { opacity: .45; cursor: not-allowed; }
+.lv2-bulk__item--danger, .lv2-bulk__item--danger:hover:not(:disabled) { color: var(--danger); }
+.lv2-bulk__item--split {margin-top: 4px; padding-top: 9px; border-top: 1px solid var(--hairline); border-radius: 0 0 6px 6px; }
+.lv2-bulk__check { width: 12px; flex: none; text-align: center; color: var(--ink); font-weight: 600; }
+.lv2-bulk__clear {
+    display: inline-flex; align-items: center; justify-content: center;
+    width: 28px; height: 28px; margin-left: -8px;
+    background: none; border: 0; border-radius: 6px; padding: 0;
+    color: var(--rail-ink);
+    cursor: pointer;
+}
+.lv2-bulk__clear:hover { background: var(--rail-hover); color: var(--rail-ink-strong); }
+.lv2-bulk__clear:focus-visible { outline: none; box-shadow: var(--focus); }
+.lv2-bulk__note { padding: 7px 8px; color: var(--ink-2); font: var(--text-small); }
+
+.lv2-bulk__dot { width: 8px; height: 8px; border-radius: 2px; flex: none; background: var(--ink-3); }
+
+/* In the list the bar sits at the foot of the view, so its menus open upward. */
+.lv2 > .lv2-bulk .lv2-bulk__menu { top: auto; bottom: calc(100% + 8px); }
+
+@media (max-width: 767px) {
+    .lv2-bulk { padding: 0 16px; gap: 10px; }
+    .lv2-bulk__esc { display: none; }
+    .lv2-bulk__clear { width: 36px; height: 36px; }
+    .lv2 > .lv2-bulk { position: fixed; bottom: calc(var(--tabbar-h) + env(safe-area-inset-bottom, 0px)); }
+    .lv2 > .lv2-bulk ~ .lv2__scroll { padding-bottom: calc(48px + env(safe-area-inset-bottom, 0px)); }
+    /* A menu takes the width of the screen here, whichever button opened it. */
+    .lv2 > .lv2-bulk .lv2-bulk__menu { position: fixed; left: 16px; right: 16px; bottom: calc(var(--tabbar-h) + env(safe-area-inset-bottom, 0px) + 48px); }
+    .lv2-undo { bottom: calc(var(--tabbar-h) + env(safe-area-inset-bottom, 0px) + 12px); }
+}
+
+</style>

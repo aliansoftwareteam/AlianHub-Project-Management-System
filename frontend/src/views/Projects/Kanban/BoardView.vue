@@ -8,30 +8,22 @@
             :message="$t('Upgrades.the_feature_not_available')"
         />
     </div>
-    <div v-else>
+    <div v-else class="board-view" :data-density="density">
         <template v-if="isLoading">
             <div class="kanban-board-skeleton">
-                <div class="kanban-column-skeleton" v-for="j in Math.round(Math.random() * (5 - 2) + 2)" :key="j">
-                    <div class="d-flex justify-content-between w-100 mb-15px">
-                        <Skelaton class="border-radius-5-px" style="height: 25px; width: 70px;" />
-                        <span class="cursor-pointer">
-                            <Skelaton class="border-radius-5-px" style="height: 25px; width: 24px;" />
-                        </span>
+                <div class="kanban-column-skeleton" v-for="j in skeletonColumns" :key="j">
+                    <div class="kanban-column-skeleton__head">
+                        <Skelaton class="kanban-skel kanban-skel--count" />
+                        <Skelaton class="kanban-skel kanban-skel--add" />
                     </div>
-                    <div class="">
-                        <div class="kanban-card-wrapper-skeleton" :style="{ backgroundColor: '#FFF' }">
-                            <div class="kanban-card-skeleton pt-10px pl-10px pr-10px pb-5px w-100 mb-10px" v-for="i in Math.round(Math.random() * (5 - 2) + 2)" :key="i">
-                                <Skelaton class="border-radius-5-px mt-5px" style="height: 22px; width: 278px;" />
-                                <div class="d-flex align-items-center mt-5px justify-content-between">
-                                    <div class="d-flex align-items-center">
-                                        <Skelaton class="mr-8px border-radius-50-per" style="height: 21px; width: 21px;" />
-                                    </div>
-                                    <div class="d-flex align-items-center justify-content-between">
-                                        <Skelaton class="mr-8px border-radius-50-per" style="height: 21px; width: 21px;" />
-                                        <Skelaton class="mr-8px border-radius-50-per" style="height: 21px; width: 21px;" />
-                                        <Skelaton class="mr-8px border-radius-5-px" style="height: 21px; width: 30px;" />
-                                        <Skelaton class="border-radius-50-per" style="height: 21px; width: 21px;" />
-                                    </div>
+                    <div class="kanban-column-skeleton__cards">
+                        <div class="kanban-card-skeleton" v-for="i in SKELETON_CARDS" :key="i">
+                            <Skelaton class="kanban-skel kanban-skel--title" />
+                            <div class="kanban-card-skeleton__foot">
+                                <Skelaton class="kanban-skel kanban-skel--avatar" />
+                                <div class="kanban-card-skeleton__chips">
+                                    <Skelaton class="kanban-skel kanban-skel--chip" />
+                                    <Skelaton class="kanban-skel kanban-skel--chip" />
                                 </div>
                             </div>
                         </div>
@@ -41,14 +33,39 @@
         </template>
         <template v-else>
             <template v-if="processedBoardData.length && sprints?.length">
-                <KanbanBoard :data="processedBoardData" :group="grouped" :sprintId="sprintId" />
+                <ListBulkBar v-if="projectData?._id" :project="projectData" />
+                <div class="board-card-fields">
+                    <ListSortControl :sort="boardSort.sort.value" :options="sortOptions" :dragNote="false" @key="boardSort.setKey" @dir="boardSort.setDir" />
+                    <ViewColumnChooser
+                        titleKey="ViewColumns.card_fields"
+                        :columns="cardFields.columns.value"
+                        @toggle="cardFields.setVisible"
+                        @move="cardFields.move"
+                        @reset="cardFields.reset"
+                    />
+                    <ViewDensityControl :model-value="density" @update:model-value="setDensity" />
+                </div>
+                <KanbanBoard :data="processedBoardData" :group="grouped" :sprintId="sprintId" :otherRows="otherOnBoard" :otherProjects="otherRows.projects.value" :otherTruncated="otherRowsShown && otherRows.truncated.value" />
             </template>
             <template v-else>
-                <div class="d-flex align-items-center justify-content-center flex-column mt-1">
+                <div class="board-view__empty">
+                    <CreateTask
+                        v-if="creatingFirstTask"
+                        :sprint="sprints[0]"
+                        :assigneeOptions="project?.AssigneeUserId"
+                        :groupBy="grouped"
+                        :considerWidth="false"
+                        @cancel="creatingFirstTask = false"
+                        @submit="creatingFirstTask = false"
+                    />
                     <EmptyState
-                        v-if="project?.deletedStatusKey !== 2"
-                        :title="!project?.lastTaskId ? $t('EmptyState.no_tasks_title') : $t('EmptyState.no_match_title')"
-                        :message="!project?.lastTaskId ? $t('EmptyState.no_tasks_msg') : $t('EmptyState.no_match_msg')"
+                        v-else-if="project?.deletedStatusKey !== 2"
+                        :title="$t(emptyTitleKey)"
+                        :message="$t(emptyMessageKey)"
+                        :actionLabel="canCreateFirstTask ? $t('EmptyState.no_tasks_action') : ''"
+                        data-test="board-empty"
+                        @action="creatingFirstTask = true"
+                        :sentence="emptySentenceKey ? $t(emptySentenceKey) : ''"
                         helpPath="tasks"
                     />
                 </div>
@@ -58,25 +75,44 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted, watch, inject, defineProps, defineEmits } from 'vue';
+import { ref, computed, onMounted, watch, inject, provide, defineProps, defineEmits } from 'vue';
 import { useStore } from 'vuex';
 import EmptyState from '@/components/atom/EmptyState/EmptyState.vue';
+import CreateTask from '@/components/atom/CreateTask/CreateTask.vue';
+import { useCustomComposable } from '@/composable';
 import { markFirstRunStep, FIRST_RUN_STEPS } from '@/composable/firstRunProgress';
 import isEqual from 'lodash/isEqual';
 
 // Components
 import KanbanBoard from '@/views/Projects/Kanban/KanbanBoard.vue';
+import ListBulkBar from '@/views/Projects/ListView/ListBulkBar.vue';
+import { taskInGroup } from '@/views/Projects/ListView/listFilter';
+import { inList } from '@/store/ProjectData/listMembership';
+import { placeOnBoard, useOtherProjectRows } from '@/views/Projects/composables/otherProjectRows';
 import UpgradePlan from '@/components/atom/UpgradYourPlanComponent/UpgradYourPlanComponent.vue';
 import Skelaton from '@/components/atom/Skelaton/Skelaton.vue';
+import ViewColumnChooser from '@/views/Projects/components/columns/ViewColumnChooser.vue';
+import ViewDensityControl from '@/views/Projects/components/columns/ViewDensityControl.vue';
+import { useViewSettings } from '@/views/Projects/composables/viewSettingsContext';
+import { columnCatalogue, useViewColumns } from '@/views/Projects/composables/viewColumns';
+import ListSortControl from '@/views/Projects/ListView/ListSortControl.vue';
+import { sortChoices, sortTasks, useListSort } from '@/views/Projects/composables/viewSort';
+import { useProjectCustomFields } from '@/views/Projects/composables/projectCustomFields';
+import { useListRowMenu } from '@/views/Projects/ListView/useListRowMenu.js';
+import { useListInlineEdit } from '@/views/Projects/ListView/useListInlineEdit.js';
+import { useGroupSource } from '@/views/Projects/composables/groupSource';
+import { AGENT_WORK_GROUP } from '@viewSettings';
+import { drawsGroup } from '@/views/Projects/composables/agentWorkQuery';
 
 // Helpers
 import { taskListHelper } from '@/views/Projects/helper.js';
+import { useTaskEmptyState } from '@/views/Projects/composables/useTaskEmptyState.js';
 import { useRoute } from 'vue-router';
 const route = useRoute();
 
 // --- Props & Emits ---
 const props = defineProps({
-    grouped: { type: Number, default: 0 },
+    grouped: { type: [Number, String], default: 0 },
     commonDateFormatForDate: { type: String, default: "DD/MM/YYYY" },
     sprints: { type: Array, default: () => [] },
     projectData: { type: Object, default: () => { } },
@@ -86,15 +122,54 @@ defineEmits(['change']);
 
 // --- Store & Injected State ---
 const { getters } = useStore();
-const { groupBy, checkCase } = taskListHelper();
+const { groupBy, getGroupCounts } = taskListHelper();
 const showArchiveVar = inject("showArchived");
 const searchedTask = inject('searchedTask');
 const project = inject('selectedProject');
+const { emptyTitleKey, emptyMessageKey, emptySentenceKey } = useTaskEmptyState(project);
+const { checkPermission } = useCustomComposable();
+const creatingFirstTask = ref(false);
+const canCreateFirstTask = computed(() => Boolean(props.sprints?.length)
+    && !showArchiveVar.value
+    && !searchedTask.value
+    && checkPermission('task.task_create', project.value?.isGlobalPermission) === true
+    && checkPermission('task.task_list', project.value?.isGlobalPermission) === true);
+
+const customFields = useProjectCustomFields(project, { archived: showArchiveVar });
+const cardCatalogue = computed(() => columnCatalogue('board', { fields: customFields.defs.value }));
+const cardFields = useViewColumns(computed(() => project.value?._id), 'board', cardCatalogue);
+provide('boardCardFields', cardFields.visibleColumns);
+provide('boardFieldTasks', customFields.allTasks);
+
+/* The card menu's rights and the two actions it borrows from the List, built once for the
+   board rather than once per card. */
+const rowMenu = useListRowMenu(project, showArchiveVar);
+provide('boardTaskMenu', { rights: rowMenu.rights, duplicate: rowMenu.duplicate, removeFromList: rowMenu.removeFromList, rename: useListInlineEdit(project).rename });
+
+const boardSort = useListSort();
+const { density, setDensity } = useViewSettings();
+const sortOptions = computed(() => sortChoices(customFields.defs.value));
+const userNames = computed(() => new Map((getters['users/users'] || []).map((user) => [user._id, user.Employee_Name])));
+const sortContext = computed(() => ({
+    priorities: getters['settings/companyPriority'] || [],
+    statuses: project.value?.taskStatusData || [],
+    fields: customFields.defs.value,
+    userName: (id) => userNames.value.get(id)
+}));
 
 // --- Reactive State ---
 const isLoading = ref(true);
 const internalGroupedTasks = ref([]);
 const sprintId = ref(null);
+
+// A skeleton that redraws at a different size on every load reads as movement
+// rather than as the shape of what is coming.
+const SKELETON_CARDS = 3;
+const skeletonColumns = computed(() => {
+    const groups = internalGroupedTasks.value[0]?.items?.length
+        || (props.grouped === 0 ? project.value?.taskStatusData?.length : 0);
+    return Math.min(Math.max(Number(groups) || 3, 2), 5);
+});
 
 // --- Computed Properties ---
 const currentCompany = computed(() => getters["settings/selectedCompany"]);
@@ -106,7 +181,7 @@ const taskSourceArray = computed(() => {
     if (searchedTask.value && searchedTasksData.value.length > 0) {
         const currentSprintId = props.sprints[0]?.id;
         if (!currentSprintId) return [];
-        return searchedTasksData.value.filter(task => task.sprintId === currentSprintId);
+        return searchedTasksData.value.filter(task => inList(task, currentSprintId));
     } else if (!searchedTask.value && project.value?._id && props.sprints[0]?.id) {
         return allProjectTasks.value[project.value._id]?.[props.sprints[0].id]?.tasks || [];
     }
@@ -130,15 +205,11 @@ const processedBoardData = computed(() => {
 
         switch (group.searchKey) {
             case "DueDate":
-                tasksForGroup = filteredSourceTasks.filter(task =>
-                    task.DueDate ? checkCase(group.operation, group.searchValue, (new Date(task.DueDate).getTime() / 1000)) : group.operation === "non"
-                );
+                tasksForGroup = filteredSourceTasks.filter(task => taskInGroup(task, group));
                 tasksForGroup.sort((a, b) => a.groupByDueDateIndex - b.groupByDueDateIndex);
                 break;
             case "AssigneeUserId":
-                tasksForGroup = filteredSourceTasks.filter(task =>
-                    (Array.isArray(task.AssigneeUserId) ? task.AssigneeUserId.slice().sort().join("_") : task.AssigneeUserId || "") === group.value
-                );
+                tasksForGroup = filteredSourceTasks.filter(task => taskInGroup(task, group));
                 tasksForGroup.sort((a, b) => a.groupByAssigneeIndex - b.groupByAssigneeIndex);
                 break;
             case "statusKey":
@@ -150,9 +221,10 @@ const processedBoardData = computed(() => {
                 tasksForGroup.sort((a, b) => a.groupByPriorityIndex - b.groupByPriorityIndex);
                 break;
             default:
-                tasksForGroup = filteredSourceTasks.filter(task => task[group.searchKey] === group.searchValue);
+                tasksForGroup = filteredSourceTasks.filter(task => (group.customFieldId || group.agentWork ? taskInGroup(task, group) : task[group.searchKey] === group.searchValue));
                 break;
         }
+        tasksForGroup = sortTasks(tasksForGroup, boardSort.sort.value, sortContext.value);
 
         // If subtasks don't need filtering here, remove this map.
         const processedTasks = tasksForGroup.map(task => {
@@ -173,11 +245,16 @@ const processedBoardData = computed(() => {
             ...group,
             sprintId: currentSprintId,
             tasksArray: processedTasks,
-            disabled: group.searchKey === "DueDate" && ["Next", "Overdue", "No Due Date"].includes(group.name),
+            disabled: group.dropDisabled || (group.searchKey === "DueDate" && ["Next", "Overdue", "No Due Date"].includes(group.name)),
             totalTaskCounts: dataKeys || {},
         };
-    });
+    }).filter((column) => drawsGroup(column, column.tasksArray.length));
 });
+
+/* A search or a filter is matched against this project's own data, which says nothing of a task that lives elsewhere. */
+const otherRows = useOtherProjectRows(project, computed(() => props.sprints[0]?.id || ''));
+const otherRowsShown = computed(() => !searchedTask.value && !showArchiveVar.value);
+const otherOnBoard = computed(() => placeOnBoard(otherRowsShown.value ? otherRows.rows.value : [], processedBoardData.value));
 
 // Watch for changes in grouping type or sprints to regenerate the group structure
 watch([() => props.grouped, () => props.sprints,() => route?.params], ([newGroup, newSprints, newRouteParams], [oldGroup, oldSprints, oldRouteParams]) => {
@@ -192,19 +269,32 @@ watch([() => props.grouped, () => props.sprints,() => route?.params], ([newGroup
     }
 }, { deep: true });
 
-// --- Lifecycle Hooks ---
+/* Columns the board already read answer at once (`firstPageOnly`), so only a new one is asked for, and the board stays drawn. */
+useGroupSource(project, () => props.grouped, () => {
+    if (!props.sprints?.length) return;
+    groupBy(props.grouped, true, project.value, props.sprints, internalGroupedTasks, true, 'board', false, true, (resp) => {
+        internalGroupedTasks.value = resp;
+        /* A task an agent took or let go moved between columns the board had already counted. */
+        if (props.grouped === AGENT_WORK_GROUP && resp[0]?.items?.length) {
+            getGroupCounts({ projectId: project.value._id, sprintId: resp[0].id, items: resp[0].items, projectData: project.value })
+                .catch((error) => console.error("ERROR in board column counts: ", error));
+        }
+    }, { firstPageOnly: true });
+});
+
 onMounted(async () => {
     markFirstRunStep(FIRST_RUN_STEPS.BOARD_VIEW);
     if (project.value?._id && props.sprints?.length) {
         isLoading.value = true;
 
         try {
-            const needsInitialGrouping = !allProjectTasks.value[project.value._id]?.[props.sprints[0].id];
+            /* The sprint being in the store does not say its columns were read: the Table reads a
+               row's subtasks into it. Each column asks, and one that was read answers at once. */
             await new Promise((resolve) => {
-                groupBy(props.grouped, needsInitialGrouping, project.value, props.sprints, internalGroupedTasks, true, 'board', false, true, (resp) => {
+                groupBy(props.grouped, true, project.value, props.sprints, internalGroupedTasks, true, 'board', false, true, (resp) => {
                     internalGroupedTasks.value = resp;
-                    resolve(); 
-                });
+                    resolve();
+                }, { firstPageOnly: true });
             });
 
         } catch (error) {
@@ -218,4 +308,9 @@ onMounted(async () => {
 });
 
 </script>
-<style src="./new-style.css" scoped />
+<style src="./new-style.css" />
+
+<style>
+.board-card-fields { display: flex; justify-content: flex-end; align-items: center; gap: var(--sp-3); padding: var(--sp-2) var(--page-pad-x, 20px) 0; }
+@media (max-width: 767px) { .board-card-fields { padding: var(--sp-2) 16px 0; } }
+</style>

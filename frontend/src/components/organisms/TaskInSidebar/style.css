@@ -20,7 +20,7 @@
     padding-right: 10px;
 }
  .task__name-sidebar:hover{
-    background-color: #F0F0F0;
+    background-color: var(--surface-hover);
     border-radius: 5px;
 }
 .covert__folder-sprint .task__name-sidebar{

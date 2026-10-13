@@ -1,0 +1,31 @@
+# Progress: Sprint 1 — shared AI core and run correctness
+
+## Checklist
+One pull request per step; tick with the merge commit.
+
+- [x] Step 1: `Modules/AICore/` (provider factory, usage, instruction guard, `modelCall`, persistence) with shims at every old path; ProjectTemplates onto the factory; boundary conventions test — #566 `db21784a`; consumers repointed and the shims deleted in one PR, #575 `255be10d`, because jest mocks tie each test to its consumer
+- [x] Step 2: `idempotencyKey`, partial unique indexes, `runs.start` insert-and-catch, reaper `agent.reap-stuck-proposals` every 5 min — #570 `bacb9207`
+- [x] Step 3: `Modules/Agents/engine/timeouts.js`; Agenda `lockLifetime` 17 min with `job.touch()` between graph nodes; server, SSE and Mongo timeouts — #569 `0a13449c`
+- [x] Step 4: `triggerDepth`/`triggerEventId` on the run; `canStart` refuses `loop_depth_exceeded` at depth 3; actions emit depth + 1 — #568 `8b84214c`
+- [x] Step 5: `Modules/AICore/spend.js` meters every `chat()` into `ai_usage` by feature; budget sums the ledger; Instance console per-feature breakdown — #572 `3dc9d97f`
+- [x] Step 6: `Modules/AICore/estimate.js` + `spendGuard` reserve/reconcile/release on `reservedUsd`; `spend_cap_exceeded` before the vendor call — #571 `8d618a29`
+- [x] Step 7: `expiresAt` set only by `terminalUpdate`; migration `008-agent-run-expiry`; approve refuses `run_missing` — #567 `03675ee7`
+- [x] Interface: Instance console → AI agents (extend) — per-feature spend in #572; owner and member sweep still to record
+- [x] Defects closed: #12 (#570), #13 (#569), #14 (#568), #15 (#571), #16 (#567), #18 (#572)
+- [x] Exit gate met and gates green — code gates green on `beta` at `3dc9d97f`; migration 008, the in-process sweep, and the owner/member sweeps still to run; consumer repoint and shim deletion still open — owner and member sweeps at build 141 and 147, and the in-process sweep against the real model
+
+## Log
+| Date | Entry |
+|---|---|
+| 2026-09-10 | Filed from `docs/AI-PLATFORM-ARCHITECTURE.md` (sprint 1) |
+| 2026-09-11 | Steps 1–7 merged into `beta` as seven PRs (#566–#572). Four needed a rebase over the run-schema changes (#568, #569, #570, #571, #572 in turn) because every step touched `agent_runs`. Gates on merged beta: backend 155 suites / 1857 tests, conventions 92, frontend vitest 129, `npm run i18n:check` exit 0, eslint 0 errors, `vue-cli-service build` done. Cross-links to tick on 006: budgets pre-call (step 6) and usage accounting (step 5). |
+| 2026-09-11 | Deviations: `trigger.depth` stored flat as `triggerDepth` because `trigger` is a string enum; `transcribe.js` and `probes.js` still name a vendor host (allowlisted, not chat calls); the reaper also fails the run waiting on a stuck proposal; the pre-call guard exempts personal and local accounts; migration 008 uses `syncIndexes`, which drops any undeclared index on `agent_runs`. |
+| 2026-09-11 | Step 5 on `feat/s1-spend-at-core`: `Modules/AICore/spend.js` meters every `chat()` into a new `ai_usage` collection keyed by feature (`Modules/AICore/features.js`); `budget.js` sums the ledger; Instance console card shows spend per feature. Closes defect #18. |
+| 2026-09-11 | Step 6 on `fix/s1-precall-spend-cap`: `Modules/AICore/estimate.js` prices a call before it is made; `Modules/Agents/spendGuard.js` reserves it on the run (`reservedUsd`, atomic `$inc`), refuses over the run cap or the company month as `spend_cap_exceeded` with an audit row, reconciles to the real cost after. Reproduced on beta first: the fake provider was called for a run capped under its estimate. Closes defect 15 and 006's "spend cap evaluated after the model call". |
+| 2026-09-12 | `npm run migrate -- status` on the dev database reports nothing to do: every migration through 014 is applied, so the outstanding migration step for sprints 0–2 is done. The AI agents spend card still needs an instance-owner sweep. |
+| 2026-09-12 | Owner sweep on the local server at build 141, signed in as the instance owner (Local PM) with a one-hour session the owner authorised. Verified: Instance settings → AI shows the monthly budget, this month's spend, the 80% and 100% alert lines and the per-feature breakdown; Instance console → AI providers lists each provider and model with health, breaker state, calls, latency, last error, rate-limit budget and unpriced warnings, naming the node it answers for; Instance → Stats shows the build label with commit, channel and Node version; Instance → Upgrade lists builds since v14.35.0 with their pull requests; an agent's run detail shows TRACE, REPLAY with its redaction note, the PINNED revision and the revert control correctly disabled once the undo window has passed; the agent settings page shows revision history and a pinned-model selector listing only priced models, defaulting to the workspace routing policy. Not swept: the routing policy screen, which is being moved from the instance console into workspace settings. |
+| 2026-09-12 | Every interface row is swept by the owner and by a member at build 141. The only outstanding item is the in-process sweep against a real model, which cannot run here because no provider key is configured on this machine. |
+| 2026-09-12 | In-process sweep against the real model on the local server at build 147, using the OpenAI key already in `.env` (gpt-4o). An AI Ask call booked `ask · gpt-4o · openai · $0.0023` in `ai_usage`; an agent run booked `agent_run · gpt-4o · $0.0034`, pinned agent revision 3 with its skill revision, ran `brief.parse` as a data skill and carries a trace id. Pinning an unpriced model is refused with the named reason: "No price on file for gpt-9-imaginary; add it under instance settings (LLM_PRICING) before running." (code `unpriced_model`); a priced pin saves and clears. A run capped below its estimate is refused before the provider call: audit reason "spend_cap_exceeded: the next call is estimated at $0.0264 (3075 tokens) but the run cap of $0.0000 has $0.0000 left", with no new ledger row. Only OpenAI is configured on this machine, so the other three providers were not exercised against a live vendor; their adapters are covered by the contract test from #660. |
+
+## Last step
+Complete. Moved to done.

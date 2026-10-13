@@ -25,19 +25,27 @@ const { handleFileUploadForTrackerSS,handleuploadMainFileForbase64Thumbnail } = 
  * @returns
  */
 const { updateProjectForTimelog, findAndUpdateProjectOrTaskStartDate, updateRemainingTime } = require('./helpers');
-exports.timeTrackerStart = (req, res) => {
+const { pinSessionTenant } = require('../../../Config/tenant');
+const { trackerUser, trackedTask, refuse } = require('./sessionUser');
+const { escapeHtml } = require('../../../utils/escapeHtml');
+const { isPeriodLocked, PERIOD_LOCKED } = require('../../TimesheetApproval/helpers/lockGuard');
+const { START_LOCKED } = require('./timerRules');
+
+/* A running timer belongs to the day it started, so stopping one that started in an approved
+ * period is refused like any other change to that period, as trimming it already is. */
+const STOP_LOCKED = "This timesheet period is approved and locked — this timer's entry can't be changed.";
+const startsInLockedPeriod = (companyId, userId, startSec) => isPeriodLocked({ companyId, userId, date: new Date((Number(startSec) || 0) * 1000) });
+
+exports.timeTrackerStart = async (req, res) => {
+    const companyId = pinSessionTenant(req, res);
+    if (!companyId) return;
+    const actor = await trackerUser(req, res);
+    if (!actor) return;
     if (!(req.body && req.body.description)) {
         res.send({
             status: false,
             statusText: `description is required`
         });
-        return;
-    }
-    if (!(req.body && req.body.userId)) {
-        res.send({
-            status: false,
-            statusText: `UserId is required`
-        })
         return;
     }
     if (!(req.body && req.body.projectId)) {
@@ -54,22 +62,17 @@ exports.timeTrackerStart = (req, res) => {
         })
         return;
     }
-    if (!(req.body && req.body.companyId)) {
-        res.send({
-            status: false,
-            statusText: `CompanyId is required`
-        })
-        return;
-    }
+    if (!(await trackedTask(req, res, companyId, actor.id))) return;
     const utcDateTime = DateTime.utc();
     const timeStamp = Math.floor(utcDateTime.toSeconds());
-    let companyId = req.body.companyId
-    let type = req.body.type || SCHEMA_TYPE.TIMESHEET
+    if (await startsInLockedPeriod(companyId, actor.id, timeStamp)) {
+        return res.send({ status: false, statusText: START_LOCKED, code: PERIOD_LOCKED });
+    }
     let data = {
         CreatedAt: utcDateTime.ts,
         UpdatedAt: utcDateTime.ts,
         LogDescription: req.body.description,
-        Loggeduser: req.body.userId,
+        Loggeduser: actor.id,
         TicketID: req.body.taskId,
         ProjectId: req.body.projectId,
         LogStartTime: timeStamp,
@@ -80,13 +83,13 @@ exports.timeTrackerStart = (req, res) => {
         startTimeTracker: timeStamp,
     }
     let obj = {
-        type: type,
+        type: SCHEMA_TYPE.TIMESHEET,
         data: data
     }
-    MongoDbCrudOpration(req.body.companyId, obj, "save")
+    MongoDbCrudOpration(companyId, obj, "save")
         .then((response) => {
-            updateProjectForTimelog(req.body.companyId, req.body.projectId, false, timeStamp, req.body.userId, req.body.taskId, response.id, true)
-            updateRemainingTime(req.body.companyId,req.body.taskId);
+            updateProjectForTimelog(companyId, req.body.projectId, false, timeStamp, actor.id, req.body.taskId, response.id, true)
+            updateRemainingTime(companyId,req.body.taskId);
             res.send({
                 status: true,
                 statusText: response.id
@@ -106,19 +109,16 @@ exports.timeTrackerStart = (req, res) => {
  * @returns
  */
 
-exports.timeTrackerStart2 = (req, res) => {
+exports.timeTrackerStart2 = async (req, res) => {
+    const companyId = pinSessionTenant(req, res);
+    if (!companyId) return;
+    const actor = await trackerUser(req, res);
+    if (!actor) return;
     if (!(req.body && req.body.description)) {
         res.send({
             status: false,
             statusText: `description is required`
         });
-        return;
-    }
-    if (!(req.body && req.body.userId)) {
-        res.send({
-            status: false,
-            statusText: `UserId is required`
-        })
         return;
     }
     if (!(req.body && req.body.projectId)) {
@@ -135,24 +135,14 @@ exports.timeTrackerStart2 = (req, res) => {
         })
         return;
     }
-    if (!(req.body && req.body.companyId)) {
-        res.send({
-            status: false,
-            statusText: `CompanyId is required`
-        })
-        return;
-    }
+    if (!(await trackedTask(req, res, companyId, actor.id))) return;
     const utcDateTime = DateTime.utc();
     const timeStamp = Math.floor(utcDateTime.toSeconds());
-    // console.log(req.body.considerActionTime,"req.body.considerActionTime",req.body.actionTime);
-    
-    let companyId = req.body.companyId
-    let type = req.body.type || SCHEMA_TYPE.TIMESHEET
     let data = {
         CreatedAt: utcDateTime.ts,
         UpdatedAt: utcDateTime.ts,
         LogDescription: req.body.description,
-        Loggeduser: req.body.userId,
+        Loggeduser: actor.id,
         TicketID: req.body.taskId,
         ProjectId: req.body.projectId,
         LogStartTime: req.body.considerActionTime ? req.body.actionTime : timeStamp,
@@ -166,7 +156,7 @@ exports.timeTrackerStart2 = (req, res) => {
         type: SCHEMA_TYPE.COMPANY_USERS,
         data: [
             {
-                userId: req.body.userId
+                userId: actor.id
             },
             {
                 isTrackerUser: 1,
@@ -174,17 +164,20 @@ exports.timeTrackerStart2 = (req, res) => {
             }
         ]
     }
-    MongoDbCrudOpration(req.body.companyId, object,"findOne").then((cUser)=>{
-        if (cUser.isTrackerUser) {            
+    MongoDbCrudOpration(companyId, object,"findOne").then(async (cUser)=>{
+        if (cUser.isTrackerUser) {
+            if (await startsInLockedPeriod(companyId, actor.id, data.LogStartTime)) {
+                return res.send({ status: false, statusText: START_LOCKED, code: PERIOD_LOCKED });
+            }
             let obj = {
-                type: type,
+                type: SCHEMA_TYPE.TIMESHEET,
                 data: data
             }
-            MongoDbCrudOpration(req.body.companyId, obj, "save")
+            MongoDbCrudOpration(companyId, obj, "save")
                 .then((response) => {
-                    updateProjectForTimelog(req.body.companyId, req.body.projectId, false, timeStamp, req.body.userId, req.body.taskId, response.id, true)
-                    findAndUpdateProjectOrTaskStartDate({companyId:req.body.companyId,userId:req.body.userId,projectId:req.body.projectId,taskId:req.body.taskId,startDateForProjectOrTask:new Date()});
-                    updateRemainingTime(req.body.companyId,req.body.taskId);
+                    updateProjectForTimelog(companyId, req.body.projectId, false, timeStamp, actor.id, req.body.taskId, response.id, true)
+                    findAndUpdateProjectOrTaskStartDate({companyId,userId:actor.id,projectId:req.body.projectId,taskId:req.body.taskId,startDateForProjectOrTask:new Date()});
+                    updateRemainingTime(companyId,req.body.taskId);
                     res.send({
                         status: true,
                         statusText: response.id
@@ -217,7 +210,11 @@ exports.timeTrackerStart2 = (req, res) => {
  * @returns
  */
 
-exports.endTimeTracker = (req, res) => {
+exports.endTimeTracker = async (req, res) => {
+    const companyId = pinSessionTenant(req, res);
+    if (!companyId) return;
+    const actor = await trackerUser(req, res);
+    if (!actor) return;
     if (!(req.body && req.body.timeSheetId)) {
         res.send({
             status: false,
@@ -225,31 +222,10 @@ exports.endTimeTracker = (req, res) => {
         })
         return;
     }
-    if (!(req.body && req.body.companyId)) {
-        res.send({
-            status: false,
-            statusText: "companyId is required"
-        })
-        return;
-    }
-    if (!(req.body && req.body.userName)) {
-        res.send({
-            status: false,
-            statusText: "userName is required"
-        })
-        return;
-    }
     if (!(req.body && req.body.sprintId)) {
         res.send({
             status: false,
             statusText: "sprintId is required"
-        })
-        return;
-    }
-    if (!(req.body && req.body.userId)) {
-        res.send({
-            status: false,
-            statusText: "userId is required"
         })
         return;
     }
@@ -311,23 +287,26 @@ exports.endTimeTracker = (req, res) => {
     }
     const utcDateTime = DateTime.utc();
     const timeStamp = Math.floor(utcDateTime.toSeconds());
-    let companyId = req.body.companyId
-    let type =  req.body.type||SCHEMA_TYPE.TIMESHEET
     const calculateDuration = (startTimestamp, endTimestamp) => {
         const timeDifference = endTimestamp - startTimestamp;
         const durationMinutes = timeDifference / 60;
         return Math.round(durationMinutes);
     }
     let objGet = {
-        type: type,
+        type: SCHEMA_TYPE.TIMESHEET,
         data: [{
             _id: {
                 $in:[req.body.timeSheetId]
             },
          }]
     }
-    MongoDbCrudOpration(req.body.companyId, objGet, "findOne")
-        .then((response) => {
+    MongoDbCrudOpration(companyId, objGet, "findOne")
+        .then(async (response) => {
+            if (!response) return refuse(res, 404, 'No time entry was found for this timer.');
+            if (String(response.Loggeduser) !== actor.id) return refuse(res, 403, 'You can only track your own time.');
+            if (await startsInLockedPeriod(companyId, actor.id, response.LogStartTime)) {
+                return res.send({ status: false, statusText: STOP_LOCKED, code: PERIOD_LOCKED });
+            }
             let trackShots = [];
             let trttt = response.trackShots||[];
             if (response.trackShots && response.trackShots.length) {
@@ -342,7 +321,7 @@ exports.endTimeTracker = (req, res) => {
                 trackShots: response.trackShots ? trttt : [],
             }
             let obj = {
-                type: type,
+                type: SCHEMA_TYPE.TIMESHEET,
                 data: [{ _id: req.body.timeSheetId },{
                     $set: { ...data },
                     $unset: {
@@ -351,7 +330,7 @@ exports.endTimeTracker = (req, res) => {
                 },
                 { new: true, useFindAndModify: false }]
             }
-            MongoDbCrudOpration(req.body.companyId, obj, "findOneAndUpdate")
+            MongoDbCrudOpration(companyId, obj, "findOneAndUpdate")
                 .then((resUp) => {
                     // Activity-log date = the day of the logged session. `response.CreatedAt`
                     // is not a field on the timesheet (Mongoose stores lowercase `createdAt`),
@@ -370,16 +349,16 @@ exports.endTimeTracker = (req, res) => {
                         return formattedTime;
                     }
                     let historyObj = {
-                        'message': `<b>${req.body.userName}</b> has added <b>${convertMinutesToHHMM(data.LogTimeDuration)} hrs (${`DATE_${dt}`} from ${`TIMESTAMP_${response.LogStartTime * 1000}`} to ${`TIMESTAMP_${data.LogEndTime * 1000}`}) </b> logged hours`,
+                        'message': `<b>${escapeHtml(actor.Employee_Name)}</b> has added <b>${convertMinutesToHHMM(data.LogTimeDuration)} hrs (${`DATE_${dt}`} from ${`TIMESTAMP_${response.LogStartTime * 1000}`} to ${`TIMESTAMP_${data.LogEndTime * 1000}`}) </b> logged hours`,
                         'key': 'TimeLog',
                         sprintId: req.body.sprintId
                     }
                     let userData = {
-                        id: req.body.userId
+                        id: actor.id
                     }
-                    hlp.HandleHistory("Logtask", req.body.companyId, req.body.projectId, req.body.taskId, historyObj, userData).then((resp) => {
+                    hlp.HandleHistory("Logtask", companyId, req.body.projectId, req.body.taskId, historyObj, userData).then((resp) => {
                         let notiObj = {
-                            userName: req.body.userName,
+                            userName: actor.Employee_Name,
                             timeDuration: convertMinutesToHHMM(data.LogTimeDuration),
                             logTimeDate: dt,
                             TaskName: req.body.taskName,
@@ -390,12 +369,12 @@ exports.endTimeTracker = (req, res) => {
                             message: notiTemp.loggedHours(notiObj),
                         };
                         let userDataNoti = {
-                            id: req.body.userId,
+                            id: actor.id,
                             companyOwnerId: req.body.companyOwnerId,
                         }
                         HandleBothNotification({
                             type: 'task',
-                            companyId: req.body.companyId,
+                            companyId,
                             projectId: req.body.projectId,
                             taskId: req.body.taskId,
                             folderId: req.body.folderId ? req.body.folderId : "",
@@ -405,8 +384,8 @@ exports.endTimeTracker = (req, res) => {
                         }).catch((error) => {
                             logger.error(`Notification Set Error: ${error}`);
                         })
-                        updateProjectForTimelog(req.body.companyId, req.body.projectId, false, req.body.considerActionTime ? req.body.actionTime : timeStamp, req.body.userId, req.body.taskId, req.body.timeSheetId, false)
-                        updateRemainingTime(req.body.companyId,req.body.taskId);
+                        updateProjectForTimelog(companyId, req.body.projectId, false, req.body.considerActionTime ? req.body.actionTime : timeStamp, actor.id, req.body.taskId, req.body.timeSheetId, false)
+                        updateRemainingTime(companyId,req.body.taskId);
                         res.send({
                             status: true,
                             statusText: "Logtime added successfully"

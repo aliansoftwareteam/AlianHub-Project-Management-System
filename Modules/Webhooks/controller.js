@@ -1,9 +1,29 @@
 const { SCHEMA_TYPE } = require("../../Config/schemaType");
 const { MongoDbCrudOpration } = require("../../utils/mongo-handler/mongoQueries");
+const { tenantOf } = require("../../Config/tenant");
+const { fail } = require("../../Config/respond");
 const mongoose = require("mongoose");
 const logger = require("../../Config/loggerConfig");
 const { validateWebhookInput, isObjectIdString, generateSecret, EVENT_TYPES } = require('./helpers/webhookRules');
 const { invalidateCompanyCache } = require('./dispatcher');
+const { resolvePublic } = require('../Agents/engine/safeFetch');
+const { webhookAllowlist } = require('./helpers/privateHostAllowlist');
+const { storeSigningSecret, revokeSigningSecret } = require('./helpers/signingSecret');
+const { requestAddress } = require('../../utils/requestAddress');
+const { managedBy } = require('./helpers/hookAudience');
+
+const PRIVATE_DESTINATION = 'The webhook url must resolve to a public address, or to a private host the instance owner allows.';
+
+/* The literal check in validateWebhookInput cannot see what a hostname resolves to;
+ * this closes that gap at save time. The dispatcher resolves again before each POST. */
+const resolvesPublicly = async (url, allowlist) => {
+    try {
+        await resolvePublic(String(url).trim(), { allowlist });
+        return true;
+    } catch (error) {
+        return false;
+    }
+};
 
 // Outgoing-webhook management. The HMAC secret is generated server-side and
 // returned ONCE on create; list/update responses always mask it.
@@ -23,22 +43,7 @@ const { invalidateCompanyCache } = require('./dispatcher');
  */
 const callerId = (req) => String((req && req.uid) || '');
 
-/**
- * Match only what this caller owns.
- *
- * Rows with no owner stay visible to everyone. They are webhooks that predate ownership
- * being recorded, and hiding them would leave an ACTIVE integration nobody can see, edit
- * or delete while it keeps posting company data to whatever URL it holds. Visible and
- * removable beats invisible and running.
- */
-const ownedBy = (uid) => ({
-    $or: [
-        { createdBy: uid },
-        { createdBy: '' },
-        { createdBy: null },
-        { createdBy: { $exists: false } },
-    ],
-});
+const actorOf = (req) => ({ id: callerId(req), ip: requestAddress(req) });
 
 const maskHook = (hook) => ({
     _id: hook._id,
@@ -50,6 +55,7 @@ const maskHook = (hook) => ({
     createdBy: hook.createdBy || '',
     lastStatus: hook.lastStatus,
     lastDeliveredAt: hook.lastDeliveredAt,
+    needsAttention: hook.needsAttention || '',
     createdAt: hook.createdAt,
 });
 
@@ -61,7 +67,7 @@ exports.listEvents = (req, res) => {
 /* POST /api/v2/webhooks  body: { name, url, events, format } */
 exports.createWebhook = async (req, res) => {
     try {
-        const companyId = req.headers['companyid'] || '';
+        const companyId = tenantOf(req);
         const { name, url, events, format } = req.body || {};
         const uid = callerId(req);
         if (!companyId) {
@@ -70,19 +76,24 @@ exports.createWebhook = async (req, res) => {
         if (!uid) {
             return res.send({ status: false, statusText: 'An authenticated user is required.' });
         }
-        const check = validateWebhookInput({ name, url, events, format });
+        const allowlist = webhookAllowlist();
+        const check = validateWebhookInput({ name, url, events, format, allowlist });
         if (!check.valid) {
             return res.send({ status: false, statusText: check.reason });
         }
+        if (!(await resolvesPublicly(url, allowlist))) {
+            return res.send({ status: false, statusText: PRIVATE_DESTINATION });
+        }
 
         const secret = generateSecret();
+        const kept = await storeSigningSecret({ companyId, name: String(name).trim(), secret, actor: actorOf(req) });
         const created = await MongoDbCrudOpration(companyId, {
             type: SCHEMA_TYPE.WEBHOOKS,
             data: {
                 name: String(name).trim(),
                 url: String(url).trim(),
                 events,
-                secret,
+                ...kept,
                 active: true,
                 format: format || 'json',
                 createdBy: uid,
@@ -94,32 +105,32 @@ exports.createWebhook = async (req, res) => {
         return res.send({ status: true, statusText: 'Webhook created. Store the secret now — it is not shown again.', data: { ...maskHook(created), secret } });
     } catch (error) {
         logger.error(`ERROR in create webhook: ${error.message}`);
-        return res.send({ status: false, statusText: error.message });
+        return fail(res, error.message, error.statusCode);
     }
 };
 
 /* GET /api/v2/webhooks */
 exports.listWebhooks = async (req, res) => {
     try {
-        const companyId = req.headers['companyid'] || '';
+        const companyId = tenantOf(req);
         if (!companyId) {
             return res.send({ status: false, statusText: 'companyId is required.' });
         }
         const hooks = await MongoDbCrudOpration(companyId, {
             type: SCHEMA_TYPE.WEBHOOKS,
-            data: [ownedBy(callerId(req))],
+            data: [await managedBy(companyId, callerId(req))],
         }, 'find');
         return res.send({ status: true, statusText: 'Webhooks fetched.', data: (hooks || []).map(maskHook) });
     } catch (error) {
         logger.error(`ERROR in list webhooks: ${error.message}`);
-        return res.send({ status: false, statusText: error.message });
+        return fail(res, error.message, error.statusCode);
     }
 };
 
 /* PUT /api/v2/webhooks/:id  body: { name?, url?, events?, active? } */
 exports.updateWebhook = async (req, res) => {
     try {
-        const companyId = req.headers['companyid'] || '';
+        const companyId = tenantOf(req);
         const { id } = req.params;
         if (!companyId || !isObjectIdString(id)) {
             return res.send({ status: false, statusText: 'companyId and a valid webhook id are required.' });
@@ -127,14 +138,19 @@ exports.updateWebhook = async (req, res) => {
         const { name, url, events, active, format } = req.body || {};
         const update = {};
         if (name !== undefined || url !== undefined || events !== undefined || format !== undefined) {
+            const allowlist = webhookAllowlist();
             const check = validateWebhookInput({
                 name: name !== undefined ? name : 'placeholder',
                 url: url !== undefined ? url : 'https://placeholder.invalid',
                 events: events !== undefined ? events : ['*'],
                 format,
+                allowlist,
             });
             if (!check.valid) {
                 return res.send({ status: false, statusText: check.reason });
+            }
+            if (url !== undefined && !(await resolvesPublicly(url, allowlist))) {
+                return res.send({ status: false, statusText: PRIVATE_DESTINATION });
             }
             if (name !== undefined) update.name = String(name).trim();
             if (url !== undefined) update.url = String(url).trim();
@@ -152,7 +168,7 @@ exports.updateWebhook = async (req, res) => {
         const updated = await MongoDbCrudOpration(companyId, {
             type: SCHEMA_TYPE.WEBHOOKS,
             data: [
-                { _id: new mongoose.Types.ObjectId(id), ...ownedBy(callerId(req)) },
+                { _id: new mongoose.Types.ObjectId(id), ...(await managedBy(companyId, callerId(req))) },
                 { $set: update },
                 { returnDocument: 'after' },
             ],
@@ -164,14 +180,14 @@ exports.updateWebhook = async (req, res) => {
         return res.send({ status: true, statusText: 'Webhook updated.', data: maskHook(updated) });
     } catch (error) {
         logger.error(`ERROR in update webhook: ${error.message}`);
-        return res.send({ status: false, statusText: error.message });
+        return fail(res, error.message, error.statusCode);
     }
 };
 
 /* DELETE /api/v2/webhooks/:id */
 exports.deleteWebhook = async (req, res) => {
     try {
-        const companyId = req.headers['companyid'] || '';
+        const companyId = tenantOf(req);
         const { id } = req.params;
         if (!companyId || !isObjectIdString(id)) {
             return res.send({ status: false, statusText: 'companyId and a valid webhook id are required.' });
@@ -181,7 +197,7 @@ exports.deleteWebhook = async (req, res) => {
         // would let one member remove another's integration, and the logs with it.
         const owned = await MongoDbCrudOpration(companyId, {
             type: SCHEMA_TYPE.WEBHOOKS,
-            data: [{ _id: webhookId, ...ownedBy(callerId(req)) }],
+            data: [{ _id: webhookId, ...(await managedBy(companyId, callerId(req))) }],
         }, 'findOne');
         if (!owned) {
             return res.send({ status: false, statusText: 'Webhook not found.' });
@@ -194,11 +210,12 @@ exports.deleteWebhook = async (req, res) => {
             type: SCHEMA_TYPE.WEBHOOK_LOGS,
             data: [{ webhookId }],
         }, 'deleteMany').catch(() => {});
+        await revokeSigningSecret({ companyId, hook: owned, actor: actorOf(req) });
         invalidateCompanyCache(companyId);
         return res.send({ status: true, statusText: 'Webhook deleted.' });
     } catch (error) {
         logger.error(`ERROR in delete webhook: ${error.message}`);
-        return res.send({ status: false, statusText: error.message });
+        return fail(res, error.message, error.statusCode);
     }
 };
 
@@ -211,7 +228,7 @@ exports.deleteWebhook = async (req, res) => {
  */
 exports.listWebhookLogs = async (req, res) => {
     try {
-        const companyId = req.headers['companyid'] || '';
+        const companyId = tenantOf(req);
         const { id } = req.params;
         if (!companyId || !isObjectIdString(id)) {
             return res.send({ status: false, statusText: 'companyId and a valid webhook id are required.' });
@@ -223,7 +240,7 @@ exports.listWebhookLogs = async (req, res) => {
         const webhookId = new mongoose.Types.ObjectId(id);
         const owned = await MongoDbCrudOpration(companyId, {
             type: SCHEMA_TYPE.WEBHOOKS,
-            data: [{ _id: webhookId, ...ownedBy(callerId(req)) }],
+            data: [{ _id: webhookId, ...(await managedBy(companyId, callerId(req))) }],
         }, 'findOne');
         if (!owned) {
             return res.send({ status: false, statusText: 'Webhook not found.' });
@@ -245,6 +262,6 @@ exports.listWebhookLogs = async (req, res) => {
         });
     } catch (error) {
         logger.error(`ERROR in list webhook logs: ${error.message}`);
-        return res.send({ status: false, statusText: error.message });
+        return fail(res, error.message, error.statusCode);
     }
 };

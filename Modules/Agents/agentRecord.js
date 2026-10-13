@@ -1,0 +1,26 @@
+// One place that knows what a new agent row looks like. controller.createAgent
+// writes the same defaults; anything else that creates an agent goes through here.
+const { SCHEMA_TYPE } = require('../../Config/schemaType');
+const { MongoDbCrudOpration } = require('../../utils/mongo-handler/mongoQueries');
+const registry = require('./registry');
+const runs = require('./runs');
+const revisions = require('./revisions');
+const { DEFAULT_RATE_LIMIT_PER_DAY } = require('./dailyRunLimit');
+
+const DEFAULTS = Object.freeze({ autonomy: 0, spendCapUsd: 30, rateLimitPerDay: DEFAULT_RATE_LIMIT_PER_DAY, paused: false, account: 'workspace', deletedStatusKey: 0, projectIds: [] });
+
+const createAgentRecord = async (companyId, fields, { ownerId } = {}) => {
+    const name = String((fields && fields.name) || '').trim().slice(0, 80);
+    if (!name) throw new Error('name is required.');
+    const allowedActions = Array.isArray(fields.allowedActions) ? registry.allowedActionsToStore(fields.allowedActions) : [];
+    const role = fields.role === undefined ? {} : { role: require('./agentRole').roleOf(fields.role) };
+    const saved = await MongoDbCrudOpration(companyId, {
+        type: SCHEMA_TYPE.AGENTS,
+        data: { ...DEFAULTS, ...fields, ...role, name, allowedActions, ownerId: ownerId ? String(ownerId) : undefined },
+    }, 'save');
+    await revisions.recordCreate(companyId, saved, { actor: ownerId ? { userId: String(ownerId) } : undefined });
+    runs.emitAgent(companyId, { agent: saved });
+    return saved;
+};
+
+module.exports = { createAgentRecord, DEFAULTS };

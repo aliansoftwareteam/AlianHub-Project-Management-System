@@ -37,14 +37,15 @@
                                     </textarea>
                                     <div class="red" >{{item?.error }}</div>
                                 </div>
-                                <DropDown v-if="item.type === 'dropdown'">
+                                <DropDown v-if="item.type === 'dropdown'" mode="listbox">
                                     <template #button>
-                                        <div :ref="uniqueId+item.title" class="dropdown-button">{{item.value}}</div>
+                                        <div :ref="uniqueId+item.title" class="dropdown-button"><span class="ah-sr-only">{{ item.title }}</span>{{item.value}}</div>
                                     </template>
                                     <template #options>
                                         <DropDownOption
                                             v-for="(option, index) in item.options"
                                             :key="index"
+                                            :selected="option.value === item.value"
                                             @click="item.value = option.value,$refs[uniqueId+item.title][0].click()"
                                         >
                                             <span class="ml-10px">{{ option.value }}</span>
@@ -243,20 +244,20 @@ function parseJsonAiText() {
 </script>
 <style>
 .prompt-body-sidebar{
-    background: #FFFFFF;
+    background: var(--surface);
     margin: 15px;
     width: 893px;
 }
 .dropdown-button{
     border-radius: 5px;
-    border: 1px solid rgb(220, 220, 220);
+    border: 1px solid var(--border);
     height: 29px;
     padding: 5px;
 }
 .prompt_form{
     border-radius: 8px;
-    border: 1px solid #FFFFFF;
-    box-shadow: 0px 2px 12px 3px #00000026;
+    border: 1px solid var(--surface);
+    box-shadow: 0px 2px 12px 3px var(--shadow-ink);
 }
 .generate-button-ai{
     margin-right: 20px;
@@ -271,7 +272,7 @@ function parseJsonAiText() {
 }
 
 .prompt-body-sidebar{
-    background: #FFFFFF;
+    background: var(--surface);
     margin: 15px;
     width: calc(100% - 30px);
 }

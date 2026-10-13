@@ -1,5 +1,9 @@
 const { Schema } = require('mongoose');
+const fileSweep = require('../../Modules/Knowledge/ingest/fileSweep');
+const { FIGURES_INDEX_KEY } = require('../../Modules/Knowledge/figuresPipeline');
+const tombstonePurge = require('../../Modules/Knowledge/ingest/purgeFilter');
 const { schema } = require('./schema');
+const { CLEARED_RETENTION_SECONDS } = require('../../Modules/Inbox/helpers/inboxRules');
 // P1-SEC-11 — Core entity schemas hardened to `strict: true`. The
 // field lists in `./schema.js` cover every known write path; unknown
 // fields are now silently dropped instead of persisted, which blocks
@@ -7,6 +11,19 @@ const { schema } = require('./schema');
 // privilege-escalation surface flagged in the security audit. If a
 // new legitimate field needs to land, declare it in `./schema.js`.
 const taskSchema = new Schema(schema.tasks, { strict: true, timestamps: true });
+/* A task gains extra lists only on a stored row, through Modules/Tasks/helpers/taskExtraLists.js.
+ * Every writer of a new task document passes one of these two, so a created, imported, copied or
+ * templated row cannot carry the lists of the row it was built from. */
+taskSchema.pre('save', function dropExtraListsFromNewTask() {
+    if (this.isNew) this.set('extraLists', undefined);
+});
+taskSchema.pre('insertMany', function dropExtraListsFromNewTasks(next, docs) {
+    [].concat(docs || []).forEach((doc) => {
+        if (doc && typeof doc.set === 'function') doc.set('extraLists', undefined);
+        else if (doc) delete doc.extraLists;
+    });
+    next();
+});
 const commentSchema = new Schema(schema.comments, { strict: true, timestamps: true });
 const timeSheetSchema = new Schema(schema.timesheet, { strict: true, timestamps: true });
 // BUG-046 / #100 — every other schema in this file already uses
@@ -46,6 +63,10 @@ const appsSchema = new Schema(schema.apps, {strict: true, timestamps: true})
 const notificationsSchema = new Schema(schema.notifications, {strict: true, timestamps: true})
 const notificationsSettingsSchema= new Schema(schema.notificationsSettings, {strict: true, timestamps: true})
 const mentionsSchema= new Schema(schema.mentions, {strict: true, timestamps: true})
+notificationsSchema.index({ clearedAt: 1 }, { expireAfterSeconds: CLEARED_RETENTION_SECONDS, name: 'cleared_purge' });
+mentionsSchema.index({ purgeAt: 1 }, { expireAfterSeconds: 0, name: 'cleared_purge' });
+notificationsSchema.index({ receiverID: 1, taskId: 1 });
+mentionsSchema.index({ mentionIds: 1, taskId: 1 });
 const projectRulesSchema= new Schema(schema.projectRules, {strict: true, timestamps: true})
 const subscriptionPlanSchema = new Schema(schema.subscriptionPlan, {strict: true, timestamps: true});
 // `planFeature` / `planFeatureDisplay` intentionally hold an open-ended
@@ -82,6 +103,8 @@ sessionsSchema.index({ createdAt: 1 }, { expireAfterSeconds: Number(process.env.
 const referCodeSchema = new Schema(schema.refferalcodes, {strict: true, timestamps: true});
 const refferalmapping = new Schema(schema.refferalmapping, {strict: true, timestamps: true});
 const globalSettingsSchema = new Schema(schema.globalSettings, {strict: true, timestamps: true});
+const schemaVersionsSchema = new Schema(schema.schemaVersions, {strict: true, timestamps: false, minimize: false});
+const instanceSettingsSchema = new Schema(schema.instanceSettings, {strict: true, timestamps: false, minimize: false});
 const webhooksSchema = new Schema(schema.webhooks, {strict: true, timestamps: true});
 const webhookLogsSchema = new Schema(schema.webhookLogs, {strict: true, timestamps: true});
 // webhook logs: always read newest-first per webhook; cap retention by query.
@@ -99,6 +122,14 @@ const exportJobsSchema = new Schema(schema.exportJobs, {strict: true, timestamps
 exportJobsSchema.index({ userId: 1, createdAt: -1 });
 const importJobsSchema = new Schema(schema.importJobs, {strict: true, timestamps: true});
 importJobsSchema.index({ userId: 1, createdAt: -1 });
+const aiFieldJobsSchema = new Schema(schema.aiFieldJobs, {strict: true, timestamps: true});
+aiFieldJobsSchema.index({ userId: 1, createdAt: -1 });
+aiFieldJobsSchema.index({ createdAt: 1 }, { expireAfterSeconds: 30 * 24 * 60 * 60 });
+const customFieldLinksSchema = new Schema(schema.customFieldLinks, {strict: true, timestamps: true});
+customFieldLinksSchema.index({ taskId: 1, fieldId: 1 }, { unique: true });
+customFieldLinksSchema.index({ fieldId: 1, ids: 1 });
+customFieldLinksSchema.index({ fieldId: 1, kind: 1 });
+customFieldLinksSchema.index({ ids: 1 });
 const epicsSchema = new Schema(schema.epics, {strict: true, timestamps: true});
 epicsSchema.index({ ProjectID: 1, deletedStatusKey: 1 });
 const pagesSchema = new Schema(schema.pages, {strict: true, timestamps: true});
@@ -106,8 +137,12 @@ pagesSchema.index({ parentPageId: 1, deletedStatusKey: 1 });
 pagesSchema.index({ ProjectID: 1, deletedStatusKey: 1 });
 // "Which docs are attached to this task?" is asked on every task detail open.
 pagesSchema.index({ linkedTasks: 1, deletedStatusKey: 1 });
+pagesSchema.index({ 'sharedWith.userId': 1 }, { sparse: true });
 const pageVersionsSchema = new Schema(schema.pageVersions, {strict: true, timestamps: true});
 pageVersionsSchema.index({ pageId: 1, createdAt: -1 });
+const pageCommentsSchema = new Schema(schema.pageComments, {strict: true, timestamps: true});
+pageCommentsSchema.index({ pageId: 1, isDeleted: 1, createdAt: 1 });
+pageCommentsSchema.index({ parentId: 1 });
 const publicSharesSchema = new Schema(schema.publicShares, {strict: true, timestamps: true});
 publicSharesSchema.index({ token: 1 }, { unique: true });
 const intakeItemsSchema = new Schema(schema.intakeItems, {strict: true, timestamps: true});
@@ -117,6 +152,23 @@ publicShareIndexSchema.index({ token: 1 }, { unique: true });
 const recurringTasksSchema = new Schema(schema.recurringTasks, {strict: true, timestamps: true});
 recurringTasksSchema.index({ ProjectID: 1, deletedStatusKey: 1 });
 recurringTasksSchema.index({ enabled: 1, deletedStatusKey: 1, nextRunAt: 1 });
+recurringTasksSchema.index({ sourceTaskId: 1, deletedStatusKey: 1 });
+const taskTemplatesSchema = new Schema(schema.task_templates, {strict: true, timestamps: true});
+taskTemplatesSchema.index({ scope: 1, ProjectID: 1, deletedStatusKey: 1 });
+const viewTemplatesSchema = new Schema(schema.view_templates, {strict: true, timestamps: true});
+viewTemplatesSchema.index({ deletedStatusKey: 1, name: 1 });
+const projectSnapshotsSchema = new Schema(schema.project_snapshots, {strict: true, timestamps: true});
+projectSnapshotsSchema.index({ kind: 1, deletedStatusKey: 1 });
+projectSnapshotsSchema.index({ templateId: 1, part: 1 });
+const everythingViewsSchema = new Schema(schema.everything_views, {strict: true, timestamps: true});
+everythingViewsSchema.index({ userId: 1, deletedStatusKey: 1 });
+const goalsSchema = new Schema(schema.goals, {strict: true, timestamps: true});
+goalsSchema.index({ deletedStatusKey: 1, ownerUserId: 1 });
+goalsSchema.index({ deletedStatusKey: 1, visibility: 1 });
+goalsSchema.index({ 'targets.sources.taskIds': 1 });
+goalsSchema.index({ 'targets.sources.sprintIds': 1 });
+const whiteboardsSchema = new Schema(schema.whiteboards, {strict: true, timestamps: true});
+whiteboardsSchema.index({ projectId: 1, sprintId: 1 }, { unique: true, partialFilterExpression: { deletedStatusKey: 0 } });
 const remindersSchema = new Schema(schema.reminders, {strict: true, timestamps: true});
 remindersSchema.index({ userId: 1, fired: 1, reminderAt: 1 });
 const notesSchema = new Schema(schema.notes, {strict: true, timestamps: true});
@@ -140,6 +192,20 @@ auditLogsSchema.index({ createdAt: -1 });
 auditLogsSchema.index({ actorId: 1, createdAt: -1 });
 auditLogsSchema.index({ entityType: 1, entityId: 1, createdAt: -1 });
 auditLogsSchema.index({ action: 1, createdAt: -1 });
+// Action-level idempotency (028): a replayed step opens no second row, so the
+// row's own state is what says whether the effect already happened.
+auditLogsSchema.index({ 'meta.idempotencyKey': 1 }, { unique: true, partialFilterExpression: { 'meta.idempotencyKey': { $type: 'string' } } });
+// Two servers appending the same sequence number: the second insert fails and retries on the new tip.
+require('../../Modules/Audit/helpers/chainRules').CHAIN_INDEXES.forEach(([keys, options]) => auditLogsSchema.index({ ...keys }, { ...options }));
+const auditChainHeadsSchema = new Schema(schema.auditChainHeads, {strict: true, timestamps: false});
+const auditChainAnchorsSchema = new Schema(schema.auditChainAnchors, {strict: true, timestamps: true});
+auditChainAnchorsSchema.index({ seq: -1 }, { unique: true, name: 'audit_anchor_seq' });
+const auditChainProgressSchema = new Schema(schema.auditChainProgress, {strict: true, timestamps: false});
+const auditRedactionsSchema = new Schema(schema.auditRedactions, {strict: true, timestamps: true});
+const auditChainKeySchema = new Schema(schema.auditChainKey, {strict: true, timestamps: false});
+const secretsSchema = new Schema(schema.secrets, {strict: true, timestamps: false});
+secretsSchema.index({ handle: 1 }, { unique: true, name: 'secrets_handle' });
+secretsSchema.index({ createdAt: -1 });
 const scimConfigsSchema = new Schema(schema.scimConfigs, {strict: true, timestamps: true});
 const ptoEntriesSchema = new Schema(schema.ptoEntries, {strict: true, timestamps: true});
 ptoEntriesSchema.index({ userId: 1, startDate: 1 });
@@ -155,12 +221,150 @@ const emailInboxesSchema = new Schema(schema.emailInboxes, {strict: true, timest
 emailInboxesSchema.index({ token: 1 });
 emailInboxesSchema.index({ companyId: 1, deletedStatusKey: 1 });
 const calendarFeedsSchema = new Schema(schema.calendarFeeds, {strict: true, timestamps: true});
-calendarFeedsSchema.index({ token: 1 });
+calendarFeedsSchema.index({ tokenHash: 1 });
 calendarFeedsSchema.index({ companyId: 1, deletedStatusKey: 1 });
 const automationRulesSchema = new Schema(schema.automationRules, {strict: true, timestamps: true});
 automationRulesSchema.index({ deletedStatusKey: 1 });
+
+const automationEventLogSchema = new Schema(schema.automationEventLog, {strict: true, timestamps: true});
+automationEventLogSchema.index({ eventId: 1 }, { unique: true });
+automationEventLogSchema.index({ type: 1, occurredAt: -1 });
+// Diagnostic only — 14 days is long enough to read a week of traffic twice.
+automationEventLogSchema.index({ createdAt: 1 }, { expireAfterSeconds: 1209600 });
+
+const automationRunsSchema = new Schema(schema.automationRuns, {strict: true, timestamps: true});
+// The single most important index in the engine: it is what makes a duplicate
+// delivery a no-op instead of a second execution of the same rule.
+automationRunsSchema.index({ ruleId: 1, eventId: 1 }, { unique: true });
+automationRunsSchema.index({ startedAt: -1 });
+automationRunsSchema.index({ status: 1, startedAt: -1 });
+automationRunsSchema.index({ createdAt: 1 }, { expireAfterSeconds: 7776000 });
+
+const workflowRunsSchema = new Schema(schema.workflowRuns, {strict: true, timestamps: true});
+// Same job the automation index does, one level up: a redelivered trigger loses
+// the insert instead of starting a second run of the same workflow.
+workflowRunsSchema.index({ dedupeKey: 1 }, { unique: true, partialFilterExpression: { dedupeKey: { $type: 'string' } } });
+workflowRunsSchema.index({ status: 1, startedAt: -1 });
+workflowRunsSchema.index({ workflowId: 1, startedAt: -1 });
+// What the API lists by: the runs of one kind, and the runs of one agent.
+workflowRunsSchema.index({ source: 1, startedAt: -1 });
+workflowRunsSchema.index({ agentId: 1, startedAt: -1 });
+workflowRunsSchema.index({ createdAt: 1 }, { expireAfterSeconds: 7776000 });
+
+const workflowStepRunsSchema = new Schema(schema.workflowStepRuns, {strict: true, timestamps: true});
+// The unique index on run and step. One row per step of a run means a step can
+// only ever be claimed by winning the compare-and-set on that one row.
+workflowStepRunsSchema.index({ runId: 1, stepId: 1 }, { unique: true });
+workflowStepRunsSchema.index({ runId: 1, status: 1 });
+// The reclaim scan and the per-tenant claim count both read this one.
+workflowStepRunsSchema.index({ status: 1, leaseExpiresAt: 1 });
+workflowStepRunsSchema.index({ status: 1, nextAttemptAt: 1 });
+workflowStepRunsSchema.index({ createdAt: 1 }, { expireAfterSeconds: 7776000 });
+// The fan-out join and the loop both ask "what belongs to this step?".
+workflowStepRunsSchema.index({ runId: 1, parentStepId: 1 });
+
+const workflowApprovalsSchema = new Schema(schema.workflowApprovals, {strict: true, timestamps: true});
+// One approval per step of a run: a redelivered tick opens the same row rather
+// than a second request for the same decision.
+workflowApprovalsSchema.index({ runId: 1, stepId: 1 }, { unique: true });
+// The escalation and deadline sweeps read this one.
+workflowApprovalsSchema.index({ status: 1, deadlineAt: 1 });
+
+const workflowDefinitionsSchema = new Schema(schema.workflowDefinitions, {strict: true, timestamps: true});
+// What the builder lists: the company's workflows, most recently edited first.
+workflowDefinitionsSchema.index({ deletedStatusKey: 1, updatedAt: -1 });
+workflowDefinitionsSchema.index({ enabled: 1, updatedAt: -1 });
+workflowApprovalsSchema.index({ ownerUserId: 1, status: 1 });
+workflowApprovalsSchema.index({ createdAt: 1 }, { expireAfterSeconds: 7776000 });
+
+const agentFindingsSchema = new Schema(schema.agentFindings, {strict: true, timestamps: true});
+// The dedup key. Unique, so a concurrent second run cannot race in a duplicate.
+agentFindingsSchema.index({ taskId: 1, factId: 1 }, { unique: true });
+agentFindingsSchema.index({ projectId: 1, status: 1 });
+
+const projectFindingsSchema = new Schema(schema.projectFindings, {strict: true, timestamps: true});
+// One row per project and cause. Unique, so two servers looking at once cannot file the same finding twice.
+projectFindingsSchema.index({ projectId: 1, key: 1 }, { unique: true, name: 'project_cause' });
+projectFindingsSchema.index({ projectId: 1, status: 1, openedAt: -1 });
+// The questions waiting for one person's AI (Modules/Agents/manager/chatQuestions.js), read on every look at the work queue.
+projectFindingsSchema.index({ userId: 1, status: 1, openedAt: 1 }, { name: 'asked_in_chat_by_person', partialFilterExpression: { rule: 'asked_in_chat' } });
+
+const agentWorkMarksSchema = new Schema(schema.agentWorkMarks, {strict: true, timestamps: true});
+// Unique, so of two agents reaching for one place, one turn or one item at the same moment, the insert of exactly one lands.
+agentWorkMarksSchema.index({ scope: 1, key: 1 }, { unique: true, name: 'one_mark' });
+agentWorkMarksSchema.index({ ref: 1 });
+
+const agentsSchema = new Schema(schema.agents, {strict: true, timestamps: true});
+agentsSchema.index({ paused: 1 });
+agentsSchema.index({ ownerId: 1 });
+
+const agentRunsSchema = new Schema(schema.agentRuns, {strict: true, timestamps: true});
+agentRunsSchema.index({ agentId: 1, startedAt: -1 });
+agentRunsSchema.index({ startedAt: -1 });
+agentRunsSchema.index({ status: 1, startedAt: -1 });
+agentRunsSchema.index({ taskId: 1, startedAt: -1 });
+agentRunsSchema.index({ projectId: 1, status: 1 });
+agentRunsSchema.index({ projectId: 1, finishedAt: -1 });
+agentRunsSchema.index({ expiresAt: 1 }, { expireAfterSeconds: 0 });
+agentRunsSchema.index({ 'failure.type': 1, startedAt: -1 }, { partialFilterExpression: { 'failure.type': { $type: 'string' } } });
+// One open run per agent and task (the open set mirrors runs.OPEN) and one run
+// per idempotency key: a double-click, a retried request or a redelivered job
+// hits the index instead of starting a second run.
+agentRunsSchema.index({ agentId: 1, taskId: 1, status: 1 }, { unique: true, partialFilterExpression: { taskId: { $type: 'string' }, status: { $in: ['queued', 'running', 'waiting_approval'] } } });
+agentRunsSchema.index({ idempotencyKey: 1 }, { unique: true, partialFilterExpression: { idempotencyKey: { $type: 'string' } } });
+agentRunsSchema.index({ startedBy: 1, kind: 1, startedAt: -1 }, { partialFilterExpression: { kind: { $type: 'string' } } });
+
+const agentRevisionsSchema = new Schema(schema.agentRevisions, {strict: true, timestamps: true});
+agentRevisionsSchema.index({ agentId: 1, n: 1 }, { unique: true });
+agentRevisionsSchema.index({ agentId: 1, state: 1 });
+
+const agentSchedulesSchema = new Schema(schema.agentSchedules, {strict: true, timestamps: true});
+agentSchedulesSchema.index({ enabled: 1, nextRunAt: 1 });
+agentSchedulesSchema.index({ agentId: 1 });
+agentSchedulesSchema.index({ ownerId: 1 });
+
+const aiUsageSchema = new Schema(schema.aiUsage, {strict: true, timestamps: true});
+aiUsageSchema.index({ at: -1 });
+aiUsageSchema.index({ feature: 1, at: -1 });
+aiUsageSchema.index({ runId: 1 });
+aiUsageSchema.index({ userId: 1, at: -1 });
+aiUsageSchema.index({ createdAt: 1 }, { expireAfterSeconds: 34214400 });
+
+const aiReplaysSchema = new Schema(schema.aiReplays, {strict: true, timestamps: false});
+aiReplaysSchema.index({ runId: 1, createdAt: 1 });
+aiReplaysSchema.index({ feature: 1, createdAt: -1 });
+aiReplaysSchema.index({ expiresAt: 1 }, { expireAfterSeconds: 0 });
+
+const aiReservationsSchema = new Schema(schema.aiReservations, {strict: true, timestamps: true});
+aiReservationsSchema.index({ state: 1, at: -1 });
+aiReservationsSchema.index({ runId: 1 });
+aiReservationsSchema.index({ expiresAt: 1 }, { expireAfterSeconds: 0 });
+
+const aiAlertsSchema = new Schema(schema.aiAlerts, {strict: true, timestamps: true});
+aiAlertsSchema.index({ type: 1, key: 1 }, { unique: true, partialFilterExpression: { status: 'open' } });
+aiAlertsSchema.index({ status: 1, openedAt: -1 });
+
+const agentSkillsSchema = new Schema(schema.agentSkills, {strict: true, timestamps: true});
+agentSkillsSchema.index({ key: 1 }, { unique: true });
+agentSkillsSchema.index({ enabled: 1, retiredAt: 1 });
+
+const agentProposalsSchema = new Schema(schema.agentProposals, {strict: true, timestamps: true});
+agentProposalsSchema.index({ status: 1, createdAt: -1 });
+agentProposalsSchema.index({ createdAt: -1 });
+agentProposalsSchema.index({ agentId: 1, createdAt: -1 });
+agentProposalsSchema.index({ taskId: 1 });
+const rolePlaybookOverridesSchema = new Schema(schema.rolePlaybookOverrides, {strict: true, timestamps: true});
+rolePlaybookOverridesSchema.index({ key: 1 }, { unique: true });
+const agentStandingApprovalsSchema = new Schema(schema.agentStandingApprovals, {strict: true, timestamps: true});
+agentStandingApprovalsSchema.index({ projectId: 1, action: 1, status: 1 });
+const callsSchema = new Schema(schema.calls, {strict: true, timestamps: true});
+callsSchema.index({ callId: 1 }, { unique: true });
+callsSchema.index({ chatId: 1, createdAt: -1 });
 const integrationConnectionsSchema = new Schema(schema.integrationConnections, {strict: true, timestamps: true});
 integrationConnectionsSchema.index({ type: 1, deletedStatusKey: 1 });
+// One row per app event and task, kept for good: whoever inserts it first acts, so an old pull request updated again never acts twice.
+const appConnectionEventsSchema = new Schema(schema.appConnectionEvents, {strict: true, timestamps: true});
+appConnectionEventsSchema.index({ key: 1 }, { unique: true, name: 'event_task' });
 const cloudStorageConnectionsSchema = new Schema(schema.cloudStorageConnections, {strict: true, timestamps: true});
 // Every lookup is "this user's connection to this provider" — unique so a
 // double-tap on Connect can't leave two rows with divergent refresh tokens.
@@ -171,11 +375,97 @@ formsSchema.index({ ProjectID: 1, deletedStatusKey: 1 });
 const formSubmissionsSchema = new Schema(schema.form_submissions, {strict: true, timestamps: true});
 // The response table is always "this form's submissions, newest first".
 formSubmissionsSchema.index({ formId: 1, createdAt: -1 });
+const projectContractsSchema = new Schema(schema.projectContracts, {strict: true, timestamps: true});
+// One contract per project — unique so a double-tap on Save can't leave two
+// rows disagreeing about the tax rate.
+projectContractsSchema.index({ ProjectID: 1, deletedStatusKey: 1 }, { unique: true });
+const projectInvoicesSchema = new Schema(schema.projectInvoices, {strict: true, timestamps: true});
+projectInvoicesSchema.index({ ProjectID: 1, deletedStatusKey: 1, issuedDate: -1 });
+// The number series runs per project (invoiceSeq lives on the project's
+// contract), so uniqueness is per project too — a company-wide unique index
+// would collide the moment a second project raised its first invoice.
+projectInvoicesSchema.index({ ProjectID: 1, number: 1 }, { unique: true });
+const knowledgeChunksSchema = new Schema(schema.knowledgeChunks, {strict: true, timestamps: true});
+knowledgeChunksSchema.index({ sourceType: 1, sourceId: 1, ordinal: 1 }, { unique: true });
+knowledgeChunksSchema.index({ projectId: 1, deleted: 1 });
+knowledgeChunksSchema.index({ createdBy: 1, visibility: 1 });
+knowledgeChunksSchema.index({ sourceType: 1, taskId: 1 });
+// The vector search's candidate scan: the newest chunks of a source type under one embedding model.
+knowledgeChunksSchema.index({ sourceType: 1, embeddingModel: 1, sourceUpdatedAt: -1 });
+knowledgeChunksSchema.index(fileSweep.INDEX_KEY, fileSweep.INDEX_OPTIONS);
+knowledgeChunksSchema.index(FIGURES_INDEX_KEY);
+knowledgeChunksSchema.index(tombstonePurge.INDEX_KEY, tombstonePurge.INDEX_OPTIONS);
+const knowledgeIndexStateSchema = new Schema(schema.knowledgeIndexState, {strict: true, timestamps: true});
+knowledgeIndexStateSchema.index({ sourceType: 1 }, { unique: true });
+const knowledgeExclusionsSchema = new Schema(schema.knowledgeExclusions, {strict: true, timestamps: true});
+knowledgeExclusionsSchema.index({ kind: 1, sourceType: 1, sourceId: 1, userId: 1 }, { unique: true });
 
-// Global search: one combined text index per collection.
+const permissionDecisionsSchema = new Schema(schema.permissionDecisions, {strict: true, timestamps: false});
+permissionDecisionsSchema.index({ day: 1, mode: 1, method: 1, route: 1, permission: 1, role: 1, scope: 1, reason: 1 }, { unique: true, name: 'decision_key' });
+permissionDecisionsSchema.index({ day: 1 }, { expireAfterSeconds: 30 * 24 * 60 * 60 });
+const egressAllowlistsSchema = new Schema(schema.egressAllowlists, {strict: true, timestamps: false});
+const connectorConnectionsSchema = new Schema(schema.connectorConnections, {strict: true, timestamps: true});
+connectorConnectionsSchema.index({ connector: 1, deletedStatusKey: 1 });
+connectorConnectionsSchema.index({ userId: 1, connector: 1, deletedStatusKey: 1 });
+const instructionPatternsSchema = new Schema(schema.instructionPatterns, {strict: true, timestamps: false});
+const agentSessionsSchema = new Schema(schema.agentSessions, {strict: true, timestamps: false});
+agentSessionsSchema.index({ taskId: 1, createdAt: -1 });
+agentSessionsSchema.index({ state: 1, deliveredAt: 1 });
+agentSessionsSchema.index({ grantId: 1, state: 1 });
+const agentSessionEndpointsSchema = new Schema(schema.agentSessionEndpoints, {strict: true, timestamps: false});
+agentSessionEndpointsSchema.index({ clientId: 1 }, { unique: true, name: 'client_id' });
+const askThreadsSchema = new Schema(schema.askThreads, {strict: true, timestamps: true});
+askThreadsSchema.index({ ownerId: 1, lastTurnAt: -1 });
+const dashboardCardAnswersSchema = new Schema(schema.dashboardCardAnswers, {strict: true, timestamps: false});
+dashboardCardAnswersSchema.index({ dashboardId: 1, cardUid: 1, userId: 1 }, { unique: true, name: 'one_per_card_viewer' });
+dashboardCardAnswersSchema.index({ userId: 1 });
+const taskAiValuesSchema = new Schema(schema.taskAiValues, {strict: true, timestamps: false});
+taskAiValuesSchema.index({ taskId: 1, kind: 1 }, { unique: true, name: 'one_per_task_kind' });
+taskAiValuesSchema.index({ madeBy: 1 });
+const aiFeedbackSchema = new Schema(schema.aiFeedback, {strict: true, timestamps: false});
+aiFeedbackSchema.index({ userId: 1, feature: 1, itemId: 1 }, { unique: true, name: 'one_per_person_item' });
+aiFeedbackSchema.index({ createdAt: -1 });
+const aiEvalRunsSchema = new Schema(schema.aiEvalRuns, {strict: true, timestamps: false});
+aiEvalRunsSchema.index({ suite: 1, ranAt: -1 });
+const assignmentRulesSchema = new Schema(schema.assignmentRules, {strict: true, timestamps: false});
+assignmentRulesSchema.index({ projectId: 1 }, { unique: true, name: 'project_id' });
+const assignmentDecisionsSchema = new Schema(schema.assignmentDecisions, {strict: true, timestamps: true});
+assignmentDecisionsSchema.index({ taskId: 1, inputHash: 1 }, { unique: true, name: 'task_revision' });
+assignmentDecisionsSchema.index({ taskId: 1, createdAt: -1 });
+assignmentDecisionsSchema.index({ createdAt: -1 });
+const dispatchDecisionsSchema = new Schema(schema.dispatchDecisions, {strict: true, timestamps: false});
+dispatchDecisionsSchema.index({ taskId: 1, inputHash: 1 }, { unique: true, name: 'task_revision' });
+dispatchDecisionsSchema.index({ projectId: 1, state: 1, createdAt: -1 });
+const aiProfilesSchema = new Schema(schema.aiProfiles, {strict: true, timestamps: true});
+aiProfilesSchema.index({ ownerId: 1 }, { unique: true, name: 'owner_id' });
+
+const oauthClientsSchema = new Schema(schema.oauthClients, {strict: true, timestamps: false});
+oauthClientsSchema.index({ clientId: 1 }, { unique: true, name: 'client_id' });
+oauthClientsSchema.index({ companyId: 1, createdAt: -1 });
+const oauthGrantsSchema = new Schema(schema.oauthGrants, {strict: true, timestamps: false});
+oauthGrantsSchema.index({ grantId: 1 }, { unique: true, name: 'grant_id' });
+oauthGrantsSchema.index({ companyId: 1, userId: 1 });
+oauthGrantsSchema.index({ purgeAt: 1 }, { expireAfterSeconds: 0, name: 'purge_at' });
+const oauthTokensSchema = new Schema(schema.oauthTokens, {strict: true, timestamps: false});
+oauthTokensSchema.index({ tokenHash: 1 }, { unique: true, name: 'token_hash' });
+oauthTokensSchema.index({ grantId: 1 });
+oauthTokensSchema.index({ purgeAt: 1 }, { expireAfterSeconds: 0, name: 'purge_at' });
+oauthGrantsSchema.index({ clientId: 1, companyId: 1 });
+oauthGrantsSchema.index({ userId: 1, createdAt: -1 });
+const oauthClientApprovalsSchema = new Schema(schema.oauthClientApprovals, {strict: true, timestamps: false});
+oauthClientApprovalsSchema.index({ companyId: 1, clientId: 1 }, { unique: true, name: 'company_client' });
+oauthClientApprovalsSchema.index({ companyId: 1, status: 1 });
+
+const cspReportsSchema = new Schema(schema.cspReports, {strict: true, timestamps: false});
+cspReportsSchema.index({ day: 1, directive: 1, blockedHost: 1, documentPath: 1 }, { unique: true, name: 'report_key' });
+cspReportsSchema.index({ day: 1 }, { expireAfterSeconds: 30 * 24 * 60 * 60 });
+
+// One combined text index per collection, for global search and knowledge retrieval.
 taskSchema.index({ TaskName: 'text', rawDescription: 'text' });
 projectsSchema.index({ ProjectName: 'text' });
 commentSchema.index({ message: 'text' });
+pagesSchema.index({ title: 'text', rawText: 'text' });
+knowledgeChunksSchema.index({ text: 'text' });
 
 // BUG-021 / #75 — Indexes for the hottest query paths. Each company has its
 // own MongoDB database, so `companyId` itself is the database name and need
@@ -192,12 +482,27 @@ taskSchema.index({ ProjectID: 1, sprintId: 1, deletedStatusKey: 1 });
 taskSchema.index({ sprintId: 1, deletedStatusKey: 1 });
 taskSchema.index({ AssigneeUserId: 1 });
 taskSchema.index({ ParentTaskId: 1 });
+taskSchema.index({ ancestors: 1 });
 taskSchema.index({ TaskKey: 1 });
+// An import looks up what it already brought into a project, and its undo what it created.
+taskSchema.index({ ProjectID: 1, importSourceId: 1 }, { sparse: true });
+taskSchema.index({ importJobId: 1 }, { sparse: true });
+// The due-date trigger reads a day-wide range of this every few minutes (Modules/Automations/engine/dueDateTrigger).
+taskSchema.index({ DueDate: 1 });
+// The Everything view pages across projects on these; Modules/Tasks/helpers/everythingQuery.js sorts in their order.
+taskSchema.index({ ProjectID: 1, deletedStatusKey: 1, updatedAt: -1, _id: 1 });
+taskSchema.index({ ProjectID: 1, deletedStatusKey: 1, DueDate: 1, _id: 1 });
+// The tasks a list also shows that live elsewhere (Modules/Tasks/helpers/taskExtraLists.js).
+taskSchema.index({ 'extraLists.sprintId': 1, deletedStatusKey: 1 });
 
 // comments: every comment is fetched by task/sprint/project triplet.
 commentSchema.index({ 'objId.taskId': 1, deletedStatusKey: 1 });
 commentSchema.index({ 'objId.sprintId': 1 });
 commentSchema.index({ 'objId.projectId': 1 });
+// Comments are stored with a top-level taskId; the objId.* keys above index nothing.
+commentSchema.index({ taskId: 1 });
+commentSchema.index({ parentId: 1 }, { sparse: true });
+commentSchema.index({ assigneeId: 1, resolved: 1 }, { sparse: true });
 
 // history: by task and by project (timeline display).
 historySchema.index({ TaskId: 1, createdAt: -1 });
@@ -234,8 +539,10 @@ userAuthSchema.index({ email: 1 });
 // companyUsers: lookup by userId + invitation status.
 companyUserSchema.index({ userId: 1 });
 
-// sessions: refresh-token lookup is what `Config/jwt.js` does.
+// sessions: the refresh endpoint finds a session by token hash, tracker sign-in by code hash.
 sessionsSchema.index({ refreshToken: 1 });
+sessionsSchema.index({ refreshTokenHash: 1 });
+sessionsSchema.index({ trackerCodeHash: 1 }, { sparse: true });
 sessionsSchema.index({ userId: 1 });
 
 // resetAttempt: keyed by IP.
@@ -249,13 +556,22 @@ module.exports = {
     apiActivityLogsSchema,
     exportJobsSchema,
     importJobsSchema,
+    aiFieldJobsSchema,
+    customFieldLinksSchema,
     epicsSchema,
     pagesSchema,
     pageVersionsSchema,
+    pageCommentsSchema,
     publicSharesSchema,
     intakeItemsSchema,
     publicShareIndexSchema,
     recurringTasksSchema,
+    taskTemplatesSchema,
+    viewTemplatesSchema,
+    projectSnapshotsSchema,
+    everythingViewsSchema,
+    goalsSchema,
+    whiteboardsSchema,
     remindersSchema,
     notesSchema,
     generalRemindersSchema,
@@ -273,10 +589,64 @@ module.exports = {
     emailInboxesSchema,
     calendarFeedsSchema,
     automationRulesSchema,
+    automationEventLogSchema,
+    automationRunsSchema,
+    workflowRunsSchema,
+    workflowStepRunsSchema,
+    workflowApprovalsSchema,
+    workflowDefinitionsSchema,
+    agentFindingsSchema,
+    projectFindingsSchema,
+    agentWorkMarksSchema,
+    agentsSchema,
+    agentRunsSchema,
+    agentRevisionsSchema,
+    agentSchedulesSchema,
+    aiUsageSchema,
+    aiReservationsSchema,
+    aiReplaysSchema,
+    aiAlertsSchema,
+    agentProposalsSchema,
+    agentStandingApprovalsSchema,
+    agentSkillsSchema,
+    rolePlaybookOverridesSchema,
+    callsSchema,
     integrationConnectionsSchema,
+    appConnectionEventsSchema,
     cloudStorageConnectionsSchema,
     formsSchema,
     formSubmissionsSchema,
+    projectContractsSchema,
+    projectInvoicesSchema,
+    knowledgeChunksSchema,
+    knowledgeIndexStateSchema,
+    knowledgeExclusionsSchema,
+    permissionDecisionsSchema,
+    cspReportsSchema,
+    auditChainHeadsSchema,
+    auditChainAnchorsSchema,
+    auditChainProgressSchema,
+    auditRedactionsSchema,
+    auditChainKeySchema,
+    egressAllowlistsSchema,
+    connectorConnectionsSchema,
+    instructionPatternsSchema,
+    agentSessionsSchema,
+    agentSessionEndpointsSchema,
+    askThreadsSchema,
+    dashboardCardAnswersSchema,
+    taskAiValuesSchema,
+    aiFeedbackSchema,
+    aiEvalRunsSchema,
+    assignmentRulesSchema,
+    assignmentDecisionsSchema,
+    dispatchDecisionsSchema,
+    aiProfilesSchema,
+    secretsSchema,
+    oauthClientsSchema,
+    oauthGrantsSchema,
+    oauthTokensSchema,
+    oauthClientApprovalsSchema,
     historySchema,
     userIdSchema, 
     usersSchema,
@@ -299,7 +669,6 @@ module.exports = {
     settingsSchema,
     milestone,
     mainChatSchema,
-    settingsSchema,
     appsSchema,
     notificationsSchema,
     notificationsSettingsSchema,
@@ -328,5 +697,7 @@ module.exports = {
     userDashboard,
     referCodeSchema,
     refferalmapping,
-    globalSettingsSchema
+    globalSettingsSchema,
+    schemaVersionsSchema,
+    instanceSettingsSchema
 };

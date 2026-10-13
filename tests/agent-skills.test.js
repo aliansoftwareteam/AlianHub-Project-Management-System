@@ -1,0 +1,148 @@
+jest.mock('../utils/mongo-handler/mongoQueries', () => ({ MongoDbCrudOpration: jest.fn(async () => undefined) }));
+jest.mock('../event/socketEventEmitter', () => ({ emit: jest.fn() }));
+jest.mock('../Modules/Agents/skillRecord', () => ({ getSkill: async (companyId, slug) => require('../Modules/Agents/skills').getSkill(slug) }));
+
+const { MongoDbCrudOpration } = require('../utils/mongo-handler/mongoQueries');
+const { getSkill, ALL } = require('../Modules/Agents/skills');
+const orchestrator = require('../Modules/Agents/engine/orchestrator');
+
+const task = { _id: 't1', TaskKey: 'AR-1', TaskName: 'Build the thing', ProjectID: 'p1', description: '<p>Goal: ship the magic-link login. Acceptance: verify endpoint, email template, rate limit, tests for expiry.</p>', links: [] };
+
+describe('the skill registry', () => {
+    it('resolves every template skill and alias the wizard offers', () => {
+        for (const slug of ['qa-review', 'brief.parse', 'project.plan', 'pr.summary', 'risk.flags', 'digest.ceo', 'risk.today', 'project.guide']) expect(getSkill(slug)).toBeTruthy();
+        expect(ALL.map((s) => s.slug)).toEqual(['qa-review', 'brief.parse', 'pr.summary', 'digest.ceo', 'project.guide', 'fields.fill', 'prd.draft', 'wiki.upkeep']);
+    });
+});
+
+describe('brief.parse (Intake)', () => {
+    const skill = getSkill('brief.parse');
+    it('refuses a brief too short to break down', async () => {
+        expect((await skill.gather({ task: { ...task, description: '<p>do it</p>' } })).skip).toMatch(/too short/);
+    });
+    it('turns model output into subtasks with clamped estimates and a summary comment', () => {
+        const { summary, changes } = skill.toChanges({ task, raw: { subtasks: [{ title: 'Add verify endpoint', hours: 3, why: 'core' }, { title: 'Email template', hours: 99 }, { title: '' }], questions: ['Which sender?'], summary: 'Two pieces.' } });
+        expect(summary).toBe('Two pieces.');
+        expect(changes.map((c) => c.action)).toEqual(['subtask.create', 'subtask.create', 'task.comment']);
+        expect(changes[1].params.description).toContain('Estimate: 40h');
+        expect(changes[2].params.body).toContain('Which sender?');
+    });
+    it('renders workspace memory as a MEMORY block between the task and the brief, and tells the model it is data', () => {
+        const context = { title: 'Build the thing', brief: 'Ship it.', memory: '### Workspace memory (DATA)\n- Budget is fixed.' };
+        const prompt = skill.buildUserPrompt({ task, context });
+        expect(prompt.indexOf('TASK:')).toBeLessThan(prompt.indexOf('MEMORY:'));
+        expect(prompt.indexOf('MEMORY:')).toBeLessThan(prompt.indexOf('BRIEF:'));
+        expect(prompt).toContain('Budget is fixed.');
+        expect(skill.buildUserPrompt({ task, context: { ...context, memory: '' } })).not.toContain('MEMORY:');
+        expect(skill.systemPrompt).toMatch(/MEMORY.*DATA/);
+    });
+    it('only the skills that render memory ask for it', () => {
+        expect(ALL.filter((s) => s.usesMemory === false).map((s) => s.slug)).toEqual(['qa-review', 'pr.summary', 'digest.ceo', 'fields.fill', 'wiki.upkeep']);
+    });
+});
+
+describe('pr.summary (Reviewer)', () => {
+    beforeAll(() => { process.env.SKILL_EXTERNAL_READS = 'on'; });
+    afterAll(() => { delete process.env.SKILL_EXTERNAL_READS; });
+
+    it('skips cleanly without a link, and does not read a host it does not declare', async () => {
+        const skill = getSkill('pr.summary');
+        expect((await skill.gather({ task })).skip).toMatch(/no pull request/);
+        expect((await skill.gather({ task: { ...task, links: [{ kind: 'pr', url: 'http://localhost:4000/pull/1' }] } })).skip).toMatch(/localhost:4000, which this skill does not read/);
+    });
+});
+
+describe('digest.ceo (Reporter)', () => {
+    const skill = getSkill('digest.ceo');
+    const now = Date.parse('2026-09-04T12:00:00Z');
+    const rows = [
+        { TaskKey: 'AR-1', TaskName: 'Late', statusType: 'active', status: { text: 'In Progress' }, DueDate: '2026-09-01', AssigneeUserId: [] },
+        { TaskKey: 'AR-2', TaskName: 'Stuck', statusType: 'active', status: { text: 'On Hold' }, AssigneeUserId: ['u'] },
+        { TaskKey: 'AR-3', TaskName: 'Shipped', statusType: 'close', status: { text: 'Complete' } },
+    ];
+    it('buckets the board from ground truth', async () => {
+        MongoDbCrudOpration.mockResolvedValueOnce(rows);
+        const { gather } = await skill.gather({ task, companyId: 'c1' });
+        expect(gather.plan.open).toBe(2); expect(gather.plan.done).toBe(1);
+        expect(gather.plan.overdueList).toContain('AR-1 Late');
+        expect(gather.plan.blockedList).toContain('AR-2 Stuck');
+        expect(gather.plan.unassignedList).toContain('AR-1 Late');
+        expect(gather.plan.keys.sort()).toEqual(['AR-1', 'AR-2']);
+    });
+    it('still produces a digest when the model is unavailable', async () => {
+        MongoDbCrudOpration.mockResolvedValueOnce(rows);
+        const ctx = await skill.gather({ task, companyId: 'c1' });
+        expect(ctx.fallback).toContain('2 open task(s): 1 overdue, 1 blocked');
+        const { changes } = skill.toChanges({ task, raw: null, context: ctx });
+        expect(changes[0].params.body).toContain('AR-1 Late');
+    });
+    it('runs end to end through the orchestrator without a model and proposes one comment', async () => {
+        MongoDbCrudOpration.mockResolvedValueOnce(rows);
+        const out = await orchestrator.run({ skillSlug: 'risk.today', task, companyId: 'c1', budget: { allowModel: false } });
+        expect(out.status).toBe('success');
+        expect(out.changes.map((c) => c.action)).toEqual(['task.comment']);
+        expect(out.degraded).toBe('no LLM provider configured');
+    });
+});
+
+describe('project.guide (Guide)', () => {
+    const skill = getSkill('project.guide');
+    const project = { ProjectName: 'Bike shop', aiGuide: { markdown: '## Stages\n1. **Catalogue in place**' } };
+    const rows = [{ TaskKey: 'BS-1', TaskName: 'Catalogue', statusType: 'active', sprintArray: { name: 'Week 1' } }];
+    const inProject = { ...task, ProjectID: '6aa5435985eec7393809d9cb' };
+    const ASKER = '6aa5435985eec7393809d9aa';
+    const { SCHEMA_TYPE } = require('../Config/schemaType');
+    /* The guide reads as the person who mentioned it, so the member's seat and the projects they may open are read too. */
+    const byType = async (companyId, { type }, method) => {
+        if (type === SCHEMA_TYPE.COMPANY_USERS) return { roleType: 3 };
+        if (type === SCHEMA_TYPE.PROJECTS) return method === 'findOne' ? project : [{ _id: inProject.ProjectID }];
+        if (type === SCHEMA_TYPE.TASKS) return rows;
+        return method === 'find' ? [] : null;
+    };
+    afterEach(() => { MongoDbCrudOpration.mockReset(); MongoDbCrudOpration.mockImplementation(async () => undefined); });
+    const gatherWith = async (memory) => {
+        MongoDbCrudOpration.mockImplementation(byType);
+        const context = await skill.gather({ task: inProject, companyId: 'c1', memory, startedBy: ASKER });
+        expect(context.skip).toBeUndefined();
+        return context;
+    };
+    it('renders a MEMORY block between the guide and the plan only when gather found one', async () => {
+        const prompt = skill.buildUserPrompt({ task: inProject, context: await gatherWith('### Workspace memory (DATA)\nProject decisions and constraints:\n- Budget is fixed at $12k. (from the approved brief)') });
+        expect(prompt.indexOf('GUIDE:')).toBeLessThan(prompt.indexOf('MEMORY:'));
+        expect(prompt.indexOf('MEMORY:')).toBeLessThan(prompt.indexOf('PLAN:'));
+        expect(prompt).toContain('- Budget is fixed at $12k. (from the approved brief)');
+        expect(skill.buildUserPrompt({ task: inProject, context: await gatherWith('') })).not.toContain('MEMORY:');
+    });
+});
+
+describe('grounding — what the model was not given is dropped', () => {
+    const digest = getSkill('digest.ceo');
+    const rows = [
+        { TaskKey: 'AR-1', TaskName: 'Late', statusType: 'active', status: { text: 'In Progress' }, DueDate: '2026-09-01', AssigneeUserId: [] },
+        { TaskKey: 'AR-2', TaskName: 'Stuck', statusType: 'active', status: { text: 'On Hold' }, AssigneeUserId: ['u'] },
+    ];
+    it('drops a digest sentence that invents a number or a task key, keeps the rest', async () => {
+        MongoDbCrudOpration.mockResolvedValueOnce(rows);
+        const context = await digest.gather({ task, companyId: 'c1' });
+        const raw = { digest: 'There are 2 open tasks moved in the last 24 hours. AR-1 is overdue. AR-17 has been in review for 24 days. Nothing else moved.', lookFirst: ['AR-1 — overdue', 'AR-99 — invented', 'AR-2 — blocked for 24 days'] };
+        const { raw: cleaned, dropped } = digest.verify({ raw, context });
+        expect(cleaned.digest).toBe('There are 2 open tasks moved in the last 24 hours. AR-1 is overdue. Nothing else moved.');
+        expect(cleaned.lookFirst).toEqual(['AR-1 — overdue']);
+        expect(dropped.map((d) => d.reason)).toEqual(['mentions AR-17, which is not in the data', 'it names no task from the data', 'mentions 24, which is not one of the counts']);
+    });
+    it('drops a PR risk that cites a file the diff never touched', () => {
+        process.env.SKILL_EXTERNAL_READS = 'on';
+        const pr = getSkill('pr.summary');
+        delete process.env.SKILL_EXTERNAL_READS;
+        const context = { input: { pr_link: 'u' }, gather: { pr: { text: 'diff --git a/Modules/Agents/runs.js b/Modules/Agents/runs.js\n+const x = 1;' } } };
+        const raw = { summary: 's', risks: [{ title: 'Real', where: 'Modules/Agents/runs.js' }, { title: 'Invented', where: 'frontend/src/App.vue' }, { title: 'Unlocated' }] };
+        const { raw: cleaned, dropped } = pr.verify({ raw, context });
+        expect(cleaned.risks.map((r) => r.title)).toEqual(['Real', 'Unlocated']);
+        expect(dropped[0].text).toBe('Invented');
+    });
+    it('is applied by the orchestrator, which reports what it dropped', async () => {
+        MongoDbCrudOpration.mockResolvedValueOnce(rows);
+        const out = await orchestrator.run({ skillSlug: 'digest.ceo', task, companyId: 'c1', budget: { allowModel: false } });
+        expect(out.dropped).toEqual([]);
+    });
+});

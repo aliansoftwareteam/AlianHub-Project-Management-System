@@ -17,32 +17,32 @@
                     <div class="aitc__head-left">
                         <span class="aitc__badge" aria-hidden="true">✨</span>
                         <div>
-                            <div class="aitc__title">Plan with AI</div>
-                            <div class="aitc__subtitle">Draft sprints and tasks for this project from your requirements — you review before anything is created.</div>
+                            <div class="aitc__title">{{ $t('AiTask.title') }}</div>
+                            <div class="aitc__subtitle">{{ $t('AiTask.subtitle') }}</div>
                         </div>
                     </div>
-                    <button class="aitc__close" @click="close()" aria-label="Close">&#10005;</button>
+                    <button class="aitc__close" @click="close()" :aria-label="$t('AiTask.close')">&#10005;</button>
                 </div>
 
                 <!-- STEP: input -->
                 <div v-if="step === 'input'" class="aitc__body">
                     <!-- What should AI create? -->
                     <div class="aitc__modes">
-                        <button type="button" class="aitc__mode" :class="{ 'aitc__mode--on': mode === 'full' }" @click="mode = 'full'">Sprints + tasks</button>
+                        <button type="button" class="aitc__mode" :class="{ 'aitc__mode--on': mode === 'full' }" @click="mode = 'full'">{{ $t('AiTask.mode_full') }}</button>
                         <button
                             type="button"
                             class="aitc__mode"
                             :class="{ 'aitc__mode--on': mode === 'tasks' }"
                             :disabled="!sprints.length"
-                            :title="!sprints.length ? 'This project has no sprints yet — create a sprint first' : ''"
+                            :title="!sprints.length ? $t('AiTask.no_sprints_hint') : ''"
                             @click="mode = 'tasks'"
-                        >Tasks only</button>
-                        <button type="button" class="aitc__mode" :class="{ 'aitc__mode--on': mode === 'sprints' }" @click="mode = 'sprints'">Sprints only</button>
+                        >{{ $t('AiTask.mode_tasks') }}</button>
+                        <button type="button" class="aitc__mode" :class="{ 'aitc__mode--on': mode === 'sprints' }" @click="mode = 'sprints'">{{ $t('AiTask.mode_sprints') }}</button>
                     </div>
 
                     <!-- Target sprint (tasks-only mode) -->
                     <div v-if="mode === 'tasks'" class="aitc__sprint-pick">
-                        <label class="aitc__field-label">Add tasks to sprint</label>
+                        <label class="aitc__field-label">{{ $t('AiTask.target_sprint') }}</label>
                         <select v-model="targetSprintId" class="aitc__select">
                             <option v-for="s in sprints" :key="s.id" :value="s.id">{{ s.name }}</option>
                         </select>
@@ -59,27 +59,27 @@
                     </div>
 
                     <div v-if="mode === 'full'" class="aitc__chips">
-                        <span class="aitc__chips-label">Try:</span>
-                        <button type="button" class="aitc__chip" @click="requirements = 'Build a Shopify clothing store: home, collection, product, cart and checkout pages, plus store policies and theme setup.'">Shopify store</button>
-                        <button type="button" class="aitc__chip" @click="requirements = 'Mobile app MVP: onboarding, signup/login, home feed, profile and settings — design + build per screen, with the supporting API endpoints.'">Mobile app MVP</button>
-                        <button type="button" class="aitc__chip" @click="requirements = 'REST API for a tasks service: auth endpoints and full CRUD for tasks and projects, with validation and tests.'">REST API</button>
-                        <button type="button" class="aitc__chip" @click="requirements = 'Marketing launch campaign: landing page, email sequence, social content calendar and analytics setup.'">Marketing campaign</button>
+                        <span class="aitc__chips-label">{{ $t('AiTask.try') }}</span>
+                        <button type="button" class="aitc__chip" @click="requirements = $t('AiTask.example_shopify_prompt')">{{ $t('AiTask.example_shopify') }}</button>
+                        <button type="button" class="aitc__chip" @click="requirements = $t('AiTask.example_mobile_prompt')">{{ $t('AiTask.example_mobile') }}</button>
+                        <button type="button" class="aitc__chip" @click="requirements = $t('AiTask.example_api_prompt')">{{ $t('AiTask.example_api') }}</button>
+                        <button type="button" class="aitc__chip" @click="requirements = $t('AiTask.example_marketing_prompt')">{{ $t('AiTask.example_marketing') }}</button>
                     </div>
 
                     <!-- Advanced (optional): extra things AI can create when needed -->
                     <div v-if="mode !== 'sprints'" class="aitc__advanced">
-                        <span class="aitc__advanced-label">Advanced (optional)</span>
+                        <span class="aitc__advanced-label">{{ $t('AiTask.advanced') }}</span>
                         <label class="aitc__opt">
                             <input type="checkbox" v-model="features.subtasks" />
-                            <span>Break tasks into sub-tasks</span>
+                            <span>{{ $t('AiTask.opt_subtasks') }}</span>
                         </label>
                         <label class="aitc__opt">
                             <input type="checkbox" v-model="features.links" />
-                            <span>Link related tasks</span>
+                            <span>{{ $t('AiTask.opt_links') }}</span>
                         </label>
                         <label class="aitc__opt">
                             <input type="checkbox" v-model="features.epics" />
-                            <span>Organize into epics</span>
+                            <span>{{ $t('AiTask.opt_epics') }}</span>
                         </label>
                         <!-- Temporarily hidden until the custom-field render is fixed; backend support stays in place and re-enables by uncommenting.
                         <label class="aitc__opt">
@@ -93,7 +93,7 @@
                     <div v-if="error" class="aitc__error">{{ error }}</div>
 
                     <div class="aitc__actions">
-                        <button class="aitc__btn aitc__btn--ghost" @click="close()">Cancel</button>
+                        <button class="aitc__btn aitc__btn--ghost" @click="close()">{{ $t('AiTask.cancel') }}</button>
                         <button class="aitc__btn aitc__btn--ai" :disabled="!canGenerate" @click="generate()">
                             <span aria-hidden="true">✨</span> {{ generateLabel }}
                         </button>
@@ -103,23 +103,23 @@
                 <!-- STEP: generating -->
                 <div v-else-if="step === 'generating'" class="aitc__body aitc__center">
                     <div class="aitc__orb" aria-hidden="true"></div>
-                    <p class="aitc__status">{{ progressMsg || 'Generating…' }}</p>
-                    <p class="aitc__sub">This can take up to a minute for a detailed plan.</p>
+                    <p class="aitc__status">{{ progressMsg || $t('AiTask.generating') }}</p>
+                    <p class="aitc__sub">{{ $t('AiTask.generating_sub') }}</p>
                 </div>
 
                 <!-- STEP: preview -->
                 <div v-else-if="step === 'preview'" class="aitc__body">
                     <div class="aitc__preview-head">
-                        <span class="aitc__preview-hint">Review — uncheck anything you don't want.</span>
-                        <span class="aitc__selected-pill">{{ selectedCount }} selected</span>
+                        <span class="aitc__preview-hint">{{ $t('AiTask.review_hint') }}</span>
+                        <span class="aitc__selected-pill">{{ $t('AiTask.selected', { n: selectedCount }) }}</span>
                         <span v-if="runUsage" class="aitc__usage" :title="usageTooltip">
-                            {{ formatTokens(runUsage.totalTokens) }} tokens<template
+                            {{ $t('AiTask.token_count', { n: formatTokens(runUsage.totalTokens) }, runUsage.totalTokens) }}<template
                                 v-if="runUsage.costUsd !== null"> · {{ formatCost(runUsage.costUsd) }}</template>
                         </span>
                     </div>
-                    <div v-if="plan.links && plan.links.length" class="aitc__links-note">🔗 {{ plan.links.length }} task link{{ plan.links.length === 1 ? '' : 's' }} will be created</div>
-                    <div v-if="plan.epics && plan.epics.length" class="aitc__links-note">📁 {{ plan.epics.length }} epic{{ plan.epics.length === 1 ? '' : 's' }} will be created</div>
-                    <div v-if="plan.customFields && plan.customFields.length" class="aitc__links-note">🏷️ {{ plan.customFields.length }} custom field{{ plan.customFields.length === 1 ? '' : 's' }} will be created</div>
+                    <div v-if="plan.links && plan.links.length" class="aitc__links-note">🔗 {{ $t('AiTask.links_note', { n: plan.links.length }, plan.links.length) }}</div>
+                    <div v-if="plan.epics && plan.epics.length" class="aitc__links-note">📁 {{ $t('AiTask.epics_note', { n: plan.epics.length }, plan.epics.length) }}</div>
+                    <div v-if="plan.customFields && plan.customFields.length" class="aitc__links-note">🏷️ {{ $t('AiTask.fields_note', { n: plan.customFields.length }, plan.customFields.length) }}</div>
                     <div class="aitc__plan style-scroll">
                         <!-- full: sprints, each with its tasks -->
                         <template v-if="mode === 'full'">
@@ -143,7 +143,7 @@
 
                         <!-- tasks: flat list into the chosen sprint -->
                         <template v-else-if="mode === 'tasks'">
-                            <div class="aitc__sprint-name"><span>Adding to: {{ targetSprintName || 'sprint' }}</span></div>
+                            <div class="aitc__sprint-name"><span>{{ $t('AiTask.adding_to', { sprint: targetSprintName || $t('AiTask.sprint_fallback') }) }}</span></div>
                             <div v-for="(task, ti) in (plan.tasks || [])" :key="ti">
                                 <label class="aitc__task" :class="{ 'aitc__task--off': !task.__selected }">
                                     <input type="checkbox" v-model="task.__selected" />
@@ -166,7 +166,7 @@
                     </div>
                     <div v-if="error" class="aitc__error">{{ error }}</div>
                     <div class="aitc__actions">
-                        <button class="aitc__btn aitc__btn--ghost" @click="step = 'input'">Back</button>
+                        <button class="aitc__btn aitc__btn--ghost" @click="step = 'input'">{{ $t('AiTask.back') }}</button>
                         <button class="aitc__btn aitc__btn--ai" :disabled="selectedCount === 0" @click="create()">{{ createLabel }}</button>
                     </div>
                 </div>
@@ -174,7 +174,7 @@
                 <!-- STEP: creating -->
                 <div v-else-if="step === 'creating'" class="aitc__body aitc__center">
                     <div class="aitc__orb" aria-hidden="true"></div>
-                    <p class="aitc__status">{{ progressMsg || 'Creating…' }}</p>
+                    <p class="aitc__status">{{ progressMsg || $t('AiTask.creating') }}</p>
                 </div>
             </div>
         </div>
@@ -184,6 +184,7 @@
 <script setup>
 import { ref, computed, watch, defineProps, defineEmits } from 'vue';
 import { useToast } from 'vue-toast-notification';
+import { useI18n } from 'vue-i18n';
 import { useAiTaskGenerator } from '@/composable/aiTaskGenerator';
 
 const props = defineProps({
@@ -197,6 +198,7 @@ const props = defineProps({
 const emit = defineEmits(['update:modelValue', 'done']);
 
 const $toast = useToast();
+const { t } = useI18n();
 const { generateTasks, executeTasks, subscribeToProgress } = useAiTaskGenerator();
 
 const step = ref('input');          // input | generating | preview | creating
@@ -226,9 +228,9 @@ const formatCost = (n) => (n >= 0.01 ? `$${n.toFixed(2)}` : `$${n.toFixed(4)}`);
 const usageTooltip = computed(() => {
     const u = runUsage.value;
     if (!u) return '';
-    const parts = [`${formatTokens(u.inputTokens)} in · ${formatTokens(u.outputTokens)} out`];
+    const parts = [t('AiTask.usage_split', { input: formatTokens(u.inputTokens), output: formatTokens(u.outputTokens) })];
     if (u.model) parts.push(u.model);
-    if (u.costUsd === null) parts.push('no price on file for this model');
+    if (u.costUsd === null) parts.push(t('AiTask.usage_no_price'));
     return parts.join(' — ');
 });
 const progressMsg = ref('');
@@ -256,27 +258,27 @@ const selectedCount = computed(() => {
 });
 
 const inputLabel = computed(() => {
-    if (mode.value === 'tasks') return 'What tasks should I add?';
-    if (mode.value === 'sprints') return 'What sprints should I create?';
-    return 'What should this project include?';
+    if (mode.value === 'tasks') return t('AiTask.input_label_tasks');
+    if (mode.value === 'sprints') return t('AiTask.input_label_sprints');
+    return t('AiTask.input_label_full');
 });
 
 const inputPlaceholder = computed(() => {
-    if (mode.value === 'tasks') return 'e.g. Add the auth API endpoints — login, signup, refresh, logout — each with validation and tests.';
-    if (mode.value === 'sprints') return 'e.g. Break this project into delivery phases: setup, core features, polish, and launch.';
-    return 'e.g. Build a customer onboarding flow — signup, email verification, profile setup, and a welcome dashboard. Node + Vue.';
+    if (mode.value === 'tasks') return t('AiTask.placeholder_tasks');
+    if (mode.value === 'sprints') return t('AiTask.placeholder_sprints');
+    return t('AiTask.placeholder_full');
 });
 
 const generateLabel = computed(() => {
-    if (mode.value === 'tasks') return 'Generate tasks';
-    if (mode.value === 'sprints') return 'Generate sprints';
-    return 'Generate plan';
+    if (mode.value === 'tasks') return t('AiTask.generate_tasks');
+    if (mode.value === 'sprints') return t('AiTask.generate_sprints');
+    return t('AiTask.generate_plan');
 });
 
 const createLabel = computed(() => {
     const n = selectedCount.value;
-    if (mode.value === 'sprints') return `Create ${n} sprint${n === 1 ? '' : 's'}`;
-    return `Create ${n} task${n === 1 ? '' : 's'}`;
+    if (mode.value === 'sprints') return t('AiTask.create_sprints', { n }, n);
+    return t('AiTask.create_tasks', { n }, n);
 });
 
 const canGenerate = computed(() => {
@@ -331,7 +333,7 @@ function planHasContent(p) {
 async function generate() {
     if (!canGenerate.value) return;
     error.value = '';
-    progressMsg.value = `${generateLabel.value}…`;
+    progressMsg.value = t('AiTask.progress_label', { label: generateLabel.value });
     step.value = 'generating';
     try {
         const res = await generateTasks(props.projectId, {
@@ -342,14 +344,14 @@ async function generate() {
         });
         const p = res && res.plan;
         if (!planHasContent(p)) {
-            throw new Error('The AI did not return anything. Try rephrasing your requirements.');
+            throw new Error(t('AiTask.empty_plan'));
         }
         selectAll(p);
         plan.value = p;
         planUsage.value = (res && res.usage) || null;
         step.value = 'preview';
     } catch (e) {
-        error.value = (e && e.message) || 'Generation failed. Please try again.';
+        error.value = (e && e.message) || t('AiTask.generate_failed');
         step.value = 'input';
     }
 }
@@ -393,7 +395,7 @@ async function create() {
     const payload = buildSelectedPlan();
     if (!payloadHasContent(payload)) return;
     error.value = '';
-    progressMsg.value = 'Creating…';
+    progressMsg.value = t('AiTask.creating');
     step.value = 'creating';
     try {
         const res = await executeTasks(props.projectId, {
@@ -402,15 +404,15 @@ async function create() {
             targetSprintId: mode.value === 'tasks' ? targetSprintId.value : '',
         });
         if (!res || !res.status || !res.jobId) {
-            throw new Error((res && res.statusText) || 'Could not start creation.');
+            throw new Error((res && res.statusText) || t('AiTask.start_failed'));
         }
         subscribeToProgress(res.jobId, (raw) => {
             let pl = raw;
             if (pl && pl.data) pl = pl.data;
             if (!pl) return;
             if (pl.event === 'progress') {
-                if (pl.step === 'sprint') progressMsg.value = 'Creating sprints…';
-                else if (pl.step === 'tasks') progressMsg.value = `Creating tasks… ${pl.completed || 0}/${pl.total || 0}`;
+                if (pl.step === 'sprint') progressMsg.value = t('AiTask.creating_sprints');
+                else if (pl.step === 'tasks') progressMsg.value = t('AiTask.creating_tasks', { done: pl.completed || 0, total: pl.total || 0 });
             } else if (pl.event === 'complete') {
                 const totals = pl.totals || {};
                 $toast.success(successMessage(totals), { position: 'top-right' });
@@ -418,22 +420,22 @@ async function create() {
                 reset();
                 emit('update:modelValue', false);
             } else if (pl.event === 'error') {
-                error.value = pl.error || 'Creation failed. Please try again.';
+                error.value = pl.error || t('AiTask.create_failed');
                 step.value = 'preview';
             }
         });
     } catch (e) {
-        error.value = (e && e.message) || 'Creation failed. Please try again.';
+        error.value = (e && e.message) || t('AiTask.create_failed');
         step.value = 'preview';
     }
 }
 
 function successMessage(totals) {
-    const t = totals.tasks || 0;
-    const s = totals.sprints || 0;
-    if (mode.value === 'sprints') return `Created ${s} sprint${s === 1 ? '' : 's'} with AI`;
-    if (mode.value === 'tasks') return `Created ${t} task${t === 1 ? '' : 's'} with AI`;
-    return `Created ${t} task${t === 1 ? '' : 's'} in ${s} sprint${s === 1 ? '' : 's'} with AI`;
+    const tasks = totals.tasks || 0;
+    const sprints = totals.sprints || 0;
+    if (mode.value === 'sprints') return t('AiTask.success_sprints', { n: sprints }, sprints);
+    if (mode.value === 'tasks') return t('AiTask.success_tasks', { n: tasks }, tasks);
+    return t('AiTask.success_full', { tasks: t('AiTask.task_count', { n: tasks }, tasks), sprints: t('AiTask.sprint_count', { n: sprints }, sprints) });
 }
 </script>
 
@@ -441,10 +443,8 @@ function successMessage(totals) {
 .aitc__overlay {
     position: fixed;
     inset: 0;
-    /* Teleported to <body>, outside #app — so the app's `#app { font-family: 'Roboto' }`
-       doesn't reach it and text falls back to the browser serif. Set it explicitly. */
-    font-family: 'Roboto', sans-serif;
-    background: rgba(20, 22, 40, 0.55);
+    font-family: var(--font-ui);
+    background: var(--scrim);
     backdrop-filter: blur(2px);
     display: flex;
     align-items: center;
@@ -453,15 +453,15 @@ function successMessage(totals) {
     padding: 16px;
 }
 .aitc__modal {
-    background: #fff;
-    color: #1c2434;
+    background: var(--surface);
+    color: var(--ink);
     border-radius: 16px;
     width: min(580px, 96vw);
     max-height: 88vh;
     display: flex;
     flex-direction: column;
     padding: 22px 24px 20px;
-    box-shadow: 0 24px 60px rgba(28, 26, 80, 0.28);
+    box-shadow: var(--shadow-modal);
 }
 
 /* Header */
@@ -477,64 +477,64 @@ function successMessage(totals) {
     box-shadow: 0 6px 16px rgba(108, 99, 255, 0.35);
 }
 .aitc__title { font-size: 17px; font-weight: 700; line-height: 1.2; }
-.aitc__subtitle { font-size: 12.5px; color: #6b7488; margin-top: 3px; line-height: 1.5; max-width: 430px; }
+.aitc__subtitle { font-size: 12.5px; color: var(--ink-2); margin-top: 3px; line-height: 1.5; max-width: 430px; }
 .aitc__close {
     flex: 0 0 auto; border: none; background: transparent; cursor: pointer;
-    color: #9aa1b1; font-size: 15px; width: 28px; height: 28px; border-radius: 8px;
+    color: var(--ink-2); font-size: 15px; width: 28px; height: 28px; border-radius: 8px;
     transition: background 0.15s, color 0.15s;
 }
-.aitc__close:hover { background: #f1f2f6; color: #e8556b; }
+.aitc__close:hover { background: var(--fill); color: var(--danger); }
 
 /* Body */
 .aitc__body { display: flex; flex-direction: column; min-height: 0; }
 .aitc__center { align-items: center; justify-content: center; padding: 42px 0; text-align: center; }
-.aitc__field-label { font-size: 13px; font-weight: 600; color: #3a4255; margin-bottom: 8px; }
+.aitc__field-label { font-size: 13px; font-weight: 600; color: var(--ink-label); margin-bottom: 8px; }
 
 /* Mode selector */
 .aitc__modes { display: flex; gap: 6px; margin-bottom: 14px; }
 .aitc__mode {
     flex: 1 1 0;
-    border: 1px solid #e3e6ef; background: #f7f8fb; color: #4a5266;
+    border: 1px solid var(--border); background: var(--surface-2); color: var(--ink-label);
     font-size: 12.5px; font-weight: 600;
     border-radius: 9px; padding: 8px 6px; cursor: pointer;
     font-family: inherit;
     transition: border-color 0.15s, color 0.15s, background 0.15s;
 }
-.aitc__mode:hover:not(:disabled) { border-color: #7C5CFF; color: #6a5cff; }
-.aitc__mode--on { border-color: #7C5CFF; color: #6a5cff; background: #f3f1ff; }
+.aitc__mode:hover:not(:disabled) { border-color: var(--agent); color: var(--agent-ink); }
+.aitc__mode--on { border-color: var(--agent); color: var(--agent-ink); background: var(--agent-bg); }
 .aitc__mode:disabled { opacity: 0.45; cursor: not-allowed; }
 
 /* Sprint picker (tasks-only mode) */
 .aitc__sprint-pick { margin-bottom: 14px; }
 .aitc__select {
     width: 100%; box-sizing: border-box;
-    border: 1px solid #e0e3ec; border-radius: 9px;
-    padding: 9px 12px; font-size: 13.5px; color: #1c2434;
-    background: #fff; font-family: inherit; cursor: pointer;
+    border: 1px solid var(--border); border-radius: 9px;
+    padding: 9px 12px; font-size: 13.5px; color: var(--ink);
+    background: var(--surface); font-family: inherit; cursor: pointer;
 }
-.aitc__select:focus { outline: none; border-color: #7C5CFF; }
+.aitc__select:focus { outline: none; border-color: var(--agent); }
 
 /* Advanced (optional) section */
-.aitc__advanced { margin-top: 14px; padding-top: 12px; border-top: 1px solid #eef0f5; }
-.aitc__advanced-label { display: block; font-size: 11px; font-weight: 700; letter-spacing: 0.04em; text-transform: uppercase; color: #9aa1b1; margin-bottom: 8px; }
-.aitc__opt { display: flex; align-items: center; gap: 8px; font-size: 13px; color: #3a4255; cursor: pointer; }
-.aitc__opt input { accent-color: #6a5cff; width: 15px; height: 15px; }
+.aitc__advanced { margin-top: 14px; padding-top: 12px; border-top: 1px solid var(--hairline); }
+.aitc__advanced-label { display: block; font-size: 11px; font-weight: 700; letter-spacing: 0.04em; text-transform: uppercase; color: var(--ink-2); margin-bottom: 8px; }
+.aitc__opt { display: flex; align-items: center; gap: 8px; font-size: 13px; color: var(--ink-label); cursor: pointer; }
+.aitc__opt input { accent-color: var(--agent); width: 15px; height: 15px; }
 
 /* Sub-tasks in the preview */
 .aitc__subs { margin: 0 0 4px 30px; }
 .aitc__subs--off { opacity: 0.5; }
-.aitc__sub { font-size: 12px; color: #6b7488; padding: 2px 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.aitc__sub { font-size: 12px; color: var(--ink-2); padding: 2px 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
 /* Textarea with gradient focus ring */
 .aitc__textarea-wrap {
     border-radius: 12px;
     padding: 1.5px;
-    background: #e6e8ef;
+    background: var(--border);
     transition: background 0.2s, box-shadow 0.2s;
 }
 .aitc__textarea-wrap:focus-within {
     background: linear-gradient(120deg, #7C5CFF, #4D7CFF, #C44BFF);
-    box-shadow: 0 0 0 4px rgba(124, 92, 255, 0.14);
+    box-shadow: 0 0 0 4px var(--brand-ring);
 }
 .aitc__textarea {
     width: 100%; box-sizing: border-box;
@@ -543,25 +543,25 @@ function successMessage(totals) {
     padding: 13px 14px;
     font-size: 14px; line-height: 1.55;
     resize: vertical; min-height: 112px;
-    font-family: inherit; color: #1c2434;
-    background: #fff;
+    font-family: inherit; color: var(--ink);
+    background: var(--surface);
 }
-.aitc__textarea::placeholder { color: #aab0bf; }
+.aitc__textarea::placeholder { color: var(--ink-2); }
 
 /* Quick-start chips */
 .aitc__chips { display: flex; flex-wrap: wrap; align-items: center; gap: 7px; margin-top: 12px; }
-.aitc__chips-label { font-size: 12px; color: #8a92a4; margin-right: 2px; }
+.aitc__chips-label { font-size: 12px; color: var(--ink-2); margin-right: 2px; }
 .aitc__chip {
-    border: 1px solid #e3e6ef; background: #f7f8fb; color: #4a5266;
+    border: 1px solid var(--border); background: var(--surface-2); color: var(--ink-label);
     font-size: 12px; font-weight: 500;
     border-radius: 999px; padding: 5px 12px; cursor: pointer;
     transition: border-color 0.15s, color 0.15s, background 0.15s;
 }
-.aitc__chip:hover { border-color: #7C5CFF; color: #6a5cff; background: #f3f1ff; }
+.aitc__chip:hover { border-color: var(--agent); color: var(--agent-ink); background: var(--agent-bg); }
 
 /* Error */
 .aitc__error {
-    font-size: 13px; color: #c0392b; background: #fdecec;
+    font-size: 13px; color: var(--danger); background: var(--danger-bg);
     border-radius: 8px; padding: 9px 12px; margin-top: 14px;
 }
 
@@ -573,10 +573,10 @@ function successMessage(totals) {
     display: inline-flex; align-items: center; gap: 6px;
     border: 1px solid transparent; transition: transform 0.15s ease, box-shadow 0.15s ease, background 0.15s;
 }
-.aitc__btn--ghost { background: #fff; border-color: #dfe2ea; color: #4a5266; }
-.aitc__btn--ghost:hover { background: #f5f6f9; }
+.aitc__btn--ghost { background: var(--surface); border-color: var(--border); color: var(--ink-label); }
+.aitc__btn--ghost:hover { background: var(--surface-hover); }
 .aitc__btn--ai {
-    color: #fff;
+    color: var(--surface);
     background: linear-gradient(120deg, #7C5CFF 0%, #4D7CFF 55%, #C44BFF 100%);
     box-shadow: 0 6px 16px rgba(108, 99, 255, 0.32);
 }
@@ -585,41 +585,41 @@ function successMessage(totals) {
 
 /* Preview */
 .aitc__preview-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px; }
-.aitc__preview-hint { font-size: 13px; color: #6b7488; }
+.aitc__preview-hint { font-size: 13px; color: var(--ink-2); }
 /* Sits beside the selected count — informational, not something to act on.
    Tabular figures so the number does not jitter as boxes are ticked. */
 .aitc__usage {
     margin-left: auto;
     font-size: 11.5px;
-    color: #8a909c;
+    color: var(--ink-2);
     font-variant-numeric: tabular-nums;
     cursor: help;
-    border-bottom: 1px dotted #cbd5e1;
+    border-bottom: 1px dotted var(--border);
 }
 
-.aitc__selected-pill { font-size: 12px; font-weight: 600; color: #6a5cff; background: #f3f1ff; border-radius: 999px; padding: 3px 11px; }
-.aitc__links-note { font-size: 12px; color: #6b7488; margin: -4px 0 8px; }
-.aitc__plan { overflow-y: auto; max-height: 48vh; border: 1px solid #ecedf3; border-radius: 12px; padding: 6px; }
+.aitc__selected-pill { font-size: 12px; font-weight: 600; color: var(--agent-ink); background: var(--agent-bg); border-radius: 999px; padding: 3px 11px; }
+.aitc__links-note { font-size: 12px; color: var(--ink-2); margin: -4px 0 8px; }
+.aitc__plan { overflow-y: auto; max-height: 48vh; border: 1px solid var(--hairline); border-radius: 12px; padding: 6px; }
 .aitc__sprint { margin-bottom: 6px; }
 .aitc__sprint-name {
     display: flex; align-items: center; gap: 8px;
-    font-size: 13px; font-weight: 700; color: #1c2434;
-    padding: 8px 8px 6px; position: sticky; top: 0; background: #fff;
+    font-size: 13px; font-weight: 700; color: var(--ink);
+    padding: 8px 8px 6px; position: sticky; top: 0; background: var(--surface);
 }
-.aitc__count { font-size: 11px; font-weight: 600; color: #6a5cff; background: #f3f1ff; border-radius: 999px; padding: 1px 8px; }
+.aitc__count { font-size: 11px; font-weight: 600; color: var(--agent-ink); background: var(--agent-bg); border-radius: 999px; padding: 1px 8px; }
 .aitc__task {
     display: flex; align-items: center; gap: 9px;
     padding: 7px 9px; border-radius: 9px; font-size: 13px; cursor: pointer;
     transition: background 0.12s, opacity 0.12s;
 }
-.aitc__task:hover { background: #f6f7fb; }
+.aitc__task:hover { background: var(--surface-hover); }
 .aitc__task--off { opacity: 0.5; }
-.aitc__task input { accent-color: #6a5cff; width: 15px; height: 15px; flex: 0 0 auto; }
-.aitc__task-name { flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: #2b3346; }
+.aitc__task input { accent-color: var(--agent); width: 15px; height: 15px; flex: 0 0 auto; }
+.aitc__task-name { flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--ink-label); }
 .aitc__pri { flex: 0 0 auto; font-size: 11px; font-weight: 600; border-radius: 999px; padding: 2px 9px; }
-.aitc__pri--high { background: #fdeaea; color: #c0392b; }
-.aitc__pri--medium { background: #eef0fb; color: #3a55b0; }
-.aitc__pri--low { background: #eef0f3; color: #6b7488; }
+.aitc__pri--high { background: var(--danger-bg); color: var(--danger); }
+.aitc__pri--medium { background: var(--brand-tint); color: var(--brand); }
+.aitc__pri--low { background: var(--fill); color: var(--ink-2); }
 
 /* Loading ring (gradient) */
 .aitc__orb {
@@ -630,7 +630,7 @@ function successMessage(totals) {
     mask: radial-gradient(farthest-side, transparent calc(100% - 6px), #000 calc(100% - 5px));
     animation: aitc-spin 1.1s linear infinite;
 }
-.aitc__status { font-size: 14px; font-weight: 600; color: #2b3346; margin: 0; }
-.aitc__sub { font-size: 12px; color: #97a0af; margin: 8px 0 0; }
+.aitc__status { font-size: 14px; font-weight: 600; color: var(--ink-label); margin: 0; }
+.aitc__sub { font-size: 12px; color: var(--ink-2); margin: 8px 0 0; }
 @keyframes aitc-spin { to { transform: rotate(360deg); } }
 </style>

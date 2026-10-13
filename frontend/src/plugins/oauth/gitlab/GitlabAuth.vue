@@ -1,25 +1,28 @@
 <template>
-    <button @click="loginWithGitLab" class="border-0 border-radius-6-px cursor-pointer p-15px" :disabled="isLoading" title="GitLab">
-        <div v-if="isLoading" class="oauth-spinner"></div>
-        <img v-else :src="GitlabIcon" alt="gitlab-icon"/>
+    <button type="button" class="auth__provider" :disabled="isLoading" :aria-busy="isLoading" @click="loginWithGitLab">
+        <span v-if="isLoading" class="oauth-spinner"></span>
+        <ShellIcon v-else name="gitlab" :size="16" />
+        <span>{{ label || $t('Auth.continue_with', { provider: 'GitLab' }) }}</span>
     </button>
 </template>
 
 <script setup>
+import { publicConfig } from "@/config/publicConfig";
+import ShellIcon from "@/components/organisms/Shell/ShellIcon.vue";
 import { onMounted, ref, defineProps } from "vue";
-import Cookies from 'js-cookie';
 import { useToast } from 'vue-toast-notification';
 import { useRouter, useRoute } from 'vue-router'
 import { useI18n } from "vue-i18n";
 
 // Image
-import GitlabIcon from "@/assets/images/svg/gitlab_icon.svg";
 
 // Utilities
 import { apiRequestWithoutSecure, apiRequestWithoutCompnay, getAuth } from "@/services";
 import * as env from '@/config/env';
+import { rememberInvitationLink, takeInvitationLink } from "../invitationLink";
 
 const props = defineProps({
+    label: { type: String, default: "" },
     mode: {
         type: String,
         default: "login"
@@ -31,6 +34,10 @@ const props = defineProps({
     companyUserDocID: {
         type: String,
         default: null
+    },
+    linkId: {
+        type: String,
+        default: ""
     }
 });
 
@@ -71,10 +78,11 @@ onMounted(async () => {
 // Trigger GitLab OAuth (GitLab requires response_type=code in the authorize URL).
 function loginWithGitLab() {
     localStorage.setItem("gitlabAuthMode", props.mode);
-    const clientId = process.env.VUE_APP_GITLAB_CLIENT_ID;
+    rememberInvitationLink(props.linkId);
+    const clientId = publicConfig.auth.gitlab.clientId;
     const scope = "read_user";
     const redirectUri = window.location.origin;
-    const base = process.env.VUE_APP_GITLAB_BASE_OAUTH_URL || 'https://gitlab.com/oauth';
+    const base = publicConfig.auth.gitlab.baseUrl || 'https://gitlab.com/oauth';
     const gitlabAuthUrl = `${base}/authorize?client_id=${clientId}&redirect_uri=${encodeURIComponent(redirectUri)}&response_type=code&scope=${encodeURIComponent(scope)}`;
     window.location.href = gitlabAuthUrl;
 }
@@ -109,9 +117,7 @@ const login = async (userInfo) => {
         const object = {
             email: userInfo.email,
             gitlabId: userInfo.gitlabId,
-            // Forward the GitLab access token so the backend can re-verify the
-            // identity against GitLab's /user API instead of trusting the
-            // client-supplied id/email. Required in the default (strict) mode.
+            // The server takes the identity from this token alone.
             accessToken: userInfo.accessToken,
             isLoginType: "frontend",
             authProvider: "gitlab"
@@ -130,8 +136,6 @@ const login = async (userInfo) => {
         userData.value = userResponse?.data?.data.userData;
         if (userResponse.data.status == false) {
             localStorage.removeItem("updateToken");
-            Cookies.remove('refreshToken');
-            Cookies.remove('accessToken');
             throw new Error('MongoDB Error from Api')
         }
 
@@ -139,8 +143,6 @@ const login = async (userInfo) => {
         let cid = localStorage.getItem("selectedCompany") ?? companyID;
         if (!uData.isEmailVerified) {
             localStorage.removeItem("updateToken");
-            Cookies.remove('refreshToken');
-            Cookies.remove('accessToken');
             throw new Error("Verify your email and try again");
         }
 
@@ -198,11 +200,9 @@ const login = async (userInfo) => {
         } else if(error?.response?.data?.message === "User not found"){
             $toast.error('User not found', { position: 'top-right' });
         } else {
-            $toast.error(t("Toast.something_went_wrong"), { position: 'top-right' });
+            $toast.error(error?.response?.data?.message || t("Toast.something_went_wrong"), { position: 'top-right' });
         }
 
-        Cookies.remove('refreshToken');
-        Cookies.remove('accessToken');
         localStorage.removeItem("updateToken");
         localStorage.removeItem("userId");
         localStorage.removeItem("isLogging");
@@ -224,8 +224,10 @@ const signup = async (userInfo) => {
             lastName: userInfo.lastName,
             email: userInfo.email,
             gitlabId: userInfo.gitlabId,
+            accessToken: userInfo.accessToken,
             assignCompany: companyId,
-            companyUserDocID: companyUserDocID
+            companyUserDocID: companyUserDocID,
+            linkId: takeInvitationLink()
         };
 
         const signupRes = await apiRequestWithoutSecure("post", env.API_SIGNUP_WITH_GITLAB, payload);

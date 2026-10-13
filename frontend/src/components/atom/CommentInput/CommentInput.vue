@@ -1,17 +1,20 @@
 <template>
     <!-- <div> -->
-        <div v-if="showUsersList" class="position-fi overflow-y-auto bg-white style-scroll border-radius-5-px z-index-6 show__userlist">
-            <ul class="d-flex flex-column m-0 p-0">
-                <template v-if="filteredUsers.length">
+        <div v-if="showUsersList" class="position-fi overflow-y-auto comment-input-bg-white comment-input-style-scroll border-radius-5-px z-index-6 show__userlist">
+            <ul :id="listboxId" role="listbox" :aria-label="$t('Comments.mention_suggestions')" class="d-flex flex-column m-0 p-0">
+                <template v-if="mentionOptions.length">
                     <li
                         class="d-flex align-items-center cursor-pointer p5px-p10px"
-                        :class="{'bg-blue white': selectedUserIndex === index}"
+                        :class="{'comment-input-bg-blue comment-input-white': selectedUserIndex === index}"
                         v-for="(data, index) in filteredUsers"
+                        :id="optionId(index)"
                         :key="index"
+                        role="option"
+                        :aria-selected="selectedUserIndex === index"
                         @mouseover="selectedUserIndex = index"
                         @click="addMention(data)"
                     >
-                        <UserProfile
+                        <UserProfile decorative
                             :showDot="false"
                             class="user__profile cursor-pointer mr-10px"
                             :data="{
@@ -24,20 +27,57 @@
                         />
                         <span>{{data.name}}</span>
                     </li>
+                    <li v-if="filteredAgents.length" role="group" :aria-label="$t('Comments.mention_agents')" class="d-flex flex-column">
+                        <span class="p5px-p10px comment-input-font-size-12 comment-input-gray" aria-hidden="true">{{ $t('Comments.mention_agents') }}</span>
+                        <ul class="d-flex flex-column m-0 p-0">
+                            <li
+                                class="d-flex align-items-center cursor-pointer p5px-p10px"
+                                :class="{'comment-input-bg-blue comment-input-white': selectedUserIndex === filteredUsers.length + index}"
+                                v-for="(agent, index) in filteredAgents"
+                                :id="optionId(filteredUsers.length + index)"
+                                :key="agent.key"
+                                role="option"
+                                :aria-selected="selectedUserIndex === filteredUsers.length + index"
+                                @mouseover="selectedUserIndex = filteredUsers.length + index"
+                                @click="addMention(agent)"
+                            >
+                                <span class="ah-avatar ah-avatar--sm ah-avatar--agent mr-10px" aria-hidden="true">{{ agent.name.slice(0, 1).toUpperCase() }}</span>
+                                <span>{{ agent.own ? $t('TaskPanel.my_ai', { name: agent.name }) : agent.name }}</span>
+                                <span class="ah-chip ah-chip--agent ah-chip--mono ml-10px">{{ $t('TaskPanel.agent_tag') }}</span>
+                                <span v-if="agent.note" class="comment-input__agent-note">{{ agent.note }}</span>
+                            </li>
+                        </ul>
+                    </li>
+                    <li
+                        v-if="showAiOption"
+                        :id="optionId(aiIndex)"
+                        class="d-flex align-items-center cursor-pointer p5px-p10px"
+                        :class="{'comment-input-bg-blue comment-input-white': selectedUserIndex === aiIndex}"
+                        role="option"
+                        data-test="mention-ai"
+                        :aria-selected="selectedUserIndex === aiIndex"
+                        @mouseover="selectedUserIndex = aiIndex"
+                        @click="addMention(aiOption)"
+                    >
+                        <span class="ah-avatar ah-avatar--sm ah-avatar--agent mr-10px" aria-hidden="true">{{ aiOption.name }}</span>
+                        <span>{{ $t('AiMention.option') }}</span>
+                        <span class="ml-10px comment-input-font-size-12 comment-input__ai-hint">{{ $t('AiMention.option_hint') }}</span>
+                    </li>
                 </template>
                 <template v-else>
-                    <li class="d-flex align-items-center cursor-pointer p5px-p10px" @click="focusTextArea()">
+                    <li :id="optionId('none')" role="option" aria-disabled="true" class="d-flex align-items-center cursor-pointer p5px-p10px" @click="focusTextArea()">
                         {{$t('Comments.no_user_found')}}
                     </li>
                 </template>
             </ul>
+            <p v-if="agentsNote" class="comment-input__menu-note" data-test="mention-note">{{ agentsNote }}</p>
         </div>
         <div class="d-flex flex-column w-100">
-            <div v-if="reply && Object.keys(reply).length" class="d-flex align-items-center justify-content-between overflow-y-auto bg-white style-scroll border-top-radius-5-px reply-box bg-gainsboro">
+            <div v-if="reply && Object.keys(reply).length" class="d-flex align-items-center justify-content-between overflow-y-auto comment-input-bg-white comment-input-style-scroll border-top-radius-5-px reply-box comment-input-bg-gainsboro">
                 <div class="d-flex align-items-center emp__profile-wrapper">
-                    <UserProfile
+                    <UserProfile decorative
                         :showDot="false"
-                        class="profile-image mr-5px emplyoee__profile-img"
+                        class="comment-input-profile-image mr-5px emplyoee__profile-img"
                         :data="{
                             id: reply.userId,
                             title: getUser(reply.userId).Employee_Name,
@@ -47,20 +87,25 @@
                         :thumbnail="'30x30'"
                     />
                     <strong class="text-nowrap cursor-default mr-5px">{{getUser(reply.userId).Employee_Name}}: </strong>
-                    <span v-if="reply.type === 'text' || reply.type === 'link'" class="text-ellipsis cursor-default" :title="checkLink(changeText(reply.message), true)" v-html="checkLink(changeText(reply.message), true)"></span>
+                    <span v-if="reply.type === 'text' || reply.type === 'link'" class="text-ellipsis cursor-default" :title="commentPlainText(reply.message)" v-html="commentHtml(reply.message, { links: true })"></span>
                     <span v-else class="text-ellipsis cursor-default" :title="reply.mediaName">{{reply.mediaName}}</span>
                 </div>
                 <div class="d-flex align-items-center">
-                    <img :src="closeIcon" @click="$emit('cancel-reply')" alt="closeIcon" class="cursor-pointer cancel__reply">
+                    <button type="button" class="cancel__reply-btn" :aria-label="$t('TaskPanel.cancel_reply')" @click="$emit('cancel-reply')"><img :src="closeIcon" alt="" class="cursor-pointer cancel__reply"></button>
                 </div>
             </div>
 
             <textarea
                 v-show="!recording"
                 type="text"
-                class="write-message style-scroll"
+                class="write-message comment-input-style-scroll"
                 id="message-box"
                 ref="messageBox"
+                role="combobox"
+                aria-autocomplete="list"
+                :aria-expanded="showUsersList"
+                :aria-controls="showUsersList ? listboxId : undefined"
+                :aria-activedescendant="activeOptionId"
                 :placeHolder="$t('PlaceHolder.Type_here')"
                 @keypress="handleEnter"
                 @keydown="keyDown"
@@ -78,15 +123,19 @@
 
 <script setup>
 // PACKAGES
-import { useCustomComposable, useGetterFunctions } from "@/composable";
-import {defineProps, defineEmits, computed, onMounted, onBeforeUnmount, watch, ref, nextTick, inject} from "vue";
+import { useGetterFunctions } from "@/composable";
+import { commentHtml, commentPlainText } from "@/utils/commentHtml";
+import {defineProps, defineEmits, computed, onMounted, onBeforeUnmount, watch, ref, nextTick, inject, useId} from "vue";
 
 // COMPONENTS
 import UserProfile from "@/components/atom/UserProfile/UserProfile.vue"
+import { agentMentionKey, mentionName } from "@/utils/agentMention";
+import { twinNotes } from "@/utils/agentTwins";
+import { AI_MENTION_KEY, AI_MENTION_NAME } from "@/utils/aiMention";
+import { canUseAi } from "@/composable/aiAvailability";
 
 // UTILS
 const {getUser} = useGetterFunctions();
-const {changeText, checkLink} = useCustomComposable();
 
 // IMAGES
 const closeIcon = require("@/assets/images/delete1.png");
@@ -125,6 +174,18 @@ const props = defineProps({
     loadingChat: {
         type: Boolean,
         default: true
+    },
+    agents: {
+        type: Array,
+        default: () => []
+    },
+    agentsNote: {
+        type: String,
+        default: ""
+    },
+    aiMention: {
+        type: Boolean,
+        default: false
     }
 });
 
@@ -185,13 +246,35 @@ const filteredUsers = computed(() => {
     return users.value.filter((x) => !x.ghost && x.name.replaceAll(" ", "").toLowerCase().includes(mentionSearch.value.toLowerCase()))
 });
 
+const filteredAgents = computed(() => {
+    const noteOf = twinNotes(props.agents.filter((agent) => !agent.mentionKey));
+    return props.agents
+        .map((agent) => (agent.mentionKey ? { name: mentionName(agent.name), key: agent.mentionKey, own: true } : { name: agent.name, key: agentMentionKey(agent._id), note: noteOf(agent) }))
+        .filter((agent) => agent.name.replaceAll(" ", "").toLowerCase().includes(mentionSearch.value.toLowerCase()));
+});
+
+const aiOption = { name: AI_MENTION_NAME, key: AI_MENTION_KEY };
+const showAiOption = computed(() => props.aiMention && canUseAi()
+    && aiOption.name.toLowerCase().startsWith(mentionSearch.value.replaceAll(" ", "").toLowerCase()));
+const aiIndex = computed(() => filteredUsers.value.length + filteredAgents.value.length);
+
+const mentionOptions = computed(() => [...filteredUsers.value, ...filteredAgents.value, ...(showAiOption.value ? [aiOption] : [])]);
+
+const listboxId = `comment-mentions-${useId()}`;
+const optionId = (key) => `${listboxId}-${key}`;
+const activeOptionId = computed(() => {
+    if(!showUsersList.value) return undefined;
+    if(!mentionOptions.value.length) return optionId("none");
+    return selectedUserIndex.value < mentionOptions.value.length ? optionId(selectedUserIndex.value) : undefined;
+});
+
 function handleEnter(e) {
     if(e.keyCode === 13 && !e.shiftKey) {
         if(clientWidth.value < 768) return;
         e.preventDefault();
 
         if(showUsersList.value) {
-            addMention(filteredUsers.value[selectedUserIndex.value]);
+            addMention(mentionOptions.value[selectedUserIndex.value]);
         } else {
             if(props.modelValue.trim().length) {
                 emit("enter");
@@ -206,7 +289,7 @@ function keyDown(e) {
         if(e.keyCode === 38 || e.keyCode === 40) {
             e.preventDefault();
             if (e.keyCode === 40) {
-                selectedUserIndex.value += selectedUserIndex.value < (filteredUsers.value.length -1) ? 1 : 0;
+                selectedUserIndex.value += selectedUserIndex.value < (mentionOptions.value.length -1) ? 1 : 0;
             } else if (e.keyCode === 38) {
                 selectedUserIndex.value -= selectedUserIndex.value > 0 ? 1 : 0;
             }
@@ -352,4 +435,51 @@ function handlePaste(e) {
 
 <style>
 @import './style.css';
+</style>
+
+<style scoped>
+.comment-input-white {
+    color: var(--on-brand) !important;
+}
+.comment-input-gray {
+    color: var(--ink-2);
+}
+.comment-input-bg-white {
+    background-color: var(--surface);
+}
+.comment-input-bg-blue {
+    background-color: var(--brand);
+}
+.comment-input-bg-gainsboro {
+    background-color: var(--fill);
+}
+.comment-input-font-size-12 {
+    font-size: 12px;
+}
+.comment-input-profile-image {
+    object-fit: fill;
+    height: 25px;
+    width: 25px;
+    border-radius: 50%;
+    background-color: var(--surface);
+    border: 1px solid var(--hairline);
+}
+@media (max-width: 767px) {
+    .comment-input-profile-image {
+        border-radius: 50% !important;
+    }
+}
+.comment-input-style-scroll::-webkit-scrollbar-track {
+    background-color: var(--canvas);
+}
+.comment-input-style-scroll::-webkit-scrollbar {
+    width: 2px;
+    height: 2px;
+    background-color: var(--canvas);
+    border-radius: 8px;
+}
+.comment-input-style-scroll::-webkit-scrollbar-thumb {
+    background-color: var(--ink-3);
+    border-radius: 8px;
+}
 </style>

@@ -14,7 +14,7 @@
         class="task_right custom__field_list_view"
         @click="handleOpenInput(obj,props.task._id)"
     >
-        <template v-if="props.task.customField && Object.keys(props.task.customField).length">
+        <template v-if="appliesTo(obj.key) && props.task.customField && Object.keys(props.task.customField).length">
             <template v-for="(item, index) in Object.keys(props.task.customField)" :key="index">
                 <div v-if="obj.key === props.task.customField[item]._id" class="position-re">
                     <component
@@ -29,7 +29,7 @@
             </template>
         </template>
         <!-- Read-only computed columns (formula/rollup) are never stored on the task, so render them from the live def. -->
-        <div v-if="computedDefs[obj.key]" class="position-re">
+        <div v-if="computedDefs[obj.key] && appliesTo(obj.key)" class="position-re">
             <ComputedComponentViewColumn
                 :def="computedDefs[obj.key]"
                 :task="props.task"
@@ -37,17 +37,25 @@
                 :defs="finalCustomFieldsList"
             />
         </div>
+        <div v-else-if="moduleDefs[obj.key] && appliesTo(obj.key)" class="position-re" @click.stop>
+            <component
+                :is="fieldTypeUi(moduleDefs[obj.key].fieldType).value"
+                compact
+                :def="moduleDefs[obj.key]"
+                :value="props.task.customField?.[obj.key]?.fieldValue"
+                :label="moduleDefs[obj.key].fieldTitle || ''"
+                v-bind="taskPropFor(moduleDefs[obj.key].fieldType, props.task)"
+            />
+        </div>
     </span>
 </template>
 
 <script setup>
     //import
-    import * as env from '@/config/env';
     import taskClass from "@/utils/TaskOperations";
     import { useToast } from "vue-toast-notification";
-    import { apiRequest } from '../../../../../services';
     import { computed, nextTick, ref, inject } from 'vue';
-    import { useCustomComposable,useGetterFunctions } from '@/composable';
+    import { useCustomComposable } from '@/composable';
     import DateComponentListing from '../../atom/customFieldViewColumn/dateComponentViewColumn.vue';
     import EmailComponentListing from '../../atom/customFieldViewColumn/emailComponentViewColumn.vue';
     import PhoneComponentListing from '../../atom/customFieldViewColumn/phoneComponentViewColumn.vue';
@@ -60,8 +68,9 @@
     import ComputedComponentViewColumn from '../../atom/customFieldViewColumn/computedComponentViewColumn.vue';
     import { useStore } from 'vuex';
     import { useI18n } from "vue-i18n";
+    import { fieldAppliesToTask } from '@fieldTaskTypes';
+    import { fieldTypeUi, taskPropFor } from '@/plugins/customFieldView/fieldTypes';
     const { t } = useI18n();
-    const { getUser } = useGetterFunctions();
 
     const {checkPermission, checkApps} = useCustomComposable();
     const $toast = useToast()
@@ -82,6 +91,8 @@
     // All custom field definitions (used to resolve formula references and rollup sources).
     const finalCustomFieldsList = computed(() => getters['settings/finalCustomFields'] || []);
 
+    const appliesTo = (fieldId) => fieldAppliesToTask(finalCustomFieldsList.value.find((def) => def?._id === fieldId), props.task);
+
     // Map of computed (formula/rollup) field definitions keyed by their _id.
     const computedDefs = computed(() => {
         const map = {};
@@ -92,6 +103,11 @@
         });
         return map;
     });
+
+    /* The legacy list only shows these types; they are edited in the List and Table views and the task panel. */
+    const moduleDefs = computed(() => Object.fromEntries(finalCustomFieldsList.value
+        .filter((def) => def && fieldTypeUi(def.fieldType))
+        .map((def) => [def._id, def])));
 
     // Flat, de-duped task list (parents + subtasks) for rollup aggregation — from the
     // sources populated in the List/Board/Table flow (the row task's own subtaskArray
@@ -130,16 +146,9 @@
     const taskId = ref('');
     const customFieldId = ref('');
     //inject
-    const userId = inject('$userId');
     const companyId = inject("$companyId");
     const customFieldPermission = computed(() => checkPermission("task.task_custom_field", props.projectData.isGlobalPermission, {gettersVal: getters}))
-    const companyOwner = computed(() => {
-        return getters["settings/companyOwnerDetail"];
-    });
 
-    //getUser
-    const user = getUser(userId.value);
-    
     // function
     const getView = (val) => {
         switch(val){
@@ -171,21 +180,21 @@
             if(detail.fieldType === 'date'){
                 try{
                     detail.fieldValue = new Date(value);
-                    insertCustomField(detail,value);
+                    insertCustomField(detail);
                 } catch(error){
                     console.error('ERROR',error);
                 }
             }else if(detail.fieldType === 'dropdown'){
                 detail.fieldValue = [value.id];
                 try {
-                    insertCustomField(detail,value);
+                    insertCustomField(detail);
                 } catch(error){
                     console.error('ERROR',error);
                 }
             }else if(detail.fieldType === 'number' || detail.fieldType === 'money'){
                 try{
                     detail.fieldValue = String(value);
-                    insertCustomField(detail,value);
+                    insertCustomField(detail);
                 } catch(error){
                     console.error('ERROR',error);
                 }
@@ -208,7 +217,7 @@
                                     detail.fieldFlag = detail.fieldFlag ? detail.fieldFlag : detail.fieldCountryObject.code;
                                 }
                             }
-                            insertCustomField(detail,value);
+                            insertCustomField(detail);
                         } catch(error){
                             console.error('ERROR',error);
                         }
@@ -218,7 +227,7 @@
         } else if(detail.fieldType === 'checkbox'){
             try{
                 detail.fieldValue = value;
-                insertCustomField(detail,value);
+                insertCustomField(detail);
             } catch(error){
                 console.error('ERROR',error);
             }
@@ -229,12 +238,7 @@
         }
     };
 
-    const insertCustomField = (detail,data) => {
-        let userData = {
-            id: user.id,
-            name: user.Employee_Name,
-            companyOwnerId: companyOwner.value._id,
-        }
+    const insertCustomField = (detail) => {
         let updateDetail = {};
         updateDetail.fieldValue = detail.fieldValue;
         if(detail.fieldType === "phone"){
@@ -245,21 +249,6 @@
         updateDetail._id = detail._id;
         taskClass.updateTaskCustomField({taskId: props.task._id, customFieldId: detail._id, updateDetail: updateDetail,companyId:companyId.value,taskObj:props.task,detail:detail}).then((res) => {
             if(res.status){
-                let historyObj = {
-                    'message': `<b>${userData.name}</b> has added value in <b> ${detail.fieldTitle}</b> Custom Field as <b>${data.value ? data.value : data}</b>.`,
-                    'key' : 'Project_Category',
-                    'sprintId' : props.task.sprintId
-                }
-                apiRequest("post", env.HANDLE_HISTORY, {
-                    "type": 'task',
-                    "companyId": companyId.value,
-                    "projectId": props.task.ProjectID,
-                    "taskId": props.task._id,
-                    "object": historyObj,
-                    "userData": userData
-                }).catch((err) =>{
-                    console.error("Error in updating the notification",err);
-                });
                 if(detail.fieldType !== "phone"){
                     customFieldId.value = "";
                 }
@@ -274,7 +263,7 @@
     };
 
     const handleOpenInput = (value,id) => {
-        if(customFieldPermission.value == true){
+        if(customFieldPermission.value == true && appliesTo(value.key)){
             taskId.value = id;
             customFieldId.value = value.key;
         }

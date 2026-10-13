@@ -11,6 +11,7 @@
             :help="props.help"
             :class="{'input-error': hasValidationError}"
             :label="props.label"
+            :aria-label="props.toopTipHover ? props.label : undefined"
             :placeholder="props.placeholder"
             :validation="props.validations"
             :validation-visibility="props.validationVisibility"
@@ -46,7 +47,7 @@
 </template>
 <script setup>
     import { computed, onMounted, ref, watch } from "vue";
-    import {FormKit} from '@formkit/vue';
+    import { FormKit } from '@/plugins/customFieldView/lazyFormKit';
     import { useCustomComposable } from "@/composable";
     import ToolTip from "@/components/molecules/ToolTip/ToolTip.vue";    
     import { ValidationFunction } from "@/composable/DefaultValidationFunction";

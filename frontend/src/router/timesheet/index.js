@@ -35,5 +35,22 @@ export default [
         },
         component: () => import(/* webpackChunkName: "ProjectTimesheet" */ '@/views/Timesheet/TrackerTimeSheet/TrackerTimesheet.vue'),
     },
-    
+    {
+        path: '/:cid/time/log',
+        name: 'LogTime',
+        meta: {
+            title: "Log time",
+            requiresAuth: true
+        },
+        component: () => import(/* webpackChunkName: "LogTimeSheet" */ '@/views/TimeLog/LogTimeSheet.vue'),
+    },
+    {
+        path: '/:cid/approvals',
+        name: 'Approvals',
+        meta: {
+            title: "Approvals",
+            requiresAuth: true
+        },
+        component: () => import(/* webpackChunkName: "Approvals" */ '@/views/Approvals/Approvals.vue'),
+    },
 ]

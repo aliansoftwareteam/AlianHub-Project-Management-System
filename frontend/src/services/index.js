@@ -4,7 +4,11 @@ import Cookies from 'js-cookie';
 import Store from "@/store/index";
 import { useCustomComposable } from '@/composable';
 import * as offline from '@/offline';
+import { dropWorkerRuntimeCaches } from '@/serviceWorker/registration';
+import { forgetLocalePrefs } from '@/views/Settings/Language/localePrefs';
+import { installBusyHandling } from './busy';
 const { logOut } = useAuth();
+export const SESSION_EXPIRED_KEY = "ah.sessionExpired";
 const apiHost = env.API_URI;
 export const axiosInstance = axios.create({ baseURL: apiHost });
 export const axiosInstanceWithFormData = axios.create({ baseURL: apiHost });
@@ -13,15 +17,25 @@ export const axiosInstanceWithoutCompanyWithFormData = axios.create({ baseURL: a
 export const axiosInstanceWithoutSecure = axios.create({ baseURL: apiHost });
 export const axiosInstanceWithoutSecureWithFormData = axios.create({ baseURL: apiHost });
 
+[
+    axiosInstance,
+    axiosInstanceWithFormData,
+    axiosInstanceWithoutCompany,
+    axiosInstanceWithoutCompanyWithFormData,
+    axiosInstanceWithoutSecure,
+    axiosInstanceWithoutSecureWithFormData
+].forEach(installBusyHandling);
+
 
 
 axiosInstance.interceptors.request.use((req) => {
+    // Unreadable under httpOnly cookies, so no header is sent and the server reads the cookie instead.
     const token = Cookies.get('accessToken') || '';
     const companyId = localStorage.getItem('selectedCompany') || "";
     const headers = {
         'Accept': 'application/json',
         'Content-Type': 'application/json',
-        'Authorization': 'Bearer ' + token,
+        ...(token ? { 'Authorization': 'Bearer ' + token } : {}),
         'companyId': companyId
     }
     req.headers = headers;
@@ -35,7 +49,7 @@ axiosInstanceWithFormData.interceptors.request.use((req) => {
     const companyId = localStorage.getItem('selectedCompany') || "";
     const headers = {
         'Content-Type': 'multipart/form-data',
-        'Authorization': 'Bearer ' + token,
+        ...(token ? { 'Authorization': 'Bearer ' + token } : {}),
         'companyId': companyId
     }
     req.headers = headers;
@@ -49,7 +63,7 @@ axiosInstanceWithoutCompany.interceptors.request.use((req) => {
     const headers = {
         'Accept': 'application/json',
         'Content-Type': 'application/json',
-        'Authorization': 'Bearer ' + token
+        ...(token ? { 'Authorization': 'Bearer ' + token } : {})
     }
     req.headers = headers;
     return req;
@@ -61,7 +75,7 @@ axiosInstanceWithoutCompanyWithFormData.interceptors.request.use((req) => {
     const token = Cookies.get('accessToken') || '';
     const headers = {
         'Content-Type': 'multipart/form-data',
-        'Authorization': 'Bearer ' + token
+        ...(token ? { 'Authorization': 'Bearer ' + token } : {})
     }
     req.headers = headers;
     return req;
@@ -93,36 +107,67 @@ axiosInstanceWithoutSecureWithFormData.interceptors.request.use((req) => {
 
 
 
-export const getAuth = async (id,isFirst) => {
-    return new Promise((resolve, reject) => {
-        let data = {
-            uid: id
-        };
-        const refreshToken = Cookies.get('refreshToken') || '';
+let renewal = null;
+let renewalAfter = null;
 
-        if(refreshToken){
-            let headers = {
-                'Accept': 'application/json',
-                'Content-Type': 'application/json',
-                'refresh-token': refreshToken
-            };
-            let url = env.GENERATETOKEN_V2;
-            axios.post(apiHost + url, data, { headers }).then((result) => {
-                if (isFirst) {
-                    localStorage.setItem('updateToken', result.data.token)
-                }
-                resolve(result.data);
-            }).catch((error) => {
-                console.error('error', error.response.data);
-                reject(error.response.data);
-                if (error?.response?.data?.isLogout) {
-                    logOut();
-                }
-            });
-        } else {
-            logOut();
+const requestAuth = (id, retried = false) => new Promise((resolve, reject) => {
+    const headers = {
+        'Accept': 'application/json',
+        'Content-Type': 'application/json',
+    };
+    const readable = Cookies.get('refreshToken') || '';
+    const sentHeader = Boolean(readable);
+    if (sentHeader) headers['refresh-token'] = readable;
+    axios.post(apiHost + env.GENERATETOKEN_V2, { uid: id }, { headers }).then((result) => {
+        resolve(result.data);
+    }).catch((error) => {
+        const data = error?.response?.data;
+        // Another tab exchanged this token first; the server's reuse grace covers the race.
+        if (data?.isRotated && !retried) {
+            requestAuth(id, true).then(resolve, reject);
+            return;
         }
-    })
+        // Nothing to refresh with and the server has nothing to read: the session is gone.
+        if (!sentHeader && error?.response?.status === 400) {
+            logOut({ expired: true });
+        }
+        console.error('error', data);
+        reject(data);
+        if (data?.isLogout) {
+            logOut({ expired: true });
+        }
+    });
+});
+
+const beginRenewal = (id) => {
+    renewal = requestAuth(id).finally(() => { renewal = null; });
+    return renewal;
+};
+
+/* A request refused because its token ran out needs any newer token: the renewal already on its way will do. */
+const renewExpired = (id) => renewal || beginRenewal(id);
+
+/* A page asks for a renewal after something a session carries has changed (a workspace joined or made). A renewal
+ * already on its way was issued without it, so the page gets one that begins once that has landed, shared by
+ * everyone who asked in the meantime. */
+const renewFromNow = (id) => {
+    if (!renewal) return beginRenewal(id);
+    if (!renewalAfter) {
+        renewalAfter = renewal.catch(() => null).then(() => {
+            renewalAfter = null;
+            return renewExpired(id);
+        });
+    }
+    return renewalAfter;
+};
+
+export const getAuth = async (id, isFirst) => {
+    const data = await renewFromNow(id);
+    if (isFirst) {
+        // Clears the value earlier builds stored under this key.
+        localStorage.removeItem('updateToken');
+    }
+    return data;
 };
 const abortControllers={};
 
@@ -182,10 +227,10 @@ export const apiRequest = (type, endPoint, data, dataType, options) => {
                             return;
                         }
                         if (err?.response?.data?.isLogout) {
-                            logOut();
+                            logOut({ expired: true });
                         }else if (err?.response?.data?.isJwtError) {
                             const userId = localStorage.getItem('userId') || "";
-                            await getAuth(userId);
+                            await renewExpired(userId);
                             apiRequest(type, endPoint, data, dataType, options).then((sData)=>{
                                 resolve(sData);
                             }).catch((err) => {
@@ -237,10 +282,10 @@ export const apiRequestWithoutCompnay = (type, endPoint, data, dataType,options)
                             return;
                         }
                     if (err?.response?.data?.isLogout) {
-                        logOut();
+                        logOut({ expired: true });
                     } else if (err?.response?.data?.isJwtError) {
                         const userId = localStorage.getItem('userId') || "";
-                        await getAuth(userId);
+                        await renewExpired(userId);
                         apiRequestWithoutCompnay(type, endPoint, data, dataType, options).then((sData)=>{
                             resolve(sData);
                         }).catch((err) => {
@@ -303,17 +348,19 @@ export function useAuth() {
         localStorage.removeItem("webTokens");
         localStorage.removeItem("updateToken");
         localStorage.removeItem('logged');
-        Cookies.remove('refreshToken');
-        Cookies.remove('accessToken');
+        forgetLocalePrefs();
         try { offline.clearOffline(); } catch (e) { /* offline cleanup best-effort */ }
+        dropWorkerRuntimeCaches();
         if(value?.withOutRefresh !== true){
             window.location.reload();
         }
     };
 
     async function logOut(data) {
+        if (data?.expired) {
+            try { sessionStorage.setItem(SESSION_EXPIRED_KEY, "1"); } catch (e) { /* the login page then just shows no notice */ }
+        }
         try {
-            const refreshToken = Cookies.get('refreshToken') || '';
             const userId = localStorage.getItem('userId') || '';
             
             const cleanup = async (value) => {
@@ -324,12 +371,9 @@ export function useAuth() {
                 removeLocalValue(value);
             };
     
-            if (userId && refreshToken && data?.islogOut === true) {
+            if (userId && data?.islogOut === true) {
                 try {
-                    await apiRequestWithoutCompnay("post", env.LOGOUT, {
-                        id: userId,
-                        refreshToken: refreshToken,
-                    });                    
+                    await apiRequestWithoutCompnay("post", env.LOGOUT, { id: userId });
                 } catch (error) {
                     console.error('Error in logout', error);
                     cleanup(data);

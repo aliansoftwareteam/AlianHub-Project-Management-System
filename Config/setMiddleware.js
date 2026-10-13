@@ -1,4 +1,5 @@
 const jwt = require('./jwt');
+const providerContext = require('../Modules/AICore/providerContext');
 const verifyJWTTokenWithCRoute = [
     "/api/v1/verifyToken",
     "/api/v1/createproject",
@@ -30,8 +31,6 @@ const verifyJWTTokenWithCRoute = [
     "/api/v1/draggablemilestone",
     "/api/v1/updateunreadcommentscount",
     "/api/v1/sendNotification",
-    "/api/v1/handleHistory",
-    "/api/v1/handleNotification",
     "/api/v1/send-fcm",
     "/api/v1/prepare-notification-data",
     "/api/v1/get-tasks",
@@ -57,12 +56,67 @@ const verifyJWTTokenWithCRoute = [
     // Wiki pages (Modules/Pages). These were reachable without a token: the prefix was in
     // neither JWT list, and app.use only guards the prefixes it is given. The handlers now
     // take the author from req.uid, which this is what sets.
+    // Found by probing every v2 prefix without a token (AR-52): these ran their
+    // handlers for anyone with a company id in a header. app.use only guards the
+    // prefixes it is given, so a module that forgets to register here is open.
+    "/api/v2/support-mail",
+    "/api/v2/test",
+    "/api/v2/custom-fields",
+    "/api/v2/prepare-notification-data",
+    "/api/v2/sendInvitationEmail",
+    "/api/v2/epics",
+    "/api/v2/exports",
+    "/api/v2/imports",
+    "/api/v2/reactions",
+    "/api/v2/recent-visits",
+    "/api/v2/users/favourites",
+    "/api/v2/search",
     "/api/v2/pages",
+    "/api/v2/trash",
+    "/api/v2/projects",
+    "/api/v2/sample-data",
     // Forms (Modules/Forms). Managing a form is company data: the prefix has to be
     // listed here or every handler below is reachable with no token, and the author
     // they record comes from req.uid, which this is what sets. The PUBLIC submission
     // endpoint is deliberately not under this prefix.
     "/api/v2/forms",
+    "/api/v2/task-templates",
+    "/api/v2/view-templates",
+    "/api/v2/goals",
+    "/api/v2/whiteboards",
+    "/api/v2/assignment-rules",
+    "/api/v1/removeCache",
+    // Found by walking the Express stack for routes no guard list reached (task 034).
+    // /api/v1/generatePrompt is exact on purpose: its /events/:id stream is an
+    // EventSource, which cannot send a token.
+    "/api/v1/mongoOpration",
+    "/api/v1/task",
+    "/api/v1/importTemplate",
+    "/api/v1/importSettingsNotification",
+    "/api/v1/export",
+    "/api/v1/recurring-tasks",
+    "/api/v1/reminders",
+    "/api/v1/clips",
+    "/api/v3/timeTracker/start",
+    "/api/v3/timetracker/capture",
+    "/api/v2/timesheet-approval",
+    "/api/v1/manageTrackerUserPermission",
+    "/api/v1/projectSetting/autoArchive",
+    "/api/v1/projectSetting/estimationScale",
+    "/api/v1/pushupdateunreadcommentscount",
+    "/api/v1/unsetCommentCounts",
+    /^\/api\/v1\/generatePrompt\/?$/i,
+    "/api/v1/generatePromptChat",
+    "/api/v1/deleteUserChat",
+    "/api/v1/getPrompts",
+    "/api/v1/findOnePrompts",
+    "/api/v1/getAiCategory",
+    "/api/v1/ai/description",
+    "/api/v1/getAiModels",
+    "/api/v1/findOneAiModel",
+    "/api/v1/push-mark-read",
+    "/api/v1/setting/skills",
+    "/api/v1/milestoneRange",
     "/api/v1/importTasks",
     "/api/v1/wasabi/retriveObject",
     "/api/v1/wasabi/deleteFile",
@@ -79,7 +133,7 @@ const verifyJWTTokenWithCRoute = [
     '/api/v2/updateSubscriptionChargebeeEstimate',
     '/api/v1/addAndRemoveUserInChargebeeSubscription',
     '/api/v1/addAndRemoveUserInPaymentSubscriptionEstimate',
-    'api/v1/checkSendInviatation',
+    '/api/v1/checkSendInviatation',
     '/api/v1/checkSubscriptionSchedule',
     '/api/v1/removeSubscriptionScheduledChanges',
     '/api/v1/getSubscription',
@@ -117,14 +171,14 @@ const verifyJWTTokenWithCRoute = [
     '/api/v1/estimatedTime/:pid/:tid',
     '/api/v1/estimatedTime',
     '/api/v1/project/checklist',
-    'api/v1/notifications',
-    'api/v1/notifications/:id',
+    '/api/v1/notifications',
     '/api/v1/milestone',
     '/api/v1/milestone/project/:pid',
     '/api/v1/milestone/:id',
     '/api/v1/milestoneReport',
     '/api/v1/customField',
     '/api/v1/project/template/custom',
+    '/api/v1/getGlobalTemplate',
     '/api/v1/templates/taskType',
     '/api/v1/templates/taskStatus',
     '/api/v1/tours',
@@ -142,6 +196,7 @@ const verifyJWTTokenWithCRoute = [
     '/api/v1/comments',
     '/api/v1/main-chats',
     '/api/v1/notes',
+    '/api/v1/clips',
     '/api/v1/general-reminders',
     '/api/v1/app-notification',
     '/api/v1/activity-log',
@@ -188,6 +243,24 @@ const verifyJWTTokenWithCRoute = [
     // Talk to Text speech-to-text (Modules/AI/transcribe) — JWT + companyId so
     // only authenticated users can spend the STT quota.
     '/api/v1/ai/transcribe',
+    '/api/v1/ai/meeting-notes',
+    '/api/v1/ai/chat-summary',
+    '/api/v1/ai/task-summary',
+    '/api/v1/ai/task-values',
+    '/api/v1/ai/task-category',
+    '/api/v1/ai/task-assist',
+    '/api/v1/ai/task-next-steps',
+    '/api/v1/ai/task-research',
+    '/api/v1/ai/selection',
+    // Ask (handoff 13i) — retrieval is scoped to req.uid's own visible projects,
+    // so the handler is only correct when this populates req.uid.
+    '/api/v1/ai/ask',
+    '/api/v1/ai/memory',
+    '/api/v1/ai/feedback',
+    '/api/v1/ai/quality',
+    '/api/v1/ai/notes-to-tasks',
+    // @ai in comments and chat: the handlers check thread access for req.uid.
+    '/api/v1/ai/chat-ask',
     // Personal API tokens (Modules/ApiTokens). app.use prefix-matching
     // covers /:id, /:id/logs and /me too. Routes were previously
     // unauthenticated (trusted body userData) — now JWT-protected; the
@@ -204,7 +277,21 @@ const verifyJWTTokenWithCRoute = [
     // req.uid. The login-flow routes (/api/v2/sso/oidc|saml|public) stay PUBLIC
     // (pre-auth), so they are intentionally NOT listed here.
     '/api/v2/sso/config',
+    '/api/v1/notifications/preferences',
     '/api/v1/audit-logs',
+    // Agents as teammates (Modules/Agents): runs, proposals, spend, personal accounts.
+    // A prefix, so /:id, /runs, /proposals/:id/approve are all behind a token. The MCP
+    // endpoint (/mcp) is deliberately NOT here — it authenticates its own bearer PAT.
+    '/api/v2/agents',
+    // Outside agent sessions (Modules/AgentSessions, EXTERNAL_AGENT_SESSIONS): delegation, the strip's reads and the
+    // delivery URLs. The outside agent itself never calls these; it reports through /mcp with its OAuth token.
+    ...(require('../Modules/AgentSessions/config').isOn() ? ["/api/v2/agent-sessions"] : []),
+    // Not listed, on purpose (Modules/Mcp, MCP_OAUTH): /.well-known/oauth-protected-resource and
+    // /.well-known/oauth-protected-resource/mcp are public by design (RFC 9728), since a client
+    // reads them before it holds a token; they carry no secret and exist only with the flag on.
+    // Workflow runs (Modules/Workflows) — JWT+company; prefix-matches /workflows/runs
+    // and the per-step controls. Owner/admin is enforced in-controller.
+    "/api/v2/workflows",
     // SCIM admin config (Modules/Scim) — JWT+company; owner/admin gated
     // in-controller. The SCIM 2.0 protocol routes (/scim/v2/*) use bearer-token
     // auth (company resolved from the token) and are intentionally NOT listed.
@@ -213,6 +300,11 @@ const verifyJWTTokenWithCRoute = [
     // Time-off / PTO (Modules/Pto) — JWT+company; prefix-matches /pto, /pto/:id,
     // /pto/:id/status, /pto/capacity. Role checks are enforced in-controller.
     '/api/v1/pto',
+    // Agile reports (Modules/AgileReports) — JWT+company; prefix-matches
+    // /agile/burndown, /agile/velocity, /agile/cfd, /agile/sprint-insights and
+    // /agile/milestones. Without the prefix the company was taken from a header
+    // anyone can type, which is a cross-tenant read of every sprint.
+    '/api/v1/agile',
     // Cross-project Portfolio rollup (Modules/Portfolio, REP-01) — JWT+company;
     // prefix-matches /portfolio, /portfolio/:id, /portfolio/:id/rollup.
     '/api/v1/portfolio',
@@ -224,6 +316,10 @@ const verifyJWTTokenWithCRoute = [
     '/api/v1/reports/custom',
     '/api/v1/reports/variance',
     '/api/v1/reports/capacity',
+    // Web timer reconciliation (Modules/LogTime webTimer) — JWT+company so req.uid scopes the caller's sessions.
+    '/api/v2/timetracker/running',
+    '/api/v2/timetracker/trim',
+    "/api/v2/timetracker/can-start",
     '/api/v1/reports/schedules',
     // Email-to-task management (AUTO-01). NOTE: only the /inboxes management
     // routes are JWT-protected; the public inbound webhook /api/v1/email-in/:token
@@ -233,6 +329,10 @@ const verifyJWTTokenWithCRoute = [
     // /api/v1/calendar/ics/:token is intentionally NOT listed (token authenticates it).
     '/api/v1/calendar/feeds',
     '/api/v1/automations',
+    // The v2 registry manifest carries no tenant data, but it does describe every
+    // trigger and action the engine supports; there is no reason to serve it to
+    // an unauthenticated caller when the rest of the module is protected.
+    '/api/v2/automations',
     '/api/v1/integrations',
     // Cloud storage attachments (AHE-3838). The OAuth callback is NOT under
     // this prefix — it lives at /api/v1/cloud-oauth/callback because a provider
@@ -251,19 +351,49 @@ const verifyJWTTokenWithCRoute = [
     // is the entire point of them.
     '/api/v2/public-shares',
     '/api/v2/intake',
+    // Who can see a project, sprint or doc (Modules/WhoCanSee): the answer is only for someone who can see it.
+    "/api/v2/who-can-see",
+    // Project billing (Modules/Milestone billing.* + Modules/Invoice project
+    // invoices). Every handler reads or writes contract money and takes the
+    // actor from req.uid — which only this middleware sets. The GUEST-facing
+    // client view is under this prefix too: a guest still logs in, and the
+    // login-free variant is the /share/:token page, not an open API.
+    '/api/v2/billing',
+    '/api/v2/invoices',
     // Outgoing webhooks (Modules/Webhooks). A webhook belongs to the member who created
     // it, and every route is scoped to req.uid — which only this middleware sets. These
     // were in neither list, so the owner was taken from the request body instead: with
     // the list now filtered by owner, that would have been a way to read someone else's
     // integrations rather than merely to mislabel one.
     '/api/v2/webhooks',
+    // Workspace secrets by handle (Modules/Secrets): owner or admin only, never an API token; metadata only.
+    '/api/v2/secrets',
+    // Workspace provider keys by handle (Modules/ProviderKeys): owner or admin only, never an API token; metadata only.
+    '/api/v2/provider-keys',
+    // The AI switch (Modules/AiSwitch): any member reads the state, only an owner or admin changes it.
+    "/api/v2/ai-switch",
+    // Agent connectors (Modules/Connectors): owner or admin only, never an API token; no route returns a token.
+    "/api/v2/connectors",
+    // Dashboards (Modules/UserDashboard) read the company from the header, so they get the same live seat check.
+    '/api/v1/dashboard',
+    '/api/v1/dashboards',
+    '/api/v1/cardcomponent',
+    // Not listed, on purpose (Modules/OAuthServer, MCP_OAUTH): /.well-known/oauth-authorization-server and /oauth/* are
+    // public by design, since a client reaches them before anyone holds a token and the token endpoint authenticates
+    // the client itself; /api/v2/oauth-clients, /api/v2/oauth-client-approvals and /api/v2/oauth-grants check the
+    // session inline, so with the flag off no path answers differently.
 ];
 const verifyJWTToken = [
     "/api/v2/company/delete",
     "/api/v2/company/create",
-    "api/v1/freeCompanyCount",
+    "/api/v1/freeCompanyCount",
+    "/api/v1/getUserProfile",
+    "/api/v1/getTaskTypeImage",
+    "/api/v2/auth/:id/change-password",
+    "/api/v2/session/delete",
     "/api/v1/wasabi/retriveUserProfile/:companyId/:path",
     "/api/v1/wasabi/uploadFile",
+    "/api/v1/wasabi/uploadFile_64",
     "/api/v1/createPaymentPlan",
     "/api/v1/getSubscriptionPaymentResource/:id",
     "/api/v1/getSubscriptionTransection/:id",
@@ -278,7 +408,12 @@ const verifyJWTToken = [
     "/api/v1/storage/uploadFile",
     "/api/v1/storage/uploadFileBase64",
     "/api/v1/user",
+    "/api/v2/users/sessions",
+    "/api/v2/users/onboarding",
+    "/api/v2/users/nav-preferences",
+    "/api/v2/users/home-cards",
     "/api/v2/session/update",
+    "/api/v2/auth/tracker-code",
     "/api/v1/userAndCompanyCheck",
     "/api/v1/admin/wasabi/retriveObject",
     "/api/v1/admin/getInvoiceAndCreditNotes",
@@ -294,15 +429,11 @@ const verifyJWTToken = [
     '/api/v1/subscriptions/:id',
     '/api/v1/admin/plan-feature',
     '/api/v1/admin/plan-feature-display',
-    '/api/v1/invoice',
     '/api/v1/admin/company',
     '/api/v1/admin/company/find',
     '/api/v1/customer-update',
     '/api/v2/logout',
     '/api/v1/root-members',
-    '/api/v1/dashboard/:id',
-    '/api/v1/dashboard',
-    '/api/v1/cardcomponent',
     '/api/v1/validateRefferalCode',
     '/api/v1/getreferralpercentage',
     '/api/v1/customeModals/checkUserReviewWithModal',
@@ -316,8 +447,14 @@ const verifyJWTToken = [
  * Middleware With CompanyId
  * @param {*} app 
  */
+exports.guardedPrefixes = verifyJWTTokenWithCRoute;
+
 exports.setMiddlewareWithCV2 = (app) => {
     app.use(verifyJWTTokenWithCRoute, jwt.verifyJWTTokenWithCV2)
+    // Runs the rest of the request inside the verified tenant so model calls it
+    // triggers can resolve that workspace's own provider key. Unauthenticated
+    // requests run without one and read the instance keys, as before.
+    app.use(verifyJWTTokenWithCRoute, providerContext.middleware)
 };
 
 
@@ -331,4 +468,8 @@ exports.setMiddlewareV2 = (app) => {
     // (body/params/query/header), enforce it matches the JWT audience.
     // Routes without a companyId scope pass through unchanged.
     app.use(verifyJWTToken, jwt.requireCompanyAud)
+    // Runs the rest of the request inside the verified tenant so model calls it
+    // triggers can resolve that workspace's own provider key. Unauthenticated
+    // requests run without one and read the instance keys, as before.
+    app.use(verifyJWTToken, providerContext.middleware)
 };

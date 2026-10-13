@@ -1,46 +1,66 @@
 <template>
-    <div class="task-assigneesearch-groupbywrapper" :class="{'overflow-auto' : clientWidth <=767}">
-        <div class="d-flex align-items-center justify-content-between flex-wrap task-filtersearchassignee-wrapper" :class="{'w-545' : clientWidth <=767 }" v-if="['ProjectListView', 'Calendar', 'ProjectKanban','TableView'].includes(activeTab)">
-            <div class="d-flex align-items-center justify-content-start task-filtersearch" :class="[{ 'mb-10px': clientWidth <= 767 }]" :style="{width: (clientWidth <= 767 ? '100%' : '')}" v-if="!showArchived">
-                <TaskFilter :projectData="projectData" @apply="(q) => $emit('applyFilter', q)" @clear="$emit('clearFilter')" v-if="Object.keys(projectData).length > 0"/>
-                <div class="position-re task-fitler-search" id="projectviewfiltersearch_driver">
+    <div class="task-assigneesearch-groupbywrapper pft" role="toolbar" :aria-label="$t('Projects.view_toolbar')" :class="{ 'pft--search-open': searchOpen, 'pft--phone': sheetMode }">
+        <div class="d-flex align-items-center justify-content-between flex-wrap task-filtersearchassignee-wrapper" v-if="['ProjectListView', 'Calendar', 'ProjectKanban','TableView'].includes(activeTab)">
+            <div class="d-flex align-items-center justify-content-start task-filtersearch">
+                <TaskFilter :projectData="projectData" @apply="onApplyFilter" @clear="onClearFilter" v-if="!sheetMode && Object.keys(projectData).length > 0"/>
+                <button type="button" class="pft__search-toggle" :aria-label="$t('PlaceHolder.search')" :aria-expanded="searchOpen" @click="searchOpen = !searchOpen">
+                    <ShellIcon name="search" :size="15" />
+                </button>
+                <div class="position-re task-fitler-search pft__search" id="projectviewfiltersearch_driver">
+                    <ShellIcon name="search" :size="14" class="pft__search-icon" />
                     <input
                         type="text"
                         :placeHolder="$t('PlaceHolder.search')"
-                        class="form-control"
-                        :style="{width: (clientWidth > 767 ? '260px' : '90%')}"
+                        :aria-label="$t('PlaceHolder.search')"
+                        class="pft__input"
+                        :maxlength="SEARCH_TEXT_MAX"
                         :value="taskSearch"
                         @input="$emit('update:taskSearch', $event.target.value)"
                     >
-                    <DropDown title="Search In" id="searchfilterdropdownoptions_driver" class="position-ab dropdown-image-horizontal" :bodyClass="{'search__in-dropdown' : true}">
+                    <DropDown mode="listbox" :title="$t('Projects.search_in')" id="searchfilterdropdownoptions_driver" themed class="position-ab dropdown-image-horizontal" :bodyClass="{'search__in-dropdown' : true}">
                         <template #head>
-                            <h4 class="black font-size-13 font-weight-500 p-10px m-0 search__in" :class="{'border-bottom': clientWidth > 767}">
+                            <h4 class="pft__scope-head" :class="{ 'pft__scope-head--ruled': clientWidth > 767 }">
                                 {{ $t('Projects.search_in') }}
                             </h4>
                         </template>
-                        <template #button>
-                            <img :src="horizontalDots" alt="horizontalDots" class="vertical-middle" id="searchfilterdropdown_driver">
+                        <template #button="{ triggerAttrs }">
+                            <button type="button" class="pft__search-scope" :title="$t('Projects.search_in')" :aria-label="$t('Projects.search_in')" v-bind="triggerAttrs">
+                                <ShellIcon name="chevronDown" :size="13" />
+                            </button>
                         </template>
                         <template #options>
-                            <DropDownOption @click="taskDescriptionSearch || taskKeySearch ? $emit('update:taskNameSearch', !taskNameSearch) : ''" class="task-serachstatus-dropdown border-radius-4-px">
-                                <span class="project-mobile-desc mr-10px">{{ $t('Projects.task_name') }}</span>
+                            <DropDownOption :selected="taskNameSearch" @click="taskDescriptionSearch || taskKeySearch ? $emit('update:taskNameSearch', !taskNameSearch) : ''" class="task-serachstatus-dropdown">
+                                <span class="project-mobile-desc pft__scope-name">{{ $t('Projects.task_name') }}</span>
                                 <Toggle width="20" :modelValue="taskNameSearch" @update:modelValue="(v) => $emit('update:taskNameSearch', v)" :disabled="taskNameSearch && !taskDescriptionSearch && !taskKeySearch" @change="$emit('search')"/>
                             </DropDownOption>
-                            <DropDownOption @click="$emit('update:taskKeySearch', !taskKeySearch)" class="task-serachstatus-dropdown border-radius-4-px">
-                                <span class="project-mobile-desc mr-10px">{{ $t('Projects.task_key') }}</span>
+                            <DropDownOption :selected="taskKeySearch" @click="$emit('update:taskKeySearch', !taskKeySearch)" class="task-serachstatus-dropdown">
+                                <span class="project-mobile-desc pft__scope-name">{{ $t('Projects.task_key') }}</span>
                                 <Toggle width="20" :modelValue="taskKeySearch" @update:modelValue="(v) => $emit('update:taskKeySearch', v)" @change="$emit('toggleSearch'),$emit('search')"/>
                             </DropDownOption>
-                            <DropDownOption @click="$emit('update:taskDescriptionSearch', !taskDescriptionSearch)" class="task-serachstatus-dropdown border-radius-4-px">
-                                <span class="project-mobile-desc mr-10px">{{ $t('ProjectDetails.description') }}</span>
+                            <DropDownOption :selected="taskDescriptionSearch" @click="$emit('update:taskDescriptionSearch', !taskDescriptionSearch)" class="task-serachstatus-dropdown">
+                                <span class="project-mobile-desc pft__scope-name">{{ $t('ProjectDetails.description') }}</span>
                                 <Toggle width="20" :modelValue="taskDescriptionSearch" @update:modelValue="(v) => $emit('update:taskDescriptionSearch', v)" @change="$emit('toggleSearch'),$emit('search')"/>
                             </DropDownOption>
                         </template>
                     </DropDown>
                 </div>
+                <button
+                    v-if="sheetMode"
+                    type="button"
+                    class="pft__filters-btn"
+                    data-test="filters-button"
+                    aria-haspopup="dialog"
+                    :aria-expanded="String(filtersOpen)"
+                    :aria-label="activeFilterCount ? $t('Projects.filters_active', { n: activeFilterCount }) : $t('Projects.filters')"
+                    @click="filtersOpen = true"
+                >
+                    <span>{{ $t('Projects.filters') }}</span>
+                    <span v-if="activeFilterCount" class="pft__filters-count" aria-hidden="true">{{ activeFilterCount }}</span>
+                </button>
                 <Assignee
                     :tourId="'projectviewassignee_driver'"
                     v-if="clientWidth > 767 && projectData?.isPrivateSpace"
-                    class="assignee-data ml-15px"
+                    class="assignee-data pft__members"
                     :users="projectData.AssigneeUserId"
                     :options="[...users.map((x) => x._id), ...teams.map((x) => 'tId_'+x._id)]"
                     :imageWidth="clientWidth>1024 ? '30px' : '25px'"
@@ -52,183 +72,131 @@
                     :isDisplayTeam="true"
                 />
             </div>
-            <div v-if="['ProjectListView', 'ProjectKanban','TableView'].includes(activeTab)" class="d-flex align-items-center justify-content-end task-filter-assignee overflow-auto style-scroll" :style="`${showArchived ? 'width: 100%;' : ''}`" :class="clientWidth <= 767 ? 'justify-content-start' : ''">
+            <component :is="sheetMode ? ProjectFiltersSheet : InPlace" v-model:open="filtersOpen">
+            <div v-if="isListLike" class="d-flex align-items-center justify-content-end task-filter-assignee" :class="clientWidth <= 767 ? 'justify-content-start' : ''">
+                <TaskFilter :projectData="projectData" @apply="onApplyFilter" @clear="onClearFilter" v-if="sheetMode && Object.keys(projectData).length > 0"/>
                 <template v-if="!showArchived">
-                    <!-- AI Assist (AHE-3777): project-level AI task generation. Placed before "Write with AI". -->
-                    <button class="ai-assist-btn text-nowrap mr-1 cursor-pointer" @click="$emit('openAiAssist')" v-if="checkApps('AI',projectData) && checkPermission('task.task_create',projectData?.isGlobalPermission) === true">
-                        <span class="ai-assist-btn__spark" aria-hidden="true">✨</span>
-                        <span class="ai-assist-btn__label">AI Assist</span>
-                    </button>
-                    <button class="text-nowrap btn ai_button mr-1 cursor-pointer" @click="$emit('openAi')" v-if="checkApps('AI',projectData) && checkPermission('artificial_intelligence',projectData?.isGlobalPermission) === true">
-                        <img src="@/assets/images/svg/ai_image_white.svg" class="mr-10-px"/>
-                        <span>{{ $t('AI.write_with_ai') }}</span>
-                    </button>
-                    <!-- Tags app available on the plan but not switched on for this project: inline locked chip. -->
-                    <AppTeaserBlock
-                        v-if="getAppState('tags', projectData) === 'disabled' && checkPermission('task.task_tag',projectData?.isGlobalPermission) !== null"
-                        appKey="tags" variant="inline" class="mr-1"
-                    />
-                    <!-- AI app available on the plan but not switched on for this project: inline locked chip. -->
-                    <AppTeaserBlock
-                        v-if="getAppState('AI', projectData) === 'disabled' && checkPermission('task.task_create',projectData?.isGlobalPermission) === true"
-                        appKey="AI" variant="inline" class="mr-1"
-                    />
-                    <DropDown id="group_by" class="mr-1 group_by">
-                        <template #button>
-                            <button class="text-nowrap btn-white border-groupBy border-radius-6-px cursor-pointer" ref="group_by_status" @click="currentActive='group'">
-                                <div class="group-by-dropdown" :class="{'active' : clientWidth <= 767 && currentActive == 'group' }">
-                                    <strong :style="{color: (clientWidth <= 767 ? '#535358' : '#000')}" :class="{'font-size-12 font-weight-500' : clientWidth > 767 , 'font-size-14 font-weight-400' : clientWidth <=767}">{{ $t('Projects.group_by') }} : </strong>
-                                    <span :style="{color: (clientWidth <= 767 ? '#535358' : '#818181')}" :class="{'font-size-12' : clientWidth > 767 , 'font-size-14' : clientWidth <=767}">{{ $t(`Projects.${groupByOptions.find(x => x.id === groupBy).label}`) }}</span>
-                                </div>
-                            </button>
-                        </template>
-                        <template #options>
-                            <DropDownOption v-for="item in groupByOptions" :key="item.id" @click="$emit('update:groupBy', item.id); $refs.group_by_status.click(item)" :class="{'bg-light-gray' : item.id === groupBy}">
-                                <div>
-                                    <img :src="item.image" :alt="item.label" class="pr-10px">
-                                    <span :class="{'purple' : item.id === groupBy}">{{ $t(`Projects.${item.label}`) }}</span>
-                                </div>
-                            </DropDownOption>
-                        </template>
-                    </DropDown>
-                    <DropDown class="mr-1 group_by" v-if="activeTab === 'ProjectListView'">
-                        <template #button>
-                            <button class="text-nowrap btn-white border-groupBy border-radius-6-px cursor-pointer" ref="expand_collapse" @click="currentActive='subtask'">
-                                <div class="group-by-dropdown current__dropdown" :class="{'active' : clientWidth <= 767 && currentActive == 'subtask' }">
-                                    <strong :style="{color: (clientWidth <= 767 ? '#535358' : '#000')}" :class="{'font-size-12 font-weight-500' : clientWidth > 767 , 'font-size-14 font-weight-400' : clientWidth <=767}">{{ $t('Projects.subtask') }}: </strong>
-                                    <span :style="{color: (clientWidth <= 767 ? '#535358' : '#818181')}" :class="{'font-size-12' : clientWidth > 767 , 'font-size-14' : clientWidth <=767}"> {{collapsed ? $t('Projects.collapsed') : $t('Projects.expanded')}}</span>
-                                </div>
-                            </button>
-                        </template>
-                        <template #options>
-                            <DropDownOption @click="$emit('update:collapsed', false); $refs.expand_collapse.click()" :class="{'bg-light-gray' : !collapsed}">
-                                <span :class="{'purple' : !collapsed}">{{ $t('Projects.expanded') }}</span>
-                            </DropDownOption>
-                            <DropDownOption @click="$emit('update:collapsed', true); $refs.expand_collapse.click()" :class="{'bg-light-gray' : collapsed}">
-                                <span :class="{'purple' : collapsed}">{{ $t('Projects.collapsed') }}</span>
-                            </DropDownOption>
-                        </template>
-                    </DropDown>
-                    <!-- All newer features live behind one "…" menu (matches
-                         the task context-menu pattern) instead of nine
-                         separate toolbar buttons. -->
-                    <DropDown id="more_features" class="mr-1" :zIndex="10">
-                        <template #button>
-                            <button class="text-nowrap btn-white border-groupBy border-radius-6-px cursor-pointer" ref="more_features_trigger" :title="$t('Projects.more_features')">
-                                <img :src="horizontalDots" alt="more" class="vertical-middle">
-                            </button>
-                        </template>
-                        <template #options>
-                            <DropDownOption @click="$refs.more_features_trigger.click(); showGlobalSearch = true">
-                                <div><span class="dropdown-label">{{ $t('Projects.global_search') }}</span></div>
-                            </DropDownOption>
-                            <DropDownOption @click="$refs.more_features_trigger.click(); showRecent = true">
-                                <div><span class="dropdown-label">{{ $t('Projects.recent_tasks') }}</span></div>
-                            </DropDownOption>
-                            <DropDownOption @click="$refs.more_features_trigger.click(); showBurndown = true">
-                                <div><span class="dropdown-label">{{ $t('Projects.burndown') }}</span></div>
-                            </DropDownOption>
-                            <DropDownOption @click="$refs.more_features_trigger.click(); showEpics = true">
-                                <div><span class="dropdown-label">{{ $t('Projects.epics') }}</span></div>
-                            </DropDownOption>
-                            <DropDownOption @click="$refs.more_features_trigger.click(); showPages = true">
-                                <div><span class="dropdown-label">{{ $t('Projects.pages') }}</span></div>
-                            </DropDownOption>
-                            <DropDownOption @click="$refs.more_features_trigger.click(); showExport = true">
-                                <div><span class="dropdown-label">{{ $t('Projects.export_tasks') }}</span></div>
-                            </DropDownOption>
-                            <DropDownOption @click="$refs.more_features_trigger.click(); showPublicShare = true">
-                                <div><span class="dropdown-label">{{ $t('Projects.public_link') }}</span></div>
-                            </DropDownOption>
-                            <DropDownOption @click="$refs.more_features_trigger.click(); showImportJira = true">
-                                <div><span class="dropdown-label">{{ $t('Projects.import_jira') }}</span></div>
-                            </DropDownOption>
-                            <DropDownOption @click="$refs.more_features_trigger.click(); showImportCsv = true">
-                                <div><span class="dropdown-label">{{ $t('Projects.import_csv') }}</span></div>
-                            </DropDownOption>
-                            <DropDownOption @click="$refs.more_features_trigger.click(); showImportTrello = true">
-                                <div><span class="dropdown-label">{{ $t('Projects.import_trello') }}</span></div>
-                            </DropDownOption>
-                            <DropDownOption @click="$refs.more_features_trigger.click(); showImportAsana = true">
-                                <div><span class="dropdown-label">{{ $t('Projects.import_asana') }}</span></div>
-                            </DropDownOption>
-                            <DropDownOption @click="$refs.more_features_trigger.click(); showImportMonday = true">
-                                <div><span class="dropdown-label">{{ $t('Projects.import_monday') }}</span></div>
-                            </DropDownOption>
-                            <DropDownOption @click="$refs.more_features_trigger.click(); showAutoArchive = true">
-                                <div><span class="dropdown-label">{{ $t('Projects.auto_archive') }}</span></div>
-                            </DropDownOption>
-                            <DropDownOption @click="$refs.more_features_trigger.click(); showEstimationScale = true">
-                                <div><span class="dropdown-label">Estimation scale</span></div>
-                            </DropDownOption>
-                        </template>
-                    </DropDown>
-                    <GlobalSearchModal v-model="showGlobalSearch" />
-                    <RecentVisitsDropdown v-model="showRecent" />
-                    <BurndownModal v-model="showBurndown" :projectData="projectData" />
-                    <EpicsPanel v-model="showEpics" :projectData="projectData" />
-                    <PagesPanel v-model="showPages" :projectData="projectData" />
-                    <ExportTasksDropdown v-model="showExport" :projectData="projectData" />
-                    <PublicShareModal v-model="showPublicShare" :projectData="projectData" />
-                    <ImportJiraModal v-model="showImportJira" :projectData="projectData" />
-                    <ImportCsvModal v-model="showImportCsv" :projectData="projectData" />
-                    <ImportTrelloModal v-model="showImportTrello" :projectData="projectData" />
-                    <ImportAsanaModal v-model="showImportAsana" :projectData="projectData" />
-                    <ImportMondayModal v-model="showImportMonday" :projectData="projectData" />
-                    <AutoArchiveModal v-model="showAutoArchive" :projectData="projectData" />
-                    <EstimationScaleModal v-model="showEstimationScale" :projectData="projectData" />
-                    <div class="mr-1 border-groupBy border-radius-6-px d-flex align-items-center assignee-filter manage__filter-users">
-                        <div
-                            @click="$emit('manageFilterUsers', userId)"
-                            :class="{'bg-white' : filterUsers.includes(userId)}"
-                            class="border-radius-6-px border-right-radius-0 border-right cursor-pointer assignee-user font-size-12 font-weight-400 p7x-5px"
-                        >
-                            <img :src="filterUsers.includes(userId) ? activeUserIcon : userIcon" alt="user icon" class="vertical-middle">
-                            <span class="font-size-12 font-weight-400 ml-7px"> {{ $t('Projects.me') }} </span>
-                        </div>
-                        <div
-                            v-if="projectData?.isGlobalPermission === false ? checkPermission('task.show_tasks',projectData.isGlobalPermission) === 2 || checkPermission('task.show_tasks',projectData.isGlobalPermission) === true : true"
-                            @click="$emit('update:userSidebar', !userSidebar)"
-                            class="border-radius-6-px border-left-radius-0 cursor-pointer assignee-status p4x-5px"
-                            :class="{'bg-white blue' : filterUsers.length && filterUsers.filter((x) => x !== userId).length}"
-                        >
-                            <img :src="filterUsers.length && filterUsers.filter((x) => x !== userId).length ? activeGroupIcon : groupIcon" alt="user icon">
-                            <span class="font-size-12 font-weight-400 ml-10px"> {{filterUsers.length && filterUsers.filter((x) => x !== userId).length ? `(${filterUsers.filter((x) => x !== userId).length})` : $t('ProjectDetails.assignee')}}</span>
-                        </div>
-                    </div>
-                </template>
-                <button class="archived-btn font-weight-400 d-flex align-items-center justify-content-between" :style="{color: (clientWidth <= 767 ? '#535358' : '')}" :class="{'outline-primary show-archived-active': showArchived, 'outline-secondary': !showArchived, 'border-radius-6-px font-size-14' : clientWidth <=767 , 'border-0 font-size-13' : clientWidth > 767 }">
-                    <template v-if="showArchived">
-                        <span class="font-weight-bold font-size-16 dark-gray">{{ $t('ProjectSlider.archived_list') }}</span>
-                        <span v-if="!showArchivedProjects" @click="$emit('update:showArchived', false)">{{ $t('ProjectSlider.hide_archive') }}</span>
-                    </template>
-                    <template v-else>
-                        <span @click="$emit('update:showArchived', true)" class="text-nowrap">{{ $t('ProjectSlider.show_archive') }}</span>
-                    </template>
-                </button>
-            </div>
-            <div v-if="['Calendar'].includes(activeTab)" class="d-flex align-items-center justify-content-end task-filter-assignee style-scroll" :class="clientWidth <= 767 ? 'justify-content-start' : ''">
-                <div class="mr-1 border-groupBy border-radius-6-px d-flex align-items-center assignee-filter manage__filter-users">
-                    <div
-                        @click="$emit('manageFilterUsers', userId)"
-                        :class="{'bg-white' : filterUsers.includes(userId)}"
-                        class="border-radius-6-px border-right-radius-0 border-right cursor-pointer assignee-user font-size-12 font-weight-400 p7x-5px"
+                    <button
+                        type="button"
+                        class="pft__icon-btn pft__ai"
+                        :title="$t('AI.write_with_ai')"
+                        :aria-label="$t('AI.write_with_ai')"
+                        @click="$emit('openAi')"
+                        v-if="canUseAi({ project: projectData, permitted: checkPermission('artificial_intelligence',projectData?.isGlobalPermission) === true })"
                     >
-                        <img :src="filterUsers.includes(userId) ? activeUserIcon : userIcon" alt="user icon" class="vertical-middle">
-                        <span class="font-size-12 font-weight-400 ml-7px">{{ $t('Projects.me') }} </span>
+                        <ShellIcon name="ai" :size="15" />
+                    </button>
+                    <DropDown mode="listbox" id="group_by" themed class="group_by" :title="$t('Projects.group_by')" :zIndex="sheetMode ? SHEET_MENU_Z : 7">
+                        <template #button="{ triggerAttrs }">
+                            <button type="button" class="pft__ctl pft__pill" ref="group_by_status" :title="$t('Projects.group_by')" :aria-label="$t('Projects.group_by')" v-bind="triggerAttrs">
+                                <ShellIcon name="layout" :size="14" />
+                                <span class="pft__group-label">{{ groupLabel(groupByOptions.find(x => x.id === groupBy)) }}</span>
+                            </button>
+                        </template>
+                        <template #options>
+                            <DropDownOption v-for="item in groupByOptions" :key="item.id" :selected="item.id === groupBy" @click="$emit('update:groupBy', item.id); $refs.group_by_status.click()">
+                                <div class="pft__group-option">
+                                    <span v-if="item.image" class="ah-mask-icon pft__group-icon" :style="maskOf(item.image)" aria-hidden="true"></span>
+                                    <ShellIcon v-else-if="item.icon" :name="item.icon" :size="12" />
+                                    <span>{{ groupLabel(item) }}</span>
+                                </div>
+                            </DropDownOption>
+                        </template>
+                    </DropDown>
+                    <button
+                        type="button"
+                        v-if="activeTab === 'ProjectListView'"
+                        class="pft__ctl pft__icon-btn current__dropdown"
+                        :title="collapsed ? $t('Projects.expand_subtasks') : $t('Projects.collapse_subtasks')"
+                        :aria-label="collapsed ? $t('Projects.expand_subtasks') : $t('Projects.collapse_subtasks')"
+                        @click="$emit('update:collapsed', !collapsed)"
+                    >
+                        <ShellIcon :name="collapsed ? 'expand' : 'minimize'" :size="14" />
+                    </button>
+                    <div class="pft__ctl pft__seg manage__filter-users">
+                        <button
+                            type="button"
+                            @click="$emit('manageFilterUsers', userId)"
+                            :class="{'is-active' : filterUsers.includes(userId)}"
+                            :aria-pressed="filterUsers.includes(userId)"
+                            class="pft__seg-btn pft__seg-btn--me"
+                        >
+                            <ShellIcon name="user" :size="14" />
+                            <span>{{ $t('Projects.me') }}</span>
+                        </button>
+                        <button
+                            type="button"
+                            v-if="projectData?.isGlobalPermission === false ? checkPermission('task.show_tasks',projectData.isGlobalPermission) === 2 || checkPermission('task.show_tasks',projectData.isGlobalPermission) === true : true"
+                            @click="filtersOpen = false; $emit('update:userSidebar', !userSidebar)"
+                            class="pft__seg-btn pft__seg-btn--people"
+                            :class="{'is-active' : assigneeFilterCount}"
+                            :title="assigneeFilterCount ? $t('Projects.assignee_count', { n: assigneeFilterCount }) : $t('ProjectDetails.assignee')"
+                            :aria-label="assigneeFilterCount ? $t('Projects.assignee_count', { n: assigneeFilterCount }) : $t('ProjectDetails.assignee')"
+                        >
+                            <ShellIcon name="users" :size="14" />
+                            <span v-if="assigneeFilterCount" class="pft__count">{{ assigneeFilterCount }}</span>
+                        </button>
                     </div>
-                    <div
+                    <ProvenanceFilter :modelValue="doneBy" @update:modelValue="(v) => $emit('update:doneBy', v)" />
+                    <button
+                        type="button"
+                        class="pft__ctl pft__pill pft__agent-work"
+                        :class="{ 'is-active': agentWorking }"
+                        :aria-pressed="agentWorking"
+                        :title="$t('AgentWork.filter_hint')"
+                        data-test="agent-work-filter"
+                        @click="$emit('update:agentWorking', !agentWorking)"
+                    >
+                        <ShellIcon name="ai" :size="14" />
+                        <span>{{ $t('AgentWork.filter') }}</span>
+                    </button>
+                </template>
+                <span v-else class="pft__mode-chip">{{ $t('ProjectSlider.archived_list') }}</span>
+                <DropDown mode="menu" id="more_features" themed :title="$t('Projects.more_features')" :zIndex="sheetMode ? SHEET_MENU_Z : 10">
+                    <template #button="{ triggerAttrs }">
+                        <button type="button" class="pft__ctl pft__icon-btn" :title="$t('Projects.more_features')" :aria-label="$t('Projects.more_features')" v-bind="triggerAttrs">
+                            <ShellIcon name="dots" :size="15" />
+                        </button>
+                    </template>
+                    <template #options>
+                        <template v-for="(group, gi) in moreGroups" :key="group.key">
+                            <div v-if="gi" class="ah-pop__sep" role="separator"></div>
+                            <div class="ah-label ah-pop__label">{{ $t(`Projects.menu_${group.key}`) }}</div>
+                            <DropDownOption v-for="item in group.items" :key="item.key" @click="filtersOpen = false; item.open()">
+                                <div><span class="dropdown-label">{{ $t(item.label) }}</span></div>
+                            </DropDownOption>
+                        </template>
+                    </template>
+                </DropDown>
+            </div>
+            </component>
+            <div v-if="['Calendar'].includes(activeTab)" class="d-flex align-items-center justify-content-end task-filter-assignee" :class="clientWidth <= 767 ? 'justify-content-start' : ''">
+                <div class="pft__ctl pft__seg manage__filter-users">
+                    <button
+                        type="button"
+                        @click="$emit('manageFilterUsers', userId)"
+                        :class="{'is-active' : filterUsers.includes(userId)}"
+                        :aria-pressed="filterUsers.includes(userId)"
+                        class="pft__seg-btn pft__seg-btn--me"
+                    >
+                        <ShellIcon name="user" :size="14" />
+                        <span>{{ $t('Projects.me') }}</span>
+                    </button>
+                    <button
+                        type="button"
                         v-if="projectData?.isGlobalPermission === false ? checkPermission('task.show_tasks',projectData.isGlobalPermission) === 2 || checkPermission('task.show_tasks',projectData.isGlobalPermission) === true : true"
                         @click="$emit('update:userSidebar', !userSidebar)"
-                        class="border-radius-6-px border-left-radius-0 cursor-pointer assignee-status p4x-5px"
-                        :class="{'bg-white blue' : filterUsers.length && filterUsers.filter((x) => x !== userId).length}"
+                        class="pft__seg-btn pft__seg-btn--people"
+                        :class="{'is-active' : assigneeFilterCount}"
+                        :title="assigneeFilterCount ? $t('Projects.assignee_count', { n: assigneeFilterCount }) : $t('ProjectDetails.assignee')"
+                        :aria-label="assigneeFilterCount ? $t('Projects.assignee_count', { n: assigneeFilterCount }) : $t('ProjectDetails.assignee')"
                     >
-                        <img :src="filterUsers.length && filterUsers.filter((x) => x !== userId).length ? activeGroupIcon : groupIcon" alt="user icon">
-                        <span class="font-size-12 font-weight-400 ml-10px"> {{filterUsers.length && filterUsers.filter((x) => x !== userId).length ? `(${filterUsers.filter((x) => x !== userId).length})` : $t('ProjectDetails.assignee')}}</span>
-                    </div>
+                        <ShellIcon name="users" :size="14" />
+                        <span v-if="assigneeFilterCount" class="pft__count">{{ assigneeFilterCount }}</span>
+                    </button>
                 </div>
                 <div class="d-flex align-items-center assignee-filter">
-                    <div class="mr-1 group_by monthly-calendar monthly-calendar-view" @click="$emit('openCalendar')">
+                    <div class="group_by monthly-calendar monthly-calendar-view" @click="$emit('openCalendar')">
                         {{ calendarDate ? calendarDate : new Date().toLocaleString('default', { month: 'long', year: 'numeric' }) }}
                         <MonthlyCalendarMilestone
                             v-if="calendartoggle"
@@ -237,66 +205,93 @@
                             @startEndDate="(val) => $emit('handleStartEndDate', val)"
                         />
                     </div>
-                    <div class="mr-1 group_by d-flex">
-                        <button type="button" title="Previous month" class="calendar-button" @click="$emit('prevMonth')">
+                    <div class="group_by d-flex">
+                        <button type="button" :title="$t('Projects.prev_month')" class="calendar-button" @click="$emit('prevMonth')">
                             <span class="fc-icon fc-icon-chevron-left"></span>
                         </button>
-                        <button type="button" title="Next month" class="calendar-button" @click="$emit('nextMonth')">
+                        <button type="button" :title="$t('Projects.next_month')" class="calendar-button" @click="$emit('nextMonth')">
                             <span class="fc-icon fc-icon-chevron-right"></span>
                         </button>
                     </div>
-                    <div class="mr-1 group_by">
-                        <button type="button" title="This month" class="calendar-button calendar-currentday-text" @click="$emit('defaultMonth')">{{ $t('Home.Today') }}</button>
+                    <div class="group_by">
+                        <button type="button" :title="$t('Projects.this_month')" class="calendar-button calendar-currentday-text" @click="$emit('defaultMonth')">{{ $t('Home.Today') }}</button>
                     </div>
                 </div>
             </div>
         </div>
+        <template v-if="isListLike">
+            <RecentVisitsDropdown v-model="showRecent" />
+            <BurndownModal v-model="showBurndown" :projectData="projectData" />
+            <EpicsPanel v-model="showEpics" :projectData="projectData" />
+            <PagesPanel v-model="showPages" :projectData="projectData" />
+            <ExportTasksDropdown v-model="showExport" :projectData="projectData" />
+            <PublicShareModal v-model="showPublicShare" :projectData="projectData" />
+            <WhoCanSeeModal v-if="showWhoCanSee" v-model="showWhoCanSee" kind="project" :itemId="projectData?._id || ''" :title="projectData?.ProjectName || ''" />
+            <ImportDialog v-model="showImport" :projectData="projectData" :users="users" :sprint="importSprint" />
+            <AutoArchiveModal v-model="showAutoArchive" :projectData="projectData" />
+            <EstimationScaleModal v-model="showEstimationScale" :projectData="projectData" />
+        </template>
     </div>
 </template>
 
 <script setup>
-import { ref, defineProps, defineEmits } from 'vue';
+import { ref, computed, defineProps, defineEmits, watch } from 'vue';
+import { useI18n } from 'vue-i18n';
+import { canUseAi } from "@/composable/aiAvailability";
+import ShellIcon from '@/components/organisms/Shell/ShellIcon.vue';
+import { SEARCH_TEXT_MAX } from '@/utils/searchText';
+import { useRoute } from 'vue-router';
 import DropDown from '@/components/molecules/DropDown/DropDown.vue';
 import DropDownOption from '@/components/molecules/DropDownOption/DropDownOption.vue';
 import Toggle from '@/components/atom/Toggle/Toggle.vue';
 import Assignee from '@/components/molecules/Assignee/Assignee.vue';
 import TaskFilter from '@/components/molecules/TaskFilter/TaskFilter.vue';
+import ProvenanceFilter from '@/components/molecules/Provenance/ProvenanceFilter.vue';
 import MonthlyCalendarMilestone from '@/components/atom/MonthlyCalendarMilestone/MonthlyCalendarMilestone.vue';
 import BurndownModal from '@/components/molecules/Burndown/BurndownModal.vue';
 import RecentVisitsDropdown from '@/components/molecules/RecentVisits/RecentVisitsDropdown.vue';
-import GlobalSearchModal from '@/components/molecules/GlobalSearch/GlobalSearchModal.vue';
+import { openPalette } from '@/components/molecules/AdvanceSearch/paletteKeys';
 import EpicsPanel from '@/components/molecules/Epics/EpicsPanel.vue';
 import ExportTasksDropdown from '@/components/molecules/ExportTasks/ExportTasksDropdown.vue';
 import PagesPanel from '@/components/molecules/Pages/PagesPanel.vue';
 import PublicShareModal from '@/components/molecules/PublicShare/PublicShareModal.vue';
-import ImportJiraModal from '@/components/molecules/ImportJira/ImportJiraModal.vue';
-import ImportCsvModal from '@/components/molecules/ImportCsv/ImportCsvModal.vue';
-import ImportTrelloModal from '@/components/molecules/ImportTrello/ImportTrelloModal.vue';
-import ImportAsanaModal from '@/components/molecules/ImportAsana/ImportAsanaModal.vue';
-import ImportMondayModal from '@/components/molecules/ImportMonday/ImportMondayModal.vue';
+import WhoCanSeeModal from '@/components/molecules/WhoCanSee/WhoCanSeeModal.vue';
+import ImportDialog from '@/components/organisms/ImportDialog/ImportDialog.vue';
 import AutoArchiveModal from '@/components/molecules/AutoArchive/AutoArchiveModal.vue';
 import EstimationScaleModal from '@/components/molecules/EstimationScale/EstimationScaleModal.vue';
+import { ALL as DONE_BY_ALL } from '@/components/molecules/Provenance/doneByQuery';
+import { clearFilterSignal } from '@/views/Projects/composables/taskFilterSignal';
+import { maskOf } from '@/utils/iconMask';
+import ProjectFiltersSheet from './ProjectFiltersSheet.vue';
+
+const PHONE_MAX = 767;
+const { t } = useI18n();
+const groupLabel = (option) => (option?.title !== undefined ? option.title : t(`Projects.${option?.label || 'status'}`));
+const LIST_LIKE_TABS = ['ProjectListView', 'ProjectKanban', 'TableView'];
+// Menus opened from the sheet have to stack above its backdrop.
+const SHEET_MENU_Z = 70;
+
+const InPlace = (_, { slots }) => slots.default?.();
+InPlace.props = ['open'];
+InPlace.inheritAttrs = false;
 
 const showBurndown = ref(false);
-const showGlobalSearch = ref(false);
 const showEpics = ref(false);
 const showPages = ref(false);
 const showPublicShare = ref(false);
-const showImportJira = ref(false);
-const showImportCsv = ref(false);
-const showImportTrello = ref(false);
-const showImportAsana = ref(false);
-const showImportMonday = ref(false);
+const showWhoCanSee = ref(false);
+const showImport = ref(false);
 const showAutoArchive = ref(false);
 const showEstimationScale = ref(false);
 const showRecent = ref(false);
 const showExport = ref(false);
+
+const opener = (flag) => () => { flag.value = true; };
 import { useCustomComposable } from '@/composable';
-import AppTeaserBlock from '@/components/molecules/AppTeaserBlock/AppTeaserBlock.vue';
 
-const { checkPermission, checkApps, getAppState } = useCustomComposable();
+const { checkPermission } = useCustomComposable();
 
-defineProps({
+const props = defineProps({
     activeTab: { type: String, required: true },
     projectData: { type: Object, required: true },
     clientWidth: { type: Number, required: true },
@@ -307,9 +302,11 @@ defineProps({
     taskKeySearch: { type: Boolean, default: false },
     taskDescriptionSearch: { type: Boolean, default: false },
     filterUsers: { type: Array, default: () => [] },
+    doneBy: { type: String, default: 'all' },
+    agentWorking: { type: Boolean, default: false },
     userSidebar: { type: Boolean, default: false },
     collapsed: { type: Boolean, default: true },
-    groupBy: { type: Number, default: 0 },
+    groupBy: { type: [Number, String], default: 0 },
     groupByOptions: { type: Array, default: () => [] },
     users: { type: Array, default: () => [] },
     teams: { type: Array, default: () => [] },
@@ -320,7 +317,22 @@ defineProps({
     rangeObject: { type: Object, default: () => ({}) },
 });
 
-defineEmits([
+const route = useRoute();
+const searchOpen = ref(Boolean(props.taskSearch));
+watch(() => props.taskSearch, (value) => { if (value) searchOpen.value = true; });
+// The wizard files rows into one sprint: the one in the route, else the project's first.
+// 22b's "into Mobile App v2" headline reads from this.
+const importSprint = computed(() => {
+    const wanted = String(route.params.sprintId || '');
+    const flat = [];
+    Object.values(props.projectData?.sprintsObj || {}).forEach((sp) => sp?.id && flat.push({ ...sp, _id: sp.id }));
+    Object.values(props.projectData?.sprintsfolders || {}).forEach((folder) => {
+        Object.values(folder?.sprintsObj || {}).forEach((sp) => sp?.id && flat.push({ ...sp, _id: sp.id, folderId: folder.folderId, folderName: folder.folderName || '' }));
+    });
+    return flat.find((sp) => String(sp.id) === wanted) || flat[0] || {};
+});
+
+const emit = defineEmits([
     'update:taskSearch',
     'update:taskNameSearch',
     'update:taskKeySearch',
@@ -334,6 +346,8 @@ defineEmits([
     'search',
     'toggleSearch',
     'manageFilterUsers',
+    'update:doneBy',
+    'update:agentWorking',
     'changeAssignee',
     'openAi',
     'openAiAssist',
@@ -344,74 +358,73 @@ defineEmits([
     'defaultMonth',
 ]);
 
-const currentActive = ref('');
-const horizontalDots = require('@/assets/images/svg/horizontalDots.svg');
-const activeUserIcon = require('@/assets/images/peopleBlue.png');
-const userIcon = require('@/assets/images/peopleGray.png');
-const activeGroupIcon = require('@/assets/images/peopleBlue.png');
-const groupIcon = require('@/assets/images/peopleGray.png');
+const assigneeFilterCount = computed(() => props.filterUsers.filter((x) => x !== props.userId).length);
+
+const isListLike = computed(() => LIST_LIKE_TABS.includes(props.activeTab));
+const sheetMode = computed(() => props.clientWidth <= PHONE_MAX && isListLike.value);
+const filtersOpen = ref(false);
+watch(sheetMode, (on) => { if (!on) filtersOpen.value = false; });
+
+const advancedApplied = ref(false);
+watch(clearFilterSignal, () => { advancedApplied.value = false; });
+const onApplyFilter = (query) => {
+    advancedApplied.value = true;
+    emit('applyFilter', query);
+};
+const onClearFilter = () => {
+    advancedApplied.value = false;
+    emit('clearFilter');
+};
+
+const activeFilterCount = computed(() => [
+    props.filterUsers.includes(props.userId),
+    assigneeFilterCount.value > 0,
+    props.doneBy !== DONE_BY_ALL,
+    props.agentWorking,
+    advancedApplied.value,
+].filter(Boolean).length);
+
+// Show/Hide Archive is a mode switch, not a filter, so it lives in the overflow menu
+// and the menu stays mounted in archive mode — it is the only way back out.
+const moreGroups = computed(() => {
+    const groups = [];
+    if (!(props.showArchived && props.showArchivedProjects)) {
+        groups.push({ key: 'view', items: [
+            {
+                key: 'archive',
+                label: props.showArchived ? 'ProjectSlider.hide_archive' : 'ProjectSlider.show_archive',
+                open: () => emit('update:showArchived', !props.showArchived)
+            }
+        ] });
+    }
+    groups.push(
+        { key: 'find', items: [
+            { key: 'search', label: 'Projects.global_search', open: openPalette },
+            { key: 'recent', label: 'Projects.recent_tasks', open: opener(showRecent) }
+        ] },
+        { key: 'insights', items: [
+            { key: 'burndown', label: 'Projects.burndown', open: opener(showBurndown) },
+            { key: 'epics', label: 'Projects.epics', open: opener(showEpics) },
+            { key: 'pages', label: 'Projects.pages', open: opener(showPages) }
+        ] },
+        { key: 'share', items: [
+            { key: 'export', label: 'Projects.export_tasks', open: opener(showExport) },
+            { key: 'public', label: 'Projects.public_link', open: opener(showPublicShare) },
+            { key: 'whoCanSee', label: 'WhoCanSee.menu_project', open: opener(showWhoCanSee) }
+        ] },
+        { key: 'import', items: [
+            { key: 'import', label: 'Projects.import_any', open: opener(showImport) }
+        ] },
+        { key: 'settings', items: [
+            { key: 'autoArchive', label: 'Projects.auto_archive', open: opener(showAutoArchive) },
+            { key: 'estimation', label: 'Projects.estimation_scale', open: opener(showEstimationScale) }
+        ] }
+    );
+    return groups;
+});
+
 </script>
 
-<style scoped>
-/* AI Assist — modern "AI" pill: gradient border + gradient text + soft glow,
-   distinct from the solid-purple "Write with AI" beside it. */
-.ai-assist-btn {
-    display: inline-flex;
-    align-items: center;
-    gap: 6px;
-    height: 32px;
-    padding: 0 14px;
-    font-size: 12px;
-    font-weight: 600;
-    line-height: 1;
-    border-radius: 999px;
-    border: 1.5px solid transparent;
-    background:
-        linear-gradient(#fff, #fff) padding-box,
-        linear-gradient(120deg, #7C5CFF 0%, #4D7CFF 50%, #C44BFF 100%) border-box;
-    box-shadow: 0 2px 10px rgba(108, 99, 255, 0.18);
-    transition: transform 0.15s ease, box-shadow 0.15s ease;
-}
-.ai-assist-btn:hover {
-    transform: translateY(-1px);
-    box-shadow: 0 6px 18px rgba(124, 92, 255, 0.32);
-}
-.ai-assist-btn:active {
-    transform: translateY(0);
-}
-.ai-assist-btn__label {
-    background: linear-gradient(120deg, #7C5CFF 0%, #4D7CFF 50%, #C44BFF 100%);
-    -webkit-background-clip: text;
-    background-clip: text;
-    -webkit-text-fill-color: transparent;
-    color: #6a5cff; /* fallback where background-clip:text is unsupported */
-}
-.ai-assist-btn__spark {
-    font-size: 13px;
-    line-height: 1;
-}
-
-/* Tighten the gaps between the desktop action buttons so the row is less
-   crowded — the global .mr-1 gap is 16px (1rem); 8px reads better. This is
-   spacing only: we deliberately do NOT force the row onto a single line. An
-   earlier attempt used flex-wrap:nowrap + a scrollable (flex:1 / min-width:0)
-   action group, which HID the buttons that didn't fit on screens narrower than
-   a full desktop. Leaving the group free to wrap keeps every option visible. */
-@media (min-width: 768px) {
-    .task-filter-assignee > :deep(.mr-1) {
-        margin-right: 8px;
-    }
-    /* Responsive fix: keep the search box at its own width so it never
-       stretches to fill the row when the toolbar wraps (previously the 90%
-       width ballooned across a full wrapped line). And give the wrapper a
-       row-gap so, when the search + action groups wrap onto two lines, the
-       rows have clean vertical spacing instead of touching. */
-    .task-filtersearchassignee-wrapper {
-        row-gap: 10px;
-    }
-    .task-filtersearch,
-    .task-fitler-search {
-        flex: 0 0 auto;
-    }
-}
+<style>
+@import "./project-filters.css";
 </style>

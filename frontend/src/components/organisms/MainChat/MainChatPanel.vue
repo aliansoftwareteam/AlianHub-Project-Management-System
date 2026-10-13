@@ -11,6 +11,11 @@
             :is-channel="isChannel"
             :icon="icon"
             :active-pane="rightPane"
+            :details-open="rightPane === 'info'"
+            :summarizing="summarizing"
+            :asking="askOpen"
+            @summarize="summarize"
+            @ask="toggleAsk"
             @search="toggleRightPane('search')"
             @pinned="toggleRightPane('pinned')"
             @info="toggleRightPane('info')"
@@ -56,6 +61,7 @@
             :typing-label="typingLabel"
             @load-older="loadOlder"
             @reply="replyTo = $event"
+            @thread="openThread($event)"
             @copy="copyMessage"
             @remove="confirmRemove"
             @retry="retry"
@@ -64,6 +70,8 @@
             @pin="onPin"
             @mark-unread="onMarkUnread"
             @edit="editingMessage = $event"
+            @make-task="openTaskSheet($event && $event.text)"
+            @save-later="onSaveLater"
         />
 
         <MainChatComposer
@@ -72,9 +80,13 @@
             :disabled="!sendMessageAllowed"
             :disabled-reason="composerLockReason"
             :user-ids="watchers"
+            :agents="mentionableAgents"
+            :agents-note="mentionNote"
             :conversation-key="conversationKey"
             @typing="setTyping"
             @send="onSend"
+            @send-task="onSendTask"
+            @command="onCommand"
             @files="onFiles"
             @save="onSaveEdit"
             @cancel-reply="replyTo = null"
@@ -95,6 +107,7 @@
         :messages="messages"
         @close="rightPane = ''"
         @preview="openPreview"
+        @open="openSearchHit"
     />
 
     <!-- Same pane in two modes: free-text search, or this conversation's pinned
@@ -110,6 +123,58 @@
         @close="rightPane = ''"
         @open="openSearchHit"
         @unpin="onUnpinFromList"
+    />
+
+    <MainChatThread
+        v-else-if="rightPane === 'thread' && threadRootId"
+        :key="threadRootId"
+        ref="threadPane"
+        :root="threadRoot"
+        :target="conversationTarget"
+        :where="sourceLabel"
+        :user-ids="watchers"
+        :agents="mentionableAgents"
+        :agents-note="mentionNote"
+        :conversation-key="conversationKey"
+        :disabled="!sendMessageAllowed"
+        :disabled-reason="composerLockReason"
+        :sender="sender"
+        :focus-id="threadFocusId"
+        @close="closeThread"
+        @copy="copyMessage"
+        @remove="confirmRemove($event, threadPane && threadPane.remove)"
+        @preview="openPreview"
+        @make-task="openTaskSheet($event && $event.text)"
+        @command="onCommand"
+    />
+
+    <MainChatSummary
+        v-if="summaryState"
+        :loading="summarizing"
+        :error="summaryState.error"
+        :summary="summaryState.summary"
+        :items="summaryState.items"
+        @close="closeSummary"
+        @create-task="(item) => openTaskSheet(item.title, item)"
+    />
+
+    <MainChatAsk
+        v-if="askOpen"
+        :project-id="projectId"
+        :sprint-id="sprintId"
+        :task-id="effectiveTaskId"
+        @close="askOpen = false"
+    />
+
+    <MakeTaskSheet
+        v-if="taskDraft"
+        :initial-title="taskDraft.title"
+        :source-text="taskDraft.sourceText"
+        :source-label="sourceLabel"
+        :source-url="sourceUrl"
+        :default-project-id="(linkedProject && linkedProject._id) || ''"
+        @close="taskDraft = null"
+        @created="onTaskCreated"
     />
 
     <!--
@@ -134,6 +199,7 @@
 </template>
 
 <script setup>
+import { defaultStatus } from '@/components/organisms/QuickCreateTask/quickCreateTask';
 /**
  * The Main Chat conversation surface.
  *
@@ -151,9 +217,10 @@
  */
 import { computed, defineProps, defineEmits, inject, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue';
 import { useStore } from 'vuex';
+import { useRoute, useRouter } from 'vue-router';
 import { useToast } from 'vue-toast-notification';
 import { useI18n } from 'vue-i18n';
-import Swal from 'sweetalert2';
+import Swal from '@/utils/lazySwal';
 import taskClass from '@/utils/TaskOperations';
 import * as env from '@/config/env';
 import { apiRequest } from '@/services';
@@ -161,13 +228,21 @@ import { useGetterFunctions } from '@/composable';
 import { storageHelper, taskPlanPermission } from '@/composable/commonFunction';
 import ImagesPreviewer from '@/components/organisms/ImagePreviewer/ImagesPreviewer.vue';
 import MainChatHeader from './MainChatHeader.vue';
+import MainChatAsk from './MainChatAsk.vue';
 import MainChatMessageList from './MainChatMessageList.vue';
 import MainChatComposer from './MainChatComposer.vue';
 import MainChatInfo from './MainChatInfo.vue';
 import MainChatSearch from './MainChatSearch.vue';
+import MainChatThread from './MainChatThread.vue';
+import MainChatSummary from './MainChatSummary.vue';
+import MakeTaskSheet from './MakeTaskSheet.vue';
+import { canUseAi, loadAiAvailability } from '@/composable/aiAvailability';
+import { useClipRecorder } from '@/composables/useClipRecorder';
+import { shellState } from '@/components/organisms/Shell/shellState';
 import CallIcon from '@/components/organisms/CallOverlay/CallIcon.vue';
 import { useCall } from '@/composable/useCall';
 import { useMainChatConversation } from './useMainChatConversation';
+import { fetchChatAgents, fetchOwnAiInChat } from '@/views/Ai/useRunnableAgents';
 
 const props = defineProps({
     // conversation target
@@ -188,6 +263,9 @@ const props = defineProps({
     // glyph onto the channel document, so this is normally the channel itself.
     icon: { type: Object, default: () => ({}) },
     sendMessageAllowed: { type: Boolean, default: true },
+    linkedProject: { type: Object, default: null },
+    // Set on a direct conversation with an agent: every message there goes to it.
+    agentId: { type: String, default: '' },
 });
 
 // Attachment previews, search and the details pane are all owned here rather than
@@ -211,7 +289,7 @@ const list = ref(null);
 const replyTo = ref(null);
 const editingMessage = ref(null);
 
-// '' | 'info' | 'search' — the right-hand column holds one pane at a time.
+// '' | 'info' | 'search' | 'pinned' | 'thread' — the right-hand column holds one pane at a time.
 const rightPane = ref('');
 function toggleRightPane(which) {
     rightPane.value = rightPane.value === which ? '' : which;
@@ -239,12 +317,35 @@ const effectiveTaskId = computed(() => {
 
 const conversationKey = computed(() => `${(projectData && projectData.value && projectData.value._id) || ''}:${props.sprintId}:${effectiveTaskId.value || props.taskId}`);
 
+const mentionableAgents = ref([]);
+const ownAiHeldBy = ref('');
+const WHY_NO_OWN_AI = { project_manager_off: 'AgentChat.own_ai_manager_off' };
+const mentionNote = computed(() => (WHY_NO_OWN_AI[ownAiHeldBy.value] ? t(WHY_NO_OWN_AI[ownAiHeldBy.value]) : ''));
+const listOf = (value) => (Array.isArray(value) ? value : []);
+async function loadMentionableAgents() {
+    const taskId = effectiveTaskId.value;
+    const key = conversationKey.value;
+    if (props.agentId || !projectId.value || !props.sprintId || !taskId) {
+        mentionableAgents.value = [];
+        ownAiHeldBy.value = '';
+        return;
+    }
+    const thread = { projectId: projectId.value, sprintId: props.sprintId, taskId };
+    // An in-product agent needs a model on the server; the person's own connected AI does not.
+    const [inProduct, own] = await Promise.all([canUseAi() ? fetchChatAgents(thread) : [], fetchOwnAiInChat(thread)]);
+    if (key !== conversationKey.value) return;
+    mentionableAgents.value = [...listOf(inProduct), ...listOf(own && own.agents)];
+    ownAiHeldBy.value = (own && own.why) || '';
+}
+watch([conversationKey, () => canUseAi()], loadMentionableAgents, { immediate: true });
+
 // ─── Calling ────────────────────────────────────────────────────────────────────
 // One-to-one only, and only once the conversation task exists — the server authorises
 // a call by loading that task and checking the caller is one of its two participants,
 // so there is nothing to authorise against before the first message is sent.
 const { startCall, isBusy: callBusy, isSupported: callSupported, isSecure: callSecure } = useCall();
 const canCall = computed(() => !props.isChannel
+    && !props.agentId
     && isDefaultProject.value
     && !!effectiveTaskId.value
     && effectiveTaskId.value !== 'default'
@@ -288,38 +389,90 @@ const composerLockReason = computed(() => {
 });
 
 
+const conversationTarget = computed(() => ({
+    projectId: projectId.value,
+    sprintId: props.sprintId,
+    taskId: effectiveTaskId.value,
+    folderId: props.folderId,
+    isDefaultProject: isDefaultProject.value,
+}));
+
+const sender = computed(() => {
+    const me = getUser(userId.value) || {};
+    const owner = getters['settings/companyOwnerDetail'];
+    return {
+        id: me._id || me.id,
+        Employee_Name: me.Employee_Name,
+        companyOwnerId: owner && owner.userId,
+    };
+});
+
+const threadPane = ref(null);
+
 const {
     messages, loading, loadingOlder, hasMore,
     load, loadOlder, catchUp, typingUsers, setTyping,
-    attach, detach, sendText, sendFiles, retry, removeMessage, markRead,
+    attach, detach, sendText, sendMedia, sendFiles, retry, removeMessage, markRead,
     toggleReaction, togglePin, markUnreadFrom, editText,
 } = useMainChatConversation({
     socket,
     companyId,
     userId,
-    target: () => ({
-        projectId: (projectData && projectData.value && projectData.value._id) || '',
-        sprintId: props.sprintId,
-        taskId: effectiveTaskId.value,
-        folderId: props.folderId,
-        isDefaultProject: isDefaultProject.value,
-    }),
+    target: () => conversationTarget.value,
+    observe: (doc) => { if (threadPane.value) threadPane.value.receive(doc); },
     // A brand-new DM has no watchers list yet — both participants are known from
     // the target user and me.
     participants: () => (props.watchers && props.watchers.length
         ? props.watchers
         : [userId.value, props.taskId].filter(Boolean)),
     watcherPrefs: () => (projectData && projectData.value && projectData.value.watchers) || {},
-    currentUser: () => {
-        const me = getUser(userId.value) || {};
-        const owner = getters['settings/companyOwnerDetail'];
-        return {
-            id: me._id || me.id,
-            Employee_Name: me.Employee_Name,
-            companyOwnerId: owner && owner.userId,
-        };
-    },
+    currentUser: () => sender.value,
 });
+
+/* ------------------------------------------------------------------ *
+ * threads
+ *
+ * A thread opens in the right-hand column, which is a full-width sheet on a phone. The
+ * page is remounted for each conversation, so a thread never outlives the one it is in.
+ * ------------------------------------------------------------------ */
+const route = useRoute();
+const router = useRouter();
+const threadRootId = ref('');
+const threadFocusId = ref('');
+
+const threadRoot = computed(() => messages.value.find((m) => String(m._id || '') === threadRootId.value)
+    || { _id: threadRootId.value });
+
+function openThread(message, focusId = '') {
+    const id = String((message && message._id) || '');
+    if (!id) return;
+    threadRootId.value = id;
+    threadFocusId.value = focusId;
+    rightPane.value = 'thread';
+}
+
+/* A notice links to a thread with ?thread=<id>; once that thread is closed the link is spent. */
+function forgetThreadLink() {
+    if (!router || !route || !route.query || !route.query.thread) return;
+    const query = { ...route.query };
+    delete query.thread;
+    Promise.resolve(router.replace({ query })).catch(() => {});
+}
+
+function closeThread() {
+    if (rightPane.value === 'thread') rightPane.value = '';
+}
+
+watch(rightPane, (pane) => {
+    if (pane === 'thread' || !threadRootId.value) return;
+    threadRootId.value = '';
+    threadFocusId.value = '';
+    forgetThreadLink();
+});
+
+watch(() => (route && route.query ? route.query.thread : ''), (id) => {
+    if (id) openThread({ _id: String(id) });
+}, { immediate: true });
 
 const fileExtentions = computed(() => getters['settings/fileExtentions'] || []);
 
@@ -579,6 +732,7 @@ function onWindowFocus() {
     // while it was in the background — the socket dropped, or an event simply did not
     // land — this pulls it in. Cheap and idempotent, so it costs one request.
     catchUp();
+    if (threadPane.value) threadPane.value.refresh();
 
     if (keepUnread || !engaged) return;
     if (unreadCount.value > 0) readConversation();
@@ -650,6 +804,7 @@ watch(() => (socket ? socket.value : null), (instance) => {
     // A replaced instance means we were disconnected — recover whatever was sent while
     // we were away, not just future messages.
     catchUp();
+    if (threadPane.value) threadPane.value.refresh();
 });
 
 onMounted(() => window.addEventListener('focus', onWindowFocus));
@@ -666,9 +821,7 @@ async function createDirectConversation() {
     const sprint = project && project.sprintsObj
         ? Object.values(project.sprintsObj)[0]
         : null;
-    const status = project && project.taskStatusData
-        ? project.taskStatusData.find((x) => x.type === 'default_active')
-        : null;
+    const status = defaultStatus(project);
     const taskType = project && project.taskTypeCounts ? project.taskTypeCounts[0] : null;
 
     if (!project || !sprint || !status || !taskType) {
@@ -768,6 +921,107 @@ async function onSend(text) {
 async function onFiles(files) {
     if (!(await ensureConversation())) return;
     await sendFiles(files.map((f) => f), fileExtentions.value);
+}
+
+async function onSendTask(text) {
+    openTaskSheet(text);
+    await onSend(text);
+}
+
+async function onSaveLater(message) {
+    const saved = await togglePin(message);
+    $toast.success(t(saved ? 'Chat.saved_later' : 'Chat.unsaved_later'), { position: 'top-right' });
+}
+
+const askOpen = ref(false);
+function toggleAsk() {
+    if (!askOpen.value) closeSummary();
+    askOpen.value = !askOpen.value;
+}
+watch(conversationKey, () => { askOpen.value = false; });
+
+const summarizing = ref(false);
+const summaryState = ref(null);
+// Bumped on every run and close, so an answer for a conversation left behind is dropped.
+let summaryRun = 0;
+
+function closeSummary() {
+    summaryRun += 1;
+    summaryState.value = null;
+    summarizing.value = false;
+}
+
+async function summarize() {
+    if (!canUseAi() || summarizing.value) return;
+    askOpen.value = false;
+    summaryRun += 1;
+    const run = summaryRun;
+    summaryState.value = { summary: '', items: [], error: '' };
+    if (!projectId.value || !props.sprintId || !effectiveTaskId.value) return;
+
+    summarizing.value = true;
+    try {
+        const response = await apiRequest('post', env.AI_CHAT_SUMMARY, {
+            projectId: projectId.value,
+            sprintId: props.sprintId,
+            taskId: effectiveTaskId.value,
+        });
+        if (run !== summaryRun) return;
+        const body = (response && response.data) || {};
+        summaryState.value = body.status
+            ? { summary: (body.data && body.data.summary) || '', items: (body.data && body.data.actionItems) || [], error: '' }
+            : { summary: '', items: [], error: t('Chat.summary_failed') };
+    } catch (error) {
+        if (run !== summaryRun) return;
+        const aiOff = !!(error && error.response && error.response.data && error.response.data.code === 'ai_off');
+        summaryState.value = { summary: '', items: [], error: t(aiOff ? 'Chat.summary_ai_off' : 'Chat.summary_failed') };
+        if (aiOff) loadAiAvailability(companyId.value);
+    } finally {
+        if (run === summaryRun) summarizing.value = false;
+    }
+}
+
+watch(conversationKey, closeSummary);
+
+const taskDraft = ref(null);
+const sourceLabel = computed(() => (props.isChannel ? `#${props.title}` : props.title));
+const sourceUrl = computed(() => (typeof window === 'undefined' ? '' : window.location.href));
+
+function plainText(raw) {
+    return String(raw || '').replace(/<[^>]*>/g, '').trim();
+}
+
+function openTaskSheet(text, item = null) {
+    const body = plainText(text);
+    taskDraft.value = { title: body.slice(0, 250), sourceText: body, item };
+}
+
+function onTaskCreated(created) {
+    const item = taskDraft.value && taskDraft.value.item;
+    if (item && created) item.taskUrl = created.url;
+    taskDraft.value = null;
+}
+
+const { openRecorder } = useClipRecorder();
+
+async function postClip(clip) {
+    if (!clip || !clip.url) return;
+    if (!(await ensureConversation())) return;
+    const name = `${clip.title || 'clip'}.webm`;
+    await sendMedia({
+        type: clip.mediaType === 'audio' ? 'audio' : 'video',
+        mediaURL: clip.url,
+        mediaName: name,
+        mediaOriginalName: name,
+        mediaSize: clip.size || 0,
+    });
+}
+
+function onCommand({ name, text } = {}) {
+    if (name === 'summarize') summarize();
+    else if (name === 'task') openTaskSheet(text || (replyTo.value && replyTo.value.message));
+    else if (name === 'clip') openRecorder({ type: 'chat', conversationKey: conversationKey.value }, postClip);
+    else if (name === 'talk' && canUseAi()) shellState.talkToText = true;
 }
 
 async function onPin(message) {
@@ -889,14 +1143,19 @@ async function openPreview(message) {
 /**
  * Act on a search result.
  *
- * An attachment opens straight in the previewer. A text hit scrolls to the
- * message and flashes it — but only when that message is in the loaded
+ * A reply opens its thread at that reply. An attachment opens straight in the
+ * previewer. A text hit scrolls to the message and flashes it — but only when that message is in the loaded
  * transcript; the search reaches the whole conversation, so a hit can easily be
  * older than what has been paged in. Rather than silently doing nothing, say
  * where it is.
  */
 async function openSearchHit(message) {
     if (!message) return;
+
+    if (message.parentId) {
+        openThread({ _id: message.parentId }, idOf(message));
+        return;
+    }
 
     if (!['text', 'link'].includes(message.type) && message.mediaURL) {
         await openPreview(message);
@@ -932,17 +1191,16 @@ function copyMessage(message) {
         .catch(() => $toast.error(t('Toast.something_went_wrong'), { position: 'top-right' }));
 }
 
-function confirmRemove(message) {
+function confirmRemove(message, remove = removeMessage) {
     Swal.fire({
         title: t('MainChat.confirm_delete'),
         icon: 'warning',
         showCancelButton: true,
-        confirmButtonColor: '#3085d6',
-        cancelButtonColor: '#d33',
+        customClass: { confirm: 'swal2-deny' },
         cancelButtonText: t('MainChat.cancel'),
         confirmButtonText: t('MainChat.confirm_delete_yes'),
     }).then((result) => {
-        if (result.isConfirmed) removeMessage(message);
+        if (result.isConfirmed && remove) remove(message);
     });
 }
 

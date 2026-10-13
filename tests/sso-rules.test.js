@@ -23,10 +23,13 @@ describe('🔑 SSO - Rules (SEC-02)', () => {
     });
 
     describe('publicSsoView (no secret leak)', () => {
-        test('exposes only provider + isEnabled', () => {
-            const v = publicSsoView({ provider: 'oidc', isEnabled: true, oidc: { clientSecret: 'TOPSECRET' } });
-            expect(v).toEqual({ provider: 'oidc', isEnabled: true });
+        test('exposes only what the login page needs, never a secret', () => {
+            const v = publicSsoView({ provider: 'oidc', isEnabled: true, displayName: 'Okta', enforcement: 'required', oidc: { clientSecret: 'TOPSECRET' } });
+            expect(v).toEqual({ provider: 'oidc', isEnabled: true, displayName: 'Okta', enforcement: 'required' });
             expect(JSON.stringify(v)).not.toContain('TOPSECRET');
+        });
+        test('display name and enforcement default rather than leak undefined', () => {
+            expect(publicSsoView({ provider: 'saml', isEnabled: true })).toEqual({ provider: 'saml', isEnabled: true, displayName: '', enforcement: 'optional' });
         });
         test('null when disabled or missing', () => {
             expect(publicSsoView({ provider: 'oidc', isEnabled: false })).toBeNull();

@@ -41,11 +41,7 @@ export const logoutFunction = async () => {
         } else {
             try {
                 const userId = localStorage.getItem("userId");
-                const refreshToken = localStorage.getItem("refreshToken");
-                await apiRequestWithoutCompnay("post", '/api/v2/logout', {
-                    id: userId,
-                    refreshToken: refreshToken,
-                });                    
+                await apiRequestWithoutCompnay("post", '/api/v2/logout', { id: userId });
                 store.dispatch(logout());
             } catch (error) {
                 console.error('Error in logout', error);

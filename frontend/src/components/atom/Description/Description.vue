@@ -1,24 +1,25 @@
 <template>
     <div class="description-wrapper">
         <div v-if="noDescription" class="description_componenet">
-            <div class="bg-white border-radius-8-px mt-1 p-10px" :class="{'ml-10px mr-5-px': clientWidth < 767}">
+            <div class="description__add-box border-radius-8-px mt-1 p-10px" :class="{'ml-10px mr-5-px': clientWidth < 767}">
                 <button @click="noDescription = false" class="add_description_button">
                     {{$t('PlaceHolder.Add_description')}}
                 </button>
             </div>
         </div>
         <div class="editor-container description_componenet" v-show="!noDescription">
-            <div v-if="editPermission && checkAiProject && checkAiDescription" class="ai-write-desc-bar">
+            <div v-if="editPermission && aiAllowed" class="ai-write-desc-bar">
                 <div class="d-flex align-items-center cursor-pointer" @click="openAiWriteDescription()">
                     <img :src="aiIcon" class="mr-3px" alt="ai" />
                     <span class="font-size-14 font-weight-500 ai-color ai-border-bottom">{{ $t('AI.ai_write_description') }}</span>
                 </div>
             </div>
-            <div v-show="contentLoaded" id="editorjs" :class="{'ml-10px mr-10-px': clientWidth < 767, 'show_hide_class': !isShow}" @click="isShow = true"></div>
+            <div v-show="contentLoaded" id="editorjs" ref="editorHolder" role="group" :aria-label="$t('Description.description')" :class="{'ml-10px mr-10-px': clientWidth < 767, 'show_hide_class': !isShow}" @click="isShow = true"></div>
             <Transition>
                 <span v-if="showMessage" class="saved_message">{{$t('Description.saved')}}</span>
             </Transition>
             <Skelaton class="w-100 border-radius-8-px" style="height: 60px;" v-if="!contentLoaded"/>
+            <AiSelectionPanel ref="selectionPanel" :editor="currentEditor" :target="selectionTarget" @changed="saveData()" />
             <div v-show="false" id="editor-converter"></div>
             <div class="hide_show_wrapper" v-if="contentExceeds" :class="{'ml-10px mr-10-px': clientWidth < 767 }">
                 <button v-if="!isShow" @click="isShow = true" class="hide_show">{{$t('Description.show_more')}}</button>
@@ -45,22 +46,12 @@
 <script setup>
 import { computed, defineComponent, inject, onMounted, provide, ref, watch } from 'vue';
 import { useStore } from 'vuex';
-import Swal from 'sweetalert2';
+import Swal from '@/utils/lazySwal';
 import { useRoute, useRouter } from "vue-router";
-import markdownit from 'markdown-it'
 import { useToast } from 'vue-toast-notification';
 import { useI18n } from "vue-i18n";
+import { canUseAi } from "@/composable/aiAvailability";
 const { t } = useI18n();
-const mardownInit = markdownit({
-    html: true
-})
-// Emit inline code as <code class="inline-code"> (the class @editorjs/inline-code
-// uses) so Editor.js preserves + styles it when markdown is converted into
-// description blocks — a bare <code> loses the inline-code styling on sanitize.
-mardownInit.renderer.rules.code_inline = (tokens, idx) =>
-    `<code class="inline-code">${mardownInit.utils.escapeHtml(tokens[idx].content)}</code>`;
-// mardownInit.renderer.rules.strong_open = () => "<b>";
-// mardownInit.renderer.rules.strong_close = () => "</b>";
 
 import PromptSidebar from "@/components/molecules/PromptSidebar/PromptSidebar.vue"
 import AiWriteDescription from "@/components/molecules/AiWriteDescription/AiWriteDescription.vue"
@@ -75,12 +66,16 @@ import InlineCode from '@editorjs/inline-code';
 import Embed from '@editorjs/embed';
 import Table from '@editorjs/table';
 import writeWithAi from './writeWithAi.js';
+import AiSelectionPanel from '@/components/molecules/AiSelection/AiSelectionPanel.vue';
+import { createSelectionTools } from '@/components/molecules/AiSelection/selectionTools';
+import { sprintObjOf } from '@/utils/aiTargets';
 
 import { apiRequest } from '../../../services';
 import * as env from '@/config/env';
 import { useCustomComposable } from '@/composable';
 import Skelaton from '@/components/atom/Skelaton/Skelaton.vue';
 import taskClass from '@/utils/TaskOperations';
+import { descriptionTextHtml, safeEditorDocument } from '@/utils/editorHtml';
 const aiIcon = require('@/assets/images/svg/ai_image.svg');
 
 
@@ -113,7 +108,7 @@ const pendingAiSave = ref(false);
 
 const contentLoaded = ref(false)
 
-const { checkPermission,checkApps, debounce } = useCustomComposable();
+const { checkPermission, debounce } = useCustomComposable();
 
 const props = defineProps({
     description: {
@@ -154,8 +149,8 @@ const companyId = inject('$companyId');
 const project = inject("selectedProject");
 const clientWidth = inject('$clientWidth');
 
-const checkAiProject = computed(() => checkApps('AI',props.projectData));
 const checkAiDescription = props.from === 'project' ? computed(() => checkPermission("project.project_description", props.projectData?.isGlobalPermission, {gettersVal: getters})) : computed(() => checkPermission("task.task_description", props.projectData?.isGlobalPermission, {gettersVal: getters}));
+const aiAllowed = computed(() => canUseAi({ project: props.projectData, permitted: Boolean(checkAiDescription.value) }));
 
 // Inputs handed to the lightweight "Write with AI" popover. Title + type come
 // from the task when editing a task, or the project name when from==='project'
@@ -179,7 +174,7 @@ const editorTools = {
         class:writeWithAi,
         config: {
             openSidebar : openDescriptionWithAi,
-            isShowAi: checkAiProject.value && checkAiDescription.value
+            isShowAi: aiAllowed.value
         },
     },
     header: {
@@ -216,7 +211,12 @@ const editorTools = {
     }
 }
 
+// The converter turns text into blocks. An address in that text stays an address: only a person pasting one into the
+// editor makes an embedded frame of it.
+const converterTools = () => Object.fromEntries(Object.entries(editorTools).filter(([name]) => name !== 'embed'));
+
 const editor = ref();
+const editorHolder = ref(null);
 
 const $toast = useToast();
 const converter = ref();
@@ -250,10 +250,24 @@ watch(() => props.isMainSpinner, (newVal) => {
 }, {flush: 'post'});
 
 
+const selectionPanel = ref(null);
+const currentEditor = () => editor.value;
+const selectionTarget = computed(() => {
+    const list = props.from === 'task' ? sprintObjOf(props.task?.sprintArray) : null;
+    if (!list || !list.id || checkPermission('task.task_create', props.projectData?.isGlobalPermission, {gettersVal: getters}) !== true) return null;
+    return { projectData: props.projectData, lists: [list] };
+});
+
+function selectionTools() {
+    if (!aiAllowed.value) return {};
+    return createSelectionTools({ t, onPick: (pick) => selectionPanel.value?.open(pick), canSplit: Boolean(selectionTarget.value) });
+}
+
 function initEditor() {
+    const holder = editorHolder.value;
     editor.value = new EditorJS({
         holder: 'editorjs',
-        tools: {...editorTools},
+        tools: {...editorTools, ...selectionTools()},
         placeholder: t('Description.description_placeholder'),
         readOnly: !props.editPermission,
         onChange: debounce(() => {
@@ -274,7 +288,10 @@ function initEditor() {
             }
         }, 500),
         onReady(){
-            document.querySelector('.codex-editor__redactor').style.paddingBottom = '10px';
+            // Stepping to another task can take this editor off the page before it is ready.
+            if(!holder?.isConnected) return;
+            const redactor = holder.querySelector('.codex-editor__redactor');
+            if(redactor) redactor.style.paddingBottom = '10px';
             if(!props.description || (Array.isArray(props.description?.blocks) && !props.description.blocks.length)) {
                 noDescription.value = true;
             } else if (typeof props.description === 'string' && props.description !== '') {
@@ -287,7 +304,7 @@ function initEditor() {
     });
     converter.value = new EditorJS({
         holder: 'editor-converter',
-        tools: {...editorTools},
+        tools: converterTools(),
         onChange() {
             converter.value.save().then((newBlocks) => {
                 injectBlocks(newBlocks.blocks?.reverse() || [])
@@ -311,7 +328,6 @@ function checkContentSize() {
         // ADJUST BOTTOM PADDING DEPENDING ON CONTENT SIZE
         const editorTextArea = document.querySelector('.codex-editor__redactor');
         if(editorTextArea) {
-            editorTextArea.style.minHeight= '215px';
             if(contentExceeds.value) {
                 editorTextArea.style.paddingBottom = '0px';
             } else {
@@ -461,7 +477,7 @@ function renderDescription(replace = false) {
                 blockIndex.value = 1;
                 injectDescription(props.description,replace);
             }else{
-                editor.value?.render(props.description)
+                editor.value?.render(safeEditorDocument(props.description))
                 .then(() => {
                     checkContentSize()
                 });
@@ -489,7 +505,6 @@ function openDescriptionWithAi () {
             title: t('AI.please_upgrade_plan_to_use_ai'),
             text: t('AI.ai_available_on_paid_plans_upgrade_now'),
             icon: 'info',
-            confirmButtonColor: '#28C76F',
             confirmButtonText: t('Header.upgrade_now'),
             showCloseButton:true    
         }).then((result) => {
@@ -519,7 +534,6 @@ function openAiWriteDescription() {
             title: t('AI.please_upgrade_plan_to_use_ai'),
             text: t('AI.ai_available_on_paid_plans_upgrade_now'),
             icon: 'info',
-            confirmButtonColor: '#28C76F',
             confirmButtonText: t('Header.upgrade_now'),
             showCloseButton:true
         }).then((result) => {
@@ -564,8 +578,7 @@ async function applyAiDescription(payload = '') {
 async function injectDescription(description = '') {
     try {
         description = description.replaceAll(/\\n/g, '\n');
-        const htmlStr = mardownInit.render(description)
-        await converter.value.blocks.renderFromHTML(htmlStr);
+        await converter.value.blocks.renderFromHTML(descriptionTextHtml(description));
     } catch (error) {
         console.error(error,"error");
     }
@@ -577,7 +590,7 @@ async function injectBlocks (newBlocks) {
     newBlocks.forEach((block, index) => {
         blocks.splice(blockIndex.value-1, index === 0 ? 1 : 0, block);
     })
-    await editor.value.render({...tempBlock.value, blocks})
+    await editor.value.render(safeEditorDocument({...tempBlock.value, blocks}))
     checkContentSize()
     // The AI "Use this" path renders programmatically (no editor onChange fires),
     // so persist explicitly once the generated content is in the editor —
@@ -587,31 +600,6 @@ async function injectBlocks (newBlocks) {
         saveData();
     }
 }
-
-// async function cancelData () {
-//     if(Object.keys(tempBlock.value).length > 0){
-//         if(props.description){
-//             if(typeof props.description === 'string'){
-//                 const blockCount = editor.blocks.getBlocksCount();
-//                 for (let i = blockCount - 1; i >= 0; i--) {
-//                     editor.blocks.delete(i);
-//                 }
-//                 blockIndex.value = 1;
-//                 converter.blocks.renderFromHTML(props.description);
-//             }else{
-//                 editor?.render(props.description);
-//                 if(!Object.keys(tempBlock.value).length){
-//                     tempBlock.value = props.description;
-//                 }
-//             }
-//         }else{
-//             let obj = {
-//                 blocks: []
-//             }
-//             editor?.render(obj);
-//         }
-//     }
-// }
 
 function resetAiBlocks() {
     // const currIndex = blockIndex.value;

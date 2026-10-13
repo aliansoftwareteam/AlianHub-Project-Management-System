@@ -1,7 +1,33 @@
 import * as env from '@/config/env';
 import { apiRequest } from "../../services";
 import Store from '@/store/index'
-import Swal from 'sweetalert2';
+import Swal from '@/utils/lazySwal';
+import { instantEdit, tellViews } from '@/utils/instantTaskEdit';
+import { holdOwnLeave } from '@/utils/taskUpdateMarker';
+
+const actorOf = (userData) => ({
+    "Employee_Name": userData.Employee_Name,
+    "id": userData.id,
+    "companyOwnerId": userData.companyOwnerId
+});
+
+const patchTask = (body, statusText) => apiRequest("patch", env.V2_TASKS, body).then((response) => {
+    if (response.data.status) return {status: true, statusText, ...(response.data.queuedOffline ? {queueId: response.data.queueId} : {})};
+    throw {status: false, error: response.data.error, statusText: response.data.statusText};
+}, (error) => {
+    throw {status: false, error};
+});
+
+const leaving = (taskId, body) => {
+    const answered = holdOwnLeave(taskId);
+    return apiRequest("patch", "/api/v2/tasks", body).finally(answered);
+};
+
+/* A write shown before it is sent: in the store's row, and in each view that keeps its own copy of the task. */
+const showInViews = (pid, sprintId, data, updatedFields) => {
+    Store.commit('projectData/mutateUpdateFirebaseTasks', {snap: null, op: "modified", pid, sprintId, data, updatedFields});
+    tellViews(data._id, updatedFields);
+};
 
 class Task {
     create({ data, user, projectData ,indexObj = {}, groupBy}) {
@@ -62,39 +88,23 @@ class Task {
 
     /* -------------- UPDATE DUE DATE FUNCTION FOR TASK -----------------*/
 
-    updateDueDate({firebaseObj, project, task, obj,userData, commonDateFormatString,isUpdateTask}) {
-        return new Promise((resolve,reject) => {
-            try {
-                const {sprintId,ProjectID} = task;
-                Store.commit('projectData/mutateUpdateFirebaseTasks', {snap:null, op: "modified", pid:ProjectID, sprintId, data: {...task,...firebaseObj},updatedFields:{...firebaseObj}})
-                apiRequest("patch", env.V2_TASKS, {
-                    action: "updateDueDate",
-                    commonDateFormatString,
-                    firebaseObj,
-                    project,
-                    task,
-                    obj,
-                    userData: {
-                        "Employee_Name": userData.Employee_Name,
-                        "id": userData.id,
-                        "companyOwnerId": userData.companyOwnerId
-                    },
-                    isUpdateTask
-                })
-                .then((response) => {
-                    if (response.data.status) {
-                        resolve({status: true, statusText: "Task due date updated successfully"});
-                    } else {
-                        reject({status: false, error: response.data.error})
-                    }
-                })
-                .catch((error) => {
-                    reject({status: false, error: error})
-                })
-            } catch (error) {
-                reject({status: false, error: error})
-            }
-        })
+    updateDueDate({firebaseObj, project, task, obj,userData, commonDateFormatString,isUpdateTask, announce = false}) {
+        return instantEdit({
+            task,
+            fields: firebaseObj,
+            failure: announce ? "Toast.Due_date_not_updated" : "",
+            send: () => patchTask({
+                action: "updateDueDate",
+                commonDateFormatString,
+                timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+                firebaseObj,
+                project,
+                task,
+                obj,
+                userData: actorOf(userData),
+                isUpdateTask
+            }, "Task due date updated successfully")
+        });
     }
 
     /* -------------- UPDATE START DATE FUNCTION FOR TASK -----------------*/
@@ -103,10 +113,11 @@ class Task {
         return new Promise((resolve,reject) => {
             try {
                 const {sprintId,ProjectID} = task;
-                Store.commit('projectData/mutateUpdateFirebaseTasks', {snap:null, op: "modified", pid:ProjectID, sprintId, data: {...task,...firebaseObj},updatedFields:{...firebaseObj}});
+                showInViews(ProjectID, sprintId, {...task,...firebaseObj}, {...firebaseObj});
                 apiRequest("patch", env.V2_TASKS, {
                     action: "updateStartDate",
                     commonDateFormatString,
+                    timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone,
                     firebaseObj,
                     project,
                     task,
@@ -172,117 +183,69 @@ class Task {
         }
     }
 
-    updateStatus({ newStatus, prevStatus, projectData, task, userData , isUpdateTask = true}) {
-        return new Promise((resolve,reject) => {
-            try {
-                const {sprintId,ProjectID} = task;
-                this.warnIfBlocked({ task, newStatus });
-                Store.commit('projectData/mutateUpdateFirebaseTasks', {snap:null, op: "modified", pid:ProjectID, sprintId, data: {...task, ...newStatus},updatedFields:{...newStatus}});
-                apiRequest("patch", env.V2_TASKS, {
-                    action: "updateStatus",
-                    newStatus,
-                    prevStatus,
-                    projectData,
-                    task,
-                    isUpdateTask,
-                    userData: {
-                        "Employee_Name": userData.Employee_Name,
-                        "id": userData.id,
-                        "companyOwnerId": userData.companyOwnerId
-                    }
-                })
-                .then((response) => {
-                    if (response.data.status) {
-                        resolve({status: true, statusText: "Task status updated successfully"});
-                    } else {
-                        reject({status: false, error: response.data.error})
-                    }
-                })
-                .catch((error) => {
-                    reject({status: false, error: error})
-                })
-            } catch (error) {
-                reject({status: false, error: error})
-            }
-        })
+    updateStatus({ newStatus, prevStatus, projectData, task, userData , isUpdateTask = true, announce = false}) {
+        this.warnIfBlocked({ task, newStatus });
+        return instantEdit({
+            task,
+            fields: newStatus,
+            failure: announce ? "Toast.Status_not_updated" : "",
+            send: () => patchTask({
+                action: "updateStatus",
+                newStatus,
+                prevStatus,
+                projectData,
+                task,
+                isUpdateTask,
+                userData: actorOf(userData)
+            }, "Task status updated successfully")
+        });
     }
 
     /* -------------- UPDATE PRIORITY FUNCTION FOR TASK -----------------*/
 
-    updatePriority({ firebaseObj ,projectData ,taskData ,priorityObj, userData,isUpdateTask = true}) {
-        return new Promise((resolve,reject) => {
-            try {
-                const {sprintId,ProjectID} = taskData;
-                Store.commit('projectData/mutateUpdateFirebaseTasks', {snap:null, op: "modified", pid:ProjectID, sprintId, data: {...taskData, ...firebaseObj},updatedFields:{...firebaseObj}});
-                apiRequest("patch", env.V2_TASKS, {
-                    action: "updatePriority",
-                    firebaseObj,
-                    projectData,
-                    taskData,
-                    priorityObj,
-                    isUpdateTask,
-                    userData: {
-                        "Employee_Name": userData.Employee_Name,
-                        "id": userData.id,
-                        "companyOwnerId": userData.companyOwnerId
-                    }
-                })
-                .then((response) => {
-                    if (response.data.status) {
-                        resolve({status: true, statusText: "Task priority updated successfully"});
-                    } else {
-                        reject({status: false, error: response.data.error})
-                    }
-                })
-                .catch((error) => {
-                    reject({status: false, error: error})
-                })
-            } catch (error) {
-                reject({status: false, error: error})
-            }
-        })
+    /* `priorityObj` may be a promise: the icon links it carries are for the history entry, and the row does not wait for them. */
+    updatePriority({ firebaseObj ,projectData ,taskData ,priorityObj, userData,isUpdateTask = true, announce = false}) {
+        return instantEdit({
+            task: taskData,
+            fields: firebaseObj,
+            failure: announce ? "Toast.Priority_not_updated" : "",
+            send: () => Promise.resolve(priorityObj).then((history) => patchTask({
+                action: "updatePriority",
+                firebaseObj,
+                projectData,
+                taskData,
+                priorityObj: history,
+                isUpdateTask,
+                userData: actorOf(userData)
+            }, "Task priority updated successfully"), (error) => {
+                throw {status: false, error};
+            })
+        });
     }
 
     /* -------------- UPDATE TASK NAME FUNCTION -----------------*/
 
-    updateTaskName({ firebaseObj,projectData ,taskData ,obj, userData}) {
-        return new Promise((resolve,reject) => {
-            try {
-                const {sprintId,ProjectID} = taskData;
-                Store.commit('projectData/mutateUpdateFirebaseTasks', {snap:null, op: "modified", pid:ProjectID, sprintId, data: {...taskData, ...firebaseObj},updatedFields:{...firebaseObj}});
-                apiRequest("patch", env.V2_TASKS, {
-                    action: "updateTaskName",
-                    firebaseObj,
-                    projectData,
-                    taskData,
-                    obj,
-                    userData: {
-                        "Employee_Name": userData.Employee_Name,
-                        "id": userData.id,
-                        "companyOwnerId": userData.companyOwnerId
-                    }
-                })
-                .then((response) => {
-                    if (response.data.status) {
-                        resolve({status: true, statusText: "Task name updated successfully"});
-                    } else {
-                        reject({status: false, error: response.data.error})
-                    }
-                })
-                .catch((error) => {
-                    reject({status: false, error: error})
-                })
-            } catch (error) {
-                reject({status: false, error: error})
-            }
-        })
+    updateTaskName({ firebaseObj,projectData ,taskData ,obj, userData, announce = false}) {
+        return instantEdit({
+            task: taskData,
+            fields: firebaseObj,
+            failure: announce ? "Toast.something_went_wrong" : "",
+            send: () => patchTask({
+                action: "updateTaskName",
+                firebaseObj,
+                projectData,
+                taskData,
+                obj,
+                userData: actorOf(userData)
+            }, "Task name updated successfully")
+        });
     } 
 
       updateTotalEstimatedTime({ firebaseObj,projectData ,taskData ,obj, userData}) {
         return new Promise((resolve,reject) => {
             try {
                 const {sprintId,ProjectID} = taskData;
-                Store.commit('projectData/mutateUpdateFirebaseTasks', {snap:null, op: "modified", pid:ProjectID, sprintId, data: {...taskData, ...firebaseObj},updatedFields:{...firebaseObj}});
+                showInViews(ProjectID, sprintId, {...taskData, ...firebaseObj}, {...firebaseObj});
                 apiRequest("patch", env.V2_TASKS, {
                     action: "updateTaskTotalEstimate",
                     firebaseObj,
@@ -317,7 +280,7 @@ class Task {
         return new Promise((resolve,reject) => {
             try {
                 const {sprintId,ProjectID} = taskData;
-                Store.commit('projectData/mutateUpdateFirebaseTasks', {snap:null, op: "modified", pid:ProjectID, sprintId, data: {...taskData, ...firebaseObj},updatedFields:{...firebaseObj}});
+                showInViews(ProjectID, sprintId, {...taskData, ...firebaseObj}, {...firebaseObj});
                 apiRequest("patch", env.V2_TASKS, {
                     action: "updatePoints",
                     firebaseObj,
@@ -352,7 +315,7 @@ class Task {
             try {
                 const {sprintId,ProjectID} = taskData;
                 // Optimistic store update so the Gantt (and every other open view) moves immediately.
-                Store.commit('projectData/mutateUpdateFirebaseTasks', {snap:null, op: "modified", pid:ProjectID, sprintId, data: {...taskData, ...firebaseObj},updatedFields:{...firebaseObj}});
+                showInViews(ProjectID, sprintId, {...taskData, ...firebaseObj}, {...firebaseObj});
                 apiRequest("patch", env.V2_TASKS, {
                     action: "updateDates",
                     firebaseObj,
@@ -380,58 +343,50 @@ class Task {
         })
     }
 
+    /* rows: [{ task, startDate, DueDate }], written in one request; a failed write puts every task's old dates back. */
+    async updateDatesBatch({ rows, userData }) {
+        const commitDates = (task, dates) => Store.commit('projectData/mutateUpdateFirebaseTasks', {
+            snap: null, op: "modified", pid: task.ProjectID, sprintId: task.sprintId, data: { ...task, ...dates }, updatedFields: { ...dates },
+        });
+        const previous = rows.map(({ task }) => ({ startDate: task.startDate, DueDate: task.DueDate }));
+        rows.forEach(({ task, startDate, DueDate }) => commitDates(task, { startDate, DueDate }));
+        try {
+            const response = await apiRequest("post", env.V2_TASKS_BULK, {
+                action: "bulkUpdateDates",
+                dates: rows.map(({ task, startDate, DueDate }) => ({ taskId: task._id, startDate, DueDate })),
+                userData: { Employee_Name: userData.Employee_Name, id: userData.id, companyOwnerId: userData.companyOwnerId },
+            });
+            if (!response?.data?.status) throw new Error(response?.data?.statusText || "bulkUpdateDates failed");
+            return response.data.data;
+        } catch (error) {
+            rows.forEach(({ task }, at) => commitDates(task, previous[at]));
+            throw error;
+        }
+    }
+
     /* -------------- UPDATE ASSIGNEE ADD OR ASSIGNEE REMOVE FUNCTION FOR TASK -----------------*/
 
-    updateAssignee({ firebaseObj,projectData ,taskData,employeeName,type,userData,isUpdateTask = true}) {
-        return new Promise((resolve,reject) => {
-            try {
-                let assignee = taskData.AssigneeUserId;
-                const uid = firebaseObj.AssigneeUserId;
-                if(type === 'assigneeAdd'){
-                    assignee.push(uid);
-                    assignee = Array.from(new Set(assignee));
-                }else{
-                    assignee = assignee.filter((id) => id!== uid);
-                }
-
-                const {sprintId,ProjectID} = taskData;
-
-                Store.commit('projectData/mutateUpdateFirebaseTasks', { 
-                    snap: null,
-                    op: "modified",
-                    pid: ProjectID,
-                    sprintId,
-                    data: { ...taskData, AssigneeUserId: assignee }, updatedFields: { ...firebaseObj }
-                });
-
-                apiRequest("patch", env.V2_TASKS, {
-                    action: "updateAssignee",
-                    firebaseObj,
-                    projectData,
-                    taskData,
-                    employeeName,
-                    type,
-                    isUpdateTask,
-                    userData: {
-                        "Employee_Name": userData.Employee_Name,
-                        "id": userData.id,
-                        "companyOwnerId": userData.companyOwnerId
-                    }
-                })
-                .then((response) => {
-                    if (response.data.status) {
-                        resolve({status: true, statusText: "Task assignee updated successfully"});
-                    } else {
-                        reject({status: false, error: response.data.error})
-                    }
-                })
-                .catch((error) => {
-                    reject({status: false, error: error})
-                })
-            } catch (error) {
-                reject({status: false, error: error})
-            }
-        })
+    updateAssignee({ firebaseObj,projectData ,taskData,employeeName,type,userData,isUpdateTask = true, announce = false}) {
+        const uid = firebaseObj.AssigneeUserId;
+        const held = taskData.AssigneeUserId || [];
+        let assignee = held.filter((id) => id !== uid);
+        if(type === 'assigneeAdd') assignee = [...new Set([...held, uid])];
+        else if(type === 'replace') assignee = [].concat(uid || []);
+        return instantEdit({
+            task: taskData,
+            fields: { AssigneeUserId: assignee },
+            failure: announce ? "Toast.Assignee_not_updated" : "",
+            send: () => patchTask({
+                action: "updateAssignee",
+                firebaseObj,
+                projectData,
+                taskData,
+                employeeName,
+                type,
+                isUpdateTask,
+                userData: actorOf(userData)
+            }, "Task assignee updated successfully")
+        });
     }
 
     /* -------------- UPDATE TASK LEADER (CREATED BY) -----------------*/
@@ -447,15 +402,7 @@ class Task {
 
                 const { sprintId, ProjectID } = taskData;
 
-                // Optimistic UI: mirror what updateAssignee does for AssigneeUserId
-                Store.commit('projectData/mutateUpdateFirebaseTasks', {
-                    snap: null,
-                    op: "modified",
-                    pid: ProjectID,
-                    sprintId,
-                    data: { ...taskData, Task_Leader: newLeaderId },
-                    updatedFields: { ...firebaseObj }
-                });
+                showInViews(ProjectID, sprintId, { ...taskData, Task_Leader: newLeaderId }, { ...firebaseObj });
 
                 apiRequest("patch", env.V2_TASKS, {
                     action: "updateTaskLeader",
@@ -490,15 +437,9 @@ class Task {
     updateWatcher({companyId, projectId, sprintId, taskId, userId, add,userData,employeeName, watchers: watchersArr}) {
         return new Promise((resolve,reject) => {
             try {
-                let watchers = watchersArr;
-                if(add){
-                    watchers.push(userId);
-                    watchers = Array.from(new Set(watchers));
-                }else{
-                    watchers = watchers.filter((id) => id!== userId);
-                }
-                
-                Store.commit('projectData/mutateUpdateFirebaseTasks', {snap:null, op: "modified", pid:projectId, sprintId, data: {_id: taskId, watchers: watchers},updatedFields:{watchers}});
+                const held = watchersArr || [];
+                const watchers = add ? Array.from(new Set([...held, userId])) : held.filter((id) => id !== userId);
+                showInViews(projectId, sprintId, {_id: taskId, watchers}, {watchers});
                 apiRequest("patch", env.V2_TASKS, {action: "updateWatcher", companyId, projectId, sprintId, taskId, userId, add,userData,employeeName})
                 .then((response) => {
                     if (response.data.status) {
@@ -528,7 +469,7 @@ class Task {
                 }else{
                     tags = tags.filter((id) => id!== tagId);
                 }
-                Store.commit('projectData/mutateUpdateFirebaseTasks', {snap:null, op: "modified", pid:projectId, sprintId, data: {_id: taskId, tagsArray: tags},updatedFields:{tagsArray: tags}});
+                showInViews(projectId, sprintId, {_id: taskId, tagsArray: tags}, {tagsArray: tags});
                 apiRequest("patch", env.V2_TASKS, {action: "updateTags", companyId, projectId, sprintId, taskId, tagId, operation})
                 .then((response) => {
                     if (response.data.status) {
@@ -546,23 +487,16 @@ class Task {
         })
     }
 
-    /* -------------- UPDATE CHECKLISTS -----------------*/
-    // This function handles all MongoDB update queries
+    /* `localUpdateArray` is the checklist as it will be once saved; without it nothing is shown before the answer. */
     updateChecklistsv2({data, projectId,taskId,historyObj,sprintId,companyId,ops,taskData,localUpdateArray}){
-        return new Promise((resolve, reject) => {
-            Store.commit('projectData/mutateUpdateFirebaseTasks', {snap:null, op: "modified", pid:projectId, sprintId, data: {_id: taskId, checklistArray: localUpdateArray},updatedFields:{checklistArray: localUpdateArray}});
-            apiRequest("patch", env.V2_TASKS, {action: "updateChecklists", companyId, projectId, sprintId, taskId, data, operation:ops,historyObj,taskData})
-            .then((response) => {
-                if (response.data.status) {
-                    resolve({status: true, statusText: "Checklist updated successfully"});
-                } else {
-                    reject({status: false, error: response.data.error})
-                }
-            })
-            .catch((error) => {
-                reject({status: false, error: error})
-            })
-        })
+        const send = () => patchTask({action: "updateChecklists", companyId, projectId, sprintId, taskId, data, operation:ops,historyObj,taskData}, "Checklist updated successfully");
+        if (!Array.isArray(localUpdateArray)) return send();
+        return instantEdit({
+            task: {...taskData, _id: taskId, ProjectID: projectId, sprintId},
+            fields: {checklistArray: localUpdateArray},
+            failure: "Toast.Checklist_not_saved",
+            send
+        });
     }
 
     /* -------------- UPDATE ATTACHMENTS -----------------*/
@@ -581,7 +515,7 @@ class Task {
                 }
                 
                 const {ProjectID} = taskData;
-                Store.commit('projectData/mutateUpdateFirebaseTasks', {snap:null, op: "modified", pid:ProjectID, sprintId, data: {...taskData, attachments},updatedFields:{attachments}});
+                showInViews(ProjectID, sprintId, {...taskData, attachments}, {attachments});
                 apiRequest("patch", env.V2_TASKS, {action: "updateAttachments", companyId, sprintId, taskId, taskData, id, operation, data, userData,projectData})
                 .then((response) => {
                     if (response.data.status) {
@@ -606,6 +540,7 @@ class Task {
                 apiRequest("patch", env.V2_TASKS, {action: "updateDescription", companyId, projectData, sprintId, task, userData, text})
                 .then((response) => {
                     if (response.data.status) {
+                        if (task._id && text?.blocks) tellViews(task._id, {descriptionBlock: text.blocks, rawDescription: text.text});
                         resolve({status: true, statusText: "Task description updated successfully"});
                     } else {
                         reject({status: false, error: response.data.error})
@@ -687,7 +622,7 @@ class Task {
     convertToSubTask({companyId, projectData, sprintId, selectedTaskId,taskId,oldProject,isSubTask,userData}) {
         return new Promise((resolve,reject) => {
             try {
-                apiRequest("patch", "/api/v2/tasks", {action: "convertToSubTask", companyId, projectData, sprintId, selectedTaskId,taskId,oldProject,isSubTask,userData})
+                leaving(selectedTaskId, {action: "convertToSubTask", companyId, projectData, sprintId, selectedTaskId,taskId,oldProject,isSubTask,userData})
                 .then((response) => {
                     if (response.data.status) {
                         resolve({status: true, statusText: "converted",data:response.data.data});
@@ -707,7 +642,7 @@ class Task {
     moveTask({companyId, projectData, sprintObj, moveTaskId,oldSprintObj,oldProject,isSubTask,assignee,watcher,userData}) {
         return new Promise((resolve,reject) => {
             try {
-                apiRequest("patch", "/api/v2/tasks", {action: "moveTask", companyId, projectData, sprintObj, moveTaskId, oldSprintObj,oldProject,isSubTask,assignee,watcher,userData})
+                leaving(moveTaskId, {action: "moveTask", companyId, projectData, sprintObj, moveTaskId, oldSprintObj,oldProject,isSubTask,assignee,watcher,userData})
                 .then((response) => {
                     if (response.data.status) {
                         resolve({status: true, statusText: "moved",data:response.data.data});
@@ -727,7 +662,7 @@ class Task {
     convertToList({companyId, projectData, taskId, userData, folderData, sprintObj,isSubTask}) {
         return new Promise((resolve,reject) => {
             try {
-                apiRequest("patch", "/api/v2/tasks", {action: "convertToList", companyId, projectData, taskId, userData, folderData, sprintObj,isSubTask})
+                leaving(taskId, {action: "convertToList", companyId, projectData, taskId, userData, folderData, sprintObj,isSubTask})
                 .then((response) => {
                     if (response.data.status) {
                         Store.commit('projectData/mutateSprints', {op: "added", data: response.data.data});
@@ -832,7 +767,7 @@ class Task {
     convertToTask({companyId, projectData, taskId, sprintObj,parentTaskId,oldSprintObj,oldProject}) {
         return new Promise((resolve,reject) => {
             try {
-                apiRequest("patch", "/api/v2/tasks", {action: "convertToTask", companyId, projectData, taskId, sprintObj,parentTaskId,oldSprintObj,oldProject})
+                leaving(taskId, {action: "convertToTask", companyId, projectData, taskId, sprintObj,parentTaskId,oldSprintObj,oldProject})
                 .then((response) => {
                     if (response.data.status) {
                         resolve({status: true, statusText: "convertToTask"});
@@ -935,7 +870,7 @@ class Task {
         return new Promise((resolve, reject) => {
             try {
                 const {sprintId,ProjectID} = taskData;
-                Store.commit('projectData/mutateUpdateFirebaseTasks', {snap:null, op: "modified", pid:ProjectID, sprintId, data: {...taskData, ...firebaseObj},updatedFields:{...firebaseObj}});
+                showInViews(ProjectID, sprintId, {...taskData, ...firebaseObj}, {...firebaseObj});
                 apiRequest("patch", env.V2_TASKS, {
                     action: "updateTaskType",
                     newStatus:firebaseObj,

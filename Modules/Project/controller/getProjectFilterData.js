@@ -3,6 +3,12 @@ const { MongoDbCrudOpration } = require("../../../utils/mongo-handler/mongoQueri
 const { fetchRules } = require("../../settings/securityPermissions/controller");
 const mongoose = require("mongoose")
 const { escapeRegex } = require("../../../utils/escapeRegex");
+const { ACTIVE_SEAT } = require("../../../Config/seatStatus");
+const { isPrivileged } = require("../../../Config/roleTypes");
+const { arrangeRules, rolePermission, PRIVATE_PROJECTS, seesEveryPrivateProject } = require("../../../Config/rulePermissions");
+const { ownOrNotPersonal, othersPersonalListIds } = require("../../PersonalList/ownership");
+const { visibleProjectIds } = require("../../Agents/scope");
+const { sprintIdentities, visibleSprintClause } = require("../../Sprints/helpers/sprintVisibility");
 
 exports.projectFilter = async (req, res) => {
     try {
@@ -17,28 +23,32 @@ exports.projectFilter = async (req, res) => {
             return res.status(404).json({ message: "Type is not found" });
         }
 
-        const response = await fetchRules(companyId);
-
-        const [teams, companyUsers] = await Promise.all([
+        const [teams, seat] = await Promise.all([
             getTeamData(uid, companyId),
-            getCompanyUser(uid, companyId)
+            getActiveSeat(uid, companyId)
         ]);
+        if (!seat) {
+            return res.status(200).json([]);
+        }
 
         const teamIds = teams.map((team) => 'tId_' + team._id);
-        const roleType = companyUsers?.roleType;
-        const isNonAdmin = roleType !== 1 && roleType !== 2;
+        const { roleType } = seat;
 
-        const rule = response && response.length ? response?.find((x) => x?.key === 'public_projects') : {};
-        const showAllProjects = rule?.roles?.find((role) => role.key === roleType)?.permission === true;
+        // The same rule as decideProjectAccess in Config/projectAccess.js, so the search never names a project the caller cannot open.
+        const everyPrivateProject = isPrivileged(roleType)
+            || seesEveryPrivateProject(rolePermission(arrangeRules(await fetchRules(companyId)), roleType, PRIVATE_PROJECTS));
 
-        const privateQuery = preparePrivateQuery(uid, teamIds, isNonAdmin);
-        const publicQuery = preparePublicQuery(uid, teamIds, isNonAdmin, showAllProjects);
+        const privateQuery = preparePrivateQuery(uid, teamIds, everyPrivateProject);
+        const publicQuery = preparePublicQuery(uid);
+
+        const joinsSprints = ['sprint', 'folder', 'projectFilter_folder', 'projectFilter_sprint'].includes(req.body.type);
+        const visibleSprints = joinsSprints && !isPrivileged(roleType) ? [{ $match: visibleSprintClause(await sprintIdentities(companyId, uid)) }] : [];
 
         let projectQuery;
         if (req.body.type === 'sprint') {
-            projectQuery = buildSprintQuery(req, privateQuery, publicQuery);
+            projectQuery = buildSprintQuery(req, privateQuery, publicQuery, visibleSprints);
         } else if (req.body.type === 'folder') {
-            projectQuery = buildFolderQuery(req, privateQuery, publicQuery);
+            projectQuery = buildFolderQuery(req, privateQuery, publicQuery, visibleSprints);
         } else if (req.body.type === 'projectName') {
             projectQuery = buildProjectNameQuery(req, privateQuery, publicQuery);
         } else if (req.body.type === 'projectFilter') {
@@ -46,11 +56,11 @@ exports.projectFilter = async (req, res) => {
         } else if (req.body.type === 'projectFilter_projectName') {
             projectQuery = buildProjectFilterProjectNameQuery(req, privateQuery, publicQuery,uid);
         } else if (req.body.type === 'projectFilter_folder') {
-            projectQuery = buildProjectFilterFolderQuery(req, privateQuery,publicQuery,uid);   
+            projectQuery = buildProjectFilterFolderQuery(req, privateQuery, publicQuery, uid, visibleSprints);
         } else if (req.body.type === 'projectFilter_sprint') {
-            projectQuery = buildProjectFilterSprintQuery(req, privateQuery, publicQuery,uid);
+            projectQuery = buildProjectFilterSprintQuery(req, privateQuery, publicQuery, uid, visibleSprints);
         } else if (req.body.type === 'showArchiveOnly') {
-            projectQuery = buildArchivedProjectQuery();
+            projectQuery = buildArchivedProjectQuery(await archiveScope(companyId, uid, roleType));
         }
         if (req.body.skip) projectQuery.push({ $skip: Number(req.body.skip) });
         if (req.body.limit) projectQuery.push({ $limit: Number(req.body.limit) });
@@ -77,41 +87,56 @@ const getTeamData = async (uid, companyId) => {
     return await MongoDbCrudOpration(companyId, teamObj, 'find');
 };
 
-const getCompanyUser = async (uid, companyId) => {
+const getActiveSeat = async (uid, companyId) => {
     const companyObj = {
         type: SCHEMA_TYPE.COMPANY_USERS,
         data: [
-            { userId: uid },
+            { userId: uid, ...ACTIVE_SEAT },
             { roleType: 1, _id: 0 }
         ]
     };
     return await MongoDbCrudOpration(companyId, companyObj, 'findOne');
 };
 
-const preparePrivateQuery = (uid, teamIds, isNonAdmin) => ({
+const preparePrivateQuery = (uid, teamIds, everyPrivateProject) => ({
     isPrivateSpace: true,
     deletedStatusKey: { $in: [0,undefined] },
     statusType: {$nin: ['close']},
-    ...(isNonAdmin && { AssigneeUserId: { $in: [uid, ...teamIds] } })
+    ...ownOrNotPersonal(uid),
+    ...(everyPrivateProject ? {} : { AssigneeUserId: { $in: [uid, ...teamIds] } })
 });
 
-const preparePublicQuery = (uid, teamIds, isNonAdmin, showAllProjects) => ({
+// Public means visible to every member: the public_projects permission does not narrow it.
+const preparePublicQuery = (uid) => ({
     isPrivateSpace: false,
     deletedStatusKey: { $in: [0,undefined] },
     statusType: {$nin: ['close']},
-    ...(isNonAdmin && !showAllProjects && { AssigneeUserId: { $in: [uid, ...teamIds] } })
+    ...ownOrNotPersonal(uid)
 });
 
-const buildProjection = (fields, additionalField) => {
-    const projection = {};
-    if (fields) {
-        fields.split(',').forEach((field) => {
-            projection[field] = 1;
-        });
+const toObjectIds = (ids) => ids.map((id) => new mongoose.Types.ObjectId(String(id)));
+
+/* Archived sprints and folders are listed across projects, so the scope is the projects the caller
+ * can open. Owners and admins keep every project, trashed ones included, short of someone else's
+ * personal list, and read past sprint privacy. */
+const archiveScope = async (companyId, uid, roleType) => {
+    if (isPrivileged(roleType)) {
+        const personalLists = toObjectIds(await othersPersonalListIds(companyId, uid));
+        const projects = personalLists.length ? { projectId: { $nin: personalLists } } : {};
+        return { sprints: projects, folders: projects };
     }
-    projection[additionalField] = 1;
-    return projection;
+    const projects = { projectId: { $in: toObjectIds(await visibleProjectIds(companyId, uid)) } };
+    return { sprints: { ...projects, ...visibleSprintClause(await sprintIdentities(companyId, uid)) }, folders: projects };
 };
+
+/* The projection a search takes from its caller: the fields the web app asks a search for. Mongo adds _id by itself. */
+const SEARCH_FIELDS = Object.freeze(['_id', 'ProjectName']);
+
+const buildProjection = (fields) => Object.fromEntries(String(typeof fields === 'string' ? fields : '').split(',')
+    .map((field) => field.trim())
+    .filter((field) => SEARCH_FIELDS.includes(field))
+    .concat('_id')
+    .map((field) => [field, 1]));
 
 const finalFilterQery = (query) =>{
     if (query[Object.keys(query)[0]].length) {      
@@ -156,7 +181,7 @@ const showArchivedQuery = (showArchived) => {
     }
 }
 
-const buildSprintQuery = (req, privateQuery, publicQuery) => [
+const buildSprintQuery = (req, privateQuery, publicQuery, visibleSprints) => [
     { $match: { $or: [privateQuery, publicQuery] } },
     {
         "$lookup": {
@@ -185,7 +210,8 @@ const buildSprintQuery = (req, privateQuery, publicQuery) => [
                     "$match": {
                         ...showArchivedQuery(req.body.showArchived)
                     }
-                }
+                },
+                ...visibleSprints
             ],
             "as": "sprintData"
         }
@@ -246,7 +272,7 @@ const buildSprintQuery = (req, privateQuery, publicQuery) => [
 ];
 
 
-const buildFolderQuery = (req, privateQuery, publicQuery) => [
+const buildFolderQuery = (req, privateQuery, publicQuery, visibleSprints) => [
     { $match: { $or: [privateQuery, publicQuery] } },
     {
         "$lookup": {
@@ -289,7 +315,8 @@ const buildFolderQuery = (req, privateQuery, publicQuery) => [
                             ]
                         }
                     }
-                }
+                },
+                ...visibleSprints
             ]
         }
     },
@@ -450,13 +477,7 @@ const buildProjectFilterQuery = (req, privateQuery, publicQuery,userId) => {
             
         }
     }
-    if (req.body.fields) {
-        qry.push({
-            "$project": {
-                ...buildProjection(req.body.fields),
-            }
-        })
-    }
+    qry.push({ "$project": buildProjection(req.body.fields) });
     return qry
 }
 
@@ -574,18 +595,12 @@ const buildProjectFilterProjectNameQuery = (req, privateQuery, publicQuery,userI
             
         }
     }
-    if (req.body.fields) {
-        qry.push({
-            "$project": {
-                ...buildProjection(req.body.fields),
-            }
-        })
-    }
+    qry.push({ "$project": buildProjection(req.body.fields) });
     return qry
 }
 
 
-const buildProjectFilterFolderQuery = (req, privateQuery, publicQuery,userId) => {
+const buildProjectFilterFolderQuery = (req, privateQuery, publicQuery, userId, visibleSprints) => {
     if (req.body.query[Object.keys(req.body.query)[0]].length) {
         let isClose = false;
         req.body.query[Object.keys(req.body.query)[0]].forEach((ele)=>{
@@ -652,7 +667,8 @@ const buildProjectFilterFolderQuery = (req, privateQuery, publicQuery,userId) =>
                                 ]
                             }
                         }
-                    }
+                    },
+                    ...visibleSprints
                 ]
             }
         },
@@ -753,19 +769,17 @@ const buildProjectFilterFolderQuery = (req, privateQuery, publicQuery,userId) =>
             
         }
     }
-    // if (req.body.fields) {
-        qry.push({
+    qry.push({
             "$project": {
                 ...buildProjection(req.body.fields),
                 "folders": { "$arrayElemAt": ["$folders", 0] },
                 "sprints": { "$arrayElemAt": ["$sprints", 0] }
             }
-        })
-    // }
+    })
     return qry
 }
 
-const buildProjectFilterSprintQuery = (req, privateQuery, publicQuery,userId) => {
+const buildProjectFilterSprintQuery = (req, privateQuery, publicQuery, userId, visibleSprints) => {
     if (req.body.query[Object.keys(req.body.query)[0]].length) {
         let isClose = false;
         req.body.query[Object.keys(req.body.query)[0]].forEach((ele)=>{
@@ -818,7 +832,8 @@ const buildProjectFilterSprintQuery = (req, privateQuery, publicQuery,userId) =>
                         "$match": {
                             ...showArchivedQuery(req.body.showArchived)
                         }
-                    }
+                    },
+                    ...visibleSprints
                 ],
                 "as": "sprintData"
             }
@@ -953,8 +968,7 @@ const buildProjectFilterSprintQuery = (req, privateQuery, publicQuery,userId) =>
             
         }
     }
-    // if (req.body.fields) {
-        qry.push({
+    qry.push({
             "$project": {
                 ...buildProjection(req.body.fields),
                 "sprints": 1,
@@ -966,21 +980,18 @@ const buildProjectFilterSprintQuery = (req, privateQuery, publicQuery,userId) =>
                     }
                 }
             }
-        })
-    // }
+    })
     return qry
 }
 
-const buildArchivedProjectQuery = () => {
+const buildArchivedProjectQuery = (scope) => {
     let qry = [
         {
             $match: {
-                $expr: {
-                    $or: [
-                        { $eq: ["$deletedStatusKey", 2] },
-                        { $gt: ["$archiveTaskCount", 1] }
-                    ]
-                }
+                $and: [
+                    scope.sprints,
+                    { $or: [{ deletedStatusKey: 2 }, { archiveTaskCount: { $gt: 1 } }] }
+                ]
             }
         },
         {
@@ -991,20 +1002,19 @@ const buildArchivedProjectQuery = () => {
                 as: "folderData"
             }
         },
-        // Add source identifier for "sprint" documents
         {
             $addFields: {
                 source: "matchedDocuments"
             }
         },
-        // Use $unionWith to include "folders" collection
         {
             $unionWith: {
-                coll: "folders", // The collection to union with
+                coll: "folders",
                 pipeline: [
                     {
                         $match: {
-                            deletedStatusKey: 2 
+                            ...scope.folders,
+                            deletedStatusKey: 2
                         }
                     },
                     {
@@ -1033,14 +1043,12 @@ const buildArchivedProjectQuery = () => {
 
 exports.getRemainingProject = async (req, res) => {
     try {
-        const { dataIds } = req.body;
+        const { dataIds } = req.body || {};
 
-        // if (!dataIds || dataIds.length === 0) {
-        //     return res.status(400).json({
-        //         status: false,
-        //         message: `'dataIds' parameter is required`
-        //     })
-        // }
+        if (!Array.isArray(dataIds) || !dataIds.length || !dataIds.every((id) => /^[a-f0-9]{24}$/i.test(String(id)))) {
+            const statusText = "'dataIds' must be a non-empty list of project ids.";
+            return res.status(400).json({ status: false, statusText, message: statusText, field: 'dataIds' });
+        }
 
         const convertIds = dataIds.map(x => new mongoose.Types.ObjectId(x))
         const query = {
@@ -1057,9 +1065,7 @@ exports.getRemainingProject = async (req, res) => {
         return res.status(200).json({ status: true, data: response || [] });
 
     } catch (error) {
-        return res.status(500).json({
-            message: "An error occurred while get the remaining projects",
-            error: error 
-        });
+        const statusText = "An error occurred while get the remaining projects";
+        return res.status(500).json({ status: false, statusText, message: statusText });
     }
 }

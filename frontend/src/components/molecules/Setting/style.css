@@ -1,5 +1,5 @@
-* {
-    -webkit-box-sizing: border-box;
+/* :where() keeps this at the weight the bare * had, so no class rule loses to it; it used to reach every screen once this file had loaded. */
+:where(.main-setting_wrapper), :where(.main-setting_wrapper) * {
     box-sizing: border-box;
     outline: none;
     text-transform: none;
@@ -7,7 +7,8 @@
 }
 
 .mySettingSection {
-    background: #FFFFFF;
+    background: var(--surface);
+    color: var(--ink);
     -webkit-box-shadow: 0px 2px 12px rgb(0 0 0 / 15%);
     box-shadow: 0px 2px 12px rgb(0 0 0 / 15%);
     border-radius: 5px;
@@ -55,21 +56,21 @@
     background-size: cover;
     background-position: center center;
     border-radius: 15px;
-    border: 2px solid #102a83;
+    border: 2px solid var(--brand);
 }
 .settingProfileWrapper .noimg-uploadImage {
     width: 121px;
     height: 121px;
     display: inline-block;
-    background-color: #2f3990;
-    color: #fff;
+    background-color: var(--brand);
+    color: var(--on-brand);
     border-radius: 50%;
     display: flex;
     align-items: center;
     justify-content: center;
-    border-color: #2F3990;
+    border-color: var(--brand);
     font-size: 50px;
-    border: 2px solid #102a83;
+    border: 2px solid var(--brand);
 }
 .settingProfileWrapper {
     max-width: 121px;
@@ -118,7 +119,7 @@
 }
 
 .teaminput-sidebar .dropdown {
-    border: 1px solid #E0E0E0;
+    border: 1px solid var(--border);
     height: 30px;
     display: flex;
     flex-direction: column;
@@ -147,13 +148,13 @@ form .inputFieldDiv .con-select.selectExample {
     align-items: center;
     display: flex;
     width: 270px;
-    border: 1px solid #DFE1E6;
-    font-family: 'Roboto';
+    border: 1px solid var(--border);
+    font-family: var(--font-ui);
     font-style: normal;
     font-weight: 400;
     font-size: 13px;
     line-height: 19px;
-    color: #818181;
+    color: var(--ink-2);
     max-width: 465px;
     padding: 0px 10px;
     border-radius: 6px;
@@ -176,16 +177,16 @@ form .inputFieldDiv .con-select.selectExample .input-select-con {
 }
 
 .settingProfileFormSubmission.settingProfileFormSubmission_info label {
-    font-family: 'Roboto';
+    font-family: var(--font-ui);
     font-style: normal;
     font-weight: 500;
     font-size: 14px;
     line-height: 21px;
-    color: #000000;
+    color: var(--ink);
 }
 
 .main-setting_wrapper .invalid-feedback {
-    color: #ff0000;
+    color: var(--danger);
     font-size: 11px;
     position: absolute;
     top: 30px;
@@ -199,13 +200,13 @@ input.form-control {
 
 .inputFieldDiv input {
     height: 30px;
-    border: 1px solid #DFE1E6;
-    font-family: 'Roboto';
+    border: 1px solid var(--border);
+    font-family: var(--font-ui);
     font-style: normal;
     font-weight: 400;
     font-size: 13px;
     line-height: 19px;
-    color: #818181;
+    color: var(--ink-2);
     max-width: 465px;
     width: 100%;
     padding: 4px 10px;
@@ -214,11 +215,11 @@ input.form-control {
 
 .blue_btn {
     font-size: 16px;
-    background: #2f3990 !important;
+    background: var(--brand) !important;
     padding: 7px 10px;
     border-radius: 4px;
     border: 0;
-    color: #fff;
+    color: var(--on-brand);
     cursor: pointer;
     min-height: 30px;
 }
@@ -231,7 +232,7 @@ input.form-control {
 .setting-section-right:has(.mySettingSection) {
     /* padding: 20px 10px 0px 10px; */
     /* height: calc(99vh - 90px); */
-    background: #f4f5f7;
+    background: var(--canvas);
 }
 
 .task_priority_wrapper {
@@ -245,14 +246,13 @@ input.form-control {
 }
 
 h2.task_priority_wrapper_value {
-    font-family: 'Roboto',sans-serif;
+    font-family: var(--font-ui);
     font-size: 18px;
     font-weight: 500;
     line-height: 27px;
     letter-spacing: 0px;
     text-align: left;
-    /* padding-bottom: 10px; */
-    color: #000;
+    color: inherit;
     margin: 30px 0px 10px;
 }
 
@@ -327,7 +327,7 @@ h2.task_priority_wrapper_value {
     position: relative;
     padding: 0.4rem;
     border-radius: 5px;
-    border: 1px solid #DFE1E6;
+    border: 1px solid var(--border);
     -webkit-box-sizing: border-box;
     box-sizing: border-box;
     -webkit-box-shadow: 0 0 0 0 rgba(0, 0, 0, .15);
@@ -356,7 +356,7 @@ h2.task_priority_wrapper_value {
     box-sizing: border-box;
     overflow: hidden;
     font-size: .85rem;
-    color: rgba(0, 0, 0, .4);
+    color: var(--ink-2);
     white-space: nowrap;
     cursor: text;
     -webkit-user-select: none;
@@ -368,7 +368,7 @@ h2.task_priority_wrapper_value {
 }
 
 .img_uploadpriority_wrapper .from-group label {
-    border: 1px solid #dfe1e6;
+    border: 1px solid var(--border);
     /* padding: 4px 14px; */
     border-radius: 4px;
     position: absolute;
@@ -376,7 +376,7 @@ h2.task_priority_wrapper_value {
     /* width: 79px; */
     top: 0;
     font-size: 16px;
-    font-family: 'Roboto';
+    font-family: var(--font-ui);
     font-style: normal;
     font-weight: 400;
 }
@@ -386,8 +386,8 @@ h2.task_priority_wrapper_value {
     object-fit: scale-down;
 }
 .img_uploadpriority_wrapper .Upload_img_span{
-    color: #818181;
-    font-family: Roboto;
+    color: var(--ink-2);
+    font-family: var(--font-ui);
     font-size: 12px;
     font-style: normal;
     font-weight: 400;
@@ -400,14 +400,14 @@ h2.task_priority_wrapper_value {
 .white_btn.vs-button-primary.vs-button-filled,
 .white_btn {
     font-size: 16px;
-    background: #fff !important;
+    background: var(--surface) !important;
     padding: 4px 10px;
     border-radius: 4px;
-    color: #2f3990;
-    border: 1px solid #2f3990;
+    color: var(--brand);
+    border: 1px solid var(--brand);
     margin-left: 15px;
     cursor: pointer;
-    font-family: 'Roboto';
+    font-family: var(--font-ui);
     min-height: 30px;
     /* width: 77px; */
 }
@@ -424,7 +424,7 @@ h2.task_priority_wrapper_value {
     margin-right: 20px;
     padding-right: 10px;
     float: left;
-    background: #ECEEF1;
+    background: var(--fill);
     border-radius: 20px;
     display: flex;
     -webkit-box-align: center;
@@ -436,7 +436,7 @@ h2.task_priority_wrapper_value {
     justify-content: center;
     margin-bottom: 3px;
     min-height: 26px;
-    color: rgba(0, 0, 0, .7);
+    color: var(--ink-label);
     position: relative;
     /* min-width:63px; */
 }
@@ -466,14 +466,14 @@ h2.task_priority_wrapper_value {
 }
 
 span.font_family_status {
-    font-family: 'Roboto';
+    font-family: var(--font-ui);
     font-size: 13px;
     font-weight: 400;
     line-height: 19px;
     letter-spacing: 0px;
     text-align: left;
     margin: 0px 0px 0px 5px;
-    color: #818181;
+    color: var(--ink-2);
 }
 
 .addExtentionWrapper {
@@ -487,13 +487,13 @@ span.font_family_status {
 
 /* milestone status */
 h3.date_milestone {
-    font-family: 'Roboto',sans-serif;
+    font-family: var(--font-ui);
     font-size: 14px;
     font-weight: 500;
     line-height: 21px;
     letter-spacing: 0px;
     text-align: left;
-    color:#000;
+    color:var(--ink);
     margin-bottom: 10px;
     margin-top: 0;
 }
@@ -556,12 +556,12 @@ h3.date_milestone {
 .form-group-milestone label {
     position: relative;
     cursor: pointer;
-    font-family: 'Roboto';
+    font-family: var(--font-ui);
     font-style: normal;
     font-weight: 400;
     font-size: 14px;
     line-height: 22px;
-    color: #3B3B3B;
+    color: var(--ink);
     vertical-align: middle;
     display: -webkit-box;
     display: -ms-flexbox;
@@ -578,28 +578,28 @@ h3.date_milestone {
     vertical-align: text-top;
     width: 14px;
     height: 14px;
-    border: 1px solid #2F3990;
+    border: 1px solid var(--brand);
     border-radius: 2px;
 }
 .form-group-milestone input:checked+label:before{
-    background: #2F3990;
+    background: var(--brand);
 }
 .form-group-milestone input:checked+label:after {
     content: "";
     position: absolute;
     left: 3px;
     top: 10px;
-    background: white;
+    background: var(--on-brand);
     width: 2px;
     height: 2px;
-    box-shadow: 2px 0 0 white, 4px 0 0 white, 4px -2px 0 white, 4px -4px 0 white, 4px -6px 0 white, 4px -8px 0 white;
+    box-shadow: 2px 0 0 var(--on-brand), 4px 0 0 var(--on-brand), 4px -2px 0 var(--on-brand), 4px -4px 0 var(--on-brand), 4px -6px 0 var(--on-brand), 4px -8px 0 var(--on-brand);
     transform: rotate(45deg);
 }
 
 .milestone-table-overflow {
     width: 100%;
     border-radius: 4px !important;
-    border: 1px solid #CFCFCF;
+    border: 1px solid var(--border);
     border-bottom: 0px;
 }
 
@@ -614,18 +614,18 @@ h3.date_milestone {
 }
 
 .milestone_wrapper_table thead {
-    background-color: #DFE1E6;
+    background-color: var(--fill);
 }
 
 .milestone_wrapper_table th {
-    font-family: 'Roboto';
+    font-family: var(--font-ui);
     font-size: 16px;
     font-weight: 500;
     letter-spacing: 0px;
     text-align: left;
     padding: 12.5px 10px;
     border: 0;
-    color: #000;
+    color: var(--ink);
 }
 
 .milestone_wrapper_table tbody {
@@ -633,14 +633,14 @@ h3.date_milestone {
 }
 
 .milestone_wrapper_table td {
-    font-family: 'Roboto';
+    font-family: var(--font-ui);
     font-size: 16px;
     font-weight: 400;
     letter-spacing: 0px;
     text-align: left;
-    border-bottom: 1px solid #CFCFCF;
+    border-bottom: 1px solid var(--border);
     padding: 10px 10px !important;
-    color: #535358;
+    color: var(--ink-2);
 }
 .color_box_main{
    width: 200px;
@@ -666,7 +666,7 @@ h3.date_milestone {
 .dropDelete {
     margin-left: 10px;
     position: relative !important;
-    color: rgba(255, 0, 0, 1);
+    color: var(--danger);
 
 }
 
@@ -689,13 +689,13 @@ h3.date_milestone {
 
 .addExtentionWrapper::-webkit-scrollbar {
     width: 10px;
-    background-color: #F5F5F5;
+    background-color: var(--canvas);
 }
 
 .addExtentionWrapper::-webkit-scrollbar-track {
     -webkit-box-shadow: inset 0 0 6px rgba(0, 0, 0, 0.3);
     border-radius: 10px;
-    background-color: #F5F5F5;
+    background-color: var(--canvas);
 }
 
 .wrapper_milestone{
@@ -1003,7 +1003,7 @@ max-width: 100%;
     justify-content: space-between;
     gap: 20px;
     padding: 16px 0 4px;
-    border-top: 1px solid #eef0f5;
+    border-top: 1px solid var(--hairline);
 }
 /* The switch sits on the label's line, not centred against the whole block — with a
    two-line description, centring leaves it floating between the two. */
@@ -1026,11 +1026,34 @@ max-width: 100%;
     margin: 0 0 3px;
     font-size: 14px;
     font-weight: 500;
-    color: #2a2c39;
+    color: var(--ink);
 }
 .company__setting-toggle-copy p {
     margin: 0;
     font-size: 12px;
     line-height: 1.5;
-    color: #8b90a3;
+    color: var(--ink-2);
 }
+
+/* The card rules above keep their light-mode literals; dark mode repaints them from the tokens. */
+:root[data-theme="dark"] .mySettingSection { box-shadow: 0 0 0 1px var(--hairline); }
+:root[data-theme="dark"] .mySettingSection :is(.form-control, .vs-input--input, select, textarea) {
+    background-color: var(--surface-2);
+    border-color: var(--ink-3);
+    color: var(--ink) !important;
+}
+:root[data-theme="dark"] .mySettingSection :is(input, textarea)::placeholder { color: var(--ink-2); }
+:root[data-theme="dark"] .mySettingSection :is(.dropdown, .img_uploadpriority_wrapper .from-group label, .milestone-table-overflow, .milestone_wrapper_table td) { border-color: var(--ink-3); }
+:root[data-theme="dark"] .mySettingSection :is(label, .black, h3.date_milestone, .milestone_wrapper_table th, .company__setting-toggle-copy label) { color: var(--ink); }
+:root[data-theme="dark"] .mySettingSection :is(.vs-input--placeholder, span.font_family_status, .milestone_wrapper_table td, .Upload_img_span, .company__setting-toggle-copy p) { color: var(--ink-2); }
+:root[data-theme="dark"] .mySettingSection :is(.con-vs-chip, .currencies_wrapper_setting, .milestone_wrapper_table thead) { background: var(--fill); }
+:root[data-theme="dark"] .mySettingSection .company__setting-toggle { border-top-color: var(--hairline); }
+:root[data-theme="dark"] .mySettingSection .form-group-milestone label:before { border-color: var(--brand); }
+:root[data-theme="dark"] .mySettingSection .form-group-milestone input:checked + label:before { background: var(--brand); }
+:root[data-theme="dark"] .mySettingSection .form-group-milestone input:checked + label:after {
+    background: var(--on-brand);
+    box-shadow: 2px 0 0 var(--on-brand), 4px 0 0 var(--on-brand), 4px -2px 0 var(--on-brand), 4px -4px 0 var(--on-brand), 4px -6px 0 var(--on-brand), 4px -8px 0 var(--on-brand);
+}
+:root[data-theme="dark"] .mySettingSection .blue_btn { background: var(--brand) !important; color: var(--on-brand); }
+:root[data-theme="dark"] .mySettingSection .white_btn { background: transparent !important; color: var(--brand); border-color: var(--brand); }
+:root[data-theme="dark"] .mySettingSection :is(.dropdown-arrow, .Upload_icon img) { filter: invert(1) hue-rotate(180deg); }

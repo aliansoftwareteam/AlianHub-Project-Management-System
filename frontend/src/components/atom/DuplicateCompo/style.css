@@ -1,6 +1,6 @@
 .duplicate__component--copysection{
     padding: 14px 20px;
-    border: 1px solid #CFCFCF;
+    border: 1px solid var(--border);
     margin: 15px 20px 0px 20px;
 }
 .duplicate__component--wrapper{
@@ -15,7 +15,7 @@
     position: absolute;
     top: 0;
     width: 160px;
-    border-top: 1px solid #DFE1E6;
+    border-top: 1px solid var(--border);
 }
 .duplicate__component--copysection h3{
     line-height: 23.68px;

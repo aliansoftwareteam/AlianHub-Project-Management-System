@@ -8,14 +8,14 @@
             <div class="clip__card">
                 <!-- HEAD -->
                 <div class="d-flex align-items-center justify-content-between clip__head">
-                    <span class="font-size-16 font-weight-700">{{ $t('ClipRecorder.record_clip') }}</span>
+                    <span class="clip-recorder-font-size-16 clip-recorder-font-weight-700">{{ $t('ClipRecorder.record_clip') }}</span>
                     <div class="d-flex align-items-center clip__head-actions">
-                        <span class="cursor-pointer font-size-16 clip__close" :title="$t('ClipRecorder.close')" @click="requestClose">&#10005;</span>
+                        <span class="cursor-pointer clip-recorder-font-size-16 clip__close" :title="$t('ClipRecorder.close')" @click="requestClose">&#10005;</span>
                     </div>
                 </div>
 
                 <!-- UNSUPPORTED -->
-                <div v-if="!isMediaSupported" class="font-size-13 clip__msg clip__msg--err">
+                <div v-if="!isMediaSupported" class="clip-recorder-font-size-13 clip__msg clip__msg--err">
                     {{ $t('ClipRecorder.unsupported') }}
                 </div>
 
@@ -38,12 +38,12 @@
                         <button type="button" class="clip__start" @click="startRecording">{{ $t('ClipRecorder.start') }}</button>
                     </div>
 
-                    <div v-if="!isDisplaySupported && phase === 'idle'" class="font-size-12 gray81 clip__hint">
+                    <div v-if="!isDisplaySupported && phase === 'idle'" class="clip-recorder-font-size-12 clip-recorder-gray81 clip__hint">
                         {{ $t('ClipRecorder.screen_https_hint') }}
                     </div>
 
                     <!-- ERROR (permission / runtime) -->
-                    <div v-if="errorMessage" class="font-size-13 clip__msg clip__msg--err">
+                    <div v-if="errorMessage" class="clip-recorder-font-size-13 clip__msg clip__msg--err">
                         {{ errorMessage }}
                     </div>
 
@@ -55,11 +55,11 @@
 
                     <!-- TITLE (preview only — name the clip before saving) -->
                     <div v-if="phase === 'preview'" class="clip__title-row">
-                        <label class="font-size-12 gray81 clip__title-label">{{ $t('ClipRecorder.title_label') }}</label>
+                        <label class="clip-recorder-font-size-12 clip-recorder-gray81 clip__title-label">{{ $t('ClipRecorder.title_label') }}</label>
                         <input
                             v-model="title"
                             type="text"
-                            class="clip__title-input font-size-13"
+                            class="clip__title-input clip-recorder-font-size-13"
                             :placeholder="$t('ClipRecorder.title_placeholder')"
                             :maxlength="120"
                             :disabled="isSaving"
@@ -69,8 +69,8 @@
                     <!-- CONTROLS — idle keeps its Start inline with the mode row above,
                          so this is the preview step's actions only. -->
                     <div v-if="phase === 'preview'" class="d-flex justify-content-end clip__actions">
-                        <button type="button" class="clip__btn-ghost font-size-13 mr-10px" :disabled="isSaving" @click="reRecord">{{ $t('ClipRecorder.re_record') }}</button>
-                        <button type="button" class="btn-primary font-size-13" :disabled="isSaving" @click="saveClip">{{ isSaving ? $t('ClipRecorder.saving') : $t('ClipRecorder.save') }}</button>
+                        <button type="button" class="clip__btn-ghost clip-recorder-font-size-13 mr-10px" :disabled="isSaving" @click="reRecord">{{ $t('ClipRecorder.re_record') }}</button>
+                        <button type="button" class="btn-primary clip-recorder-font-size-13" :disabled="isSaving" @click="saveClip">{{ isSaving ? $t('ClipRecorder.saving') : $t('ClipRecorder.save') }}</button>
                     </div>
                 </template>
             </div>
@@ -80,7 +80,7 @@
              can keep working. Stop returns to the modal for preview + save. -->
         <div v-else class="clip__mini">
             <span class="clip__dot"></span>
-            <span class="clip__mini-timer font-size-13 font-weight-600">{{ formattedElapsed }}</span>
+            <span class="clip__mini-timer clip-recorder-font-size-13 clip-recorder-font-weight-600">{{ formattedElapsed }}</span>
             <button type="button" class="clip__mini-stop" @click="stopRecording">{{ $t('ClipRecorder.stop') }}</button>
         </div>
     </template>
@@ -467,21 +467,21 @@ onBeforeUnmount(() => {
 .clip__overlay {
     position: fixed;
     inset: 0;
-    background: rgba(0, 0, 0, 0.35);
+    background: var(--scrim);
     z-index: 1100;
     display: flex;
     align-items: center;
     justify-content: center;
 }
 .clip__card {
-    background: #fff;
+    background: var(--surface);
     border-radius: 10px;
     width: min(460px, 92vw);
     padding: 16px 20px;
-    box-shadow: 0 8px 30px rgba(0, 0, 0, 0.18);
+    box-shadow: var(--shadow-pop);
     /* Mounted at the app shell (navy Header) — set an explicit dark text colour so
        labels/title don't inherit the header's white text and vanish on the card. */
-    color: #2b2b2b;
+    color: var(--ink);
 }
 .clip__head {
     margin-bottom: 12px;
@@ -490,10 +490,10 @@ onBeforeUnmount(() => {
     gap: 14px;
 }
 .clip__close {
-    color: #9a9a9a;
+    color: var(--ink-2);
 }
 .clip__close:hover {
-    color: #e84a4a;
+    color: var(--danger);
 }
 /* Idle step: the three modes and Start sit on one line, separated from the
    header by a divider, so choosing and starting is a single row. */
@@ -504,21 +504,21 @@ onBeforeUnmount(() => {
     flex-wrap: wrap;
     padding-top: 12px;
     margin-bottom: 0;
-    border-top: 1px solid #ededf3;
+    border-top: 1px solid var(--hairline);
 }
 .clip__mode {
     display: flex;
     align-items: center;
     gap: 6px;
-    border: 1px solid #e0e0e0;
+    border: 1px solid var(--hairline);
     border-radius: 8px;
     padding: 6px 10px;
     cursor: pointer;
     font-size: 12.5px;
 }
 .clip__mode--active {
-    border-color: #2f3990;
-    background: #f1f2fb;
+    border-color: var(--brand);
+    background: var(--brand-tint);
 }
 /* Pushed to the far right of the same row. */
 .clip__start {
@@ -527,14 +527,14 @@ onBeforeUnmount(() => {
     font-family: inherit;
     font-size: 12.5px;
     font-weight: 600;
-    color: #fff;
-    background: #2f3990;
+    color: var(--on-brand);
+    background: var(--brand);
     border: 0;
     border-radius: 8px;
     cursor: pointer;
 }
 .clip__start:hover {
-    background: #262e75;
+    background: var(--brand-deep);
 }
 .clip__mode input:disabled {
     cursor: not-allowed;
@@ -549,14 +549,14 @@ onBeforeUnmount(() => {
     border-radius: 8px;
 }
 .clip__msg--err {
-    background: #fdecec;
-    color: #c0392b;
+    background: var(--danger-bg);
+    color: var(--danger);
 }
 .clip__dot {
     width: 10px;
     height: 10px;
     border-radius: 50%;
-    background: #e84a4a;
+    background: var(--danger);
     animation: clip-pulse 1s infinite;
     flex: 0 0 auto;
 }
@@ -567,7 +567,7 @@ onBeforeUnmount(() => {
     width: 100%;
     max-height: 320px;
     border-radius: 8px;
-    background: #000;
+    background: var(--rail);
 }
 .clip__title-row {
     display: flex;
@@ -580,14 +580,14 @@ onBeforeUnmount(() => {
 }
 .clip__title-input {
     width: 100%;
-    border: 1px solid #e0e0e0;
+    border: 1px solid var(--hairline);
     border-radius: 8px;
     padding: 8px 10px;
     outline: none;
-    color: #2b2b2b;
+    color: var(--ink);
 }
 .clip__title-input:focus {
-    border-color: #2f3990;
+    border-color: var(--brand);
 }
 .clip__actions {
     margin-top: 4px;
@@ -598,15 +598,15 @@ onBeforeUnmount(() => {
     cursor: not-allowed;
 }
 .clip__btn-ghost {
-    background: #f1f1f1;
-    border: 1px solid #e0e0e0;
+    background: var(--fill);
+    border: 1px solid var(--hairline);
     border-radius: 6px;
     padding: 6px 14px;
-    color: #333;
+    color: var(--ink-label);
     cursor: pointer;
 }
 .clip__btn-ghost:hover {
-    background: #e7e7e7;
+    background: var(--fill);
 }
 .clip__btn-ghost:disabled {
     opacity: 0.6;
@@ -621,19 +621,19 @@ onBeforeUnmount(() => {
     display: flex;
     align-items: center;
     gap: 10px;
-    background: #1b1b38;
-    color: #fff;
+    background: var(--rail);
+    color: var(--rail-ink-strong);
     padding: 8px 12px;
     border-radius: 30px;
-    box-shadow: 0 6px 20px rgba(0, 0, 0, 0.3);
+    box-shadow: var(--shadow-pop);
 }
 .clip__mini-timer {
     font-variant-numeric: tabular-nums;
     min-width: 42px;
 }
 .clip__mini-stop {
-    background: #e84a4a;
-    color: #fff;
+    background: var(--danger);
+    color: var(--on-danger);
     border: 0;
     border-radius: 16px;
     padding: 4px 12px;
@@ -644,5 +644,26 @@ onBeforeUnmount(() => {
     0% { opacity: 1; }
     50% { opacity: 0.3; }
     100% { opacity: 1; }
+}
+</style>
+
+<style scoped>
+.clip-recorder-gray81 {
+    color: var(--ink-2);
+}
+.clip-recorder-font-weight-600 {
+    font-weight: 600 !important;
+}
+.clip-recorder-font-weight-700 {
+    font-weight: 700 !important;
+}
+.clip-recorder-font-size-12 {
+    font-size: 12px;
+}
+.clip-recorder-font-size-13 {
+    font-size: 13px;
+}
+.clip-recorder-font-size-16 {
+    font-size: 16px;
 }
 </style>

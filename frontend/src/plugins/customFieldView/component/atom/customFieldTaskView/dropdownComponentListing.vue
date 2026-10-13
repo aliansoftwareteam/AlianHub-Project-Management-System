@@ -18,7 +18,7 @@
                                 <a v-if="!items?.length && !checkDefault.length" class="formkit-input" @click="isVisible = true">{{ detail.fieldPlaceholder }}</a>
                                 <div class="d-flex" v-else>
                                     <div class="mr-10px font-size-12 font-weight-400 cursor-pointer" v-for="(item) in items && items.length ? items || [] : checkDefault || []" :key="item.id" @click="isVisible = true">
-                                        <span class="d-block border-radius-15-px p3x-14px" :style="[{ color: item.color, backgroundColor: item.color + '20' }]">
+                                        <span class="d-block border-radius-15-px p3x-14px" :class="{ 'ah-status-ink': !props.isProjectDetail }" :style="optionChipStyle(item)">
                                             {{ item.label }}
                                         </span>
                                     </div>
@@ -31,7 +31,7 @@
         </div>
         <Sidebar
             v-model:visible="isVisible"
-            :title="`Select ${detail.fieldTitle}`"
+            :title="$t('CustomField.select_field', { field: detail.fieldTitle })"
             :enable-search="true"
             :options="detail.fieldOptions || []"
             @selected="selectedObj($event)"
@@ -46,6 +46,7 @@
 import ToolTip from "@/components/molecules/ToolTip/ToolTip.vue";
 import { ref, defineProps, defineEmits, onMounted,watch, nextTick } from "vue";
 import useCustomFieldImage from '@/composable/customFieldIcon.js';
+import { optionChipStyle } from '@/utils/statusChipColors';
 const { getImageData } = useCustomFieldImage();
 
 // Components
@@ -75,31 +76,30 @@ const render = ref(true);
 
 const editIconImage = require("@/assets/images/editing.png");
 
-// Watches
+const optionsOf = (detail) => JSON.parse(JSON.stringify(Array.isArray(detail?.fieldOptions) ? detail.fieldOptions : []));
+
 watch(() => props.detail, (newVal) => {
     if(newVal){
-        items.value = JSON.parse(JSON.stringify(newVal?.fieldOptions))?.filter(x => newVal?.fieldValue?.includes(x.id)) || [];
-        checkDefault.value = JSON.parse(JSON.stringify(newVal?.fieldOptions))?.filter((x) => x.selected === true) || [];
+        items.value = optionsOf(newVal).filter(x => newVal?.fieldValue?.includes(x.id));
+        checkDefault.value = optionsOf(newVal).filter((x) => x.selected === true);
         details.value = newVal;
     }
 });
 
-// Initialize data
 onMounted(() => {
     render.value = false;
     nextTick(()=>{
         if(props.detail && props?.detail?.fieldValue) {
             details.value = props.detail;
-            items.value = JSON.parse(JSON.stringify(props.detail?.fieldOptions)).filter(x => props.detail?.fieldValue?.includes(x.id)) || [];
+            items.value = optionsOf(props.detail).filter(x => props.detail?.fieldValue?.includes(x.id));
         }
-        checkDefault.value = JSON.parse(JSON.stringify(props.detail?.fieldOptions)).filter((x) => x?.selected === true) || [];
+        checkDefault.value = optionsOf(props.detail).filter((x) => x?.selected === true);
         render.value = true;
     });
 })
 
-// This function is used to get selected option from sidebar
 const selectedObj = (obj) => {
-    items.value = props.detail?.fieldOptions.filter(x => x.id === obj.id);
+    items.value = optionsOf(props.detail).filter(x => x.id === obj.id);
     emit('blurUpdate', obj, props.detail, "");
 }
 

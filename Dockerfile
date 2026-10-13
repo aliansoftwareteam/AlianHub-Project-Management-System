@@ -35,9 +35,32 @@ RUN ln -sf /app/brandSettings.json /app/frontend/brandSettings.json
 #   "Can't resolve '../../../../../package.json'"
 COPY package.json /app/package.json
 
-# Build the SPA bundle
+# vue.config.js aliases these backend modules into the bundle so the app and the
+# API share one copy. tests/conventions/docker-frontend-aliases.test.js fails when
+# an alias is added without its COPY line here.
+COPY Modules/Pages/helpers/pageContent.js /app/Modules/Pages/helpers/pageContent.js
+COPY Modules/Agents/workKinds.js /app/Modules/Agents/workKinds.js
+COPY Modules/Agents/engine/egressRules.js /app/Modules/Agents/engine/egressRules.js
+COPY Modules/Agents/dailyRunLimit.js /app/Modules/Agents/dailyRunLimit.js
+COPY Modules/Auth/helpers/passwordRule.js /app/Modules/Auth/helpers/passwordRule.js
+COPY Modules/Project/helpers/viewSettings.js /app/Modules/Project/helpers/viewSettings.js
+COPY Modules/CustomField/helpers/fieldTaskTypes.js /app/Modules/CustomField/helpers/fieldTaskTypes.js
+COPY Modules/CustomField/helpers/datePastFuture.js /app/Modules/CustomField/helpers/datePastFuture.js
+COPY Modules/CustomField/fieldTypes /app/Modules/CustomField/fieldTypes
+COPY Modules/Automations/templates.js /app/Modules/Automations/templates.js
+COPY Modules/Company/helpers/workingDays.js /app/Modules/Company/helpers/workingDays.js
+COPY Modules/Tasks/helpers/taskTreeRules.js /app/Modules/Tasks/helpers/taskTreeRules.js
+COPY Modules/Tasks/helpers/ganttShift.js /app/Modules/Tasks/helpers/ganttShift.js
+COPY Modules/Tasks/helpers/workingCalendar.js /app/Modules/Tasks/helpers/workingCalendar.js
+COPY Modules/Tasks/helpers/taskExtraListsRules.js /app/Modules/Tasks/helpers/taskExtraListsRules.js
+COPY Modules/Tasks/helpers/descriptionBlock.js /app/Modules/Tasks/helpers/descriptionBlock.js
+COPY Modules/Tasks/helpers/richTextAllowlist.js /app/Modules/Tasks/helpers/richTextAllowlist.js
+COPY Modules/Forms/helpers/formLogic.js /app/Modules/Forms/helpers/formLogic.js
+
+# Build the SPA bundle. webpack needs more than Node's default ~2 GB heap for
+# this bundle (same setting as ci.yml).
 COPY frontend/ ./
-RUN npm run build
+RUN NODE_OPTIONS=--max-old-space-size=4096 npm run build
 
 
 # ─── Stage 2: Backend production deps ────────────────────────────────
@@ -68,21 +91,25 @@ COPY --from=frontend-builder /app/frontend/dist ./frontend/dist
 
 # Copy backend source — order matters for layer caching, but at this
 # stage we're only running, not installing.
-COPY package.json ./
-COPY brandSettings.json ./
-COPY index.js server.js check-version.js installation.js ./
+COPY package.json CHANGELOG.md build-info.jso[n] ./
+COPY brandSettings.json thumbnail.json ./
+COPY index.js server.js cron.js ./
 COPY Config/ ./Config/
 COPY Modules/ ./Modules/
 COPY common-storage/ ./common-storage/
+COPY docs/ ./docs/
 COPY event/ ./event/
 COPY middlewares/ ./middlewares/
+COPY migrations/ ./migrations/
 COPY public/ ./public/
 COPY scripts/ ./scripts/
 COPY socket/ ./socket/
 COPY utils/ ./utils/
+COPY wasabiUploadsLocal/ ./wasabiUploadsLocal/
 
-# Persistent storage directory (mounted as a volume in compose)
-RUN mkdir -p /app/common-storage/uploads \
+# Writable directories: uploaded files (STORAGE_TYPE=server), logs, backups —
+# each mounted as a volume in compose so they survive an image update.
+RUN mkdir -p /app/storage /app/log /app/backups \
  && chown -R node:node /app
 
 # Drop to non-root user
@@ -90,13 +117,17 @@ USER node
 
 EXPOSE 4000
 
+# Config/jwt.js passes JWT_ALGORITHM and JWT_EXP straight to jwt.sign, which
+# rejects undefined options — without them no session can be created.
 ENV NODE_ENV=production \
-    PORT=4000
+    PORT=4000 \
+    STORAGE_TYPE=server \
+    JWT_ALGORITHM=HS256 \
+    JWT_EXP=24h
 
-# Health check — passes if the server responds (even with a 4xx),
-# fails only on connection errors or 5xx. No extra binary needed.
-HEALTHCHECK --interval=30s --timeout=5s --start-period=20s --retries=3 \
-  CMD node -e "require('http').get('http://localhost:'+(process.env.PORT||4000)+'/', r => process.exit(r.statusCode < 500 ? 0 : 1)).on('error', () => process.exit(1))"
+# /health answers 200 only when the database is reachable, 503 otherwise.
+HEALTHCHECK --interval=30s --timeout=5s --start-period=40s --retries=3 \
+  CMD node -e "require('http').get('http://localhost:'+(process.env.PORT||4000)+'/health', r => process.exit(r.statusCode === 200 ? 0 : 1)).on('error', () => process.exit(1))"
 
 # tini as PID 1 forwards signals correctly so Node shuts down gracefully
 ENTRYPOINT ["/sbin/tini", "--"]

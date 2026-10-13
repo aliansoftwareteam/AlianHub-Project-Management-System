@@ -4,7 +4,7 @@
         <img :src="closeIcon" @click="cancelRecord()" alt="closeIcon" class="mx-1 cursor-pointer">
         <button class="btn-primary ml-1 border-radius-8-px record__btn" @click="stopRecord(true)"><img :src="sendIcon" alt="sendIcon" class="cursor-pointer"></button>
     </template>
-    <audio src=""  class="d-none" id="audioPlayer" controls @pause="(e) => {e.preventDefault()}"></audio>
+    <audio class="d-none" id="audioPlayer" controls @pause="(e) => {e.preventDefault()}"></audio>
 </template>
 
 <script setup>

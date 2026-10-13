@@ -1,0 +1,294 @@
+const mongoose = require('mongoose');
+const { SCHEMA_TYPE } = require('../../Config/schemaType');
+const { MongoDbCrudOpration } = require('../../utils/mongo-handler/mongoQueries');
+const { idForms } = require('../../utils/mongo-handler/objectIdKeys');
+const permissionGuard = require('../../Config/permissionGuard');
+const { isPrivileged } = require('../../Config/roleTypes');
+const { visibleProjectIds } = require('../Agents/scope');
+const { hiddenSprintIds } = require('../Sprints/helpers/sprintVisibility');
+const { pageReachFilter, pageReachedBy, shareFor } = require('../Pages/helpers/pageRules');
+const { COMMENT_TYPES, CHUNK_ONLY_SOURCES } = require('./sources');
+const { chunkGuide, guideMarkdown, guideTitle } = require('./ingest/chunker');
+
+// What one caller may retrieve, resolved on every call and never cached here:
+// a snapshot kept between calls is exactly how a person removed from a project
+// or a sprint keeps reading it. Agents and MCP tokens do not pass the browser
+// session check, so the company role is looked up here for every kind of caller.
+
+const SOURCE_TYPES = ['task', 'page', 'comment', 'transcript', 'guide', 'file'];
+const CALLER_KINDS = ['user', 'agent', 'mcp'];
+const OBJECT_ID = /^[a-f0-9]{24}$/i;
+const ATTACHMENTS_PERMISSION = 'task.task_attachments';
+const TITLE_LENGTH = 160;
+
+const SOURCE_COLLECTIONS = {
+    task: SCHEMA_TYPE.TASKS,
+    page: SCHEMA_TYPE.PAGES,
+    comment: SCHEMA_TYPE.COMMENTS,
+    transcript: SCHEMA_TYPE.CALLS,
+    guide: SCHEMA_TYPE.PROJECTS,
+    file: SCHEMA_TYPE.TASKS,
+};
+
+class RetrievalRefused extends Error {
+    constructor(message) {
+        super(message);
+        this.name = 'RetrievalRefused';
+        this.statusCode = 403;
+    }
+}
+
+const objectIds = (ids) => ids.filter((id) => OBJECT_ID.test(String(id))).map((id) => new mongoose.Types.ObjectId(String(id)));
+
+/* A file is read where the web app would show the task's attachments: the same permission, judged
+ * per project, since a project can carry its own rules. Rules that cannot be read grant nothing. */
+const attachmentProjects = async (companyId, uid, privileged, projectIds) => {
+    if (privileged) return projectIds;
+    const granted = await Promise.all(projectIds.map(async (projectId) => {
+        try {
+            return permissionGuard.isReadable(await permissionGuard.evaluatePermission(companyId, uid, ATTACHMENTS_PERMISSION, { projectId }));
+        } catch (error) {
+            return false;
+        }
+    }));
+    return projectIds.filter((projectId, at) => granted[at]);
+};
+
+/* An API token narrowed to some projects reads inside them only, and, as the MCP tools hold it,
+ * reaches nothing filed under no project. An empty list is a token that is not narrowed. */
+const tokenNarrowing = (tokenProjectIds) => {
+    const allowed = (Array.isArray(tokenProjectIds) ? tokenProjectIds : []).map(String);
+    return allowed.length ? allowed : null;
+};
+
+const resolveVisibleSet = async ({ companyId, caller, scope } = {}) => {
+    const company = String(companyId || '');
+    const { kind, userId, agentId = null, runId = null, tokenProjectIds = [] } = caller || {};
+    const uid = String(userId || '');
+    if (!OBJECT_ID.test(company)) throw new RetrievalRefused('A valid companyId is required.');
+    if (!CALLER_KINDS.includes(kind)) throw new RetrievalRefused(`Unknown caller kind: ${kind}.`);
+    if (!OBJECT_ID.test(uid)) throw new RetrievalRefused('A caller retrieves as a user of the company.');
+
+    const roleType = await permissionGuard.getRoleType(company, uid);
+    if (roleType === null || roleType === undefined) throw new RetrievalRefused('The caller holds no role in this company.');
+    const privileged = isPrivileged(roleType);
+
+    const narrowing = tokenNarrowing(tokenProjectIds);
+    const visible = (await visibleProjectIds(company, uid)).map(String).filter((id) => !narrowing || narrowing.includes(id));
+    const projectId = scope && scope.projectId ? String(scope.projectId) : null;
+    const projectIds = projectId ? visible.filter((id) => id === projectId) : visible;
+    const hidden = privileged || !projectIds.length ? [] : await hiddenSprintIds(company, uid, projectIds);
+    const wanted = scope && Array.isArray(scope.sourceTypes) ? scope.sourceTypes : SOURCE_TYPES;
+    const fileProjectIds = wanted.includes('file') ? await attachmentProjects(company, uid, privileged, projectIds) : [];
+    const inScope = projectId ? [projectId] : null;
+    const namedProjectIds = narrowing ? (inScope || narrowing).filter((id) => narrowing.includes(id)) : inScope;
+
+    return {
+        companyId: company,
+        caller: { kind, userId: uid, agentId, runId },
+        roleType,
+        privileged,
+        projectId,
+        projectIds,
+        hiddenSprintIds: hidden.map(String),
+        fileProjectIds,
+        sourceTypes: SOURCE_TYPES.filter((type) => wanted.includes(type)),
+        ...(namedProjectIds ? { namedProjectIds } : {}),
+        ...(narrowing ? { projectBound: true, reachesProjectless: false } : {}),
+    };
+};
+
+/* A set narrowed for an agent run (agentScope.js) is project-bound: content in no project reaches
+ * it only as far as that module allows. */
+const projectlessClosed = (set) => Boolean(set.projectBound) && !set.reachesProjectless;
+
+/* Where a page shared with the caller by name is still read: anywhere, unless the search is scoped to a
+ * project, or the set is kept to some (a narrowed token's own list, an agent's projects). */
+const namedWithin = (set) => {
+    if (Array.isArray(set.namedProjectIds)) return objectIds(set.namedProjectIds);
+    return set.projectId || set.projectBound ? objectIds(set.projectIds) : null;
+};
+
+/* A page with no project is the company's, unless the caller scoped to one project. */
+const pageReach = (set, projectField, sharedAsIds = false) => pageReachFilter({
+    uid: set.caller.userId,
+    projectIds: objectIds(set.projectIds),
+    companyWide: !(set.projectId || projectlessClosed(set)),
+    projectField,
+    namedProjectIds: namedWithin(set),
+    sharedAsIds,
+});
+
+/* A call belongs to the people on it; its project narrows only a search scoped to one project, or
+ * a project-bound set. */
+const callProjects = (set, ids) => {
+    if (set.projectId || projectlessClosed(set)) return { projectId: { $in: ids } };
+    if (set.projectBound) return { $and: [{ $or: [{ projectId: { $in: ids } }, { projectId: { $in: [null, undefined] } }] }] };
+    return {};
+};
+
+/* Access control as plain match clauses, one per source, that a backend puts beside
+ * its own search at the top level of the query: MongoDB refuses $text inside $or. */
+const clausesFor = (set) => {
+    const projects = objectIds(set.projectIds);
+    const sprintClause = set.hiddenSprintIds.length ? { sprintId: { $nin: objectIds(set.hiddenSprintIds) } } : {};
+    const task = { ProjectID: { $in: projects }, deletedStatusKey: { $ne: 1 }, mainChat: { $ne: true }, ...sprintClause };
+    return {
+        task,
+        guide: { deletedStatusKey: { $ne: 1 } },
+        file: { ...task, ProjectID: { $in: objectIds(set.fileProjectIds || []) } },
+        page: { deletedStatusKey: { $ne: 1 }, ...pageReach(set, 'ProjectID') },
+        comment: { projectId: { $in: projects }, isDeleted: { $ne: true }, type: { $in: COMMENT_TYPES }, ...sprintClause },
+        transcript: {
+            participants: set.caller.userId,
+            deletedStatusKey: { $ne: 1 },
+            ...callProjects(set, idForms(set.projectIds)),
+        },
+    };
+};
+
+const liveChunk = (set, sourceType) => ({ companyId: set.companyId, sourceType, deleted: { $ne: true } });
+
+/* The same rules over the fields a chunk copies from its source. They narrow the search;
+ * recheck() against the live rows is still what decides. */
+const chunkClausesFor = (set) => {
+    const hidden = set.hiddenSprintIds.length ? { sprintId: { $nin: objectIds(set.hiddenSprintIds) } } : {};
+    return {
+        page: { ...liveChunk(set, 'page'), ...pageReach(set, 'projectId', true) },
+        comment: { ...liveChunk(set, 'comment'), projectId: { $in: objectIds(set.projectIds) }, ...hidden },
+        guide: { ...liveChunk(set, 'guide'), projectId: { $in: objectIds(set.projectIds) } },
+        file: { ...liveChunk(set, 'file'), projectId: { $in: objectIds(set.fileProjectIds || []) }, ...hidden },
+        transcript: {
+            ...liveChunk(set, 'transcript'),
+            participants: set.caller.userId,
+            ...callProjects(set, objectIds(set.projectIds)),
+        },
+    };
+};
+
+/* chunkSources names the sources whose chunk store is built for this company; the rest are
+ * searched from their rows. */
+const filterFor = (set, { chunkSources = [] } = {}) => {
+    const clauses = clausesFor(set);
+    const chunked = chunkClausesFor(set);
+    const fromChunks = Object.keys(chunked).filter((sourceType) => chunkSources.includes(sourceType));
+    fromChunks.forEach((sourceType) => { clauses[sourceType] = chunked[sourceType]; });
+    const sourceTypes = set.sourceTypes.filter((sourceType) => !CHUNK_ONLY_SOURCES.includes(sourceType) || fromChunks.includes(sourceType));
+    return { sourceTypes, clauses, chunkSources: fromChunks };
+};
+
+const readByNameOnly = (set, page) => {
+    const uid = set && set.caller ? set.caller.userId : '';
+    if (!shareFor(page, uid)) return false;
+    const open = (set.projectIds || []).map(String);
+    return !pageReachedBy(page, { uid, inProject: (id) => open.includes(String(id)), companyWide: !(set.projectId || projectlessClosed(set)), named: false });
+};
+
+const permissionOf = (sourceType, row, set = null) => {
+    if (sourceType === 'page') {
+        if (set && readByNameOnly(set, row)) return { visibility: 'named', via: 'share' };
+        if (String(row.visibility || '') === 'private') return { visibility: 'private', via: 'owner' };
+        if (!row.ProjectID) return { visibility: 'company', via: 'company' };
+        return { visibility: 'project', via: 'project' };
+    }
+    if (sourceType === 'comment') return { visibility: 'project', via: row.taskId ? 'task' : 'project' };
+    if (sourceType === 'transcript') return { visibility: 'participants', via: 'participant' };
+    if (sourceType === 'file') return { visibility: 'project', via: 'task' };
+    return { visibility: 'project', via: 'project' };
+};
+
+const time = (value) => (value ? new Date(value).getTime() || 0 : 0);
+
+const commentTitle = (row) => String(row.message || '').replace(/\s+/g, ' ').trim();
+
+/* A comment is visible where its task is: the task must still pass the task clause. */
+const onVisibleTasks = async (set, clauses, comments) => {
+    const taskIds = [...new Set(comments.map((c) => c.taskId).filter(Boolean).map(String))];
+    if (!taskIds.length) return comments;
+    const tasks = await MongoDbCrudOpration(set.companyId, {
+        type: SCHEMA_TYPE.TASKS,
+        data: [{ _id: { $in: objectIds(taskIds) }, ...clauses.task }, '_id'],
+    }, 'find');
+    const visible = new Set((tasks || []).map((task) => String(task._id)));
+    return comments.filter((c) => !c.taskId || visible.has(String(c.taskId)));
+};
+
+const editedSince = (row, p) => time(row.updatedAt) > time(p.updatedAt);
+
+/* How each source is re-read. `rowId` names the live row a passage stands on, `keep` decides from
+ * that row whether the passage still exists, and `stale` whether its excerpt may quote text the
+ * source no longer says. A file is one attachment of its task: it exists while the attachment is
+ * on the task, and its text never changes. A guide is one field of its project, so its project's
+ * other edits do not make it stale; a passage from a guide chunk whose text the guide no longer
+ * chunks into is. */
+const RECHECK = {
+    task: { fields: '_id' },
+    page: { fields: '_id visibility ProjectID createdBy sharedWith title updatedAt', title: (row) => row.title, stale: editedSince },
+    comment: { fields: '_id taskId message updatedAt', title: commentTitle, stale: editedSince, narrow: onVisibleTasks },
+    transcript: { fields: '_id title updatedAt', title: (row) => row.title || 'Call notes', stale: editedSince },
+    guide: {
+        fields: '_id ProjectName aiGuide updatedAt',
+        visible: (set, projectId) => set.projectIds.map(String).includes(projectId),
+        keep: (row) => Boolean(guideMarkdown(row).trim()),
+        title: guideTitle,
+        stale: (row, p) => (p.contentHash ? !chunkGuide(row).some((piece) => piece.contentHash === p.contentHash) : editedSince(row, p)),
+    },
+    file: {
+        fields: '_id attachments.id',
+        rowId: (p) => String(p.sourceId).split(':')[0],
+        keep: (row, p) => (Array.isArray(row.attachments) ? row.attachments : []).some((item) => item && `${row._id}:${item.id}` === String(p.sourceId)),
+    },
+};
+
+const rowIdOf = (p) => (RECHECK[p.sourceType].rowId ? RECHECK[p.sourceType].rowId(p) : String(p.sourceId));
+
+/* Re-read the ranked candidates from their live source rows and keep only those the
+ * caller may still see, whatever index produced them. Order is preserved. A source edited after
+ * the text a passage came from keeps its place but shows its live title and no excerpt, since the
+ * old excerpt may quote what the edit removed; onStale hears about it. */
+const recheck = async ({ set, passages, onStale }) => {
+    const clauses = clausesFor(set);
+    const bySource = {};
+    passages.forEach((p) => {
+        const spec = RECHECK[p.sourceType];
+        if (!set.sourceTypes.includes(p.sourceType) || !spec || !OBJECT_ID.test(rowIdOf(p))) return;
+        if (spec.visible && !spec.visible(set, rowIdOf(p))) return;
+        (bySource[p.sourceType] = bySource[p.sourceType] || new Set()).add(rowIdOf(p));
+    });
+
+    const live = {};
+    await Promise.all(Object.entries(bySource).map(async ([sourceType, ids]) => {
+        const spec = RECHECK[sourceType];
+        let rows = await MongoDbCrudOpration(set.companyId, {
+            type: SOURCE_COLLECTIONS[sourceType],
+            data: [{ _id: { $in: objectIds([...ids]) }, ...clauses[sourceType] }, spec.fields],
+        }, 'find');
+        if (spec.narrow) rows = await spec.narrow(set, clauses, rows || []);
+        (rows || []).forEach((row) => { live[`${sourceType}:${row._id}`] = row; });
+    }));
+
+    return passages
+        .map((p) => ({ p, row: RECHECK[p.sourceType] && live[`${p.sourceType}:${rowIdOf(p)}`] }))
+        .filter(({ p, row }) => row && (!RECHECK[p.sourceType].keep || RECHECK[p.sourceType].keep(row, p)))
+        .map(({ p, row }) => {
+            const spec = RECHECK[p.sourceType];
+            const permission = permissionOf(p.sourceType, row, set);
+            if (!spec.stale || !spec.stale(row, p)) return { ...p, permission };
+            if (onStale) onStale(p);
+            return { ...p, title: String(spec.title(row) || '').slice(0, TITLE_LENGTH), excerpt: '', updatedAt: row.updatedAt, permission };
+        });
+};
+
+module.exports = {
+    SOURCE_TYPES,
+    CALLER_KINDS,
+    SOURCE_COLLECTIONS,
+    RetrievalRefused,
+    attachmentProjects,
+    resolveVisibleSet,
+    clausesFor,
+    chunkClausesFor,
+    filterFor,
+    permissionOf,
+    recheck,
+};

@@ -8,7 +8,7 @@ export default [
             title: "Settings",
             requiresAuth: true
         },
-        component: () => import(/* webpackChunkName: Settings */ '@/components/templates/Settings/Settings.vue'),
+        component: () => import(/* webpackChunkName: Settings */ '@/views/Settings/SettingsShell.vue'),
         children: [
             {
                 path: "setting",
@@ -21,6 +21,15 @@ export default [
             },
             
             ...CustomFieldRouter,
+            {
+                path: "language",
+                name: "LanguageRegion",
+                meta: {
+                    title: "Language & Region",
+                    requiresAuth: true
+                },
+                component: () => import(/* webpackChunkName: LanguageRegion */ '@/views/Settings/Language/Language.vue')
+            },
             {
                 path: "members",
                 name: "Members",
@@ -58,6 +67,15 @@ export default [
                 component: () => import(/* webpackChunkName: ScimSettings */ '@/views/Settings/Scim/ScimSettings.vue')
             },
             {
+                path: "agent-clients",
+                name: "AgentClients",
+                meta: {
+                    title: "Agent clients",
+                    requiresAuth: true
+                },
+                component: () => import(/* webpackChunkName: "AgentClients" */ '@/views/Settings/AgentClients/AgentClients.vue')
+            },
+            {
                 path: "time-off",
                 name: "TimeOff",
                 meta: {
@@ -85,6 +103,15 @@ export default [
                 component: () => import(/* webpackChunkName: Projects */ '@/views/Settings/Projects/Projects.vue')
             },
             {
+                path: "import-export",
+                name: "ImportExport",
+                meta: {
+                    title: "Import & export",
+                    requiresAuth: true
+                },
+                component: () => import(/* webpackChunkName: ImportExport */ '@/views/Settings/ImportExport/ImportExport.vue')
+            },
+            {
                 path: "template",
                 name: "Template",
                 meta: {
@@ -94,6 +121,15 @@ export default [
                 component: () => import(/* webpackChunkName: Template */ '@/views/Settings/Template/Template.vue')
             },
             {
+                path: "task-templates",
+                name: "TaskTemplates",
+                meta: {
+                    title: "Task templates",
+                    requiresAuth: true
+                },
+                component: () => import(/* webpackChunkName: TaskTemplates */ '@/views/Settings/TaskTemplates/TaskTemplates.vue')
+            },
+            {
                 path: "security-permissions",
                 name: "Security & Permissions",
                 meta: {
@@ -101,6 +137,15 @@ export default [
                     requiresAuth: true
                 },
                 component: () => import(/* webpackChunkName: Security & Permissions */ '@/views/Settings/SecurityPermissions/SecurityPermissions.vue')
+            },
+            {
+                path: "routing-policy",
+                name: "RoutingPolicy",
+                meta: {
+                    title: "Routing Policy",
+                    requiresAuth: true
+                },
+                component: () => import(/* webpackChunkName: Routing Policy */ '@/views/Settings/RoutingPolicy/RoutingPolicy.vue')
             },
             {
                 path: "my-profile",
@@ -155,6 +200,26 @@ export default [
                     requiresAuth: true
                 },
                 component: () => import(/* webpackChunkName: Notifications */ '@/views/Settings/Notifications/Notifications.vue')
+            },
+            {
+                path: "instance",
+                name: "Instance",
+                redirect: { name: "InstanceHealth" },
+                meta: { title: "Instance", requiresAuth: true },
+                component: () => import(/* webpackChunkName: "instance" */ '@/views/Settings/Instance/InstanceShell.vue'),
+                children: [
+                    { path: "health", name: "InstanceHealth", meta: { title: "Instance health", requiresAuth: true }, component: () => import(/* webpackChunkName: "instance" */ '@/views/Settings/Instance/InstanceHealth.vue') },
+                    { path: "settings", name: "InstanceSettings", meta: { title: "Instance settings", requiresAuth: true }, component: () => import(/* webpackChunkName: "instance" */ '@/views/Settings/Instance/InstanceSettings.vue') },
+                    { path: "enforcement", name: "InstanceEnforcement", meta: { title: "Enforcement", requiresAuth: true }, component: () => import(/* webpackChunkName: "instance" */ '@/views/Settings/Instance/InstanceEnforcement.vue') },
+                    { path: "egress", name: "InstanceEgress", meta: { title: "Egress", requiresAuth: true }, component: () => import(/* webpackChunkName: "instance" */ '@/views/Settings/Instance/InstanceEgress.vue') },
+                    { path: "instruction-patterns", name: "InstanceInstructionPatterns", meta: { title: "Instruction patterns", requiresAuth: true }, component: () => import(/* webpackChunkName: "instance" */ '@/views/Settings/Instance/InstanceInstructionPatterns.vue') },
+                    { path: "knowledge", name: "InstanceKnowledge", meta: { title: "Knowledge sources", requiresAuth: true }, component: () => import(/* webpackChunkName: "instance" */ '@/views/Settings/Instance/InstanceKnowledge.vue') },
+                    { path: "backups", name: "InstanceBackups", meta: { title: "Backups", requiresAuth: true }, component: () => import(/* webpackChunkName: "instance" */ '@/views/Settings/Instance/InstanceBackups.vue') },
+                    { path: "upgrade", name: "InstanceUpgrade", meta: { title: "Upgrade", requiresAuth: true }, component: () => import(/* webpackChunkName: "instance" */ '@/views/Settings/Instance/InstanceUpgrade.vue') },
+                    { path: "logs", name: "InstanceLogs", meta: { title: "Logs", requiresAuth: true }, component: () => import(/* webpackChunkName: "instance" */ '@/views/Settings/Instance/InstanceLogs.vue') },
+                    { path: "providers", name: "InstanceProviders", meta: { title: "AI providers", requiresAuth: true }, component: () => import(/* webpackChunkName: "instance" */ '@/views/Settings/Instance/InstanceProviders.vue') },
+                    { path: "stats", name: "InstanceStats", meta: { title: "Instance stats", requiresAuth: true }, component: () => import(/* webpackChunkName: "instance" */ '@/views/Settings/Instance/InstanceStats.vue') },
+                ]
             },
             {
                 path: "time-tracking",

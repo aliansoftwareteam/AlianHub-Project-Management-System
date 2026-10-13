@@ -1,0 +1,502 @@
+const mongoose = require('mongoose');
+const logger = require('../../../Config/loggerConfig');
+const { MongoDbCrudOpration } = require('../../../utils/mongo-handler/mongoQueries');
+const { SCHEMA_TYPE } = require('../../../Config/schemaType');
+const { sessionTenantOf, TenantError } = require('../../../Config/tenant');
+const { getRoleType, isPrivileged } = require('../../../Config/permissionGuard');
+const { removeCache } = require('../../../utils/commonFunctions');
+const socketEmitter = require('../../../event/socketEventEmitter');
+const { recordAuditFromReq } = require('../../Audit/recorder');
+const { resolveRate } = require('../../TimeSheet/helpers/billingRules');
+const math = require('../../Milestone/helpers/billingMath');
+const billing = require('../../Milestone/controller/billing');
+const { openTasksById } = require('../../Tasks/helpers/openNames');
+const { idForms } = require('../../../utils/mongo-handler/objectIdKeys');
+
+// Client invoices raised against a project (handoff 19c).
+//
+// A line is never typed in as a bare number: it is drafted from a milestone or
+// from a month of time logs and keeps the ids it came from, so "what is this
+// $28,000?" is answered by opening the tasks or the logs behind it rather than
+// by trusting the label. Every mutation here touches money, so every one of
+// them is audited.
+
+const { actorId, isObjectIdString, refuseGuest } = billing;
+const LINE_KINDS = Object.freeze(['milestone', 'time', 'change_request', 'expense', 'adjustment']);
+const STATUSES = Object.freeze(['draft', 'sent', 'paid']);
+
+const cacheKeyFor = (projectId, companyId) => `projectInvoices:${projectId}:${companyId}`;
+
+const lineId = () => new mongoose.Types.ObjectId().toString();
+
+/* Recompute every stored total from the lines. Totals are never taken from the
+ * client: a request that could set its own total could send a $0 invoice. */
+const priceInvoice = (lines, taxRateBp) => {
+    const totals = math.invoiceTotals({ lines, taxRateBp });
+    const priced = lines.map((line, index) => ({ ...line, amountMinor: totals.lineAmountsMinor[index] }));
+    return {
+        lines: priced,
+        subtotalMinor: totals.subtotalMinor,
+        taxMinor: totals.taxMinor,
+        totalMinor: totals.totalMinor,
+    };
+};
+
+const sanitizeLine = (raw = {}) => {
+    const kind = LINE_KINDS.includes(String(raw.kind)) ? String(raw.kind) : 'adjustment';
+    const hasRate = raw.unitMinor !== null && raw.unitMinor !== undefined && raw.unitMinor !== '';
+    return {
+        id: raw.id ? String(raw.id) : lineId(),
+        kind,
+        label: String(raw.label || '').slice(0, 200),
+        detail: String(raw.detail || '').slice(0, 300),
+        qtyMilli: hasRate ? Math.max(0, Math.round(Number(raw.qtyMilli) || 0)) : 1000,
+        unitMinor: hasRate ? Math.max(0, Math.round(Number(raw.unitMinor) || 0)) : null,
+        amountMinor: hasRate ? 0 : Math.round(Number(raw.amountMinor) || 0),
+        milestoneId: raw.milestoneId && isObjectIdString(String(raw.milestoneId)) ? String(raw.milestoneId) : '',
+        taskIds: Array.isArray(raw.taskIds) ? raw.taskIds.map(String).filter(isObjectIdString).slice(0, 500) : [],
+        timelogIds: Array.isArray(raw.timelogIds) ? raw.timelogIds.map(String).filter(isObjectIdString).slice(0, 2000) : [],
+    };
+};
+
+/* Sequential invoice number, allocated on the contract so two drafts raised in
+ * the same second cannot collide. */
+const nextInvoiceNumber = async (companyId, projectId, contract) => {
+    const updated = await MongoDbCrudOpration(companyId, {
+        type: SCHEMA_TYPE.PROJECT_CONTRACTS,
+        data: [
+            { ProjectID: new mongoose.Types.ObjectId(projectId), deletedStatusKey: 0 },
+            { $inc: { invoiceSeq: 1 } },
+            { upsert: true, returnDocument: 'after', setDefaultsOnInsert: true },
+        ],
+    }, 'findOneAndUpdate');
+    const seq = Number((updated && updated.invoiceSeq) || 1);
+    const prefix = (contract && contract.invoicePrefix) || 'INV';
+    return `${prefix}-${new Date().getUTCFullYear()}-${String(seq).padStart(3, '0')}`;
+};
+
+/* nextInvoiceNumber upserts a bare contract row to hold the counter, so "a contract
+ * exists" only counts once someone has saved the terms. */
+const hasSavedContract = async (companyId, projectId) => Boolean(await MongoDbCrudOpration(companyId, {
+    type: SCHEMA_TYPE.PROJECT_CONTRACTS,
+    data: [{ ProjectID: String(projectId), deletedStatusKey: 0, updatedBy: { $exists: true } }, { _id: 1 }],
+}, 'findOne'));
+
+const refuseWithoutContract = (res, source) => res.status(400).json({
+    status: false,
+    statusText: `This project has no billing contract. Set up the contract before drafting an invoice from ${source}.`,
+});
+
+const addDays = (date, days) => new Date(date.getTime() + (Number(days) || 0) * 86400000);
+
+const saveDraft = async ({ companyId, req, projectId, ctx, source, lines, periodStart, periodEnd }) => {
+    const contract = ctx.contract;
+    const priced = priceInvoice(lines.map(sanitizeLine), contract.taxRateBp);
+    const issuedDate = new Date();
+    const number = await nextInvoiceNumber(companyId, projectId, contract);
+    const saved = await MongoDbCrudOpration(companyId, {
+        type: SCHEMA_TYPE.PROJECT_INVOICES,
+        data: {
+            ProjectID: new mongoose.Types.ObjectId(projectId),
+            number,
+            clientName: contract.clientName,
+            source,
+            periodStart: periodStart || null,
+            periodEnd: periodEnd || null,
+            issuedDate,
+            dueDate: addDays(issuedDate, contract.paymentTermsDays),
+            lines: priced.lines,
+            currency: contract.currency,
+            currencySymbol: contract.currencySymbol,
+            taxLabel: contract.taxLabel,
+            taxRateBp: contract.taxRateBp,
+            subtotalMinor: priced.subtotalMinor,
+            taxMinor: priced.taxMinor,
+            totalMinor: priced.totalMinor,
+            status: 'draft',
+            createdBy: actorId(req),
+        },
+    }, 'save');
+
+    removeCache(cacheKeyFor(projectId, companyId));
+    socketEmitter.emit('update', { type: 'add', data: saved, module: 'projectInvoice' });
+    recordAuditFromReq(req, {
+        action: 'billing.invoice.draft',
+        entityType: 'project_invoice',
+        entityId: String(saved._id),
+        entityName: number,
+        meta: { projectId, source, totalMinor: priced.totalMinor, currency: contract.currency, lineCount: priced.lines.length },
+    });
+    return saved;
+};
+
+/* GET /api/v2/invoices?projectId= */
+exports.listInvoices = async (req, res) => {
+    try {
+        const companyId = sessionTenantOf(req);
+        const projectId = String((req.query && req.query.projectId) || '');
+        if (!isObjectIdString(projectId)) {
+            return res.send({ status: false, statusText: 'A valid projectId is required.' });
+        }
+        if (await refuseGuest(req, res)) return undefined;
+        const docs = await MongoDbCrudOpration(companyId, {
+            type: SCHEMA_TYPE.PROJECT_INVOICES,
+            data: [{ ProjectID: new mongoose.Types.ObjectId(projectId), deletedStatusKey: 0 }, null, { sort: { issuedDate: -1, createdAt: -1 } }],
+        }, 'find');
+        return res.send({ status: true, statusText: 'OK', data: docs || [] });
+    } catch (error) {
+        if (error instanceof TenantError) return res.status(error.statusCode).json({ status: false, statusText: error.message });
+        logger.error(`ERROR in list invoices: ${error.message}`);
+        return res.send({ status: false, statusText: error.message });
+    }
+};
+
+/* GET /api/v2/invoices/:id — the invoice plus the tasks and time logs each line
+ * was drafted from, so a line can be expanded without a second round trip. */
+exports.getInvoice = async (req, res) => {
+    try {
+        const companyId = sessionTenantOf(req);
+        const id = String(req.params.id || '');
+        if (!isObjectIdString(id)) {
+            return res.send({ status: false, statusText: 'A valid invoice id is required.' });
+        }
+        if (await refuseGuest(req, res)) return undefined;
+        const invoice = await MongoDbCrudOpration(companyId, {
+            type: SCHEMA_TYPE.PROJECT_INVOICES,
+            data: [{ _id: id, deletedStatusKey: 0 }],
+        }, 'findOne');
+        if (!invoice) return res.send({ status: false, statusText: 'Invoice not found.' });
+
+        const taskIds = [...new Set((invoice.lines || []).flatMap((l) => l.taskIds || []).map(String))];
+        const timelogIds = [...new Set((invoice.lines || []).flatMap((l) => l.timelogIds || []).map(String))];
+        /* A line names its time rows by id: the rows read are those of the invoice's own project. */
+        const timelogs = timelogIds.length ? await MongoDbCrudOpration(companyId, {
+            type: SCHEMA_TYPE.TIMESHEET,
+            data: [{ _id: { $in: timelogIds }, ProjectId: { $in: idForms(String(invoice.ProjectID)) } }, '_id TicketID Loggeduser LogTimeDuration LogStartTime LogDescription'],
+        }, 'find') : [];
+        const openTasks = await openTasksById(companyId, req.uid, [...taskIds, ...(timelogs || []).map((l) => l.TicketID)], { TaskKey: 1, TaskName: 1, statusType: 1 });
+        const names = await billing.resolveUserNames(companyId, (timelogs || []).map((l) => String(l.Loggeduser)));
+
+        return res.send({
+            status: true,
+            statusText: 'OK',
+            data: {
+                invoice,
+                trace: {
+                    tasks: taskIds.map((taskId) => (openTasks[taskId]
+                        ? { _id: taskId, key: openTasks[taskId].TaskKey || '', name: openTasks[taskId].TaskName || '', done: String(openTasks[taskId].statusType || '') === billing.DONE_STATUS_TYPE }
+                        : { _id: taskId, key: '', name: '', done: false, hidden: true })),
+                    timelogs: (timelogs || []).map((l) => ({
+                        _id: String(l._id),
+                        taskId: String(l.TicketID || ''),
+                        userName: names.get(String(l.Loggeduser)) || '',
+                        minutes: Number(l.LogTimeDuration) || 0,
+                        at: Number(l.LogStartTime) || 0,
+                        note: openTasks[String(l.TicketID || '')] ? String(l.LogDescription || '').slice(0, 200) : '',
+                    })),
+                },
+            },
+        });
+    } catch (error) {
+        if (error instanceof TenantError) return res.status(error.statusCode).json({ status: false, statusText: error.message });
+        logger.error(`ERROR in get invoice: ${error.message}`);
+        return res.send({ status: false, statusText: error.message });
+    }
+};
+
+/* POST /api/v2/invoices/draft-from-milestone  body: { projectId, milestoneId } */
+exports.draftFromMilestone = async (req, res) => {
+    try {
+        const companyId = sessionTenantOf(req);
+        const projectId = String((req.body && req.body.projectId) || '');
+        const milestoneId = String((req.body && req.body.milestoneId) || '');
+        if (!isObjectIdString(projectId) || !isObjectIdString(milestoneId)) {
+            return res.send({ status: false, statusText: 'A valid projectId and milestoneId are required.' });
+        }
+        if (await refuseGuest(req, res)) return undefined;
+        const ctx = await billing.buildBillingContext(companyId, projectId);
+        if (!ctx) return res.send({ status: false, statusText: 'Project not found.' });
+        if (!(await hasSavedContract(companyId, projectId))) return refuseWithoutContract(res, 'a milestone');
+        const milestone = ctx.milestones.find((m) => m.id === milestoneId);
+        if (!milestone) return res.send({ status: false, statusText: 'Milestone not found on this project.' });
+        if (milestone.cancelled) return res.send({ status: false, statusText: 'A cancelled milestone cannot be invoiced.' });
+        if (ctx.paidMilestoneIds.has(milestoneId) || ctx.invoicedMilestoneIds.has(milestoneId)) {
+            return res.send({ status: false, statusText: 'This milestone is already on an issued invoice.' });
+        }
+        if (ctx.contract.requireTasksDoneToInvoice && milestone.taskCount > 0 && milestone.doneCount < milestone.taskCount) {
+            return res.send({
+                status: false,
+                statusText: `${milestone.taskCount - milestone.doneCount} task(s) in this milestone are still open. Finish them or turn the rule off in the contract.`,
+            });
+        }
+
+        const lines = [{
+            kind: 'milestone',
+            label: milestone.name,
+            detail: `${milestone.taskCount} tasks`,
+            amountMinor: milestone.amountMinor,
+            milestoneId,
+            taskIds: milestone.taskIds,
+        }];
+        const saved = await saveDraft({ companyId, req, projectId, ctx, source: 'milestone', lines });
+        return res.send({ status: true, statusText: 'Draft invoice created.', data: saved });
+    } catch (error) {
+        if (error instanceof TenantError) return res.status(error.statusCode).json({ status: false, statusText: error.message });
+        logger.error(`ERROR in draft invoice from milestone: ${error.message}`);
+        return res.send({ status: false, statusText: error.message });
+    }
+};
+
+/* POST /api/v2/invoices/draft-from-month  body: { projectId, month: 'YYYY-MM' }
+ * One line per person, from that month's BILLABLE logs at their resolved rate. */
+exports.draftFromMonth = async (req, res) => {
+    try {
+        const companyId = sessionTenantOf(req);
+        const projectId = String((req.body && req.body.projectId) || '');
+        if (!isObjectIdString(projectId)) {
+            return res.send({ status: false, statusText: 'A valid projectId is required.' });
+        }
+        if (await refuseGuest(req, res)) return undefined;
+        const ctx = await billing.buildBillingContext(companyId, projectId);
+        if (!ctx) return res.send({ status: false, statusText: 'Project not found.' });
+        if (!(await hasSavedContract(companyId, projectId))) return refuseWithoutContract(res, 'logged time');
+
+        const { start, end, label } = billing.monthWindow(req.body && req.body.month);
+        const startSec = Math.floor(start.getTime() / 1000);
+        const endSec = Math.floor(end.getTime() / 1000);
+        const rates = await MongoDbCrudOpration(companyId, {
+            type: SCHEMA_TYPE.BILLING_RATES,
+            data: [{ deletedStatusKey: 0 }],
+        }, 'find');
+
+        const byUser = new Map();
+        (ctx.timelogs || []).forEach((log) => {
+            const at = Number(log.LogStartTime) || 0;
+            if (at < startSec || at > endSec) return;
+            if (log.billable === false) return;
+            const minutes = Number(log.LogTimeDuration) || 0;
+            if (minutes <= 0) return;
+            const userId = String(log.Loggeduser || '');
+            if (!byUser.has(userId)) byUser.set(userId, { userId, minutes: 0, taskIds: new Set(), timelogIds: [] });
+            const row = byUser.get(userId);
+            row.minutes += minutes;
+            if (log.TicketID) row.taskIds.add(String(log.TicketID));
+            row.timelogIds.push(String(log._id));
+        });
+        if (!byUser.size) {
+            return res.send({ status: false, statusText: `No billable time logged on this project in ${label}.` });
+        }
+
+        const names = await billing.resolveUserNames(companyId, [...byUser.keys()]);
+        const lines = [...byUser.values()].map((row) => {
+            const rateMinor = math.toMinor(resolveRate({ entry: { Loggeduser: row.userId, ProjectId: projectId }, rates: rates || [] }));
+            const qtyMilli = math.minutesToMilliHours(row.minutes);
+            return {
+                kind: 'time',
+                label: `${names.get(row.userId) || 'Unassigned'} · ${label}`,
+                detail: `${math.milliHoursToHours(qtyMilli).toFixed(2)}h across ${row.taskIds.size} task(s)`,
+                qtyMilli,
+                unitMinor: rateMinor,
+                taskIds: [...row.taskIds],
+                timelogIds: row.timelogIds,
+            };
+        });
+
+        const saved = await saveDraft({
+            companyId, req, projectId, ctx, source: 'month', lines, periodStart: start, periodEnd: end,
+        });
+        return res.send({ status: true, statusText: 'Draft invoice created.', data: saved });
+    } catch (error) {
+        if (error instanceof TenantError) return res.status(error.statusCode).json({ status: false, statusText: error.message });
+        logger.error(`ERROR in draft invoice from month: ${error.message}`);
+        return res.send({ status: false, statusText: error.message });
+    }
+};
+
+/* PUT /api/v2/invoices/:id  body: { lines?, taxRateBp?, dueDate?, notes? }
+ * Only a draft is editable — an issued invoice is a document the client has. */
+exports.updateInvoice = async (req, res) => {
+    try {
+        const companyId = sessionTenantOf(req);
+        const id = String(req.params.id || '');
+        if (!isObjectIdString(id)) {
+            return res.send({ status: false, statusText: 'A valid invoice id is required.' });
+        }
+        if (await refuseGuest(req, res)) return undefined;
+        const invoice = await MongoDbCrudOpration(companyId, {
+            type: SCHEMA_TYPE.PROJECT_INVOICES,
+            data: [{ _id: id, deletedStatusKey: 0 }],
+        }, 'findOne');
+        if (!invoice) return res.send({ status: false, statusText: 'Invoice not found.' });
+        if (invoice.status !== 'draft') {
+            return res.send({ status: false, statusText: 'This invoice has already been issued. Raise a new one instead.' });
+        }
+
+        const body = req.body || {};
+        const set = {};
+        const taxRateBp = body.taxRateBp === undefined ? Number(invoice.taxRateBp) || 0 : Math.max(0, Math.round(Number(body.taxRateBp) || 0));
+        if (taxRateBp > 10000) return res.send({ status: false, statusText: 'A tax rate above 100% is not a tax rate.' });
+        const lines = (body.lines === undefined ? (invoice.lines || []) : body.lines).map(sanitizeLine);
+        const priced = priceInvoice(lines, taxRateBp);
+        set.lines = priced.lines;
+        set.taxRateBp = taxRateBp;
+        set.subtotalMinor = priced.subtotalMinor;
+        set.taxMinor = priced.taxMinor;
+        set.totalMinor = priced.totalMinor;
+        if (body.taxLabel !== undefined) set.taxLabel = String(body.taxLabel).slice(0, 40);
+        if (body.notes !== undefined) set.notes = String(body.notes).slice(0, 2000);
+        if (body.dueDate !== undefined) {
+            const d = new Date(body.dueDate);
+            set.dueDate = Number.isNaN(d.getTime()) ? invoice.dueDate : d;
+        }
+        set.updatedBy = actorId(req);
+
+        const saved = await MongoDbCrudOpration(companyId, {
+            type: SCHEMA_TYPE.PROJECT_INVOICES,
+            data: [{ _id: id }, { $set: set }, { returnDocument: 'after' }],
+        }, 'findOneAndUpdate');
+
+        removeCache(cacheKeyFor(String(invoice.ProjectID), companyId));
+        socketEmitter.emit('update', { type: 'update', data: saved, module: 'projectInvoice' });
+        recordAuditFromReq(req, {
+            action: 'billing.invoice.update',
+            entityType: 'project_invoice',
+            entityId: id,
+            entityName: invoice.number,
+            meta: {
+                projectId: String(invoice.ProjectID),
+                fromTotalMinor: Number(invoice.totalMinor) || 0,
+                toTotalMinor: priced.totalMinor,
+                currency: invoice.currency,
+            },
+        });
+        return res.send({ status: true, statusText: 'Invoice saved.', data: saved });
+    } catch (error) {
+        if (error instanceof TenantError) return res.status(error.statusCode).json({ status: false, statusText: error.message });
+        logger.error(`ERROR in update invoice: ${error.message}`);
+        return res.send({ status: false, statusText: error.message });
+    }
+};
+
+const transition = async (req, res, target) => {
+    const companyId = sessionTenantOf(req);
+    const id = String(req.params.id || '');
+    if (!isObjectIdString(id)) {
+        return res.send({ status: false, statusText: 'A valid invoice id is required.' });
+    }
+    if (await refuseGuest(req, res)) return undefined;
+    const invoice = await MongoDbCrudOpration(companyId, {
+        type: SCHEMA_TYPE.PROJECT_INVOICES,
+        data: [{ _id: id, deletedStatusKey: 0 }],
+    }, 'findOne');
+    if (!invoice) return res.send({ status: false, statusText: 'Invoice not found.' });
+    if (invoice.status === target) return res.send({ status: false, statusText: `This invoice is already ${target}.` });
+    if (target === 'sent' && invoice.status !== 'draft') {
+        return res.send({ status: false, statusText: 'Only a draft can be sent.' });
+    }
+    if (target === 'paid' && invoice.status !== 'sent') {
+        return res.send({ status: false, statusText: 'Send the invoice before marking it paid.' });
+    }
+    if (target === 'sent' && !(invoice.lines || []).length) {
+        return res.send({ status: false, statusText: 'An invoice with no lines cannot be sent.' });
+    }
+
+    const set = { status: target, updatedBy: actorId(req) };
+    if (target === 'sent') set.sentAt = new Date();
+    if (target === 'paid') set.paidAt = new Date();
+
+    const saved = await MongoDbCrudOpration(companyId, {
+        type: SCHEMA_TYPE.PROJECT_INVOICES,
+        data: [{ _id: id }, { $set: set }, { returnDocument: 'after' }],
+    }, 'findOneAndUpdate');
+
+    removeCache(cacheKeyFor(String(invoice.ProjectID), companyId));
+    socketEmitter.emit('update', { type: 'update', data: saved, module: 'projectInvoice' });
+    recordAuditFromReq(req, {
+        action: `billing.invoice.${target}`,
+        entityType: 'project_invoice',
+        entityId: id,
+        entityName: invoice.number,
+        meta: {
+            projectId: String(invoice.ProjectID),
+            totalMinor: Number(invoice.totalMinor) || 0,
+            currency: invoice.currency,
+            milestoneIds: (invoice.lines || []).map((l) => l.milestoneId).filter(Boolean),
+        },
+    });
+    return res.send({ status: true, statusText: target === 'sent' ? 'Invoice sent.' : 'Invoice marked paid.', data: saved });
+};
+
+/* DELETE /api/v2/invoices/:id?projectId= — soft-deletes a draft. An issued invoice is
+ * a document the client already holds, so it can only be superseded, never removed. */
+exports.deleteInvoice = async (req, res) => {
+    try {
+        const companyId = sessionTenantOf(req);
+        const id = String(req.params.id || '');
+        const projectId = String((req.query && req.query.projectId) || (req.body && req.body.projectId) || '');
+        if (!isObjectIdString(id) || !isObjectIdString(projectId)) {
+            return res.status(400).json({ status: false, statusText: 'A valid invoice id and projectId are required.' });
+        }
+        const uid = String(req.uid || '');
+        if (!isPrivileged(await getRoleType(companyId, uid))) {
+            return res.status(403).json({ status: false, statusText: 'Only an owner or admin can delete an invoice.' });
+        }
+        const invoice = await MongoDbCrudOpration(companyId, {
+            type: SCHEMA_TYPE.PROJECT_INVOICES,
+            data: [{ _id: id, deletedStatusKey: 0 }],
+        }, 'findOne');
+        if (!invoice || String(invoice.ProjectID) !== projectId) {
+            return res.status(404).json({ status: false, statusText: 'Invoice not found.' });
+        }
+        const notDraft = { status: false, statusText: 'Only a draft invoice can be deleted. This one has already been issued.' };
+        if (invoice.status !== 'draft') return res.status(409).json(notDraft);
+
+        const deleted = await MongoDbCrudOpration(companyId, {
+            type: SCHEMA_TYPE.PROJECT_INVOICES,
+            data: [{ _id: id, status: 'draft', deletedStatusKey: 0 }, { $set: { deletedStatusKey: 1, updatedBy: uid } }, { returnDocument: 'after' }],
+        }, 'findOneAndUpdate');
+        if (!deleted) return res.status(409).json(notDraft);
+
+        removeCache(cacheKeyFor(projectId, companyId));
+        socketEmitter.emit('update', { type: 'delete', data: { _id: id, ProjectID: projectId }, module: 'projectInvoice' });
+        recordAuditFromReq(req, {
+            action: 'billing.invoice.delete',
+            entityType: 'project_invoice',
+            entityId: id,
+            entityName: invoice.number,
+            meta: { projectId, totalMinor: Number(invoice.totalMinor) || 0, currency: invoice.currency },
+        });
+        return res.json({ status: true, statusText: 'Draft invoice deleted.', data: { _id: id } });
+    } catch (error) {
+        if (error instanceof TenantError) return res.status(error.statusCode).json({ status: false, statusText: error.message });
+        logger.error(`ERROR in delete invoice: ${error.message}`);
+        return res.status(500).json({ status: false, statusText: 'The invoice was not deleted.', message: error.message });
+    }
+};
+
+/* POST /api/v2/invoices/:id/send */
+exports.sendInvoice = async (req, res) => {
+    try {
+        return await transition(req, res, 'sent');
+    } catch (error) {
+        if (error instanceof TenantError) return res.status(error.statusCode).json({ status: false, statusText: error.message });
+        logger.error(`ERROR in send invoice: ${error.message}`);
+        return res.send({ status: false, statusText: error.message });
+    }
+};
+
+/* POST /api/v2/invoices/:id/paid */
+exports.markInvoicePaid = async (req, res) => {
+    try {
+        return await transition(req, res, 'paid');
+    } catch (error) {
+        if (error instanceof TenantError) return res.status(error.statusCode).json({ status: false, statusText: error.message });
+        logger.error(`ERROR in mark invoice paid: ${error.message}`);
+        return res.send({ status: false, statusText: error.message });
+    }
+};
+
+module.exports.LINE_KINDS = LINE_KINDS;
+module.exports.STATUSES = STATUSES;
+module.exports.priceInvoice = priceInvoice;
+module.exports.sanitizeLine = sanitizeLine;

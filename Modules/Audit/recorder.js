@@ -1,7 +1,12 @@
 const { SCHEMA_TYPE } = require("../../Config/schemaType");
 const { MongoDbCrudOpration } = require("../../utils/mongo-handler/mongoQueries");
 const logger = require("../../Config/loggerConfig");
-const { normalizeAuditEntry, retentionCutoff } = require("./helpers/auditRules");
+const { normalizeAuditEntry, retentionCutoff, retentionDaysAtLeast, RETENTION_DEFAULT_DAYS } = require("./helpers/auditRules");
+const chain = require("./chain");
+const { tenantOf } = require("../../Config/tenant");
+const { requestAddress } = require('../../utils/requestAddress');
+
+const OBJECT_ID_PATTERN = /^[a-f0-9]{24}$/i;
 
 // SEC-04 — record an audit row. Fire-and-forget: NEVER throws to the caller, so
 // a logging hiccup can never break the mutation it's recording.
@@ -10,34 +15,69 @@ const recordAudit = (companyId, entry) => {
         if (!companyId) return;
         const n = normalizeAuditEntry(entry);
         if (!n.valid) return;
-        MongoDbCrudOpration(companyId, { type: SCHEMA_TYPE.AUDIT_LOGS, data: n.entry }, 'save')
+        chain.saveAuditRow(companyId, n.entry)
             .catch((e) => logger.error(`recordAudit ${companyId}: ${e.message || e}`));
     } catch (e) {
         logger.error(`recordAudit threw: ${e.message || e}`);
     }
 };
 
-// Convenience: pull actor + ip from an Express req.
+const sessionActorName = async (uid) => {
+    if (!OBJECT_ID_PATTERN.test(uid)) return '';
+    const user = await MongoDbCrudOpration(SCHEMA_TYPE.GOLBAL, { type: SCHEMA_TYPE.USERS, data: [{ _id: uid }, { Employee_Name: 1 }] }, 'findOne');
+    return (user && user.Employee_Name) || '';
+};
+
+// A SCIM request carries no session; its company is the one its bearer token was issued for.
+const auditCompanyOf = (req) => {
+    if (req.scimCompanyId) return String(req.scimCompanyId);
+    try {
+        return tenantOf(req);
+    } catch (e) {
+        return '';
+    }
+};
+
+/* The actor is whoever the session says; a name or id in the request body is only the client's claim. */
 const recordAuditFromReq = (req, entry) => {
-    const companyId = req.headers['companyid'] || (req.body && req.body.companyId);
-    const userData = (req.body && req.body.userData) || {};
-    const forwarded = req.headers['x-forwarded-for'] || req.ip;
-    recordAudit(companyId, {
-        actorId: req.uid || userData.id || userData._id || '',
-        actorName: userData.name || userData.Employee_Name || '',
-        ip: forwarded ? String(forwarded).split(',')[0] : '',
-        ...entry,
-    });
+    const companyId = auditCompanyOf(req);
+    const actorId = req.uid ? String(req.uid) : '';
+    const ip = requestAddress(req);
+    sessionActorName(actorId)
+        .catch((e) => {
+            logger.error(`audit actor lookup ${actorId}: ${e.message || e}`);
+            return '';
+        })
+        .then((actorName) => recordAudit(companyId, { actorId, actorName, ip, ...entry }));
+};
+
+/* Audit rows explain agent runs, so under the chain they are kept at least as long as the runs are. */
+const retentionDaysFor = (requested) => {
+    const days = requested || Number(process.env.AUDIT_RETENTION_DAYS) || undefined;
+    if (!chain.isOn()) return days;
+    const { RETENTION_SECONDS } = require('../Agents/runs');
+    const runDays = Math.ceil(RETENTION_SECONDS / (24 * 60 * 60));
+    const kept = retentionDaysAtLeast(days || RETENTION_DEFAULT_DAYS, runDays);
+    if (kept.clamped) logger.warn(`audit retention: AUDIT_RETENTION_DAYS=${kept.requested} is shorter than the ${runDays} days agent runs are kept, so audit rows are kept ${kept.days} days`);
+    return kept.days;
+};
+
+const pruneCompany = async (companyId, cutoff) => {
+    const requested = chain.config().requested;
+    if (!requested) await chain.reportKeptWhileOff(companyId, cutoff);
+    const anchor = requested ? await chain.anchorBeforePrune(companyId, cutoff) : null;
+    await MongoDbCrudOpration(companyId, { type: SCHEMA_TYPE.AUDIT_LOGS, data: [chain.pruneFilter(anchor, cutoff)] }, 'deleteMany');
+    if (anchor) await chain.mirrorHead(companyId);
 };
 
 // Cron: prune rows older than the retention window, across every company.
 const runAuditRetentionForAllCompanies = async (retentionDays) => {
     try {
         const companies = await MongoDbCrudOpration('global', { type: SCHEMA_TYPE.COMPANIES, data: [{}, { _id: 1 }] }, 'find');
-        const cutoff = retentionCutoff(new Date(), retentionDays || Number(process.env.AUDIT_RETENTION_DAYS) || undefined);
+        const cutoff = retentionCutoff(new Date(), retentionDaysFor(retentionDays));
         for (const c of (companies || [])) {
             // eslint-disable-next-line no-await-in-loop
-            await MongoDbCrudOpration(String(c._id), { type: SCHEMA_TYPE.AUDIT_LOGS, data: [{ createdAt: { $lt: cutoff } }] }, 'deleteMany')
+            await pruneCompany(String(c._id), cutoff)
                 .catch((e) => logger.error(`audit prune ${c._id}: ${e.message || e}`));
         }
     } catch (error) {

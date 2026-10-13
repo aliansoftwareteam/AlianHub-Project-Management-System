@@ -2,7 +2,7 @@
  * AI-powered task time estimator.
  *
  * Given a task, asks the configured LLM (Anthropic preferred, OpenAI/DeepSeek
- * fallback — reuses the AIProjectGenerator/llmProvider factory) for an
+ * fallback — reuses the AICore/llmProvider factory) for an
  * estimated completion time. By default the target is a human DEVELOPER's
  * effort (configurable via ESTIMATE_TARGET=human|agent). The point estimate
  * is persisted to `tasks.totalEstimatedTime` (minutes) and broadcast over
@@ -33,9 +33,11 @@ const { SCHEMA_TYPE } = require('../../Config/schemaType');
 const { MongoDbCrudOpration } = require('../../utils/mongo-handler/mongoQueries');
 const socketEmitter = require('../../event/socketEventEmitter');
 
+const { FEATURES } = require('../AICore/features');
+
 let providerFactory = null;
 try {
-    providerFactory = require('../AIProjectGenerator/llmProvider');
+    providerFactory = require('../AICore/llmProvider');
 } catch (_e) {
     providerFactory = null;
 }
@@ -142,7 +144,7 @@ const SYSTEM_PROMPT = (() => {
         'task-time-estimate.md',
     );
     const raw = fs.readFileSync(promptPath, 'utf8');
-    const cleaned = raw.replace(/^﻿/, '').replace(/\r\n/g, '\n').trim();
+    const cleaned = raw.replace(/^\uFEFF/, '').replace(/\r\n/g, '\n').trim();
     const frag = TARGET_FRAGMENTS[ESTIMATE_TARGET] || TARGET_FRAGMENTS.human;
     return cleaned
         .replace(/\{\{ESTIMATE_TARGET_LABEL\}\}/g, frag.label)
@@ -504,7 +506,7 @@ function resolveProvider() {
 }
 
 /** One model call → one parsed sample (or null). Never throws. */
-async function callOnce(provider, userMessage) {
+async function callOnce(provider, userMessage, spend) {
     try {
         const chatPromise = provider.chat({
             systemPrompt: SYSTEM_PROMPT,
@@ -520,6 +522,7 @@ async function callOnce(provider, userMessage) {
             // 8192 gives the reasoning ample room while non-thinking models
             // (GPT-4.1, Claude, deepseek-chat) self-terminate well under it.
             maxTokens: 8192,
+            spend,
         });
         const result = await Promise.race([
             chatPromise,
@@ -581,7 +584,7 @@ async function runEstimate(companyId, task) {
     const samples = [];
     for (let i = 0; i < ESTIMATE_SAMPLES; i += 1) {
         // eslint-disable-next-line no-await-in-loop
-        const sample = await callOnce(provider, userMessage);
+        const sample = await callOnce(provider, userMessage, { feature: FEATURES.TASK_ESTIMATE, companyId });
         if (sample) samples.push(sample);
     }
     if (!samples.length) return null;
@@ -624,18 +627,20 @@ async function runEstimate(companyId, task) {
     };
 }
 
-async function persistEstimate(companyId, taskId, minutes, opts = {}) {
-    const { userData, previousMinutes, maxMinutes } = opts;
-    // The company cap, applied at the single point every estimate is written.
-    // Prompting the model to stay under a limit is a request; this is where the
-    // limit actually holds — including when the model ignores it, when the
-    // calibration multiplier pushes a value back over, and on any future caller
-    // that forgets the rule exists.
-    let finalMinutes = minutes;
+/* The company cap. Prompting the model to stay under a limit is a request; this
+ * is where the limit holds, including when the calibration multiplier pushes a
+ * value back over. Both the written estimate and a proposal pass through it. */
+function capMinutes(minutes, maxMinutes) {
     if (Number.isFinite(Number(maxMinutes)) && Number(maxMinutes) > 0
         && Number.isFinite(Number(minutes)) && Number(minutes) > Number(maxMinutes)) {
-        finalMinutes = Math.round(Number(maxMinutes));
+        return Math.round(Number(maxMinutes));
     }
+    return minutes;
+}
+
+async function persistEstimate(companyId, taskId, minutes, opts = {}) {
+    const { userData, previousMinutes, maxMinutes } = opts;
+    const finalMinutes = capMinutes(minutes, maxMinutes);
     const updateQuery = {
         type: SCHEMA_TYPE.TASKS,
         data: [
@@ -651,7 +656,7 @@ async function persistEstimate(companyId, taskId, minutes, opts = {}) {
                 type: 'update',
                 data: result,
                 updatedFields: { totalEstimatedTime: finalMinutes },
-                module: 'task',
+                module: 'task', companyId,
             });
         } catch (_e) { /* socket emit best-effort */ }
 
@@ -773,8 +778,38 @@ async function estimateAndPersist({ companyId, taskId, task, force = false, user
     }
 }
 
+/* The same estimate estimateAndPersist would write, returned for the person to
+ * review; nothing is stored, broadcast or logged. Never throws. */
+async function proposeEstimate({ companyId, task, maxMinutes } = {}) {
+    try {
+        if (!companyId || !task) return { status: false, reason: 'missing required input' };
+        if (!providerFactory
+            || typeof providerFactory.isAnyProviderConfigured !== 'function'
+            || !providerFactory.isAnyProviderConfigured()) {
+            return { status: false, reason: 'no LLM provider configured' };
+        }
+        const estimate = await runEstimate(companyId, task);
+        if (!estimate || estimate.minutes == null) return { status: false, reason: 'no estimate returned' };
+        return {
+            status: true,
+            minutes: capMinutes(estimate.minutes, maxMinutes),
+            optimistic: estimate.optimistic,
+            likely: estimate.likely,
+            pessimistic: estimate.pessimistic,
+            confidence: estimate.confidence,
+            work_items: estimate.work_items,
+            reasoning: estimate.reasoning,
+            basedOnSamples: estimate.basedOnSamples,
+        };
+    } catch (error) {
+        logger.error(`AI task estimate proposal failed: ${error && error.message ? error.message : error}`);
+        return { status: false, reason: (error && error.message) || 'estimator error' };
+    }
+}
+
 module.exports = {
     estimateAndPersist,
+    proposeEstimate,
     // Exposed for unit tests / debugging — not part of the runtime contract.
     _internal: {
         clampMinutes,

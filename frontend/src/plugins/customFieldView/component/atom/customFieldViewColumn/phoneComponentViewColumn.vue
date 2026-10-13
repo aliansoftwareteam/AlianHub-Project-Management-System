@@ -11,18 +11,21 @@
             :plugins="[inputUpdateValue]"
         >
             <template #prefix>
-                <DropDown v-if="checkCountrySelect && checkCountrySelect.length" @isVisible="search='',allCountriesArray = allCountries, addListener()" :id="'security'+makeUniqueId(6)">
+                <DropDown themed mode="listbox" v-if="checkCountrySelect && checkCountrySelect.length" @isVisible="search='',allCountriesArray = allCountries, addListener()" :id="'security'+makeUniqueId(6)">
                     <template #button>
                         <div ref="outSideClick" @click="handleClick()" class="d-flex align-items-center align-items-center justify-content-between">
+                            <span class="ah-sr-only">{{$t('CustomField.country_code')}}</span>
                             <div class="d-flex align-items-center">
                                 <div v-if="props?.detail?.fieldCountryObject" :class="`vti__flag ${flag?.toLowerCase()}`" ></div>
                             </div>
                         </div>
                     </template>
-                    <template #options>
+                    <template #search>
                         <input type="text" class="customfield__form-control" :placeHolder="$t('PlaceHolder.search')" v-model="search" @input="handleInput">
+                    </template>
+                    <template #options>
                         <div v-if="allCountriesArray && allCountriesArray.length">
-                            <DropDownOption v-for="(Country,index) in allCountriesArray" :key="index" @click="handleUpdate(Country)">
+                            <DropDownOption v-for="(Country,index) in allCountriesArray" :key="index" :selected="Country.code.toLowerCase() === flag?.toLowerCase()" @click="handleUpdate(Country)">
                                 <div class="d-flex align-items-center">
                                     <div :class="`vti__flag ${Country.code.toLowerCase()}`" ></div>
                                     <p class="ownEveryone">{{Country.en}}</p>
@@ -34,9 +37,10 @@
                         </div>
                     </template>
                 </DropDown>
-                <DropDown @isVisible="search='',allCountriesArray = allCountries" v-else-if="!(checkCountrySelect && checkCountrySelect.length) && props?.detail?.fieldCode && props?.detail?.fieldCountryCode && props?.detail?.fieldCode !== props?.detail?.fieldCountryCode" :id="'security'+makeUniqueId(6)">
+                <DropDown themed mode="listbox" @isVisible="search='',allCountriesArray = allCountries" v-else-if="!(checkCountrySelect && checkCountrySelect.length) && props?.detail?.fieldCode && props?.detail?.fieldCountryCode && props?.detail?.fieldCode !== props?.detail?.fieldCountryCode" :id="'security'+makeUniqueId(6)">
                     <template #button>
                         <div ref="outSideClick" @click="handleClick()" class="d-flex align-items-center align-items-center justify-content-between phone_pipeline">
+                            <span class="ah-sr-only">{{$t('CustomField.country_code')}}</span>
                             <div class="d-flex align-items-center mr-12px">
                                 <div v-if="props?.detail?.fieldCountryObject" :class="`vti__flag ${flag?.toLowerCase()}`" ></div>
                                 <p class="font-size-14 font-weight-400">{{code}}</p>
@@ -46,10 +50,12 @@
                             </div>
                         </div>
                     </template>
-                    <template #options>
+                    <template #search>
                         <input type="text" class="customfield__form-control" :placeHolder="$t('PlaceHolder.search')" v-model="search" @input="handleInput">
+                    </template>
+                    <template #options>
                         <div v-if="allCountriesArray && allCountriesArray.length && (allCountriesArray).filter((x)=>x.code === props.detail.fieldFlag || x.code === props.detail.fieldCountryObject.code).length">
-                            <DropDownOption v-for="(Country,index) in (allCountriesArray).filter((x)=>x.code === props.detail.fieldFlag || x.code === props.detail.fieldCountryObject.code)" :key="index" @click="handleUpdate(Country)">
+                            <DropDownOption v-for="(Country,index) in (allCountriesArray).filter((x)=>x.code === props.detail.fieldFlag || x.code === props.detail.fieldCountryObject.code)" :key="index" :selected="Country.code.toLowerCase() === flag?.toLowerCase()" @click="handleUpdate(Country)">
                                 <div class="d-flex align-items-center">
                                     <div :class="`vti__flag ${Country.code.toLowerCase()}`" ></div>
                                     <p class="ownEveryone">{{Country.en}}</p>
@@ -83,7 +89,7 @@
     </div>
 </template>
 <script setup>
-    import { FormKit } from '@formkit/vue';
+    import { FormKit } from '@/plugins/customFieldView/lazyFormKit';
     import { nextTick, onBeforeUnmount, onMounted, ref, watch } from "vue";
     import { useCustomComposable } from "@/composable";
     import DropDown from '@/components/molecules/DropDown/DropDown.vue';

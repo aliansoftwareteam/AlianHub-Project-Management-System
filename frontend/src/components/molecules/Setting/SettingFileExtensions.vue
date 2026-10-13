@@ -28,7 +28,7 @@
                         </button>
                     </div>
                 </form>
-                <div class="addExtentionWrapper d-flex flex-wrap">
+                <div class="addExtentionWrapper d-flex flex-wrap" role="group" tabindex="0" :aria-label="$t('Milestone.file_extensions')">
                     <div v-for="(object, index) in arrayobj" :key="index">
                         <div class="con-vs-chip vs-chip-null">
                             <span class="text-chip vs-chip--text">

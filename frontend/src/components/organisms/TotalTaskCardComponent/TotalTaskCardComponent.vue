@@ -1,11 +1,11 @@
 <template>
     <div class="d-flex align-items-center justify-content-center h-100 border-radius-8-px">
         <div>
-            <div class="font-size-24 black font-weight-bold text-center" v-if="!isDataFetching">{{ taskRange }}</div>
-            <div class="font-size-24 black font-weight-bold text-center" v-else>
+            <div class="total-task-card-component-font-size-24 total-task-card-component-black total-task-card-component-font-weight-bold text-center" v-if="!isDataFetching">{{ taskRange }}</div>
+            <div class="total-task-card-component-font-size-24 total-task-card-component-black total-task-card-component-font-weight-bold text-center" v-else>
                 <SkelatonVue v-for="index in 1" :key="index"  :style="{height: '45px', width: '160px', borderRadius:'5px', margin: '5px 0px 5px 5px'}" :class="{}"/>
             </div>
-            <div class="font-size-24 black font-weight-bold" v-if="cardDataObject?.measure === 3">{{ cardDataObject?.taskLabel }}</div>
+            <div class="total-task-card-component-font-size-24 total-task-card-component-black total-task-card-component-font-weight-bold" v-if="cardDataObject?.measure === 3">{{ cardDataObject?.taskLabel }}</div>
         </div>
     </div>
 </template>
@@ -221,3 +221,15 @@
         return (sorted[middleIndex - 1] + sorted[middleIndex]) / 2;
     }
 </script>
+
+<style scoped>
+.total-task-card-component-font-size-24 {
+    font-size: 24px;
+}
+.total-task-card-component-font-weight-bold {
+    font-weight: bold;
+}
+.total-task-card-component-black {
+    color: var(--ink);
+}
+</style>

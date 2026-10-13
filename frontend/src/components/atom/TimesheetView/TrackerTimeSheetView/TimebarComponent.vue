@@ -4,7 +4,7 @@
       <div
         v-for="(timeSlot, index) in timeSlots"
         :key="index"
-        class="time-slot bg-white w-100"
+        class="time-slot w-100"
         ref="scrollElement"
         :class="{ 'selected': selectedSlot === timeSlot.time,'inRange':  selectedSlot !== timeSlot.time && timeSlots[index].inRange, 'last-element': timeSlots.length -1 === index ,'cursor-pointer': timeSlots[index].inRange}"
         @click="selectSlot(timeSlot)"

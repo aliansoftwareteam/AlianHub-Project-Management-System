@@ -1,6 +1,9 @@
 const { SCHEMA_TYPE } = require('../../Config/schemaType');
 const { dbCollections } = require('../../Config/collections');
+const mongoose = require('mongoose');
 const { handleConnection } = require("../../middlewares/mongoConnector/mongoConnection")
+const { connections, checkConnectionExists, closeConnection } = require("../../middlewares/mongoConnector/helper")
+const { markRetiring, clearRetiring } = require("../../middlewares/mongoConnector/retiring")
 const {
     timeSheetSchema,
     historySchema,
@@ -54,6 +57,8 @@ const {
     referCodeSchema,
     refferalmapping,
     globalSettingsSchema,
+    schemaVersionsSchema,
+    instanceSettingsSchema,
     webhooksSchema,
     webhookLogsSchema,
     recentVisitsSchema,
@@ -61,13 +66,22 @@ const {
     apiActivityLogsSchema,
     exportJobsSchema,
     importJobsSchema,
+    aiFieldJobsSchema,
+    customFieldLinksSchema,
     epicsSchema,
     pagesSchema,
     pageVersionsSchema,
+    pageCommentsSchema,
     publicSharesSchema,
     intakeItemsSchema,
     publicShareIndexSchema,
     recurringTasksSchema,
+    taskTemplatesSchema,
+    viewTemplatesSchema,
+    projectSnapshotsSchema,
+    everythingViewsSchema,
+    goalsSchema,
+    whiteboardsSchema,
     remindersSchema,
     generalRemindersSchema,
     generalReminderQueueSchema,
@@ -85,10 +99,64 @@ const {
     emailInboxesSchema,
     calendarFeedsSchema,
     automationRulesSchema,
+    automationEventLogSchema,
+    automationRunsSchema,
+    workflowRunsSchema,
+    workflowStepRunsSchema,
+    workflowApprovalsSchema,
+    workflowDefinitionsSchema,
+    agentFindingsSchema,
+    projectFindingsSchema,
+    agentWorkMarksSchema,
+    agentsSchema,
+    agentRunsSchema,
+    agentRevisionsSchema,
+    agentSchedulesSchema,
+    aiUsageSchema,
+    aiReservationsSchema,
+    aiReplaysSchema,
+    aiAlertsSchema,
+    agentProposalsSchema,
+    agentStandingApprovalsSchema,
+    rolePlaybookOverridesSchema,
+    agentSkillsSchema,
+    callsSchema,
     integrationConnectionsSchema,
+    appConnectionEventsSchema,
     cloudStorageConnectionsSchema,
     formsSchema,
-    formSubmissionsSchema
+    formSubmissionsSchema,
+    projectContractsSchema,
+    projectInvoicesSchema,
+    knowledgeChunksSchema,
+    knowledgeIndexStateSchema,
+    knowledgeExclusionsSchema,
+    permissionDecisionsSchema,
+    cspReportsSchema,
+    auditChainHeadsSchema,
+    auditChainAnchorsSchema,
+    auditChainProgressSchema,
+    auditRedactionsSchema,
+    auditChainKeySchema,
+    egressAllowlistsSchema,
+    connectorConnectionsSchema,
+    instructionPatternsSchema,
+    agentSessionsSchema,
+    agentSessionEndpointsSchema,
+    askThreadsSchema,
+    dashboardCardAnswersSchema,
+    taskAiValuesSchema,
+    aiFeedbackSchema,
+    aiEvalRunsSchema,
+    assignmentRulesSchema,
+    assignmentDecisionsSchema,
+    dispatchDecisionsSchema,
+    aiProfilesSchema,
+    secretsSchema,
+    oauthClientsSchema,
+    oauthGrantsSchema,
+    oauthTokensSchema,
+    oauthClientApprovalsSchema
 } = require('./createSchema');
 
 
@@ -200,6 +268,10 @@ exports.checkType = (type) => {
             return refferalmapping
         case SCHEMA_TYPE.GLOBALSETTING:
             return globalSettingsSchema
+        case SCHEMA_TYPE.SCHEMA_VERSIONS:
+            return schemaVersionsSchema
+        case SCHEMA_TYPE.INSTANCE_SETTINGS:
+            return instanceSettingsSchema
         case SCHEMA_TYPE.WEBHOOKS:
             return webhooksSchema
         case SCHEMA_TYPE.WEBHOOK_LOGS:
@@ -214,12 +286,18 @@ exports.checkType = (type) => {
             return exportJobsSchema
         case SCHEMA_TYPE.IMPORT_JOBS:
             return importJobsSchema
+        case SCHEMA_TYPE.AI_FIELD_JOBS:
+            return aiFieldJobsSchema
+        case SCHEMA_TYPE.CUSTOM_FIELD_LINKS:
+            return customFieldLinksSchema
         case SCHEMA_TYPE.EPICS:
             return epicsSchema
         case SCHEMA_TYPE.PAGES:
             return pagesSchema
         case SCHEMA_TYPE.PAGE_VERSIONS:
             return pageVersionsSchema
+        case SCHEMA_TYPE.PAGE_COMMENTS:
+            return pageCommentsSchema
         case SCHEMA_TYPE.PUBLIC_SHARES:
             return publicSharesSchema
         case SCHEMA_TYPE.INTAKE_ITEMS:
@@ -228,6 +306,18 @@ exports.checkType = (type) => {
             return publicShareIndexSchema
         case SCHEMA_TYPE.RECURRING_TASKS:
             return recurringTasksSchema
+        case SCHEMA_TYPE.TASK_TEMPLATES:
+            return taskTemplatesSchema
+        case SCHEMA_TYPE.VIEW_TEMPLATES:
+            return viewTemplatesSchema
+        case SCHEMA_TYPE.PROJECT_SNAPSHOTS:
+            return projectSnapshotsSchema
+        case SCHEMA_TYPE.EVERYTHING_VIEWS:
+            return everythingViewsSchema
+        case SCHEMA_TYPE.GOALS:
+            return goalsSchema
+        case SCHEMA_TYPE.WHITEBOARDS:
+            return whiteboardsSchema
         case SCHEMA_TYPE.REMINDERS:
             return remindersSchema
         case SCHEMA_TYPE.GENERAL_REMINDERS:
@@ -262,14 +352,122 @@ exports.checkType = (type) => {
             return calendarFeedsSchema
         case SCHEMA_TYPE.AUTOMATION_RULES:
             return automationRulesSchema
+        case SCHEMA_TYPE.AUTOMATION_EVENT_LOG:
+            return automationEventLogSchema
+        case SCHEMA_TYPE.AUTOMATION_RUNS:
+            return automationRunsSchema
+        case SCHEMA_TYPE.WORKFLOW_RUNS:
+            return workflowRunsSchema
+        case SCHEMA_TYPE.WORKFLOW_STEP_RUNS:
+            return workflowStepRunsSchema
+        case SCHEMA_TYPE.WORKFLOW_APPROVALS:
+            return workflowApprovalsSchema
+        case SCHEMA_TYPE.WORKFLOW_DEFINITIONS:
+            return workflowDefinitionsSchema
+        case SCHEMA_TYPE.AGENT_FINDINGS:
+            return agentFindingsSchema
+        case SCHEMA_TYPE.PROJECT_FINDINGS:
+            return projectFindingsSchema
+        case SCHEMA_TYPE.AGENT_WORK_MARKS:
+            return agentWorkMarksSchema
+        case SCHEMA_TYPE.AGENTS:
+            return agentsSchema
+        case SCHEMA_TYPE.AGENT_RUNS:
+            return agentRunsSchema
+        case SCHEMA_TYPE.AGENT_REVISIONS:
+            return agentRevisionsSchema
+        case SCHEMA_TYPE.AGENT_SCHEDULES:
+            return agentSchedulesSchema
+        case SCHEMA_TYPE.AI_USAGE:
+            return aiUsageSchema
+        case SCHEMA_TYPE.AI_REPLAYS:
+            return aiReplaysSchema
+        case SCHEMA_TYPE.AI_RESERVATIONS:
+            return aiReservationsSchema
+        case SCHEMA_TYPE.AI_ALERTS:
+            return aiAlertsSchema
+        case SCHEMA_TYPE.AGENT_PROPOSALS:
+            return agentProposalsSchema
+        case SCHEMA_TYPE.AGENT_STANDING_APPROVALS:
+            return agentStandingApprovalsSchema
+        case SCHEMA_TYPE.AGENT_SKILLS:
+            return agentSkillsSchema
+        case SCHEMA_TYPE.ROLE_PLAYBOOK_OVERRIDES:
+            return rolePlaybookOverridesSchema
+        case SCHEMA_TYPE.CALLS:
+            return callsSchema
         case SCHEMA_TYPE.INTEGRATION_CONNECTIONS:
             return integrationConnectionsSchema
+        case SCHEMA_TYPE.APP_CONNECTION_EVENTS:
+            return appConnectionEventsSchema
         case SCHEMA_TYPE.CLOUD_STORAGE_CONNECTIONS:
             return cloudStorageConnectionsSchema
         case SCHEMA_TYPE.FORMS:
             return formsSchema
         case SCHEMA_TYPE.FORM_SUBMISSIONS:
             return formSubmissionsSchema
+        case SCHEMA_TYPE.PROJECT_CONTRACTS:
+            return projectContractsSchema
+        case SCHEMA_TYPE.PROJECT_INVOICES:
+            return projectInvoicesSchema
+        case SCHEMA_TYPE.KNOWLEDGE_CHUNKS:
+            return knowledgeChunksSchema
+        case SCHEMA_TYPE.KNOWLEDGE_INDEX_STATE:
+            return knowledgeIndexStateSchema
+        case SCHEMA_TYPE.KNOWLEDGE_EXCLUSIONS:
+            return knowledgeExclusionsSchema
+        case SCHEMA_TYPE.PERMISSION_DECISIONS:
+            return permissionDecisionsSchema
+        case SCHEMA_TYPE.CSP_REPORTS:
+            return cspReportsSchema
+        case SCHEMA_TYPE.AUDIT_CHAIN_HEADS:
+            return auditChainHeadsSchema
+        case SCHEMA_TYPE.AUDIT_CHAIN_ANCHORS:
+            return auditChainAnchorsSchema
+        case SCHEMA_TYPE.AUDIT_CHAIN_PROGRESS:
+            return auditChainProgressSchema
+        case SCHEMA_TYPE.AUDIT_REDACTIONS:
+            return auditRedactionsSchema
+        case SCHEMA_TYPE.AUDIT_CHAIN_KEY:
+            return auditChainKeySchema
+        case SCHEMA_TYPE.EGRESS_ALLOWLISTS:
+            return egressAllowlistsSchema
+        case SCHEMA_TYPE.CONNECTOR_CONNECTIONS:
+            return connectorConnectionsSchema
+        case SCHEMA_TYPE.INSTRUCTION_PATTERNS:
+            return instructionPatternsSchema
+        case SCHEMA_TYPE.AGENT_SESSIONS:
+            return agentSessionsSchema
+        case SCHEMA_TYPE.AGENT_SESSION_ENDPOINTS:
+            return agentSessionEndpointsSchema
+        case SCHEMA_TYPE.ASK_THREADS:
+            return askThreadsSchema
+        case SCHEMA_TYPE.DASHBOARD_CARD_ANSWERS:
+            return dashboardCardAnswersSchema
+        case SCHEMA_TYPE.TASK_AI_VALUES:
+            return taskAiValuesSchema
+        case SCHEMA_TYPE.AI_FEEDBACK:
+            return aiFeedbackSchema
+        case SCHEMA_TYPE.AI_EVAL_RUNS:
+            return aiEvalRunsSchema
+        case SCHEMA_TYPE.ASSIGNMENT_RULES:
+            return assignmentRulesSchema
+        case SCHEMA_TYPE.ASSIGNMENT_DECISIONS:
+            return assignmentDecisionsSchema
+        case SCHEMA_TYPE.DISPATCH_DECISIONS:
+            return dispatchDecisionsSchema
+        case SCHEMA_TYPE.AI_PROFILES:
+            return aiProfilesSchema
+        case SCHEMA_TYPE.SECRETS:
+            return secretsSchema
+        case SCHEMA_TYPE.OAUTH_CLIENTS:
+            return oauthClientsSchema
+        case SCHEMA_TYPE.OAUTH_GRANTS:
+            return oauthGrantsSchema
+        case SCHEMA_TYPE.OAUTH_TOKENS:
+            return oauthTokensSchema
+        case SCHEMA_TYPE.OAUTH_CLIENT_APPROVALS:
+            return oauthClientApprovalsSchema
         default:
             return ""
     }
@@ -384,6 +582,10 @@ exports.tableType = (type) => {
             return `${dbCollections.REFFERALMAPPING}`   
         case SCHEMA_TYPE.GLOBALSETTING:
                 return `${dbCollections.GLOBALSETTING}`
+        case SCHEMA_TYPE.SCHEMA_VERSIONS:
+                return `${dbCollections.SCHEMA_VERSIONS}`
+        case SCHEMA_TYPE.INSTANCE_SETTINGS:
+                return `${dbCollections.INSTANCE_SETTINGS}`
         case SCHEMA_TYPE.WEBHOOKS:
                 return `${dbCollections.WEBHOOKS}`
         case SCHEMA_TYPE.WEBHOOK_LOGS:
@@ -398,12 +600,18 @@ exports.tableType = (type) => {
                 return `${dbCollections.EXPORT_JOBS}`
         case SCHEMA_TYPE.IMPORT_JOBS:
                 return `${dbCollections.IMPORT_JOBS}`
+        case SCHEMA_TYPE.AI_FIELD_JOBS:
+                return `${dbCollections.AI_FIELD_JOBS}`
+        case SCHEMA_TYPE.CUSTOM_FIELD_LINKS:
+                return `${dbCollections.CUSTOM_FIELD_LINKS}`
         case SCHEMA_TYPE.EPICS:
                 return `${dbCollections.EPICS}`
         case SCHEMA_TYPE.PAGES:
                 return `${dbCollections.PAGES}`
         case SCHEMA_TYPE.PAGE_VERSIONS:
                 return `${dbCollections.PAGE_VERSIONS}`
+        case SCHEMA_TYPE.PAGE_COMMENTS:
+                return `${dbCollections.PAGE_COMMENTS}`
         case SCHEMA_TYPE.PUBLIC_SHARES:
                 return `${dbCollections.PUBLIC_SHARES}`
         case SCHEMA_TYPE.INTAKE_ITEMS:
@@ -412,6 +620,18 @@ exports.tableType = (type) => {
                 return `${dbCollections.PUBLIC_SHARE_INDEX}`
         case SCHEMA_TYPE.RECURRING_TASKS:
                 return `${dbCollections.RECURRING_TASKS}`
+        case SCHEMA_TYPE.TASK_TEMPLATES:
+                return `${dbCollections.TASK_TEMPLATES}`
+        case SCHEMA_TYPE.VIEW_TEMPLATES:
+                return `${dbCollections.VIEW_TEMPLATES}`
+        case SCHEMA_TYPE.PROJECT_SNAPSHOTS:
+                return `${dbCollections.PROJECT_SNAPSHOTS}`
+        case SCHEMA_TYPE.EVERYTHING_VIEWS:
+                return `${dbCollections.EVERYTHING_VIEWS}`
+        case SCHEMA_TYPE.GOALS:
+                return `${dbCollections.GOALS}`
+        case SCHEMA_TYPE.WHITEBOARDS:
+                return `${dbCollections.WHITEBOARDS}`
         case SCHEMA_TYPE.REMINDERS:
                 return `${dbCollections.REMINDERS}`
         case SCHEMA_TYPE.GENERAL_REMINDERS:
@@ -446,18 +666,178 @@ exports.tableType = (type) => {
                 return `${dbCollections.CALENDAR_FEEDS}`
         case SCHEMA_TYPE.AUTOMATION_RULES:
                 return `${dbCollections.AUTOMATION_RULES}`
+        case SCHEMA_TYPE.AUTOMATION_EVENT_LOG:
+                return `${dbCollections.AUTOMATION_EVENT_LOG}`
+        case SCHEMA_TYPE.AUTOMATION_RUNS:
+                return `${dbCollections.AUTOMATION_RUNS}`
+        case SCHEMA_TYPE.WORKFLOW_RUNS:
+                return `${dbCollections.WORKFLOW_RUNS}`
+        case SCHEMA_TYPE.WORKFLOW_STEP_RUNS:
+                return `${dbCollections.WORKFLOW_STEP_RUNS}`
+        case SCHEMA_TYPE.WORKFLOW_APPROVALS:
+                return `${dbCollections.WORKFLOW_APPROVALS}`
+        case SCHEMA_TYPE.WORKFLOW_DEFINITIONS:
+                return `${dbCollections.WORKFLOW_DEFINITIONS}`
+        case SCHEMA_TYPE.AGENT_FINDINGS:
+                return `${dbCollections.AGENT_FINDINGS}`
+        case SCHEMA_TYPE.PROJECT_FINDINGS:
+                return `${dbCollections.PROJECT_FINDINGS}`
+        case SCHEMA_TYPE.AGENT_WORK_MARKS:
+                return `${dbCollections.AGENT_WORK_MARKS}`
+        case SCHEMA_TYPE.AGENTS:
+                return `${dbCollections.AGENTS}`
+        case SCHEMA_TYPE.AGENT_RUNS:
+                return `${dbCollections.AGENT_RUNS}`
+        case SCHEMA_TYPE.AGENT_REVISIONS:
+                return `${dbCollections.AGENT_REVISIONS}`
+        case SCHEMA_TYPE.AGENT_SCHEDULES:
+                return `${dbCollections.AGENT_SCHEDULES}`
+        case SCHEMA_TYPE.AI_USAGE:
+                return `${dbCollections.AI_USAGE}`
+        case SCHEMA_TYPE.AI_REPLAYS:
+                return `${dbCollections.AI_REPLAYS}`
+        case SCHEMA_TYPE.AI_RESERVATIONS:
+                return `${dbCollections.AI_RESERVATIONS}`
+        case SCHEMA_TYPE.AI_ALERTS:
+                return `${dbCollections.AI_ALERTS}`
+        case SCHEMA_TYPE.AGENT_PROPOSALS:
+                return `${dbCollections.AGENT_PROPOSALS}`
+        case SCHEMA_TYPE.AGENT_STANDING_APPROVALS:
+                return `${dbCollections.AGENT_STANDING_APPROVALS}`
+        case SCHEMA_TYPE.AGENT_SKILLS:
+                return `${dbCollections.AGENT_SKILLS}`
+        case SCHEMA_TYPE.ROLE_PLAYBOOK_OVERRIDES:
+                return `${dbCollections.ROLE_PLAYBOOK_OVERRIDES}`
+        case SCHEMA_TYPE.CALLS:
+                return `${dbCollections.CALLS}`
         case SCHEMA_TYPE.INTEGRATION_CONNECTIONS:
                 return `${dbCollections.INTEGRATION_CONNECTIONS}`
+        case SCHEMA_TYPE.APP_CONNECTION_EVENTS:
+                return `${dbCollections.APP_CONNECTION_EVENTS}`
         case SCHEMA_TYPE.CLOUD_STORAGE_CONNECTIONS:
                 return `${dbCollections.CLOUD_STORAGE_CONNECTIONS}`
         case SCHEMA_TYPE.FORMS:
                 return `${dbCollections.FORMS}`
         case SCHEMA_TYPE.FORM_SUBMISSIONS:
                 return `${dbCollections.FORM_SUBMISSIONS}`
+        case SCHEMA_TYPE.PROJECT_CONTRACTS:
+                return `${dbCollections.PROJECT_CONTRACTS}`
+        case SCHEMA_TYPE.PROJECT_INVOICES:
+                return `${dbCollections.PROJECT_INVOICES}`
+        case SCHEMA_TYPE.KNOWLEDGE_CHUNKS:
+                return `${dbCollections.KNOWLEDGE_CHUNKS}`
+        case SCHEMA_TYPE.KNOWLEDGE_INDEX_STATE:
+                return `${dbCollections.KNOWLEDGE_INDEX_STATE}`
+        case SCHEMA_TYPE.KNOWLEDGE_EXCLUSIONS:
+                return `${dbCollections.KNOWLEDGE_EXCLUSIONS}`
+        case SCHEMA_TYPE.PERMISSION_DECISIONS:
+                return `${dbCollections.PERMISSION_DECISIONS}`
+        case SCHEMA_TYPE.CSP_REPORTS:
+                return `${dbCollections.CSP_REPORTS}`
+        case SCHEMA_TYPE.AUDIT_CHAIN_HEADS:
+                return `${dbCollections.AUDIT_CHAIN_HEADS}`
+        case SCHEMA_TYPE.AUDIT_CHAIN_ANCHORS:
+                return `${dbCollections.AUDIT_CHAIN_ANCHORS}`
+        case SCHEMA_TYPE.AUDIT_CHAIN_PROGRESS:
+                return `${dbCollections.AUDIT_CHAIN_PROGRESS}`
+        case SCHEMA_TYPE.AUDIT_REDACTIONS:
+                return `${dbCollections.AUDIT_REDACTIONS}`
+        case SCHEMA_TYPE.AUDIT_CHAIN_KEY:
+                return `${dbCollections.AUDIT_CHAIN_KEY}`
+        case SCHEMA_TYPE.EGRESS_ALLOWLISTS:
+                return `${dbCollections.EGRESS_ALLOWLISTS}`
+        case SCHEMA_TYPE.CONNECTOR_CONNECTIONS:
+                return `${dbCollections.CONNECTOR_CONNECTIONS}`
+        case SCHEMA_TYPE.INSTRUCTION_PATTERNS:
+                return `${dbCollections.INSTRUCTION_PATTERNS}`
+        case SCHEMA_TYPE.AGENT_SESSIONS:
+                return `${dbCollections.AGENT_SESSIONS}`
+        case SCHEMA_TYPE.AGENT_SESSION_ENDPOINTS:
+                return `${dbCollections.AGENT_SESSION_ENDPOINTS}`
+        case SCHEMA_TYPE.ASK_THREADS:
+                return `${dbCollections.ASK_THREADS}`
+        case SCHEMA_TYPE.DASHBOARD_CARD_ANSWERS:
+                return `${dbCollections.DASHBOARD_CARD_ANSWERS}`
+        case SCHEMA_TYPE.TASK_AI_VALUES:
+                return `${dbCollections.TASK_AI_VALUES}`
+        case SCHEMA_TYPE.AI_FEEDBACK:
+                return `${dbCollections.AI_FEEDBACK}`
+        case SCHEMA_TYPE.AI_EVAL_RUNS:
+                return `${dbCollections.AI_EVAL_RUNS}`
+        case SCHEMA_TYPE.ASSIGNMENT_RULES:
+                return `${dbCollections.ASSIGNMENT_RULES}`
+        case SCHEMA_TYPE.ASSIGNMENT_DECISIONS:
+                return `${dbCollections.ASSIGNMENT_DECISIONS}`
+        case SCHEMA_TYPE.DISPATCH_DECISIONS:
+                return `${dbCollections.DISPATCH_DECISIONS}`
+        case SCHEMA_TYPE.AI_PROFILES:
+                return `${dbCollections.AI_PROFILES}`
+        case SCHEMA_TYPE.SECRETS:
+                return `${dbCollections.SECRETS}`
+        case SCHEMA_TYPE.OAUTH_CLIENTS:
+                return `${dbCollections.OAUTH_CLIENTS}`
+        case SCHEMA_TYPE.OAUTH_GRANTS:
+                return `${dbCollections.OAUTH_GRANTS}`
+        case SCHEMA_TYPE.OAUTH_TOKENS:
+                return `${dbCollections.OAUTH_TOKENS}`
+        case SCHEMA_TYPE.OAUTH_CLIENT_APPROVALS:
+                return `${dbCollections.OAUTH_CLIENT_APPROVALS}`
         default:
             return ""
     }
 }
+
+/* connection.model() given a collection name compiles a fresh model on every call, and each
+ * compile fires an unawaited createCollection + createIndexes: every query also wrote to its
+ * database, and one of those writes landing after a dropDatabase recreated the database.
+ * Keyed by schema too, because two schema types share the customField collection. */
+const compiledModels = new WeakMap();
+
+const compiledModel = (database, table, schema) => {
+    if (!compiledModels.has(database)) compiledModels.set(database, new Map());
+    const bySchema = compiledModels.get(database);
+    if (!bySchema.has(schema)) bySchema.set(schema, new Map());
+    const byTable = bySchema.get(schema);
+    if (!byTable.has(table)) byTable.set(table, database.model(table, schema, table));
+    return byTable.get(table);
+};
+
+const modelsOn = (database) => [...(compiledModels.get(database) || new Map()).values()].flatMap((byTable) => [...byTable.values()]);
+
+const settleSchemaInit = async (database) => {
+    let settled = 0;
+    while (modelsOn(database).length > settled) {
+        const models = modelsOn(database);
+        settled = models.length;
+        await Promise.allSettled(models.map((model) => model.init()));
+    }
+};
+
+/* Refuses new connections to the company from the start, then retires the pooled one, so neither
+ * a request arriving mid-deletion nor a schema init the pool started can reach the database after
+ * the drop. A dedicated connection drops it: mongoose.connect would open the process-wide default
+ * connection, which refuses to reopen for a second company once active. */
+exports.dropCompanyDatabase = async (companyId) => {
+    markRetiring(companyId);
+    try {
+        const pooled = checkConnectionExists({ connections, db: companyId });
+        if (pooled) {
+            await settleSchemaInit(pooled.connection);
+            closeConnection(companyId);
+        }
+        const baseUrl = String(process.env.MONGODB_URL || '').replace(/\/+$/, '');
+        const connStr = baseUrl.startsWith('mongodb+srv') ? `${baseUrl}/${companyId}` : `${baseUrl}/${companyId}?authSource=admin`;
+        const connection = await mongoose.createConnection(connStr).asPromise();
+        try {
+            await connection.dropDatabase();
+        } finally {
+            await connection.close();
+        }
+    } catch (error) {
+        clearRetiring(companyId);
+        throw error;
+    }
+};
 
 /**
  * MongoDb CrudOpration Insert, Update, Delete
@@ -467,9 +847,17 @@ exports.tableType = (type) => {
  * @returns {Promise<String>} A Promise that resolves with the Response from db.
  *                            Rejects with an error message if any issues occur during the Process.
  */
+const TASK_WRITES = ['findOneAndUpdate', 'updateOne', 'updateMany', 'deleteOne', 'deleteMany', 'findOneAndDelete', 'findOneAndReplace', 'replaceOne'];
+/* Mongoose drops an undefined id from a filter, so a write whose filter reads { _id: undefined } would land on the first task. */
+const namesNoTask = (filter) => filter && typeof filter === 'object' && !Array.isArray(filter) && Object.hasOwn(filter, '_id') && (filter._id === undefined || filter._id === null || filter._id === '');
+
 exports.MongoDbCrudOpration = (companyId, data, method) => {
     return new Promise(async (resolve, reject) => {
         try {
+            if (data && data.type === SCHEMA_TYPE.TASKS && TASK_WRITES.includes(method) && Array.isArray(data.data) && namesNoTask(data.data[0])) {
+                reject(new Error('A task write must name the task: the filter has an empty _id.'));
+                return;
+            }
             var res = await handleConnection(companyId)
             if (res?.status) {
                 let { database } = res
@@ -480,7 +868,7 @@ exports.MongoDbCrudOpration = (companyId, data, method) => {
                 let table = this.tableType(data.type)
                 var myVariable = this.checkType(data.type)
                 if (method === 'save') {
-                    const Model = database.model(table, myVariable, table);
+                    const Model = compiledModel(database, table, myVariable);
                     const newDocument = new Model(data.data);
                     newDocument.save().then((res) => {
                         resolve(res)
@@ -488,8 +876,16 @@ exports.MongoDbCrudOpration = (companyId, data, method) => {
                         reject(err)
                     });
                 }
+                else if (method === 'createIndex') {
+                    const model = compiledModel(database, table, myVariable)
+                    model.collection.createIndex(...data.data).then(resolve).catch(reject)
+                }
+                else if (method === 'dropIndex') {
+                    const model = compiledModel(database, table, myVariable)
+                    model.collection.dropIndex(...data.data).then(resolve).catch(reject)
+                }
                 else if (method == "find") {
-                    const model = database.model(table, myVariable, table)
+                    const model = compiledModel(database, table, myVariable)
                     model[method].apply(model, data.data).then((res) => {
                         resolve(res)
                     }).catch((err) => {
@@ -497,7 +893,7 @@ exports.MongoDbCrudOpration = (companyId, data, method) => {
                     })
                 }
                 else {
-                    const model = database.model(table, myVariable, table)
+                    const model = compiledModel(database, table, myVariable)
                     model[method].apply(model, data.data).then((res) => {
                         resolve(res)
                     }).catch((err) => {

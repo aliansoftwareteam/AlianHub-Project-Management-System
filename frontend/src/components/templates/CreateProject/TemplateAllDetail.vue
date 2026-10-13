@@ -36,6 +36,7 @@ import { useRoute, useRouter } from "vue-router";
 import {storageQueryBuilder,generateFileName} from '@/utils/storageQueryBuild.js';
 import * as env from '@/config/env';
 import { useI18n } from "vue-i18n";
+import { companyCurrency } from '@/utils/companyCurrency';
 const { t } = useI18n();
 const  { checkAllFields } = useValidation();
 
@@ -55,7 +56,7 @@ const  { checkAllFields } = useValidation();
             default : ()=>({})
         }
     });
-    const defaultCurrency = computed(() => getters['settings/allCurrencyArray']?.find((x) => x.code === "INR"))
+    const defaultCurrency = computed(() => companyCurrency(getters['settings/allCurrencyArray']))
     const formData = ref(props.modelValue);
     const templateViewObj = ref(props.templateView);
     const proIconData = ref({});
@@ -189,9 +190,10 @@ const  { checkAllFields } = useValidation();
     cursor: pointer;
 }
 .templateall__submit-btn{
-   background: #2F3990; border-radius: 4px; color: white; border: none; padding: 3px 14.1px;
+   background: var(--brand); border-radius: 4px; color: var(--on-brand); border: none; padding: 3px 14.1px;
 }
 .disableButton {
-    background-color: #818181 !important;
+    background-color: var(--fill) !important;
+    color: var(--ink-2);
 }
 </style>

@@ -25,8 +25,11 @@ const { handleFileUploadForTrackerSS,handleuploadMainFileForbase64Thumbnail } = 
  * @returns
  */
 const { updateProjectForTimelog, updateRemainingTime } = require('./helpers');
+const { pinSessionTenant } = require('../../../Config/tenant');
 exports.captureTimetracker = (req, res) => {
     try {
+        const companyId = pinSessionTenant(req, res);
+        if (!companyId) return;
         if (!(req.body && req.body.file)) {
             res.send({
                 status: false,
@@ -38,13 +41,6 @@ exports.captureTimetracker = (req, res) => {
             res.send({
                 status: false,
                 statusText: 'path is required'
-            });
-            return;
-        }
-        if (!(req.body && req.body.companyId)) {
-            res.send({
-                status: false,
-                statusText: 'companyId is required'
             });
             return;
         }
@@ -109,13 +105,12 @@ exports.captureTimetracker = (req, res) => {
                     statusText: `Error file create:${err}`
                 })
             }
-            handleuploadMainFileForbase64Thumbnail(req.body.companyId, req.body.path, req.body.file, false, 'trackshot').then((fileName) => {
+            handleuploadMainFileForbase64Thumbnail(companyId, req.body.path, req.body.file, false, 'trackshot').then((fileName) => {
                 fs.unlink(`wasabiUploads/${filenames}`, (err) => {
                     if (err) {
                         logger.error(`Error deleting file: ${err}`);
                     }
                 });
-                let companyId = req.body.companyId
                 let type = req.body.type||SCHEMA_TYPE.TIMESHEET
                 let objGet = {
                     type: type,
@@ -125,7 +120,7 @@ exports.captureTimetracker = (req, res) => {
                         },
                      }]
                 }
-                MongoDbCrudOpration(req.body.companyId, objGet, "findOne")
+                MongoDbCrudOpration(companyId, objGet, "findOne")
                     .then((response) => {
                         const utcDateTime = DateTime.utc();
                         const timeStamp = Math.floor(utcDateTime.toSeconds());
@@ -161,10 +156,10 @@ exports.captureTimetracker = (req, res) => {
                             },
                             { new: true, useFindAndModify: false }]
                         }
-                        MongoDbCrudOpration(req.body.companyId, obj, "findOneAndUpdate")
+                        MongoDbCrudOpration(companyId, obj, "findOneAndUpdate")
                         .then(updateRes => {
-                            updateProjectForTimelog(req.body.companyId, response.ProjectId, false, timeStamp, response.Loggeduser, response.TicketID, req.body.timeSheetId, true)
-                            updateRemainingTime(req.body.companyId,response.TicketID);
+                            updateProjectForTimelog(companyId, response.ProjectId, false, timeStamp, response.Loggeduser, response.TicketID, req.body.timeSheetId, true)
+                            updateRemainingTime(companyId,response.TicketID);
                             res.send({
                                 status: true,
                                 statusText: `Data Update Succesfully`
@@ -200,6 +195,8 @@ exports.captureTimetracker = (req, res) => {
 
 exports.captureTimetracker2 = (req, res) => {
     try {
+        const companyId = pinSessionTenant(req, res);
+        if (!companyId) return;
         if (!(req.body && req.file)) {
             res.send({
                 status: false,
@@ -211,13 +208,6 @@ exports.captureTimetracker2 = (req, res) => {
             res.send({
                 status: false,
                 statusText: 'path is required'
-            });
-            return;
-        }
-        if (!(req.body && req.body.companyId)) {
-            res.send({
-                status: false,
-                statusText: 'companyId is required'
             });
             return;
         }
@@ -270,7 +260,7 @@ exports.captureTimetracker2 = (req, res) => {
             });
             return;
         }
-            handleFileUploadForTrackerSS(req.body.companyId, req.body.path, req.file.path, false ,req.file,  'trackshot').then((fileName) => {
+            handleFileUploadForTrackerSS(companyId, req.body.path, req.file.path, false ,req.file,  'trackshot').then((fileName) => {
                 let type = req.body.type||SCHEMA_TYPE.TIMESHEET
                 let objGet = {
                     type: type,
@@ -280,7 +270,7 @@ exports.captureTimetracker2 = (req, res) => {
                         },
                      }]
                 }
-                MongoDbCrudOpration(req.body.companyId, objGet, "findOne")
+                MongoDbCrudOpration(companyId, objGet, "findOne")
                     .then((response) => {
                         const utcDateTime = DateTime.utc();
                         const timeStamp = Math.floor(utcDateTime.toSeconds());
@@ -315,10 +305,10 @@ exports.captureTimetracker2 = (req, res) => {
                             },
                             { new: true, useFindAndModify: false }]
                         }
-                        MongoDbCrudOpration(req.body.companyId, obj, "findOneAndUpdate")
+                        MongoDbCrudOpration(companyId, obj, "findOneAndUpdate")
                         .then(() => {
-                            updateProjectForTimelog(req.body.companyId, response.ProjectId, false, timeStamp, response.Loggeduser, response.TicketID, req.body.timeSheetId, true)
-                            updateRemainingTime(req.body.companyId,response.TicketID);
+                            updateProjectForTimelog(companyId, response.ProjectId, false, timeStamp, response.Loggeduser, response.TicketID, req.body.timeSheetId, true)
+                            updateRemainingTime(companyId,response.TicketID);
                             res.send({
                                 status: true,
                                 statusText: `Data Update Succesfully`
@@ -351,6 +341,8 @@ exports.captureTimetracker2 = (req, res) => {
 
 exports.captureTimetracker3 = (req, res) => {
     try {
+        const companyId = pinSessionTenant(req, res);
+        if (!companyId) return;
         if (!(req.body && req.file)) {
             res.send({
                 status: false,
@@ -362,13 +354,6 @@ exports.captureTimetracker3 = (req, res) => {
             res.send({
                 status: false,
                 statusText: 'path is required'
-            });
-            return;
-        }
-        if (!(req.body && req.body.companyId)) {
-            res.send({
-                status: false,
-                statusText: 'companyId is required'
             });
             return;
         }
@@ -421,7 +406,7 @@ exports.captureTimetracker3 = (req, res) => {
             });
             return;
         }
-            handleFileUploadForTrackerSS(req.body.companyId, req.body.path, req.file.path, false ,req.file,  'trackshot').then((fileName) => {
+            handleFileUploadForTrackerSS(companyId, req.body.path, req.file.path, false ,req.file,  'trackshot').then((fileName) => {
                 let type = req.body.type||SCHEMA_TYPE.TIMESHEET
                 let objGet = {
                     type: type,
@@ -431,7 +416,7 @@ exports.captureTimetracker3 = (req, res) => {
                         },
                      }]
                 }
-                MongoDbCrudOpration(req.body.companyId, objGet, "findOne")
+                MongoDbCrudOpration(companyId, objGet, "findOne")
                     .then((response) => {
                         let object = {
                             type: SCHEMA_TYPE.COMPANY_USERS,
@@ -445,7 +430,7 @@ exports.captureTimetracker3 = (req, res) => {
                                 }
                             ]
                         }
-                        MongoDbCrudOpration(req.body.companyId, object,"findOne").then((cUser)=>{
+                        MongoDbCrudOpration(companyId, object,"findOne").then((cUser)=>{
                             if (cUser.isTrackerUser) {    
                                 const utcDateTime = DateTime.utc();
                                 const timeStamp = Math.floor(utcDateTime.toSeconds());
@@ -480,10 +465,10 @@ exports.captureTimetracker3 = (req, res) => {
                                     },
                                     { new: true, useFindAndModify: false }]
                                 }
-                                MongoDbCrudOpration(req.body.companyId, obj, "findOneAndUpdate")
+                                MongoDbCrudOpration(companyId, obj, "findOneAndUpdate")
                                 .then(() => {
-                                    updateProjectForTimelog(req.body.companyId, response.ProjectId, false, timeStamp, response.Loggeduser, response.TicketID, req.body.timeSheetId, true)
-                                    updateRemainingTime(req.body.companyId,response.TicketID);
+                                    updateProjectForTimelog(companyId, response.ProjectId, false, timeStamp, response.Loggeduser, response.TicketID, req.body.timeSheetId, true)
+                                    updateRemainingTime(companyId,response.TicketID);
                                     res.send({
                                         status: true,
                                         statusText: `Data Update Succesfully`
