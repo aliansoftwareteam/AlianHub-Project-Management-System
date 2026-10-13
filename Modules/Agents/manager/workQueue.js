@@ -43,7 +43,15 @@ const REFUSAL = Object.freeze({
     NOT_CONNECTED: 'Only a connected agent takes work from the queue.',
     NO_ITEM: 'That item was not found. Check queue.list.',
     TAKEN: 'Another agent holds that item. Pick another one.',
+    TAKEN_BY_ROLE: (role) => `The ${role} role on your own connection holds that item. Pick another one.`,
+    TAKEN_WITHOUT_ROLE: 'Your own connection holds that item without a role. Give it back without a role first.',
+    OTHER_ROLE: (role) => `That item was routed to the ${role} role, not to the role you work as. Pick one from your own queue.`,
+    NOT_ROUTED: 'That item was not routed to a role. Claim it without a role.',
+    BAD_ROLE: 'A role is written as blueprint/slug, as in it-company/bug-triager.',
     NOT_HELD: 'You do not hold that item. Your claim may have run out, or a person took the item back.',
+    NOT_HELD_AS: (role) => `You do not hold that item as the ${role} role. Your claim may have run out, or a person took the item back.`,
+    HELD_BY_ROLE: (role) => `The ${role} role on your own connection holds that item, not you. Only that role gives it back.`,
+    HELD_WITHOUT_ROLE: 'You claimed that item without a role. Give it back without a role.',
     NOT_YOUR_AI: 'You can hand a task only to your own connected AI.',
     ONE_AT_A_TIME: 'You already hold an item. Finish it or give it back with queue.release, then take the next one.',
     PROJECT_FULL: 'This project already has as many agents at work as it allows. Wait, then ask again: an item is handed out when one of them finishes.',
@@ -71,6 +79,26 @@ const nameOf = async (actor) => byline(toolNameOf(actor), actor.personName || ((
 /* A task handed to one person's AI is work for that person's connections only. */
 const handedTo = (row) => String((row.rule === HANDED_OVER && row.facts && row.facts.handedTo) || '');
 const offeredTo = (row, uid) => !handedTo(row) || handedTo(row) === String(uid);
+
+/* Several roles can work over one connection at once (each work_as_<role> prompt), so a claim, the one item a
+ * holder may have and its place in a project belong to the connection and the role it works as together. Without a
+ * role the holder is the bare connection, as before roles. */
+const ROLE_MARK = '#';
+const ROLE_NAME = /^[a-z0-9-]+\/[a-z0-9-]+$/;
+const ROLE_MAX = 100;
+const isRole = (role) => typeof role === 'string' && role.length <= ROLE_MAX && ROLE_NAME.test(role);
+/* '' for a role that is not one, so nothing is ever held under it. */
+const holderOf = (actor, role) => {
+    const connection = connectionOf(actor);
+    if (!role) return connection;
+    return connection && isRole(role) ? `${connection}${ROLE_MARK}${role}` : '';
+};
+const roleOfHolder = (holder) => {
+    const at = String(holder || '').indexOf(ROLE_MARK);
+    return at < 0 ? '' : String(holder).slice(at + 1);
+};
+const sameConnection = (holder, connection) => String(holder || '').split(ROLE_MARK)[0] === connection;
+const routedRole = (row) => String((row && row.rule === HANDED_OVER && row.facts && row.facts.role) || '');
 
 const liveClaim = (row, now) => (row && row.claim && new Date(row.claim.until).getTime() > new Date(now).getTime() ? row.claim : null);
 
@@ -202,19 +230,31 @@ const executors = {
      * A new claim then needs the connection's one hand and a place in the project, each by a write only one caller
      * wins; the caller that gets neither gives the claim back. */
     async 'queue.claim'({ companyId, actor, params }) {
-        const connection = connectionOf(actor);
-        if (!connection) throw new DeterministicError(REFUSAL.NOT_CONNECTED);
+        if (!connectionOf(actor)) throw new DeterministicError(REFUSAL.NOT_CONNECTED);
+        if (params.role && !isRole(params.role)) throw new DeterministicError(REFUSAL.BAD_ROLE);
+        const connection = holderOf(actor, params.role);
         const item = await itemFor({ companyId, uid: actor.userId, itemId: params.itemId, asAgent: true });
         if (!item) throw new DeterministicError(REFUSAL.NO_ITEM);
+        // A role names its own hand and project place, so it may claim only what was routed to it: an invented role
+        // on any other item would be a second hand for the same connection.
+        if (params.role && !routedRole(item.row)) throw new DeterministicError(REFUSAL.NOT_ROUTED);
+        if (params.role && routedRole(item.row) !== params.role) throw new DeterministicError(REFUSAL.OTHER_ROLE(routedRole(item.row)));
         const now = new Date();
         const held = await heldBy(companyId, item.row, now);
+        if (held && held.by !== connection && sameConnection(held.by, connectionOf(actor))) {
+            throw new DeterministicError(roleOfHolder(held.by) ? REFUSAL.TAKEN_BY_ROLE(roleOfHolder(held.by)) : REFUSAL.TAKEN_WITHOUT_ROLE);
+        }
         // A claim kept longer keeps the time it was first taken: a list of tasks shows it as "since".
         const at = held && held.by === connection ? held.at : now;
         const claim = { by: connection, userId: String(actor.userId), name: await nameOf(actor), at, until: new Date(now.getTime() + CLAIM_MINUTES * MINUTE_MS) };
         const taken = await change(companyId, {
-            ...waiting, _id: item.row._id, $or: [{ claim: null }, { 'claim.until': { $lte: now } }, { 'claim.by': connection }],
+            ...waiting, _id: item.row._id, ...(params.role ? { 'facts.role': params.role } : {}), $or: [{ claim: null }, { 'claim.until': { $lte: now } }, { 'claim.by': connection }],
         }, { $set: { claim } });
-        if (!taken) throw new DeterministicError(REFUSAL.TAKEN);
+        if (!taken) {
+            const [current] = params.role ? await find(companyId, SCHEMA_TYPE.PROJECT_FINDINGS, [{ _id: item.row._id }]) : [];
+            if (current && routedRole(current) !== params.role) throw new DeterministicError(REFUSAL.OTHER_ROLE(routedRole(current)));
+            throw new DeterministicError(REFUSAL.TAKEN);
+        }
         const renews = Boolean(held && held.by === connection);
         const place = renews ? { held: '' } : await places.takeFor({ companyId, projectId: item.projectId, connection, itemId: item.row._id, now, holds: claimStands(companyId, now) });
         if (place.held) {
@@ -229,17 +269,22 @@ const executors = {
     },
 
     async 'queue.release'({ companyId, actor, params }) {
-        const connection = connectionOf(actor);
+        if (params.role && !isRole(params.role)) throw new DeterministicError(REFUSAL.BAD_ROLE);
+        const connection = holderOf(actor, params.role);
+        const notHeld = params.role ? REFUSAL.NOT_HELD_AS(params.role) : REFUSAL.NOT_HELD;
         const item = connection ? await itemFor({ companyId, uid: actor.userId, itemId: params.itemId, asAgent: true }) : null;
         const now = new Date();
         const claim = item ? liveClaim(item.row, now) : null;
-        if (!claim || claim.by !== connection) throw new DeterministicError(REFUSAL.NOT_HELD);
+        if (claim && claim.by !== connection && sameConnection(claim.by, connectionOf(actor))) {
+            throw new DeterministicError(roleOfHolder(claim.by) ? REFUSAL.HELD_BY_ROLE(roleOfHolder(claim.by)) : REFUSAL.HELD_WITHOUT_ROLE);
+        }
+        if (!claim || claim.by !== connection) throw new DeterministicError(notHeld);
         const finished = params.finished === true;
         const leaves = LEAVES_WHEN_FINISHED.includes(item.row.rule);
         const left = { why: LEFT.FINISHED, userId: String(actor.userId), name: claim.name, at: now };
         const set = finished ? { leftQueue: left, ...(leaves ? { status: STATUS.CLOSED, closedAt: now } : {}) } : null;
         const released = await change(companyId, { _id: item.row._id, 'claim.by': connection }, { $unset: { claim: '' }, ...(set ? { $set: set } : {}) });
-        if (!released) throw new DeterministicError(REFUSAL.NOT_HELD);
+        if (!released) throw new DeterministicError(notHeld);
         await places.giveBack(companyId, item.row._id, connection);
         announce(companyId);
         return {
@@ -429,6 +474,17 @@ const closeFinished = async (companyId, projectId, now = new Date()) => {
     await Promise.all(rows.filter((row) => open.has(String(row.taskId))).map((row) => standing(companyId, row, now)));
 };
 
+/* A lead re-routed a held item: a claim made as the old role is no longer that role's work, so it is dropped and its
+ * place given back. A claim made without a role stands. */
+const reRouted = async (companyId, row, role) => {
+    const by = row && row.claim && row.claim.by;
+    const was = roleOfHolder(by);
+    if (!was || was === role) return false;
+    const dropped = await change(companyId, { _id: row._id, 'claim.by': by }, { $unset: { claim: '' } });
+    if (dropped) await places.giveBack(companyId, row._id, by);
+    return Boolean(dropped);
+};
+
 /* A pause takes every item out of the agents' hands at once, so no task still reads as being worked on: the items of
  * one project, or with no project named those of the whole workspace. */
 const dropClaimsIn = async (companyId, projectId = null) => {
@@ -440,5 +496,5 @@ const dropClaimsIn = async (companyId, projectId = null) => {
 };
 
 module.exports = {
-    CLAIM_MINUTES, QUEUE_RULES, LEFT, REFUSAL, LISTED_MAX, announce, connectionOf, liveClaim, itemsFor, itemFor, executors, inverses, claimsOf, heldTasks, aboutTask, handOver, pickableOn, handOverFromComment, takeBack, closeFinished, dropClaimsIn,
+    CLAIM_MINUTES, QUEUE_RULES, LEFT, REFUSAL, LISTED_MAX, announce, connectionOf, holderOf, reRouted, liveClaim, itemsFor, itemFor, executors, inverses, claimsOf, heldTasks, aboutTask, handOver, pickableOn, handOverFromComment, takeBack, closeFinished, dropClaimsIn,
 };
