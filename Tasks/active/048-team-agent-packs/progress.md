@@ -54,3 +54,5 @@ Confirmed by the owner on 2026-10-08: "go with your recommendations". Decisions 
 
 ### 2026-10-13
 - AP-493 (`pack-brings-setup.md`): a type starter rule falls back to the role's tag of that name when the project lacks the type (Bug Triager routes on `bug`), and playbooks declare `fields:` that an apply proposes as one fields.create approval per project; Order Intake, Non-conformance Recorder, Maintenance Planner and Bug Triager declare theirs. Undo withdraws a waiting field approval; approved fields stay.
+- Builds 865 and 866: each role keeps its own queue claim on a shared connection (#1635, 865); packs propose their playbooks' fields and route on the role's tag when a type is missing (#1637, 866). Pack run 2 findings 1 to 4 and 6 are fixed. Finding 5 stays: creates from an outside AI keep waiting for approval (owner decision A, 2026-10-13).
+- Owner decision A on AP-523: the IT company pack re-applied on AlianHub Platform, tags `bug` and `needs-triage` approved, rule tag `bug` → Bug Triager, in "Suggests changes".

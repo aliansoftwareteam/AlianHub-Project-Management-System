@@ -1,21 +1,26 @@
 # Handoff: where to start next session
 
-Updated 2026-10-10 IST. Read this first, then `Tasks/index.md` and the `progress.md` files named below. Overwrite this file at the end of every session.
+Updated 2026-10-13 IST. Read this first, then `Tasks/index.md` and the `progress.md` files named below. Overwrite this file at the end of every session.
 
 ## State
 
 - **Four tasks are in hand.**
-  - Task 047, "AI-run" (`Tasks/active/047-ai-run/`, tracker AP-441): the agent is the person's own Claude or ChatGPT over MCP (decision 30). **AI-1 run 2 is done: 15 of 15 pass, three runs each** (#1630); its fixes are #1631 and #1632.
-  - Task 048, "Team agent packs" (`Tasks/active/048-team-agent-packs/`): parts 1 to 6 merged. Pack run 2 (Manufacturing) is measured (#1628) and its fixes merged (#1629). Left: the flow board, the owner's read of the playbooks.
+  - Task 047, "AI-run" (`Tasks/active/047-ai-run/`, tracker AP-441): the agent is the person's own Claude or ChatGPT over MCP (decision 30). **AI-1 run 2 is done: 15 of 15 pass, three runs each** (#1630); its fixes are #1631 and #1632; the scorecard's AI row is current (#1634, AP-487).
+  - Task 048, "Team agent packs" (`Tasks/active/048-team-agent-packs/`): parts 1 to 6 merged. Pack run 2 (Manufacturing) is measured (#1628); its findings 1 to 4 and 6 are fixed (#1629, #1635, #1637). Finding 5 stays by owner decision A. Left: the flow board, the owner's read of the playbooks.
   - Task 049, "GitHub repos per project" (`Tasks/active/049-github-repos-per-project/`, tracker AP-524): merged (#1627, migration 075).
   - Task 046, "great next to ClickUp": no new parity features; fixes, proof and the held PRs remain.
-- **`beta` is at build 861** (#1632). This docs PR becomes the next build.
-- **Local build (localhost):** `DISPATCHER=on`, `MCP_ROLE_PROMPTS=on` and `APP_CONNECTIONS=on` in the owner's `.env` (approved by the owner). Check which build the server answers with `npm run version:show` after a rebuild. The daily AI budget is $50 and the monthly $1,500. GitHub is connected by one-click OAuth (the owner set the `GITHUB_CONNECT_*` keys), `api.github.com` is allowed on the main workspace's egress, and AlianHub Platform is mapped to aliansoftwareteam/AlianHub-Project-Management-System. The IT company pack is on AlianHub Platform with its 3 agents on ("Suggests changes"); the Manufacturing pack is on Sweep Project W2d with its 3 agents paused. Start the server only with the "alianhub-api" launch entry: it now unsets the `ANTHROPIC_MODEL` that Claude Code passes down (it had made the server use "opusplan").
+- **`beta` is at build 866** (#1637). This docs PR becomes the next build.
+- **Local build (localhost): build 866.** `DISPATCHER=on`, `MCP_ROLE_PROMPTS=on` and `APP_CONNECTIONS=on` in the owner's `.env` (approved by the owner). Check which build the server answers with `npm run version:show` after a rebuild. The daily AI budget is $50 and the monthly $1,500. GitHub is connected by one-click OAuth (the owner set the `GITHUB_CONNECT_*` keys), `api.github.com` is allowed on the main workspace's egress, and AlianHub Platform is mapped to aliansoftwareteam/AlianHub-Project-Management-System. The IT company pack is re-applied on AlianHub Platform with its 3 agents on ("Suggests changes"), tags `bug` and `needs-triage` approved and the rule tag `bug` → Bug Triager (AP-523); the Manufacturing pack is on Sweep Project W2d with its 3 agents paused. Start the server only with the "alianhub-api" launch entry: it now unsets the `ANTHROPIC_MODEL` that Claude Code passes down (it had made the server use "opusplan").
 - **The owner's local `.env`, changed at the owner's request on 2026-10-08:** the MCP flags (`MCP_OAUTH=both`, issuer localhost:4000, `MCP_TOOLS_DATA/MANAGE/WORK=on`, `MCP_OAUTH_DCR=on`), and the AI provider switched to Anthropic: `LLM_PROVIDER="anthropic"`, `ANTHROPIC_MODEL="claude-sonnet-5-5"`, its price $2/$10 per million in `LLM_PRICING`. The key is in the admin field only; the `.env` key line stays empty. A backup of the old `.env` is in the private handoff folder.
 - **The owner's Claude Code is connected** as `alianhub-oauth` (user scope, OAuth, Manage tasks, Write docs, Read chat). Measured runs: `claude -p "<sentence>" --allowedTools "mcp__alianhub-oauth" --max-turns 40 --output-format json`, from `~`, with the browser pane on the job's start screen.
-- `docs/API.md`, `docs/api/openapi.json`, `docs/ENV.md` and `.env.example` are in sync with build 861.
+- `docs/API.md`, `docs/api/openapi.json`, `docs/ENV.md` and `.env.example` are in sync with build 866.
 
-## Merged since the last handoff (builds 773 to 861)
+## Owner decisions, 2026-10-13
+
+- **A on AP-523:** the IT company pack re-applied on AlianHub Platform, tags `bug` and `needs-triage` approved, the rule tag `bug` → Bug Triager, in suggest mode.
+- **A on creates:** creates from an outside AI keep waiting for approval. Pack run 2 finding 5 stays.
+
+## Merged since the last handoff (builds 773 to 866)
 
 | Build | PR | What it carried |
 |---|---|---|
@@ -93,6 +98,11 @@ Updated 2026-10-10 IST. Read this first, then `Tasks/index.md` and the `progress
 | 859 | #1630 | AI-1 run 2 results, 15 of 15 |
 | 860 | #1631 | MCP: fewer needless holds and conflicts on a person's own AI's writes |
 | 861 | #1632 | MCP: dates in the person's zone, unique view names, `views.list` |
+| 862 | #1633 | The docs PR for builds 853 to 861 |
+| 863 | #1634 | The scorecard's AI row names the gaps fixed since run 2 (AP-487) |
+| 864 | #1636 | A time entry with no start never defaults into the future (fixed `beta` failing before 09:00 UTC) |
+| 865 | #1635 | Each role keeps its own queue claim on a shared connection |
+| 866 | #1637 | Packs propose their playbooks' fields and route on the role's tag when a type is missing |
 
 Each PR's own title is in `docs/BETA-LOG.md` or on GitHub. The reversible choices they made are in 047's `progress.md`, under "Choices to review".
 
@@ -105,7 +115,7 @@ Since 2026-10-08 the owner gives work as tasks in project AlianHub Platform (AP)
 | PR | What | State |
 |---|---|---|
 | #1364 | A cloud run's API reference catch-up | Replaced. Close it |
-| This PR | The beta log for builds 853 to 861, API docs, 047, 048 and 049 progress, this handoff | Not a draft, merged by hand when its required checks pass |
+| This PR | The beta log for builds 862 to 866, 047 and 048 progress, this handoff | Not a draft, merged by hand when its required checks pass |
 
 ## The combined-PR method
 
@@ -139,7 +149,6 @@ Open owner tasks in AlianHub (AP):
 - **AP-504**: revoke the two secrets pasted in chat on 2026-10-08.
 - **AP-498, AP-500, AP-501, AP-502, AP-503**: open owner items; details on each task.
 - **Approve the tracker task** "GitHub: each project picks its own repositories" in the Inbox.
-- **Decision A or B:** should creates from an outside AI wait for approval? Default A: keep the hold.
 
 Older items:
 1. **Read the 048 playbooks** (merged in build 825) and say what to change.
@@ -159,15 +168,16 @@ Access findings and their state are in `~/.claude/projects/-Users-mevil-Alian-Hu
 
 ## Next steps, in order
 
-1. Rebuild the local server on build 861 and hand-check the merges: a project's GitHub repositories card and header chip, the budget, the Ask box plan, manager triage, the installable shell (AP-496).
+1. A fix task for the routing-rule value box (pick a tag or a list by name) is offered as a chip; start it when accepted.
+1a. Hand-check the merges on the local build: a project's GitHub repositories card and header chip, the budget, the Ask box plan, manager triage, the installable shell (AP-496).
 2. Ask the owner to see the live view tab by eye (#1578): the coordinator's browser pane is always hidden, so it cannot.
 3. 048: left are the flow board and the owner's read of the playbooks.
 4. The hand check of build 812 and the held batch 27 items, as before.
 
-## Learned on 2026-10-10
+## Learned on 2026-10-13
 
 - **Docs-only PRs are merged by hand.** Their suites are skipped, and the queue waits on an all-skipped run. Merge such a PR by hand once its required checks pass.
-
+- **The queue can judge a just-refreshed PR on its old failed run.** After a refresh, wait for the new run to start before the queue looks at the PR again.
 ## Learned on 2026-10-02
 
 - **Green alone is not green together.** Three test PRs and a batch each passed, and `beta` was red once they met. A docs-only PR failing the browser tests is the sign. The queue now merges only on checks that began after the last merge.
