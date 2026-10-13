@@ -301,11 +301,18 @@
                         </div>
                     </div>
 
-                    <div v-if="(plan.rules || []).length || (plan.rulesDropped || []).length" class="aipg-card">
+                    <IntentPreview
+                        v-if="planCard"
+                        :preview="planCard"
+                        choosable
+                        :left-out="leftOut"
+                        :disabled="loading"
+                        data-test="plan-card"
+                        @update:left-out="(parts) => leftOut = parts"/>
+
+                    <div v-if="(plan.rulesDropped || []).length" class="aipg-card">
                         <PlanRules
-                            :rules="plan.rules || []"
                             :notes="plan.rulesDropped || []"
-                            :title="$t('AiProject.rules_title')"
                             :notes-title="$t('AiProject.rules_dropped_title')"/>
                     </div>
 
@@ -319,11 +326,9 @@
                         </ul>
                     </div>
 
-                    <div v-if="(plan.views || []).length || (plan.viewsDropped || []).length" class="aipg-card">
+                    <div v-if="(plan.viewsDropped || []).length" class="aipg-card">
                         <PlanViews
-                            :views="plan.views || []"
                             :notes="plan.viewsDropped || []"
-                            :title="$t('AiProject.views_title')"
                             :notes-title="$t('AiProject.views_dropped_title')"/>
                     </div>
 
@@ -498,6 +503,9 @@ import GuidePreview from './plan/GuidePreview.vue';
 import PlanViews from './plan/PlanViews.vue';
 import PlanRules from './plan/PlanRules.vue';
 import { POINTS } from './brief/points';
+import { cardOf, keptLists } from './plan/planCard';
+import IntentPreview from '@/components/molecules/IntentPreview/IntentPreview.vue';
+import { chosenParts } from '@/components/molecules/IntentPreview/planPicks';
 import { useAiProjectGenerator } from '@/composable/aiProjectGenerator';
 import { useStore } from 'vuex';
 import { useRoute, useRouter } from 'vue-router';
@@ -508,7 +516,7 @@ import { useI18n } from 'vue-i18n';
 
 export default defineComponent({
     name: 'AiProjectCreator',
-    components: { Sidebar, ClarifyStep, CoverageChips, BriefStep, SplitBadge, GuidePreview, PlanViews, PlanRules, SkillsSelect, ProjectSourceSelect },
+    components: { Sidebar, ClarifyStep, CoverageChips, BriefStep, SplitBadge, GuidePreview, PlanViews, PlanRules, IntentPreview, SkillsSelect, ProjectSourceSelect },
     props: {
         visible: { type: Boolean, default: false },
     },
@@ -674,6 +682,21 @@ export default defineComponent({
                 }
             }
             return { sprints: plan.value.sprints.length, tasks, taskDocs };
+        });
+
+        const leftOut = ref([]);
+        const planCard = computed(() => cardOf(plan.value, { withGuide: Boolean(approvedBrief.value || guide.value) }));
+        const keptTotals = computed(() => {
+            const picks = planCard.value ? chosenParts(planCard.value, leftOut.value) : null;
+            if (!picks) return totals.value;
+            const keep = (part) => new Set(Array.isArray(picks[part]) ? picks[part] : []);
+            const [lists, tasks] = [keep('lists'), keep('tasks')];
+            let at = 0;
+            let taskDocs = 0;
+            (plan.value.sprints || []).forEach((sprint, list) => (sprint.tasks || []).forEach((task) => {
+                if (tasks.has(at++) && lists.has(list)) taskDocs += 1 + (Array.isArray(task.subtasks) ? task.subtasks.length : 0);
+            }));
+            return { sprints: lists.size, taskDocs };
         });
 
         const briefAssumptions = computed(() => {
@@ -943,6 +966,7 @@ export default defineComponent({
                     return;
                 }
                 plan.value = result.plan;
+                leftOut.value = [];
                 planId.value = result.planId;
                 planUsage.value = result.usage || null;
                 mergeSuggestedSkills(result.plan);
@@ -1168,10 +1192,16 @@ export default defineComponent({
                 step.value = 'input';
                 return;
             }
+            const picks = planCard.value ? chosenParts(planCard.value, leftOut.value) : null;
+            if (keptLists(picks) === 0) {
+                error.value = t('AiProject.keep_one_list');
+                return;
+            }
             loading.value = true;
             error.value = '';
             try {
                 const result = await api.execute({
+                    picks,
                     plan: plan.value,
                     edits: buildEdits(),
                     userName: '',
@@ -1190,8 +1220,8 @@ export default defineComponent({
                 applyOutcome(result);
                 jobId.value = result.jobId;
                 step.value = 'executing';
-                progress.totalSprints = totals.value.sprints;
-                progress.totalTasks = totals.value.taskDocs;
+                progress.totalSprints = keptTotals.value.sprints;
+                progress.totalTasks = keptTotals.value.taskDocs;
                 subscribe();
             } catch (e) {
                 error.value = friendlyErr(e);
@@ -1286,6 +1316,7 @@ export default defineComponent({
             briefStats.truncated = false;
             briefStats.charCount = 0;
             plan.value = null;
+            leftOut.value = [];
             planId.value = null;
             jobId.value = null;
             createdProjectId.value = null;
@@ -1337,7 +1368,7 @@ export default defineComponent({
         return {
             clientWidth, step, loading, briefUploading, error, rolledBack,
             description, isPrivateSpace, proposalId, source, skills, briefFile, briefId, briefStats,
-            plan, planId, editableProjectName,
+            plan, planId, editableProjectName, planCard, leftOut,
             jobId, progress, createdProjectId,
             placeholderText,
             canGenerate, hasSource, hasGeneratedPlan, hasGeneratedQuestions, totals, isBusy,

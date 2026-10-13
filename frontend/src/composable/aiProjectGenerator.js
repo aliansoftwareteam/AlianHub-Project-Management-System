@@ -129,7 +129,7 @@ export function useAiProjectGenerator() {
         });
     }
 
-    async function execute({ plan, edits, userName, isPrivateSpace, proposalId, skills, source, approvedBrief, assumptions, guide }) {
+    async function execute({ plan, edits, userName, isPrivateSpace, proposalId, skills, source, approvedBrief, assumptions, guide, picks }) {
         // The full plan goes back to the server so the flow is stateless — no
         // in-memory cache to lose on a backend restart. The server re-validates it.
         const res = await apiRequest('post', env.AI_PROJECT_EXECUTE, {
@@ -143,6 +143,7 @@ export function useAiProjectGenerator() {
             approvedBrief: approvedBrief || undefined,
             assumptions: approvedBrief && Array.isArray(assumptions) ? assumptions : undefined,
             guide: guide || undefined,
+            picks: picks || undefined,
         });
         return unwrap(res.data);
     }

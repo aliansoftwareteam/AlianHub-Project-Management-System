@@ -195,14 +195,16 @@ describe('/plan and /execute', () => {
         expect(complete.plan.rulesDropped).toEqual([{ name: 'Email the client', reason: expect.stringContaining('Only these steps'), code: 'step' }]);
     });
 
-    it('drops every rule with code admin at /plan for a person who may not manage automations', async () => {
+    it('keeps the rules at /plan but locks them, with why, for a person who may not manage automations', async () => {
         permissionGuard.getRoleType.mockResolvedValue(ROLE_MEMBER);
         mockChat.mockResolvedValue({ content: JSON.stringify({ needsClarification: false, plan: validPlan([TELL_CREATOR, REVIEW_SUBTASK]) }), inputTokens: 1, outputTokens: 1, totalTokens: 2, model: 'fake-1' });
         await ctrl.plan(req({ description: 'A shop for bikes; tell whoever opened a task when it is done.' }), res());
         await sleep(350);
         const complete = sseEmitter.emit.mock.calls.map(([, payload]) => payload).find((payload) => payload.event === 'complete');
-        expect(complete.plan.rules).toEqual([]);
-        expect(complete.plan.rulesDropped.map(({ name, code }) => [name, code])).toEqual([['Tell the creator when done', 'admin'], ['Add a review subtask', 'admin']]);
+        expect(complete.plan.rules.map((rule) => rule.name)).toEqual(['Tell the creator when done', 'Add a review subtask']);
+        expect(complete.plan.rulesDropped).toEqual([]);
+        expect(complete.plan.locked).toEqual(['rules:0', 'rules:1']);
+        expect(complete.plan.lockedWhy).toEqual({ 'rules:0': 'owner_admin', 'rules:1': 'owner_admin' });
     });
 
     it('still sends the plan when a rule carries a 2500-character value', async () => {
@@ -216,6 +218,7 @@ describe('/plan and /execute', () => {
     });
 
     it('trims the rules again at /execute, whatever the client sends back', async () => {
+        permissionGuard.getRoleType.mockResolvedValue(ROLE_OWNER);
         const sneaked = { name: 'Sneaked in', trigger: 'task.created', actions: [{ action: 'run_agent', config: {} }], enabled: true };
         const r = res();
         await ctrl.execute(req({ plan: { ...validPlan([sneaked, TELL_CREATOR, REVIEW_SUBTASK, OVERDUE_HIGH, REVIEW_SUBTASK]), rulesDropped: [] }, source: 'other' }), r);
@@ -225,6 +228,15 @@ describe('/plan and /execute', () => {
         expect(plan.rules.map((rule) => rule.name)).toEqual(['Tell the creator when done', 'Add a review subtask', 'Overdue goes high']);
         expect(plan.rules.every((rule) => !('enabled' in rule))).toBe(true);
         expect(plan.rulesDropped).toBeUndefined();
+    });
+
+    it('leaves the rules out at /execute for a person who may not manage automations, even when ticked', async () => {
+        permissionGuard.getRoleType.mockResolvedValue(ROLE_MEMBER);
+        const r = res();
+        await ctrl.execute(req({ plan: validPlan([TELL_CREATOR]), picks: { lists: [0], tasks: [0], rules: [0] }, source: 'other' }), r);
+        expect(r.body).toMatchObject({ status: true });
+        await sleep(350);
+        expect(orchestrator.executePlan.mock.calls[0][0].plan.rules).toEqual([]);
     });
 });
 

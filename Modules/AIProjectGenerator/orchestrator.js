@@ -1003,7 +1003,7 @@ function withTimeout(promise, ms, label) {
     ]);
 }
 
-async function executePlan({ plan, companyId, uid, userData, jobId, approvedBrief, assumptions, guide }) {
+async function executePlan({ plan, companyId, uid, userData, jobId, approvedBrief, assumptions, guide, withGuideAgent = true }) {
     const tracker = {
         project: null,
         sprints: [],
@@ -1173,7 +1173,7 @@ async function executePlan({ plan, companyId, uid, userData, jobId, approvedBrie
 
         // 12. Guide agent and the runs for agent-labelled tasks (task 015).
         const agentWork = await executeAgents.start({
-            companyId, uid, projectId: tracker.project, projectName: projectDoc.ProjectName, pairs: taskPairs, agents, withGuide, approvedBrief, assumptions,
+            companyId, uid, projectId: tracker.project, projectName: projectDoc.ProjectName, pairs: taskPairs, agents, withGuide, withGuideAgent, approvedBrief, assumptions,
         });
 
         // Last, so nothing after it can roll the project back and leave a rule behind.

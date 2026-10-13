@@ -19,6 +19,7 @@ const planAutomations = require('./planAutomations');
 const { usageFromResult, addUsage, summarize } = require('../AICore/usage');
 const planRules = require('./planRules');
 const planViews = require('./planViews');
+const planPicks = require('./planPicks');
 const sseEmitter = require('./sseEmitter');
 const orchestrator = require('./orchestrator');
 const clarifier = require('./clarifier');
@@ -270,7 +271,7 @@ async function generatePlanForJob({ jobId, uid, companyId, description, addition
         }
 
         if (plan && typeof plan === 'object') {
-            const trimmed = await planAutomations.trimRulesFor({ companyId, uid, given: plan.rules, project: plan.project });
+            const trimmed = planAutomations.trimRules(plan.rules, plan.project);
             plan.rules = trimmed.kept;
             plan.rulesDropped = trimmed.dropped;
         }
@@ -289,6 +290,7 @@ async function generatePlanForJob({ jobId, uid, companyId, description, addition
         const { kept, dropped } = planViews.trimViews(plan.views);
         plan.views = kept;
         plan.viewsDropped = dropped;
+        Object.assign(plan, planPicks.marksOf(await planPicks.locksFor({ companyId, uid, plan })));
 
         const planId = token();
         myCache.set(cacheKey('plan', uid, planId), {
@@ -680,6 +682,13 @@ exports.execute = async (req, res) => {
         plan = normalizePlanColors(reCheck.data);
         plan.views = planViews.trimViews(plan.views).kept;
 
+        const { approvedBrief, assumptions, guide } = req.body || {};
+        const withGuide = Boolean((approvedBrief && String(approvedBrief).trim()) || guide);
+        const locks = await planPicks.locksFor({ companyId, uid, plan });
+        const picked = planPicks.narrow(plan, req.body && req.body.picks, { withGuide, locks });
+        if (picked.error) return sendError(res, 400, picked.error);
+        plan = picked.plan;
+
         // Applied *after* validation on purpose: `proposalId` is not in
         // ProjectSchema, so zod strips whatever the LLM emitted and only the
         // user's step-1 input reaches the project document.
@@ -726,17 +735,13 @@ exports.execute = async (req, res) => {
 
         const jobId = token();
 
-        // Task 015: the approved brief, its assumptions and the generated guide
-        // travel with the plan and land on the project; the orchestrator owns them.
-        const { approvedBrief, assumptions, guide } = req.body || {};
-
         // Reply right away with the jobId; client opens SSE on /execute/events/:jobId.
         res.send({ status: true, jobId });
 
         // Tiny delay so the client has time to attach the SSE listener before
         // we start emitting (otherwise an instant-success run can race).
         setTimeout(() => {
-            orchestrator.executePlan({ plan, companyId, uid: String(uid), userData, jobId, approvedBrief, assumptions, guide })
+            orchestrator.executePlan({ plan, companyId, uid: String(uid), userData, jobId, approvedBrief, assumptions, guide, withGuideAgent: picked.withGuideAgent })
                 .catch((e) => {
                     logger.error(`AIPG execute error: ${e && e.message ? e.message : e}`);
                 });
