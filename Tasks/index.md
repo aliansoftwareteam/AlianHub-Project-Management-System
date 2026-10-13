@@ -13,6 +13,8 @@ Auto-maintained registry of all tasks. Reflects YAML frontmatter from each `task
 | 006 | AI agent engine foundation + QA agent | active | medium | 005 | active/006-agent-engine-foundation |
 | 006 | AI-native Pages space and distinctive shell | done | high | — | done/006-ai-native-pages-shell |
 | 007 | Automation sentence builder UI + v2 rule API | done | high | 005 | done/007-automation-builder-ui |
+| 006 | Remove auto-assignee from task creation | done | medium | — | done/006-remove-task-auto-assignee |
+| 007 | Fix "Invalid URL" on member invitation links | done | high | — | done/007-fix-invite-link-invalid-url |
 | 008 | Redesign stage 1 — tokens, login/auth, global rail shell, Home, task detail panel | done | high | — | done/008-shell-redesign-stage1 |
 | 009 | Redesign stages 2–3 — first run and daily work in the new shell | done | high | 008 | done/009-redesign-daily-work |
 | 010 | Redesign stage 4 — auditable AI agent system | done | high | 009 | done/010-redesign-ai-system |

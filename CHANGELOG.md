@@ -16,6 +16,18 @@ from [Conventional Commits](https://www.conventionalcommits.org/) on `main`.
 
 ---
 
+## [14.36.0](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/compare/v14.35.0...v14.36.0) (2026-10-06)
+
+
+### 🚀 Features
+
+* **tasks:** stop pre-assigning the creator on new tasks ([a14900d](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/a14900d146c4be1b1a428e851ca3a5d0a9c4c061))
+
+
+### 🐛 Bug Fixes
+
+* **auth:** stop appending stray characters to member invitation links ([b89bdca](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/b89bdca775c2eddc293ffefe1ab6d307a5e2af22))
+
 ## [14.35.0](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/compare/v14.34.0...v14.35.0) (2026-08-26)
 
 
