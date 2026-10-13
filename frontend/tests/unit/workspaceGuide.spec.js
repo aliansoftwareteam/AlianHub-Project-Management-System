@@ -14,7 +14,9 @@ vi.mock('vue-router', () => ({ useRoute: () => ({ params: {}, query: {} }), useR
 import AgentTeammates from '@/views/Ai/AgentTeammates.vue';
 import AgentMentionBox from '@/views/Ai/AgentMentionBox.vue';
 import AgentMemberRow from '@/views/Ai/AgentMemberRow.vue';
+import WorkspaceGuideAdd from '@/views/Ai/WorkspaceGuideAdd.vue';
 import { fetchRunnableAgents } from '@/views/Ai/useRunnableAgents';
+import { reasonOf, useAgents } from '@/views/Ai/useAgents';
 import { aiAvailability, AI_STATE } from '@/composable/aiAvailability';
 
 const OWNER = 1;
@@ -98,5 +100,27 @@ describe('the Workspace Guide in the @ menu', () => {
         expect(await fetchRunnableAgents('t1')).toEqual([]);
         Object.assign(aiAvailability, { state: AI_STATE.ON, loaded: true });
         expect(await fetchRunnableAgents('t1')).toEqual([GUIDE]);
+    });
+});
+
+describe('the Workspace Guide keeps its limits in the UI', () => {
+    it('shows its own words, not the server\'s, when adding fails', async () => {
+        apiRequest.mockRejectedValue({ response: { data: { status: false, statusText: 'Server said no in English' } } });
+        const wrapper = mount(WorkspaceGuideAdd, { props: { state: 'missing', canManage: true } });
+        await wrapper.find('button').trigger('click');
+        await flushPromises();
+        expect(wrapper.text()).toContain('Parity.guide_add_failed');
+        expect(wrapper.text()).not.toContain('Server said no');
+    });
+
+    it('saves only the name of a built-in agent', async () => {
+        apiRequest.mockImplementation(() => ok([]));
+        await useAgents().saveAgent({ ...GUIDE, name: 'Ask Ally' });
+        const put = apiRequest.mock.calls.find(([type]) => type === 'put');
+        expect(put[2]).toEqual({ name: 'Ask Ally' });
+    });
+
+    it('words a locked built-in refusal in the reader\'s language', () => {
+        expect(reasonOf({ response: { data: { code: 'built_in_locked', statusText: 'English' } } }, 'Ai.save_failed')).toBe('Ai.built_in_locked');
     });
 });

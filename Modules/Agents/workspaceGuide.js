@@ -16,8 +16,7 @@ const MADE_BY = `built-in:${KEY}`;
 
 const STATE = Object.freeze({ MISSING: 'missing', PRESENT: 'present', REMOVED: 'removed' });
 
-/* The one switch for who gets a Workspace Guide on their own. On is option A: every workspace created from now on.
- * Set WORKSPACE_GUIDE_AUTO_CREATE=false (Instance settings, AI) for option B: none until an admin adds it. */
+// WORKSPACE_GUIDE_AUTO_CREATE=false leaves new workspaces without one until an admin adds it.
 const autoCreateOn = () => isOn(process.env.WORKSPACE_GUIDE_AUTO_CREATE);
 
 const isDuplicateKey = (e) => Boolean(e && (e.code === 11000 || /duplicate key/i.test(e.message || '')));
@@ -65,7 +64,7 @@ const onCompanyCreated = async (companyId, ownerId) => {
         return await ensureWorkspaceAgent(companyId, { ownerId });
     } catch (e) {
         logger.error(`workspace guide for ${companyId}: ${e.message}`);
-        throw e;
+        return { failed: true };
     }
 };
 

@@ -3008,6 +3008,7 @@ export default {
         "stop_failed": "That run could not be stopped.",
         "run_failed": "The run did not start.",
         "save_failed": "The agent was not saved.",
+        "built_in_locked": "A built-in agent keeps its own settings. You can rename, pause or remove it.",
         "delete_failed": "The agent was not deleted.",
         "ladder_rule": "Money, production and deletes are always a human.",
         "autonomy": "Autonomy",

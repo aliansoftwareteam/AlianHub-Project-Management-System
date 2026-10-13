@@ -608,6 +608,7 @@
     "Ai.back": "Back",
     "Ai.back_to_queue": "Back to the queue",
     "Ai.back_to_waiting": "Back to Waiting",
+    "Ai.built_in_locked": "A built-in agent keeps its own settings. You can rename, pause or remove it.",
     "Ai.cancel": "Cancel",
     "Ai.cap_hint": "The agent pauses itself at the cap.",
     "Ai.cli_agents": "CLI coding agents",

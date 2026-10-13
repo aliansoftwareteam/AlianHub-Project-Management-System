@@ -141,6 +141,16 @@ const agentPatchFields = (body) => {
     return set;
 };
 
+/* A built-in agent ships with its limits: it can be renamed, paused or removed, never widened. */
+const BUILT_IN_EDITABLE = Object.freeze(['name']);
+const BUILT_IN_LOCKED = 'built_in_locked';
+const refuseBuiltInEdit = (res, agent, set) => {
+    if (!agent || !agent.builtIn) return null;
+    const locked = Object.keys(set).filter((k) => !BUILT_IN_EDITABLE.includes(k));
+    if (!locked.length) return null;
+    return fail(res, 'A built-in agent keeps its own settings. You can rename, pause or remove it.', 400, { code: BUILT_IN_LOCKED, data: { fields: locked } });
+};
+
 /* GET /api/v2/agents/registry */
 exports.getRegistry = (req, res) => res.send({ status: true, statusText: 'Registry fetched.', data: require('./actions').manifest() });
 
@@ -215,10 +225,11 @@ exports.updateAgent = async (req, res) => {
         const { actor } = caller;
         const set = agentPatchFields(req.body || {});
         if (!Object.keys(set).length) return fail(res, 'Nothing to update.');
-        if (refusePin(res, set)) return undefined;
-        if (await refuseSkills(res, companyId, set)) return undefined;
         const before = await runs.getAgent(companyId, req.params.id);
         if (!before) return fail(res, 'Agent not found.', 404);
+        if (refuseBuiltInEdit(res, before, set)) return undefined;
+        if (refusePin(res, set)) return undefined;
+        if (await refuseSkills(res, companyId, set)) return undefined;
         const updated = await MongoDbCrudOpration(companyId, { type: SCHEMA_TYPE.AGENTS, data: [{ _id: oid(req.params.id) }, { $set: set }, { returnDocument: 'after' }] }, 'findOneAndUpdate');
         if (!updated) return fail(res, 'Agent not found.', 404);
         const { revision } = await revisions.recordSave(companyId, before, updated, { actor, ip: req.ip || '' });
@@ -310,6 +321,7 @@ exports.createRevision = async (req, res) => {
         if (!ctx) return undefined;
         const body = req.body || {};
         const fields = agentPatchFields(body);
+        if (refuseBuiltInEdit(res, ctx.agent, fields)) return undefined;
         if (await refuseSkills(res, ctx.companyId, fields)) return undefined;
         const row = await revisions.createDraft(ctx.companyId, ctx.agent, { fields, state: body.state, note: body.note, actor: ctx.actor });
         return res.send({ status: true, statusText: `Revision ${row.n} saved as ${row.state}.`, data: revisionRow(row) });
