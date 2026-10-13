@@ -14,6 +14,9 @@ const { READER_CATALOGUE, plain } = require('./catalogues');
 const externalReads = require('./externalReads');
 const { readDeclared } = require('../engine/agentFetch');
 const replay = require('../../AICore/replay');
+const projectScope = require('../scope');
+const { hiddenSprintFilter } = require('../../Sprints/helpers/sprintVisibility');
+const { plainTextOf } = require('../../Tasks/helpers/cleanRichText');
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 const BLOCKED = /hold|block|wait/i;
@@ -136,25 +139,30 @@ const READERS = Object.freeze({
         return { key: task.TaskKey || '', title: task.TaskName || '', brief: brief.slice(0, params.maxChars), chars: brief.length };
     },
 
-    async project(companyId, { task }, params) {
+    async project(companyId, { task, startedBy }, params) {
         const projectId = oid(task.ProjectID);
         if (!projectId) return { skip: 'the task has no project' };
+        if (params.asStarter && startedBy && !(await projectScope.visibleProjectIds(companyId, startedBy)).includes(String(projectId))) {
+            return { skip: 'the person who asked cannot open this project' };
+        }
         const project = await MongoDbCrudOpration(companyId, {
             type: SCHEMA_TYPE.PROJECTS,
-            data: [{ _id: projectId, deletedStatusKey: { $ne: 1 } }, { ProjectName: 1, aiGuide: 1 }],
+            data: [{ _id: projectId, deletedStatusKey: { $ne: 1 } }, { ProjectName: 1, aiGuide: 1, description: 1, descriptionBlock: 1 }],
         }, 'findOne');
         if (!project) return { skip: 'the project was not found' };
         const guide = project.aiGuide && project.aiGuide.markdown ? String(project.aiGuide.markdown).slice(0, params.maxChars) : '';
         if (!guide && params.requireGuide) return { skip: `${project.ProjectName || 'this project'} has no stored guide yet — generate one from the project page first` };
-        return { name: project.ProjectName || '', guide, hasGuide: Boolean(guide) };
+        const description = (plain(project.description) || plainTextOf(project.descriptionBlock)).slice(0, params.maxChars);
+        return { name: project.ProjectName || '', guide, hasGuide: Boolean(guide), description };
     },
 
-    async 'project.tasks'(companyId, { task }, params) {
+    async 'project.tasks'(companyId, { task, startedBy }, params) {
         const projectId = String(task.ProjectID || '');
         if (!projectId) return { skip: 'the task has no project' };
+        const hidden = params.asStarter && startedBy ? await hiddenSprintFilter(companyId, startedBy, [projectId]) : {};
         const tasks = (await MongoDbCrudOpration(companyId, {
             type: SCHEMA_TYPE.TASKS,
-            data: [{ ProjectID: projectId, deletedStatusKey: { $ne: 1 }, isParentTask: true },
+            data: [{ ProjectID: projectId, deletedStatusKey: { $ne: 1 }, isParentTask: true, ...hidden },
                    { TaskKey: 1, TaskName: 1, status: 1, statusType: 1, DueDate: 1, AssigneeUserId: 1, updatedAt: 1, sprintArray: 1, origin: 1 },
                    { limit: 400, sort: { DueDate: 1 } }],
         }, 'find')) || [];

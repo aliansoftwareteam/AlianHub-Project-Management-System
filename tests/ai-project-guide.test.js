@@ -158,11 +158,72 @@ describe('skill project.guide', () => {
         expect((await skill.gather({ task: task({ ProjectID: P2 }), companyId: C })).skip).toMatch(/not found/);
     });
 
-    it('skips when the project has no stored guide, or the task no project', async () => {
-        mockDb.seed(SCHEMA_TYPE.PROJECTS, { _id: P1, ProjectName: 'Bike shop', deletedStatusKey: 0 });
-        expect((await skill.gather({ task: task(), companyId: C })).skip).toMatch(/no stored guide/);
+    it('answers from the description and the plan when the project has no stored guide, and says so', async () => {
+        mockDb.seed(SCHEMA_TYPE.PROJECTS, { _id: P1, ProjectName: 'Bike shop', description: '<p>An online shop for <b>used bikes</b>.</p>', deletedStatusKey: 0 });
+        mockDb.seed(SCHEMA_TYPE.TASKS, { ProjectID: P1, TaskKey: 'BS-1', TaskName: 'List the bikes', statusType: 'active', isParentTask: true, sprintArray: { name: 'Week 1' } });
+        const context = await skill.gather({ task: task(), companyId: C });
+        expect(context.skip).toBeUndefined();
+        expect(context.gather.project).toMatchObject({ hasGuide: false, guide: '', description: 'An online shop for used bikes .' });
+        const prompt = skill.buildUserPrompt({ task: task(), context });
+        expect(prompt).toContain('GUIDE: (none stored for this project)');
+        expect(prompt).toContain('DESCRIPTION:\nAn online shop for used bikes .');
+        expect(prompt).toContain('BS-1 List the bikes');
+        const { changes } = skill.toChanges({ task: task(), raw: { nextStep: 'List the first ten bikes.' }, context });
+        expect(changes[changes.length - 1].params.body).toMatch(/^No guide is stored for this project yet, so this comes from its description and plan.\nNext step: List the first ten bikes./);
+    });
+
+    it('reads the description from the editor blocks when there is no plain one', async () => {
+        mockDb.seed(SCHEMA_TYPE.PROJECTS, { _id: P1, ProjectName: 'Bike shop', descriptionBlock: { blocks: [{ type: 'paragraph', data: { text: 'Bikes for commuters' } }] }, deletedStatusKey: 0 });
+        const context = await skill.gather({ task: task(), companyId: C });
+        expect(context.gather.project.description).toContain('Bikes for commuters');
+        expect(skill.buildUserPrompt({ task: task(), context })).toContain('(no tasks yet)');
+    });
+
+    it('with a stored guide, the prompt and the comment are as before: no description, no note', async () => {
+        mockDb.seed(SCHEMA_TYPE.PROJECTS, { _id: P1, ProjectName: 'Bike shop', description: 'Used bikes', aiGuide: { ...GUIDE, markdown: '## Stages\n1. Catalogue' }, deletedStatusKey: 0 });
+        const context = await skill.gather({ task: task(), companyId: C });
+        const prompt = skill.buildUserPrompt({ task: task(), context });
+        expect(prompt).toContain('GUIDE:\n## Stages\n1. Catalogue\n\nPLAN:');
+        expect(prompt).not.toContain('DESCRIPTION');
+        const { changes } = skill.toChanges({ task: task(), raw: { nextStep: 'Wire payments.' }, context });
+        expect(changes[changes.length - 1].params.body).toMatch(/^Next step: Wire payments./);
+    });
+
+    it('skips when the task has no project or the project is gone', async () => {
         expect((await skill.gather({ task: task({ ProjectID: '' }), companyId: C })).skip).toMatch(/no project/);
         expect((await skill.gather({ task: task({ ProjectID: P2 }), companyId: C })).skip).toMatch(/not found/);
+    });
+
+    describe('as the person who mentioned it', () => {
+        const HEX_C = '6f0000000000000000000c01';
+        const ASKER = '6f0000000000000000000a01';
+        const OPEN_LIST = '6f0000000000000000000b01';
+        const PRIVATE_LIST = '6f0000000000000000000b02';
+
+        beforeEach(() => {
+            mockDb.seed(SCHEMA_TYPE.COMPANY_USERS, { userId: ASKER, roleType: 3, status: 2, isDelete: false });
+            mockDb.seed(SCHEMA_TYPE.SPRINTS, { _id: OPEN_LIST, projectId: P1, name: 'Week 1' });
+            mockDb.seed(SCHEMA_TYPE.SPRINTS, { _id: PRIVATE_LIST, projectId: P1, name: 'Secret', private: true, AssigneeUserId: ['someone-else'] });
+            mockDb.seed(SCHEMA_TYPE.TASKS, { ProjectID: P1, TaskKey: 'BS-1', TaskName: 'List the bikes', statusType: 'active', isParentTask: true, sprintId: OPEN_LIST, sprintArray: { name: 'Week 1' } });
+            mockDb.seed(SCHEMA_TYPE.TASKS, { ProjectID: P1, TaskKey: 'BS-9', TaskName: 'Hidden pricing deal', statusType: 'active', isParentTask: true, sprintId: PRIVATE_LIST, sprintArray: { name: 'Secret' } });
+        });
+
+        it('leaves out the tasks of a private list the asker is not on', async () => {
+            mockDb.seed(SCHEMA_TYPE.PROJECTS, { _id: P1, ProjectName: 'Bike shop', description: 'Used bikes', isPrivateSpace: false, deletedStatusKey: 0 });
+            const context = await skill.gather({ task: task(), companyId: HEX_C, startedBy: ASKER });
+            expect(context.skip).toBeUndefined();
+            expect(context.gather.plan.plan).toContain('BS-1 List the bikes');
+            expect(context.gather.plan.plan).not.toContain('BS-9');
+            expect(context.gather.plan.plan).not.toContain('Secret');
+            expect(context.fallback).not.toContain('BS-9');
+        });
+
+        it('reads nothing of a project the asker cannot open', async () => {
+            mockDb.seed(SCHEMA_TYPE.PROJECTS, { _id: P1, ProjectName: 'Bike shop', description: 'Used bikes', isPrivateSpace: true, AssigneeUserId: ['someone-else'], deletedStatusKey: 0 });
+            const context = await skill.gather({ task: task(), companyId: HEX_C, startedBy: ASKER });
+            expect(context.skip).toMatch(/cannot open this project/);
+            expect(mockDb.calls.some((c) => c.type === SCHEMA_TYPE.TASKS)).toBe(false);
+        });
     });
 
     it('turns the answer into one comment plus at most three proposed subtasks', () => {

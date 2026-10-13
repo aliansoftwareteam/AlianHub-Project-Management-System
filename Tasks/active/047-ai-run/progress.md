@@ -378,3 +378,4 @@ Builds 813 to 815 reached `beta` between 2026-10-02 23:44 and 2026-10-04 11:09 I
 ### 2026-10-13
 - Builds 863 to 866: the scorecard's AI row names the gaps fixed since run 2 (#1634, 863, AP-487); a time entry with no start never defaults into the future, which had failed `beta` before 09:00 UTC (#1636, 864).
 - Owner decision A: creates from an outside AI keep waiting for approval.
+- AP-490 T2-A: the Project Guide answers on a project with no stored guide, from its description and plan, and says so; it reads as the person who mentioned it (no private lists or projects they cannot open). Migration 076 moves unedited company copies to the new seed.
