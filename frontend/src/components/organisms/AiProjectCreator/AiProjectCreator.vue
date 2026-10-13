@@ -383,7 +383,17 @@
                     />
 
                     <transition name="aipg-fade">
-                        <div v-if="error" class="aipg-alert aipg-alert-danger">{{ error }}</div>
+                        <div v-if="error" class="aipg-alert aipg-alert-danger">
+                            <div>{{ error }}</div>
+                            <button
+                                v-if="planExpired"
+                                type="button"
+                                class="aipg-btn aipg-btn-ghost"
+                                data-test="generate-again"
+                                :disabled="loading"
+                                @click="onGenerateAgain"
+                            >{{ $t('AiProject.generate_again') }}</button>
+                        </div>
                     </transition>
 
                     <div class="aipg-actions aipg-actions-split">
@@ -586,6 +596,7 @@ export default defineComponent({
 
         const plan = ref(null);
         const planId = ref(null);
+        const planExpired = ref(false);
         const editableProjectName = computed({
             get: () => (plan.value ? plan.value.project.ProjectName : ''),
             set: (v) => { if (plan.value) plan.value.project.ProjectName = String(v || '').slice(0, 80); },
@@ -944,6 +955,7 @@ export default defineComponent({
                 }
                 plan.value = result.plan;
                 planId.value = result.planId;
+                planExpired.value = false;
                 planUsage.value = result.usage || null;
                 mergeSuggestedSkills(result.plan);
                 step.value = 'preview';
@@ -1019,6 +1031,12 @@ export default defineComponent({
             step.value = hasGeneratedQuestions.value ? 'clarify' : 'input';
         }
 
+        async function onGenerateAgain() {
+            planExpired.value = false;
+            error.value = '';
+            await runPlanGeneration(clarifications.value);
+        }
+
         function onPreviewBack() {
             error.value = '';
             step.value = approvedBrief.value ? 'brief' : 'input';
@@ -1030,6 +1048,7 @@ export default defineComponent({
             guideError.value = '';
             try {
                 const res = await api.generateGuide({
+                    planId: planId.value,
                     approvedBrief: approvedBrief.value,
                     assumptions: planAssumptions.value,
                     plan: plan.value,
@@ -1046,11 +1065,6 @@ export default defineComponent({
             } finally {
                 guideLoading.value = false;
             }
-        }
-
-        function guideForExecute() {
-            if (!guide.value) return null;
-            return { ...guide.value, markdown: guideMarkdown.value || guide.value.markdown || '' };
         }
 
         function applyOutcome(payload) {
@@ -1172,17 +1186,19 @@ export default defineComponent({
             error.value = '';
             try {
                 const result = await api.execute({
-                    plan: plan.value,
+                    planId: planId.value,
                     edits: buildEdits(),
                     userName: '',
                     isPrivateSpace: isPrivateSpace.value,
                     proposalId: proposalId.value,
                     source: source.value,
                     skills: skills.value,
-                    approvedBrief: approvedBrief.value || null,
-                    assumptions: planAssumptions.value,
-                    guide: guideForExecute(),
                 });
+                if (result && result.expired) {
+                    planExpired.value = true;
+                    error.value = t('AiProject.plan_expired');
+                    return;
+                }
                 if (!result || !result.status || !result.jobId) {
                     error.value = (result && result.statusText) || t('AiProject.execute_failed');
                     return;
@@ -1287,6 +1303,7 @@ export default defineComponent({
             briefStats.charCount = 0;
             plan.value = null;
             planId.value = null;
+            planExpired.value = false;
             jobId.value = null;
             createdProjectId.value = null;
             progress.project = 'pending';
@@ -1337,7 +1354,7 @@ export default defineComponent({
         return {
             clientWidth, step, loading, briefUploading, error, rolledBack,
             description, isPrivateSpace, proposalId, source, skills, briefFile, briefId, briefStats,
-            plan, planId, editableProjectName,
+            plan, planId, planExpired, onGenerateAgain, editableProjectName,
             jobId, progress, createdProjectId,
             placeholderText,
             canGenerate, hasSource, hasGeneratedPlan, hasGeneratedQuestions, totals, isBusy,

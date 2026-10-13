@@ -70,8 +70,9 @@ export function useAiProjectGenerator() {
         return unwrap(res.data);
     }
 
-    async function generateGuide({ approvedBrief, assumptions, plan }) {
+    async function generateGuide({ planId, approvedBrief, assumptions, plan }) {
         const res = await apiRequest('post', env.AI_PROJECT_GUIDE, {
+            planId: planId || undefined,
             approvedBrief,
             assumptions: Array.isArray(assumptions) ? assumptions : [],
             plan: plan || undefined,
@@ -129,22 +130,24 @@ export function useAiProjectGenerator() {
         });
     }
 
-    async function execute({ plan, edits, userName, isPrivateSpace, proposalId, skills, source, approvedBrief, assumptions, guide }) {
-        // The full plan goes back to the server so the flow is stateless — no
-        // in-memory cache to lose on a backend restart. The server re-validates it.
-        const res = await apiRequest('post', env.AI_PROJECT_EXECUTE, {
-            plan,
-            edits: edits || null,
-            userName: userName || '',
-            isPrivateSpace: !!isPrivateSpace,
-            proposalId: proposalId || '',
-            skills: Array.isArray(skills) ? skills : [],
-            source: source || '',
-            approvedBrief: approvedBrief || undefined,
-            assumptions: approvedBrief && Array.isArray(assumptions) ? assumptions : undefined,
-            guide: guide || undefined,
-        });
-        return unwrap(res.data);
+    // The server builds the plan it proposed under planId, with the brief and guide it kept; it answers 410 once
+    // that copy has expired.
+    async function execute({ planId, edits, userName, isPrivateSpace, proposalId, skills, source }) {
+        try {
+            const res = await apiRequest('post', env.AI_PROJECT_EXECUTE, {
+                planId,
+                edits: edits || null,
+                userName: userName || '',
+                isPrivateSpace: !!isPrivateSpace,
+                proposalId: proposalId || '',
+                skills: Array.isArray(skills) ? skills : [],
+                source: source || '',
+            });
+            return unwrap(res.data);
+        } catch (e) {
+            if (e && e.response && e.response.status === 410) return { status: false, expired: true };
+            throw e;
+        }
     }
 
     /**

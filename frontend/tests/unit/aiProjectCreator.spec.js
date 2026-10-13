@@ -71,8 +71,9 @@ class FakeEventSource {
     close() {}
 }
 
-function routes({ clarify, briefResponse = brief, planResponse = plan, guideResponse = guide, execute } = {}) {
+function routes({ clarify, briefResponse = brief, planResponse = plan, guideResponse = guide, execute, executeFails } = {}) {
     apiRequest.mockImplementation((method, url, body) => {
+        if (url === env.AI_PROJECT_EXECUTE && executeFails) return Promise.reject(executeFails);
         if (url === env.AI_PROJECT_CLARIFY) return Promise.resolve({ data: { status: true, data: clarify(body) } });
         if (url === env.AI_PROJECT_BRIEF) return ok({ brief: briefResponse, coverage: allMet });
         if (url === env.AI_PROJECT_PLAN) return Promise.resolve({ data: { status: true, plan: planResponse, planId: 'plan-1' } });
@@ -216,6 +217,7 @@ describe('AiProjectCreator guided flow', () => {
         expect(wrapper.find('[data-test="plan-assumptions"]').text()).toContain('No launch date given');
 
         const guideBody = callsTo(env.AI_PROJECT_GUIDE)[0][2];
+        expect(guideBody.planId).toBe('plan-1');
         expect(guideBody.approvedBrief).toBe(brief.markdown);
         expect(guideBody.assumptions).toEqual(brief.assumptions);
         expect(wrapper.text()).toContain('Discovery');
@@ -264,7 +266,7 @@ describe('AiProjectCreator guided flow', () => {
         expect(wrapper.vm.splitSummary).toEqual({ agent: 1, agentAfter: 1, person: 1 });
     });
 
-    it('executes with the approved brief, assumptions and guide, then shows the queued runs, refusals and guide link', async () => {
+    it('executes the plan it was shown by its id, then shows the queued runs, refusals and guide link', async () => {
         routes({ clarify: () => ({ coverage: allMet, round: 1, maxRounds: 2, questions: [] }) });
         const wrapper = mountCreator();
         await describeAndStart(wrapper);
@@ -276,9 +278,10 @@ describe('AiProjectCreator guided flow', () => {
         await flushPromises();
 
         const body = callsTo(env.AI_PROJECT_EXECUTE)[0][2];
-        expect(body.approvedBrief).toBe(brief.markdown);
-        expect(body.assumptions).toEqual(brief.assumptions);
-        expect(body.guide).toMatchObject({ stages: guide.stages, markdown: guide.markdown });
+        expect(body.planId).toBe('plan-1');
+        expect(body).not.toHaveProperty('plan');
+        expect(body).not.toHaveProperty('approvedBrief');
+        expect(body).not.toHaveProperty('guide');
         expect(wrapper.vm.step).toBe('executing');
 
         FakeEventSource.last.emit({
@@ -295,6 +298,26 @@ describe('AiProjectCreator guided flow', () => {
 
         await wrapper.find('[data-test="open-guide"]').trigger('click');
         expect(push).toHaveBeenCalledWith({ name: 'AiAgent', params: { cid: 'company-1', id: 'agent-9' } });
+    });
+
+    it('says when the plan has expired and generates it again', async () => {
+        routes({ clarify: () => ({ coverage: allMet, round: 1, maxRounds: 2, questions: [] }), executeFails: { response: { status: 410, data: { status: false } } } });
+        const wrapper = mountCreator();
+        await reachPreview(wrapper);
+        expect(wrapper.find('[data-test="generate-again"]').exists()).toBe(false);
+
+        await wrapper.find('[data-test="create-everything"]').trigger('click');
+        await flushPromises();
+        expect(wrapper.vm.step).toBe('preview');
+        expect(wrapper.text()).toContain('AiProject.plan_expired');
+
+        await wrapper.find('[data-test="generate-again"]').trigger('click');
+        await flushPromises();
+        expect(callsTo(env.AI_PROJECT_PLAN)).toHaveLength(2);
+        expect(callsTo(env.AI_PROJECT_PLAN)[1][2].approvedBrief).toBe(brief.markdown);
+        expect(wrapper.vm.step).toBe('preview');
+        expect(wrapper.find('[data-test="generate-again"]').exists()).toBe(false);
+        expect(wrapper.text()).not.toContain('AiProject.plan_expired');
     });
 
     it('emits created for the new project only when it is opened', async () => {
@@ -412,7 +435,7 @@ describe('AiProjectCreator guided flow', () => {
 
         await wrapper.find('[data-test="create-everything"]').trigger('click');
         await flushPromises();
-        expect(callsTo(env.AI_PROJECT_EXECUTE)[0][2].plan.rules).toEqual(planResponse.rules);
+        expect(callsTo(env.AI_PROJECT_EXECUTE)[0][2].planId).toBe('plan-1');
 
         FakeEventSource.last.emit({
             event: 'complete', projectId: 'proj-1', totals: { sprints: 1, tasks: 4 },

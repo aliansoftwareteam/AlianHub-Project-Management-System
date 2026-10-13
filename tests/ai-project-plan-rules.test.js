@@ -20,6 +20,7 @@ const sseEmitter = require('../Modules/AIProjectGenerator/sseEmitter');
 const orchestrator = require('../Modules/AIProjectGenerator/orchestrator');
 const ctrl = require('../Modules/AIProjectGenerator/controller');
 const planAutomations = require('../Modules/AIProjectGenerator/planAutomations');
+const planStash = require('../Modules/AIProjectGenerator/planStash');
 const { PlanSchema } = require('../Modules/AIProjectGenerator/schemaValidator');
 const { buildSystemPrompt } = require('../Modules/AIProjectGenerator/promptBuilder');
 const { catalogueForAgents } = require('../Modules/Agents/automationRequests');
@@ -215,10 +216,11 @@ describe('/plan and /execute', () => {
         expect(complete.plan.rulesDropped).toEqual([{ name: 'Long', reason: expect.any(String), code: 'fit' }]);
     });
 
-    it('trims the rules again at /execute, whatever the client sends back', async () => {
+    it('trims the rules again at /execute', async () => {
         const sneaked = { name: 'Sneaked in', trigger: 'task.created', actions: [{ action: 'run_agent', config: {} }], enabled: true };
+        const planId = planStash.rememberPlan({ uid: U, companyId: C, plan: { ...validPlan([sneaked, TELL_CREATOR, REVIEW_SUBTASK, OVERDUE_HIGH, REVIEW_SUBTASK]), rulesDropped: [] } });
         const r = res();
-        await ctrl.execute(req({ plan: { ...validPlan([sneaked, TELL_CREATOR, REVIEW_SUBTASK, OVERDUE_HIGH, REVIEW_SUBTASK]), rulesDropped: [] }, source: 'other' }), r);
+        await ctrl.execute(req({ planId, source: 'other' }), r);
         expect(r.body).toMatchObject({ status: true });
         await sleep(350);
         const { plan } = orchestrator.executePlan.mock.calls[0][0];

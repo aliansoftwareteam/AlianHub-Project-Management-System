@@ -20,6 +20,7 @@ const { usageFromResult, addUsage, summarize } = require('../AICore/usage');
 const planRules = require('./planRules');
 const planViews = require('./planViews');
 const sseEmitter = require('./sseEmitter');
+const { PLAN_TTL_SECONDS, PLAN_EXPIRED, cacheKey, rememberPlan, storedPlan, storedGuide } = require('./planStash');
 const orchestrator = require('./orchestrator');
 const clarifier = require('./clarifier');
 const memoryStore = require('../Agents/memory');
@@ -29,7 +30,6 @@ const { normaliseSource, cleanProposalId, numericProposalId, validateProposalId 
 const { normalizePlanColors } = orchestrator;
 const { sessionTenantOf, TenantError } = require('../../Config/tenant');
 
-const PLAN_TTL_SECONDS = 15 * 60;        // 15 min
 const BRIEF_TTL_SECONDS = 30 * 60;       // 30 min
 const OBJECT_ID_PATTERN = /^[a-f0-9]{24}$/i;
 
@@ -68,10 +68,6 @@ function tasksResponseSchemaForMode(mode) {
 
 function token() {
     return crypto.randomBytes(12).toString('hex');
-}
-
-function cacheKey(kind, uid, id) {
-    return `aipg:${kind}:${uid}:${id}`;
 }
 
 function sendError(res, status, message) {
@@ -290,12 +286,7 @@ async function generatePlanForJob({ jobId, uid, companyId, description, addition
         plan.views = kept;
         plan.viewsDropped = dropped;
 
-        const planId = token();
-        myCache.set(cacheKey('plan', uid, planId), {
-            companyId,
-            plan,
-            createdAt: Date.now(),
-        }, PLAN_TTL_SECONDS);
+        const planId = rememberPlan({ uid, companyId, plan, approvedBrief, assumptions });
 
         emit({
             event: 'complete',
@@ -648,15 +639,11 @@ exports.execute = async (req, res) => {
         const companyId = resolveCompanyId(req);
         if (!companyId) return sendError(res, 403, 'Company access denied');
 
-        // The plan travels in the request body. We deliberately do NOT rely
-        // on an in-memory cache here — a nodemon restart between /plan and
-        // /execute would otherwise lose it. The client always has the full
-        // plan (it was returned from /plan and shown in the preview), so
-        // it just sends it back.
-        let plan = req.body && req.body.plan;
-        if (!plan || typeof plan !== 'object') return sendError(res, 400, 'plan required in request body');
+        const planId = req.body && req.body.planId;
+        const stored = storedPlan({ uid, companyId, planId });
+        if (!stored) return res.status(410).send({ status: false, statusText: PLAN_EXPIRED, code: 'PLAN_EXPIRED' });
+        let plan = JSON.parse(JSON.stringify(stored.plan));
 
-        // Apply optional inline edits (renames the user made in the preview).
         const editsRaw = req.body && req.body.edits;
         if (editsRaw && typeof editsRaw === 'object') {
             plan = applyEdits(plan, editsRaw);
@@ -726,9 +713,8 @@ exports.execute = async (req, res) => {
 
         const jobId = token();
 
-        // Task 015: the approved brief, its assumptions and the generated guide
-        // travel with the plan and land on the project; the orchestrator owns them.
-        const { approvedBrief, assumptions, guide } = req.body || {};
+        const { approvedBrief, assumptions } = stored;
+        const guide = storedGuide({ uid, companyId, planId });
 
         // Reply right away with the jobId; client opens SSE on /execute/events/:jobId.
         res.send({ status: true, jobId });

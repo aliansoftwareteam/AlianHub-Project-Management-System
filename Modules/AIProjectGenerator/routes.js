@@ -1,9 +1,11 @@
 const ctrl = require('./controller');
 const guideCtrl = require('./guideController');
 const { agentsRefused } = require('../Agents/guard');
+const { requirePermission } = require('../../Config/permissionGuard');
 
 /* The workspace's AI writes these when a person asks for them. */
 const askedByPeople = agentsRefused('ai.spend');
+const mayCreateProjects = requirePermission('project.project_create');
 
 exports.init = (app) => {
     /**
@@ -28,7 +30,7 @@ exports.init = (app) => {
      *       /api/v1/ai-progress/{jobId}, avoiding proxy 504s while the LLM is
      *       still producing the full plan.
      */
-    app.post('/api/v1/ai/project/plan', askedByPeople, ctrl.plan);
+    app.post('/api/v1/ai/project/plan', askedByPeople, mayCreateProjects, ctrl.plan);
 
     /**
      * @swagger
@@ -69,7 +71,7 @@ exports.init = (app) => {
      *     summary: Execute an approved plan and create the full project bootstrap
      *     tags: [AI Project Generator]
      */
-    app.post('/api/v1/ai/project/execute', agentsRefused('project.create'), ctrl.execute);
+    app.post('/api/v1/ai/project/execute', agentsRefused('project.create'), mayCreateProjects, ctrl.execute);
 
     /**
      * @swagger

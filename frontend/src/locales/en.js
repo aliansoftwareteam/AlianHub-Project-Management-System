@@ -3627,6 +3627,8 @@ export default {
         upload_failed: "Brief upload failed",
         plan_failed: "Plan generation failed. Please try again.",
         plan_empty: "The AI did not return a plan. Please try again.",
+        plan_expired: "This plan has expired. Generate it again.",
+        generate_again: "Generate again",
         execute_failed: "Execution failed",
         clarify_failed: "Couldn't draft clarifying questions",
         clarify_skip_all: "Skip and generate plan",

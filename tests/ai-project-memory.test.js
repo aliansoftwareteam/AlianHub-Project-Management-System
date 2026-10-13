@@ -16,6 +16,7 @@ const persistence = require('../Modules/AICore/persistence');
 const memory = require('../Modules/Agents/memory');
 const ctrl = require('../Modules/AIProjectGenerator/controller');
 const guideCtrl = require('../Modules/AIProjectGenerator/guideController');
+const planStash = require('../Modules/AIProjectGenerator/planStash');
 const executeAgents = require('../Modules/AIProjectGenerator/executeAgents');
 const orchestrator = require('../Modules/AIProjectGenerator/orchestrator');
 const { buildSystemPrompt, buildCoverageSystemPrompt, buildClarifySystemPrompt, buildBriefSystemPrompt, buildTasksSystemPrompt, _readPartial: readPartial } = require('../Modules/AIProjectGenerator/promptBuilder');
@@ -320,13 +321,15 @@ describe('/execute with an approved brief', () => {
         orchestrator.executePlan.mockImplementation(async ({ companyId, uid, approvedBrief, assumptions }) => executeAgents.start({
             companyId, uid, projectId: NEW_PROJECT, projectName: 'Bike shop', pairs: [], agents: [], withGuide: false, approvedBrief, assumptions,
         }));
-        const r = res();
-        await ctrl.execute(req({
+        const planId = planStash.rememberPlan({
+            uid: U,
+            companyId: C,
             plan: validPlan(),
-            source: 'other',
             approvedBrief: APPROVED,
             assumptions: [{ point: 'team', text: 'No team named; planning for the owner alone.' }, { point: 'existing', text: 'Nothing exists yet; planning for a fresh store.' }],
-        }), r);
+        });
+        const r = res();
+        await ctrl.execute(req({ planId, source: 'other' }), r);
         expect(r.body).toMatchObject({ status: true });
         await sleep(350);
         expect(orchestrator.executePlan).toHaveBeenCalledTimes(1);

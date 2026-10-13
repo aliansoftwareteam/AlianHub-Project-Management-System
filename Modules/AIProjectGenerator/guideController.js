@@ -11,6 +11,7 @@ const { _readPartial: readPartial } = require('./promptBuilder');
 const { usageFromResult, summarize } = require('../AICore/usage');
 const memoryStore = require('../Agents/memory');
 const { resolveProjectId } = require('./projectAccess');
+const planStash = require('./planStash');
 
 const MIN_BRIEF_CHARS = 20;
 const MAX_STAGES = 8;
@@ -100,12 +101,15 @@ exports.guide = async (req, res) => {
         if (!req.uid) return sendError(res, 401, 'Unauthorized');
         const companyId = tenantOf(req);
         const body = req.body || {};
-        const approvedBrief = clip(body.approvedBrief, 20000);
+        const stored = planStash.storedPlan({ uid: req.uid, companyId, planId: body.planId });
+        const from = stored || body;
+        const approvedBrief = clip(from.approvedBrief, 20000);
         if (approvedBrief.length < MIN_BRIEF_CHARS) return sendError(res, 400, `approvedBrief must be at least ${MIN_BRIEF_CHARS} characters`);
         if (!isAnyProviderConfigured()) return sendError(res, 503, 'No LLM provider is configured');
         const project = await resolveProjectId({ companyId, uid: req.uid, projectId: body.projectId });
         if (project.hidden) return sendError(res, 404, 'Project not found');
-        const out = await generateGuide({ approvedBrief, assumptions: body.assumptions, plan: body.plan, companyId, userId: String(req.uid), projectId: project.projectId });
+        const out = await generateGuide({ approvedBrief, assumptions: from.assumptions, plan: from.plan, companyId, userId: String(req.uid), projectId: project.projectId });
+        if (stored) planStash.rememberGuide({ uid: req.uid, companyId, planId: body.planId, guide: out.guide });
         return res.send({ status: true, data: { guide: out.guide }, usage: out.usage, model: out.model, provider: out.provider });
     } catch (error) {
         if (error instanceof TenantError) return sendError(res, error.statusCode, error.message);
