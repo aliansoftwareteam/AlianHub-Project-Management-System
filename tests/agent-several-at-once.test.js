@@ -184,53 +184,117 @@ describe('one item per agent at a time', () => {
 
 describe('several roles over one connection', () => {
     const ROLES = ['manufacturing/order-intake', 'manufacturing/maintenance-planner', 'manufacturing/non-conformance-recorder'];
-    const claimAs = (role, itemId) => rpc(agent(1), 'queue.claim', { itemId, role });
-    const releaseAs = (role, itemId) => rpc(agent(1), 'queue.release', { itemId, role });
+    const dispatcherQueue = require('../Modules/AssignmentRules/dispatcher/queue');
+    const claimAs = (role, itemId, caller = agent(1)) => rpc(caller, 'queue.claim', { itemId, ...(role ? { role } : {}) });
+    const releaseAs = (role, itemId, caller = agent(1)) => rpc(caller, 'queue.release', { itemId, ...(role ? { role } : {}) });
+    const routeTo = (task, role) => dispatcherQueue.put(CID, task, { role, by: OWNER });
+    const routed = async (...roles) => Promise.all(roles.map(async (role) => {
+        const task = orphan();
+        await routeTo(task, role);
+        return { task, itemId: String(findings().find((row) => row.rule === 'handed_over' && row.taskId === String(task._id))._id) };
+    }));
 
-    it('lets three roles on one connection each hold their own item at the same moment', async () => {
-        const queue = await items(3);
+    it('lets three roles on one connection each hold the item routed to them at the same moment', async () => {
+        const queue = await routed(...ROLES);
         const outcomes = await Promise.all(ROLES.map((role, index) => claimAs(role, queue[index].itemId)));
         expect(outcomes.every((out) => out.ok === true)).toBe(true);
         expect(new Set(heldRows().map((row) => row.claim.by)).size).toBe(3);
     });
 
     it('keeps one item for each role', async () => {
-        const [first, second] = await items(2);
+        const [first, second] = await routed(ROLES[0], ROLES[0]);
         expect(await claimAs(ROLES[0], first.itemId)).toMatchObject({ ok: true });
         expect(await claimAs(ROLES[0], second.itemId)).toMatchObject({ isError: true, error: REFUSAL.ONE_AT_A_TIME });
     });
 
-    it('never gives back the item another role holds, and says which role holds it', async () => {
+    it('refuses a role claim on an item routed to no role, so a made-up role is never a second hand', async () => {
         const [first, second] = await items(2);
-        await claimAs(ROLES[0], first.itemId);
-        await claimAs(ROLES[2], second.itemId);
-        expect(await releaseAs(ROLES[2], first.itemId)).toMatchObject({ isError: true, error: REFUSAL.HELD_BY_ROLE(ROLES[0]) });
-        expect(await release(agent(1), first.itemId)).toMatchObject({ isError: true });
-        expect(rowOf(first.itemId).claim).toBeDefined();
-        expect(await claimAs(ROLES[1], first.itemId)).toMatchObject({ isError: true, error: REFUSAL.TAKEN_BY_ROLE(ROLES[0]) });
-        expect(await releaseAs(ROLES[0], first.itemId)).toMatchObject({ ok: true });
-        expect(await releaseAs(ROLES[2], second.itemId)).toMatchObject({ ok: true });
+        expect(await claimAs(null, first.itemId)).toMatchObject({ ok: true });
+        expect(await claimAs('made-up/role', second.itemId)).toMatchObject({ isError: true, error: REFUSAL.NOT_ROUTED });
+        expect(rowOf(second.itemId).claim).toBeUndefined();
     });
 
-    it('refuses to give back the claim of another connection', async () => {
-        const [first] = await items(1);
-        await claimAs(ROLES[0], first.itemId);
-        expect(await rpc(agent(2), 'queue.release', { itemId: first.itemId, role: ROLES[0] })).toMatchObject({ isError: true, error: REFUSAL.NOT_HELD });
-        expect(await rpc(agent(2), 'queue.claim', { itemId: first.itemId, role: ROLES[0] })).toMatchObject({ isError: true, error: REFUSAL.TAKEN });
+    it('refuses a role that is not written as blueprint/slug', async () => {
+        const [first] = await routed(ROLES[0]);
+        expect(await workQueue.executors['queue.claim']({ companyId: CID, actor: agent(1).actor, params: { itemId: first.itemId, role: 'Not A Role' } }).catch((e) => e.message)).toBe(REFUSAL.BAD_ROLE);
+        expect(await workQueue.executors['queue.release']({ companyId: CID, actor: agent(1).actor, params: { itemId: first.itemId, role: `a/${'b'.repeat(120)}` } }).catch((e) => e.message)).toBe(REFUSAL.BAD_ROLE);
     });
-
-    const routedTo = (itemId, role) => Object.assign(rowOf(itemId), { rule: 'handed_over', facts: { role } });
 
     it('refuses an item routed to another role', async () => {
-        const [first] = await items(1);
-        routedTo(first.itemId, ROLES[0]);
+        const [first] = await routed(ROLES[0]);
         expect(await claimAs(ROLES[1], first.itemId)).toMatchObject({ isError: true, error: REFUSAL.OTHER_ROLE(ROLES[0]) });
         expect(await claimAs(ROLES[0], first.itemId)).toMatchObject({ ok: true });
     });
 
+    it('never gives back the item another role holds, and says which role holds it', async () => {
+        const [first, second] = await routed(ROLES[0], ROLES[2]);
+        await claimAs(ROLES[0], first.itemId);
+        await claimAs(ROLES[2], second.itemId);
+        expect(await releaseAs(ROLES[2], first.itemId)).toMatchObject({ isError: true, error: REFUSAL.HELD_BY_ROLE(ROLES[0]) });
+        expect(await releaseAs(null, first.itemId)).toMatchObject({ isError: true, error: REFUSAL.HELD_BY_ROLE(ROLES[0]) });
+        expect(rowOf(first.itemId).claim).toBeDefined();
+        expect(await releaseAs(ROLES[0], first.itemId)).toMatchObject({ ok: true });
+        expect(await releaseAs(ROLES[2], second.itemId)).toMatchObject({ ok: true });
+    });
+
+    it('refuses to give back or take the claim of another connection, naming the role asked for', async () => {
+        const [first] = await routed(ROLES[0]);
+        await claimAs(ROLES[0], first.itemId);
+        expect(await releaseAs(ROLES[0], first.itemId, agent(2))).toMatchObject({ isError: true, error: REFUSAL.NOT_HELD_AS(ROLES[0]) });
+        expect(await claimAs(ROLES[0], first.itemId, agent(2))).toMatchObject({ isError: true, error: REFUSAL.TAKEN });
+    });
+
+    it('still lets a connection claim a routed item without a role, and keeps that claim apart from a role claim', async () => {
+        const [first] = await routed(ROLES[0]);
+        expect(await claimAs(null, first.itemId)).toMatchObject({ ok: true });
+        expect(await claimAs(ROLES[0], first.itemId)).toMatchObject({ isError: true, error: REFUSAL.TAKEN_WITHOUT_ROLE });
+        expect(await releaseAs(ROLES[0], first.itemId)).toMatchObject({ isError: true, error: REFUSAL.HELD_WITHOUT_ROLE });
+        expect(await releaseAs(null, first.itemId)).toMatchObject({ ok: true });
+        expect(await claimAs(ROLES[0], first.itemId)).toMatchObject({ ok: true });
+        expect(await claimAs(null, first.itemId)).toMatchObject({ isError: true, error: REFUSAL.TAKEN_BY_ROLE(ROLES[0]) });
+    });
+
+    it('keeps the time a role first took the item when it claims again', async () => {
+        const [first] = await routed(ROLES[0]);
+        await claimAs(ROLES[0], first.itemId);
+        const at = new Date('2026-10-01T08:00:00Z');
+        rowOf(first.itemId).claim.at = at;
+        expect(await claimAs(ROLES[0], first.itemId)).toMatchObject({ ok: true });
+        expect(new Date(rowOf(first.itemId).claim.at).getTime()).toBe(at.getTime());
+    });
+
+    it('undoing a role claim gives the item and its place back', async () => {
+        const { undoAuditRow } = require('../Modules/Agents/undo');
+        const [first, second] = await routed(ROLES[0], ROLES[0]);
+        await claimAs(ROLES[0], first.itemId);
+        const row = rows(SCHEMA_TYPE.AUDIT_LOGS).find((each) => each.meta && each.meta.action === 'queue.claim' && each.meta.undo);
+        expect(await undoAuditRow(CID, row, { kind: 'human', userId: OWNER }, '1.1.1.1')).toMatchObject({ ok: true });
+        expect(rowOf(first.itemId).claim).toBeUndefined();
+        expect(await claimAs(ROLES[0], second.itemId)).toMatchObject({ ok: true });
+    });
+
+    it('re-routing a held item drops the old role\'s claim and frees its hand and place', async () => {
+        project().agentLimits = { atOnce: 1 };
+        const [first, second] = await routed(ROLES[0], ROLES[0]);
+        await claimAs(ROLES[0], first.itemId);
+        await routeTo(first.task, ROLES[1]);
+        expect(rowOf(first.itemId).claim).toBeUndefined();
+        expect(await releaseAs(ROLES[0], first.itemId)).toMatchObject({ isError: true, error: REFUSAL.NOT_HELD_AS(ROLES[0]) });
+        expect(await claimAs(ROLES[0], second.itemId)).toMatchObject({ ok: true });
+        await releaseAs(ROLES[0], second.itemId);
+        expect(await claimAs(ROLES[1], first.itemId)).toMatchObject({ ok: true });
+    });
+
+    it('routing a held item again to the same role keeps the claim', async () => {
+        const [first] = await routed(ROLES[0]);
+        await claimAs(ROLES[0], first.itemId);
+        await routeTo(first.task, ROLES[0]);
+        expect(rowOf(first.itemId).claim).toBeDefined();
+        expect(await releaseAs(ROLES[0], first.itemId)).toMatchObject({ ok: true });
+    });
+
     it('lists the item a role holds as its own, and leaves it out for the connection without that role', async () => {
-        const [first] = await items(1);
-        routedTo(first.itemId, ROLES[0]);
+        const [first] = await routed(ROLES[0]);
         await claimAs(ROLES[0], first.itemId);
         const mine = (await rpc(agent(1), 'queue.list', { role: ROLES[0] })).items;
         expect(mine.find((item) => item.itemId === first.itemId)).toMatchObject({ yours: true });

@@ -53,6 +53,7 @@ async function put(companyId, task, { role, agentId, by, byPerson = false }) {
     const held = rows.find((row) => row.status === STATUS.OPEN);
     const now = new Date();
     if (held) {
+        await require('../../Agents/manager/workQueue').reRouted(companyId, held, role);
         await MongoDbCrudOpration(companyId, {
             type: SCHEMA_TYPE.PROJECT_FINDINGS,
             data: [{ _id: new mongoose.Types.ObjectId(String(held._id)) }, { $set: { 'facts.role': role, 'facts.agentId': agentId || '' }, $unset: { leftQueue: '' } }],
