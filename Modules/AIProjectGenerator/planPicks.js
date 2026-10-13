@@ -2,10 +2,7 @@
 
 const planLocks = require('../Agents/planLocks');
 
-// The parts of a generator plan, named on the shared plan card (frontend IntentPreview) as "<part>:<place>": its
-// lists (the sprints), its tasks counted across the lists in order, its views, its rules and the project's Guide
-// agent. The picks sent back at /execute can only leave parts out: a place the plan does not hold is ignored, a part
-// the person may not make is left out whatever is ticked, and a task goes with its list.
+// Picks name parts as "<part>:<place>", tasks counted across the lists in order; they can only leave parts out.
 
 const PARTS = Object.freeze(['lists', 'tasks', 'views', 'rules', 'agents']);
 const REFUSED = Object.freeze({
@@ -40,7 +37,7 @@ const locksFor = async ({ companyId, uid, plan }) => {
     const views = listOf(plan && plan.views);
     if (views.length) {
         const refused = await require('../Agents/projectCreate').refusedFor(companyId, uid, { views }).catch(() => ({ project: '', parts: [] }));
-        if (!refused.project && refused.parts.some((entry) => entry.part === 'views')) views.forEach((view, at) => locks.set(keyOf('views', at), planLocks.WHY.OWN_RIGHTS));
+        if (refused.project || refused.parts.some((entry) => entry.part === 'views')) views.forEach((view, at) => locks.set(keyOf('views', at), planLocks.WHY.OWN_RIGHTS));
     }
     return locks;
 };

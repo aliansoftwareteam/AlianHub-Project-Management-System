@@ -466,6 +466,10 @@ describe('AiProjectCreator guided flow', () => {
         await tick(wrapper, 'lists:1');
         expect(wrapper.vm.leftOut).toEqual(['lists:1', 'tasks:1', 'tasks:3', 'views:0', 'agents:0']);
         expect(wrapper.find('[data-pick="tasks:3"]').element.checked).toBe(false);
+        expect(wrapper.findAll('.aipg-folder.is-left-out')).toHaveLength(1);
+        expect(wrapper.findAll('.aipg-task.is-left-out').map((li) => li.find('input').element.value)).toEqual(['Summarise the theme PR', 'Launch']);
+        expect(wrapper.find('.aipg-plan-header .aipg-helper').text()).toContain('AiProject.sprint_count');
+        expect(wrapper.vm.keptTotals).toMatchObject({ sprints: 1, tasks: 2 });
 
         await tick(wrapper, 'tasks:1');
         expect(wrapper.vm.leftOut).not.toContain('tasks:1');

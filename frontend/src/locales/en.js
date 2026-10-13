@@ -3571,6 +3571,7 @@ export default {
         open_guide_agent: "Open the Guide agent →",
         views_title: "Views",
         keep_one_list: "Keep at least one list ticked.",
+        left_out: "Left out",
         views_dropped_title: "Left out of the plan",
         views_made_title: "Views made",
         views_not_made_title: "Views not made",

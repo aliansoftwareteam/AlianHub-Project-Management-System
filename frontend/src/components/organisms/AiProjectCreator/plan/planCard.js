@@ -1,6 +1,4 @@
-// The generator's plan as the shared plan card reads it (IntentPreview), built from the live plan so a renamed list or
-// task reads as renamed. Part keys match the server's (Modules/AIProjectGenerator/planPicks.js): tasks are counted
-// across the lists in order, and each task needs its list.
+// Part keys must match Modules/AIProjectGenerator/planPicks.js: tasks are counted across the lists in order.
 
 const listOf = (value) => (Array.isArray(value) ? value : []);
 const textOf = (value) => (typeof value === 'string' ? value.trim() : '');

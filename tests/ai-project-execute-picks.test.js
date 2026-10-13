@@ -135,6 +135,12 @@ describe('the locks a generator plan carries', () => {
         });
     });
 
+    it('locks the views for a person who may not create a project at all', async () => {
+        projectCreate.refusedFor.mockResolvedValue({ project: 'project.create is not granted', parts: [] });
+        const marks = planPicks.marksOf(await planPicks.locksFor({ companyId: C, uid: U, plan: plan() }));
+        expect(marks.locked).toEqual(['views:0', 'views:1']);
+    });
+
     it('locks nothing for an owner or admin', async () => {
         expect(planPicks.marksOf(await planPicks.locksFor({ companyId: C, uid: U, plan: plan() }))).toEqual({ locked: [], lockedWhy: {} });
     });

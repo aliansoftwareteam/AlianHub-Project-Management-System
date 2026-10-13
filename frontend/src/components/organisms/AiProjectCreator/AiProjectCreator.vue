@@ -278,7 +278,7 @@
                                 :disabled="loading"/>
                             <code class="aipg-code-pill">{{ plan.project.ProjectCode }}</code>
                             <span class="aipg-ml-auto aipg-helper">
-                                {{ $t('AiProject.sprint_count', { n: totals.sprints }, totals.sprints) }} · {{ $t('AiProject.task_count', { n: totals.tasks }, totals.tasks) }}
+                                {{ $t('AiProject.sprint_count', { n: keptTotals.sprints }, keptTotals.sprints) }} · {{ $t('AiProject.task_count', { n: keptTotals.tasks }, keptTotals.tasks) }}
                                 <!-- Cost is omitted, not zeroed, when the model
                                      has no price on file — a wrong number is
                                      worse than no number. -->
@@ -337,6 +337,7 @@
                             v-for="(sprint, si) in plan.sprints"
                             :key="'s-'+si"
                             class="aipg-folder"
+                            :class="{ 'is-left-out': isLeftOut('lists:' + si) }"
                             :open="si === 0">
                             <summary class="aipg-folder-summary">
                                 <span class="aipg-chevron" aria-hidden="true">›</span>
@@ -346,16 +347,18 @@
                                     maxlength="80"
                                     :disabled="loading"
                                     @click.stop/>
-                                <span class="aipg-pill aipg-ml-auto">{{ $t('AiProject.task_count', { n: sprint.tasks.length }, sprint.tasks.length) }}</span>
+                                <span v-if="isLeftOut('lists:' + si)" class="aipg-pill aipg-ml-auto" data-test="left-out">{{ $t('AiProject.left_out') }}</span>
+                                <span v-else class="aipg-pill aipg-ml-auto">{{ $t('AiProject.task_count', { n: sprint.tasks.length }, sprint.tasks.length) }}</span>
                             </summary>
                             <ul class="aipg-task-list">
-                                <li v-for="(task, ti) in sprint.tasks" :key="'t-'+si+'-'+ti" class="aipg-task">
+                                <li v-for="(task, ti) in sprint.tasks" :key="'t-'+si+'-'+ti" class="aipg-task" :class="{ 'is-left-out': isLeftOut(taskKey(si, ti)) }">
                                     <div class="aipg-task-row">
                                         <input
                                             v-model="task.TaskName"
                                             class="aipg-input-plain aipg-task-name"
                                             maxlength="200"
                                             :disabled="loading"/>
+                                        <span v-if="isLeftOut(taskKey(si, ti))" class="aipg-pill" data-test="left-out">{{ $t('AiProject.left_out') }}</span>
                                         <SplitBadge :split="task.split"/>
                                     </div>
                                     <details class="aipg-task-desc">
@@ -693,11 +696,16 @@ export default defineComponent({
             const [lists, tasks] = [keep('lists'), keep('tasks')];
             let at = 0;
             let taskDocs = 0;
+            let kept = 0;
             (plan.value.sprints || []).forEach((sprint, list) => (sprint.tasks || []).forEach((task) => {
-                if (tasks.has(at++) && lists.has(list)) taskDocs += 1 + (Array.isArray(task.subtasks) ? task.subtasks.length : 0);
+                if (!tasks.has(at++) || !lists.has(list)) return;
+                kept += 1;
+                taskDocs += 1 + (Array.isArray(task.subtasks) ? task.subtasks.length : 0);
             }));
-            return { sprints: lists.size, taskDocs };
+            return { sprints: lists.size, tasks: kept, taskDocs };
         });
+        const isLeftOut = (key) => leftOut.value.includes(key) || (planCard.value?.locked || []).includes(key);
+        const taskKey = (si, ti) => 'tasks:' + ((plan.value?.sprints || []).slice(0, si).reduce((n, sprint) => n + (sprint.tasks || []).length, 0) + ti);
 
         const briefAssumptions = computed(() => {
             const list = briefDraft.value && Array.isArray(briefDraft.value.assumptions) ? briefDraft.value.assumptions : [];
@@ -1368,7 +1376,7 @@ export default defineComponent({
         return {
             clientWidth, step, loading, briefUploading, error, rolledBack,
             description, isPrivateSpace, proposalId, source, skills, briefFile, briefId, briefStats,
-            plan, planId, editableProjectName, planCard, leftOut,
+            plan, planId, editableProjectName, planCard, leftOut, keptTotals, isLeftOut, taskKey,
             jobId, progress, createdProjectId,
             placeholderText,
             canGenerate, hasSource, hasGeneratedPlan, hasGeneratedQuestions, totals, isBusy,
@@ -1922,6 +1930,8 @@ details[open] > .aipg-task-desc-trigger .aipg-chevron { transform: rotate(90deg)
     transition: border-color 0.15s ease;
 }
 .aipg-folder[open] { border-color: var(--brand-border); }
+.aipg-folder.is-left-out .aipg-folder-name,
+.aipg-task.is-left-out .aipg-task-name { color: var(--ink-2); text-decoration: line-through; }
 .aipg-folder-summary {
     list-style: none;
     cursor: pointer;
