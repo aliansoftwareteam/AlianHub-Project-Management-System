@@ -23,6 +23,8 @@
             </div>
         </div>
 
+        <AdminOnlyNote v-if="!canCreate" what="projects" class="pl2__admin-only" />
+
         <div v-if="rows.length" class="ah-card pl2__table">
             <div class="pl2__row pl2__row--head">
                 <span class="ah-label">{{ $t('Projects.col_project') }}</span>
@@ -156,6 +158,7 @@ import { useRoute, useRouter } from 'vue-router';
 import { useI18n } from 'vue-i18n';
 import { useCustomComposable, useGetterFunctions } from '@/composable';
 import ShellIcon from '@/components/organisms/Shell/ShellIcon.vue';
+import AdminOnlyNote from '@/components/molecules/AdminOnlyNote/AdminOnlyNote.vue';
 import ConfirmationSidebar from '@/components/molecules/ConfirmationSidebar/ConfirmationSidebar.vue';
 import CreateProjectSidebar from '@/components/organisms/CreateProject/CreateProjectSidebar.vue';
 import AiProjectCreator from '@/components/organisms/AiProjectCreator/AiProjectCreator.vue';
@@ -349,4 +352,5 @@ onBeforeUnmount(() => {
 
 <style>
 @import "./projects-list.css";
+.pl2__admin-only { margin-bottom: var(--sp-6, 12px); }
 </style>

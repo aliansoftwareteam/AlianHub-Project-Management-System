@@ -68,17 +68,15 @@ describe('what next, in order', () => {
         expect(whatNext({ empty: true, approvals: 1 })).toEqual({ kind: NEXT.APPROVALS, count: 1 });
     });
 
-    it('approvals come before everything else', () => {
-        expect(whatNext({ approvals: 3, waiting: 4, overdue: 2, today: 5 })).toEqual({ kind: NEXT.APPROVALS, count: 3 });
+    it('the person\'s own work due soon comes before approvals, which may be other people\'s agents asking', () => {
+        expect(whatNext({ approvals: 3, waiting: 4, overdue: 2, today: 5, soon: 1 })).toEqual({ kind: NEXT.OVERDUE, count: 2 });
+        expect(whatNext({ approvals: 3, waiting: 4, today: 5, soon: 1 })).toEqual({ kind: NEXT.TODAY, count: 5 });
+        expect(whatNext({ approvals: 6, waiting: 6, soon: 1 })).toEqual({ kind: NEXT.SOON, count: 1 });
     });
 
-    it('what the Waiting on you card holds comes next, when the Inbox tab holds nothing', () => {
-        expect(whatNext({ waiting: 2, overdue: 1 })).toEqual({ kind: NEXT.WAITING, count: 2 });
-    });
-
-    it('then overdue work, then today', () => {
-        expect(whatNext({ overdue: 2, today: 5 })).toEqual({ kind: NEXT.OVERDUE, count: 2 });
-        expect(whatNext({ today: 5 })).toEqual({ kind: NEXT.TODAY, count: 5 });
+    it('then approvals, then what the Waiting on you card holds', () => {
+        expect(whatNext({ approvals: 3, waiting: 4 })).toEqual({ kind: NEXT.APPROVALS, count: 3 });
+        expect(whatNext({ waiting: 2 })).toEqual({ kind: NEXT.WAITING, count: 2 });
     });
 
     it('with nothing to do it says so', () => {
@@ -90,7 +88,7 @@ describe('what next, in order', () => {
 describe('the numbers on the line are the linked screens\' own', () => {
     it('approvals: the count the Inbox shows on its approval tab', async () => {
         serverCounts = { approval: 2, approvals: 1, proposals: 1, primary: 9 };
-        serverTasks = [task('late', day(-2))];
+        serverTasks = [task('far', day(30))];
         const home = await openHome();
         expect(home.next).toEqual({ kind: NEXT.APPROVALS, count: 2 });
     });
@@ -105,6 +103,13 @@ describe('the numbers on the line are the linked screens\' own', () => {
         const calm = await openHome();
         expect(calm.next).toEqual({ kind: NEXT.TODAY, count: calm.work.groups.value.today.length });
         expect(calm.next.count).toBe(2);
+    });
+
+    it('due soon: a task of the person\'s own in the next week, ahead of approvals; a far one is not soon', async () => {
+        serverCounts = { approval: 6, approvals: 6, proposals: 6, primary: 0 };
+        serverTasks = [task('friday', day(3)), task('far', day(30))];
+        const home = await openHome();
+        expect(home.next).toEqual({ kind: NEXT.SOON, count: 1 });
     });
 
     it('nothing is read beyond My work\'s tasks and the Inbox count', async () => {

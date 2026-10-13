@@ -891,6 +891,8 @@ export default {
         "next_overdue_action": "Show overdue",
         "next_today": "You have one task for today. | You have {n} tasks for today.",
         "next_today_action": "Show today",
+        "next_soon": "One of your tasks is due within a week. | {n} of your tasks are due within a week.",
+        "next_soon_action": "Show your tasks",
         "next_start_project": "Start with one project: name what you are working on and add the tasks you already know.",
         "next_start_project_action": "Create a project",
         "next_start_task": "Nothing is assigned to you yet. Add a task of your own for today.",
@@ -2394,6 +2396,12 @@ export default {
         "undone_some": "{done} of {n} changes were undone.",
         "undo_failed": "That could not be undone."
     },
+    "AdminOnly": {
+        "projects": "Only an admin can create projects. Ask {names} to create one or to change your role.",
+        "invite": "Only an admin can invite people. Ask {names} to invite them or to change your role.",
+        "an_admin": "an admin",
+        "either": "{first} or {second}"
+    },
     "AgentActions": {
         "folder_create": "Make a folder",
         "tag_create": "Add a tag to a project",
@@ -3058,6 +3066,7 @@ export default {
         "proposal_findings_on": "File {n} QA finding on {on} | File {n} QA findings on {on}",
         "proposal_first_and_more": "{label} and {n} more change | {label} and {n} more changes",
         "proposal_untitled": "A change with no title",
+        "proposal_named": "{label}: “{name}”",
         "back_to_waiting": "Back to Waiting",
         "waiting_days": "Waiting {n} day | Waiting {n} days",
         "sort_by": "Sort",
@@ -6615,6 +6624,7 @@ export default {
         "auto_archive_after": "Archive after",
         "days": "days",
         "list_of_user": "Список пользователей",
+        "choose_people": "Choose people",
         "list_of_project_status": "Список статусов проектов",
         "list_of_task_type": "Список типов задач",
         "list_of_task_status": "Список статусов задач",
@@ -8864,7 +8874,8 @@ export default {
         "always_by": "Done without asking, under \"Always do this\" set up by {person}.",
         "said_and": "{said} · {also}",
         "skill_finding": "Found by the skill \"{skill}\"",
-        "via_rest": "Made by a connected app"
+        "via_rest": "Made by a connected app",
+        "outside_client_held": "This change {risk}, and it came from {client}, an app outside AlianHub, so a person has to approve it"
     },
     "AuditEvents": {
         "agent_action": "An agent made a change",

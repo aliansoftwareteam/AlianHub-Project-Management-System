@@ -313,7 +313,7 @@ describe('the step on the setup card', () => {
 });
 
 describe('the setup card with a skipped step', () => {
-    it('moves on to the next step, counts the skipped one as not done and keeps it clickable', async () => {
+    it('moves on to the next step, counts the skipped one as settled and keeps it clickable', async () => {
         const { default: SetupChecklist } = await import('@/components/molecules/Home/SetupChecklist.vue');
         const wrapper = mount(SetupChecklist, {
             props: {
@@ -325,7 +325,7 @@ describe('the setup card with a skipped step', () => {
             global: { stubs: { ShellIcon: true } }
         });
         expect(wrapper.find('.hc-setup__cta').text()).toBe('Home.open_my_work');
-        expect(wrapper.find('.hc-setup__ring').text()).toBe('0/2');
+        expect(wrapper.find('.hc-setup__ring').text()).toBe('1/2');
         const skipped = wrapper.findAll('.hc-setup__step')[0];
         expect(skipped.classes()).toContain('is-skipped');
         expect(skipped.text()).toContain('Home.step_skipped');

@@ -366,6 +366,11 @@
 .ah-detail__props .priority-comp.taskdetail-label,
 .ah-detail__props .due-date.taskdetail-label { width: auto; padding: 8.5px 0; border-radius: var(--r-sm, 4px); }
 .ah-detail__props .priority-comp span { padding: 0; }
+/* The date input keeps the browser's default size (about 20 characters), wider than the value column; it ran past the panel edge and the picker it opens with it. */
+.ah-detail__props .due-date.taskdetail-label { flex: 1 1 auto; min-width: 0; max-width: 100%; }
+.ah-detail__props .due-date .dp__main,
+.ah-detail__props .due-date .dp__main > div { min-width: 0; max-width: 100%; }
+.ah-detail__props .due-date .date_format_cal { width: 100%; min-width: 0; box-sizing: border-box; }
 /* Every value control is a click target: WCAG 2.5.8 wants at least 24px. */
 .ah-detail__prop-link,
 .ah-detail__props .task-status-name,

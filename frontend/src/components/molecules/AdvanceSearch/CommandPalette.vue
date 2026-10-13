@@ -268,7 +268,7 @@ const NAV = computed(() => [
     { key: 'integrations', label: t('Header.Integrations'), icon: 'integrations', route: 'Integrations', sub: t('settingslider.Settings') },
     { key: 'notifications', label: t('Inbox.nav_notifications'), icon: 'bell', route: 'Notifications', sub: t('settingslider.Settings') },
     { key: 'tracking', label: t('Inbox.nav_time_tracking'), icon: 'time', route: 'Time Tracking', sub: t('settingslider.Settings') },
-    { key: 'profile', label: t('Shell.my_profile'), icon: 'user', route: 'My Profile', sub: t('settingslider.Settings') },
+    { key: 'profile', label: t('Settings.nav_my_settings'), icon: 'user', route: 'My Profile', sub: t('settingslider.Settings') },
     { key: 'security', label: t('Inbox.nav_security'), icon: 'shield', route: 'Security & Permissions', sub: t('settingslider.Settings') },
     { key: 'audit', label: t('Audit.title'), icon: 'audit', route: 'AuditLog' },
     { key: 'changelog', label: t('Changelog.whats_new'), icon: 'changelog', route: 'Changelog' },

@@ -367,6 +367,17 @@ describe('the manage tools for an OAuth client', () => {
         expect(await described('task.create')).toMatch(/at once/);
     });
 
+    it('names the app in the reason a held write waits, not its metadata address', async () => {
+        process.env.MCP_TOOLS_MANAGE = 'on';
+        process.env.AGENT_TAINT_ROUTING = 'on';
+        const { raw } = await mint(MANAGING, [...ALL_SCOPES, 'tasks:manage']);
+        const ctx = await require('../Modules/Mcp/oauthAuth').authenticate({ headers: {} }, raw);
+        const reason = require('../Modules/Mcp/taintHold').heldForApproval(ctx, require('../Modules/Mcp/tools').actionOf('task.create'));
+        expect(ctx.actor.agentName).toBeTruthy();
+        expect(reason).toContain(`it came from an outside client (${ctx.actor.agentName})`);
+        expect(ctx.actor.agentName).not.toBe(ctx.oauth.clientId);
+    });
+
     it('says of no held write that it is made at once', async () => {
         process.env.MCP_TOOLS_MANAGE = 'on';
         process.env.AGENT_TAINT_ROUTING = 'on';

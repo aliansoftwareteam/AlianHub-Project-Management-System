@@ -13,6 +13,7 @@
                 <button type="button" class="ah-tab" :class="{ 'is-active': mode === 'org' }" @click="mode = 'org'">{{ $t('Org.tab_org') }}</button>
             </div>
         </header>
+        <AdminOnlyNote v-if="!canInvite" what="invite" class="pd__admin-only" />
 
         <div v-if="mode === 'org'" class="pd__body ah-scroll">
             <section v-for="root in orgRoots" :key="root.id" class="ah-card">
@@ -183,6 +184,7 @@ import { useRouter } from "vue-router";
 import { useStore } from "vuex";
 import { useI18n } from "vue-i18n";
 import ShellIcon from "@/components/organisms/Shell/ShellIcon.vue";
+import AdminOnlyNote from "@/components/molecules/AdminOnlyNote/AdminOnlyNote.vue";
 import EmptyState from "@/components/atom/EmptyState/EmptyState.vue";
 import { useCustomComposable } from "@/composable";
 import { apiRequest } from "@/services";
@@ -496,6 +498,7 @@ onMounted(() => {
 </script>
 
 <style scoped>
+.pd__admin-only { margin: 0 var(--sp-8, 16px) var(--sp-6, 12px); }
 .pd { display: flex; flex-direction: column; height: 100%; background: var(--canvas); color: var(--ink); font: var(--text-body); }
 .pd__bar { gap: 10px; }
 .pd__count { color: var(--ink-2); }

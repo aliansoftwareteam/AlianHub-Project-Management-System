@@ -1,4 +1,4 @@
-import { changeLabel, labelSlug } from "./agentActionLabels";
+import { agentActionLabel, changeLabel, labelSlug } from "./agentActionLabels";
 
 // Built-in skills carry persona names ("Reviewer") in their records, which say
 // who rather than what; these keys are named from the i18n map instead.
@@ -61,6 +61,8 @@ export const autonomyTip = (t, level) => t("Ai.autonomy_tip", { code: `L${levelO
 // stored proposals keep them, so they are read back rather than re-fetched.
 const CHANGES_ON = /^(\S+): (\d+) change(?:\(s\)|s)? on (.+)$/;
 const FINDINGS_ON = /^File (\d+) QA finding(?:\(s\)|s)? on (.+)$/;
+// A connected app's proposal is filed under its tool's name and description (Modules/Mcp/propose.js).
+const TOOL_FILED = /^([a-z][a-z_]*(?:\.[a-z_]+)+): /;
 
 // A proposal filed by a caller that had no title to give was stored with the text of that nothing.
 const NO_WORDS = Object.freeze(["", "undefined", "null"]);
@@ -77,6 +79,13 @@ const titleFromChanges = (t, proposal) => {
     return more ? t("Ai.proposal_first_and_more", { label: first, n: more }, more) : first;
 };
 
+const titleFromTool = (t, proposal, tool) => {
+    const first = Array.isArray(proposal.changes) ? proposal.changes[0] : null;
+    const label = agentActionLabel(t, first && first.action) || agentActionLabel(t, tool) || humaniseKey(tool);
+    const named = wordsOf(first && first.params && (first.params.title || first.params.name));
+    return named ? t("Ai.proposal_named", { label, name: named }) : label;
+};
+
 export const proposalTitle = (t, proposal) => {
     const what = wordsOf(proposal && proposal.what);
     if (!what) return titleFromChanges(t, proposal);
@@ -90,7 +99,8 @@ export const proposalTitle = (t, proposal) => {
         const n = Number(findings[1]);
         return t("Ai.proposal_findings_on", { n, on: findings[2] }, n);
     }
-    return what;
+    const tool = TOOL_FILED.exec(what);
+    return tool ? titleFromTool(t, proposal, tool[1]) : what;
 };
 
 export const waitingDaysOf = (proposal, now = Date.now()) => {
