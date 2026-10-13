@@ -6,7 +6,7 @@ jest.mock('../utils/commonFunctions', () => ({ removeCache: jest.fn() }));
 jest.mock('../Modules/Sprints/controller', () => ({ addSprintFun: jest.fn() }));
 jest.mock('../Modules/Tasks/helpers/helper', () => ({ HandleHistory: jest.fn(async () => null) }));
 jest.mock('../Modules/Tasks/helpers/handleNotification', () => ({ HandleBothNotification: jest.fn(async () => null) }));
-jest.mock('../Modules/createProject/controller', () => ({ checkProjectPlan: jest.fn(async () => null), removeProjectCount: jest.fn(async () => null) }));
+jest.mock('../Modules/createProject/controller', () => ({ checkProjectPlan: jest.fn(async () => ({ status: true })), removeProjectCount: jest.fn(async () => null) }));
 jest.mock('../Modules/Company/helpers/companyCurrency', () => ({ defaultCurrencyOf: jest.fn(async () => 'USD') }));
 jest.mock('../Modules/AIProjectGenerator/sseEmitter', () => ({ emit: jest.fn() }));
 jest.mock('../Modules/AIProjectGenerator/executeAgents', () => ({
@@ -77,5 +77,33 @@ describe('executePlan and the planned rules', () => {
         const out = await orchestrator.executePlan({ plan: plan(), companyId: C, uid: U, userData: { id: U }, jobId: 'job-2' });
         expect(out.ok).toBe(true);
         expect(sseEmitter.emit.mock.calls.some(([, payload]) => payload.event === 'error')).toBe(false);
+    });
+});
+
+describe('executePlan and the project plan check', () => {
+    const createProject = require('../Modules/createProject/controller');
+    const { SCHEMA_TYPE } = require('../Config/schemaType');
+    const savedProjects = () => mockMongo.mock.calls.filter(([, { type }, op]) => op === 'save' && type === SCHEMA_TYPE.PROJECTS);
+
+    beforeEach(() => {
+        addSprintFun.mockClear();
+        createProject.removeProjectCount.mockClear();
+    });
+
+    it('stops before anything is made when the check does not pass, and gives the count back', async () => {
+        createProject.checkProjectPlan.mockResolvedValueOnce({ status: false, statusText: 'The plan allows no more projects.' });
+        const out = await orchestrator.executePlan({ plan: plan(), companyId: C, uid: U, userData: { id: U }, jobId: 'job-3' });
+        expect(out).toEqual({ ok: false, error: 'The plan allows no more projects.' });
+        expect(savedProjects()).toHaveLength(0);
+        expect(addSprintFun).not.toHaveBeenCalled();
+        expect(createProject.removeProjectCount).toHaveBeenCalledWith(C, false);
+    });
+
+    it('leaves the count alone when the check could not count the project', async () => {
+        createProject.checkProjectPlan.mockRejectedValueOnce({ status: false, countRollBack: false });
+        const out = await orchestrator.executePlan({ plan: plan(), companyId: C, uid: U, userData: { id: U }, jobId: 'job-4' });
+        expect(out.ok).toBe(false);
+        expect(savedProjects()).toHaveLength(0);
+        expect(createProject.removeProjectCount).not.toHaveBeenCalled();
     });
 });

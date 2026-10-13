@@ -17,7 +17,8 @@
  *     "force-rename to 'To Do'". Domain-specific names survive intact.
  *
  *  5. Plan-limit gate matches the manual flow: `checkProjectPlan` runs
- *     before any work, with `removeProjectCount` rollback on failure.
+ *     before any work and stops the run when it does not pass, with
+ *     `removeProjectCount` rollback on failure.
  *
  *  6. `ProjectCode` is generated server-side from the project name using
  *     the same first-letter regex the manual wizard uses, with a
@@ -1003,7 +1004,12 @@ function withTimeout(promise, ms, label) {
     ]);
 }
 
-async function executePlan({ plan, companyId, uid, userData, jobId, approvedBrief, assumptions, guide }) {
+const planCheckReason = (outcome) => {
+    const reason = outcome && (outcome.statusText || outcome.message);
+    return typeof reason === 'string' && reason ? reason : 'Project plan check did not pass.';
+};
+
+async function executePlan({ plan, companyId, uid, userData, jobId, approvedBrief, assumptions, guide, withGuideAgent = true }) {
     const tracker = {
         project: null,
         sprints: [],
@@ -1028,45 +1034,20 @@ async function executePlan({ plan, companyId, uid, userData, jobId, approvedBrie
             logger.warn(`[AIPG][${jobId}] split not attached (${e && e.message ? e.message : e}); every task is treated as a person's`);
         }
 
-        // 1. Plan-limit gate — INTENTIONALLY BYPASSED.
-        //
-        // We still call `checkProjectPlan` because internally it $inc's the
-        // company's `projectCount.{projectCount,publicCount,privateCount}`
-        // counters BEFORE checking the limit ceiling. Keeping that call
-        // means AI-created projects stay accurately counted in the
-        // companies doc — matching how the manual createProject flow
-        // tracks them. We just swallow the rejection that comes back
-        // when the ceiling is tripped, so creation proceeds anyway.
-        //
-        // checkProjectPlan rejects in two distinct cases:
-        //   (a) `countRollBack === false` — the $inc itself failed (e.g.
-        //       Mongo write error). Count was NOT mutated, so we leave
-        //       tracker.countIncremented = false. Nothing for the
-        //       downstream rollback path to undo.
-        //   (b) Otherwise — the $inc succeeded and only the ceiling
-        //       check failed. Count WAS mutated, so we mark
-        //       countIncremented = true and the existing rollback() in
-        //       the outer catch will correctly decrement on later
-        //       failure, exactly like the limit-not-tripped path.
+        // The same plan check the manual create runs; a rejection after the count's $inc still owes a rollback.
         emit({ event: 'progress', step: 'project', status: 'started' });
-        logger.info(`[AIPG][${jobId}] step 1: checkProjectPlan start (company=${companyId})`);
+        let planCheck;
         try {
-            await withTimeout(
+            planCheck = await withTimeout(
                 checkProjectPlan({ body: { CompanyId: companyId, isPrivateSpace: tracker.isPrivateSpace } }),
                 45000, 'checkProjectPlan'
             );
-            tracker.countIncremented = true;
         } catch (err) {
-            const incrementFailed = err && err.countRollBack === false;
-            if (!incrementFailed) {
-                tracker.countIncremented = true;
-            }
-            const reason = (err && err.statusText)
-                || (err && err.message)
-                || 'unknown';
-            logger.warn(`[AIPG][${jobId}] checkProjectPlan rejected — bypassed (reason: ${reason}, incrementApplied: ${!incrementFailed})`);
+            tracker.countIncremented = !(err && err.countRollBack === false);
+            throw new Error(planCheckReason(err));
         }
-        logger.info(`[AIPG][${jobId}] step 1: checkProjectPlan done (limit gate bypassed)`);
+        tracker.countIncremented = true;
+        if (!planCheck || !planCheck.status) throw new Error(planCheckReason(planCheck));
 
         // 2. Load company context.
         logger.info(`[AIPG][${jobId}] step 2: loadCompanyContext start`);
@@ -1173,7 +1154,7 @@ async function executePlan({ plan, companyId, uid, userData, jobId, approvedBrie
 
         // 12. Guide agent and the runs for agent-labelled tasks (task 015).
         const agentWork = await executeAgents.start({
-            companyId, uid, projectId: tracker.project, projectName: projectDoc.ProjectName, pairs: taskPairs, agents, withGuide, approvedBrief, assumptions,
+            companyId, uid, projectId: tracker.project, projectName: projectDoc.ProjectName, pairs: taskPairs, agents, withGuide, withGuideAgent, approvedBrief, assumptions,
         });
 
         // Last, so nothing after it can roll the project back and leave a rule behind.

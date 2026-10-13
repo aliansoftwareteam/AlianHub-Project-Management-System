@@ -278,7 +278,7 @@
                                 :disabled="loading"/>
                             <code class="aipg-code-pill">{{ plan.project.ProjectCode }}</code>
                             <span class="aipg-ml-auto aipg-helper">
-                                {{ $t('AiProject.sprint_count', { n: totals.sprints }, totals.sprints) }} · {{ $t('AiProject.task_count', { n: totals.tasks }, totals.tasks) }}
+                                {{ $t('AiProject.sprint_count', { n: keptTotals.sprints }, keptTotals.sprints) }} · {{ $t('AiProject.task_count', { n: keptTotals.tasks }, keptTotals.tasks) }}
                                 <!-- Cost is omitted, not zeroed, when the model
                                      has no price on file — a wrong number is
                                      worse than no number. -->
@@ -301,11 +301,18 @@
                         </div>
                     </div>
 
-                    <div v-if="(plan.rules || []).length || (plan.rulesDropped || []).length" class="aipg-card">
+                    <IntentPreview
+                        v-if="planCard"
+                        :preview="planCard"
+                        choosable
+                        :left-out="leftOut"
+                        :disabled="loading"
+                        data-test="plan-card"
+                        @update:left-out="(parts) => leftOut = parts"/>
+
+                    <div v-if="(plan.rulesDropped || []).length" class="aipg-card">
                         <PlanRules
-                            :rules="plan.rules || []"
                             :notes="plan.rulesDropped || []"
-                            :title="$t('AiProject.rules_title')"
                             :notes-title="$t('AiProject.rules_dropped_title')"/>
                     </div>
 
@@ -319,11 +326,9 @@
                         </ul>
                     </div>
 
-                    <div v-if="(plan.views || []).length || (plan.viewsDropped || []).length" class="aipg-card">
+                    <div v-if="(plan.viewsDropped || []).length" class="aipg-card">
                         <PlanViews
-                            :views="plan.views || []"
                             :notes="plan.viewsDropped || []"
-                            :title="$t('AiProject.views_title')"
                             :notes-title="$t('AiProject.views_dropped_title')"/>
                     </div>
 
@@ -332,6 +337,7 @@
                             v-for="(sprint, si) in plan.sprints"
                             :key="'s-'+si"
                             class="aipg-folder"
+                            :class="{ 'is-left-out': isLeftOut('lists:' + si) }"
                             :open="si === 0">
                             <summary class="aipg-folder-summary">
                                 <span class="aipg-chevron" aria-hidden="true">›</span>
@@ -341,16 +347,18 @@
                                     maxlength="80"
                                     :disabled="loading"
                                     @click.stop/>
-                                <span class="aipg-pill aipg-ml-auto">{{ $t('AiProject.task_count', { n: sprint.tasks.length }, sprint.tasks.length) }}</span>
+                                <span v-if="isLeftOut('lists:' + si)" class="aipg-pill aipg-ml-auto" data-test="left-out">{{ $t('AiProject.left_out') }}</span>
+                                <span v-else class="aipg-pill aipg-ml-auto">{{ $t('AiProject.task_count', { n: sprint.tasks.length }, sprint.tasks.length) }}</span>
                             </summary>
                             <ul class="aipg-task-list">
-                                <li v-for="(task, ti) in sprint.tasks" :key="'t-'+si+'-'+ti" class="aipg-task">
+                                <li v-for="(task, ti) in sprint.tasks" :key="'t-'+si+'-'+ti" class="aipg-task" :class="{ 'is-left-out': isLeftOut(taskKey(si, ti)) }">
                                     <div class="aipg-task-row">
                                         <input
                                             v-model="task.TaskName"
                                             class="aipg-input-plain aipg-task-name"
                                             maxlength="200"
                                             :disabled="loading"/>
+                                        <span v-if="isLeftOut(taskKey(si, ti))" class="aipg-pill" data-test="left-out">{{ $t('AiProject.left_out') }}</span>
                                         <SplitBadge :split="task.split"/>
                                     </div>
                                     <details class="aipg-task-desc">
@@ -383,7 +391,17 @@
                     />
 
                     <transition name="aipg-fade">
-                        <div v-if="error" class="aipg-alert aipg-alert-danger">{{ error }}</div>
+                        <div v-if="error" class="aipg-alert aipg-alert-danger">
+                            <div>{{ error }}</div>
+                            <button
+                                v-if="planExpired"
+                                type="button"
+                                class="aipg-btn aipg-btn-ghost"
+                                data-test="generate-again"
+                                :disabled="loading"
+                                @click="onGenerateAgain"
+                            >{{ $t('AiProject.generate_again') }}</button>
+                        </div>
                     </transition>
 
                     <div class="aipg-actions aipg-actions-split">
@@ -498,6 +516,9 @@ import GuidePreview from './plan/GuidePreview.vue';
 import PlanViews from './plan/PlanViews.vue';
 import PlanRules from './plan/PlanRules.vue';
 import { POINTS } from './brief/points';
+import { cardOf, keptLists } from './plan/planCard';
+import IntentPreview from '@/components/molecules/IntentPreview/IntentPreview.vue';
+import { chosenParts } from '@/components/molecules/IntentPreview/planPicks';
 import { useAiProjectGenerator } from '@/composable/aiProjectGenerator';
 import { useStore } from 'vuex';
 import { useRoute, useRouter } from 'vue-router';
@@ -508,7 +529,7 @@ import { useI18n } from 'vue-i18n';
 
 export default defineComponent({
     name: 'AiProjectCreator',
-    components: { Sidebar, ClarifyStep, CoverageChips, BriefStep, SplitBadge, GuidePreview, PlanViews, PlanRules, SkillsSelect, ProjectSourceSelect },
+    components: { Sidebar, ClarifyStep, CoverageChips, BriefStep, SplitBadge, GuidePreview, PlanViews, PlanRules, IntentPreview, SkillsSelect, ProjectSourceSelect },
     props: {
         visible: { type: Boolean, default: false },
     },
@@ -586,6 +607,7 @@ export default defineComponent({
 
         const plan = ref(null);
         const planId = ref(null);
+        const planExpired = ref(false);
         const editableProjectName = computed({
             get: () => (plan.value ? plan.value.project.ProjectName : ''),
             set: (v) => { if (plan.value) plan.value.project.ProjectName = String(v || '').slice(0, 80); },
@@ -675,6 +697,26 @@ export default defineComponent({
             }
             return { sprints: plan.value.sprints.length, tasks, taskDocs };
         });
+
+        const leftOut = ref([]);
+        const planCard = computed(() => cardOf(plan.value, { withGuide: Boolean(approvedBrief.value || guide.value) }));
+        const keptTotals = computed(() => {
+            const picks = planCard.value ? chosenParts(planCard.value, leftOut.value) : null;
+            if (!picks) return totals.value;
+            const keep = (part) => new Set(Array.isArray(picks[part]) ? picks[part] : []);
+            const [lists, tasks] = [keep('lists'), keep('tasks')];
+            let at = 0;
+            let taskDocs = 0;
+            let kept = 0;
+            (plan.value.sprints || []).forEach((sprint, list) => (sprint.tasks || []).forEach((task) => {
+                if (!tasks.has(at++) || !lists.has(list)) return;
+                kept += 1;
+                taskDocs += 1 + (Array.isArray(task.subtasks) ? task.subtasks.length : 0);
+            }));
+            return { sprints: lists.size, tasks: kept, taskDocs };
+        });
+        const isLeftOut = (key) => leftOut.value.includes(key) || (planCard.value?.locked || []).includes(key);
+        const taskKey = (si, ti) => 'tasks:' + ((plan.value?.sprints || []).slice(0, si).reduce((n, sprint) => n + (sprint.tasks || []).length, 0) + ti);
 
         const briefAssumptions = computed(() => {
             const list = briefDraft.value && Array.isArray(briefDraft.value.assumptions) ? briefDraft.value.assumptions : [];
@@ -943,7 +985,9 @@ export default defineComponent({
                     return;
                 }
                 plan.value = result.plan;
+                leftOut.value = [];
                 planId.value = result.planId;
+                planExpired.value = false;
                 planUsage.value = result.usage || null;
                 mergeSuggestedSkills(result.plan);
                 step.value = 'preview';
@@ -1019,6 +1063,12 @@ export default defineComponent({
             step.value = hasGeneratedQuestions.value ? 'clarify' : 'input';
         }
 
+        async function onGenerateAgain() {
+            planExpired.value = false;
+            error.value = '';
+            await runPlanGeneration(clarifications.value);
+        }
+
         function onPreviewBack() {
             error.value = '';
             step.value = approvedBrief.value ? 'brief' : 'input';
@@ -1030,6 +1080,7 @@ export default defineComponent({
             guideError.value = '';
             try {
                 const res = await api.generateGuide({
+                    planId: planId.value,
                     approvedBrief: approvedBrief.value,
                     assumptions: planAssumptions.value,
                     plan: plan.value,
@@ -1046,11 +1097,6 @@ export default defineComponent({
             } finally {
                 guideLoading.value = false;
             }
-        }
-
-        function guideForExecute() {
-            if (!guide.value) return null;
-            return { ...guide.value, markdown: guideMarkdown.value || guide.value.markdown || '' };
         }
 
         function applyOutcome(payload) {
@@ -1153,6 +1199,7 @@ export default defineComponent({
                     sprintName: s.sprintName,
                     tasks: (s.tasks || []).map((t) => ({ TaskName: t.TaskName })),
                 })),
+                ...(guide.value && guideMarkdown.value ? { guideMarkdown: guideMarkdown.value } : {}),
             };
         }
 
@@ -1168,21 +1215,29 @@ export default defineComponent({
                 step.value = 'input';
                 return;
             }
+            const picks = planCard.value ? chosenParts(planCard.value, leftOut.value) : null;
+            if (keptLists(picks) === 0) {
+                error.value = t('AiProject.keep_one_list');
+                return;
+            }
             loading.value = true;
             error.value = '';
             try {
                 const result = await api.execute({
-                    plan: plan.value,
+                    planId: planId.value,
+                    picks,
                     edits: buildEdits(),
                     userName: '',
                     isPrivateSpace: isPrivateSpace.value,
                     proposalId: proposalId.value,
                     source: source.value,
                     skills: skills.value,
-                    approvedBrief: approvedBrief.value || null,
-                    assumptions: planAssumptions.value,
-                    guide: guideForExecute(),
                 });
+                if (result && result.expired) {
+                    planExpired.value = true;
+                    error.value = t('AiProject.plan_expired');
+                    return;
+                }
                 if (!result || !result.status || !result.jobId) {
                     error.value = (result && result.statusText) || t('AiProject.execute_failed');
                     return;
@@ -1190,8 +1245,8 @@ export default defineComponent({
                 applyOutcome(result);
                 jobId.value = result.jobId;
                 step.value = 'executing';
-                progress.totalSprints = totals.value.sprints;
-                progress.totalTasks = totals.value.taskDocs;
+                progress.totalSprints = keptTotals.value.sprints;
+                progress.totalTasks = keptTotals.value.taskDocs;
                 subscribe();
             } catch (e) {
                 error.value = friendlyErr(e);
@@ -1286,7 +1341,9 @@ export default defineComponent({
             briefStats.truncated = false;
             briefStats.charCount = 0;
             plan.value = null;
+            leftOut.value = [];
             planId.value = null;
+            planExpired.value = false;
             jobId.value = null;
             createdProjectId.value = null;
             progress.project = 'pending';
@@ -1337,7 +1394,7 @@ export default defineComponent({
         return {
             clientWidth, step, loading, briefUploading, error, rolledBack,
             description, isPrivateSpace, proposalId, source, skills, briefFile, briefId, briefStats,
-            plan, planId, editableProjectName,
+            plan, planId, planExpired, onGenerateAgain, editableProjectName, planCard, leftOut, keptTotals, isLeftOut, taskKey,
             jobId, progress, createdProjectId,
             placeholderText,
             canGenerate, hasSource, hasGeneratedPlan, hasGeneratedQuestions, totals, isBusy,
@@ -1891,6 +1948,8 @@ details[open] > .aipg-task-desc-trigger .aipg-chevron { transform: rotate(90deg)
     transition: border-color 0.15s ease;
 }
 .aipg-folder[open] { border-color: var(--brand-border); }
+.aipg-folder.is-left-out .aipg-folder-name,
+.aipg-task.is-left-out .aipg-task-name { color: var(--ink-2); text-decoration: line-through; }
 .aipg-folder-summary {
     list-style: none;
     cursor: pointer;

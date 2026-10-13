@@ -19,7 +19,9 @@ const planAutomations = require('./planAutomations');
 const { usageFromResult, addUsage, summarize } = require('../AICore/usage');
 const planRules = require('./planRules');
 const planViews = require('./planViews');
+const planPicks = require('./planPicks');
 const sseEmitter = require('./sseEmitter');
+const { PLAN_TTL_SECONDS, PLAN_EXPIRED, cacheKey, rememberPlan, storedPlan, storedGuide, claimPlan, releasePlan, forgetPlan } = require('./planStash');
 const orchestrator = require('./orchestrator');
 const clarifier = require('./clarifier');
 const memoryStore = require('../Agents/memory');
@@ -29,9 +31,9 @@ const { normaliseSource, cleanProposalId, numericProposalId, validateProposalId 
 const { normalizePlanColors } = orchestrator;
 const { sessionTenantOf, TenantError } = require('../../Config/tenant');
 
-const PLAN_TTL_SECONDS = 15 * 60;        // 15 min
 const BRIEF_TTL_SECONDS = 30 * 60;       // 30 min
 const OBJECT_ID_PATTERN = /^[a-f0-9]{24}$/i;
+const MAX_GUIDE_MARKDOWN_CHARS = 20000;
 
 // AI task-creation modes (AHE-3777 enhancement):
 //   'full'    — sprints + tasks (original behavior)
@@ -68,10 +70,6 @@ function tasksResponseSchemaForMode(mode) {
 
 function token() {
     return crypto.randomBytes(12).toString('hex');
-}
-
-function cacheKey(kind, uid, id) {
-    return `aipg:${kind}:${uid}:${id}`;
 }
 
 function sendError(res, status, message) {
@@ -270,7 +268,7 @@ async function generatePlanForJob({ jobId, uid, companyId, description, addition
         }
 
         if (plan && typeof plan === 'object') {
-            const trimmed = await planAutomations.trimRulesFor({ companyId, uid, given: plan.rules, project: plan.project });
+            const trimmed = planAutomations.trimRules(plan.rules, plan.project);
             plan.rules = trimmed.kept;
             plan.rulesDropped = trimmed.dropped;
         }
@@ -289,13 +287,9 @@ async function generatePlanForJob({ jobId, uid, companyId, description, addition
         const { kept, dropped } = planViews.trimViews(plan.views);
         plan.views = kept;
         plan.viewsDropped = dropped;
+        Object.assign(plan, planPicks.marksOf(await planPicks.locksFor({ companyId, uid, plan })));
 
-        const planId = token();
-        myCache.set(cacheKey('plan', uid, planId), {
-            companyId,
-            plan,
-            createdAt: Date.now(),
-        }, PLAN_TTL_SECONDS);
+        const planId = rememberPlan({ uid, companyId, plan, approvedBrief, assumptions });
 
         emit({
             event: 'complete',
@@ -648,15 +642,14 @@ exports.execute = async (req, res) => {
         const companyId = resolveCompanyId(req);
         if (!companyId) return sendError(res, 403, 'Company access denied');
 
-        // The plan travels in the request body. We deliberately do NOT rely
-        // on an in-memory cache here — a nodemon restart between /plan and
-        // /execute would otherwise lose it. The client always has the full
-        // plan (it was returned from /plan and shown in the preview), so
-        // it just sends it back.
-        let plan = req.body && req.body.plan;
-        if (!plan || typeof plan !== 'object') return sendError(res, 400, 'plan required in request body');
+        const planId = req.body && req.body.planId;
+        const stored = storedPlan({ uid, companyId, planId });
+        if (!stored) return planExpired(res);
+        let plan = JSON.parse(JSON.stringify(stored.plan));
+        const { approvedBrief, assumptions } = stored;
+        const guide = editedGuide(storedGuide({ uid, companyId, planId }), req.body && req.body.edits);
+        const withGuide = Boolean((approvedBrief && String(approvedBrief).trim()) || guide);
 
-        // Apply optional inline edits (renames the user made in the preview).
         const editsRaw = req.body && req.body.edits;
         if (editsRaw && typeof editsRaw === 'object') {
             plan = applyEdits(plan, editsRaw);
@@ -679,6 +672,11 @@ exports.execute = async (req, res) => {
         }
         plan = normalizePlanColors(reCheck.data);
         plan.views = planViews.trimViews(plan.views).kept;
+
+        const locks = await planPicks.locksFor({ companyId, uid, plan: stored.plan });
+        const picked = planPicks.narrow(plan, req.body && req.body.picks, { withGuide, locks });
+        if (picked.error) return sendError(res, 400, picked.error);
+        plan = picked.plan;
 
         // Applied *after* validation on purpose: `proposalId` is not in
         // ProjectSchema, so zod strips whatever the LLM emitted and only the
@@ -724,11 +722,8 @@ exports.execute = async (req, res) => {
             companyOwnerId: companyId,
         };
 
+        if (!claimPlan({ uid, planId })) return planExpired(res);
         const jobId = token();
-
-        // Task 015: the approved brief, its assumptions and the generated guide
-        // travel with the plan and land on the project; the orchestrator owns them.
-        const { approvedBrief, assumptions, guide } = req.body || {};
 
         // Reply right away with the jobId; client opens SSE on /execute/events/:jobId.
         res.send({ status: true, jobId });
@@ -736,8 +731,10 @@ exports.execute = async (req, res) => {
         // Tiny delay so the client has time to attach the SSE listener before
         // we start emitting (otherwise an instant-success run can race).
         setTimeout(() => {
-            orchestrator.executePlan({ plan, companyId, uid: String(uid), userData, jobId, approvedBrief, assumptions, guide })
+            orchestrator.executePlan({ plan, companyId, uid: String(uid), userData, jobId, approvedBrief, assumptions, guide, withGuideAgent: picked.withGuideAgent })
+                .then((out) => (out && out.ok ? forgetPlan({ uid, planId }) : releasePlan({ uid, planId })))
                 .catch((e) => {
+                    releasePlan({ uid, planId });
                     logger.error(`AIPG execute error: ${e && e.message ? e.message : e}`);
                 });
         }, 200);
@@ -746,6 +743,15 @@ exports.execute = async (req, res) => {
         return sendError(res, 500, error && error.message ? error.message : 'Execute failed');
     }
 };
+
+const planExpired = (res) => res.status(410).send({ status: false, statusText: PLAN_EXPIRED, code: 'PLAN_EXPIRED' });
+
+/* The Guide's text is the person's to reword before the project is made; the guide itself stays the server's. */
+function editedGuide(guide, edits) {
+    if (!guide) return null;
+    const markdown = edits && typeof edits.guideMarkdown === 'string' ? edits.guideMarkdown.slice(0, MAX_GUIDE_MARKDOWN_CHARS) : '';
+    return markdown.trim() ? { ...guide, markdown } : guide;
+}
 
 function applyEdits(plan, edits) {
     const next = JSON.parse(JSON.stringify(plan));
