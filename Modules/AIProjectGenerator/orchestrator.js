@@ -55,6 +55,7 @@ const { hiddenSprintFilter } = require('../Sprints/helpers/sprintVisibility');
 const planRules = require('./planRules');
 const sseEmitter = require('./sseEmitter');
 const executeAgents = require('./executeAgents');
+const planViews = require('./planViews');
 const { taskCreatedHistoryMessage, projectCreatedHistoryMessage, projectCreatedNoticeMessage } = require('./historyMessages');
 
 // Concurrency cap for fire-and-forget AI estimates after bulk task insert —
@@ -383,14 +384,14 @@ function shapeTaskType(entry, idx) {
 
 // ─── Required views — match company defaults ───────────────────────────
 
-function pickRequiredComponents(tabComponents) {
+function pickRequiredComponents(tabComponents, plannedKeys = new Set()) {
     if (!Array.isArray(tabComponents) || !tabComponents.length) return [];
     let defaultPicked = false;
     const shaped = tabComponents
         .filter((v) => {
             const lowerName = String(v.name || '').trim().toLowerCase();
             const lowerKey = String(v.keyName || '').trim().toLowerCase();
-            if (lowerKey) return AI_PROJECT_VIEW_KEYS.has(lowerKey);
+            if (lowerKey) return AI_PROJECT_VIEW_KEYS.has(lowerKey) || plannedKeys.has(lowerKey);
             return AI_PROJECT_VIEW_NAMES.has(lowerName);
         })
         .map((v) => {
@@ -546,7 +547,7 @@ function buildProjectDoc({ plan, context, companyId, uid, projectIdHint, project
 
     const defaultProjectStatus = projectStatusMerge.merged.find((s) => s.type === 'default_active') || projectStatusMerge.merged[0];
     const apps = pickAppKeys(context.apps);
-    const projectRequired = pickRequiredComponents(context.tabComponents);
+    const projectRequired = pickRequiredComponents(context.tabComponents, planViews.tabKeysFor(plan.views));
     const defaultComponent = projectRequired.find((c) => c.setAsDefault) || projectRequired[0] || {};
     const defaultRequired = defaultComponent.keyName || defaultComponent.name || '';
 
@@ -1128,6 +1129,8 @@ async function executePlan({ plan, companyId, uid, userData, jobId, approvedBrie
             emit({ event: 'progress', step: 'tasks', status: 'progress', completed, total: totalTasks });
         }
 
+        const views = await planViews.makeViews({ companyId, uid, projectId: tracker.project, views: plan.views });
+
         // 9. History row (best-effort, single entry).
         const historyObject = {
             message: projectCreatedHistoryMessage(userData, projectDoc, tracker),
@@ -1158,10 +1161,11 @@ async function executePlan({ plan, companyId, uid, userData, jobId, approvedBrie
             projectName: projectDoc.ProjectName,
             totals,
             splitSummary: plan.splitSummary || null,
+            views,
             ...agentWork,
         });
 
-        return { ok: true, projectId: tracker.project, totals, ...agentWork };
+        return { ok: true, projectId: tracker.project, totals, views, ...agentWork };
     } catch (error) {
         logger.error(`[AIPG][${jobId}] orchestrator catch: ${error && error.message ? error.message : error}${error && error.stack ? '\n' + error.stack : ''}`);
         await rollback({ companyId, tracker });
@@ -1587,6 +1591,7 @@ module.exports = {
     // Exported for tests / debugging.
     loadCompanyContext,
     buildProjectDoc,
+    pickRequiredComponents,
     mergeStatusList,
     rollback,
     bgFromText,

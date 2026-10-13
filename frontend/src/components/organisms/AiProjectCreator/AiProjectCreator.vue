@@ -311,6 +311,14 @@
                         </ul>
                     </div>
 
+                    <div v-if="(plan.views || []).length || (plan.viewsDropped || []).length" class="aipg-card">
+                        <PlanViews
+                            :views="plan.views || []"
+                            :notes="plan.viewsDropped || []"
+                            :title="$t('AiProject.views_title')"
+                            :notes-title="$t('AiProject.views_dropped_title')"/>
+                    </div>
+
                     <div class="aipg-folder-list">
                         <details
                             v-for="(sprint, si) in plan.sprints"
@@ -411,7 +419,7 @@
                     </p>
 
                     <div v-if="step === 'done' && hasOutcome" class="aipg-card aipg-outcome" data-test="outcome">
-                        <p class="aipg-outcome-line">
+                        <p v-if="outcome.runsQueued > 0" class="aipg-outcome-line">
                             <span class="aipg-chip aipg-chip-app">⚡ {{ $t('AiProject.runs_queued', { n: outcome.runsQueued }, outcome.runsQueued) }}</span>
                         </p>
                         <div v-if="outcome.runsRefused.length" class="aipg-outcome-refused" data-test="runs-refused">
@@ -423,6 +431,11 @@
                                 </li>
                             </ul>
                         </div>
+                        <PlanViews
+                            :views="outcome.viewsMade"
+                            :notes="outcome.viewsNotMade"
+                            :title="$t('AiProject.views_made_title')"
+                            :notes-title="$t('AiProject.views_not_made_title')"/>
                         <button
                             v-if="outcome.guideAgentId"
                             type="button"
@@ -465,6 +478,7 @@ import CoverageChips from './brief/CoverageChips.vue';
 import BriefStep from './brief/BriefStep.vue';
 import SplitBadge from './plan/SplitBadge.vue';
 import GuidePreview from './plan/GuidePreview.vue';
+import PlanViews from './plan/PlanViews.vue';
 import { POINTS } from './brief/points';
 import { useAiProjectGenerator } from '@/composable/aiProjectGenerator';
 import { useStore } from 'vuex';
@@ -476,7 +490,7 @@ import { useI18n } from 'vue-i18n';
 
 export default defineComponent({
     name: 'AiProjectCreator',
-    components: { Sidebar, ClarifyStep, CoverageChips, BriefStep, SplitBadge, GuidePreview, SkillsSelect, ProjectSourceSelect },
+    components: { Sidebar, ClarifyStep, CoverageChips, BriefStep, SplitBadge, GuidePreview, PlanViews, SkillsSelect, ProjectSourceSelect },
     props: {
         visible: { type: Boolean, default: false },
     },
@@ -524,7 +538,7 @@ export default defineComponent({
         const guideLoading = ref(false);
         const guideError = ref('');
 
-        const outcome = reactive({ guideAgentId: null, runsQueued: 0, runsRefused: [] });
+        const outcome = reactive({ guideAgentId: null, runsQueued: 0, runsRefused: [], viewsMade: [], viewsNotMade: [] });
 
         // True when ANY in-flight operation owns the modal — brief upload,
         // clarify LLM call, plan LLM call, or the orchestrator's execute
@@ -677,7 +691,8 @@ export default defineComponent({
             return labelled ? counts : null;
         });
 
-        const hasOutcome = computed(() => outcome.runsQueued > 0 || outcome.runsRefused.length > 0 || !!outcome.guideAgentId);
+        const hasOutcome = computed(() => outcome.runsQueued > 0 || outcome.runsRefused.length > 0 || !!outcome.guideAgentId
+            || outcome.viewsMade.length > 0 || outcome.viewsNotMade.length > 0);
 
         // What this run cost. One wizard run can be two LLM calls — the clarify
         // round and the plan itself — so both are collected and added up;
@@ -1024,6 +1039,9 @@ export default defineComponent({
             if (payload.guideAgentId) outcome.guideAgentId = payload.guideAgentId;
             if (typeof payload.runsQueued === 'number') outcome.runsQueued = payload.runsQueued;
             if (Array.isArray(payload.runsRefused)) outcome.runsRefused = payload.runsRefused.filter(Boolean);
+            const views = payload.views || {};
+            if (Array.isArray(views.made)) outcome.viewsMade = views.made.filter(Boolean);
+            if (Array.isArray(views.notMade)) outcome.viewsNotMade = views.notMade.filter(Boolean);
         }
 
         // User's picks first, then the model's — known slugs only, mirroring the
@@ -1276,6 +1294,8 @@ export default defineComponent({
             outcome.guideAgentId = null;
             outcome.runsQueued = 0;
             outcome.runsRefused = [];
+            outcome.viewsMade = [];
+            outcome.viewsNotMade = [];
             emit('close');
         }
 

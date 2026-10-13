@@ -251,10 +251,21 @@ const ProjectSchema = z.object({
     dupesIn(proj.taskTypeCounts, 'taskTypeCounts');
 });
 
+// Loose on purpose: a view the shared plan check refuses is dropped with a
+// reason at /plan (./planViews.js) rather than sending the whole plan back
+// for repair. The cap here only bounds a runaway response.
+const PlanViewSchema = z.object({
+    name: z.string().max(200).optional().default(''),
+    kind: z.string().max(40).optional().default('list'),
+    look: z.record(z.string(), z.unknown()).optional(),
+    showFields: z.array(z.string().max(200)).max(50).optional(),
+});
+
 const PlanSchema = z.object({
     project: ProjectSchema,
     // Safety cap only: 200 sprints is far beyond any honest plan.
     sprints: z.array(SprintSchema).min(1).max(200),
+    views: z.array(PlanViewSchema).max(20).optional(),
 }).superRefine((plan, ctx) => {
     const issue = (msg, path) => ctx.addIssue({ code: z.ZodIssueCode.custom, message: msg, path: path || [] });
 
