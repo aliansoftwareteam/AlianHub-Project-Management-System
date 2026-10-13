@@ -72,6 +72,8 @@ const ROUTES = Object.freeze({
 });
 
 const refuse = (message) => new tools.DeterministicError(message);
+/* `code` names the reason for a screen that shows it in the person's language; the message stays for an AI. */
+const refuseAs = (code, message) => Object.assign(refuse(message), { code });
 const idOf = (value) => (value === undefined || value === null ? '' : String(value));
 const isId = (value) => OBJECT_ID.test(idOf(value));
 const lower = (value) => String(value).trim().toLowerCase();
@@ -486,6 +488,8 @@ const addressOf = (companyId, made) => {
 };
 
 const NAME_TAKEN = 409;
+const FORBIDDEN = 403;
+const routeRefusalCode = (status) => (status === FORBIDDEN ? 'permission' : 'other');
 const kindOf = (keyName) => Object.keys(VIEW_KINDS).find((kind) => VIEW_KINDS[kind] === keyName) || keyName || '';
 
 const titleOf = (view) => view.title || view.name || '';
@@ -546,21 +550,22 @@ const savedViews = (companyId, project, privateViews = []) => [
 const createView = async ({ companyId, who, projectId, name, kind = 'list', look }) => {
     const project = await storedProject(companyId, projectId);
     const inProject = idOf(project._id);
-    if (!Object.hasOwn(VIEW_KINDS, kind)) throw refuse(`The kind of view must be one of ${Object.keys(VIEW_KINDS).join(', ')}.`);
+    if (!Object.hasOwn(VIEW_KINDS, kind)) throw refuseAs('kind', `The kind of view must be one of ${Object.keys(VIEW_KINDS).join(', ')}.`);
     const named = sharedViewNamed(project, name);
-    if (named) throw refuse(viewInUse(companyId, project, named).message);
+    if (named) throw refuseAs('name_taken', viewInUse(companyId, project, named).message);
     const problem = lookProblem(look);
-    if (problem) throw refuse(problem);
+    if (problem) throw refuseAs('look', problem);
     const source = sourceView(project, kind);
-    if (!source) throw refuse(noSource(kind));
+    if (!source) throw refuseAs('no_source', noSource(kind));
     const fitted = await settingsFor(companyId, project, lookOf(look));
     const answer = await answerOf('viewCreate', { companyId, who, params: { id: inProject }, body: { sourceViewId: viewIdOf(source), title: viewNameOf(name), settings: fitted.settings, uniqueTitle: true } });
     if (answer.code === NAME_TAKEN) {
         const taken = sharedViewNamed(await storedProject(companyId, inProject), name);
-        throw refuse(taken ? viewInUse(companyId, project, taken).message : reasonOf(answer, 'A shared view by that name already exists.'));
+        throw refuseAs('name_taken', taken ? viewInUse(companyId, project, taken).message : reasonOf(answer, 'A shared view by that name already exists.'));
     }
     if (answer.code !== 200 || !answer.body || answer.body.status !== true) {
-        throw Object.assign(refuse(reasonOf(answer, 'The view was not added. Try again, or tell the person.')), answer.code >= SERVER_FAULT ? { tryAgain: true } : {});
+        const failed = refuseAs(routeRefusalCode(answer.code), reasonOf(answer, 'The view was not added. Try again, or tell the person.'));
+        throw Object.assign(failed, answer.code >= SERVER_FAULT ? { tryAgain: true } : {});
     }
     const view = answer.body.data;
     return { project, projectId: inProject, viewId: viewIdOf(view), name: view.title, kind, keyName: view.keyName, leftOut: fitted.leftOut };
@@ -609,6 +614,6 @@ const executors = {
 };
 
 module.exports = {
-    executors, answerOf, reasonOf, lineOf, fieldsOfProject, createFields, createView, withdrawFields, withdrawView, draftsOf, draftsProblem, draftsMisfit, valuesOf, valuesProblem, valuesMisfit, fieldChoice, lookOf, lookProblem, viewNameOf, viewIdOf, sourceView, noSource, savedViewShowing, sharedViewNamed, viewInUse, savedViews,
+    executors, answerOf, reasonOf, lineOf, fieldsOfProject, createFields, createView, withdrawFields, withdrawView, draftsOf, draftsProblem, draftsMisfit, valuesOf, valuesProblem, valuesMisfit, fieldChoice, lookOf, lookProblem, viewNameOf, viewIdOf, sourceView, noSource, routeRefusalCode, savedViewShowing, sharedViewNamed, viewInUse, savedViews,
     FIELD_TYPES, CREATE_TYPES, FIELDS_MAX, FIELD_NAME_MAX, OPTIONS_MAX, OPTION_MAX, NOTE_MAX, VALUES_MAX, FIELD_SET, VIEW_KINDS, VIEW_NAME_MAX, GROUPS, SORTS, DIRECTIONS, PRIORITIES, SUBTASKS, LOOK_MAX, DUE,
 };

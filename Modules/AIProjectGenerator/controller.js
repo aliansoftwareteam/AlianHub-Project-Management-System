@@ -18,6 +18,7 @@ const { attachSplit } = require('./planSplit');
 const planAutomations = require('./planAutomations');
 const { usageFromResult, addUsage, summarize } = require('../AICore/usage');
 const planRules = require('./planRules');
+const planViews = require('./planViews');
 const sseEmitter = require('./sseEmitter');
 const orchestrator = require('./orchestrator');
 const clarifier = require('./clarifier');
@@ -285,6 +286,9 @@ async function generatePlanForJob({ jobId, uid, companyId, description, addition
             throw new Error(`Plan failed final validation: ${issues}`);
         }
         plan = await attachSplit(normalizePlanColors(reCheck.data), { companyId, assumptions });
+        const { kept, dropped } = planViews.trimViews(plan.views);
+        plan.views = kept;
+        plan.viewsDropped = dropped;
 
         const planId = token();
         myCache.set(cacheKey('plan', uid, planId), {
@@ -674,6 +678,7 @@ exports.execute = async (req, res) => {
             return sendError(res, 400, `Plan failed validation: ${issues}`);
         }
         plan = normalizePlanColors(reCheck.data);
+        plan.views = planViews.trimViews(plan.views).kept;
 
         // Applied *after* validation on purpose: `proposalId` is not in
         // ProjectSchema, so zod strips whatever the LLM emitted and only the
