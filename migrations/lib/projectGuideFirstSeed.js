@@ -1,4 +1,4 @@
-// project.guide as migration 022 first wrote it into each company, kept to test migration 076.
+// project.guide as migration 022 first wrote it into each company, kept for migration 076 to recognise and restore.
 
 const MAX_PROPOSED = 3;
 const NEXT_STEP = '{{#answer.nextStep}}{{answer.nextStep | clip:1200}}{{/answer.nextStep}}{{^answer.nextStep}}{{fallback}}{{/answer.nextStep}}';

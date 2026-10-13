@@ -10,7 +10,7 @@ const { SCHEMA_TYPE } = require('../Config/schemaType');
 const { settingsCollectionDocs } = require('../Config/collections');
 const { MongoDbCrudOpration } = require('../utils/mongo-handler/mongoQueries');
 const { documentOf, SEEDS } = require('../Modules/Agents/skills/seeds');
-const firstSeed = require('./fixtures/projectGuideFirstSeed');
+const firstSeed = require('../migrations/lib/projectGuideFirstSeed');
 const migration = require('../migrations/076-project-guide-without-stored-guide');
 
 const UNTOUCHED = '6f0000000000000000000d01';
@@ -26,6 +26,7 @@ const guideOf = (companyId) => (mockDbFor(companyId).store[SCHEMA_TYPE.AGENT_SKI
 
 describe('migration 076: project.guide answers without a stored guide', () => {
     beforeEach(() => {
+        Object.keys(mockDbs).forEach((id) => delete mockDbs[id]);
         mockDbFor(UNTOUCHED).seed(SCHEMA_TYPE.AGENT_SKILLS, { ...documentOf(firstSeed), enabled: false, model: 'kept-model' });
         mockDbFor(EDITED).seed(SCHEMA_TYPE.AGENT_SKILLS, { ...documentOf(firstSeed), name: 'Our guide' });
     });
@@ -51,5 +52,14 @@ describe('migration 076: project.guide answers without a stored guide', () => {
 
         await migration.up(context());
         expect(migration.fingerprint(guideOf(UNTOUCHED))).toBe(migration.fingerprint(documentOf(SEEDS.projectGuide)));
+    });
+
+    it('down() puts the first seed back on copies still on the new seed, and leaves edited ones', async () => {
+        await migration.up(context());
+        await migration.down(context());
+        expect(migration.fingerprint(guideOf(UNTOUCHED))).toBe(migration.FIRST_SEED_SHA256);
+        expect(guideOf(UNTOUCHED).gather[0].params.requireGuide).toBe(true);
+        expect(guideOf(UNTOUCHED)).toMatchObject({ enabled: false, model: 'kept-model' });
+        expect(guideOf(EDITED).name).toBe('Our guide');
     });
 });

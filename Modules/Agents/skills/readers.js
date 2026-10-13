@@ -142,7 +142,8 @@ const READERS = Object.freeze({
     async project(companyId, { task, startedBy }, params) {
         const projectId = oid(task.ProjectID);
         if (!projectId) return { skip: 'the task has no project' };
-        if (params.asStarter && startedBy && !(await projectScope.visibleProjectIds(companyId, startedBy)).includes(String(projectId))) {
+        if (params.asStarter && !startedBy) return { skip: 'no person to read as' };
+        if (params.asStarter && !(await projectScope.visibleProjectIds(companyId, startedBy)).includes(String(projectId))) {
             return { skip: 'the person who asked cannot open this project' };
         }
         const project = await MongoDbCrudOpration(companyId, {
@@ -159,7 +160,8 @@ const READERS = Object.freeze({
     async 'project.tasks'(companyId, { task, startedBy }, params) {
         const projectId = String(task.ProjectID || '');
         if (!projectId) return { skip: 'the task has no project' };
-        const hidden = params.asStarter && startedBy ? await hiddenSprintFilter(companyId, startedBy, [projectId]) : {};
+        if (params.asStarter && !startedBy) return { skip: 'no person to read as' };
+        const hidden = params.asStarter ? await hiddenSprintFilter(companyId, startedBy, [projectId]) : {};
         const tasks = (await MongoDbCrudOpration(companyId, {
             type: SCHEMA_TYPE.TASKS,
             data: [{ ProjectID: projectId, deletedStatusKey: { $ne: 1 }, isParentTask: true, ...hidden },

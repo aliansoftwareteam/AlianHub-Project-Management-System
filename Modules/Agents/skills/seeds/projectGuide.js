@@ -41,7 +41,7 @@ module.exports = Object.freeze({
             'TASK: {{gather.task.title}}',
             '{{#gather.task.brief}}TASK BRIEF: {{gather.task.brief}}{{/gather.task.brief}}',
         ].join('\n'),
-        output: '{"nextStep":"one or two sentences","why":"one sentence","proposedTasks":[{"title":"...","why":"one sentence","hours":2}],"flags":["..."]}',
+        output: '{"nextStep":"one or two sentences","why":"one sentence","proposedTasks":[{"title":"...","why":"one sentence","hours":2}],"flags":["..."],"notes":"optional"}',
         maxTokens: 1800,
     },
     emit: [
@@ -59,7 +59,7 @@ module.exports = Object.freeze({
             action: 'task.comment',
             label: 'Post the next step',
             params: {
-                body: `${NO_GUIDE}Next step: ${NEXT_STEP}\n{{#answer.why}}{{answer.why | clip:400}}\n{{/answer.why}}{{#emitted.subtask.create}}\nProposed {{emitted.subtask.create}} follow-up task(s).\n{{/emitted.subtask.create}}{{#answer.flags | bullets:6}}\nFlags:\n{{answer.flags | bullets:6}}{{/answer.flags}}`,
+                body: `${NO_GUIDE}Next step: ${NEXT_STEP}\n{{#answer.why}}{{answer.why | clip:400}}\n{{/answer.why}}{{#emitted.subtask.create}}\nProposed {{emitted.subtask.create}} follow-up task(s).\n{{/emitted.subtask.create}}{{#answer.flags | bullets:6}}\nFlags:\n{{answer.flags | bullets:6}}{{/answer.flags}}{{#answer.notes}}\n\nNotes: {{answer.notes | clip:400}}{{/answer.notes}}`,
             },
         },
     ],

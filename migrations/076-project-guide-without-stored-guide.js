@@ -1,5 +1,6 @@
 const crypto = require('crypto');
 const { documentOf, SEEDS } = require('../Modules/Agents/skills/seeds');
+const firstSeed = require('./lib/projectGuideFirstSeed');
 
 /* project.guide now answers on a project with no stored guide (AP-490, T2-A). Migration 022 gave every company its own
  * copy of the first seed, which shadows the built-in one and still skips such projects. A copy that is still exactly
@@ -22,24 +23,33 @@ const fingerprint = (doc) => crypto.createHash('sha256').update(canon(Object.fro
 
 const plain = (doc) => (doc && typeof doc.toObject === 'function' ? doc.toObject() : doc);
 
+const contentOf = (doc) => Object.fromEntries([...CONTENT, 'emits', 'risk'].filter((f) => doc[f] !== undefined).map((f) => [f, doc[f]]));
+
+/* Moves every company copy whose content fingerprints as `from` to the document `to`. */
+const replaceCopies = (ctx, from, to) => {
+    const $set = contentOf(to);
+    const type = ctx.SCHEMA_TYPE.AGENT_SKILLS;
+    return ctx.forEachCompany(async (companyId) => {
+        const copy = plain(await ctx.company(companyId, { type, data: [{ key: KEY }] }, 'findOne'));
+        if (!copy) return { updated: 0, kept: 0 };
+        if (fingerprint(copy) !== from) {
+            ctx.logger.info(`[migrations] 076 ${companyId}: project.guide was edited, kept as it is`);
+            return { updated: 0, kept: 1 };
+        }
+        await ctx.company(companyId, { type, data: [{ _id: copy._id }, { $set }] }, 'updateOne');
+        return { updated: 1, kept: 0 };
+    });
+};
+
 module.exports = {
     id: ID,
     scope: 'company',
     fingerprint,
     FIRST_SEED_SHA256,
     async up(ctx) {
-        const next = documentOf(SEEDS.projectGuide);
-        const $set = Object.fromEntries([...CONTENT, 'emits', 'risk'].filter((f) => next[f] !== undefined).map((f) => [f, next[f]]));
-        const type = ctx.SCHEMA_TYPE.AGENT_SKILLS;
-        await ctx.forEachCompany(async (companyId) => {
-            const copy = plain(await ctx.company(companyId, { type, data: [{ key: KEY }] }, 'findOne'));
-            if (!copy) return { updated: 0, kept: 0 };
-            if (fingerprint(copy) !== FIRST_SEED_SHA256) {
-                ctx.logger.info(`[migrations] 076 ${companyId}: project.guide was edited, kept as it is`);
-                return { updated: 0, kept: 1 };
-            }
-            await ctx.company(companyId, { type, data: [{ _id: copy._id }, { $set }] }, 'updateOne');
-            return { updated: 1, kept: 0 };
-        });
+        await replaceCopies(ctx, FIRST_SEED_SHA256, documentOf(SEEDS.projectGuide));
+    },
+    async down(ctx) {
+        await replaceCopies(ctx, fingerprint(documentOf(SEEDS.projectGuide)), documentOf(firstSeed));
     },
 };
