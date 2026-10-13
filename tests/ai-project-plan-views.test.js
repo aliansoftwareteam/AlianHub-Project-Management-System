@@ -91,9 +91,9 @@ describe('trimming the views', () => {
         ]);
         expect(kept.map((view) => view.name)).toEqual(['Board by person', 'Due dates', 'View 3', 'View 4', 'View 5']);
         expect(dropped).toEqual([
-            { name: 'Gantt', reason: expect.stringMatching(/^needs a kind: one of list, board, table, calendar, workload/) },
-            { name: 'board BY person', reason: '"board BY person" is named twice in views' },
-            { name: 'View 6', reason: 'a plan holds at most 5 views' },
+            { name: 'Gantt', reason: expect.stringMatching(/^needs a kind: one of list, board, table, calendar, workload/), code: 'kind' },
+            { name: 'board BY person', reason: '"board BY person" is named twice in views', code: 'name_taken' },
+            { name: 'View 6', reason: 'a plan holds at most 5 views', code: 'too_many' },
         ]);
     });
 
@@ -101,6 +101,17 @@ describe('trimming the views', () => {
         const { kept, dropped } = planViews.trimViews([{ name: '', kind: 'list' }, { name: 'Sorted', kind: 'list', look: { sortDirection: 'asc' } }]);
         expect(kept).toEqual([]);
         expect(dropped.map((entry) => entry.reason)).toEqual(['needs a name', 'sortDirection needs sortBy']);
+        expect(dropped.map((entry) => entry.code)).toEqual(['name_missing', 'look']);
+    });
+
+    it('gives each reason from the routes a code the web app translates', () => {
+        expect(planViews.reasonCode('This project already has a saved view named "Mine". Use that one, or pick another name.')).toBe('name_taken');
+        expect(planViews.reasonCode('The person approving may not make this part: x is not granted')).toBe('permission');
+        expect(planViews.reasonCode('this project has no calendar view to start from; the person adds one in AlianHub first')).toBe('no_source');
+        expect(planViews.reasonCode('groupBy must be one of status, assignee, priority, due_date, or the id of a custom field')).toBe('look');
+        expect(planViews.reasonCode('The kind of view must be one of list, board.')).toBe('kind');
+        expect(planViews.reasonCode('The view was not added. Try again, or tell the person.')).toBe('other');
+        expect(planViews.reasonCode(undefined)).toBe('other');
     });
 
     it('names the tab each kept kind needs on the new project', () => {
@@ -125,7 +136,7 @@ describe('/plan', () => {
         await sleep(350);
         const complete = sseEmitter.emit.mock.calls.map(([, payload]) => payload).find((payload) => payload.event === 'complete');
         expect(complete.plan.views.map((view) => view.name)).toEqual(['Board by person', 'Due dates']);
-        expect(complete.plan.viewsDropped).toEqual([{ name: 'Gantt', reason: expect.stringContaining('needs a kind') }]);
+        expect(complete.plan.viewsDropped).toEqual([{ name: 'Gantt', reason: expect.stringContaining('needs a kind'), code: 'kind' }]);
     });
 
     it('trims the views again at /execute, whatever the client sends back', async () => {
@@ -152,7 +163,7 @@ describe('making the views', () => {
         expect(given.approvedBy).toBeUndefined();
         expect(Object.keys(given.plan)).toEqual(['views']);
         expect(given.plan.views.map((view) => [view.name, view.kind])).toEqual([['Board by person', 'board'], ['Due dates', 'calendar']]);
-        expect(out).toEqual({ made: [{ name: 'Board by person', kind: 'board' }], notMade: [{ name: 'Due dates', reason: 'the view was not added' }] });
+        expect(out).toEqual({ made: [{ name: 'Board by person', kind: 'board' }], notMade: [{ name: 'Due dates', reason: 'the view was not added', code: 'other' }] });
     });
 
     it('makes nothing and asks nothing when the plan has no views', async () => {
@@ -166,14 +177,14 @@ describe('making the views', () => {
         const out = await planViews.makeViews({ companyId: C, uid: U, projectId: P, views: [BY_PERSON, DUE_DATES] });
         expect(out.made).toEqual([]);
         expect(out.notMade).toEqual([
-            { name: 'Board by person', reason: 'permission_denied: ProjectRequiredComponent is not granted' },
-            { name: 'Due dates', reason: 'permission_denied: ProjectRequiredComponent is not granted' },
+            { name: 'Board by person', reason: 'permission_denied: ProjectRequiredComponent is not granted', code: 'permission' },
+            { name: 'Due dates', reason: 'permission_denied: ProjectRequiredComponent is not granted', code: 'permission' },
         ]);
     });
 
     it('never throws, so a view that breaks cannot undo the project', async () => {
         jest.spyOn(projectSetup, 'carryOut').mockRejectedValue(new Error('the database went away'));
         await expect(planViews.makeViews({ companyId: C, uid: U, projectId: P, views: [BY_PERSON] }))
-            .resolves.toEqual({ made: [], notMade: [{ name: 'Board by person', reason: 'the database went away' }] });
+            .resolves.toEqual({ made: [], notMade: [{ name: 'Board by person', reason: 'the database went away', code: 'other' }] });
     });
 });

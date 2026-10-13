@@ -14,7 +14,7 @@
             <ul class="pv__list pv__list--notes" data-test="plan-views-notes">
                 <li v-for="(note, i) in notes" :key="'n-' + i">
                     <strong v-if="note.name">{{ note.name }}</strong>
-                    <span v-if="note.reason"> — {{ note.reason }}</span>
+                    <span> — {{ reasonLabel(note.code) }}</span>
                 </li>
             </ul>
         </template>
@@ -32,9 +32,12 @@ defineProps({
     notesTitle: { type: String, default: '' },
 });
 
+const REASON_CODES = ['permission', 'name_taken', 'name_missing', 'look', 'kind', 'too_many', 'no_source'];
+
 const { t } = useI18n();
 
 const kindLabel = (kind) => t(`AiProject.view_kind_${kind}`);
+const reasonLabel = (code) => t(`AiProject.view_reason_${REASON_CODES.includes(code) ? code : 'other'}`);
 </script>
 
 <style scoped>
