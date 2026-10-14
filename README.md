@@ -14,7 +14,7 @@
 </p>
 
 <p align="center">
-  The self-hosted Jira / ClickUp alternative with sprints, Gantt, Kanban, time tracking and AI agents over MCP.
+  The self-hosted Jira / ClickUp alternative for every team — engineering, design, marketing, sales, support, finance, operations and more.
 </p>
 
 <p align="center">
@@ -73,7 +73,7 @@
     </td>
     <td width="33%" valign="top">
       👥 <a href="docs/guide/agents/09-team-packs-and-role-agents.md"><b>Agents and team packs</b></a><br/>
-      Role agents for seven company blueprints, from IT and manufacturing to agencies and construction, that pick up tasks, comment and propose.
+      Role agents for eight company blueprints, from IT and manufacturing to agencies, schools and clinics, that pick up tasks, comment and propose.
     </td>
   </tr>
   <tr>
@@ -109,6 +109,87 @@ flowchart LR
 ```
 
 Step-by-step: [docs/CONNECT-YOUR-AI.md](docs/CONNECT-YOUR-AI.md) · every tool: [docs/MCP-AGENT-GUIDE.md](docs/MCP-AGENT-GUIDE.md) · using it day to day: [docs/guide/agents/](docs/guide/agents/README.md)
+
+## 👥 One workspace for every team
+
+<table>
+  <tr>
+    <td width="33%" valign="top">
+      💻 <b>Engineering & QA</b><br/>
+      Bugs, code review, releases and incidents.<br/><sub>Bug Triager, Code Reviewer, QA Engineer, Release Manager</sub>
+    </td>
+    <td width="33%" valign="top">
+      🎨 <b>Design</b><br/>
+      Briefs, UI work and design reviews.<br/><sub>Design Lead, UI/UX Designer, Design QA Reviewer</sub>
+    </td>
+    <td width="33%" valign="top">
+      🧭 <b>Product</b><br/>
+      Roadmaps, PRDs, feedback and risks.<br/><sub>PRD Writer, Roadmap Keeper, Feedback Collector, Risk Watch</sub>
+    </td>
+  </tr>
+  <tr>
+    <td width="33%" valign="top">
+      📣 <b>Marketing</b><br/>
+      Campaigns, content, SEO and social.<br/><sub>Campaign Manager, SEO Specialist, Content Writer, Social Media Manager</sub>
+    </td>
+    <td width="33%" valign="top">
+      🤝 <b>Sales</b><br/>
+      Leads, proposals, quotes and orders.<br/><sub>Sales Development Rep, Proposal Writer, Quote Preparer, Order Intake</sub>
+    </td>
+    <td width="33%" valign="top">
+      🎧 <b>Support</b><br/>
+      Tickets, customer replies and the knowledge base.<br/><sub>Support Agent, Support Lead, Customer Service Agent, Knowledge Base Writer</sub>
+    </td>
+  </tr>
+  <tr>
+    <td width="33%" valign="top">
+      👥 <b>People (HR)</b><br/>
+      Onboarding, training and rosters.<br/><sub>Onboarding Coordinator, Training Records, Shift Roster Checker</sub>
+    </td>
+    <td width="33%" valign="top">
+      💰 <b>Finance</b><br/>
+      Invoices, timesheet checks and reconciliation.<br/><sub>Invoice Preparer, Timesheet Checker, Reconciliation Checker</sub>
+    </td>
+    <td width="33%" valign="top">
+      📦 <b>Operations & logistics</b><br/>
+      Stock, returns, order issues and deliveries.<br/><sub>Stock Alert, Returns Coordinator, Order Issue Triage, Delivery Tracker</sub>
+    </td>
+  </tr>
+  <tr>
+    <td width="33%" valign="top">
+      🛒 <b>Purchasing</b><br/>
+      Purchase requests and supplier follow-up.<br/><sub>Purchase Request Preparer, Supplier Follow-up, Supplier Scorecard</sub>
+    </td>
+    <td width="33%" valign="top">
+      🏭 <b>Production, quality & maintenance</b><br/>
+      Plans, inspections, non-conformances and breakdowns.<br/><sub>Production Planner, Inspection Checklist, Non-conformance Recorder, Maintenance Planner</sub>
+    </td>
+    <td width="33%" valign="top">
+      🏗️ <b>Construction sites</b><br/>
+      Daily reports, RFIs, snags and safety.<br/><sub>Site Daily Report Writer, RFI Tracker, Snag List Keeper, Safety Checklist</sub>
+    </td>
+  </tr>
+  <tr>
+    <td width="33%" valign="top">
+      💼 <b>Client delivery</b><br/>
+      Agency and professional-services engagements.<br/><sub>Agency Account Manager, Client Approval Tracker, Engagement Planner, Client Status Reporter</sub>
+    </td>
+    <td width="33%" valign="top">
+      🎓 <b>Schools</b><br/>
+      Courses, exams, cover and parent updates.<br/><sub>Course Planner, Exam Planner, Cover Planner, Parent Update Writer</sub>
+    </td>
+    <td width="33%" valign="top">
+      🩺 <b>Clinics</b><br/>
+      Front desk, follow-ups and compliance.<br/><sub>Front Desk Request Sorter, Appointment Follow-up List, Credential Expiry Watch</sub>
+    </td>
+  </tr>
+</table>
+
+One project per team, the same people across all of them, and time tracking and dashboards that cover every team. The names in small print are the role agents a [team pack](docs/guide/agents/09-team-packs-and-role-agents.md) turns on.
+
+**Built for software teams too:** connect GitHub and see pull requests linked to tasks, run sprints with burndown and a Gantt chart, let the Bug Triager sort new bugs, and work from Claude Code over MCP.
+
+**Move in from Jira, ClickUp, Trello, Asana, Monday.com or a CSV spreadsheet** — imports can be undone ([moving from ClickUp](docs/MOVING-FROM-CLICKUP.md)).
 
 ## Everything in one workspace
 
