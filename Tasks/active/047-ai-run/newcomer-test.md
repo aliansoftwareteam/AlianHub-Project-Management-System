@@ -252,3 +252,69 @@ Per-task notes:
 - What the screen says when an invitation cannot be mailed: the newcomer never reached an invite form.
 
 Next run: give the newcomer a workspace of their own (or an Admin role), seed one proposal in their own project for task 8, and run it with a real person.
+
+## Run 2, 2026-10-14, AI newcomer, path A
+
+Date: 2026-10-14, 12:29 to 12:32 IST. Build: `14.37.0-beta.4`, commit `746d3114` (from `/version`), which holds the run-1 fixes (#1644, #1645, #1646). Observer and newcomer: one QA agent (Claude) playing both, driving a headless browser. Path: A (connect, then say it). Tracker: AP-486.
+
+**An AI newcomer is not a real person**, as in run 1. This run is a walk-through that looks for walls.
+
+**The run stopped in task 1.** The script asks for a newcomer who owns a new workspace, made through the app's own sign-up with no invitation. This build has no such sign-up, so no account was made and no later task could start. No credentials were created, nothing was changed in the owner's data, and no model budget was spent.
+
+Set-up as found:
+- **Account.** None possible. `http://localhost:4000/` opens "Welcome back. Log in to your workspace." with Email, Password, "Forgot password?", "Log in", "Keep me signed in on this device", "Help" and "Locked out?". There is no "Sign up", "Create account" or "Start a workspace", and no Google, GitHub or GitLab button. The two help links go to help.alianhub.com, which the newcomer may not open.
+- **Checked by the observer, from outside the newcomer's role:** `/#/signup` and `/#/setup` both lead back to the log-in page. The install wizard runs only on an empty server. In the code, the only screen that makes an account is the invitation page (`/api/v2/createUser` with an invitation). The sign-up plugin's router (`frontend/src/plugins/register/router.js`) is empty. `/business` ("Company Information", the screen that makes a workspace) needs an account first. No local alternative is documented: `CLAUDE.md` names only the install wizard, and `docs/TESTING-E2E.md` describes the invitation path.
+- **The connect address works without an account.** `/.well-known/oauth-authorization-server` and `/.well-known/oauth-protected-resource` answer, client registration is offered at `/oauth/register`, and `POST /mcp` answers 401. A person who starts from Claude's side would still end on the same log-in page: `/#/oauth/consent` sends a signed-out person to `/#/login?redirect_url=/oauth/consent`.
+- **Window.** 1280 × 860, desktop.
+
+### Score sheet
+
+| # | Task | Limit (min) | Time taken | Result | First wrong click | Words not understood | Where they stopped | Settings page opened |
+|---|---|---|---|---|---|---|---|---|
+| 1 | Sign up | 2 | 0:05 to the stop | **fail, stopped** | none: nothing on the page leads to an account | "Welcome back" for a person who never had an account | Log-in page: "Welcome back. Log in to your workspace." No sign-up, and no line saying who can give an account | none |
+| 2 | Connect your AI | 3 (A) | — | not started | — | — | — | — |
+| 3 | Make a project by describing it | 3 | — | not started | — | — | — | — |
+| 4 | Add three tasks | 2 | — | not started | — | — | — | — |
+| 5 | Assign one | 1 | — | not started | — | — | — | — |
+| 6 | Set a date | 1 | — | not started | — | — | — | — |
+| | **Clock for tasks 1 to 6** | under 10 | — | line nine: **fail** (task 1) | | | | |
+| 7 | Find what to do next | 1 | — | not started | — | — | — | — |
+| 8 | Ask the AI for a budget field, then approve it | 2 | — | not started | — | — | — | — |
+| 9 | Simple mode off and on | 2 | — | not started | — | — | — | — |
+| 10 | Invite a person | 2 | — | not started | — | — | — | — |
+| | **Whole session** | under 60 | about 0:05 | line ten: **fail** (task 1) | | | | |
+
+Totals: passes 0 of 10. Fails 1. Not started 9. Stops 1. Help pages opened 0. Tour: not reached. Settings pages opened: 0.
+
+### Findings, worst first
+
+1. **A person cannot get an account on this build without an invitation.** The log-in page offers no sign-up and does not say who can make an account. Every newcomer route in the script starts with an account the person makes for themselves, so tasks 1 to 10 and both finish lines cannot be run as written. Options to decide, default first:
+   - (a) For a self-hosted server, the newcomer who owns a workspace is the person who installs it. Rewrite task 1 to start at the install wizard on an empty database, and run the test on a second, throwaway server. No product change is needed.
+   - (b) Add a sign-up page behind a server setting such as "Let people start their own workspace", off by default.
+   - (c) In any case, the log-in page should say "No account? Ask the person who runs this server to invite you."
+2. **Connecting from Claude first is also a dead end without an account.** The connect address works, but the consent screen sends a signed-out person to the same log-in page, with no way forward and no word about why.
+3. **The docs promise a sign-up the build does not show.** `docs/CONNECT-YOUR-AI.md` says "When you sign up for the first time, this is the last step", and this script's step 2 asks "whether the local build lets a person create an account and a workspace without an invitation". The answer is no. The doc should say that the step follows the install wizard or an invitation.
+4. **"Welcome back"** is the only greeting, including for a person who has never had an account.
+
+### Run-1 findings, rechecked
+
+No account could be made, so none of these was seen on the screen. Each status comes from the code of build `746d3114`.
+
+| Run 1 | Status | Evidence |
+|---|---|---|
+| 1. A Member cannot make a project and is not told why | **CHANGED** | #1645 (`60dde1d09`) adds "Only an admin can create projects. Ask {names} to create one or to change your role." on the Projects page. #1646 (`8dd76b303`) shows "New project", and "Create with AI" when the server has AI, to everyone who may create. A Member still cannot make one. That is the role, now explained. |
+| 2. A Member cannot invite and is not told | **CHANGED** | #1645 adds the same kind of note on Members: "Only an admin can invite people. Ask {names}…". A Member still cannot invite. |
+| 3. A new Member's Home opens on strangers' approvals | **CHANGED** | #1644 (`72a73ac80`) and #1645 (`fc6cf2eea`): Home asks for approval only for the person's own proposals and links the rest as waiting for the team. "What next" puts the person's own tasks due within a week first. Card titles name the change ("{label}: “{name}”") instead of tool text. Only the connection's person or an admin may choose "Always do this". A plain Approve on a team proposal is still allowed when the Member has the rights to make the change by hand. That is a policy question, not a bug. |
+| 4. "Describe it" has no path without a model | **STILL OPEN for path B** | In Simple mode, Ask leads to Connect your AI when the server has no model (`navItems.js`), and "Create with AI" shows only when AI is on. Without a model or a connected AI, the project is still made by hand. |
+| 5. The list does not follow the side panel; the date box runs past its cell | **FIXED in code** | #1645: `PersonalList.vue` watches the open task (`followDetail.js`). `TaskDetailOverlay/style.css` keeps the date box in its cell. Not seen on the screen. |
+| 6. Simple / Full is hard to find and renames places | **STILL OPEN, partly changed** | The avatar menu item now reads "My settings" to match the page heading. Simple still relabels "Everything" as "My work" and "AI" as "Ask" (`navItems.js` `inSimple`), and the choice is still only on My settings. |
+| 7. The join link appears only after "Resend Invitation" | **NOT RECHECKED** | `Members.vue` has shown the join link when mail fails since `e6dfc3cb8` (2026-09-24), which was before run 1, yet the owner still met this in run 1. It needs the owner's screen to recheck. |
+| 8. Small things | **FIXED in code, mostly** | "List Of User" is now "Choose people". Assignee can show the name (`showName`). "Get going" counts a skipped step as done. The More menu has a background. Not rechecked: "+ New" drawing over the checklist, and quick-add clearing the box before the row appears. |
+
+### Not tested, and why
+
+- Tasks 2 to 10, path A, the consent screen, "Set up my project", the budget field and its approval in the AI Inbox: no account could be made without an invitation, and the brief rules out invitations and the owner's account.
+- No throwaway Claude config or MCP server was added, because there was no account to connect it to.
+- A second server on an empty database, for the install wizard: this would be a new set-up on the owner's machine, and it is outside this run's brief. It is option (a) under finding 1.
+
+Next run: decide finding 1 first. With (a), run the full script on a throwaway server that starts at the install wizard, on path A.
