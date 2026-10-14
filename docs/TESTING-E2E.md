@@ -7,7 +7,7 @@ AlianHub has two end-to-end layers on top of the unit and convention tests. Both
 | API integration | Jest project `integration` | `tests/integration/<area>.int.test.js` | `npm run test:integration` |
 | UI | Playwright (Chromium) | `e2e/specs/<area>.spec.js` | `npm run e2e` |
 
-Neither layer runs in `npm test`, which stays unit + conventions only. CI runs both in the `e2e` job on every pull request to `beta`, `staging` and `main`, and on every push to `beta`. A newer push to the same branch cancels the run still in progress.
+Neither layer runs in `npm test`, which stays unit + conventions only. CI runs both in the `e2e` job on every pull request to `staging` and `main`, and on every push to `staging`. A newer push to the same branch cancels the run still in progress.
 
 ## Running locally
 
