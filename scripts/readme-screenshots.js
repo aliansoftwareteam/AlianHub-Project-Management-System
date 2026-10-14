@@ -75,6 +75,11 @@ const argValue = (flag) => {
 };
 
 const MONGO_URL = argValue('--mongo-url') || 'mongodb://127.0.0.1:27018';
+const LOOPBACK_URL = /^mongodb:\/\/(?:[^@/]*@)?(?:127\.0\.0\.1|localhost|\[::1\])(?::\d+)?(?:\/|$)/;
+if (!LOOPBACK_URL.test(MONGO_URL)) {
+    process.stderr.write(`Refusing ${MONGO_URL}: the script drops every database it finds, so it only runs against a MongoDB on this machine.\n`);
+    process.exit(1);
+}
 Object.assign(process.env, { E2E_MONGODB_URL: MONGO_URL });
 
 const log = (message) => process.stdout.write(`${message}\n`);
@@ -160,10 +165,29 @@ async function logTime(world) {
     }
 }
 
+/* Spreads each open task's hours over its working days, so the workload grid has planned time to show. */
+async function planHours(world) {
+    const { tasks, project, owner } = world;
+    const today = new Date();
+    today.setUTCHours(9, 0, 0, 0);
+    const loads = [180, 240, 120, 300];
+    for (const [at, task] of tasks.entries()) {
+        if (task.state === 'done') continue;
+        for (let day = Math.max(task.startDay, -3); day < task.startDay + task.length && day < 14; day += 1) {
+            const date = new Date(today.getTime() + day * DAY_MS);
+            if (date.getUTCDay() === 0 || date.getUTCDay() === 6) continue;
+            assertOk(await owner.api.put('/api/v1/estimatedTime', {
+                userId: task.person.userId, taskId: String(task._id), projectId: String(project._id), date: date.toISOString(), minutes: loads[(at + day + 8) % loads.length],
+            }), `plan hours on ${task.name}`);
+        }
+    }
+}
+
 async function seedScreens(world) {
     const { owner, project, tasks } = world;
     const page = assertOk(await owner.api.post('/api/v2/pages', { title: 'Launch plan', projectId: project._id, contentBlocks: DOC_BLOCKS.slice(1) }), 'create the doc').data;
     await seedAgents(world);
+    await planHours(world);
     const dashboard = assertOk(await owner.api.post('/api/v1/dashboards', { title: 'Delivery overview', visibility: 'private' }), 'create the dashboard').data;
     await fillDashboard(owner.api, dashboard._id);
     return { pageId: String(page._id), dashboardId: String(dashboard._id), taskId: tasks[9]._id, sprintId: tasks[9].sprintId };
@@ -230,9 +254,36 @@ const PREP = {
         await click(page, page.getByText('Raise the priority of Migrate blog posts to High'));
         await page.waitForTimeout(1500);
     },
+    calendar: async (page, world) => {
+        await page.goto(`/#/${world.companyId}/project/${world.project._id}/s/${world.sprints[2]._id}?tab=Calendar`);
+        await page.locator(SHELL).waitFor({ state: 'visible', timeout: SHELL_TIMEOUT_MS });
+        await settle(page);
+        await page.waitForTimeout(2500);
+    },
+    'ai-ask': async (page, world) => {
+        assertOk(await world.owner.api.put('/api/v2/instance/settings', LOCAL_MODEL), 'point Ask at a local model');
+        await page.reload();
+        await page.locator(SHELL).waitFor({ state: 'visible', timeout: SHELL_TIMEOUT_MS });
+        await settle(page);
+        await page.waitForTimeout(2000);
+        await page.locator('#land-q').fill('Which tasks in the Build list are at risk of missing the launch date, and who owns them?');
+        await page.locator('#land-q').blur();
+        await page.waitForTimeout(800);
+    },
     'time-tracking': async (page) => {
         await click(page, page.getByRole('button', { name: /previous/i }));
         await page.waitForTimeout(2000);
+    },
+};
+
+/* Ask only enables its question box once a model is configured; a local OpenAI-compatible
+ * endpoint on the discard port needs no key, and the question is typed but never sent. */
+const LOCAL_MODEL = { LLM_PROVIDER: 'openai_compatible', OPENAI_COMPATIBLE_BASE_URL: 'http://127.0.0.1:9/v1', OPENAI_COMPATIBLE_MODEL: 'llama3.1:8b' };
+const NO_MODEL = { LLM_PROVIDER: 'openai', OPENAI_COMPATIBLE_BASE_URL: '', OPENAI_COMPATIBLE_MODEL: '' };
+
+const AFTER = {
+    'ai-ask': async (page, world) => {
+        assertOk(await world.owner.api.put('/api/v2/instance/settings', NO_MODEL), 'clear the local model');
     },
 };
 
@@ -242,6 +293,7 @@ async function capture(browser, world, seeded, out, only) {
     const shots = [
         ['home', 'home'], ['list', 'project-list'], ['board', 'project-board'], ['gantt', 'project-gantt'], ['task-detail', 'task-detail'],
         ['dashboard', 'dashboard'], ['time-tracking', 'timesheets'], ['docs', 'doc'], ['ai-inbox', 'ai-inbox'], ['ai-agents', 'ai-agents'],
+        ['calendar', 'project-calendar'], ['workload', 'timesheet-workload'], ['settings', 'settings-general'], ['ai-ask', 'ai-ask'],
     ].filter(([name]) => !only || only.includes(name));
     const raw = fs.mkdtempSync(path.join(os.tmpdir(), 'readme-shots-'));
     const written = [];
@@ -262,9 +314,10 @@ async function capture(browser, world, seeded, out, only) {
             await page.locator(SHELL).waitFor({ state: 'visible', timeout: SHELL_TIMEOUT_MS });
             const note = await settle(page);
             await page.waitForTimeout(2500);
-            await PREP[name]?.(page);
+            await PREP[name]?.(page, world);
             const file = path.join(raw, `${name}-${theme}.png`);
             await page.screenshot({ path: file, animations: 'disabled', caret: 'hide' });
+            await AFTER[name]?.(page, world);
             written.push({ name, theme, file, note: note.note || '' });
             log(`captured ${name}-${theme}${note.note ? ` (${note.note})` : ''}`);
         }

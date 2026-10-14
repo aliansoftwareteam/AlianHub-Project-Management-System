@@ -155,7 +155,7 @@ const NO_ACTION = {
     'ending a share of a doc': ['DELETE /api/v2/pages/:id/shares/:userId', {}, { id: PAGE, userId: INSIDER }],
     'creating a project': ['POST /api/v1/createproject', { ProjectName: 'New', ProjectCode: 'NEW', AssigneeUserId: [], LeadUserId: [] }],
     'having the workspace\'s AI draft an automation': ['POST /api/v2/automations/draft', { sentence: 'When a task is created, assign it' }],
-    'creating the tasks of a generated plan': ['POST /api/v1/ai/project/:projectId/tasks/execute', { plan: {} }, { projectId: P_OPEN }],
+    'creating the tasks of a generated plan': ['POST /api/v1/ai/project/:projectId/tasks/execute', { planId: 'f'.repeat(24) }, { projectId: P_OPEN }],
     'connecting an outside service': ['POST /api/v1/integrations/connections', { type: 'webhook', name: 'Hook', config: {} }],
     'changing a connection to an outside service': ['PUT /api/v1/integrations/connections/:id', { name: 'Hook' }, { id: CONNECTION }],
     'removing a connection to an outside service': ['DELETE /api/v1/integrations/connections/:id', {}, { id: CONNECTION }],

@@ -589,8 +589,8 @@ describe('AI project generator', () => {
         expect((await api.post('/api/v1/ai/project/guide', { approvedBrief: 'short' })).body.code).toBe('PLAN_EXPIRED');
         expect((await api.post('/api/v1/ai/project/execute', {})).status).toBe(410);
         expect((await api.post('/api/v1/ai/project/execute', { plan: { project: {} } })).body.code).toBe('PLAN_EXPIRED');
-        expect((await api.post('/api/v1/ai/project/not-an-id/tasks/execute', { plan: {} })).status).toBe(400);
-        const tasksMode = await api.post(`/api/v1/ai/project/${state.projects.shared._id}/tasks/execute`, { mode: 'tasks', plan: {} });
+        expect((await api.post('/api/v1/ai/project/not-an-id/tasks/execute', { planId: 'f'.repeat(24) })).status).toBe(400);
+        const tasksMode = await api.post(`/api/v1/ai/project/${state.projects.shared._id}/tasks/execute`, { mode: 'tasks', planId: 'f'.repeat(24) });
         expect(tasksMode.body.statusText).toBe('targetSprintId required for tasks mode');
     });
 
@@ -601,18 +601,19 @@ describe('AI project generator', () => {
         expect(res.status).toBe(403);
     });
 
-    it('adds sprints to a project the owner can open', async () => {
+    it('adds only sprints from a plan the server generated, never from the request body', async () => {
         const owner = await loginAs('owner');
         const project = await createProject(owner.api, { assigneeIds: [owner.uid], createdBy: owner.uid });
         await firstSprint(owner.api, project._id);
         const before = (await listSprints(owner.api, project._id)).length;
         const res = await owner.api.post(`/api/v1/ai/project/${project._id}/tasks/execute`, { mode: 'sprints', plan: { sprints: [{ sprintName: 'E2E sprint' }] } });
-        expect(res.body).toMatchObject({ status: true, jobId: expect.any(String) });
+        expect(res.status).toBe(410);
+        expect(res.body.code).toBe('PLAN_EXPIRED');
         const after = await waitFor(async () => {
             const count = (await listSprints(owner.api, project._id)).length;
             return count > before ? count : null;
-        });
-        expect(after).toBe(before + 1);
+        }, { timeout: 2000 });
+        expect(after).toBeNull();
     });
 
     it('AUT-07 refuses a guest adding sprints to a private project they cannot open', async () => {
@@ -621,7 +622,7 @@ describe('AI project generator', () => {
         const project = await createProject(owner.api, { assigneeIds: [owner.uid], createdBy: owner.uid, isPrivate: true });
         await firstSprint(owner.api, project._id);
         const before = (await listSprints(owner.api, project._id)).length;
-        const res = await guest.api.post(`/api/v1/ai/project/${project._id}/tasks/execute`, { mode: 'sprints', plan: { sprints: [{ sprintName: 'E2E injected' }] } });
+        const res = await guest.api.post(`/api/v1/ai/project/${project._id}/tasks/execute`, { mode: 'sprints', planId: 'f'.repeat(24), plan: { sprints: [{ sprintName: 'E2E injected' }] } });
         const after = await waitFor(async () => {
             const count = (await listSprints(owner.api, project._id)).length;
             return count > before ? count : null;

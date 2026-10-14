@@ -5,6 +5,12 @@ import { resolve } from 'path';
 import { parse } from '@vue/compiler-sfc';
 import { defineComponent, h, ref } from 'vue';
 
+// A reminder two hours ahead reads "today" only when that is not past midnight.
+vi.hoisted(() => {
+    vi.useFakeTimers({ toFake: ['Date'] });
+    vi.setSystemTime(new Date(2026, 5, 15, 12, 0, 0));
+});
+
 const { apiRequest, toast, store, socket, getWasabiImageLink } = vi.hoisted(() => {
     const socketInstance = { id: 'sock-1', emit: vi.fn(), on: vi.fn(), off: vi.fn() };
     return {

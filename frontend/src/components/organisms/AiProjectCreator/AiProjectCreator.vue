@@ -1093,12 +1093,7 @@ export default defineComponent({
             guideLoading.value = true;
             guideError.value = '';
             try {
-                const res = await api.generateGuide({
-                    planId: planId.value,
-                    approvedBrief: approvedBrief.value,
-                    assumptions: planAssumptions.value,
-                    plan: plan.value,
-                });
+                const res = await api.generateGuide({ planId: planId.value });
                 const g = res && res.status && res.guide;
                 if (!g || typeof g !== 'object') {
                     guideError.value = (res && res.statusText) || t('AiProject.guide_failed');
@@ -1214,7 +1209,7 @@ export default defineComponent({
                     sprintName: s.sprintName,
                     tasks: (s.tasks || []).map((t) => ({ TaskName: t.TaskName })),
                 })),
-                ...(guide.value && guideMarkdown.value ? { guideMarkdown: guideMarkdown.value } : {}),
+                ...(guide.value ? { guideMarkdown: guideMarkdown.value || '' } : {}),
             };
         }
 
@@ -1251,6 +1246,10 @@ export default defineComponent({
                 if (result && result.expired) {
                     planExpired.value = true;
                     error.value = t('AiProject.plan_expired');
+                    return;
+                }
+                if (result && result.inUse) {
+                    error.value = t('AiProject.plan_in_use');
                     return;
                 }
                 if (!result || !result.status || !result.jobId) {
@@ -1398,6 +1397,7 @@ export default defineComponent({
 
         function friendlyErr(e) {
             if (!e) return t('AiProject.unknown_error');
+            if (e.code === 'PLANS_BUSY' || (e.response && e.response.data && e.response.data.code === 'PLANS_BUSY')) return t('AiProject.plans_busy');
             if (e.response && e.response.data && e.response.data.statusText) return e.response.data.statusText;
             if (e.message) return e.message;
             try { return String(e); } catch (_e) { return t('AiProject.unknown_error'); }

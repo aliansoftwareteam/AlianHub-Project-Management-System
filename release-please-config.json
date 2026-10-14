@@ -13,6 +13,7 @@
   "packages": {
     ".": {
       "release-type": "node",
+      "package-name": "",
       "changelog-path": "CHANGELOG.md"
     }
   },

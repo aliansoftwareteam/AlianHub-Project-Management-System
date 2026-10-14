@@ -61,7 +61,7 @@ const projectFields = ({ approvedBrief, assumptions, guide }) => {
     if (text(approvedBrief).trim()) Object.assign(fields, briefDescription({ approvedBrief, assumptions }));
     if (Array.isArray(assumptions) && assumptions.length) fields.aiAssumptions = assumptions.map((a) => (typeof a === 'string' ? { point: null, text: a } : { point: a && a.point ? String(a.point) : null, text: text(a && a.text) })).filter((a) => a.text);
     const stored = normaliseGuide(guide);
-    if (stored) fields.aiGuide = text(guide.markdown).trim() ? { ...stored, markdown: text(guide.markdown) } : stored;
+    if (stored) fields.aiGuide = typeof guide.markdown === 'string' ? { ...stored, markdown: guide.markdown } : stored;
     return fields;
 };
 

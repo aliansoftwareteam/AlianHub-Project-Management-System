@@ -264,6 +264,7 @@ module.exports.OAUTH_CLIENT_APPROVALS = '/api/v2/oauth-client-approvals';
 module.exports.OAUTH_GRANTS = '/api/v2/oauth-grants';
 module.exports.AGENT_CHANGES = '/api/v2/agents/changes';
 module.exports.AGENT_TEAM = '/api/v2/agents/team';
+module.exports.AGENT_WORKSPACE_GUIDE = '/api/v2/agents/workspace-guide';
 module.exports.AGENT_TEAM_STANDUP = '/api/v2/agents/team/standup';
 module.exports.AGENT_ROUTABLE = '/api/v2/agents/routable';
 module.exports.AGENT_PIPELINE = '/api/v2/agents/pipeline';

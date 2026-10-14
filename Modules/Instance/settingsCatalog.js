@@ -43,6 +43,11 @@ const CATALOG = [
         label: 'AI features',
         help: 'Off stops every AI call on this instance: nothing is sent to any model, AI screens say AI is turned off, and background AI work is skipped.',
     }),
+    field('WORKSPACE_GUIDE_AUTO_CREATE', 'ai', 'boolean', {
+        default: 'true',
+        label: 'Workspace Guide in new workspaces',
+        help: 'On adds the built-in Workspace Guide agent to each workspace when it is created. Off adds none until an admin adds it from the Team board.',
+    }),
     field('LLM_PROVIDER', 'ai', 'select', { default: 'openai', options: ['openai', 'anthropic', 'deepseek', 'openai_compatible'], label: 'Provider' }),
     field('AI_API_KEY', 'ai', 'secret', { label: 'OpenAI API key' }),
     field('AI_MODEL', 'ai', 'text', { default: 'gpt-4.1', label: 'OpenAI model' }),

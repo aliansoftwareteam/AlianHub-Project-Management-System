@@ -5,6 +5,7 @@ const { MongoDbCrudOpration } = require('../../utils/mongo-handler/mongoQueries'
 const logger = require('../../Config/loggerConfig');
 const runs = require('./runs');
 const accounts = require('./accounts');
+const workspaceGuide = require('./workspaceGuide');
 const { agentProjectsFor } = require('./access');
 const { getRoleType, isPrivileged } = require('../../Config/permissionGuard');
 const { privateWorkOf, readsRun } = require('./privateWork');
@@ -202,6 +203,7 @@ const board = async (companyId, { hoursPerWeek = 40, viewerId } = {}) => {
             kind: 'agent',
             id: String(a._id),
             name: a.name || '',
+            builtIn: a.builtIn || '',
             ownerId: a.ownerId ? String(a.ownerId) : '',
             autonomy: Number(a.autonomy || 0),
             paused: Boolean(a.paused),
@@ -241,6 +243,7 @@ const board = async (companyId, { hoursPerWeek = 40, viewerId } = {}) => {
     return {
         people,
         agents: agentRows,
+        workspaceGuide: await workspaceGuide.stateOf(companyId).catch(() => undefined),
         activity,
         ...(connectedPaused === undefined ? {} : { connectedPaused }),
         totals: {
