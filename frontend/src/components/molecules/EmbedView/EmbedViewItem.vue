@@ -28,7 +28,7 @@ const route  = useRoute()
 const props = defineProps({
     data:{
         type:Object,
-        default:() =>{}
+        default:() => ({})
     },
 })
 const {getters}  = useStore()

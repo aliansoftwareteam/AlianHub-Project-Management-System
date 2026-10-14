@@ -115,7 +115,7 @@ import * as env from '@/config/env';
 const props = defineProps({
     selectedData: {
         type: Object,
-        default: () => {}
+        default: () => ({})
     },
     fromWhich: {
         type: String,

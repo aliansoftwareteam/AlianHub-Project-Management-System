@@ -70,7 +70,7 @@
 
     // props
     const props = defineProps({
-        objectProjectCurrencyBody: {type:Object,default: () => {}},
+        objectProjectCurrencyBody: {type:Object,default: () => ({})},
         index: {type:String,default: ''},
         daysOrMonth:{type:Array,default:()=>[]},
         yearSelected:{type:String,require:true}

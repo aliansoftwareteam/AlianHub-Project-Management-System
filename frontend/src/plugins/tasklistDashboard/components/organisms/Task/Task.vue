@@ -222,15 +222,14 @@ const props = defineProps({
     },
     item: {
         type: Object,
-        default: () => {}
+        default: () => ({})
     },
     projectObject: {
         type: Object,
-        default: () => {}
+        default: () => ({})
     },
     sprintObject: {
-        type: Object,
-        default: () => {}
+        type: Object
     },
     cardData: {
         type: Array,

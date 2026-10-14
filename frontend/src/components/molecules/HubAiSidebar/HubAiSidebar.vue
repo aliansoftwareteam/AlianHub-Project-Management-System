@@ -121,19 +121,19 @@ const mardownInit = markdownit({
 const props = defineProps({
     selectedPrompt: {
         type: Object,
-        default: () => {}
+        default: () => ({})
     },
     content: {
         type: Object,
-        default: () => {}
+        default: () => ({})
     },
     project: {
         type: Object,
-        default: () => {}
+        default: () => ({})
     },
     task: {
         type: Object,
-        default: () => {}
+        default: () => ({})
     },
     isSendMsg: {
         type: Boolean,

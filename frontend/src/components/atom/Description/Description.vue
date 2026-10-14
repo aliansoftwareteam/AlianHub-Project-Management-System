@@ -129,7 +129,7 @@ const props = defineProps({
     },
     projectData: {
         type: Object,
-        default: () => {}
+        default: () => ({})
     },
     from: {
         type: String,
@@ -137,7 +137,7 @@ const props = defineProps({
     },
     task: {
         type: Object,
-        default: () => {}
+        default: () => ({})
     },
     isMainSpinner: {
         type: Boolean,

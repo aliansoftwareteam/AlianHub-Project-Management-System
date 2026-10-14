@@ -183,7 +183,7 @@ const { t } = useI18n();
 const props = defineProps({
     item: {
         type: Object,
-        default: () => {}
+        default: () => ({})
     },
     activeTab:{
         type: Number

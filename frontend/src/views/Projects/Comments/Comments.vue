@@ -310,7 +310,7 @@ const props = defineProps({
     },
     creator: {
         type: Object,
-        default: () => {}
+        default: () => ({})
     },
     parentTaskId: {
         type: String,

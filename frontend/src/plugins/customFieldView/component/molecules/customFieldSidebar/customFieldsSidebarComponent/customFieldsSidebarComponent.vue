@@ -44,7 +44,7 @@
     const props = defineProps({
         componentDetail:{
             type:Object,
-            default:() => {}
+            default:() => ({})
         },
         isCustomField:{
             type:Boolean,
@@ -52,7 +52,7 @@
         },
         customFieldObject:{
             type:Object,
-            default:() => {}
+            default:() => ({})
         },
         isType:{
             type:Boolean,

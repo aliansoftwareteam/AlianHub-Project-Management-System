@@ -79,7 +79,7 @@ const props = defineProps({
     },
     task: {
         type: Object,
-        default: () => {}
+        default: () => ({})
     },
     permission: {
         type: Boolean,

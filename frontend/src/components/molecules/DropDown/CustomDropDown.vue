@@ -113,7 +113,7 @@ const props = defineProps({
     },
     bodyClass: {
         type: Object,
-        default: () => {}
+        default: () => ({})
     },
     zindexCustomDrop: {
         type: Number,

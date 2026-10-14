@@ -58,11 +58,11 @@
         },
         componentDetail:{
             type: Object,
-            default:() => {}
+            default:() => ({})
         },
         customFieldObject:{
             type: Object,
-            default:() => {}
+            default:() => ({})
         },
         isType:{
             type:Boolean,

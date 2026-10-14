@@ -374,11 +374,11 @@ const props = defineProps({
     },
     project:{
         type:Object,
-        default:() => {}
+        default:() => ({})
     },
     sprintObject:{
         type:Object,
-        default:() => {}
+        default:() => ({})
     }
 });
 

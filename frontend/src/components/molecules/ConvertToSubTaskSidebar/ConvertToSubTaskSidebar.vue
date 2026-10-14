@@ -202,11 +202,10 @@
         },
         task: { 
             type: Object,
-            default:()=>{}
+            default:() => ({})
         },
-        selectedProjectObject: { 
-            type: Object,
-            default:()=>{}
+        selectedProjectObject: {
+            type: Object
         },
         fromWhich: {
             type: String,

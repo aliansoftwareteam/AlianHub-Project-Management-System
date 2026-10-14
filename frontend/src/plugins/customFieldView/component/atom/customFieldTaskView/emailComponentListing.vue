@@ -20,7 +20,7 @@
     const props = defineProps({
         detail:{
             type:Object,
-            default:() => {}
+            default:() => ({})
         }
     });
     const fieldInputValue = ref(props.detail?.fieldValue);

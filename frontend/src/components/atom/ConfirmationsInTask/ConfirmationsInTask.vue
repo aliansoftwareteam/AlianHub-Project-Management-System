@@ -303,11 +303,11 @@ const props = defineProps({
     },
     task: {
         type: Object,
-        default: () => {},
+        default: () => ({}),
     },
     selectedConvertTask: {
         type: Object,
-        default: () => {},
+        default: () => ({}),
     },
     subTaskConfirm: {
         type: Boolean,
@@ -323,15 +323,15 @@ const props = defineProps({
     },
     oldStatus: {
         type: Array,
-        default: () => {},
+        default: () => [],
     },
     oldTaskType: {
         type: Array,
-        default: () => {},
+        default: () => [],
     },
     selectedProjectData: {
         type: Object,
-        default: () => {},
+        default: () => ({}),
     },
     errorMsg: {
         type: String,
@@ -343,7 +343,7 @@ const props = defineProps({
     },
     data: {
         type: Object,
-        default: () => {},
+        default: () => ({}),
     },
     taskConfirm: {
         type: Boolean,
@@ -371,7 +371,7 @@ const props = defineProps({
     },
     selectedSprintData : {
         type: Object,
-        default: () => {},
+        default: () => ({}),
     }
 });
 
@@ -432,26 +432,27 @@ const taskStatus = computed(() => {
     return foundStatus ? { ...foundStatus, convertStatus: foundStatus } : null
 })
 const taskTypes = computed(() => {
-    const foundType = props.selectedProjectData?.taskTypeCounts.find((x) => x.key === props.data ? props.data.TaskTypeKey : 1)
+    const foundType = props.selectedProjectData?.taskTypeCounts?.find((x) => x.key === props.data ? props.data.TaskTypeKey : 1)
     return foundType ? { ...foundType, convertType: foundType } : null
 })
 const projectStatus = computed(() => {
-    return props.selectedProjectData?.projectStatusData.find((x) => x.value === props.selectedProjectData.status)
+    return props.selectedProjectData?.projectStatusData?.find((x) => x.value === props.selectedProjectData.status)
 })
 
 const getAssignes = (() => {
-    let assigneArray = props?.selectedProjectData?.AssigneeUserId || [];
-    let sortedAssignee = props?.data?.AssigneeUserId.length > 0 ? props?.selectedProjectData?.isPrivateSpace == true ? assigneArray.filter((x) => props?.data?.AssigneeUserId.includes(x)) : props?.data?.AssigneeUserId : [];
+    const assigneArray = props.selectedProjectData?.AssigneeUserId || [];
+    const taskAssignees = props.data?.AssigneeUserId || [];
+    let sortedAssignee = taskAssignees.length > 0 ? props.selectedProjectData?.isPrivateSpace == true ? assigneArray.filter((x) => taskAssignees.includes(x)) : taskAssignees : [];
 
-    if(props?.selectedSprintData?.private === true){
-        sortedAssignee = sortedAssignee.filter((x) => props?.selectedSprintData?.AssigneeUserId.includes(x))
+    if(props.selectedSprintData?.private === true){
+        sortedAssignee = sortedAssignee.filter((x) => (props.selectedSprintData?.AssigneeUserId || []).includes(x))
     }
     assignee.value = sortedAssignee;
     return sortedAssignee;
 })
 
 const detailedUsers = computed(() => {
-  return usersData.value.filter((x) => props.data.AssigneeUserId.includes(x._id))
+  return usersData.value.filter((x) => (props.data?.AssigneeUserId || []).includes(x._id))
     .map((x) => {
         const user = getUser(x._id);
         if (user && !user.ghostUser) {
