@@ -122,4 +122,11 @@ describe('where the words point', () => {
         expect(read('views/Projects/ListView/ListView.vue')).not.toContain("$t('ProjectSlider.no_archived')");
         expect(en.EmptyState.no_archived_title).toBe('No archived tasks to show');
     });
+
+    it('an empty archive view says what archiving does under its title, in the List and the Table', () => {
+        expect(read('views/Projects/ListView/ListView.vue')).toContain(':message="$t(emptyMessageKey)"');
+        expect(read('views/Projects/ListView/ListView.vue')).not.toContain(":message=\"showArchived ? ''");
+        expect(read('views/Projects/TableView/TableView.vue')).toContain(':message="$t(emptyMessageKey)"');
+        expect(en.EmptyState.no_archived_msg).toMatch(/^Archiving keeps a task out of the way/);
+    });
 });
