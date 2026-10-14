@@ -16,6 +16,19 @@ from [Conventional Commits](https://www.conventionalcommits.org/) on `main`.
 
 ---
 
+## [14.38.0](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/compare/v14.37.0...v14.38.0) (2026-10-14)
+
+
+### 🚀 Features
+
+* **ai:** a plan can add a project dashboard ([d8163b5](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/d8163b5710b8dc49928f66cb1de8cd007ca34fb0))
+
+
+### 📘 Documentation
+
+* **readme:** add light and dark screenshots, requirements, upgrade note and what's new ([#1657](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/issues/1657)) ([0895fc3](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/0895fc39ddcd158ffdd270c4fa3df47e998251d1))
+* **readme:** add navigation, a feature grid, an AI flow diagram and collapsible FAQ ([#1655](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/issues/1655)) ([b4dbdb7](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/b4dbdb7b0e6b3bba0059d54dc2ff66a46735f467))
+
 ## [14.37.0](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/compare/v14.36.0...v14.37.0) (2026-10-13)
 
 
