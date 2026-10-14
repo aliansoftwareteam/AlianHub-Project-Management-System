@@ -335,7 +335,7 @@ const settle = (p, verb, result) => {
     forgetPicks(p);
     picked.value = picked.value.filter((id) => id !== p.proposalId);
     const more = Boolean(result.later?.waiting || result.later?.retry);
-    emit('decided', { id: p.proposalId, verb, undo: Boolean(result.undo), ...(result.madeProjects?.length ? { madeProjects: result.madeProjects } : {}), ...(more ? { more } : {}) });
+    emit('decided', { id: p.proposalId, verb, undo: Boolean(result.undo), ...(result.madeProjects?.length ? { madeProjects: result.madeProjects } : {}), ...(result.opens ? { opens: result.opens } : {}), ...(more ? { more } : {}) });
 };
 
 const approve = async (p) => {

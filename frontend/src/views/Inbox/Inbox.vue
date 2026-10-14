@@ -269,6 +269,7 @@
             <transition name="ah-fade">
                 <div v-if="undo" class="ibx__undo" role="status">
                     <span>{{ undo.text }}</span>
+                    <router-link v-if="undo.opens" class="ibx__undo-open" data-test="queue-open-made" :to="{ name: 'Project', params: { cid: companyId, id: undo.opens } }">{{ $t('Inbox.open_made') }}</router-link>
                     <button v-if="undo.fn" type="button" class="ibx__undo-btn" @click="runUndo">{{ $t('Inbox.undo') }}</button>
                 </div>
             </transition>
@@ -898,7 +899,7 @@ const undoApprovals = async (ids) => {
     else $toast.success(t('Inbox.queue_undone'), { position: 'top-right' });
     loadCounts();
 };
-const onQueueDecided = ({ id, verb, undo: canUndo, madeProjects, more }) => {
+const onQueueDecided = ({ id, verb, undo: canUndo, madeProjects, opens, more }) => {
     queue.value = queue.value.filter((p) => p.proposalId !== id);
     loadCounts();
     // What an approval left to be made later is back in the queue as rows of its own.
@@ -909,7 +910,7 @@ const onQueueDecided = ({ id, verb, undo: canUndo, madeProjects, more }) => {
     const approved = [...(undo.value?.approved || []), id];
     const undoIds = [...(undo.value?.undoIds || []), ...(canUndo ? [id] : [])];
     showUndo(t('Inbox.queue_approved', { n: approved.length }, approved.length), undoIds.length ? () => undoApprovals(undoIds) : null);
-    Object.assign(undo.value, { approved, undoIds });
+    Object.assign(undo.value, { approved, undoIds, opens: approved.length === 1 ? opens || '' : '' });
 };
 const openQueueTask = (task) => openTask({ companyId: companyId?.value, projectId: task.projectId, sprintId: task.sprintId, folderId: task.folderId || '', taskId: task.taskId });
 const onQueueUndone = ({ id }) => {
@@ -1113,7 +1114,7 @@ onUnmounted(() => {
     display: flex; align-items: center; gap: var(--sp-6, 14px); min-height: var(--control-h-lg, 33px); padding: 0 var(--sp-6, 14px);
     background: var(--rail); color: var(--rail-ink-strong); border-radius: var(--r-lg, 9px); box-shadow: var(--shadow-pop); font-size: var(--fs-md, 12.5px); white-space: nowrap;
 }
-.ibx__undo-btn { min-height: var(--hit-min); border: 0; background: transparent; color: var(--rail-brand); font: 600 var(--fs-md, 12.5px)/1 var(--font-ui); cursor: pointer; padding: 0; }
+.ibx__undo-btn, .ibx__undo-open { min-height: var(--hit-min); border: 0; background: transparent; color: var(--rail-brand); font: 600 var(--fs-md, 12.5px)/1 var(--font-ui); cursor: pointer; padding: 0; display: inline-flex; align-items: center; text-decoration: none; }
 
 .ibx__toolbar .ibx__tabs { display: none; }
 @media (max-width: 1279px) {
