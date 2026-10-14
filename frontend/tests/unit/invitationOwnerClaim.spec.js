@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { flushPromises, mount } from '@vue/test-utils';
 
 const COMPANY_ID = '6f0000000000000000000c01';
@@ -13,6 +13,7 @@ const mocks = vi.hoisted(() => ({
     getAuth: vi.fn(),
     logOut: vi.fn(),
     push: vi.fn(),
+    replace: vi.fn(),
 }));
 
 vi.mock('@/services', () => ({
@@ -24,7 +25,7 @@ vi.mock('@/services', () => ({
 }));
 vi.mock('vue-router', () => ({
     useRoute: () => ({ query: { companyId: `${COMPANY_ID}-${INVITE_ID}`, token: LINK_TOKEN } }),
-    useRouter: () => ({ push: mocks.push }),
+    useRouter: () => ({ push: mocks.push, replace: mocks.replace }),
 }));
 vi.mock('vuex', () => ({ useStore: () => ({ getters: {} }) }));
 vi.mock('@/config/publicConfig', () => ({ enabledProviders: () => [] }));
@@ -65,10 +66,20 @@ const submitInvitation = async (roleType) => {
 const callsTo = (url) => mocks.apiRequestWithoutCompnay.mock.calls.filter((call) => call[1] === url);
 
 describe('Invitation page accepting an invitation', () => {
+    let reload;
+
     beforeEach(() => {
         Object.values(mocks).forEach((mock) => mock.mockReset());
         mocks.apiRequest.mockResolvedValue({ data: { status: true } });
         mocks.getAuth.mockResolvedValue(undefined);
+        mocks.replace.mockResolvedValue(undefined);
+        reload = vi.fn();
+        vi.spyOn(window, 'location', 'get').mockReturnValue({ ...window.location, reload });
+    });
+
+    afterEach(() => {
+        vi.restoreAllMocks();
+        localStorage.clear();
     });
 
     it('records an invited owner on the company with the signed-in user id', async () => {
@@ -77,7 +88,19 @@ describe('Invitation page accepting an invitation', () => {
             ['put', env.COMPANYINVITATION, { updateObject: { objId: { userId: USER_ID } }, companyId: COMPANY_ID }],
         ]);
         expect(wrapper.find('.auth__banner').exists()).toBe(false);
-        expect(mocks.push).toHaveBeenCalledWith({ name: 'Log-in' });
+        expect(mocks.replace).toHaveBeenCalledWith(`/${COMPANY_ID}/welcome/connect-ai`);
+    });
+
+    it('signs the new account in and opens the workspace instead of the log-in page', async () => {
+        await submitInvitation(3);
+        expect(mocks.apiRequestWithoutSecure).toHaveBeenCalledWith('post', env.LOGIN, { email: 'new.owner@example.test', password: 'E2e-Passw0rd!' });
+        expect(mocks.getAuth).toHaveBeenCalledWith(USER_ID, true);
+        expect(mocks.getAuth).toHaveBeenLastCalledWith(USER_ID);
+        expect(localStorage.getItem('selectedCompany')).toBe(COMPANY_ID);
+        expect(mocks.logOut).not.toHaveBeenCalled();
+        expect(mocks.push).not.toHaveBeenCalledWith({ name: 'Log-in' });
+        expect(mocks.replace).toHaveBeenCalledWith(`/${COMPANY_ID}/welcome/connect-ai`);
+        expect(reload).toHaveBeenCalled();
     });
 
     it('links the invitation row to the signed-in user, presenting the link token', async () => {
@@ -89,6 +112,6 @@ describe('Invitation page accepting an invitation', () => {
         const wrapper = await submitInvitation(2);
         expect(callsTo(env.COMPANYINVITATION)).toHaveLength(0);
         expect(wrapper.find('.auth__banner').exists()).toBe(false);
-        expect(mocks.push).toHaveBeenCalledWith({ name: 'Log-in' });
+        expect(mocks.replace).toHaveBeenCalledWith(`/${COMPANY_ID}/welcome/connect-ai`);
     });
 });

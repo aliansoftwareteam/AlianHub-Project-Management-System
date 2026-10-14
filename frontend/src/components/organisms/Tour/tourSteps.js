@@ -28,9 +28,11 @@ function placePopover(anchor, size, viewport, side = 'right') {
     const clampY = (y) => Math.min(Math.max(EDGE, y), maxTop);
     if (!anchor) return { left: maxLeft, top: maxTop, side: 'none' };
 
+    // Pages fill from the top, so beside a tall anchor (the rail, the tree) the card sits at its foot, off the first rows.
+    const besideTop = clampY(anchor.bottom - anchor.top >= 2 * size.height ? anchor.bottom - size.height : anchor.top);
     const spots = {
-        right: { left: anchor.right + GAP, top: clampY(anchor.top) },
-        left: { left: anchor.left - GAP - size.width, top: clampY(anchor.top) },
+        right: { left: anchor.right + GAP, top: besideTop },
+        left: { left: anchor.left - GAP - size.width, top: besideTop },
         bottom: { left: clampX(anchor.left), top: anchor.bottom + GAP },
         top: { left: clampX(anchor.left), top: anchor.top - GAP - size.height }
     };
