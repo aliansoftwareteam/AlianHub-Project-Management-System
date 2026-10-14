@@ -22,11 +22,11 @@
         />
         <div id="message_container"
             @dragenter="messageAllowed ? showDropZone = true : showDropZone = false"
-            class="overflow-y-auto style-scroll position-re msg__container"
+            class="overflow-y-auto comments-style-scroll position-re msg__container"
         >
             <template v-if="loadingChat">
                 <!-- CHAT LOADER -->
-                <div class="bg-light-gray commments__component-wrapper position-re">
+                <div class="comments-bg-light-gray commments__component-wrapper position-re">
                     <div class="d-grid flex-column w-100">
                         <div class="d-flex w-100 pl-10px">
                             <div>
@@ -55,7 +55,7 @@
             </template>
             <template v-else>
                 <div class="p0x-5px">
-                    <span v-if="messages.length && convertDateFormat({seconds: popupDate}).toLowerCase() !== $t('Home.Today').toLowerCase()" class="position-sti bg-white px-1 border-radius-5-px z-index-2 d-inline-block convert_dateformat">{{convertDateFormat({seconds: popupDate})}}</span>
+                    <span v-if="messages.length && convertDateFormat({seconds: popupDate}).toLowerCase() !== $t('Home.Today').toLowerCase()" class="position-sti comments-bg-white px-1 border-radius-5-px z-index-2 d-inline-block convert_dateformat">{{convertDateFormat({seconds: popupDate})}}</span>
                     <Comment
                         v-for="(data, index) in messages" :key="data._id"
                         :message="data"
@@ -90,7 +90,7 @@
 
         <!-- FOOTER -->
         <div>
-            <div id="comment_footer"  class="border-top position-fi flex-column border-bottom d-flex align-items-end justify-content-between bg-white p-12px comment__footer">
+            <div id="comment_footer"  class="border-top position-fi flex-column border-bottom d-flex align-items-end justify-content-between comments-bg-white p-12px comment__footer">
                 <!-- SCROLL BOTTOM -->
                 <button v-if="showScrollBotton" type="button" class="scroll-bottom-btn position-ab cursor-pointer" :aria-label="$t('MainChat.jump_latest')" :title="$t('MainChat.jump_latest')" @click="scrollBottom()">
                     <span class="ah-mask-icon" :style="maskOf(downArrow)"></span>
@@ -167,7 +167,7 @@
                             'type':formData.taskName.type,
                             'event':$event.event})"
                         />
-                        <div class="red position-ab z-index-1 font-size-12 error__text">{{formData.taskName.error}}</div>
+                        <div class="red position-ab z-index-1 comments-font-size-12 error__text">{{formData.taskName.error}}</div>
                     </div>
                     <div class="position-re createTask__modal-field mb-15px">
                         <SelectComp
@@ -185,7 +185,7 @@
                             'type':formData.selectedSprint.type,
                             'event':$event})"
                         />
-                        <div class="red position-ab z-index-1 font-size-12 error__text">{{formData.selectedSprint.error}}</div>
+                        <div class="red position-ab z-index-1 comments-font-size-12 error__text">{{formData.selectedSprint.error}}</div>
                     </div>
                     <div class="position-re createTask__modal-field mb-15px">
                         <SelectComp
@@ -203,7 +203,7 @@
                             'type':formData.selectedType.type,
                             'event':$event})"
                         />
-                        <div class="red position-ab z-index-1 font-size-12 error__text">{{formData.selectedType.error}}</div>
+                        <div class="red position-ab z-index-1 comments-font-size-12 error__text">{{formData.selectedType.error}}</div>
                 </div>
                 </div>
             </template>
@@ -2283,5 +2283,30 @@ const closePreviewer = () => {
 
 .commments__component-wrapper{
     height: 100%;
+}
+</style>
+
+<style scoped>
+:where(.comments-bg-light-gray) {
+    background-color: var(--surface-2);
+}
+.comments-bg-white {
+    background-color: var(--surface);
+}
+.comments-font-size-12 {
+    font-size: 12px;
+}
+.comments-style-scroll::-webkit-scrollbar-track {
+    background-color: var(--canvas);
+}
+.comments-style-scroll::-webkit-scrollbar {
+    width: 2px;
+    height: 2px;
+    background-color: var(--canvas);
+    border-radius: 8px;
+}
+.comments-style-scroll::-webkit-scrollbar-thumb {
+    background-color: var(--ink-3);
+    border-radius: 8px;
 }
 </style>

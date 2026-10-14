@@ -3,7 +3,7 @@
         <!-- FOLDER NAME LEGEND -->
         <div
             v-if="sprint"
-            class="cursor-default black position-ab bg-white border border-radius-5-px color52 p0x-10px sprint__foldername"
+            class="cursor-default sprint-listing-black position-ab sprint-listing-bg-white border border-radius-5-px sprint-listing-color52 p0x-10px sprint__foldername"
         >
             {{sprint.projectName}} {{sprint.folderName ? `/ ${sprint.folderName}` : '' }}
         </div>
@@ -15,7 +15,7 @@
                         <img v-if="sprint.deletedStatusKey === 0 || sprint.deletedStatusKey === undefined" :src="triangleBlack" alt="traingle" :style="`transform: rotateZ(${sprint.isExpanded ? 90 : 0}deg); width: 6px;`" class="cursor-pointer">
                         <img v-if="sprint.deletedStatusKey === 2" :src="inventory_2" class="pr-10px" />
                         <img v-if="sprint.isFolder === true" :src="folder">
-                        <span class="text-ellipse font-weight-bold ml-10px cursor-pointer font-size-14 color52" :title="sprint.name">{{ sprint.name }}</span>
+                        <span class="text-ellipse sprint-listing-font-weight-bold ml-10px cursor-pointer sprint-listing-font-size-14 sprint-listing-color52" :title="sprint.name">{{ sprint.name }}</span>
                     </div>
                 </div>
             </div>
@@ -401,3 +401,20 @@ watch(() => props.sprint?.watchers, () => {
 
 </script>
 <style src="./style.css"></style>
+<style scoped>
+.sprint-listing-black {
+    color: var(--ink);
+}
+.sprint-listing-color52 {
+    color: var(--ink-2);
+}
+.sprint-listing-bg-white {
+    background-color: var(--surface);
+}
+.sprint-listing-font-weight-bold {
+    font-weight: bold;
+}
+.sprint-listing-font-size-14 {
+    font-size: 14px;
+}
+</style>

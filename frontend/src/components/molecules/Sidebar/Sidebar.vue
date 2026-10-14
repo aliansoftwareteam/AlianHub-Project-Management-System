@@ -41,10 +41,10 @@
                         </div>
                     </slot>
                 </div>
-                <div class="sidebar-body sidebar-style-scroll" :class="{'sidebar-black bg-white': !themed}" :id="uniqueId" :style="{
+                <div class="sidebar-body sidebar-style-scroll" :class="{'sidebar-black sidebar-bg-white': !themed}" :id="uniqueId" :style="{
                     'height': (hideHeader ? '100%' : '')
                 }">
-                    <div v-if="enableSearch" class="mobile-list-inputsearch-wrapper border-bottom p-15px" :class="{'bg-white': !themed}">
+                    <div v-if="enableSearch" class="mobile-list-inputsearch-wrapper border-bottom p-15px" :class="{'sidebar-bg-white': !themed}">
                         <input ref="sidebar_search" type="text" v-model="search" :placeHolder="$t('PlaceHolder.search')" :aria-label="$t('PlaceHolder.search')" class="form-control listsidebar-search sidebar-font-size-16" @input="$emit('searchChange', search)">
                     </div>
                     <slot name="body">
@@ -460,6 +460,9 @@ useFocusTrap(panelRef, computed(() => props.visible && !props.disableBackdrop));
 }
 .sidebar-bg-light-gray {
     background-color: var(--surface-2);
+}
+.sidebar-bg-white {
+    background-color: var(--surface);
 }
 .sidebar-font-size-16 {
     font-size: 16px;

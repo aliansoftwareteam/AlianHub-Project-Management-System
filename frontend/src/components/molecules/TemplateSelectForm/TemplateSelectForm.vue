@@ -6,13 +6,13 @@
 <div class="statusTaskWrapper d-flex justify-content-between template-select-form">
     <div class="taskStatusLeft" :id="containerId || undefined" v-show="!isMobile || step === 'templates'">
         <div class="d-flex justify-content-between w-90">
-            <label class="templetes mb-6px" :class="isMobile ? 'template-label-mobile' : 'template-label-desktop'">{{ $t('Templates.templates') }} ({{ templates.length }})</label>
+            <label class="templetes mb-6px" :class="isMobile ? 'template-select-form-template-label-mobile' : 'template-select-form-template-label-desktop'">{{ $t('Templates.templates') }} ({{ templates.length }})</label>
             <img class="cursor-pointer" src="@/assets/images/svg/pluss.svg" :id="addIconId || undefined" @click="openNewTemplate()"/>
         </div>
         <ul class="templated_name_ul position-re">
             <li v-for="(tempVal, index) in templates" :key="tempVal._id || index" class="cursor-pointer" :class="[{ 'temp_save_value': tempVal.isShowSave }]">
                 <span v-if="editingIndex !== index"
-                    :class="[{ 'temp_save_dot': tempVal.isShowSave, 'is-selected': isSelected(tempVal) }, isMobile ? 'templated-name-mobile' : 'templated-name-desktop']"
+                    :class="[{ 'temp_save_dot': tempVal.isShowSave, 'is-selected': isSelected(tempVal) }, isMobile ? 'template-select-form-templated-name-mobile' : 'templated-name-desktop']"
                     :title="tempVal.TemplateName" @click="selectTemplate(tempVal)"
                     class="templated_name text-ellipsis"> {{ tempVal.TemplateName }} </span>
                 <input v-else type="text" class="statusInputText form-control edit-input statuseditInput" :maxlength="50" v-model.trim="editName" @keypress.enter="confirmRename(tempVal, index)" @input="errTempMsg = ''"/>
@@ -47,8 +47,8 @@
             </span>
         </div>
         <div class="err_temp_status">
-            <div v-if="fieldError" class="red font-size-11">{{ fieldError }}</div>
-            <span v-if="errTempMsg" class="err_temp red font-size-12">{{ errTempMsg }}</span>
+            <div v-if="fieldError" class="red template-select-form-font-size-11">{{ fieldError }}</div>
+            <span v-if="errTempMsg" class="err_temp red template-select-form-font-size-12">{{ errTempMsg }}</span>
         </div>
     </div>
     <div class="taskStatusRight" :class="rightClass" :id="rightId || undefined" v-show="!isMobile || step === 'list'">
@@ -232,6 +232,32 @@ defineExpose({ closeInputs });
     .taskStatusLeft ul.templated_name_ul li span.task-leftside.tsf-actions-mobile img.taskleftEditIcon,
     .taskStatusLeft ul.templated_name_ul li span.task-leftside.tsf-actions-mobile img.taskleftdeleteIcon {
         display: inline-block;
+    }
+}
+</style>
+
+<style scoped>
+.template-select-form-template-label-desktop {
+    font-weight: 400 !important;
+    font-size: 12px !important;
+    line-height: 18px !important;
+    color: var(--ink-2) !important;
+}
+.template-select-form-font-size-11 {
+    font-size: 11px;
+}
+.template-select-form-font-size-12 {
+    font-size: 12px;
+}
+@media(max-width: 767px) {
+    .template-select-form-templated-name-mobile {
+        font-size: 16px !important;
+        line-height: 21px !important;
+    }
+    .template-select-form-template-label-mobile {
+        font-size: 16px !important;
+        line-height: 21px !important;
+        color: var(--ink-2) !important;
     }
 }
 </style>

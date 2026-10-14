@@ -74,26 +74,26 @@
                     </template>
                 </draggable>
             </div>
-            <a class="blue btn-add-new" @click="addRow">+ {{$t('CustomField.add_another_item')}}</a>
+            <a class="dropdown-custom-field-blue btn-add-new" @click="addRow">+ {{$t('CustomField.add_another_item')}}</a>
             <p v-if="!isEdit" class="options-hint">{{$t('CustomField.options_keyboard_hint')}}</p>
             <div class="mt-20px">
-                <h4 class="dark-gray font-size-14 m-0">{{$t('CustomField.predefined_options')}}</h4>
+                <h4 class="dropdown-custom-field-dark-gray dropdown-custom-field-font-size-14 m-0">{{$t('CustomField.predefined_options')}}</h4>
                 <div class="dropdown-main mt-10px">
                     <div class="dropdown-select" @click="isVisiblePrededine=true">
                         <span class="select">{{ selectedOption.label || $t('Permissions.None') }}</span>
                         <div class="arrow-dropdown"></div>
                     </div>
                 </div>
-                <span class="font-size-12 gray">{{$t('CustomField.choose_ready_made_list')}}</span>
+                <span class="dropdown-custom-field-font-size-12 dropdown-custom-field-gray">{{$t('CustomField.choose_ready_made_list')}}</span>
             </div>
         </div>
         <div v-show="tabIndexCheck === 3" data-field-tab="3">
-            <h4 class="dark-gray font-size-14">{{$t('CustomField.selected_by_default')}}</h4>
+            <h4 class="dropdown-custom-field-dark-gray dropdown-custom-field-font-size-14">{{$t('CustomField.selected_by_default')}}</h4>
             <div class="options-area style-scroll">
                 <div v-for="(row, index) in options" :key="index" class="d-flex mb-20px cursor-pointer">
                     <label class="d-flex cursor-pointer">
                         <CheckboxComponent v-model="row.selected" @click="handleCheckRow(row)" :value="row.value" customClasses="border-gray"/>
-                        <span class="ml-10px font-size-12 dark-gray2">{{ row.label }}</span>
+                        <span class="ml-10px dropdown-custom-field-font-size-12 dropdown-custom-field-dark-gray2">{{ row.label }}</span>
                     </label>
                 </div>
             </div>
@@ -387,4 +387,25 @@ defineExpose({ handleTabComp, handleSubmitComp });
 </script>
 <style scoped>
 .options-hint { margin: 8px 0 0; color: var(--ink-2); font: var(--text-small); }
+</style>
+
+<style scoped>
+.dropdown-custom-field-blue {
+    color: var(--brand) !important;
+}
+.dropdown-custom-field-dark-gray {
+    color: var(--ink);
+}
+.dropdown-custom-field-dark-gray2 {
+    color: var(--ink);
+}
+.dropdown-custom-field-font-size-14 {
+    font-size: 14px;
+}
+.dropdown-custom-field-font-size-12 {
+    font-size: 12px;
+}
+.dropdown-custom-field-gray {
+    color: var(--ink-2);
+}
 </style>

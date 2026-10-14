@@ -8,10 +8,10 @@
 <div class="statusHeader statusHeader_one">
     <div :class="{'border-radius-5-px': clientWidth > 767 , 'border-radius-8-px': clientWidth <= 767 } ">
         <h3 v-if="fromWhich == ''" class="heading_text mt-0 bg-light-gray"
-        :class="{'border-radius-5-px  task-heading-desktop': clientWidth > 767 , 'border-radius-8-px task-heading-mobile': clientWidth <= 767}"
+        :class="{'border-radius-5-px  project-task-type-form-task-heading-desktop': clientWidth > 767 , 'border-radius-8-px task-heading-mobile': clientWidth <= 767}"
         >{{$t('Projects.add_task_need')}}</h3>
         <h3 v-else class="heading_text mt-0 bg-light-gray"
-        :class="{'border-radius-5-px  task-heading-desktop': clientWidth > 767 , 'border-radius-8-px task-heading-mobile': clientWidth <= 767}"
+        :class="{'border-radius-5-px  project-task-type-form-task-heading-desktop': clientWidth > 767 , 'border-radius-8-px task-heading-mobile': clientWidth <= 767}"
         >{{$t('Projects.what_task_want')}}</h3>
     </div>
     <div class="taskStatusSection style-scroll">
@@ -33,10 +33,10 @@
             @left-focus="onLeftFocus"
         >
             <template #list>
-                <label :class="{'taskstatustitle-desktop': clientWidth > 767 , 'taskstatustitle-mobile': clientWidth <= 767}" >{{$t('Projects.task_type')}}</label>
+                <label :class="{'project-task-type-form-taskstatustitle-desktop': clientWidth > 767 , 'project-task-type-form-taskstatustitle-mobile': clientWidth <= 767}" >{{$t('Projects.task_type')}}</label>
                 <DragDropField v-if="theModel.taskTypeField.value && Object.keys(theModel.taskTypeField.value).length > 0" :group="{ name: 'task_type_group' }" :isDeletable="true" :isChangeColor="false" :modelValue="theModel.taskTypeField.value.taskTypes"  @enter:updateFieldValue="addedTaskType" @click:updateFieldValue="addedTaskType" @input:deleteFieldValue="manageDeleteData" @resetTaskTypeErr="taskTypeError=''" @disbaleButton="(val)=>{$emit('disableNext',val)}" :addTaskType="addTaskType" :useDataArray="useTaskTypeArr" @update:modelValue="manageSelectedOption" :from="'task_type'"/>
                 <div class="addStatusBtn searchValue mb-0">
-                    <button class="cursor-pointer btn btn-primary" type="button" v-if="!addTaskType" @click="openTaskTypeSidebar()" id="createprojecttasktypenew_driver">+ {{$t('Home.add_task_type')}}</button>
+                    <button class="cursor-pointer project-task-type-form-btn btn-primary" type="button" v-if="!addTaskType" @click="openTaskTypeSidebar()" id="createprojecttasktypenew_driver">+ {{$t('Home.add_task_type')}}</button>
                     <div class="d-flex align-items-center justify-content-between" v-else>
                         <button class="cursor-pointer upload-image-btn up__btn btn-primary" type="button">
                             <img v-if="addNewtaskImage" :src="addNewtaskImage" class="projecttasktypeform__image__after"/>
@@ -472,5 +472,38 @@ const { t } = useI18n();
 .taskyou_need_right .status_ul {
     max-height: 220px;
     overflow-y: auto;
+}
+</style>
+<style scoped>
+.project-task-type-form-task-heading-desktop {
+    font-weight: 700 !important;
+    font-size: 18px !important;
+    line-height: 27px !important;
+    color: var(--ink) !important;
+}
+.project-task-type-form-taskstatustitle-desktop {
+    font-weight: 500 !important;
+    font-size: 14px !important;
+    line-height: 21px !important;
+    color: var(--ink) !important;
+}
+@media (max-width: 767px) {
+    .project-task-type-form-taskstatustitle-mobile {
+        font-size: 16px !important;
+        line-height: 21px !important;
+        font-weight: 500 !important;
+        color: var(--ink) !important;
+    }
+}
+.project-task-type-form-btn {
+    margin-left: 5px;
+    padding: 4px 14px;
+    font-weight: 400;
+    font-size: 16px;
+    line-height: 24px;
+    font-family: var(--font-ui);
+    display: flex;
+    align-items: center;
+    justify-content: center;
 }
 </style>

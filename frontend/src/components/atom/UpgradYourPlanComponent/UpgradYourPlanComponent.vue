@@ -6,13 +6,13 @@
                     <img class="upw__image" :src="upgradePlan" alt="">
                 </div>
                 <div>
-                    <h3 class="upw__title font-size-22 font-weight-700 text-center line-height-33">
+                    <h3 class="upw__title upgrad-your-plan-component-font-size-22 upgrad-your-plan-component-font-weight-700 text-center upgrad-your-plan-component-line-height-33">
                         {{firstTitle}} <span class="upw__accent">{{secondTitle}}</span> {{lastTitle}}
                     </h3>
-                    <p class="upw__message font-size-16 font-weight-400 text-center line-height-23-68 mt-10px mb-20px">
+                    <p class="upw__message upgrad-your-plan-component-font-size-16 upgrad-your-plan-component-font-weight-400 text-center upgrad-your-plan-component-line-height-23-68 mt-10px mb-20px">
                         {{props.message}}
                     </p>
-                    <button @click="router.push({name: 'Upgrade', params: {cid: companyId}})" class="upw__btn cursor-pointer font-size-16 font-weight-400 text-center line-height-23-68 border-0 border-radius-4-px p3x-14px">
+                    <button @click="router.push({name: 'Upgrade', params: {cid: companyId}})" class="upw__btn cursor-pointer upgrad-your-plan-component-font-size-16 upgrad-your-plan-component-font-weight-400 text-center upgrad-your-plan-component-line-height-23-68 border-0 border-radius-4-px p3x-14px">
                         {{buttonText}}
                     </button>
                 </div>
@@ -67,4 +67,25 @@
 /* #15803d keeps the green call to action at 5:1 under white text; #28C76F was 2.2:1. */
 .upw__btn { background: #15803d; color: #fff; }
 .upw__btn:hover { background: #166534; }
+</style>
+
+<style scoped>
+.upgrad-your-plan-component-font-weight-400 {
+    font-weight: 400 !important;
+}
+.upgrad-your-plan-component-font-weight-700 {
+    font-weight: 700 !important;
+}
+.upgrad-your-plan-component-font-size-16 {
+    font-size: 16px;
+}
+.upgrad-your-plan-component-font-size-22 {
+    font-size: 22px;
+}
+.upgrad-your-plan-component-line-height-33 {
+    line-height: 33px;
+}
+.upgrad-your-plan-component-line-height-23-68 {
+    line-height: 23.68px;
+}
 </style>

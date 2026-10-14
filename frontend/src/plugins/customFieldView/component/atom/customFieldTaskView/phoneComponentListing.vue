@@ -29,7 +29,7 @@
                             <span class="ah-sr-only">{{$t('CustomField.country_code')}}</span>
                             <div class="d-flex align-items-center mr-12px">
                                 <div v-if="country" :class="`vti__flag ${flag?.toLowerCase()}`" ></div>
-                                <span v-if="clientWidth > 480" class="font-size-14 font-weight-400 pl-3px">{{code}}</span>
+                                <span v-if="clientWidth > 480" class="phone-component-listing-font-size-14 phone-component-listing-font-weight-400 pl-3px">{{code}}</span>
                             </div>
                             <div class="w-9">
                                 <img class="rotate-z-90" :src="dropDownArrow" alt="">
@@ -59,7 +59,7 @@
                             <span class="ah-sr-only">{{$t('CustomField.country_code')}}</span>
                             <div class="d-flex align-items-center mr-12px">
                                 <div v-if="country" :class="`vti__flag ${flag?.toLowerCase()}`" ></div>
-                                <span class="font-size-14 font-weight-400">{{code}}</span>
+                                <span class="phone-component-listing-font-size-14 phone-component-listing-font-weight-400">{{code}}</span>
                             </div>
                             <div class="w-9">
                                 <img class="rotate-z-90" :src="dropDownArrow" alt="">
@@ -87,7 +87,7 @@
                     <div class="d-flex align-items-center align-items-center justify-content-between phone_pipeline">
                         <div class="d-flex align-items-center">
                             <div v-if="country" :class="`vti__flag ${flag?.toLowerCase()}`" ></div>
-                            <span class="font-size-14 font-weight-400">{{code}}</span>
+                            <span class="phone-component-listing-font-size-14 phone-component-listing-font-weight-400">{{code}}</span>
                         </div>
                     </div>
                 </div>
@@ -251,3 +251,11 @@
         }
     }
 </script>
+<style scoped>
+.phone-component-listing-font-size-14 {
+    font-size: 14px;
+}
+.phone-component-listing-font-weight-400 {
+    font-weight: 400 !important;
+}
+</style>

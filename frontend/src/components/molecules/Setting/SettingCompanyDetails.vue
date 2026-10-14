@@ -1,7 +1,7 @@
 <template>
 <div class="position-re">
     <SpinnerComp :is-spinner="isSpinner" class="setting_spinner" />
-    <div class="mySettingSection box-shadow-2 main-company-section" :class="[{ 'Company-pointer-event-none': isSpinner }]">
+    <div class="mySettingSection setting-company-details-box-shadow-2 main-company-section" :class="[{ 'Company-pointer-event-none': isSpinner }]">
         <div class="row vs-con-loading__container" id="div-with-loading-profile">
             <div class="col-md-2 settingProfileCol">
                 <div class="settingProfileWrapper">
@@ -499,6 +499,9 @@ function phoneValidation (number) {
     width: 120px !important;
     height: 120px !important;
     border-radius: 50%;
-    border: 2px solid #102a83;
+    border: 2px solid var(--brand);
+}
+.setting-company-details-box-shadow-2 {
+    box-shadow: 0px 2px 12px var(--shadow-ink);
 }
 </style>

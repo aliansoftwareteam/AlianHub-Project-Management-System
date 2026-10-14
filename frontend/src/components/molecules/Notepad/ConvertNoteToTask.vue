@@ -2,8 +2,8 @@
     <div class="convert__overlay" @click.self="close">
         <div class="convert__dialog">
             <div class="d-flex align-items-center justify-content-between convert__head">
-                <span class="font-size-15 font-weight-700">{{ dialogTitle || $t('Notepad.convert_title') }}</span>
-                <span class="cursor-pointer font-size-16 convert__close" @click="close">&#10005;</span>
+                <span class="convert-note-to-task-font-size-15 convert-note-to-task-font-weight-700">{{ dialogTitle || $t('Notepad.convert_title') }}</span>
+                <span class="cursor-pointer convert-note-to-task-font-size-16 convert__close" @click="close">&#10005;</span>
             </div>
 
             <label class="convert__label">{{ $t('Notepad.task_name') }}</label>
@@ -296,7 +296,7 @@ function convert() {
     width: min(440px, 92vw);
     border-radius: 10px;
     padding: 18px 20px;
-    box-shadow: 0 12px 40px rgba(0, 0, 0, 0.28);
+    box-shadow: 0 12px 40px var(--scrim);
     display: flex;
     flex-direction: column;
 }
@@ -319,7 +319,7 @@ function convert() {
     outline: none;
     background: var(--surface);
 }
-.convert__input:focus { border-color: #5b5b6b; }
+.convert__input:focus { border-color: var(--ink-2); }
 .convert__error {
     color: var(--danger);
     font-size: 11px;
@@ -336,8 +336,8 @@ function convert() {
     cursor: pointer;
 }
 .convert__btn-primary {
-    background: #1b1b38;
-    color: #fff;
+    background: var(--brand);
+    color: var(--on-brand);
     border: none;
     border-radius: 6px;
     padding: 8px 16px;
@@ -345,4 +345,16 @@ function convert() {
     cursor: pointer;
 }
 .convert__btn-primary:disabled { opacity: 0.6; cursor: default; }
+</style>
+
+<style scoped>
+.convert-note-to-task-font-size-15 {
+    font-size: 15px;
+}
+.convert-note-to-task-font-size-16 {
+    font-size: 16px;
+}
+.convert-note-to-task-font-weight-700 {
+    font-weight: 700 !important;
+}
 </style>

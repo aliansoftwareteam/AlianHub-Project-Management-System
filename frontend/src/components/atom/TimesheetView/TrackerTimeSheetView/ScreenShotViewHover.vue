@@ -1,16 +1,16 @@
 <template>
     <div >
-        <div class="screnshotpreviewHover bg-white">
-            <div class="screnshotpreviewHover__taskNameKey bg-light-gray">
-                <div class="d-flex flex-wrap screnshotpreviewHover__taskNameKey--propjectDetail align-items-center justify-content-center font-ui gray text-center">
+        <div class="screnshotpreviewHover screenshot-view-hover-bg-white">
+            <div class="screnshotpreviewHover__taskNameKey screenshot-view-hover-bg-light-gray">
+                <div class="d-flex flex-wrap screnshotpreviewHover__taskNameKey--propjectDetail align-items-center justify-content-center font-ui screenshot-view-hover-gray text-center">
                     {{dataObj.projectKey}}  |  {{dataObj.projectName}}  / 
                     <span><img class="folderIconImg" v-if="dataObj.isFolderSprint === true" src="@/assets/images/folder.png"> {{dataObj.folderName}} {{dataObj.isFolderSprint === true ? '/' : ''}} </span>
                     {{dataObj.sprintName}}
                 </div>
-                <div class="d-flex screnshotpreviewHover__taskNameKey--taskName justify-content-around black font-ui text-ellipsis font-size-12 font-weight-500 text-center">{{dataObj.taskName}}</div>
+                <div class="d-flex screnshotpreviewHover__taskNameKey--taskName justify-content-around screenshot-view-hover-black font-ui text-ellipsis screenshot-view-hover-font-size-12 screenshot-view-hover-font-weight-500 text-center">{{dataObj.taskName}}</div>
             </div>
             <div class="screnshotpreviewHover__Discription d-flex align-items-center justify-content-between py-8px">
-                <span class="screnshotpreviewHover__Discription--memoname font-ui GunPowder text-ellipsis font-size-12 gray pr-10px mw-50">{{dataObj.memoName}}</span>
+                <span class="screnshotpreviewHover__Discription--memoname font-ui screenshot-view-hover-GunPowder text-ellipsis screenshot-view-hover-font-size-12 screenshot-view-hover-gray pr-10px mw-50">{{dataObj.memoName}}</span>
                 <span class="d-flex align-items-center">
                     <UserProfile decorative
                         :showDot="false"
@@ -22,7 +22,7 @@
                         :thumbnail="'20x20'"
                         class="cursor-pointer timelog-user-status"
                     />
-                    <span class="font-size-12 gray ml-10px">{{dataObj.userName}}</span>
+                    <span class="screenshot-view-hover-font-size-12 screenshot-view-hover-gray ml-10px">{{dataObj.userName}}</span>
                 </span>
             </div>
             <div v-if="dataObj?.trackShots?.deleted">
@@ -49,3 +49,26 @@ watch(() => props.data , (val)=>{
 })
 </script>
 <style scoped  src="./ScreenShotViewHover.css"></style>
+<style scoped>
+.screenshot-view-hover-bg-white {
+    background-color: var(--surface);
+}
+.screenshot-view-hover-bg-light-gray {
+    background-color: var(--surface-2);
+}
+.screenshot-view-hover-gray {
+    color: var(--ink-2);
+}
+.screenshot-view-hover-black {
+    color: var(--ink);
+}
+.screenshot-view-hover-GunPowder {
+    color: var(--ink-2);
+}
+.screenshot-view-hover-font-size-12 {
+    font-size: 12px;
+}
+.screenshot-view-hover-font-weight-500 {
+    font-weight: 500 !important;
+}
+</style>

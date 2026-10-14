@@ -1,8 +1,8 @@
 :root {
     --home-soft: var(--fill);
     --home-soft-2: var(--surface-hover);
-    --home-check: rgba(0, 0, 0, .25);
-    --home-label: rgba(0, 0, 0, .42);
+    --home-check: var(--ink-3);
+    --home-label: var(--ink-2);
     --home-accent-tint: var(--brand-tint);
     --home-accent-dash: var(--brand-border);
     --home-warn-tint: var(--warn-bg);
@@ -10,14 +10,11 @@
     --home-timer-btn: var(--rail-active);
     --home-timer-btn-hover: rgba(255, 255, 255, .2);
     --home-block-neutral: var(--fill);
-    --home-block-neutral-edge: rgba(0, 0, 0, .3);
+    --home-block-neutral-edge: var(--ink-3);
     --home-grid-line: var(--hairline);
 }
 :root[data-theme="dark"] {
-    --home-check: rgba(255, 255, 255, .3);
-    --home-label: rgba(255, 255, 255, .42);
     --home-agent-border: rgba(168, 146, 255, .35);
-    --home-block-neutral-edge: rgba(255, 255, 255, .35);
 }
 
 /* ---------- page frame ---------- */

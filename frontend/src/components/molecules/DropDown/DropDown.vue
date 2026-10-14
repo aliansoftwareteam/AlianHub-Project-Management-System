@@ -9,14 +9,14 @@
         </DropDownTrigger>
         <teleport to="#my-dropdown" v-if="dropdownVisible">
             <div class="position-fi dropdown-back-drop cursor-default" :style="[{'z-index':zIndex}]" v-if="dropdownVisible && !hover" @click.stop="buttonClick()"/>
-            <div :id="panelId" v-bind="panelAttrs" @click.stop="onPanelClick" @keydown="onPanelKeydown" @keyup="onPanelKeyup" @focusin="rememberFocus" class="border-radius-8-px box-shadow-serach drop-down-menu" :style="[{'z-index':zIndex}]" :class="{'dd-tokens': themed, 'bg-white gray border': !themed, 'drop-down-hide' : !bind, 'desktop-view position-fi' : clientWidth > 767, 'mobile-view position-fi' : clientWidth <= 767, ...bodyClass}" v-if="dropdownVisible">
+            <div :id="panelId" v-bind="panelAttrs" @click.stop="onPanelClick" @keydown="onPanelKeydown" @keyup="onPanelKeyup" @focusin="rememberFocus" class="border-radius-8-px drop-down-box-shadow-serach drop-down-menu" :style="[{'z-index':zIndex}]" :class="{'dd-tokens': themed, 'bg-white gray border': !themed, 'drop-down-hide' : !bind, 'desktop-view position-fi' : clientWidth > 767, 'mobile-view position-fi' : clientWidth <= 767, ...bodyClass}" v-if="dropdownVisible">
                 <slot name="head" v-if="clientWidth > 767">
                 </slot>
                 <div class="border-bottom-mobiledrop cursor-default mobile-title-header p-20px box-sizing-box" v-else :style="{height : clientWidth <=767 ? '64px' : ''}">
                     <div>
                         <slot v-if="!mode || ($slots.head && headDismisses)" name="head">
                             <div class="d-flex justify-content-between align-items-center">
-                                <span class="font-weight-bold text-ellipsis project-list-mobiletitle mw-85">{{title}}</span>
+                                <span class="drop-down-font-weight-bold text-ellipsis project-list-mobiletitle mw-85">{{title}}</span>
                                 <img :src="closeIcon" alt="close" class="cursor-pointer mobileCloseIcon" @click.stop="buttonClick()">
                             </div>
                         </slot>
@@ -24,14 +24,14 @@
                             <div v-if="$slots.head" class="dropdown-sheet-head">
                                 <slot name="head"></slot>
                             </div>
-                            <span v-else class="font-weight-bold text-ellipsis project-list-mobiletitle mw-85">{{title}}</span>
+                            <span v-else class="drop-down-font-weight-bold text-ellipsis project-list-mobiletitle mw-85">{{title}}</span>
                             <button type="button" class="dropdown-close-btn" :aria-label="$t('Common.close')" @click.stop="close()">
                                 <img :src="closeIcon" alt="" class="cursor-pointer mobileCloseIcon">
                             </button>
                         </div>
                     </div>
                 </div>
-                <div v-if="options" :style="`padding: ${clientWidth > 767 ? '10px 10px 10px' : '20px;'}`"  class="search-project-filter dropdown_option font-size-12">
+                <div v-if="options" :style="`padding: ${clientWidth > 767 ? '10px 10px 10px' : '20px;'}`"  class="search-project-filter dropdown_option drop-down-font-size-12">
                     <div v-if="$slots.search" class="drop-down-search" :class="{'black': !themed}">
                         <slot name="search"></slot>
                     </div>
@@ -537,4 +537,13 @@ function buttonClick(flag = false) {
 
 <style>
 @import "./style.css";
+.drop-down-font-weight-bold {
+    font-weight: bold;
+}
+.drop-down-font-size-12 {
+    font-size: 12px;
+}
+.drop-down-box-shadow-serach {
+    box-shadow: var(--shadow-pop);
+}
 </style>
