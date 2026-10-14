@@ -1,10 +1,10 @@
 name: Visual
 
 # Until a baseline is committed there is nothing to compare a pull request with, so the check runs
-# after each merge and on demand. Add `pull_request: branches: [beta]` back with the baseline.
+# after each merge and on demand. Add `pull_request: branches: [staging]` back with the baseline.
 on:
   push:
-    branches: [beta]
+    branches: [staging]
   workflow_dispatch:
     inputs:
       update:
@@ -25,7 +25,7 @@ jobs:
     runs-on: ubuntu-24.04
     # Not blocking while the baseline is new. Once it is committed and the tolerance in
     # e2e/visual/settings.js is tuned, remove this line and add "Core screens" to the
-    # required checks of beta.
+    # required checks of staging.
     continue-on-error: true
     timeout-minutes: 30
     container:
