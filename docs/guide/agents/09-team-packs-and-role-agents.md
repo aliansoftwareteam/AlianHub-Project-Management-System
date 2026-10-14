@@ -2,7 +2,7 @@
 
 A role playbook is a written job description for an AI. It says who the AI is in a team, what it looks after, what it needs before it starts, what it hands over, and what it never does. It is plain text. It gives no new power: your AI still acts as you, with your rights.
 
-AlianHub ships playbooks for seven company blueprints: an IT company, a manufacturer, an agency, an online store (ecommerce), a professional services firm, a school (education) and a construction firm. Each playbook names its team, such as engineering or quality. The full, current set lives in [Modules/Agents/roles](../../../Modules/Agents/roles), one folder per blueprint. A person who runs your server can switch the features on or off. See "Who switches what on" at the end.
+AlianHub ships playbooks for eight company blueprints: an IT company, a manufacturer, an agency, an online store (ecommerce), a professional services firm, a school (education), a construction firm and a clinic. Each playbook names its team, such as engineering or quality. The full, current set lives in [Modules/Agents/roles](../../../Modules/Agents/roles), one folder per blueprint. A person who runs your server can switch the features on or off. See "Who switches what on" at the end.
 
 ## Roles, grouped by team
 
