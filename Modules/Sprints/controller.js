@@ -14,7 +14,7 @@ const { escapeHtml } = require("../../utils/escapeHtml");
 const { storedNames, notifySprintCreated, notifyFolderCreated } = require("./helpers/sprintHistory");
 const { ListWriteError, prepareSprintUpdate, prepareFolderUpdate } = require("./helpers/listWrites");
 const { folderForList, parentForNewFolder, prepareFolderMove } = require("./helpers/folderTree");
-const { announceList, announceFolder } = require("./helpers/listEvents");
+const { announceList, announceListCount, announceFolder } = require("./helpers/listEvents");
 
 const namedFolderId = (folder) => (folder && typeof folder === 'object' && folder.folderId ? folder.folderId : '');
 
@@ -364,8 +364,6 @@ exports.updateSprint = async (req, res) => {
     }
 };
 
-/* A list's task count moves with every task write and is read again by the lists that show it; only a change
-   to the list itself is announced. */
 const changesTheList = (updateObject) => Object.keys(updateObject || {}).some((operator) => operator !== '$inc');
 
 exports.updateSprintFun = (req, { sharedBefore } = {}) => {
@@ -430,6 +428,7 @@ exports.updateSprintFun = (req, { sharedBefore } = {}) => {
 
                 resolve({ status: true, statusText: "Sprint_updated_successfully",data:response });
                 if (changesTheList(updateObject)) announceList('update', companyId, response, sharedBefore);
+                else announceListCount(companyId, response);
                 if(mainChat) return;
 
                 // CASCADE A FOLDER MOVE ONTO THIS SPRINT'S TASKS.

@@ -164,6 +164,7 @@ import { useCustomComposable } from "@/composable";
 import isEqual from 'lodash/isEqual';
 import { taskListHelper } from '@/views/Projects/helper.js';
 import { useTaskEmptyState } from '@/views/Projects/composables/useTaskEmptyState.js';
+import { visibleTaskCount as countShown } from './visibleTaskCount';
 import { openTask, useTaskSequenceSource } from '@/components/organisms/TaskDetailOverlay/useTaskOverlay';
 import { useViewSettings } from '@/views/Projects/composables/viewSettingsContext';
 import { useListRowEdit } from '@/views/Projects/ListView/useListInlineEdit.js';
@@ -275,15 +276,9 @@ const isSprintOpen = (sprint) => expandedSprints.value.includes(sprintKey(sprint
 
 const createSprint = computed(() => groupedTasks.value.find((sprint) => isSprintOpen(sprint)) || props.sprints[0]);
 
-/* Collapsed sprints are never fetched, so the store can only answer for what is
-   open; the sprint counters cover the rest. */
-const visibleTaskCount = computed(() => {
-    if (searchedTask?.value) return (getters['projectData/searchedTasks'] || []).length;
-    const store = taskData.value?.[props.projectData?._id];
-    const loaded = (store?.sprints || []).reduce((total, id) => total + (store?.[id]?.tasks?.length || 0), 0);
-    return loaded || groupedTasks.value.reduce((total, sprint) => total
-        + (showArchiveVar?.value ? (sprint.archiveTaskCount || 0) : (sprint.tasks || 0)), 0);
-});
+const visibleTaskCount = computed(() => (searchedTask?.value
+    ? (getters['projectData/searchedTasks'] || []).length
+    : countShown({ stored: taskData.value?.[props.projectData?._id], sprints: groupedTasks.value, archive: Boolean(showArchiveVar?.value) })));
 const hasRows = computed(() => Boolean(groupedTasks.value.length && visibleTaskCount.value));
 
 function syncExpandedSprints(sprints) {

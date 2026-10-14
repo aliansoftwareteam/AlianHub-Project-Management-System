@@ -98,7 +98,7 @@ test.describe('joining by invitation', () => {
         expect(answers.refused).toEqual([]);
     });
 
-    test('making an account on the invitation page, then signing in, opens the workspace with no refused request', async ({ page, state, loginAs }) => {
+    test('making an account on the invitation page signs the person in and opens the workspace with no refused request', async ({ page, state, loginAs }) => {
         const owner = await loginAs('owner');
         const email = `newcomer.${uniqueSuffix()}@e2e.alianhub.test`;
         const invitation = await sendInvitation({ ownerApi: owner.api, companyId: state.companyId, role: 'member', email });
@@ -110,16 +110,7 @@ test.describe('joining by invitation', () => {
         await page.locator('#inv-password').fill(PASSWORD);
         await page.getByRole('button', { name: 'Continue', exact: true }).click();
 
-        // The page signs the new account out a moment after it sends it to the sign-in page.
-        await expect(page).toHaveURL(/#\/login/);
-        await page.waitForFunction("window.localStorage.getItem('selectedCompany') === null");
-
-        await signInThroughForm(page, { email, password: PASSWORD, companyId: state.companyId });
-        await expect(page.getByRole('navigation', { name: 'Primary' })).toBeVisible();
-        await firstScreenSettled(page);
-
-        expect(answers.answered).toBeGreaterThan(0);
-        expect(answers.refused).toEqual([]);
+        await joinedWorkspaceOpens(page, state, answers);
     });
 });
 

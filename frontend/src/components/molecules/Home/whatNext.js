@@ -37,10 +37,25 @@ export function whatNext({ approvals = 0, waiting = 0, overdue = 0, today = 0, s
     return step(NEXT.CLEAR);
 }
 
+const dueCounts = (groups, keep) => ({
+    overdue: groups.overdue.filter(keep).length,
+    today: groups.today.filter(keep).length,
+    soon: dueSoon(groups.next.filter(keep)),
+});
+
+/* The sample project's tasks are due from the first day; the person's own come first whenever they have any due. */
+export function dueCountsPreferringOwn(groups, sampleProjectId) {
+    const all = dueCounts(groups, () => true);
+    const sample = String(sampleProjectId || "");
+    if (!sample) return all;
+    const own = dueCounts(groups, (task) => String(task.ProjectID || "") !== sample);
+    return own.overdue + own.today + own.soon > 0 ? own : all;
+}
+
 /* Every number comes from a read the linked screen makes itself: the Inbox's counts for its approval tab,
  * the rows My work lists, the rows the Waiting on you card holds. Nothing is counted here. Only what was filed
  * for the person asks for their approval; what waits for the rest of the team is a quieter link. */
-export function useWhatNext({ work, waiting, empty, canCreateProject, canOpenInbox }) {
+export function useWhatNext({ work, waiting, empty, canCreateProject, canOpenInbox, sampleProjectId }) {
     const approvals = ref(0);
     const team = ref(0);
     const counted = ref(false);
@@ -65,14 +80,11 @@ export function useWhatNext({ work, waiting, empty, canCreateProject, canOpenInb
 
     const next = computed(() => {
         if (!counted.value || !work.loaded.value) return null;
-        const groups = work.groups.value;
         return whatNext({
             approvals: approvals.value,
             // The Waiting on you card lists the team's proposals too; those are the quieter link, not a step.
             waiting: Math.max(0, (Number(unref(waiting)) || 0) - team.value),
-            overdue: groups.overdue.length,
-            today: groups.today.length,
-            soon: dueSoon(groups.next),
+            ...dueCountsPreferringOwn(work.groups.value, unref(sampleProjectId)),
             empty: unref(empty),
             canCreateProject: unref(canCreateProject)
         });

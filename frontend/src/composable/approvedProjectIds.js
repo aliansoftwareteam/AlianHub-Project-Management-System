@@ -8,6 +8,11 @@ export const madeProjectIds = (approvalAnswer) => distinct(listOf(approvalAnswer
     .filter((change) => change && change.ok === true && MAKES_A_PROJECT.includes(change.action))
     .map((change) => change.result?.projectId));
 
+/* The project an approval made or changed, so the finished card can open it. */
+export const openedProjectId = (approvalAnswer) => distinct(listOf(approvalAnswer?.applied)
+    .filter((change) => change && change.ok === true)
+    .map((change) => change.result?.projectId))[0] || "";
+
 /* An undo that could not trash the project (it holds work by then) answers ok: false for that part, and the project stays listed. */
 export const trashedProjectIds = (undoAnswer) => distinct(listOf(undoAnswer?.results)
     .filter((part) => part && part.ok === true && part.result?.trashed === true)

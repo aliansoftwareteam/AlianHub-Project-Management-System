@@ -5,7 +5,7 @@
                 <button type="button" class="pls__star-btn" :class="{ 'is-on': isStarred('project', item?._id), 'pls__star-btn--locked': activeTab !== 0 }" :title="$t('Projects.favourite')" :aria-label="$t('Projects.favourite')" :aria-pressed="isStarred('project', item?._id)" @click="!item.isRestrict ? updateFavourite(item) : ''">
                     <span class="ah-mask-icon pls__star" :style="maskOf(isStarred('project', item?._id) ? projectStar : blankStar)" aria-hidden="true"></span>
                 </button>
-                <span class="ProjectFirstLatter d-flex align-items-center justify-content-center text-uppercase" v-if="item.projectIcon.type === 'color'" :style="[{'background-color': item.projectIcon.type === 'color' ? item.projectIcon.data : ''}]">{{item.ProjectName ? item.ProjectName.charAt(0) : ''}}</span>
+                <span class="ah-letter-tile ProjectFirstLatter d-flex align-items-center justify-content-center text-uppercase" v-if="item.projectIcon.type === 'color'" :style="[{'background-color': item.projectIcon.type === 'color' ? item.projectIcon.data : ''}]">{{item.ProjectName ? item.ProjectName.charAt(0) : ''}}</span>
                 <WasabiImage
                     v-else
                     :style="[{'height': '20px','width': '20px','border-radius': '20px','margin-left': '5px'}]"

@@ -261,7 +261,7 @@ describe('approving makes the project as the web app would, as the person who ap
 
         expect(project.descriptionBlock.blocks).toEqual([{ type: 'paragraph', data: { text: 'Everything for the new site.' } }]);
         expect(project.taskStatusData.map((status) => status.name)).toEqual(['To Do', 'In Progress', 'In Review', 'Done']);
-        expect(listsOf(projectId)).toEqual(['List', 'Backlog', 'This week']);
+        expect(listsOf(projectId)).toEqual(['Backlog', 'This week']);
         expect(fieldsOf(projectId)).toEqual(['Budget']);
         expect(project.ProjectRequiredComponent.map((view) => view.title || view.name)).toEqual(['List', 'Board', 'Review board']);
         expect(partOf(result, 'views').items).toEqual([expect.objectContaining({ name: 'Review board', kind: 'board', made: true, leftOut: [] })]);
@@ -278,7 +278,7 @@ describe('approving makes the project as the web app would, as the person who ap
         expect(project.ProjectName).toBe(NAME);
         expect(out.applied[0].result.parts.map((part) => part.part)).toEqual(['description', 'lists', 'fields']);
         expect(project.taskStatusData.map((status) => status.name)).toEqual(['To Do', 'In Progress', 'Done']);
-        expect(listsOf(project._id)).toEqual(['List', 'This week']);
+        expect(listsOf(project._id)).toEqual(['This week']);
         expect(fieldsOf(project._id)).toEqual(['Budget']);
         expect(project.ProjectRequiredComponent.map((view) => view.title || view.name)).toEqual(['List', 'Board']);
 
@@ -388,7 +388,7 @@ describe('a part of a new project\'s plan the person reading may not make', () =
         const out = await approveWith(id, INSIDER, { 0: { lists: [0] } });
         expect(out.error).toBeUndefined();
         const projectId = String(made()._id);
-        expect(listsOf(projectId)).toEqual(['List', 'Backlog']);
+        expect(listsOf(projectId)).toEqual(['Backlog']);
         expect(out.left).toEqual({ waiting: [expect.any(String)], retry: [] });
         const [left] = out.left.waiting;
         expect(stored(SCHEMA_TYPE.AGENT_PROPOSALS, left)).toMatchObject({ status: 'pending', splitFrom: id, what: 'Set up a project', requestedBy: OWNER });
@@ -400,7 +400,7 @@ describe('a part of a new project\'s plan the person reading may not make', () =
         expect(done.error).toBeUndefined();
         expect(projectsNamed()).toHaveLength(1);
         expect(made().taskStatusData.map((status) => status.name)).toContain('Blocked');
-        expect(listsOf(projectId)).toEqual(['List', 'Backlog']);
+        expect(listsOf(projectId)).toEqual(['Backlog']);
         expect(waiting()).toHaveLength(0);
     });
 
@@ -416,7 +416,7 @@ describe('a part of a new project\'s plan the person reading may not make', () =
         expect((await approveWith(again, INSIDER)).error).toBeUndefined();
         expect(fieldsOf(projectId)).toEqual(['Budget']);
         expect(projectsNamed()).toHaveLength(1);
-        expect(listsOf(projectId)).toEqual(['List', 'Backlog']);
+        expect(listsOf(projectId)).toEqual(['Backlog']);
     });
 
     it('offers nothing again where the person who asked is not on the new project', async () => {

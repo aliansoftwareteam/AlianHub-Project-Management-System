@@ -111,6 +111,10 @@
     --row-lines: 2;
     --avatar-size: 22px;
     --avatar-font: 10px;
+    /* A project's letter tile sits on a colour the person picked, in either theme; the scrim keeps white letters
+       readable on every colour the app offers (#6473e8 goes from 4.07:1 to 6.5:1). */
+    --tile-ink: #ffffff;
+    --tile-scrim: rgba(0, 0, 0, .25);
     --chip-h: 20px;
     --chip-font: 11px;
     --hit-min: 24px;

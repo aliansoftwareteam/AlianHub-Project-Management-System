@@ -111,7 +111,6 @@ import { useToast } from "vue-toast-notification";
 import AuthShell from "@/components/templates/AuthShell/AuthShell.vue";
 import ProviderButton from "@/plugins/oauth/ProviderButton.vue";
 import ShellIcon from "@/components/organisms/Shell/ShellIcon.vue";
-import { useCustomComposable } from "@/composable";
 import { apiRequest, apiRequestWithoutCompnay, apiRequestWithoutSecure, getAuth, useAuth } from "@/services";
 import * as env from "@/config/env";
 import { connectAiWelcomePath } from "@/router/ai/connect";
@@ -126,7 +125,6 @@ const axios = inject("$axios");
 const addSubscription = inject("addSubscription");
 const openCompany = inject("$companyId", null);
 const { getters } = useStore();
-const { debouncerWithPromise } = useCustomComposable();
 const { logOut } = useAuth();
 
 const brand = computed(() => getters["brandSettingTab/brandSettings"] || {});
@@ -210,6 +208,7 @@ const submit = async () => {
     if (!validate() || busy.value) return;
     busy.value = true;
     banner.value = "";
+    let signedIn = false;
     try {
         const response = await apiRequestWithoutCompnay("post", env.CREATE_USER_V2, {
             ...splitName(form.name),
@@ -227,6 +226,8 @@ const submit = async () => {
         }
         const user = await apiRequestWithoutSecure("post", env.LOGIN, { email: email.value, password: form.password });
         if (user.status !== 200) { logOut({ islogOut: true }); banner.value = t("Auth.server_error"); return; }
+        signedIn = true;
+        localStorage.setItem("userId", String(user.data.uid));
         await getAuth(user.data.uid, true);
         localStorage.setItem("selectedCompany", companyIdRoute.value);
         const signedInUserId = String(user.data.uid);
@@ -244,16 +245,22 @@ const submit = async () => {
             }).catch((error) => console.error(error));
             try { addSubscription(companyIdRoute.value, response); } catch { /* optional plugin */ }
         }
-        apiRequest("post", env.IMPORT_NOTIFICATION_SETTING, { companyId: companyIdRoute.value, userId: signedInUserId })
-            .catch((error) => console.error("ERROR in user notification settings: ", error.message));
-        apiRequest("post", env.REMOVE_USER_NOTIFICATION, { companyId: companyIdRoute.value, userId: signedInUserId, type: "Add" })
-            .catch((error) => console.error(error, "ERROR"));
-        localStorage.setItem("isLogging", "false");
+        localStorage.setItem("isLogging", "true");
         $toast.success(t("Toast.User_has_been_registered_successfully"), { position: "top-right" });
-        router.push({ name: "Log-in" });
-        debouncerWithPromise(1000).then(() => logOut({ islogOut: true, withOutRefresh: true }));
+        // The session was issued before the invitation was accepted; a fresh one carries the workspace, and the
+        // workspace's own routes below answer only to that one. They finish before the page reloads.
+        await getAuth(signedInUserId);
+        await Promise.all([
+            apiRequest("post", env.IMPORT_NOTIFICATION_SETTING, { companyId: companyIdRoute.value, userId: signedInUserId })
+                .catch((error) => console.error("ERROR in user notification settings: ", error.message)),
+            apiRequest("post", env.REMOVE_USER_NOTIFICATION, { companyId: companyIdRoute.value, userId: signedInUserId, type: "Add" })
+                .catch((error) => console.error(error, "ERROR")),
+        ]);
+        await openJoinedWorkspace();
     } catch (error) {
         console.error(error);
+        // No session may outlive a join that did not finish: the account would be signed in with no workspace.
+        if (signedIn) logOut({ islogOut: true });
         banner.value = t("Auth.server_error");
     } finally {
         busy.value = false;
@@ -261,6 +268,14 @@ const submit = async () => {
 };
 
 const switchAccount = () => logOut({ islogOut: true });
+
+const openJoinedWorkspace = async () => {
+    // A person who had no workspace: the app holds no company, would look the new address up in the empty list it
+    // loaded before this one was joined, and send them to name a workspace. Told which one is open, it does not.
+    if (openCompany && !openCompany.value) openCompany.value = companyIdRoute.value;
+    await router.replace(connectAiWelcomePath(companyIdRoute.value));
+    window.location.reload();
+};
 
 const acceptInvitation = async () => {
     if (busy.value) return;
@@ -272,11 +287,7 @@ const acceptInvitation = async () => {
         // The session's workspaces are fixed when its token is issued; a fresh one includes the one just joined.
         await getAuth(localStorage.getItem("userId"));
         localStorage.setItem("selectedCompany", companyIdRoute.value);
-        // A person who had no workspace: the app holds no company, would look the new address up in the empty list it
-        // loaded before this one was joined, and send them to name a workspace. Told which one is open, it does not.
-        if (openCompany && !openCompany.value) openCompany.value = companyIdRoute.value;
-        await router.replace(connectAiWelcomePath(companyIdRoute.value));
-        window.location.reload();
+        await openJoinedWorkspace();
     } catch (error) {
         console.error(error);
         // A refusal means the invitation is gone; a server failure left it waiting, and the same button works again.

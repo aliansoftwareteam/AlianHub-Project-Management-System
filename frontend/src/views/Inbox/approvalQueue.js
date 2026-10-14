@@ -1,4 +1,4 @@
-import { madeProjectIds, trashedProjectIds } from '@/composable/approvedProjectIds';
+import { madeProjectIds, openedProjectId, trashedProjectIds } from '@/composable/approvedProjectIds';
 
 const refusalOf = (source, fallback) => source?.response?.data?.statusText || source?.data?.statusText || source?.message || fallback;
 
@@ -29,7 +29,7 @@ export const decideOne = async (send, id, verb, body, fallback) => {
         const res = await send(id, verb, body);
         if (!res?.data?.status) return { id, ok: false, error: refusalOf(res, fallback) };
         const data = res.data.data || {};
-        return { id, ok: true, undo: Boolean(data.undoUntil), unapplied: unappliedOf(data), left: keptByUndo(data), later: laterOf(data), standing: data.standing || null, madeProjects: madeProjectIds(data), trashedProjects: trashedProjectIds(data) };
+        return { id, ok: true, undo: Boolean(data.undoUntil), unapplied: unappliedOf(data), left: keptByUndo(data), later: laterOf(data), standing: data.standing || null, madeProjects: madeProjectIds(data), opens: openedProjectId(data), trashedProjects: trashedProjectIds(data) };
     } catch (error) {
         return { id, ok: false, error: refusalOf(error, fallback) };
     }

@@ -34,7 +34,7 @@
                 <DropDown mode="menu" maxHeight="64dvh" class="audio_dropdown" :bodyClass="{'assigneelist-audiofile-dropdown' : true}">
                     <template #head v-if="clientWidth <= 767">
                         <div class="mobiledropdown-projecttitleimage-wrapper">
-                            <span v-if="projectData?.projectIcon && projectData?.projectIcon.type === 'color'" class="d-flex align-items-center justify-content-center ml-9px" :class="{'inital-box' : clientWidth > 767 , 'project-firtsleeter-box' : clientWidth <=767}" :style="[{'background-color': projectData?.projectIcon.data}]">{{ projectData?.ProjectName.charAt(0).toUpperCase() }}</span>
+                            <span v-if="projectData?.projectIcon && projectData?.projectIcon.type === 'color'" class="ah-letter-tile d-flex align-items-center justify-content-center ml-9px" :class="{'inital-box' : clientWidth > 767 , 'project-firtsleeter-box' : clientWidth <=767}" :style="[{'background-color': projectData?.projectIcon.data}]">{{ projectData?.ProjectName.charAt(0).toUpperCase() }}</span>
                             <template v-else-if="projectData?.projectIcon && projectData?.projectIcon?.type === 'image'">
                                 <WasabiImage thumbnail="60x60" class="profile-sm-square mobile-projectlist-icon" v-if="!projectData.projectIcon.data.includes('http')" :data="{url: projectData.projectIcon.data, filename: projectData.projectIcon.data.split('/').pop(), extension: projectData.projectIcon.data.split('/').pop().split('.').pop()}"/>
                                 <img v-else class="profile-sm-square mobile-projectlist-icon" :src="projectData.projectIcon.data" alt=""/>
