@@ -20,9 +20,9 @@ Please read this guide carefully before submitting issues or pull requests.
 
 ### 3. Submitting Pull Requests
 - Fork the repository (external contributors) or branch directly (maintainers)
-- Create a topic branch from the latest `beta` — **not** `main`
+- Create a topic branch from the latest `staging` — **not** `main`
 - Keep changes focused and minimal
-- Open the PR against `beta` (not `main`); `beta` is promoted to `staging` and then `main`
+- Open the PR against `staging` (not `main`); `staging` is promoted to `main` at release time
 - CI (`.github/workflows/ci.yml`) must be green: backend lint + Jest, frontend lint + Vitest + build
 
 > 📘 See [BRANCHING.md](BRANCHING.md) for the full branching strategy, including hotfix and release workflows.
