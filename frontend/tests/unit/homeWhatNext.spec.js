@@ -13,7 +13,7 @@ vi.mock('@/utils/TaskOperations', () => ({ default: {} }));
 vi.mock('@/utils/NotificationTemplate', () => ({ taskDueDateAdd: vi.fn(), taskDueDateChange: vi.fn() }));
 
 import * as env from '@/config/env';
-import { NEXT, useWhatNext, whatNext } from '@/components/molecules/Home/whatNext';
+import { NEXT, dueCountsPreferringOwn, useWhatNext, whatNext } from '@/components/molecules/Home/whatNext';
 import HomeWhatNext from '@/components/molecules/Home/HomeWhatNext.vue';
 import { useMyWork } from '@/components/molecules/Home/useMyWork';
 
@@ -185,5 +185,31 @@ describe('the line on Home', () => {
         await link.trigger('click');
         expect(wrapper.emitted('act')).toEqual([[NEXT.TEAM]]);
         expect(mount(HomeWhatNext, { props: { next: { kind: NEXT.CLEAR, count: 0 }, team: 0 } }).find('[data-test="home-next-team"]').exists()).toBe(false);
+    });
+});
+
+describe('what next, on a workspace that started with the sample project', () => {
+    const SAMPLE = 'sample-1';
+    const groupsOf = (tasks) => ({
+        overdue: tasks.filter((t) => moment(t.DueDate).isBefore(moment().startOf('day'))),
+        today: tasks.filter((t) => moment(t.DueDate).isSame(moment(), 'day')),
+        next: tasks.filter((t) => moment(t.DueDate).isAfter(moment().endOf('day'))),
+    });
+
+    it('points at the person\'s own work before the sample project\'s', () => {
+        const groups = groupsOf([task('start-here', day(0), { ProjectID: SAMPLE }), task('book-movers', day(3), { ProjectID: 'move' })]);
+        const counts = dueCountsPreferringOwn(groups, SAMPLE);
+        expect(counts).toEqual({ overdue: 0, today: 0, soon: 1 });
+        expect(whatNext(counts)).toEqual({ kind: NEXT.SOON, count: 1 });
+    });
+
+    it('falls back to the sample project while the person has nothing of their own due', () => {
+        const groups = groupsOf([task('start-here', day(0), { ProjectID: SAMPLE }), task('someday', day(30), { ProjectID: 'move' })]);
+        expect(whatNext(dueCountsPreferringOwn(groups, SAMPLE))).toEqual({ kind: NEXT.TODAY, count: 1 });
+    });
+
+    it('counts everything when there is no sample project', () => {
+        const groups = groupsOf([task('a', day(0)), task('b', day(-2))]);
+        expect(dueCountsPreferringOwn(groups, '')).toEqual({ overdue: 1, today: 1, soon: 0 });
     });
 });
