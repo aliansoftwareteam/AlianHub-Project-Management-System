@@ -22,7 +22,7 @@ const planViews = require('./planViews');
 const planDashboard = require('./planDashboard');
 const planPicks = require('./planPicks');
 const sseEmitter = require('./sseEmitter');
-const { PLAN_TTL_SECONDS, PLAN_EXPIRED, cacheKey, rememberPlan, storedPlan, storedGuide, claimPlan, releasePlan, forgetPlan } = require('./planStash');
+const { PLAN_EXPIRED, PLAN_IN_USE, PLANS_BUSY, cacheKey, rememberPlan, hasRoomForPlan, storedPlan, storedGuide, claimPlan, releasePlan, keepClaimWhile, isClaimed, forgetPlan, rememberTasksPlan, storedTasksPlan, forgetTasksPlan } = require('./planStash');
 const orchestrator = require('./orchestrator');
 const clarifier = require('./clarifier');
 const memoryStore = require('../Agents/memory');
@@ -295,6 +295,11 @@ async function generatePlanForJob({ jobId, uid, companyId, description, addition
         Object.assign(plan, planPicks.marksOf(await planPicks.locksFor({ companyId, uid, plan })));
 
         const planId = rememberPlan({ uid, companyId, plan, approvedBrief, assumptions });
+        if (!planId) {
+            const busy = new Error(PLANS_BUSY);
+            busy.code = 'PLANS_BUSY';
+            throw busy;
+        }
 
         emit({
             event: 'complete',
@@ -412,6 +417,7 @@ exports.plan = async (req, res) => {
         const approvedBrief = String((req.body && req.body.approvedBrief) || '').trim().slice(0, MAX_APPROVED_BRIEF_CHARS);
         if (approvedBrief.length < 20 && description.length < 20) return sendError(res, 400, 'Description must be at least 20 characters');
         const assumptions = sanitizeAssumptions(req.body && req.body.assumptions);
+        if (!hasRoomForPlan(uid)) return plansBusy(res);
 
         // "Additional requirements" textarea from Step 1 of the wizard — the
         // single biggest "match my requirements" lever. Capped at 2000 chars
@@ -650,6 +656,7 @@ exports.execute = async (req, res) => {
         const planId = req.body && req.body.planId;
         const stored = storedPlan({ uid, companyId, planId });
         if (!stored) return planExpired(res);
+        if (isClaimed({ uid, planId })) return planInUse(res);
         let plan = JSON.parse(JSON.stringify(stored.plan));
         const { approvedBrief, assumptions } = stored;
         const guide = editedGuide(storedGuide({ uid, companyId, planId }), req.body && req.body.edits);
@@ -730,7 +737,8 @@ exports.execute = async (req, res) => {
             companyOwnerId: companyId,
         };
 
-        if (!claimPlan({ uid, planId })) return planExpired(res);
+        const claim = { uid, planId, token: claimPlan({ uid, planId }) };
+        if (!claim.token) return storedPlan({ uid, companyId, planId }) ? planInUse(res) : planExpired(res);
         const jobId = token();
 
         // Reply right away with the jobId; client opens SSE on /execute/events/:jobId.
@@ -739,10 +747,10 @@ exports.execute = async (req, res) => {
         // Tiny delay so the client has time to attach the SSE listener before
         // we start emitting (otherwise an instant-success run can race).
         setTimeout(() => {
-            orchestrator.executePlan({ plan, companyId, uid: String(uid), userData, jobId, approvedBrief, assumptions, guide, withGuideAgent: picked.withGuideAgent })
-                .then((out) => (out && out.ok ? forgetPlan({ uid, planId }) : releasePlan({ uid, planId })))
+            keepClaimWhile(claim, orchestrator.executePlan({ plan, companyId, uid: String(uid), userData, jobId, approvedBrief, assumptions, guide, withGuideAgent: picked.withGuideAgent }))
+                .then((out) => (out && out.ok ? forgetPlan(claim) : releasePlan(claim)))
                 .catch((e) => {
-                    releasePlan({ uid, planId });
+                    releasePlan(claim);
                     logger.error(`AIPG execute error: ${e && e.message ? e.message : e}`);
                 });
         }, 200);
@@ -753,12 +761,15 @@ exports.execute = async (req, res) => {
 };
 
 const planExpired = (res) => res.status(410).send({ status: false, statusText: PLAN_EXPIRED, code: 'PLAN_EXPIRED' });
+const planInUse = (res) => res.status(409).send({ status: false, statusText: PLAN_IN_USE, code: 'PLAN_IN_USE' });
+const plansBusy = (res) => res.status(409).send({ status: false, statusText: PLANS_BUSY, code: 'PLANS_BUSY' });
 
-/* The Guide's text is the person's to reword before the project is made; the guide itself stays the server's. */
+/* The Guide's text is the person's to reword, or clear, before the project is made; the guide itself stays the server's. */
 function editedGuide(guide, edits) {
     if (!guide) return null;
-    const markdown = edits && typeof edits.guideMarkdown === 'string' ? edits.guideMarkdown.slice(0, MAX_GUIDE_MARKDOWN_CHARS) : '';
-    return markdown.trim() ? { ...guide, markdown } : guide;
+    if (!edits || typeof edits.guideMarkdown !== 'string') return guide;
+    const markdown = edits.guideMarkdown.slice(0, MAX_GUIDE_MARKDOWN_CHARS);
+    return { ...guide, markdown: markdown.trim() ? markdown : '' };
 }
 
 function applyEdits(plan, edits) {
@@ -918,13 +929,7 @@ async function generateTasksPlanForJob({ jobId, uid, companyId, projectId, addit
         }
         plan = reCheck.data;
 
-        const planId = token();
-        myCache.set(cacheKey('tasksplan', uid, planId), {
-            companyId,
-            projectId: String(projectId),
-            plan,
-            createdAt: Date.now(),
-        }, PLAN_TTL_SECONDS);
+        const planId = rememberTasksPlan({ uid, companyId, projectId, mode, plan });
 
         emit({
             event: 'complete',
@@ -1016,18 +1021,18 @@ exports.tasksExecute = async (req, res) => {
             return sendError(res, 400, 'targetSprintId required for tasks mode');
         }
 
-        let plan = req.body && req.body.plan;
-        if (!plan || typeof plan !== 'object') return sendError(res, 400, 'plan required in request body');
-
-        // Never trust a client-supplied plan — re-validate server-side with the
-        // schema for the requested mode.
-        const reCheck = tasksPlanSchemaForMode(mode).safeParse(plan);
-        if (!reCheck.success) {
-            const issues = reCheck.error.issues.map((i) => `${i.path.join('.')}: ${i.message}`).join('\n');
-            return sendError(res, 400, `Plan failed validation: ${issues}`);
-        }
-        plan = reCheck.data;
         if (!(await guardTaskTarget(res, { companyId, uid, projectId, mode }))) return;
+
+        const planId = req.body && req.body.planId;
+        const stored = storedTasksPlan({ uid, companyId, projectId, planId });
+        if (!stored) return planExpired(res);
+        if (stored.mode !== mode) return sendError(res, 400, 'mode does not match the generated plan');
+        if (isClaimed({ uid, planId, kind: 'tasksplan' })) return planInUse(res);
+        const keep = req.body && req.body.keep;
+        if (!Array.isArray(keep)) return sendError(res, 400, 'keep must be a list of item places');
+        const reCheck = tasksPlanSchemaForMode(mode).safeParse(keptTaskPlan(stored.plan, mode, keep));
+        if (!reCheck.success) return sendError(res, 400, 'Keep at least one item of the plan.');
+        let plan = reCheck.data;
 
         let currentUserName = '';
         let allowed = new Set();
@@ -1045,12 +1050,16 @@ exports.tasksExecute = async (req, res) => {
             companyOwnerId: companyId,
         };
 
+        const claim = { uid, planId, kind: 'tasksplan', token: claimPlan({ uid, planId, kind: 'tasksplan' }) };
+        if (!claim.token) return storedTasksPlan({ uid, companyId, projectId, planId }) ? planInUse(res) : planExpired(res);
         const jobId = token();
         res.send({ status: true, jobId });
 
         setTimeout(() => {
-            orchestrator.executeTasksIntoProject({ tasksPlan: plan, projectId, companyId, uid: String(uid), userData, jobId, mode, targetSprintId })
+            keepClaimWhile(claim, orchestrator.executeTasksIntoProject({ tasksPlan: plan, projectId, companyId, uid: String(uid), userData, jobId, mode, targetSprintId }))
+                .then((out) => (out && out.ok ? forgetTasksPlan(claim) : releasePlan(claim)))
                 .catch((e) => {
+                    releasePlan(claim);
                     logger.error(`AIPG tasksExecute error: ${e && e.message ? e.message : e}`);
                 });
         }, 200);
@@ -1059,6 +1068,32 @@ exports.tasksExecute = async (req, res) => {
         return sendError(res, 500, error && error.message ? error.message : 'Execute failed');
     }
 };
+
+/* `keep` names the items to make, by place: tasks counted across the lists in order, or lists in sprints mode.
+ * Links, epics and fields stay only where a kept task names them. */
+function keptTaskPlan(plan, mode, keep) {
+    const copy = JSON.parse(JSON.stringify(plan));
+    const places = new Set(keep.filter((at) => Number.isInteger(at) && at >= 0));
+    if (mode === 'sprints') return { ...copy, sprints: (copy.sprints || []).filter((sprint, at) => places.has(at)) };
+    let narrowed;
+    if (mode === 'tasks') {
+        narrowed = { ...copy, tasks: (copy.tasks || []).filter((task, at) => places.has(at)) };
+    } else {
+        let flat = 0;
+        const sprints = (copy.sprints || [])
+            .map((sprint) => ({ ...sprint, tasks: (sprint.tasks || []).filter(() => places.has(flat++)) }))
+            .filter((sprint) => sprint.tasks.length);
+        narrowed = { ...copy, sprints };
+    }
+    const tasks = mode === 'tasks' ? narrowed.tasks : narrowed.sprints.flatMap((sprint) => sprint.tasks);
+    const refs = new Set(tasks.map((task) => task.ref).filter(Boolean));
+    const epics = new Set(tasks.map((task) => task.epicRef).filter(Boolean));
+    const fields = new Set(tasks.flatMap((task) => (task.fieldValues || []).map((value) => value.fieldRef)));
+    if (Array.isArray(narrowed.links)) narrowed.links = narrowed.links.filter((link) => refs.has(link.from) && refs.has(link.to));
+    if (Array.isArray(narrowed.epics)) narrowed.epics = narrowed.epics.filter((epic) => epics.has(epic.ref));
+    if (Array.isArray(narrowed.customFields)) narrowed.customFields = narrowed.customFields.filter((field) => fields.has(field.ref));
+    return narrowed;
+}
 
 exports.events = (req, res) => sseEmitter.handleEvents(req, res);
 exports.loadActiveMembers = loadActiveMembers;

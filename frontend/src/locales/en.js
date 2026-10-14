@@ -3637,6 +3637,8 @@ export default {
         plan_empty: "The AI did not return a plan. Please try again.",
         plan_expired: "This plan has expired. Generate it again.",
         generate_again: "Generate again",
+        plan_in_use: "This plan is already being built. Wait for it to finish.",
+        plans_busy: "Your last plans are all being built. Wait for one to finish, then generate again.",
         execute_failed: "Execution failed",
         clarify_failed: "Couldn't draft clarifying questions",
         clarify_skip_all: "Skip and generate plan",
@@ -3656,6 +3658,8 @@ export default {
         key_enter: "Enter",
     },
     AiTask: {
+        plan_expired: "This plan has expired. Generate it again.",
+        plan_in_use: "These items are already being created. Wait for it to finish.",
         title: "Plan with AI",
         subtitle: "Draft lists and tasks for this project from your requirements — you review before anything is created.",
         close: "Close",
