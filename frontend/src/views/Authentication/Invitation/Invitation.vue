@@ -245,14 +245,17 @@ const submit = async () => {
             }).catch((error) => console.error(error));
             try { addSubscription(companyIdRoute.value, response); } catch { /* optional plugin */ }
         }
-        apiRequest("post", env.IMPORT_NOTIFICATION_SETTING, { companyId: companyIdRoute.value, userId: signedInUserId })
-            .catch((error) => console.error("ERROR in user notification settings: ", error.message));
-        apiRequest("post", env.REMOVE_USER_NOTIFICATION, { companyId: companyIdRoute.value, userId: signedInUserId, type: "Add" })
-            .catch((error) => console.error(error, "ERROR"));
         localStorage.setItem("isLogging", "true");
         $toast.success(t("Toast.User_has_been_registered_successfully"), { position: "top-right" });
-        // The session was issued before the invitation was accepted; a fresh one carries the workspace.
+        // The session was issued before the invitation was accepted; a fresh one carries the workspace, and the
+        // workspace's own routes below answer only to that one. They finish before the page reloads.
         await getAuth(signedInUserId);
+        await Promise.all([
+            apiRequest("post", env.IMPORT_NOTIFICATION_SETTING, { companyId: companyIdRoute.value, userId: signedInUserId })
+                .catch((error) => console.error("ERROR in user notification settings: ", error.message)),
+            apiRequest("post", env.REMOVE_USER_NOTIFICATION, { companyId: companyIdRoute.value, userId: signedInUserId, type: "Add" })
+                .catch((error) => console.error(error, "ERROR")),
+        ]);
         await openJoinedWorkspace();
     } catch (error) {
         console.error(error);

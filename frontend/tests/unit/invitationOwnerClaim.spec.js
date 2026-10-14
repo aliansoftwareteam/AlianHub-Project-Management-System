@@ -104,6 +104,15 @@ describe('Invitation page accepting an invitation', () => {
         expect(reload).toHaveBeenCalled();
     });
 
+    it('sets up the workspace notifications only on the session that carries the workspace, before the reload', async () => {
+        const order = [];
+        mocks.getAuth.mockImplementation(async (uid, first) => { order.push(first ? 'session' : 'renewed session'); });
+        mocks.apiRequest.mockImplementation(async (type, url) => { order.push(url); return { data: { status: true } }; });
+        reload.mockImplementation(() => order.push('reload'));
+        await submitInvitation(3);
+        expect(order).toEqual(['session', 'renewed session', env.IMPORT_NOTIFICATION_SETTING, env.REMOVE_USER_NOTIFICATION, 'reload']);
+    });
+
     it.each([
         ['the member row is refused', () => ({ data: { status: false, statusText: 'Invitation not found.' } }), null],
         ['the member row update throws', () => { throw new Error('network'); }, null],
