@@ -106,7 +106,7 @@
 .mbv__muted { color: var(--ink-2); }
 
 .mbv__bar { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
-.mbv__tab-n { margin-left: 6px; color: var(--ink-2); }
+.mbv__tab-n { margin-left: 6px; color: var(--ink-label); }
 .mbv__search {
     margin-left: auto;
     display: flex;

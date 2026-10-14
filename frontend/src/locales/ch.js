@@ -7443,9 +7443,9 @@ export default {
         "are_you_sure": "您确定吗？",
         "no_revert_msg": "此操作无法撤销！",
         "yes_delete": "是的，删除！",
-        "task_will_become_subtasks_of": "任务将成为以下任务的子任务",
+        "task_moves_under": "{task} will become a subtask of {parent}.",
+        "task_and_subtasks_move_under": "{task} will become a subtask of {parent}. Its own subtasks stay under it and move with it.",
         "Are_you_sure_you_want_to_delete": "您确定要删除",
-        "subtasks_will_become_subtasks_of": "subtasks stay under it and move with it under",
         "unlock_board_view": "解锁看板视图",
         "unlock_project_detail_view": "解锁项目详情视图",
         "unlock_table_view": "解锁表格视图",
@@ -10233,7 +10233,7 @@ export default {
         "mearge_task_into": "合并任务到"
     },
     "Converttolist": {
-        "are_you_sure_convert": "您确定要将此任务转换为列表吗？",
+        "confirm_convert": "您确定要将此任务转换为列表吗？",
         "important": "重要",
         "you_will_lose": "您将丢失所有线程评论，此操作无法撤销。",
         "convert_to_list": "转换为列表"

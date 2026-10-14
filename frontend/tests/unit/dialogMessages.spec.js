@@ -39,13 +39,16 @@ describe('convert to subtask confirmation', () => {
     it('shows task names with markup as text', () => {
         const wrapper = mount(ConfirmationsInTask, {
             props: { modelValue: true, subTaskConfirm: true, task: { TaskName: '<i>one</i>' }, selectedConvertTask: { TaskName: MARKUP } },
-            global: { stubs: { Sidebar: SidebarStub, TaskStatus: true, TaskType: true, Assignee: true, UserProfile: true, DropDown: true, DropDownOption: true, TaskTypeIcon: true } },
+            global: {
+                mocks: { $t: (key, named) => (named ? `${named.task} under ${named.parent}` : key) },
+                stubs: { Sidebar: SidebarStub, TaskStatus: true, TaskType: true, Assignee: true, UserProfile: true, DropDown: true, DropDownOption: true, TaskTypeIcon: true },
+            },
         });
         const message = wrapper.find('.archive-delete-desc');
         expect(unsafe(message.element)).toHaveLength(0);
         expect(message.find('i').exists()).toBe(false);
-        const names = message.findAll('b.black').map((b) => b.text());
-        expect(names).toEqual(['<i>one</i>’s', MARKUP]);
+        const names = message.findAll('b').map((b) => b.text());
+        expect(names).toEqual(['<i>one</i>', MARKUP]);
     });
 });
 

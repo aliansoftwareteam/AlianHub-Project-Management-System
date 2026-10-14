@@ -31,7 +31,7 @@
                     </div>
                     <ConfirmationSidebar
                         v-model="showSidebar"
-                        :title="$t('Converttolist.are_you_sure_convert')"
+                        :title="$t('Converttolist.confirm_convert')"
                         :acceptButtonClass="'btn-primary font-ui'"
                         :acceptButton="$t('Converttolist.convert_to_list')"
                         @confirm="showSidebar = false,convertToListFun()">
@@ -48,7 +48,7 @@
         <div v-if="isFolder === false">
             <ConfirmationSidebar
                 v-model="showSidebar"
-                :title="$t('Converttolist.are_you_sure_convert')"
+                :title="$t('Converttolist.confirm_convert')"
                 :acceptButtonClass="'btn-primary font-ui'"
                 :acceptButton="$t('Converttolist.convert_to_list')"
                 @confirm="showSidebar = false,convertToListFun()">

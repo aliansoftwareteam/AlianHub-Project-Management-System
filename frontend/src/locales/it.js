@@ -7443,9 +7443,9 @@ export default {
         "are_you_sure": "Sei sicuro?",
         "no_revert_msg": "Non sarai in grado di annullarlo!",
         "yes_delete": "Sì, eliminalo!",
-        "task_will_become_subtasks_of": "l'attività diventerà sottoattività di",
+        "task_moves_under": "{task} will become a subtask of {parent}.",
+        "task_and_subtasks_move_under": "{task} will become a subtask of {parent}. Its own subtasks stay under it and move with it.",
         "Are_you_sure_you_want_to_delete": "Sei sicuro di voler eliminare",
-        "subtasks_will_become_subtasks_of": "subtasks stay under it and move with it under",
         "unlock_board_view": "Per sbloccare la vista Board",
         "unlock_project_detail_view": "Per sbloccare la vista Dettagli del progetto",
         "unlock_table_view": "Per sbloccare la vista Tabella",
@@ -10233,7 +10233,7 @@ export default {
         "mearge_task_into": "Unisci Compito in"
     },
     "Converttolist": {
-        "are_you_sure_convert": "Sei sicuro di voler convertire questo compito in una Lista?",
+        "confirm_convert": "Sei sicuro di voler convertire questo compito in una Lista?",
         "important": "Importante",
         "you_will_lose": "Perderai tutti i commenti a thread. Questa azione non può essere annullata",
         "convert_to_list": "Converti in lista"

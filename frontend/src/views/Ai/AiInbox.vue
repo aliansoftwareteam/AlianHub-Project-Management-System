@@ -235,6 +235,7 @@ import { useStore } from "vuex";
 import { useI18n } from "vue-i18n";
 import { useToast } from "vue-toast-notification";
 import moment from "moment";
+import { clockText } from "@/utils/clockText";
 import ShellIcon from "@/components/organisms/Shell/ShellIcon.vue";
 import EmptyState from "@/components/atom/EmptyState/EmptyState.vue";
 import AiFeedback from "@/components/molecules/AiFeedback/AiFeedback.vue";
@@ -389,7 +390,7 @@ const costLine = computed(() => {
 const shortTime = (at) => {
     if (!at) return "";
     const m = moment(at);
-    return m.isSame(moment(), "day") ? m.format("H:mm") : m.fromNow();
+    return m.isSame(moment(), "day") ? clockText(m) : m.fromNow();
 };
 
 watch(selectedApproval, () => { approvalError.value = ""; });
