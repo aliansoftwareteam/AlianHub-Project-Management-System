@@ -255,66 +255,83 @@ Next run: give the newcomer a workspace of their own (or an Admin role), seed on
 
 ## Run 2, 2026-10-14, AI newcomer, path A
 
-Date: 2026-10-14, 12:29 to 12:32 IST. Build: `14.37.0-beta.4`, commit `746d3114` (from `/version`), which holds the run-1 fixes (#1644, #1645, #1646). Observer and newcomer: one QA agent (Claude) playing both, driving a headless browser. Path: A (connect, then say it). Tracker: AP-486.
+Date: 2026-10-14, 12:41 to 12:51 IST. Build: `14.37.0-beta.5`, commit `746d3114` (`staging`), plus the log-in fix in #1678. Observer and newcomer: one QA agent (Claude) playing both. It drove a headless browser (Playwright) for AlianHub and used Claude Code CLI as the newcomer's own AI. Path: A (connect, then say it). Tracker: AP-486.
 
-**An AI newcomer is not a real person**, as in run 1. This run is a walk-through that looks for walls.
-
-**The run stopped in task 1.** The script asks for a newcomer who owns a new workspace, made through the app's own sign-up with no invitation. This build has no such sign-up, so no account was made and no later task could start. No credentials were created, nothing was changed in the owner's data, and no model budget was spent.
+**An AI newcomer is not a real person**, as in run 1. Its times are machine times. Two waits of about 30 seconds each came from the browser tool (tasks 3 and 10) and are left in the times. Treat this run as a walk-through that finds walls. Finish lines nine and ten still need real people.
 
 Set-up as found:
-- **Account.** None possible. `http://localhost:4000/` opens "Welcome back. Log in to your workspace." with Email, Password, "Forgot password?", "Log in", "Keep me signed in on this device", "Help" and "Locked out?". There is no "Sign up", "Create account" or "Start a workspace", and no Google, GitHub or GitLab button. The two help links go to help.alianhub.com, which the newcomer may not open.
-- **Checked by the observer, from outside the newcomer's role:** `/#/signup` and `/#/setup` both lead back to the log-in page. The install wizard runs only on an empty server. In the code, the only screen that makes an account is the invitation page (`/api/v2/createUser` with an invitation). The sign-up plugin's router (`frontend/src/plugins/register/router.js`) is empty. `/business` ("Company Information", the screen that makes a workspace) needs an account first. No local alternative is documented: `CLAUDE.md` names only the install wizard, and `docs/TESTING-E2E.md` describes the invitation path.
-- **The connect address works without an account.** `/.well-known/oauth-authorization-server` and `/.well-known/oauth-protected-resource` answer, client registration is offered at `/oauth/register`, and `POST /mcp` answers 401. A person who starts from Claude's side would still end on the same log-in page: `/#/oauth/consent` sends a signed-out person to `/#/login?redirect_url=/oauth/consent`.
+- **No self-service sign-up.** AlianHub stays invitation-only (the owner's decision, 2026-10-14). A newcomer who owns a workspace is the person who installs it, so this run started at the install wizard on a throwaway server: `node index.js` on port 4071 with an empty MongoDB in its own container, no AI keys, mail pointed at a closed port, and the MCP flags of the local `.env` (`MCP_OAUTH=both`, `MCP_OAUTH_DCR`, `MCP_TOOLS_DATA`, `MCP_TOOLS_MANAGE`, `MCP_TOOLS_WORK`, `MCP_ROLE_PROMPTS`). The server, its database and the Claude config were removed afterwards. The owner's instance on port 4000 was not touched.
+- **Account.** `newcomer2@example.test`, "Nova Newcomer", Owner of the workspace "Office Move Co". A colleague, `colleague.nc2@example.test`, joined as a Member through task 10's link, to recheck run 1 as a Member. The passwords live only in a private hand-off file.
+- **The AI.** Claude Code CLI, with a throwaway `--mcp-config` file and `--strict-mcp-config`, run from a scratch folder outside the repository. The model was the newcomer's own Claude. No AlianHub server key was set, so no server-side model budget was spent.
 - **Window.** 1280 × 860, desktop.
+- **Used a project tool before:** yes (an AI agent). **Tour started by itself:** yes, "Step 1 of 4, The navigation goes everywhere", first on the token page in task 2 and again on later pages. The newcomer ignored it until it covered the project row in task 3, then pressed "Skip tour".
+- **Menu:** Simple. The rail shows Home, My work, Projects, Inbox, Ask **and App connections** from the start. Dash joined later, after the AI made a dashboard.
 
 ### Score sheet
 
 | # | Task | Limit (min) | Time taken | Result | First wrong click | Words not understood | Where they stopped | Settings page opened |
 |---|---|---|---|---|---|---|---|---|
-| 1 | Sign up | 2 | 0:05 to the stop | **fail, stopped** | none: nothing on the page leads to an account | "Welcome back" for a person who never had an account | Log-in page: "Welcome back. Log in to your workspace." No sign-up, and no line saying who can give an account | none |
-| 2 | Connect your AI | 3 (A) | — | not started | — | — | — | — |
-| 3 | Make a project by describing it | 3 | — | not started | — | — | — | — |
-| 4 | Add three tasks | 2 | — | not started | — | — | — | — |
-| 5 | Assign one | 1 | — | not started | — | — | — | — |
-| 6 | Set a date | 1 | — | not started | — | — | — | — |
-| | **Clock for tasks 1 to 6** | under 10 | — | line nine: **fail** (task 1) | | | | |
-| 7 | Find what to do next | 1 | — | not started | — | — | — | — |
-| 8 | Ask the AI for a budget field, then approve it | 2 | — | not started | — | — | — | — |
-| 9 | Simple mode off and on | 2 | — | not started | — | — | — | — |
-| 10 | Invite a person | 2 | — | not started | — | — | — | — |
-| | **Whole session** | under 60 | about 0:05 | line ten: **fail** (task 1) | | | | |
+| 1 | Sign up (install wizard) | 2 | 0:24 | **pass** | none | "What does your team mainly do?" (no choice fits a move; picked "Something else") | — | none |
+| 2 | Connect your AI | 3 (A) | 2:02 | **pass** | Typed the token name into "Link account"'s Label box. It has the same placeholder, "laptop CLI", as the token's name box below it. The form then said "Give the token a name". | "Mode: Workspace key / Personal CLI account / Self-hosted model", "Provider", "Project scope", "MCP", "WHAT THIS TOKEN MAY CALL" with about 90 raw tool names | — | none (AI, Accounts is not under Settings) |
+| 3 | Make a project by describing it | 3 | 1:52 | **pass** | none | "j k ↵ r e s" at the top of the Inbox | The tour card lay over the "Office Move" row on Projects, so the row could not be clicked until "Skip tour" | none |
+| 4 | Add three tasks | 2 | 1:00 | **pass** | none | — | — | none |
+| 5 | Assign one | 1 | 0:10 | **pass** (the AI had already made the newcomer the assignee of all three in task 4) | none | — | — | none |
+| 6 | Set a date | 1 | 0:38 | **pass** | none | — | — | none |
+| | **Clock for tasks 1 to 6** | under 10 | **6:35** | line nine: **pass** (machine time, no help, no settings page) | | | | |
+| 7 | Find what to do next | 1 | 0:08 | **pass, with doubt** | none | — | — | none |
+| 8 | Ask the AI for a budget field, then approve it | 2 | 0:32 to ask, 0:23 to find, read and approve | **pass** | none | — | — | none |
+| 9 | Simple mode off and on | 2 | 0:20 | **pass** | none | — | — | My settings (allowed) |
+| 10 | Invite a person | 2 | 1:34 | **pass** | none | — | — | Members (reached from Home's "Invite team") |
+| | **Whole session** | under 60 | **about 10:00** | line ten: **pass** (machine time; the tour was closed, not followed) | | | | |
 
-Totals: passes 0 of 10. Fails 1. Not started 9. Stops 1. Help pages opened 0. Tour: not reached. Settings pages opened: 0.
+Totals:
+- Passes: 10 of 10, task 7 with doubt. Helped: 0. Stops: 0.
+- Help pages opened: 0. Tour followed: no, closed once. Settings pages opened in tasks 1 to 6: 0.
+- Line nine: **pass** on machine time. Line ten: **pass** on machine time. Both still need a real person.
+
+Per-task notes:
+- **Task 1.** `http://localhost:4071/` opens "Set up AlianHub. Create the owner account and the first workspace. Takes under a minute." It asks for six fields (first name, last name, email, password, workspace name, "What does your team mainly do?") and has one box, "Start with a sample project", ticked by default. "Create workspace" leads straight to "ONE LAST STEP, Connect your AI".
+- **Task 2.** The page offers Claude (a custom connector by address), ChatGPT, and "Claude Code and other tools: Create a token, then run the command the page gives you". The newcomer uses Claude Code, so "Create a token" was the right way. It opens AI, Accounts (`?tab=link`), headed "Coding accounts". That page first shows a "My coding agent … Link account" form, a month's spend card and a command preview that already reads "connected · 86 tools · protocol 2025-06-18" before anything is connected. "New token" asks for a name, Mode, Provider, Project scope, Expires after (30 days) and three unticked boxes. The newcomer ticked "Let this agent manage tasks" and "Let this agent write docs". The page then shows the exact `claude mcp add --transport http alianhub "http://localhost:4071/mcp?companyId=…" --header "Authorization: Bearer ahp_…"` command once. The placeholder before it read `ah_pat_••••••••`. The newcomer left AlianHub once, for the terminal. On the first question ("Are you connected to AlianHub? Who am I there?") Claude answered "You are Nova Newcomer, … owner". AI, Connect your AI then read "Connected. Your AI app was last seen here around 14/10/2026, 12:42 PM." and offered "SAY THIS TO IT FIRST: Set up my project". Did the newcomer understand what connecting gives? Yes. The page says "ask it to set up and run your projects. It sees and changes only what you can."
+- **Task 3.** What the newcomer said to Claude: "Set up my project. We move to a new office next month. Plan the move: movers, IT equipment, telling clients the new address." Claude asked no questions. It filed one proposal and said so: "The project proposal is waiting for your approval in your AlianHub Inbox." The Inbox, on "Needs your approval 1", showed "My Claude (MCP), for Nova Newcomer wants to create the project “Office Move”", with WHY, the project's description, four lists, a Blocked status, four fields (Vendor, Cost, Move Phase, Confirmed), four views, a "Move readiness" dashboard, and "Untick anything you do not want. Only what is ticked is made." The AI made everything. The newcomer only pressed Approve. After that the Inbox said "Approved. Undo" with no link to the new project, so the newcomer opened it from Projects.
+- **Task 4.** "For now put just these three things in it: Book the movers, Pack the IT equipment, Tell clients the new address." Claude filed them as one "set up the project" proposal, one task per list, each "for Nova Newcomer". One Approve made all three (OM-1 to OM-3). The second and third tasks came with the first, from the same sentence. The sidebar counts and the list headers kept saying 0 until the page was reloaded. The project opens on an empty default list called "List", with the four real lists folded.
+- **Task 5.** Already done by the AI. The task panel shows "Assignee: Nova…". In the list row the assignee is a grey avatar with no name.
+- **Task 6.** "Book the movers is mine, and it has to be finished by next Friday." It was applied at once, with no approval. Claude said: "now due Friday 23 October 2026 … I read 'next Friday' as 23 October rather than this coming Friday, 16 October. If you meant the 16th, say so". The row showed "Oct 23" without a reload. No time was added.
+- **Task 7.** Home's "WHAT NEXT" read "You have one task for today. Show today." That task is the sample project's "Start here — this project is a sandbox", due today. The newcomer's own "Book the movers" sits under "NEXT 4 · FROM THE SAMPLE PROJECT", after three sample tasks. The newcomer could read the line aloud, but it points at sample data, not at the move.
+- **Task 8.** "Add a place on my tasks to note the budget." Claude filed one proposal, and said it would sit beside the Cost field it had made in task 3. The Inbox showed "My Claude (MCP), for Nova Newcomer wants to add the fields “Budget”", "WHY Add a Budget field so each move task can record its planned spend (an agent never makes this kind of change on its own)", "New fields: Budget, Where: Office Move, Field: Budget: Money". The newcomer could say what would change and who proposed it. After Approve, "Budget" showed under Custom Field on every task. Home's "What next", read just after the proposal was filed, did not mention it until the page was reloaded.
+- **Task 9.** Avatar menu, then "My settings", then "How much to show": Simple or Full. Full turned the rail into Home, Everything, Goals, Projects, Inbox, Planner, Chat, AI, Docs, App connections, Dash, Time. Simple put it back.
+- **Task 10.** Home's checklist ("3/5 Set up Office Move Co, Next: Invite your team") has an "Invite team" button. It opens Settings, Members: "1 · UNLIMITED", Invite. The form chose the role **Member** and explained it: "Member: Works on projects and tasks day to day." The newcomer noticed it and kept it. After Send, the screen said "Couldn't email this invite. Copy the join link instead." with "Copy link" and the link itself. The agent appears on Members as "My claude-code, Agent, Connected by Nova Newcomer · Takes no seat and has no role of its own". The token was named "My Claude".
 
 ### Findings, worst first
 
-1. **A person cannot get an account on this build without an invitation.** The log-in page offers no sign-up and does not say who can make an account. Every newcomer route in the script starts with an account the person makes for themselves, so tasks 1 to 10 and both finish lines cannot be run as written. Options to decide, default first:
-   - (a) For a self-hosted server, the newcomer who owns a workspace is the person who installs it. Rewrite task 1 to start at the install wizard on an empty database, and run the test on a second, throwaway server. No product change is needed.
-   - (b) Add a sign-up page behind a server setting such as "Let people start their own workspace", off by default.
-   - (c) In any case, the log-in page should say "No account? Ask the person who runs this server to invite you."
-2. **Connecting from Claude first is also a dead end without an account.** The connect address works, but the consent screen sends a signed-out person to the same log-in page, with no way forward and no word about why.
-3. **The docs promise a sign-up the build does not show.** `docs/CONNECT-YOUR-AI.md` says "When you sign up for the first time, this is the last step", and this script's step 2 asks "whether the local build lets a person create an account and a workspace without an invitation". The answer is no. The doc should say that the step follows the install wizard or an invitation.
-4. **"Welcome back"** is the only greeting, including for a person who has never had an account.
+1. **After making an account from the join link, the person lands on Log in, not inside the app.** The colleague filled "Create your account. You're joining Office Move Co." (name, password) and pressed Continue. The next screen was "Log in", with no word that the account was made. After logging in they reached Home, skipping the "One last step, Connect your AI" page that the install wizard shows. Seen once on the throwaway server (session cookies are httpOnly there, as in the e2e harness). To check on a normal set-up.
+2. **The first-visit tour covers the work.** It starts on whatever page the newcomer is on (here, the token page) and comes back on the next pages. On Projects its card lay over the "Office Move" row, and the row could not be clicked until "Skip tour".
+3. **Counts do not follow what the AI makes.** After the AI's tasks were approved, the sidebar ("Office Move 0, 0 tasks") and the list headers ("Movers & Logistics 0", above a list holding a task) stayed at 0 until a reload. The project also opens on an empty default list, "List", that the AI's setup did not ask for, with the real lists folded.
+4. **The token page is built for developers, not newcomers.** "Create a token" lands on "Coding accounts" with a "Link account" form first, and both forms use the placeholder "laptop CLI". The command preview claims "connected · 86 tools" before anything is connected. The placeholder token reads `ah_pat_…` while real tokens start `ahp_`. About 90 raw tool names are listed under "WHAT THIS TOKEN MAY CALL". The page has no way back to the welcome step.
+5. **"What next" points at sample data first.** On a new workspace with the sample project ticked by default, "You have one task for today" is "Start here — this project is a sandbox", ahead of the newcomer's own work. It did not show a newly filed approval until a reload.
+6. **Approve leads nowhere.** After approving "create the project", the Inbox says "Approved. Undo" with no link to the project it made.
+7. **Words.** The Inbox header shows "j k ↵ r e s" with no explanation. Simple says "Five places: Home, My work, Projects, Inbox and Ask", but the menu starts with six (App connections too). The agent is named "My claude-code" on Members, not "My Claude". In the list row the assignee is a grey avatar with no name.
+8. **"Set up my project" did not ask questions.** The Connect page promises "It asks a few questions and shows you a plan. Nothing is made until you say yes." The second half held, because the plan was the Inbox card. Claude asked no questions and asked about the move date only after filing. This depends on the AI as much as on the product prompt.
+9. **Claude.ai and ChatGPT cannot reach a local server.** The page rightly says "this address must be reachable from outside your network". On `localhost` only the token path for Claude Code works, so the OAuth consent screen was not exercised.
 
-### Run-1 findings, rechecked
+### Run-1 findings, rechecked on screen
 
-No account could be made, so none of these was seen on the screen. Each status comes from the code of build `746d3114`.
-
-| Run 1 | Status | Evidence |
+| Run 1 | Status | What the screen showed |
 |---|---|---|
-| 1. A Member cannot make a project and is not told why | **CHANGED** | #1645 (`60dde1d09`) adds "Only an admin can create projects. Ask {names} to create one or to change your role." on the Projects page. #1646 (`8dd76b303`) shows "New project", and "Create with AI" when the server has AI, to everyone who may create. A Member still cannot make one. That is the role, now explained. |
-| 2. A Member cannot invite and is not told | **CHANGED** | #1645 adds the same kind of note on Members: "Only an admin can invite people. Ask {names}…". A Member still cannot invite. |
-| 3. A new Member's Home opens on strangers' approvals | **CHANGED** | #1644 (`72a73ac80`) and #1645 (`fc6cf2eea`): Home asks for approval only for the person's own proposals and links the rest as waiting for the team. "What next" puts the person's own tasks due within a week first. Card titles name the change ("{label}: “{name}”") instead of tool text. Only the connection's person or an admin may choose "Always do this". A plain Approve on a team proposal is still allowed when the Member has the rights to make the change by hand. That is a policy question, not a bug. |
-| 4. "Describe it" has no path without a model | **STILL OPEN for path B** | In Simple mode, Ask leads to Connect your AI when the server has no model (`navItems.js`), and "Create with AI" shows only when AI is on. Without a model or a connected AI, the project is still made by hand. |
-| 5. The list does not follow the side panel; the date box runs past its cell | **FIXED in code** | #1645: `PersonalList.vue` watches the open task (`followDetail.js`). `TaskDetailOverlay/style.css` keeps the date box in its cell. Not seen on the screen. |
-| 6. Simple / Full is hard to find and renames places | **STILL OPEN, partly changed** | The avatar menu item now reads "My settings" to match the page heading. Simple still relabels "Everything" as "My work" and "AI" as "Ask" (`navItems.js` `inSimple`), and the choice is still only on My settings. |
-| 7. The join link appears only after "Resend Invitation" | **NOT RECHECKED** | `Members.vue` has shown the join link when mail fails since `e6dfc3cb8` (2026-09-24), which was before run 1, yet the owner still met this in run 1. It needs the owner's screen to recheck. |
-| 8. Small things | **FIXED in code, mostly** | "List Of User" is now "Choose people". Assignee can show the name (`showName`). "Get going" counts a skipped step as done. The More menu has a background. Not rechecked: "+ New" drawing over the checklist, and quick-add clearing the box before the row appears. |
+| 1. A Member cannot make a project and is not told why | **CHANGED, seen** | As the Member: Projects shows "Only an admin can create projects. Ask Nova Newcomer to create one or to change your role." There is still no New project for a Member. |
+| 2. A Member cannot invite and is not told | **CHANGED, seen** | As the Member: Settings shows "Only an admin can invite people. Ask Nova Newcomer to invite them or to change your role." Members is not in the Member's settings menu. |
+| 3. A new Member's Home opens on strangers' approvals | **NOT REPRODUCED** | A new workspace has no team proposals. The newcomer's own proposals were titled in plain words ("My Claude (MCP), for Nova Newcomer wants to create the project “Office Move”"), not tool text. |
+| 4. "Describe it" has no path without a model | **FIXED on path A, path B not retested** | Described in one sentence to the newcomer's own Claude: the project, its lists, fields, views and dashboard were made after one approval. |
+| 5. The list does not follow the side panel; the date box runs past its cell | **FIXED, seen** | In the Personal List at 1280 px, clicking Due Date opened a calendar, and the row read "Fri" right after a date was picked, without a reload. |
+| 6. Simple / Full is hard to find and renames places | **STILL OPEN, partly changed** | The avatar menu now says "My settings", the same as the page. Full still renames "My work" to "Everything" and "Ask" to "AI". |
+| 7. The join link appears only after "Resend Invitation" | **FIXED for the first send** | "Couldn't email this invite. Copy the join link instead." and the link appear right after Send. After a reload, the link comes back only through "resend", then "Copy link". |
+| 8. Small things | **MOSTLY FIXED** | The panel shows the assignee's name ("Nova…"). The checklist counts its own steps ("3/5"). The list row still shows only an avatar. |
+
+The log-in fix (#1678) was also seen on the throwaway server: "Log in. Log in to your workspace. No account yet? Ask your workspace admin to invite you."
 
 ### Not tested, and why
 
-- Tasks 2 to 10, path A, the consent screen, "Set up my project", the budget field and its approval in the AI Inbox: no account could be made without an invitation, and the brief rules out invitations and the owner's account.
-- No throwaway Claude config or MCP server was added, because there was no account to connect it to.
-- A second server on an empty database, for the install wizard: this would be a new set-up on the owner's machine, and it is outside this run's brief. It is option (a) under finding 1.
+- Path B, and Ask or "Create with AI" with a server key: path A was chosen, and no server-key spend was allowed.
+- The OAuth consent screen and Claude.ai or ChatGPT connectors: they need an address reachable from the internet, and for Claude Code the page points to a token.
+- A real person, a phone-width window, and the owner's local instance: out of scope for this run.
 
-Next run: decide finding 1 first. With (a), run the full script on a throwaway server that starts at the install wizard, on path A.
+Next run: a real person on path A, on a server reachable from Claude.ai, so the connector and consent screen are covered.
