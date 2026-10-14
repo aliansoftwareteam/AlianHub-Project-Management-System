@@ -7443,9 +7443,9 @@ export default {
         "are_you_sure": "क्या आप निश्चित हैं?",
         "no_revert_msg": "आप इसे पलट नहीं पाएंगे!",
         "yes_delete": "हाँ, इसे हटा दें!",
-        "task_will_become_subtasks_of": "कार्य के उप-कार्य बन जाएंगे",
+        "task_moves_under": "{task} will become a subtask of {parent}.",
+        "task_and_subtasks_move_under": "{task} will become a subtask of {parent}. Its own subtasks stay under it and move with it.",
         "Are_you_sure_you_want_to_delete": "क्या आप निश्चित हैं कि आप इसे हटाना चाहते हैं?",
-        "subtasks_will_become_subtasks_of": "subtasks stay under it and move with it under",
         "unlock_board_view": "बोर्ड दृश्य को अनलॉक करने के लिए",
         "unlock_project_detail_view": "प्रोजेक्ट विवरण दृश्य को अनलॉक करने के लिए",
         "unlock_table_view": "तालिका दृश्य को अनलॉक करने के लिए",
@@ -10233,7 +10233,7 @@ export default {
         "mearge_task_into": "कार्य को में मर्ज करें"
     },
     "Converttolist": {
-        "are_you_sure_convert": "क्या आप सुनिश्चित हैं कि आप इस कार्य को सूची में परिवर्तित करना चाहते हैं?",
+        "confirm_convert": "क्या आप सुनिश्चित हैं कि आप इस कार्य को सूची में परिवर्तित करना चाहते हैं?",
         "important": "महत्वपूर्ण",
         "you_will_lose": "आप सभी थ्रेडेड टिप्पणियां खो देंगे। यह क्रिया वापस नहीं की जा सकती",
         "convert_to_list": "सूची में परिवर्तित करें"

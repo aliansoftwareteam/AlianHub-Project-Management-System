@@ -55,7 +55,16 @@
 }
 .v-toast__item {
     min-height: 3.5em!important;
+    opacity: 1;
 }
+/* The sugar theme puts white text on light green and amber (1.9:1); these pairs read in both themes. */
+.v-toast__item.v-toast__item--success { background-color: var(--ok-ink); color: var(--surface); }
+.v-toast__item.v-toast__item--warning { background-color: var(--warn-ink); color: var(--surface); }
+.v-toast__item.v-toast__item--error { background-color: var(--danger); color: var(--on-danger); }
+.v-toast__item.v-toast__item--info { background-color: var(--brand); color: var(--on-brand); }
+.v-toast__item.v-toast__item--warning .v-toast__icon { filter: invert(1); }
+:root[data-theme="dark"] .v-toast__item .v-toast__icon { filter: invert(1); }
+:root[data-theme="dark"] .v-toast__item.v-toast__item--warning .v-toast__icon { filter: none; }
 .v-toastitem .v-toasttext {
     padding: 0.5em 1em!important;
 }

@@ -7443,9 +7443,9 @@ export default {
         "are_you_sure": "Bist du sicher?",
         "no_revert_msg": "Sie können dies nicht rückgängig machen!",
         "yes_delete": "Ja, löschen!",
-        "task_will_become_subtasks_of": "Die Aufgabe wird zu Unteraufgaben von",
+        "task_moves_under": "{task} will become a subtask of {parent}.",
+        "task_and_subtasks_move_under": "{task} will become a subtask of {parent}. Its own subtasks stay under it and move with it.",
         "Are_you_sure_you_want_to_delete": "Sind Sie sicher, dass Sie löschen möchten?",
-        "subtasks_will_become_subtasks_of": "subtasks stay under it and move with it under",
         "unlock_board_view": "Um die Board-Ansicht freizuschalten",
         "unlock_project_detail_view": "Um die Projekt-Detail-Ansicht freizuschalten",
         "unlock_table_view": "Um die Tabellen-Ansicht freizuschalten",
@@ -10233,7 +10233,7 @@ export default {
         "mearge_task_into": "Aufgabe zusammenführen in"
     },
     "Converttolist": {
-        "are_you_sure_convert": "Bist du sicher, dass du diese Aufgabe in eine Liste umwandeln möchtest?",
+        "confirm_convert": "Bist du sicher, dass du diese Aufgabe in eine Liste umwandeln möchtest?",
         "important": "Wichtig",
         "you_will_lose": "Du wirst alle verschachtelten Kommentare verlieren. Diese Aktion kann nicht rückgängig gemacht werden",
         "convert_to_list": "In Liste umwandeln"

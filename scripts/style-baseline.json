@@ -17,7 +17,6 @@
     "frontend/src/components/atom/CalenderCompo/CalenderCompo.vue": { "colours": 2, "legacyClasses": 2 },
     "frontend/src/components/atom/CommentInput/style.css": { "colours": 2, "legacyClasses": 0 },
     "frontend/src/components/atom/ConfirmDelete/ConfirmDelete.vue": { "colours": 1, "legacyClasses": 0 },
-    "frontend/src/components/atom/ConfirmationsInTask/ConfirmationsInTask.vue": { "colours": 0, "legacyClasses": 4 },
     "frontend/src/components/atom/CreateTask/CreateTask.vue": { "colours": 1, "legacyClasses": 0 },
     "frontend/src/components/atom/CroppingTool/style.css": { "colours": 1, "legacyClasses": 0 },
     "frontend/src/components/atom/Currency/Currency.vue": { "colours": 0, "legacyClasses": 3 },

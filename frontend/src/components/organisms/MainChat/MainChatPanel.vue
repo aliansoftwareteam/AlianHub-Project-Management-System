@@ -779,9 +779,14 @@ async function onMarkUnread(message) {
     }
 }
 
+// The key also changes when the first send creates the conversation; clearing the new id then sent that message
+// to no conversation at all, so it is cleared only when another new chat is opened.
 watch(
-    () => [conversationKey.value, props.newChat],
-    () => { createdTaskId.value = props.newChat ? '' : createdTaskId.value; open(); },
+    () => [conversationKey.value, props.newChat, props.taskId],
+    ([, newChat, taskId], [, wasNew, previousTaskId] = []) => {
+        if (newChat && (!wasNew || taskId !== previousTaskId)) createdTaskId.value = '';
+        open();
+    },
     { immediate: true },
 );
 

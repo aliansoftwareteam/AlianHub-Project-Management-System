@@ -2,7 +2,7 @@
     <ConfirmationSidebar
             v-model="showSidebarData"
             :title="`${statusConfirmData === true ? $t('general.Different_Statuses') : ''}`"
-            :message="`${subTaskConfirm === true ? `<b class='black'>${escapeHtml(task?.TaskName)}’s</b> ${$t('conformationmsg.subtasks_will_become_subtasks_of')} <b class='black'>${escapeHtml(selectedTask?.TaskName)}</b>.` : taskConfirm ? `<b class='black'>${escapeHtml(task?.TaskName)}’s</b> ${$t('conformationmsg.task_will_become_subtasks_of')} <b class='black'>${escapeHtml(selectedTask?.TaskName)}</b>.` : ''}`"
+            :message="subTaskConfirm || taskConfirm ? $t(subTaskConfirm === true ? 'conformationmsg.task_and_subtasks_move_under' : 'conformationmsg.task_moves_under', { task: `<b>${escapeHtml(task?.TaskName)}</b>`, parent: `<b>${escapeHtml(selectedTask?.TaskName)}</b>` }) : ''"
             :acceptButtonClass="'btn-primary font-ui'"
             :acceptButton="$t('general.Continue')"
             :isShowInput="false"
