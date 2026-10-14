@@ -1,6 +1,6 @@
 <template>
     <span
-        v-for="(obj,ind) in props.projectData?.viewColumn.filter(x =>
+        v-for="(obj,ind) in props.projectData?.viewColumn?.filter(x =>
             !x?.key?.includes('created_by') &&
             !x?.key?.includes('created_date') &&
             !x?.key?.includes('TaskKey') &&

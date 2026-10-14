@@ -72,7 +72,7 @@ onMounted(() => {
 
 // This function is used to get selected option from sidebar
 const selectedObj = (obj) => {
-    items.value = props.detail?.fieldOptions.filter(x => x.id === obj.id);
+    items.value = props.detail?.fieldOptions?.filter(x => x.id === obj.id);
     emit('blurUpdate', obj, props.detail, "");
 }
 </script>
