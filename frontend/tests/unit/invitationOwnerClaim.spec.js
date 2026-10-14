@@ -97,6 +97,7 @@ describe('Invitation page accepting an invitation', () => {
         expect(mocks.getAuth).toHaveBeenCalledWith(USER_ID, true);
         expect(mocks.getAuth).toHaveBeenLastCalledWith(USER_ID);
         expect(localStorage.getItem('selectedCompany')).toBe(COMPANY_ID);
+        expect(localStorage.getItem('userId')).toBe(USER_ID);
         expect(mocks.logOut).not.toHaveBeenCalled();
         expect(mocks.push).not.toHaveBeenCalledWith({ name: 'Log-in' });
         expect(mocks.replace).toHaveBeenCalledWith(`/${COMPANY_ID}/welcome/connect-ai`);

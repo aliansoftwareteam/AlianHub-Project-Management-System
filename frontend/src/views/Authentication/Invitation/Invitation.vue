@@ -227,6 +227,7 @@ const submit = async () => {
         const user = await apiRequestWithoutSecure("post", env.LOGIN, { email: email.value, password: form.password });
         if (user.status !== 200) { logOut({ islogOut: true }); banner.value = t("Auth.server_error"); return; }
         signedIn = true;
+        localStorage.setItem("userId", String(user.data.uid));
         await getAuth(user.data.uid, true);
         localStorage.setItem("selectedCompany", companyIdRoute.value);
         const signedInUserId = String(user.data.uid);
@@ -248,7 +249,7 @@ const submit = async () => {
             .catch((error) => console.error("ERROR in user notification settings: ", error.message));
         apiRequest("post", env.REMOVE_USER_NOTIFICATION, { companyId: companyIdRoute.value, userId: signedInUserId, type: "Add" })
             .catch((error) => console.error(error, "ERROR"));
-        localStorage.setItem("isLogging", "false");
+        localStorage.setItem("isLogging", "true");
         $toast.success(t("Toast.User_has_been_registered_successfully"), { position: "top-right" });
         // The session was issued before the invitation was accepted; a fresh one carries the workspace.
         await getAuth(signedInUserId);

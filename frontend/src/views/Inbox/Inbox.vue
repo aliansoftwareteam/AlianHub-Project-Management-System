@@ -1114,7 +1114,8 @@ onUnmounted(() => {
     display: flex; align-items: center; gap: var(--sp-6, 14px); min-height: var(--control-h-lg, 33px); padding: 0 var(--sp-6, 14px);
     background: var(--rail); color: var(--rail-ink-strong); border-radius: var(--r-lg, 9px); box-shadow: var(--shadow-pop); font-size: var(--fs-md, 12.5px); white-space: nowrap;
 }
-.ibx__undo-btn, .ibx__undo-open { min-height: var(--hit-min); border: 0; background: transparent; color: var(--rail-brand); font: 600 var(--fs-md, 12.5px)/1 var(--font-ui); cursor: pointer; padding: 0; display: inline-flex; align-items: center; text-decoration: none; }
+.ibx__undo-btn { min-height: var(--hit-min); border: 0; background: transparent; color: var(--rail-brand); font: 600 var(--fs-md, 12.5px)/1 var(--font-ui); cursor: pointer; padding: 0; }
+.ibx__undo-open { min-height: var(--hit-min); display: inline-flex; align-items: center; color: var(--rail-brand); font: 600 var(--fs-md, 12.5px)/1 var(--font-ui); text-decoration: none; }
 
 .ibx__toolbar .ibx__tabs { display: none; }
 @media (max-width: 1279px) {
