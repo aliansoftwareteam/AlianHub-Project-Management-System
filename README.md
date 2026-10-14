@@ -7,7 +7,11 @@
   </a>
 </p>
 
-<h1 align="center">Open-source project management<br/><sub>your team and your AI run together</sub></h1>
+<h1 align="center">Open-source project management, run with AI</h1>
+
+<p align="center">
+  <b>Your team and AI agents plan, do and report the work — every change approved, logged and undoable.</b>
+</p>
 
 <p align="center">
   The self-hosted Jira / ClickUp alternative with sprints, Gantt, Kanban, time tracking and AI agents over MCP.
@@ -29,6 +33,85 @@
   </a>
 </p>
 
+## 🤖 AI that does the work
+
+<table>
+  <tr>
+    <td width="33%" align="center">
+      <picture>
+        <source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/aliansoftwareteam/AlianHub-Project-Management-System/main/.gitbook/assets/screenshots/ai-ask-dark.png">
+        <img src="https://raw.githubusercontent.com/aliansoftwareteam/AlianHub-Project-Management-System/main/.gitbook/assets/screenshots/ai-ask-light.png" alt="AI Ask with a question typed about at-risk tasks, scope and research controls, and suggested starting points" width="100%">
+      </picture>
+      <br/><sub><b>Ask about your projects</b></sub>
+    </td>
+    <td width="33%" align="center">
+      <picture>
+        <source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/aliansoftwareteam/AlianHub-Project-Management-System/main/.gitbook/assets/screenshots/ai-agents-dark.png">
+        <img src="https://raw.githubusercontent.com/aliansoftwareteam/AlianHub-Project-Management-System/main/.gitbook/assets/screenshots/ai-agents-light.png" alt="AI Agents page with three agents, their autonomy level and the autonomy ladder" width="100%">
+      </picture>
+      <br/><sub><b>Agents with autonomy levels</b></sub>
+    </td>
+    <td width="33%" align="center">
+      <picture>
+        <source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/aliansoftwareteam/AlianHub-Project-Management-System/main/.gitbook/assets/screenshots/ai-inbox-dark.png">
+        <img src="https://raw.githubusercontent.com/aliansoftwareteam/AlianHub-Project-Management-System/main/.gitbook/assets/screenshots/ai-inbox-light.png" alt="AI Inbox with agent proposals waiting for approval and the changes one would make" width="100%">
+      </picture>
+      <br/><sub><b>Approve in the AI Inbox</b></sub>
+    </td>
+  </tr>
+</table>
+
+<table>
+  <tr>
+    <td width="33%" valign="top">
+      💬 <b>Ask box</b><br/>
+      Ask about your projects in plain words, plan changes, or switch to research mode for a deeper answer.
+    </td>
+    <td width="33%" valign="top">
+      🧭 <b>AI project generator</b><br/>
+      A brief, a few clarifying questions, then a full plan with lists, tasks, views, starter automations and a dashboard. You review it before it is built.
+    </td>
+    <td width="33%" valign="top">
+      👥 <a href="docs/guide/agents/09-team-packs-and-role-agents.md"><b>Agents and team packs</b></a><br/>
+      Role agents for seven company blueprints, from IT and manufacturing to agencies and construction, that pick up tasks, comment and propose.
+    </td>
+  </tr>
+  <tr>
+    <td width="33%" valign="top">
+      🧑‍🏫 <b>Workspace Guide</b><br/>
+      A built-in agent in every new workspace: @mention it on any task to ask what is next from the project's plan.
+    </td>
+    <td width="33%" valign="top">
+      🔌 <a href="docs/CONNECT-YOUR-AI.md"><b>Bring your own AI</b></a><br/>
+      Connect Claude, ChatGPT or Claude Code over MCP. It works as you and sees only what you can open.
+    </td>
+    <td width="33%" valign="top">
+      🛡️ <a href="docs/guide/agents/README.md"><b>Trust and control</b></a><br/>
+      AI Inbox approvals, an audit log, undo, autonomy levels, daily and monthly AI budgets, and your choice of provider and model with your own key.
+    </td>
+  </tr>
+</table>
+
+### Connect your AI
+
+AlianHub ships an MCP server, so the AI app you already use can work inside your workspace. Open **AI → Connect your AI**, copy the address, and add it as a custom connector in Claude, ChatGPT or Claude Code; then ask in everyday words to find tasks, add tasks and subtasks, comment, log time or change a status. A change to one task is made at once with Undo; anything wider waits for a person in the AI Inbox; every change is written in the audit log; and it cannot delete tasks, docs, comments or projects, or change who may do what.
+
+```mermaid
+flowchart LR
+    You["🙋 You"] -->|ask in everyday words| AI["🤖 Your own AI<br/>Claude · ChatGPT · Claude Code"]
+    AI -->|MCP, acting as you| Hub["⚙️ AlianHub<br/>your role and permissions"]
+    Hub -->|change to one task| Done["✅ Made at once<br/>with Undo"]
+    Hub -->|"wider change, new field, view,<br/>rule or project, closing a task"| Inbox["📥 AI Inbox<br/>waits for a person"]
+    Inbox -->|Approve| Done
+    Inbox -.->|Decline, with a reason| AI
+    Done --> Work["📋 Tasks · projects · team"]
+    Hub -.->|every change| Audit["🧾 Audit log"]
+```
+
+Step-by-step: [docs/CONNECT-YOUR-AI.md](docs/CONNECT-YOUR-AI.md) · every tool: [docs/MCP-AGENT-GUIDE.md](docs/MCP-AGENT-GUIDE.md) · using it day to day: [docs/guide/agents/](docs/guide/agents/README.md)
+
+## Everything in one workspace
+
 **AlianHub** is free, open-source project management software you host yourself. It brings task management, sprint planning, time tracking with timesheets and optional screenshots, Gantt charts, Kanban boards, docs and automations into one workspace. Each person can connect their own AI assistant (Claude, ChatGPT or Claude Code) over MCP to find, add and update work for them. Teams use it as a self-hosted alternative to Jira, ClickUp, Linear and Monday.com, released under the AGPL-3.0 license and run with Docker on your own servers. Built for enterprises, startups and growing teams — no per-seat pricing, no vendor lock-in, your data on your own servers.
 
 <table>
@@ -38,8 +121,8 @@
       Lists, subtasks, sprints with burndown, and six views.
     </td>
     <td width="33%" valign="top">
-      🤖 <a href="docs/CONNECT-YOUR-AI.md"><b>AI agents</b></a><br/>
-      Your own Claude or ChatGPT over MCP; risky changes wait for approval.
+      🤖 <a href="#-ai-that-does-the-work"><b>AI agents</b></a><br/>
+      Role agents and your own AI, working beside the team.
     </td>
     <td width="33%" valign="top">
       ⏱️ <a href="docs/guide/time.md"><b>Time tracking</b></a><br/>
@@ -80,16 +163,16 @@
     </td>
     <td width="33%" align="center">
       <picture>
-        <source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/aliansoftwareteam/AlianHub-Project-Management-System/main/.gitbook/assets/screenshots/ai-inbox-dark.png">
-        <img src="https://raw.githubusercontent.com/aliansoftwareteam/AlianHub-Project-Management-System/main/.gitbook/assets/screenshots/ai-inbox-light.png" alt="AI Inbox with agent proposals waiting for approval and the changes one would make" width="100%">
+        <source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/aliansoftwareteam/AlianHub-Project-Management-System/main/.gitbook/assets/screenshots/time-tracking-dark.png">
+        <img src="https://raw.githubusercontent.com/aliansoftwareteam/AlianHub-Project-Management-System/main/.gitbook/assets/screenshots/time-tracking-light.png" alt="Weekly timesheet with hours per task and day against an 8-hour capacity" width="100%">
       </picture>
-      <br/><sub><b>AI Inbox for approvals</b></sub>
+      <br/><sub><b>Weekly timesheets</b></sub>
     </td>
   </tr>
 </table>
 
 <details>
-<summary><b>More screenshots</b> — list, task detail, dashboard, calendar, workload, time tracking, docs, AI agents, AI Ask, settings</summary>
+<summary><b>More screenshots</b> — list, task detail, dashboard, calendar, workload, docs, settings</summary>
 <br/>
 
 Your browser picks the light or dark version. The workspace shown is made-up demo data. [Try the live demo](https://demo.alianhub.com) to explore for yourself.
@@ -124,28 +207,10 @@ Your browser picks the light or dark version. The workspace shown is made-up dem
   <img src="https://raw.githubusercontent.com/aliansoftwareteam/AlianHub-Project-Management-System/main/.gitbook/assets/screenshots/workload-light.png" alt="Workload grid with planned hours per person and day against each person's capacity, with task chips that can be dragged to rebalance" width="100%">
 </picture>
 
-<h4>Time tracking</h4>
-<picture>
-  <source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/aliansoftwareteam/AlianHub-Project-Management-System/main/.gitbook/assets/screenshots/time-tracking-dark.png">
-  <img src="https://raw.githubusercontent.com/aliansoftwareteam/AlianHub-Project-Management-System/main/.gitbook/assets/screenshots/time-tracking-light.png" alt="Weekly timesheet with hours per task and day against an 8-hour capacity" width="100%">
-</picture>
-
 <h4>Docs</h4>
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/aliansoftwareteam/AlianHub-Project-Management-System/main/.gitbook/assets/screenshots/docs-dark.png">
   <img src="https://raw.githubusercontent.com/aliansoftwareteam/AlianHub-Project-Management-System/main/.gitbook/assets/screenshots/docs-light.png" alt="A doc with headings, lists and an on-this-page outline" width="100%">
-</picture>
-
-<h4>AI agents</h4>
-<picture>
-  <source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/aliansoftwareteam/AlianHub-Project-Management-System/main/.gitbook/assets/screenshots/ai-agents-dark.png">
-  <img src="https://raw.githubusercontent.com/aliansoftwareteam/AlianHub-Project-Management-System/main/.gitbook/assets/screenshots/ai-agents-light.png" alt="AI Agents page with three agents, their autonomy level and the autonomy ladder" width="100%">
-</picture>
-
-<h4>AI Ask</h4>
-<picture>
-  <source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/aliansoftwareteam/AlianHub-Project-Management-System/main/.gitbook/assets/screenshots/ai-ask-dark.png">
-  <img src="https://raw.githubusercontent.com/aliansoftwareteam/AlianHub-Project-Management-System/main/.gitbook/assets/screenshots/ai-ask-light.png" alt="AI Ask with a question typed about at-risk tasks, scope and research controls, and suggested starting points" width="100%">
 </picture>
 
 <h4>Settings</h4>
@@ -295,30 +360,6 @@ graph TB
 All data is scoped to `companyId` for multi-tenancy: a single AlianHub instance can host multiple companies, each with isolated data. Deeper docs: [`.claude/ARCHITECTURE.md`](.claude/ARCHITECTURE.md) · [`.claude/DESIGN.md`](.claude/DESIGN.md)
 
 </details>
-
-## Connect your AI
-
-AlianHub ships an MCP server, so the AI app you already use — Claude, ChatGPT or Claude Code — can work inside your workspace. Open **AI → Connect your AI**, copy the address, and add it as a custom connector; then ask in everyday words to find tasks, add tasks and subtasks, comment, log time or change a status. It works as you, every change is written in the audit log, risky changes wait for a person in the AI Inbox, and it cannot delete tasks, docs, comments or projects or change who may do what.
-
-<details>
-<summary><b>How a change flows</b></summary>
-<br/>
-
-```mermaid
-flowchart LR
-    You["🙋 You"] -->|ask in everyday words| AI["🤖 Your own AI<br/>Claude · ChatGPT · Claude Code"]
-    AI -->|MCP, acting as you| Hub["⚙️ AlianHub<br/>your role and permissions"]
-    Hub -->|change to one task| Done["✅ Made at once<br/>with Undo"]
-    Hub -->|"wider change, new field, view,<br/>rule or project, closing a task"| Inbox["📥 AI Inbox<br/>waits for a person"]
-    Inbox -->|Approve| Done
-    Inbox -.->|Decline, with a reason| AI
-    Done --> Work["📋 Tasks · projects · team"]
-    Hub -.->|every change| Audit["🧾 Audit log"]
-```
-
-</details>
-
-Step-by-step: [docs/CONNECT-YOUR-AI.md](docs/CONNECT-YOUR-AI.md) · every tool: [docs/MCP-AGENT-GUIDE.md](docs/MCP-AGENT-GUIDE.md) · using it day to day: [docs/guide/agents/](docs/guide/agents/README.md)
 
 ## Why AlianHub
 
