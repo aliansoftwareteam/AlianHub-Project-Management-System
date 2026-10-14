@@ -59,7 +59,7 @@ const viewKindProblem = (plan) => {
     return other ? `"${other.name}" is a ${other.kind} view, and a new project starts with ${offered.join(' and ')} views only; add that view once the project is there` : '';
 };
 
-const hasPlan = (asked) => plans.PARTS.some((part) => asked[part] !== undefined) || asked.definitions !== undefined;
+const hasPlan = (asked) => plans.PARTS.some((part) => asked[part] !== undefined) || asked.definitions !== undefined || asked.dashboard !== undefined;
 
 /* '' for a project that can be asked for; otherwise what is wrong with the request. */
 const problemIn = (given) => {
@@ -230,14 +230,19 @@ const executors = {
                 made: parts.reduce((count, entry) => count + entry.items.filter((item) => item.made).length, 0),
                 parts, notMade: notMadeIn(parts, draft), ...(url ? { url } : {}),
             },
-            undo: { kind: UNDO_KIND, projectId },
+            undo: { kind: UNDO_KIND, projectId, ...(plans.madeDashboards(parts).length ? { dashboards: plans.madeDashboards(parts) } : {}) },
             entityType: 'project', entityId: projectId, entityName: project.ProjectName || '',
         };
     },
 };
 
+/* The project goes first: while it is kept, so is the dashboard its plan made. */
 const inverses = {
-    [UNDO_KIND]: (companyId, made, actor) => withdraw({ companyId, who: whoOf(actor), projectId: made.projectId }),
+    async [UNDO_KIND](companyId, made, actor) {
+        const who = whoOf(actor);
+        const gone = await withdraw({ companyId, who, projectId: made.projectId });
+        return listOf(made.dashboards).length ? { ...gone, ...(await plans.withdrawDashboardsOf({ companyId, who, dashboards: made.dashboards })) } : gone;
+    },
 };
 
 module.exports = { executors, inverses, draftOf, problemIn, refusedFor, mayCreate, withdraw, addressOf, viewKinds, startingStatuses, ACTION, UNDO_KIND, NAME_MIN, NAME_MAX, DESCRIPTION_MAX };

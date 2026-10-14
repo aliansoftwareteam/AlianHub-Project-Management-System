@@ -65,3 +65,19 @@ describe('the card line', () => {
         expect(card(t, {})).toBeNull();
     });
 });
+
+describe('the dashboard of a plan', () => {
+    const planned = DASHBOARD_LINE_KINDS.planDashboard;
+
+    it('names the dashboard and its cards by the titles the editor uses', () => {
+        expect(planned(t, { name: 'Overview', cards: ['DueSoonCard', 'TasksByStatusCard'] })).toEqual({
+            label: 'IntentPreview.line_new_dashboard',
+            text: 'IntentPreview.dashboard_with_cards|name=Overview,cards=Dash.card_DueSoonCard_title, Dash.card_TasksByStatusCard_title',
+        });
+    });
+
+    it('leaves out a card the catalogue does not have, and shows nothing without a name', () => {
+        expect(planned(t, { name: 'Overview', cards: ['NoSuchCard'] }).text).toBe('Overview');
+        expect(planned(t, { name: '  ', cards: ['DueSoonCard'] })).toBeNull();
+    });
+});

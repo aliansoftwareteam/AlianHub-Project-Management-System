@@ -4,7 +4,7 @@ const planLocks = require('../Agents/planLocks');
 
 // Picks name parts as "<part>:<place>", tasks counted across the lists in order; they can only leave parts out.
 
-const PARTS = Object.freeze(['lists', 'tasks', 'views', 'rules', 'agents']);
+const PARTS = Object.freeze(['lists', 'tasks', 'views', 'dashboards', 'rules', 'agents']);
 const REFUSED = Object.freeze({
     shape: 'The chosen parts must name, for each kind of part of the plan, the places to keep.',
     noList: 'Keep at least one list of the plan.',
@@ -21,6 +21,7 @@ const countsOf = (plan, { withGuide = false } = {}) => ({
     lists: sprintsOf(plan).length,
     tasks: tasksIn(plan).length,
     views: listOf(plan && plan.views).length,
+    dashboards: plan && plan.dashboard ? 1 : 0,
     rules: listOf(plan && plan.rules).length,
     agents: withGuide ? 1 : 0,
 });
@@ -67,6 +68,7 @@ const narrow = (plan, picks, { withGuide = false, locks = new Map() } = {}) => {
         views: listOf(plan.views).filter((view, at) => kept.views.has(at)),
         rules: listOf(plan.rules).filter((rule, at) => kept.rules.has(at)),
     };
+    if (!kept.dashboards.has(0)) delete narrowed.dashboard;
     return { plan: narrowed, withGuideAgent: withGuide && kept.agents.has(0) };
 };
 
