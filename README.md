@@ -481,106 +481,43 @@ A quick tour of AlianHub. [Try the live demo](https://demo.alianhub.com) to expl
 </picture>
 </p>
 
+<h4>Calendar view</h4>
+
+<p align="center">
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/aliansoftwareteam/AlianHub-Project-Management-System/main/.gitbook/assets/screenshots/calendar-dark.png">
+  <img src="https://raw.githubusercontent.com/aliansoftwareteam/AlianHub-Project-Management-System/main/.gitbook/assets/screenshots/calendar-light.png" alt="Calendar view of the Build list for one month, with each task as a bar from its start to its due date and an unscheduled tray" width="800">
+</picture>
+</p>
+
+<h4>Workload</h4>
+
+<p align="center">
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/aliansoftwareteam/AlianHub-Project-Management-System/main/.gitbook/assets/screenshots/workload-dark.png">
+  <img src="https://raw.githubusercontent.com/aliansoftwareteam/AlianHub-Project-Management-System/main/.gitbook/assets/screenshots/workload-light.png" alt="Workload grid with planned hours per person and day against each person's capacity, with task chips that can be dragged to rebalance" width="800">
+</picture>
+</p>
+
+<h4>Settings</h4>
+
+<p align="center">
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/aliansoftwareteam/AlianHub-Project-Management-System/main/.gitbook/assets/screenshots/settings-dark.png">
+  <img src="https://raw.githubusercontent.com/aliansoftwareteam/AlianHub-Project-Management-System/main/.gitbook/assets/screenshots/settings-light.png" alt="Workspace General settings with company details, working days, the tracker limit and project milestone statuses" width="800">
+</picture>
+</p>
+
+<h4>AI Ask</h4>
+
+<p align="center">
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/aliansoftwareteam/AlianHub-Project-Management-System/main/.gitbook/assets/screenshots/ai-ask-dark.png">
+  <img src="https://raw.githubusercontent.com/aliansoftwareteam/AlianHub-Project-Management-System/main/.gitbook/assets/screenshots/ai-ask-light.png" alt="AI Ask with a question typed about at-risk tasks, scope and research controls, and suggested starting points" width="800">
+</picture>
+</p>
+
 </details>
-
-
-### Dashboard
-
-<p align="center">
-  <a href="https://demo.alianhub.com" target="_blank">
-    <img src="https://raw.githubusercontent.com/aliansoftwareteam/AlianHub-Project-Management-System/main/.gitbook/assets/screenshots/dashboard.png" alt="AlianHub customizable dashboard showing task-by-assignee, workload-by-status, and calendar widgets" width="100%" />
-  </a>
-</p>
-
-<p align="center">
-  <em>Customizable home dashboard with drag-to-arrange widgets — Task by Assignee, Workload by Status, and a live Calendar view.</em>
-</p>
-
-### Board View (Kanban)
-
-<p align="center">
-  <a href="https://demo.alianhub.com" target="_blank">
-    <img src="https://raw.githubusercontent.com/aliansoftwareteam/AlianHub-Project-Management-System/main/.gitbook/assets/screenshots/board-view.png" alt="AlianHub Kanban board showing tasks grouped by status columns with due dates, assignees, and priority indicators" width="100%" />
-  </a>
-</p>
-
-<p align="center">
-  <em>Drag-and-drop Kanban board grouped by status (or any field). Cards show due date, assignee, priority, and sub-task count. Switch the same project to <strong>List, Table, Calendar, Workload</strong>, or a custom view at any time.</em>
-</p>
-
-### List View
-
-<p align="center">
-  <a href="https://demo.alianhub.com" target="_blank">
-    <img src="https://raw.githubusercontent.com/aliansoftwareteam/AlianHub-Project-Management-System/main/.gitbook/assets/screenshots/list-view.png" alt="AlianHub list view with tasks grouped by status, showing assignee, due date, priority, and bulk-action toolbar" width="100%" />
-  </a>
-</p>
-
-<p align="center">
-  <em>Dense list view grouped by status with sortable columns — Chat, Assignee, Due Date, Priority, Key, Created Date, Created By. Select one or many tasks to bulk-edit status, priority, assignees, due dates, tags, or delete/archive in a single click.</em>
-</p>
-
-### Calendar View
-
-<p align="center">
-  <a href="https://demo.alianhub.com" target="_blank">
-    <img src="https://raw.githubusercontent.com/aliansoftwareteam/AlianHub-Project-Management-System/main/.gitbook/assets/screenshots/calendar-view.png" alt="AlianHub monthly calendar view with tasks and sub-tasks as color-coded bars spanning days" width="100%" />
-  </a>
-</p>
-
-<p align="center">
-  <em>Monthly calendar with tasks rendered as color-coded bars spanning their start and due dates. Sub-tasks appear inline with their parent. Filter by yourself or any assignee, navigate month-to-month, or jump to today.</em>
-</p>
-
-### Task Detail
-
-<p align="center">
-  <a href="https://demo.alianhub.com" target="_blank">
-    <img src="https://raw.githubusercontent.com/aliansoftwareteam/AlianHub-Project-Management-System/main/.gitbook/assets/screenshots/task-detail.png" alt="AlianHub task detail view showing description, sub-tasks, custom fields, and right-side metadata panel with status, assignees, dates, and time estimates" width="100%" />
-  </a>
-</p>
-
-<p align="center">
-  <em>Full task editor with <strong>Task Details, Comments, Activity Log, and Time Log</strong> tabs. Add sub-tasks, define unlimited custom fields (text, number, email, checkbox, currency, etc.), attach files, and track estimated vs. actual hours in the always-visible right sidebar.</em>
-</p>
-
-### Workload Report
-
-<p align="center">
-  <a href="https://demo.alianhub.com" target="_blank">
-    <img src="https://raw.githubusercontent.com/aliansoftwareteam/AlianHub-Project-Management-System/main/.gitbook/assets/screenshots/workload-report.png" alt="AlianHub weekly workload timesheet showing logged vs. planned hours per user, drillable into projects and tasks" width="100%" />
-  </a>
-</p>
-
-<p align="center">
-  <em>Weekly <strong>workload + timesheet</strong> in a single view — see logged vs. planned hours per user, drill down into projects and individual tasks, navigate any date range, and toggle between automatically tracked time and manual entries. A capacity-planning differentiator that most open-source PMS tools don't ship.</em>
-</p>
-
-### Settings & Customization
-
-<p align="center">
-  <a href="https://demo.alianhub.com" target="_blank">
-    <img src="https://raw.githubusercontent.com/aliansoftwareteam/AlianHub-Project-Management-System/main/.gitbook/assets/screenshots/settings.png" alt="AlianHub company settings page with task priorities, milestone statuses, multi-currency support, and a deep customization sidebar" width="100%" />
-  </a>
-</p>
-
-<p align="center">
-  <em>Deep, per-company customization — company info, <strong>custom task priorities with icons</strong>, milestone statuses with past/future calendar visibility, multi-currency support, members & teams, project templates, custom field manager, role-based security &amp; permissions, time-tracking rules, and notification preferences.</em>
-</p>
-
-### AI Assist
-
-<p align="center">
-  <a href="https://demo.alianhub.com" target="_blank">
-    <img src="https://raw.githubusercontent.com/aliansoftwareteam/AlianHub-Project-Management-System/main/.gitbook/assets/screenshots/ai-assist.png" alt="AlianHub AI assist modal with prompt templates across Marketing, Sales, Email, SEO, and Services" width="100%" />
-  </a>
-</p>
-
-<p align="center">
-  <em>AI available everywhere — generate tasks, sub-tasks, checklists, project plans, and task descriptions from natural language. Pre-built prompt templates across <strong>Marketing, Sales, Email, SEO, and Services</strong> to jump-start your work without staring at a blank field.</em>
-</p>
-
-<!-- More screenshots added here as new modules are captured -->
 
 ---
 
