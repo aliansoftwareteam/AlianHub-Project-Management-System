@@ -7443,9 +7443,9 @@ export default {
         "are_you_sure": "Вы уверены?",
         "no_revert_msg": "Вы не сможете отменить это!",
         "yes_delete": "Да, удалить!",
-        "task_will_become_subtasks_of": "задача станет подзадачей",
+        "task_moves_under": "{task} will become a subtask of {parent}.",
+        "task_and_subtasks_move_under": "{task} will become a subtask of {parent}. Its own subtasks stay under it and move with it.",
         "Are_you_sure_you_want_to_delete": "Вы уверены, что хотите удалить?",
-        "subtasks_will_become_subtasks_of": "subtasks stay under it and move with it under",
         "unlock_board_view": "Чтобы разблокировать представление доски",
         "unlock_project_detail_view": "Чтобы разблокировать представление деталей проекта",
         "unlock_table_view": "Чтобы разблокировать представление таблицы",
@@ -10233,7 +10233,7 @@ export default {
         "mearge_task_into": "Объединить задачу в"
     },
     "Converttolist": {
-        "are_you_sure_convert": "Вы уверены, что хотите преобразовать эту задачу в список?",
+        "confirm_convert": "Вы уверены, что хотите преобразовать эту задачу в список?",
         "important": "Важно",
         "you_will_lose": "Вы потеряете все вложенные комментарии. Это действие невозможно отменить.",
         "convert_to_list": "Преобразовать в список"

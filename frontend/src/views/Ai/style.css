@@ -32,6 +32,9 @@
 .ai-inbox { display: grid; grid-template-columns: 340px 1fr; min-height: 0; flex: 1; }
 .ai-inbox__list { border-right: 1px solid var(--hairline); background: var(--surface); overflow: auto; min-height: 0; }
 .ai-inbox__tabs { padding: 12px 14px; border-bottom: 1px solid var(--hairline); position: sticky; top: 0; background: var(--surface); z-index: 1; }
+.ai-inbox__tabs .ah-tabs { display: flex; flex-wrap: wrap; }
+.ai-inbox__tabs .ah-tab { display: inline-flex; align-items: center; gap: 4px; white-space: nowrap; }
+.ai-inbox__tabs .ai-side__count { margin-left: 0; }
 .ai-item {
     width: 100%; text-align: left; display: block;
     padding: 12px 14px; border: 0; border-bottom: 1px solid var(--hairline);

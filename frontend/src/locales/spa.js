@@ -7443,9 +7443,9 @@ export default {
         "are_you_sure": "¿Estás seguro?",
         "no_revert_msg": "¡No podrás revertir esto!",
         "yes_delete": "¡Sí, elimínalo!",
-        "task_will_become_subtasks_of": "la tarea se convertirá en subtareas de",
+        "task_moves_under": "{task} will become a subtask of {parent}.",
+        "task_and_subtasks_move_under": "{task} will become a subtask of {parent}. Its own subtasks stay under it and move with it.",
         "Are_you_sure_you_want_to_delete": "¿Estás seguro de que deseas eliminar",
-        "subtasks_will_become_subtasks_of": "subtasks stay under it and move with it under",
         "unlock_board_view": "Para desbloquear la vista de tablero",
         "unlock_project_detail_view": "Para desbloquear la vista de detalles del proyecto",
         "unlock_table_view": "Para desbloquear la vista de tabla",
@@ -10233,7 +10233,7 @@ export default {
         "mearge_task_into": "Fusionar tarea en"
     },
     "Converttolist": {
-        "are_you_sure_convert": "¿Estás seguro de que deseas convertir esta tarea en una lista?",
+        "confirm_convert": "¿Estás seguro de que deseas convertir esta tarea en una lista?",
         "important": "Importante",
         "you_will_lose": "Perderás todos los comentarios en hilo. Esta acción no se puede deshacer.",
         "convert_to_list": "Convertir en lista"

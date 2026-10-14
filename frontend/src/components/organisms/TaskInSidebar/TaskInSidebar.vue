@@ -138,7 +138,7 @@ const props = defineProps({
     },
     item: {
         type: Object,
-        default: () => {}
+        default: () => ({})
     },
     isDuplicate: {
         type: Boolean,

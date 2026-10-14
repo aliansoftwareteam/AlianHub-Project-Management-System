@@ -244,7 +244,7 @@
         },
         item: {
             type: Object,
-            default: () => {}
+            default: () => ({})
         },
         // Bulk multi-task move. Reuses the project + sprint/folder picker but
         // skips the single-task conversion/assignee modals — on confirm it

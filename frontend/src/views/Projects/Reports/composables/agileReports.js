@@ -1,6 +1,7 @@
 import { apiRequest } from '@/services';
 import * as env from '@/config/env';
 import { forecastBand, completedSeries } from './forecast';
+import { dayText } from '@/utils/clockText';
 
 const dataOf = (res) => {
     const body = res && res.data;
@@ -37,6 +38,9 @@ export const burndownSeries = (days, { metric = 'points', remaining = '', ideal 
     ];
 };
 
+/* The days come as local YYYY-MM-DD keys, which Date would read as UTC midnight. */
+export const dayLabel = (value) => dayText(/^\d{4}-\d{2}-\d{2}$/.test(String(value)) ? `${value}T00:00:00` : value) || String(value ?? '');
+
 export const burndownOptions = (days, { id = 'sprint-burndown', markers = [] } = {}) => ({
     chart: { id, toolbar: { show: false }, animations: { enabled: false }, fontFamily: 'Inter Tight, sans-serif' },
     // Remaining is the data series and stays literal. The ideal line is a reference rule, not data, so
@@ -45,7 +49,7 @@ export const burndownOptions = (days, { id = 'sprint-burndown', markers = [] } =
     stroke: { width: [2.5, 1.5], dashArray: [0, 5], curve: 'straight' },
     dataLabels: { enabled: false },
     markers: { size: 0 },
-    xaxis: { categories: (days || []).map((d) => d.date), labels: { rotate: -45, hideOverlappingLabels: true, style: { fontSize: '10px' } }, tooltip: { enabled: false } },
+    xaxis: { categories: (days || []).map((d) => d.date), labels: { rotate: -45, hideOverlappingLabels: true, style: { fontSize: '10px' }, formatter: dayLabel }, tooltip: { enabled: false } },
     yaxis: { min: 0, labels: { style: { fontSize: '10px' } } },
     legend: { position: 'top', horizontalAlign: 'right', fontSize: '11px' },
     annotations: { xaxis: markers },

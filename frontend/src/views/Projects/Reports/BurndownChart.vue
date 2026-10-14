@@ -34,7 +34,7 @@ import { ref, computed, onMounted } from 'vue';
 import { useI18n } from 'vue-i18n';
 import { apiRequest } from '@/services';
 import { downloadReportPdf, chartImage } from './reportsPdf';
-import { sprintChoices } from './composables/agileReports';
+import { sprintChoices, dayLabel } from './composables/agileReports';
 
 const props = defineProps({
     projectData: { type: Object, default: () => ({}) },
@@ -94,7 +94,7 @@ const chartOptions = computed(() => ({
     colors: ['#bdbdbd', '#2F3990'],
     stroke: { curve: 'straight', width: [2, 3], dashArray: [6, 0] },
     markers: { size: 0 },
-    xaxis: { categories: categories.value, labels: { rotate: -45, hideOverlappingLabels: true } },
+    xaxis: { categories: categories.value, labels: { rotate: -45, hideOverlappingLabels: true, formatter: dayLabel } },
     yaxis: { min: 0, title: { text: metric.value === 'points' ? t('Reports.burndown_points_remaining') : t('Reports.burndown_tasks_remaining') } },
     legend: { position: 'top' },
     title: { text: data.value && data.value.sprintName ? t('Reports.burndown_chart_title', { sprint: data.value.sprintName }) : t('Reports.burndown_chart_title_default') },

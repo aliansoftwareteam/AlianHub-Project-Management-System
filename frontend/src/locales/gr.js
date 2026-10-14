@@ -7443,9 +7443,9 @@ export default {
         "are_you_sure": "Είστε σίγουροι;",
         "no_revert_msg": "Δεν θα μπορείτε να το επαναφέρετε!",
         "yes_delete": "Ναι, διαγράψτε το!",
-        "task_will_become_subtasks_of": "Η εργασία θα γίνει υποεργασίες του",
+        "task_moves_under": "{task} will become a subtask of {parent}.",
+        "task_and_subtasks_move_under": "{task} will become a subtask of {parent}. Its own subtasks stay under it and move with it.",
         "Are_you_sure_you_want_to_delete": "Είστε σίγουροι ότι θέλετε να διαγράψετε",
-        "subtasks_will_become_subtasks_of": "subtasks stay under it and move with it under",
         "unlock_board_view": "Για να ξεκλειδώσετε την προβολή Πίνακα",
         "unlock_project_detail_view": "Για να ξεκλειδώσετε την προβολή Λεπτομερειών Έργου",
         "unlock_table_view": "Για να ξεκλειδώσετε την προβολή Πίνακα",
@@ -10233,7 +10233,7 @@ export default {
         "mearge_task_into": "Συγχώνευση Εργασίας"
     },
     "Converttolist": {
-        "are_you_sure_convert": "Είστε σίγουροι ότι θέλετε να μετατρέψετε αυτήν την εργασία σε Λίστα;",
+        "confirm_convert": "Είστε σίγουροι ότι θέλετε να μετατρέψετε αυτήν την εργασία σε Λίστα;",
         "important": "Σημαντικό",
         "you_will_lose": "Θα χάσετε όλα τα συνδεδεμένα σχόλια. Αυτή η ενέργεια δεν μπορεί να αναιρεθεί.",
         "convert_to_list": "Μετατροπή σε λίστα"
