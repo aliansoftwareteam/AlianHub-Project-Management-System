@@ -121,7 +121,7 @@ const props = defineProps({
     },
     searchTaskData: {
         type: Array,
-        default: () => {}
+        default: () => []
     },
     cardUID : {
         type: String,

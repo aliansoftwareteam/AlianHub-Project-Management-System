@@ -87,7 +87,7 @@ const activeAnything = require('@/assets/images/svg/active-anything.svg')
 const props = defineProps({
     projectData: {
         type: Object,
-        default: () => {}
+        default: () => ({})
     },
 })
 

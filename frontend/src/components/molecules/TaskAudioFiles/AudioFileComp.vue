@@ -24,7 +24,7 @@ const {getDateAndTime} = useProjects();
 defineProps({
     audioObject: {
         type: Object,
-        default: () => {}
+        default: () => ({})
     },
 })
 </script>

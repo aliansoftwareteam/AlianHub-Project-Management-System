@@ -89,7 +89,7 @@ const emit = defineEmits(['handleUpdateFromCard']);
 const props = defineProps({
     companyUserDetail: {
         type: Object,
-        default: () => { }
+        default: () => ({})
     },
     cardUID: {
         type: String,
@@ -97,7 +97,7 @@ const props = defineProps({
     },
     cardData: {
         type: Object,
-        default: () => { }
+        default: () => ({})
     },
     allProjectsArrayFilter: {
         type: Array,
@@ -105,7 +105,7 @@ const props = defineProps({
     },
     taskStatusArray: {
         type: Object,
-        default: () => {}
+        default: () => ({})
     },
     componentId: {
         type: String,

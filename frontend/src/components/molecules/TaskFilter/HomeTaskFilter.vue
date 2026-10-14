@@ -87,7 +87,7 @@ const allUsersArray = computed(() => getters["users/users"]);
 const props = defineProps({
     projectData: {
         type: Object,
-        default: () => {}
+        default: () => ({})
     },
     selectedProjects: {
         type: Array,
@@ -95,7 +95,7 @@ const props = defineProps({
     },
     selected: {
         type: Array,
-        default: () => {}
+        default: () => []
     },
     isValidateFilter: {
         type: Boolean,

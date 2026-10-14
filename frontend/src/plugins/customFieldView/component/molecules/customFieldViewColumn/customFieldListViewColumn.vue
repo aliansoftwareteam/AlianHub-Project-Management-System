@@ -78,11 +78,11 @@
     const props = defineProps({
         projectData:{
             type:Object,
-            default:() => {}
+            default:() => ({})
         },
         task:{
             type:Object,
-            default:() => {}
+            default:() => ({})
         }
     });
 

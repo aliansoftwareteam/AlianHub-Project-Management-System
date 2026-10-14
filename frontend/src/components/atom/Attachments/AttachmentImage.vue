@@ -88,7 +88,7 @@ const emit = defineEmits(["delete", "click"]);
 const props = defineProps({
     data: {
         type: Object,
-        default: () => {}
+        default: () => ({})
     },
     isDelete: {
         type: Boolean,

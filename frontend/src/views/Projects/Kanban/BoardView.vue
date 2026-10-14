@@ -115,7 +115,7 @@ const props = defineProps({
     grouped: { type: [Number, String], default: 0 },
     commonDateFormatForDate: { type: String, default: "DD/MM/YYYY" },
     sprints: { type: Array, default: () => [] },
-    projectData: { type: Object, default: () => { } },
+    projectData: { type: Object, default: () => ({}) },
 });
 
 defineEmits(['change']);

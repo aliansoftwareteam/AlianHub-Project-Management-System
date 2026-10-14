@@ -41,7 +41,7 @@
     const props = defineProps({
         projectDetail:{
             type: Object,
-            default: () => {}
+            default: () => ({})
         },
         editPermission:{
             type: [Boolean, Number],

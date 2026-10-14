@@ -22,7 +22,7 @@
     const props = defineProps({
         companyUserDetail: {
             type: Object,
-            default: () => { }
+            default: () => ({})
         },
         cardUID: {
             type: String,
@@ -30,7 +30,7 @@
         },
         cardData: {
             type: Object,
-            default: () => { }
+            default: () => ({})
         },
         allProjectsArrayFilter: {
             type: Array,
@@ -38,7 +38,7 @@
         },
         taskStatusArray: {
             type: Object,
-            default: () => {}
+            default: () => ({})
         },
         componentId: {
             type: String,
@@ -46,7 +46,7 @@
         },
         filterData: {
             type: Object,
-            default: () => {}
+            default: () => ({})
         }
     });
 

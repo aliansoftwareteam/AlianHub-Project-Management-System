@@ -242,11 +242,11 @@ const props = defineProps({
     },
     cardData: {
         type: Object,
-        default: () => { }
+        default: () => ({})
     },
     filterData: {
         type: Array,
-        default: () => { }
+        default: () => []
     },
     cardUID : {
         type: String,
@@ -261,7 +261,7 @@ const props = defineProps({
     },
     companyUserDetail: {
         type: Object,
-        default: () => {}
+        default: () => ({})
     },
     // Incremented by the card-header refresh icon (HomePage refreshKeys).
     // Watched below to re-run the active load path.

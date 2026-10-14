@@ -30,7 +30,7 @@
     const props = defineProps({
         detail:{
             type:Object,
-            default:() => {}
+            default:() => ({})
         }
     });
     const limits = computed(() => dateFieldLimits(props.detail));

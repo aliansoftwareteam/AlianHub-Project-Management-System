@@ -228,7 +228,7 @@
         billingPeriod:{type:String,required:true},
         rangeObject:{type:Object,required:true},
         currency:{type:Object,required:true},
-        disableStartEndDate:{type:Object,default: () => {}},
+        disableStartEndDate:{type:Object,default: () => ({})},
         projectId:{type:String,required:false},
         companyId:{type:String,required:false},
     });

@@ -52,7 +52,7 @@
     const props = defineProps({
         projectData:{
             type:Object,
-            default:() => {}
+            default:() => ({})
         }
     })
     const isSpinner = ref(false)

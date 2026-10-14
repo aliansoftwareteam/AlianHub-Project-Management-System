@@ -303,11 +303,11 @@ const props = defineProps({
     },
     task: {
         type: Object,
-        default: () => {},
+        default: () => ({}),
     },
     selectedConvertTask: {
         type: Object,
-        default: () => {},
+        default: () => ({}),
     },
     subTaskConfirm: {
         type: Boolean,
@@ -323,15 +323,15 @@ const props = defineProps({
     },
     oldStatus: {
         type: Array,
-        default: () => {},
+        default: () => [],
     },
     oldTaskType: {
         type: Array,
-        default: () => {},
+        default: () => [],
     },
     selectedProjectData: {
         type: Object,
-        default: () => {},
+        default: () => ({}),
     },
     errorMsg: {
         type: String,
@@ -343,7 +343,7 @@ const props = defineProps({
     },
     data: {
         type: Object,
-        default: () => {},
+        default: () => ({}),
     },
     taskConfirm: {
         type: Boolean,
@@ -371,7 +371,7 @@ const props = defineProps({
     },
     selectedSprintData : {
         type: Object,
-        default: () => {},
+        default: () => ({}),
     }
 });
 

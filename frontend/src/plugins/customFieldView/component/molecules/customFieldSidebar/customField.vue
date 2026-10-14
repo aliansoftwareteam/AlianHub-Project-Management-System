@@ -82,7 +82,7 @@
     const props = defineProps({
         componentDetails:{
             type:Object,
-            default:() => {}
+            default:() => ({})
         },
         pageInd:{
             type:Number,
@@ -90,7 +90,7 @@
         },
         customFieldObject:{
             type:Object,
-            default:() => {}
+            default:() => ({})
         },
         isType:{
             type:Boolean,

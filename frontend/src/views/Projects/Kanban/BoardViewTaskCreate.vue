@@ -164,7 +164,7 @@
         },
         sprintData: {
             type: Object,
-            default: () => {}
+            default: () => ({})
         },
         isSubTask: {
             type: Boolean,

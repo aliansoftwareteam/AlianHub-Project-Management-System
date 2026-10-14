@@ -255,7 +255,7 @@ const props = defineProps({
     },
     message: {
         type: Object,
-        default: () => {}
+        default: () => ({})
     },
     showDay: {
         type: Boolean,

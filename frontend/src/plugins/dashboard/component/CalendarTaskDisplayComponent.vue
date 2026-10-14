@@ -33,7 +33,7 @@
     // props
     const props = defineProps({
         taskObject : {type:Object,required:true},
-        findParticularProject: {type:Object,default: ()=>{}},
+        findParticularProject: {type:Object,default: () => ({})},
     });
     const emit = defineEmits([
         'openTaskDetailSidebar'

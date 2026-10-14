@@ -26,7 +26,7 @@
     const props = defineProps({
         data: {
             type: Object,
-            default: () => {}
+            default: () => ({})
         },
         widthData: {
             type: Number,

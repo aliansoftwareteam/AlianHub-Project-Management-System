@@ -79,15 +79,15 @@ const props = defineProps({
     },
     updatedObject: {
         type: Object,
-        default: () => { }
+        default: () => ({})
     },
     cardData: {
         type: Object,
-        default: () => { }
+        default: () => ({})
     },
     filterData: {
         type: Array,
-        default: () => { }
+        default: () => []
     },
 });
 

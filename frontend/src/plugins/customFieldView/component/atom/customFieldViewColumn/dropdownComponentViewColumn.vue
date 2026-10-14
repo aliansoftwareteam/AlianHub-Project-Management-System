@@ -35,7 +35,7 @@ import Sidebar from '@/components/molecules/Sidebar/Sidebar.vue';
 const props = defineProps({
     detail: {
         type: Object,
-        default: () => {}
+        default: () => ({})
     }
 });
 

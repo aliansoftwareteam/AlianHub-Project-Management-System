@@ -18,7 +18,7 @@
     const props = defineProps({
         detail:{
             type:Object,
-            default:() => {}
+            default:() => ({})
         }
     });
     const emit = defineEmits(['blurUpdate','inputUpdate','handleEdit']);
