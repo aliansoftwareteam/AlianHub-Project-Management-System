@@ -375,11 +375,7 @@ input[type="color"]::-moz-color-swatch {
     from, to { opacity: 0; }
     50% { opacity: 1; }
 }
-.inital-box:not(img):not(.profile-sm-square),
-.project-firtsleeter-box,
-span.ProjectFirstLatter,
-.rap-icon:not(.rap-icon-img),
-.ah-letter-tile {
+.ah-letter-tile:not(img):not([style*="background-image"]) {
     background-image: linear-gradient(var(--tile-scrim), var(--tile-scrim));
-    color: var(--tile-ink) !important;
+    color: var(--tile-ink);
 }

@@ -27,9 +27,22 @@ describe('a project letter tile', () => {
         expect(whiteOn(rgbOf('#6473e8'))).toBeLessThan(4.5);
     });
 
-    it('is drawn with the scrim and the tile ink wherever the app shows one', () => {
-        const rule = /([^{}]+)\{\s*background-image:\s*linear-gradient\(var\(--tile-scrim\), var\(--tile-scrim\)\);\s*color:\s*var\(--tile-ink\)\s*!important;\s*\}/.exec(shared);
+    it('is drawn with the scrim and the tile ink on project letter tiles alone, never over an image', () => {
+        const rule = /([^{}]+)\{\s*background-image:\s*linear-gradient\(var\(--tile-scrim\), var\(--tile-scrim\)\);\s*color:\s*var\(--tile-ink\);\s*\}/.exec(shared);
         expect(rule).not.toBeNull();
-        ['.inital-box', '.project-firtsleeter-box', 'span.ProjectFirstLatter', '.rap-icon'].forEach((selector) => expect(rule[1]).toContain(selector));
+        expect(rule[1].trim()).toBe('.ah-letter-tile:not(img):not([style*="background-image"])');
+    });
+
+    it('is marked on every project-coloured letter tile, and on no person\'s avatar', () => {
+        const src = (file) => readFileSync(resolve(__dirname, '../../src', file), 'utf8');
+        [
+            'components/organisms/Item/Item.vue', 'components/molecules/ConvertToList/ConvertToList.vue', 'components/molecules/ConvertToSubTaskSidebar/ConvertToSubTaskSidebar.vue',
+            'components/molecules/ProjectsListingSetting/ProjectsListingSetting.vue', 'components/templates/Dashboard/DropDownListComponent.vue', 'views/Projects/Projects.vue',
+            'views/Projects/components/ProjectActionsBar.vue', 'components/molecules/RecentlyAddedProjects/RecentlyAddedProjects.vue',
+        ].forEach((file) => {
+            const tiles = src(file).split('\n').filter((line) => /projectIcon\??\.type === 'color'/.test(line) && /<span/.test(line));
+            tiles.forEach((line) => expect(line, file).toContain('ah-letter-tile'));
+        });
+        expect(src('components/atom/AvatarImage/AvatarImage.vue')).not.toContain('ah-letter-tile');
     });
 });

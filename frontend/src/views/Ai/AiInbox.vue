@@ -398,6 +398,8 @@ const shortTime = (at) => {
 watch(selectedApproval, () => { approvalError.value = ""; });
 
 watch(selected, (p) => {
+    // Opening another proposal takes away the link to what the last approval made.
+    if (p) opened.value = "";
     editing.value = false;
     declining.value = false;
     error.value = "";
@@ -420,6 +422,7 @@ const reload = async ({ inPlace = false } = {}) => {
 
 const switchView = async (key) => {
     view.value = key;
+    opened.value = "";
     selected.value = null;
     selectedApproval.value = null;
     selectedReport.value = null;
@@ -461,6 +464,7 @@ const onApprove = async () => {
     error.value = "";
     try {
         const body = wholeChanges.value ? (canPick.value && partsChoice(editable.value, leftOutAt)) || {} : { changes: editable.value.map(asFiled) };
+        opened.value = "";
         const out = await decide(selected.value._id, "approve", body);
         opened.value = openedProjectId(out);
         const unapplied = unappliedOf(out);
@@ -491,6 +495,7 @@ const onDecline = async (reason = "") => {
     busy.value = true;
     error.value = "";
     try {
+        opened.value = "";
         await decide(selected.value._id, "decline", reason ? { reason } : {});
         declining.value = false;
         await afterDecision(t("Ai.declined_done"));

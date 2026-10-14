@@ -45,11 +45,11 @@ const CREATE_USER_RESPONSE = { data: { status: true, statusText: { _id: USER_ID,
 const LOGIN_RESPONSE = { status: 200, data: { uid: USER_ID, accessToken: 'token', refreshToken: 'refresh' } };
 const acceptedRow = (roleType) => ({ data: { status: true, statusText: 'Invitation accepted.', data: { _id: INVITE_ID, userId: USER_ID, roleType, status: 2 } } });
 
-const submitInvitation = async (roleType) => {
+const submitInvitation = async (roleType, memberAnswer = () => acceptedRow(roleType)) => {
     mocks.apiRequestWithoutSecure.mockResolvedValue(LOGIN_RESPONSE);
     mocks.apiRequestWithoutCompnay.mockImplementation(async (type, url) => {
         if (url === env.CREATE_USER_V2) return CREATE_USER_RESPONSE;
-        if (url === env.API_ROOT_MEMBERS) return acceptedRow(roleType);
+        if (url === env.API_ROOT_MEMBERS) return memberAnswer();
         if (url === env.COMPANYINVITATION) return { data: { _id: COMPANY_ID } };
         throw new Error(`unexpected ${type} ${url}`);
     });
@@ -101,6 +101,19 @@ describe('Invitation page accepting an invitation', () => {
         expect(mocks.push).not.toHaveBeenCalledWith({ name: 'Log-in' });
         expect(mocks.replace).toHaveBeenCalledWith(`/${COMPANY_ID}/welcome/connect-ai`);
         expect(reload).toHaveBeenCalled();
+    });
+
+    it.each([
+        ['the member row is refused', () => ({ data: { status: false, statusText: 'Invitation not found.' } }), null],
+        ['the member row update throws', () => { throw new Error('network'); }, null],
+        ['the fresh session cannot be had', undefined, 'second'],
+    ])('signs the new account out and opens nothing when %s', async (_label, memberAnswer, failing) => {
+        if (failing === 'second') mocks.getAuth.mockResolvedValueOnce(undefined).mockRejectedValueOnce(new Error('refresh failed'));
+        const wrapper = await submitInvitation(3, memberAnswer);
+        expect(mocks.logOut).toHaveBeenCalledWith({ islogOut: true });
+        expect(mocks.replace).not.toHaveBeenCalled();
+        expect(reload).not.toHaveBeenCalled();
+        expect(wrapper.find('.auth__banner').exists()).toBe(true);
     });
 
     it('links the invitation row to the signed-in user, presenting the link token', async () => {

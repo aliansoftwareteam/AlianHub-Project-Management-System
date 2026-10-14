@@ -112,7 +112,7 @@
                                             v-show="filterType.toLowerCase()=='projects'">
                                                 <a class="vs-dropdown-users d-flex align-items-center">
                                                     <input type="checkbox" class="ah-check" v-show="filterType.toLowerCase() == 'users'" @click="handleFilterItem(item,'checkEvent')" :value="item.id" v-model="checkedFilter">&nbsp;
-                                                    <span v-if="item?.projectIcon && item?.projectIcon.type === 'color'" class="d-flex align-items-center justify-content-center inital-box" :style="[{'background-color': item?.projectIcon.data}]">{{ item?.name.charAt(0).toUpperCase()}}</span>
+                                                    <span v-if="item?.projectIcon && item?.projectIcon.type === 'color'" class="ah-letter-tile d-flex align-items-center justify-content-center inital-box" :style="[{'background-color': item?.projectIcon.data}]">{{ item?.name.charAt(0).toUpperCase()}}</span>
                                                     <img v-if="item?.projectIcon && item?.projectIcon.type === 'image' && validateURL(item?.projectIcon.data)" class="profile-sm-square inital-box" :src="item?.projectIcon.data" alt=""/>
                                                     <WasabiImage 
                                                         v-if="item?.projectIcon && item?.projectIcon.type === 'image' && !validateURL(item?.projectIcon.data)"

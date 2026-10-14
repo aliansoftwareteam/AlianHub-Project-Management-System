@@ -222,7 +222,7 @@
                             <template v-else-if="displayType === 'project'">
                                 <div class="d-flex align-items-center justify-content-between w-100 project-custom-checkbox" :class="{'h-20': clientWidth > 767}">
                                     <span class="d-flex align-items-center">
-                                        <span v-if="item.projectIcon && item.projectIcon.type === 'color'" class="d-flex align-items-center justify-content-center font-weight-400 inital-box" :style="[{'background-color': item.projectIcon.data}]">
+                                        <span v-if="item.projectIcon && item.projectIcon.type === 'color'" class="ah-letter-tile d-flex align-items-center justify-content-center font-weight-400 inital-box" :style="[{'background-color': item.projectIcon.data}]">
                                             {{ item.ProjectName.charAt(0).toUpperCase()}}
                                         </span>
                                         <WasabiImage v-if="item.projectIcon && item.projectIcon.type === 'image'" :data="{ url: item.projectIcon.data }" class="inital-box" />

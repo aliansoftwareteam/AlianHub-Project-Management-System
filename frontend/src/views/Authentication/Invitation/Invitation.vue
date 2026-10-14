@@ -208,6 +208,7 @@ const submit = async () => {
     if (!validate() || busy.value) return;
     busy.value = true;
     banner.value = "";
+    let signedIn = false;
     try {
         const response = await apiRequestWithoutCompnay("post", env.CREATE_USER_V2, {
             ...splitName(form.name),
@@ -225,6 +226,7 @@ const submit = async () => {
         }
         const user = await apiRequestWithoutSecure("post", env.LOGIN, { email: email.value, password: form.password });
         if (user.status !== 200) { logOut({ islogOut: true }); banner.value = t("Auth.server_error"); return; }
+        signedIn = true;
         await getAuth(user.data.uid, true);
         localStorage.setItem("selectedCompany", companyIdRoute.value);
         const signedInUserId = String(user.data.uid);
@@ -253,6 +255,8 @@ const submit = async () => {
         await openJoinedWorkspace();
     } catch (error) {
         console.error(error);
+        // No session may outlive a join that did not finish: the account would be signed in with no workspace.
+        if (signedIn) logOut({ islogOut: true });
         banner.value = t("Auth.server_error");
     } finally {
         busy.value = false;
