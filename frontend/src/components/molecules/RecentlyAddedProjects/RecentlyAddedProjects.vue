@@ -31,7 +31,7 @@
                 <!-- Project icon — mirrors the project dropdown / sidebar rendering -->
                 <span
                     v-if="p.projectIcon && p.projectIcon.type === 'color'"
-                    class="rap-icon"
+                    class="rap-icon ah-letter-tile"
                     :style="{ backgroundColor: p.projectIcon.data }"
                 >{{ initial(p) }}</span>
                 <WasabiImage

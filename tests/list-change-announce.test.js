@@ -23,6 +23,7 @@ const { myCache } = require('../Config/config');
 const { SCHEMA_TYPE } = require('../Config/schemaType');
 const socketEmitter = require('../event/socketEventEmitter');
 const controller = require('../Modules/Sprints/controller');
+const { COUNT_GATHER_MS } = require('../Modules/Sprints/helpers/listEvents');
 
 const C = 'c00000000000000000000001';
 const OWNER = 'a00000000000000000000001';
@@ -128,14 +129,25 @@ describe('a list write says which list changed', () => {
     });
 });
 
-describe('a list write says nothing', () => {
-    it('when only the count of its tasks moves', async () => {
+describe('a change to the count of a list\'s tasks', () => {
+    it('is said once, a moment later, for a burst of task writes', async () => {
         const list = sprintIn();
-        const answer = await controller.updateSprintFun({ params: { id: list }, body: { companyId: C, projectId: project, updateObject: { $inc: { tasks: 1 } }, userData: { id: OWNER, Employee_Name: 'Olivia' } } });
-        await settle();
-        expect(answer).toMatchObject({ status: true });
-        expect(announced()).toEqual([]);
+        jest.useFakeTimers({ doNotFake: ['nextTick', 'setImmediate', 'queueMicrotask'] });
+        try {
+            const inc = () => controller.updateSprintFun({ params: { id: list }, body: { companyId: C, projectId: project, updateObject: { $inc: { tasks: 1 } }, userData: { id: OWNER, Employee_Name: 'Olivia' } } });
+            expect(await inc()).toMatchObject({ status: true });
+            expect(await inc()).toMatchObject({ status: true });
+            await settle();
+            expect(announced()).toEqual([]);
+            jest.advanceTimersByTime(COUNT_GATHER_MS);
+            expect(announced()).toEqual([saidOf(list)]);
+        } finally {
+            jest.useRealTimers();
+        }
     });
+});
+
+describe('a list write says nothing', () => {
 
     it('when it is refused or finds no list', async () => {
         await run(PATCH, { id: oid(), body: { type: 'editSprintName', projectId: project, sprintName: 'Nothing' } });

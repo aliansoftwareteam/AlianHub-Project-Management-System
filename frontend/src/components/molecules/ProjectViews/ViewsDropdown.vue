@@ -87,7 +87,7 @@ const { getters,commit } = useStore();
 const props = defineProps({
     projectData:{
         type:Object,
-        default:() => {}
+        default:() => ({})
     },
     tourId: {
         type: String,

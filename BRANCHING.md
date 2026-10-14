@@ -1,6 +1,6 @@
 # Branching Strategy
 
-AlianHub uses a **three-branch model** with a clear separation between stable releases, the pre-release line and active development. This guide documents how branches flow, what each branch is for, and how contributors should work with them.
+AlianHub uses a **two-branch model**: `main` holds stable releases and `staging` is where all work lands. (`beta` was retired on 2026-10-14; nothing branches from it or targets it any more.) This guide documents how branches flow, what each branch is for, and how contributors should work with them.
 
 ---
 
@@ -9,16 +9,16 @@ AlianHub uses a **three-branch model** with a clear separation between stable re
 | Branch | Purpose | Stability | Direct push? |
 |---|---|---|---|
 | `main` | Stable, public-facing | Production-ready | ❌ PR + review only |
-| `staging` | Pre-release, deployed to the demo/staging server | Release candidate | ❌ PR + CI only |
-| `beta` | Active development — where topic branches land | Work in progress, always green | ❌ PR + CI only |
+| `staging` | Active development — where topic branches land; deployed to the staging server | Work in progress, always green | ❌ PR + CI only |
 | `<type>/<desc>` | Feature / fix / chore branches | Work in progress | ✅ Your branch |
 
-- **Internal contributors** → branch off `beta` → PR back to `beta`
-- **External contributors** → fork → branch off `beta` → PR back to `beta`
-- **Promotion** → `beta` → `staging` (deploys the demo server) → `main` (release)
-- **Production hotfixes** → branch off `main` → PR to `main` → backport to `staging` and `beta`
+- **Internal contributors** → branch off `staging` → PR back to `staging`
+- **External contributors** → fork → branch off `staging` → PR back to `staging`
+- **Promotion** → `staging` → `main` (release, cut by release-please)
+- **Production hotfixes** → branch off `main` → PR to `main` → backport to `staging`
+- **Deploys** → every merge into `staging` deploys the staging server (the `CI / Deploy` workflow, `.github/workflows/main.yml`)
 
-**CI gate.** `.github/workflows/ci.yml` runs on every pull request and push to `beta`, `staging` and `main`: backend `npm run lint` + `npm test`, frontend lint + `npm test` (Vitest) + `npm run build`. A red check blocks the merge; see [docs/DEVELOPER-GUIDE.md](docs/DEVELOPER-GUIDE.md) for what each job checks. The sections below describe the `staging → main` promotion; `beta → staging` follows the same PR-with-merge-commit rule.
+**CI gate.** `.github/workflows/ci.yml` runs on every pull request and push to `staging` and `main`: backend `npm run lint` + `npm test`, frontend lint + `npm test` (Vitest) + `npm run build`; a push to `staging` also runs the full integration and browser suites. A red check blocks the merge; see [docs/DEVELOPER-GUIDE.md](docs/DEVELOPER-GUIDE.md) for what each job checks.
 
 ---
 
@@ -58,7 +58,7 @@ AlianHub uses a **three-branch model** with a clear separation between stable re
 ### `staging`
 - The **active development** branch — the base for all new work.
 - All `feat/`, `fix/`, `refactor/`, `chore/`, `docs/`, `perf/`, `test/`, `ci/`, `build/`, `style/` PRs target `staging`.
-- Should always be deployable to the demo / staging environment.
+- Should always be deployable: every merge into `staging` deploys the staging server through the `CI / Deploy` workflow (`.github/workflows/main.yml`), so a merged PR is live there minutes later.
 - Protected: requires PR + green CI. Maintainers can self-merge (no second reviewer required), but force-push is blocked.
 
 ---
@@ -158,12 +158,13 @@ For urgent production bugs that can't wait for the next `staging → main` promo
 
 ---
 
-## Beta build numbers
+## Build numbers
 
 `package.json` only moves when release-please cuts a release, so between releases the running version is derived from git instead.
 
 - **Label:** `<next>-beta.<build>`, e.g. `14.36.0-beta.59`. A checkout sitting on a release tag reports the plain release (`14.35.0`).
-- **Build:** the first-parent commits on the branch since the latest `vX.Y.Z` tag. Every PR merged (or squashed) into `beta` is one build, and its number never changes once merged.
+- **Build:** the first-parent commits on the branch since the latest `vX.Y.Z` tag. Every PR merged (or squashed) into `staging` is one build, and its number never changes once merged. The label keeps the `-beta.` suffix for continuity; it names a pre-release build, not a branch.
+- **Back-merge after each release:** release tags are cut on `main`, so a tag is only reachable from `staging` once step 6 of the release workflow (back-merge `main → staging` with a merge commit) is done. Until then `staging` keeps counting from the previous tag and shows a version below the one already released.
 - **Next:** that tag bumped by the Conventional Commits since it — a breaking change → major, `feat` → minor, otherwise patch — the same rule release-please applies.
 - **Where it shows:** Instance console → Stats and Upgrade, `/health`, `GET /version`, the setup status, the MCP server info, backup names and manifests, and the app version recorded on migrations. `npm run version:show` prints it and `npm run version:log` regenerates [`docs/BETA-LOG.md`](docs/BETA-LOG.md).
 - **Images:** a Docker image has no `.git`, so `docker.yml` stamps `build-info.json` before the build and the server reads that.

@@ -62,13 +62,25 @@ describe('--ink-3 is retired for text', () => {
         ['components/organisms/MainChat/style.css', '.mc-send:disabled', '.55'],
         ['components/organisms/MainChat/style.css', '.mc-send-more:disabled', '.55'],
         ['views/Settings/Sso/SsoSettings.vue', '.sso__link:disabled', '.55'],
-        ['views/PersonalList/style.css', '.personal__view--muted', '.7'],
         ['views/Projects/ListView/style.css', '.lv2__row.is-sub.is-done .lv2__name', '.75'],
         ['views/Projects/ProjectDetail/ProjectMemoryCard.vue', '.pm__row.is-retired .pm__text', '.75'],
     ])('%s %s keeps a visible cue with opacity %s', (file, selector, opacity) => {
         const rule = block(fs.readFileSync(path.join(SRC, file), 'utf8'), selector);
         expect(rule).toContain('color: var(--ink-2)');
         expect(rule).toMatch(new RegExp(`opacity:\\s*${opacity.replace('.', '\\.')}\\s*;`));
+    });
+
+    // A placeholder, not a disabled control, so its muted look still has to read: full ink under the opacity.
+    test.each(Object.keys(themes))('the My Work "+ View" placeholder is muted by opacity and reads at 4.5:1 in %s', (theme) => {
+        const rule = block(fs.readFileSync(path.join(SRC, 'views/PersonalList/style.css'), 'utf8'), '.personal__view--muted');
+        expect(rule).toContain('color: var(--ink)');
+        const opacity = Number(/opacity:\s*([\d.]+)\s*;/.exec(rule)[1]);
+        expect(opacity).toBeLessThan(1);
+        const ink = tokenIn(themes[theme], '--ink');
+        for (const surface of ['--surface', '--canvas']) {
+            const bg = tokenIn(themes[theme], surface);
+            expect(contrast(over({ rgb: ink.rgb, alpha: ink.alpha * opacity }, bg), bg.rgb)).toBeGreaterThanOrEqual(4.5);
+        }
     });
 
     test.each(Object.keys(themes))('--ink-2 reads at 4.5:1 or better on --surface and --canvas in %s', (theme) => {

@@ -31,7 +31,7 @@
     const props = defineProps({
         detail:{
             type:Object,
-            default:() => {}
+            default:() => ({})
         },
         isProjectDetail:{
             type: String,

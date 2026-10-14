@@ -5,6 +5,7 @@
             <div class="ah-toolbar">
                 <div class="ah-toolbar__title">{{ $t('Ai.inbox') }}</div>
                 <div class="ah-toolbar__spacer"></div>
+                <router-link v-if="opened" class="ah-btn ah-btn--secondary ah-btn--sm" data-test="ai-open-made" :to="{ name: 'Project', params: { cid: companyId, id: opened } }">{{ $t('Ai.open_made') }}</router-link>
                 <span v-if="undo" class="ah-chip ah-chip--ok">
                     {{ $t('Ai.approved') }}
                     <button type="button" class="ah-btn ah-btn--ghost ah-btn--sm" @click="onUndo">{{ $t('Ai.undo') }}</button>
@@ -235,6 +236,7 @@ import { useStore } from "vuex";
 import { useI18n } from "vue-i18n";
 import { useToast } from "vue-toast-notification";
 import moment from "moment";
+import { clockText } from "@/utils/clockText";
 import ShellIcon from "@/components/organisms/Shell/ShellIcon.vue";
 import EmptyState from "@/components/atom/EmptyState/EmptyState.vue";
 import AiFeedback from "@/components/molecules/AiFeedback/AiFeedback.vue";
@@ -243,7 +245,7 @@ import { intentSummary } from "@/components/molecules/IntentPreview/intentLines"
 import { partsChoice } from "@/components/molecules/IntentPreview/planPicks";
 import { openTask } from "@/components/organisms/TaskDetailOverlay/useTaskOverlay";
 import { dropProjects, showProjects } from "@/composable/approvedProjects";
-import { madeProjectIds, trashedProjectIds } from "@/composable/approvedProjectIds";
+import { madeProjectIds, openedProjectId, trashedProjectIds } from "@/composable/approvedProjectIds";
 import AiSidebar from "./AiSidebar.vue";
 import WorkflowApprovalRow from "./WorkflowApprovalRow.vue";
 import SlackPostPreview from "./SlackPostPreview.vue";
@@ -305,6 +307,7 @@ const editable = ref([]);
 const busy = ref(false);
 const error = ref("");
 const undo = ref(null);
+const opened = ref("");
 const declining = ref(false);
 const declineReason = ref("");
 const declineNote = ref("");
@@ -389,12 +392,14 @@ const costLine = computed(() => {
 const shortTime = (at) => {
     if (!at) return "";
     const m = moment(at);
-    return m.isSame(moment(), "day") ? m.format("H:mm") : m.fromNow();
+    return m.isSame(moment(), "day") ? clockText(m) : m.fromNow();
 };
 
 watch(selectedApproval, () => { approvalError.value = ""; });
 
 watch(selected, (p) => {
+    // Opening another proposal takes away the link to what the last approval made.
+    if (p) opened.value = "";
     editing.value = false;
     declining.value = false;
     error.value = "";
@@ -417,6 +422,7 @@ const reload = async ({ inPlace = false } = {}) => {
 
 const switchView = async (key) => {
     view.value = key;
+    opened.value = "";
     selected.value = null;
     selectedApproval.value = null;
     selectedReport.value = null;
@@ -458,7 +464,9 @@ const onApprove = async () => {
     error.value = "";
     try {
         const body = wholeChanges.value ? (canPick.value && partsChoice(editable.value, leftOutAt)) || {} : { changes: editable.value.map(asFiled) };
+        opened.value = "";
         const out = await decide(selected.value._id, "approve", body);
+        opened.value = openedProjectId(out);
         const unapplied = unappliedOf(out);
         const later = laterLine(out);
         showProjects(store, madeProjectIds(out));
@@ -487,6 +495,7 @@ const onDecline = async (reason = "") => {
     busy.value = true;
     error.value = "";
     try {
+        opened.value = "";
         await decide(selected.value._id, "decline", reason ? { reason } : {});
         declining.value = false;
         await afterDecision(t("Ai.declined_done"));
@@ -500,6 +509,7 @@ const onDecline = async (reason = "") => {
 const onUndo = async () => {
     const id = undo.value?.id;
     undo.value = null;
+    opened.value = "";
     if (!id) return;
     try {
         dropProjects(store, trashedProjectIds(await decide(id, "undo", {})));

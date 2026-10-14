@@ -79,7 +79,7 @@
         },
         inputValues:{
             type: Object,
-            default:() => {}
+            default:() => ({})
         },
         options:{
             type: Array,
@@ -103,7 +103,7 @@
         },
         detail:{
             type: Object,
-            default: () => {}
+            default: () => ({})
         },
         className:{
             type: String,
@@ -111,7 +111,7 @@
         },
         customValidationMessage:{
             type: Object,
-            default: () => {}
+            default: () => ({})
         },
         preventDefault:{
             type: Boolean,

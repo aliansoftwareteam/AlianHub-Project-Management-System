@@ -79,7 +79,7 @@
         },
         phoneObj: {
             type: Object,
-            default: () => {}
+            default: () => ({})
         }
     })
     const search = ref('');

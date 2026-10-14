@@ -15,7 +15,7 @@
                 <Spinner :isSpinner="spinner" class="position-re item-spinner"/>
                 <template v-if="!editName">
                     <img :src="favourite ? filledStar : blankStar" alt="favourite star" class="ml-6px"  @click.stop="markProjectFavourite" v-if="!isShowArchived">
-                    <span v-if="item.projectIcon && item.projectIcon.type === 'color'" class="d-flex align-items-center justify-content-center inital-box ml-6px" :style="[{'background-color': item.projectIcon.data}]">{{ item.ProjectName.charAt(0).toUpperCase()}}</span>
+                    <span v-if="item.projectIcon && item.projectIcon.type === 'color'" class="ah-letter-tile d-flex align-items-center justify-content-center inital-box ml-6px" :style="[{'background-color': item.projectIcon.data}]">{{ item.ProjectName.charAt(0).toUpperCase()}}</span>
                     <template v-else-if="item.projectIcon && item.projectIcon.type === 'image'">
                         <WasabiImage thumbnail="60x60" class="profile-sm-square ml-6px" v-if="!item.projectIcon.data.includes('http')" :data="{url: item.projectIcon.data, filename: item.projectIcon.data.split('/').pop(), extension: item.projectIcon.data.split('/').pop().split('.').pop()}"/>
                         <img v-else class="profile-sm-square ml-6px" :src="item.projectIcon.data" alt=""/>

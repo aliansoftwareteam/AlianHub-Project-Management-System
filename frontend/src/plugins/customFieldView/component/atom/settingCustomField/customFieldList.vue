@@ -199,7 +199,7 @@
     const props = defineProps({
         finalCustomFields:{
             type:Array,
-            default:() => {}
+            default:() => []
         }
     });
 

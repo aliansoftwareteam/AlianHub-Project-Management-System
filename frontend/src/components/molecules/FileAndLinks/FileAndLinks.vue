@@ -254,7 +254,7 @@
         },
         selectedData: {
             type: Object,
-            default: () => {}
+            default: () => ({})
         },
     })
 

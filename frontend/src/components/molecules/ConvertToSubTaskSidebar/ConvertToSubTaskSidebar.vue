@@ -59,7 +59,7 @@
                             <div class="gray" :class="{'convert-to-sub-task-sidebar-font-size-12' : clientWidth > 767, 'convert-to-sub-task-sidebar-font-size-16' : clientWidth <= 767}">{{$t('Notification.project')}}</div>
                             <div class="d-flex align-items-center justify-content-between project__title-browsewrapper" v-if="isShowProjectList === false" :style="[{paddingTop : clientWidth > 767 ? '7px' : '15px'}]">
                                 <div class="d-flex align-items-center text-ellipsis" :style="[{width : clientWidth > 767 ? '78%' : '50%'}]">
-                                    <span v-if="selectedProjectData.projectIcon && selectedProjectData.projectIcon.type === 'color'" class="d-flex align-items-center justify-content-center convert-to-sub-task-sidebar-font-weight-400 inital-box" :style="[{'background-color': selectedProjectData.projectIcon.data}]">{{ selectedProjectData.ProjectName.charAt(0).toUpperCase()}}</span>
+                                    <span v-if="selectedProjectData.projectIcon && selectedProjectData.projectIcon.type === 'color'" class="ah-letter-tile d-flex align-items-center justify-content-center convert-to-sub-task-sidebar-font-weight-400 inital-box" :style="[{'background-color': selectedProjectData.projectIcon.data}]">{{ selectedProjectData.ProjectName.charAt(0).toUpperCase()}}</span>
                                     <template v-else-if="selectedProjectData.projectIcon && selectedProjectData.projectIcon.type === 'image'">
                                         <WasabiImage class="profile-sm-square project__icon" v-if="!selectedProjectData.projectIcon.data.includes('http')" :data="{url: selectedProjectData.projectIcon.data, filename: selectedProjectData.projectIcon.data.split('/').pop(), extension: selectedProjectData.projectIcon.data.split('/').pop().split('.').pop()}"/>
                                         <img v-else class="profile-sm-square project__icon" :src="selectedProjectData.projectIcon.data" alt=""/>
@@ -74,7 +74,7 @@
                                     <div class="overflow-x-visible overflow-y-auto overflow-y-auto::-webkit-scrollbar duplicate__convertTask" :style="[{ maxHeight : clientWidth > 767 ? 'calc(100vh - 214px)' : 'calc(100vh - 240px)'}]">
                                         <div v-for="project in projectDatas" :key="project" class="browse__Categotyproject-wrapper">
                                             <div class="d-flex align-items-center browse__project-wrapper" @click="changeProject(project)">
-                                                <span v-if="project.projectIcon && project.projectIcon.type === 'color'" class="d-flex align-items-center justify-content-center convert-to-sub-task-sidebar-font-weight-400 inital-box ml-6px" :style="[{'background-color': project.projectIcon.data}]">{{ project.ProjectName.charAt(0).toUpperCase()}}</span>
+                                                <span v-if="project.projectIcon && project.projectIcon.type === 'color'" class="ah-letter-tile d-flex align-items-center justify-content-center convert-to-sub-task-sidebar-font-weight-400 inital-box ml-6px" :style="[{'background-color': project.projectIcon.data}]">{{ project.ProjectName.charAt(0).toUpperCase()}}</span>
                                                 <template v-else-if="project.projectIcon && project.projectIcon.type === 'image'">
                                                     <WasabiImage class="profile-sm-square project__icon" v-if="!project.projectIcon.data.includes('http')" :data="{url: project.projectIcon.data, filename: project.projectIcon.data.split('/').pop(), extension: project.projectIcon.data.split('/').pop().split('.').pop()}"/>
                                                     <img v-else class="profile-sm-square project__icon" :src="project.projectIcon.data" alt=""/>
@@ -202,11 +202,10 @@
         },
         task: { 
             type: Object,
-            default:()=>{}
+            default:() => ({})
         },
-        selectedProjectObject: { 
-            type: Object,
-            default:()=>{}
+        selectedProjectObject: {
+            type: Object
         },
         fromWhich: {
             type: String,
@@ -244,7 +243,7 @@
         },
         item: {
             type: Object,
-            default: () => {}
+            default: () => ({})
         },
         // Bulk multi-task move. Reuses the project + sprint/folder picker but
         // skips the single-task conversion/assignee modals — on confirm it

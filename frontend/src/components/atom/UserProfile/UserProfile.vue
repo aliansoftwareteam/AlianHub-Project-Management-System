@@ -31,7 +31,7 @@ const defaultUserAvatar = inject("$defaultUserAvatar")
 const props = defineProps({
     data: {
         type: Object,
-        default: () => {}
+        default: () => ({})
     },
     showDot: {
         type: Boolean,

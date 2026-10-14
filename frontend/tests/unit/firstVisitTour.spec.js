@@ -198,6 +198,15 @@ describe('it stays out of the way', () => {
         expect(spot.top + size.height).toBeLessThanOrEqual(viewport.height);
     });
 
+    it.each([
+        ['the rail', { left: 0, top: 0, right: 56, bottom: 800 }],
+        ['the project tree', { left: 56, top: 120, right: 296, bottom: 620 }]
+    ])('beside %s, leaves the first rows of the page uncovered', (_name, box) => {
+        const firstRow = { left: box.right, top: 96, right: 1280, bottom: 136 };
+        const spot = placePopover(box, SIZE, VIEW, 'right');
+        expect(overlaps(spot, SIZE, firstRow)).toBe(false);
+    });
+
     it('docks in a corner when the thing it describes is not on screen', () => {
         expect(placePopover(null, SIZE, VIEW, 'left')).toEqual({ left: 1280 - 320 - 12, top: 800 - 190 - 12, side: 'none' });
     });

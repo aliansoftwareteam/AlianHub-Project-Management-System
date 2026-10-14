@@ -13,7 +13,7 @@
                         <div class="position-re overflow-x-visible overflow-y-auto overflow-y-auto::-webkit-scrollbar" :style="[{ maxHeight : clientWidth > 767 ? 'calc(100vh - 172px)' : 'calc(100vh - 90px)'}]">
                         <div class="d-flex align-items-center justify-content-between position-sti z-index-1 project__icon-wrapper">
                             <div class="d-flex align-items-center text-ellipsis projectDivInList">
-                                <span v-if="selectedProjectData.projectIcon && selectedProjectData.projectIcon.type === 'color'" class="d-flex align-items-center justify-content-center convert-to-list-font-weight-400 inital-box ml-6px" :style="[{'background-color': selectedProjectData.projectIcon.data}]">{{ selectedProjectData.ProjectName.charAt(0).toUpperCase()}}</span>
+                                <span v-if="selectedProjectData.projectIcon && selectedProjectData.projectIcon.type === 'color'" class="ah-letter-tile d-flex align-items-center justify-content-center convert-to-list-font-weight-400 inital-box ml-6px" :style="[{'background-color': selectedProjectData.projectIcon.data}]">{{ selectedProjectData.ProjectName.charAt(0).toUpperCase()}}</span>
                                 <img v-if="selectedProjectData.projectIcon && selectedProjectData.projectIcon.type === 'image'" class="profile-sm-square ml-6px" :src="selectedProjectData.projectIcon.data" alt=""/>
                                 <span class="text-ellipsis Project-name-sidebar-inlist convert-to-list-font-weight-500 font-ui pl-10px" :class="{'convert-to-list-font-size-13' : clientWidth > 767, 'convert-to-list-font-size-16' : clientWidth <= 767}"  @click="showSidebar = true">{{selectedProjectData.ProjectCode}} | {{selectedProjectData.ProjectName}}</span>
                             </div>
@@ -31,7 +31,7 @@
                     </div>
                     <ConfirmationSidebar
                         v-model="showSidebar"
-                        :title="$t('Converttolist.are_you_sure_convert')"
+                        :title="$t('Converttolist.confirm_convert')"
                         :acceptButtonClass="'btn-primary font-ui'"
                         :acceptButton="$t('Converttolist.convert_to_list')"
                         @confirm="showSidebar = false,convertToListFun()">
@@ -48,7 +48,7 @@
         <div v-if="isFolder === false">
             <ConfirmationSidebar
                 v-model="showSidebar"
-                :title="$t('Converttolist.are_you_sure_convert')"
+                :title="$t('Converttolist.confirm_convert')"
                 :acceptButtonClass="'btn-primary font-ui'"
                 :acceptButton="$t('Converttolist.convert_to_list')"
                 @confirm="showSidebar = false,convertToListFun()">

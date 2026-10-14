@@ -59,7 +59,7 @@
                     <span class="aq__what"><strong>{{ whoOf(p) }}</strong> {{ t('Inbox.wants_to') }} {{ titleOf(p) }}</span>
                     <span v-if="p.locked" class="ah-chip ah-chip--warn" data-test="queue-locked">{{ t(LOCKED_CHIPS[p.lockedWhy] || 'Inbox.queue_locked') }}</span>
                     <span v-if="p.tainted" class="ah-chip ah-chip--warn">{{ t('Audit.tainted') }}</span>
-                    <time v-if="stamp(p.createdAt)" class="aq__when" :title="p.createdAt">{{ stamp(p.createdAt) }}</time>
+                    <time v-if="stamp(p.createdAt)" class="aq__when" :datetime="p.createdAt" :title="fullText(p.createdAt)">{{ stamp(p.createdAt) }}</time>
                 </div>
 
                 <p class="aq__why"><span class="aq__label">{{ t('Ai.why') }}</span> {{ whyOf(p) || t('Time.why_no_reason') }}</p>
@@ -201,7 +201,7 @@
                     <div class="aq__head">
                         <span class="ah-avatar ah-avatar--agent" aria-hidden="true"><ShellIcon name="agent" :size="12" /></span>
                         <span class="aq__what"><strong>{{ whoOf(p) }}</strong> {{ t('Inbox.always_did') }} {{ titleOf(p) }}</span>
-                        <time v-if="stamp(p.createdAt)" class="aq__when" :title="p.createdAt">{{ stamp(p.createdAt) }}</time>
+                        <time v-if="stamp(p.createdAt)" class="aq__when" :datetime="p.createdAt" :title="fullText(p.createdAt)">{{ stamp(p.createdAt) }}</time>
                         <button
                             type="button"
                             class="ah-btn ah-btn--secondary ah-btn--sm"
@@ -234,6 +234,7 @@ import { agentActionLabel, changeLabel } from '@/views/Ai/agentActionLabels';
 import { findingFix, findingReasons } from '@/views/Projects/ProjectDetail/findingText';
 import { plainReason } from '@/views/Ai/auditWords';
 import { decideEach, decideOne } from './approvalQueue';
+import { fullText } from '@/utils/clockText';
 
 defineOptions({ name: 'ApprovalQueue' });
 
@@ -334,7 +335,7 @@ const settle = (p, verb, result) => {
     forgetPicks(p);
     picked.value = picked.value.filter((id) => id !== p.proposalId);
     const more = Boolean(result.later?.waiting || result.later?.retry);
-    emit('decided', { id: p.proposalId, verb, undo: Boolean(result.undo), ...(result.madeProjects?.length ? { madeProjects: result.madeProjects } : {}), ...(more ? { more } : {}) });
+    emit('decided', { id: p.proposalId, verb, undo: Boolean(result.undo), ...(result.madeProjects?.length ? { madeProjects: result.madeProjects } : {}), ...(result.opens ? { opens: result.opens } : {}), ...(more ? { more } : {}) });
 };
 
 const approve = async (p) => {

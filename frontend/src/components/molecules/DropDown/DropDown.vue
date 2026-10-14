@@ -88,7 +88,7 @@ const props = defineProps({
     },
     bodyClass: {
         type: Object,
-        default: () => {}
+        default: () => ({})
     },
     zIndex: {
         type: Number,
@@ -104,7 +104,7 @@ const props = defineProps({
     },
     bodyClassHeader: {
         type: Object,
-        default: () => {}
+        default: () => ({})
     },
     keepSameWidth:{
         type: Boolean,

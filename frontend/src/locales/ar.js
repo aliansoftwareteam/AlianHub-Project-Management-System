@@ -280,6 +280,7 @@ export default {
     "Auth": {
         "welcome_back": "Welcome back",
         "login_to_workspace": "Log in to your workspace.",
+        "no_account_ask_admin": "Log in to your workspace. No account yet? Ask your workspace admin to invite you.",
         "new_here": "New here?",
         "continue_with": "Continue with {provider}",
         "show_password": "Show password",
@@ -3115,6 +3116,7 @@ export default {
         "approved": "Approved",
         "declined_done": "Declined.",
         "undo": "Undo",
+        "open_made": "Open it",
         "undone": "Reverted.",
         "queue_clear": "Queue clear",
         "queue_clear_body": "{approved} approved, {declined} declined. Nothing is waiting on you.",
@@ -7442,9 +7444,9 @@ export default {
         "are_you_sure": "Are you sure?",
         "no_revert_msg": "You won't able to revert this!",
         "yes_delete": "Yes, delete it!",
-        "task_will_become_subtasks_of": "task will become subtasks of",
+        "task_moves_under": "{task} will become a subtask of {parent}.",
+        "task_and_subtasks_move_under": "{task} will become a subtask of {parent}. Its own subtasks stay under it and move with it.",
         "Are_you_sure_you_want_to_delete": "Are you sure you want to delete",
-        "subtasks_will_become_subtasks_of": "subtasks stay under it and move with it under",
         "unlock_board_view": "To Unlock Board View",
         "unlock_project_detail_view": "To Unlock Project Detail View",
         "unlock_table_view": "To Unlock Table View",
@@ -9547,6 +9549,7 @@ export default {
         "open": "Open",
         "mark_done": "Mark done",
         "undo": "Undo",
+        "open_made": "Open it",
         "undo_approved": "Approved {who}'s time off.",
         "undo_declined": "Declined {who}'s time off.",
         "search_placeholder": "Search or ask AI…",
@@ -10232,7 +10235,7 @@ export default {
         "mearge_task_into": "Merge Task Into"
     },
     "Converttolist": {
-        "are_you_sure_convert": "Are you sure want to convert this task into a List?",
+        "confirm_convert": "Turn this task into a list?",
         "important": "Important",
         "you_will_lose": "You will lose all threaded comments. This action can't be undone",
         "convert_to_list": "Convert to list"

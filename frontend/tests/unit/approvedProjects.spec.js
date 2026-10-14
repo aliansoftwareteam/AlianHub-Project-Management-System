@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { flushPromises, mount } from '@vue/test-utils';
+import { ref } from 'vue';
 import { createI18n } from 'vue-i18n';
 import en from '@/locales/en';
 
@@ -18,7 +19,7 @@ vi.mock('@/components/organisms/Shell/shellState', () => ({ openPanel: vi.fn() }
 
 import Inbox from '@/views/Inbox/Inbox.vue';
 import { dropProjects, showProjects } from '@/composable/approvedProjects';
-import { madeProjectIds, trashedProjectIds } from '@/composable/approvedProjectIds';
+import { madeProjectIds, openedProjectId, trashedProjectIds } from '@/composable/approvedProjectIds';
 
 const PROJECT = '64b000000000000000000001';
 const MUTATION = 'projectData/mutateProjects';
@@ -43,6 +44,13 @@ describe('what an approval and an undo say about projects', () => {
         expect(madeProjectIds({ applied: [{ action: 'project.duplicate', ok: true, result: { projectId: 'copy', copiedFrom: PROJECT } }] })).toEqual(['copy']);
         expect(madeProjectIds({ applied: [] })).toEqual([]);
         expect(madeProjectIds(undefined)).toEqual([]);
+    });
+
+    it('names the project an approval made or changed, for the finished card to open', () => {
+        expect(openedProjectId({ applied: [{ ...made, ok: false }, made] })).toBe(PROJECT);
+        expect(openedProjectId({ applied: [{ action: 'project.setup', ok: true, result: { projectId: 'p2', made: 1 } }] })).toBe('p2');
+        expect(openedProjectId({ applied: [{ action: 'task.comment', ok: true, result: {} }] })).toBe('');
+        expect(openedProjectId(undefined)).toBe('');
     });
 
     it('names the projects an undo moved to the trash, and none that stayed', () => {
@@ -92,7 +100,14 @@ describe('approving a new project in the Inbox', () => {
 
     const open = async () => {
         const i18n = createI18n({ legacy: false, locale: 'en', messages: { en }, missingWarn: false, fallbackWarn: false });
-        wrapper = mount(Inbox, { attachTo: document.body, global: { plugins: [i18n], stubs: { UserProfile: true, ShellIcon: true } } });
+        wrapper = mount(Inbox, {
+            attachTo: document.body,
+            global: {
+                plugins: [i18n],
+                provide: { $companyId: ref('c1') },
+                stubs: { UserProfile: true, ShellIcon: true, 'router-link': { props: ['to'], template: '<a :data-to="JSON.stringify(to)"><slot /></a>' } },
+            },
+        });
         await flushPromises();
     };
     const approve = async () => {
@@ -121,6 +136,15 @@ describe('approving a new project in the Inbox', () => {
         expect(commit.mock.calls).toEqual([added]);
     });
 
+    it('offers to open the project it made next to the Undo', async () => {
+        await open();
+        await approve();
+        const link = wrapper.find('[data-test="queue-open-made"]');
+        expect(link.exists()).toBe(true);
+        expect(link.text()).toBe('Inbox.open_made');
+        expect(JSON.parse(link.attributes('data-to'))).toEqual({ name: 'Project', params: { cid: 'c1', id: PROJECT } });
+    });
+
     it('takes it away again when the Undo bar moves it to the trash', async () => {
         await open();
         await approve();
@@ -145,5 +169,6 @@ describe('approving a new project in the Inbox', () => {
         await approve();
         expect(projectReads()).toHaveLength(0);
         expect(commit).not.toHaveBeenCalled();
+        expect(wrapper.find('[data-test="queue-open-made"]').exists()).toBe(false);
     });
 });

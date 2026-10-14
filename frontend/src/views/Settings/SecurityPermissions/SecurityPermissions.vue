@@ -94,7 +94,7 @@
         },
         projectData:{
             type:Object,
-            default:() => {}
+            default:() => ({})
         },
         isSpinnerProject:{
             type:Boolean,

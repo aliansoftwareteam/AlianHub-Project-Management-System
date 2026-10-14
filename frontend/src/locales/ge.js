@@ -280,6 +280,7 @@ export default {
     "Auth": {
         "welcome_back": "Welcome back",
         "login_to_workspace": "Log in to your workspace.",
+        "no_account_ask_admin": "Log in to your workspace. No account yet? Ask your workspace admin to invite you.",
         "new_here": "New here?",
         "continue_with": "Continue with {provider}",
         "show_password": "Show password",
@@ -3115,6 +3116,7 @@ export default {
         "approved": "Approved",
         "declined_done": "Declined.",
         "undo": "Undo",
+        "open_made": "Open it",
         "undone": "Reverted.",
         "queue_clear": "Queue clear",
         "queue_clear_body": "{approved} approved, {declined} declined. Nothing is waiting on you.",
@@ -7442,9 +7444,9 @@ export default {
         "are_you_sure": "Bist du sicher?",
         "no_revert_msg": "Sie können dies nicht rückgängig machen!",
         "yes_delete": "Ja, löschen!",
-        "task_will_become_subtasks_of": "Die Aufgabe wird zu Unteraufgaben von",
+        "task_moves_under": "{task} will become a subtask of {parent}.",
+        "task_and_subtasks_move_under": "{task} will become a subtask of {parent}. Its own subtasks stay under it and move with it.",
         "Are_you_sure_you_want_to_delete": "Sind Sie sicher, dass Sie löschen möchten?",
-        "subtasks_will_become_subtasks_of": "subtasks stay under it and move with it under",
         "unlock_board_view": "Um die Board-Ansicht freizuschalten",
         "unlock_project_detail_view": "Um die Projekt-Detail-Ansicht freizuschalten",
         "unlock_table_view": "Um die Tabellen-Ansicht freizuschalten",
@@ -9547,6 +9549,7 @@ export default {
         "open": "Open",
         "mark_done": "Mark done",
         "undo": "Undo",
+        "open_made": "Open it",
         "undo_approved": "Approved {who}'s time off.",
         "undo_declined": "Declined {who}'s time off.",
         "search_placeholder": "Search or ask AI…",
@@ -10232,7 +10235,7 @@ export default {
         "mearge_task_into": "Aufgabe zusammenführen in"
     },
     "Converttolist": {
-        "are_you_sure_convert": "Bist du sicher, dass du diese Aufgabe in eine Liste umwandeln möchtest?",
+        "confirm_convert": "Bist du sicher, dass du diese Aufgabe in eine Liste umwandeln möchtest?",
         "important": "Wichtig",
         "you_will_lose": "Du wirst alle verschachtelten Kommentare verlieren. Diese Aktion kann nicht rückgängig gemacht werden",
         "convert_to_list": "In Liste umwandeln"

@@ -71,7 +71,7 @@
     const props = defineProps({
         componentDetail:{
             type:Object,
-            default:() => {}
+            default:() => ({})
         },
         tabIndexComp:{
             type:Number,

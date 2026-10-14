@@ -123,7 +123,7 @@ const $toast = useToast();
 const props = defineProps({
     projectData: {
         type: Object,
-        default: () => {}
+        default: () => ({})
     },
     selectedProjects: {
         type: Array,

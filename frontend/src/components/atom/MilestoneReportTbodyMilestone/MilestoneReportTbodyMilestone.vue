@@ -84,11 +84,11 @@
     const settingStatus = computed(() => JSON.parse(JSON.stringify(getters['settings/projectMilestoneStatus'])));
     // props
     const props = defineProps({
-        milestoneObj: {type:Object,default: () => {}},
+        milestoneObj: {type:Object,default: () => ({})},
         currencySymbol:{type:String,required:true},
         daysOrMonth:{type:Array,default:()=>[]},
         yearSelected:{type:String,require:true},
-        projectDetail:{type:Object,default: () => {}}
+        projectDetail:{type:Object,default: () => ({})}
     });
 
     //inject

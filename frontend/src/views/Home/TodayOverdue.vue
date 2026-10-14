@@ -212,7 +212,7 @@ const ownProjects = computed(() => projects.value.filter((p) => p._id !== sample
 const projectsLoaded = computed(() => Array.isArray(getters["projectData/projects"]?.data));
 const emptyWorkspace = computed(() => projectsLoaded.value && !ownProjects.value.length && !work.openTasks.value.some((task) => task.ProjectID !== sampleProject.value?._id));
 const waitingShown = computed(() => (homeCards.layout.includes("waiting") ? waitingCount.value : 0));
-const whatsNext = useWhatNext({ work, waiting: waitingShown, empty: emptyWorkspace, canCreateProject, canOpenInbox: computed(() => router.hasRoute("inbox")) });
+const whatsNext = useWhatNext({ work, waiting: waitingShown, empty: emptyWorkspace, canCreateProject, canOpenInbox: computed(() => router.hasRoute("inbox")), sampleProjectId: computed(() => sampleProject.value?._id) });
 const teamWaiting = whatsNext.team;
 const STARTS = [NEXT.START_PROJECT, NEXT.START_TASK];
 /* While the setup card is up it names the one next step, so a second "start here" is not put above it. */

@@ -96,7 +96,7 @@
     });
     // props
     const props = defineProps({
-        project: {type:Object,default: () => {}},
+        project: {type:Object,default: () => ({})},
         currencySymbol: {type:String,required:true},
         daysOrMonth:{type:Array,default:()=>[]},
         yearSelected:{type:String,require:true}

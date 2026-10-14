@@ -95,7 +95,7 @@ const props = defineProps({
     lable : {type:String,default: ''},
     findParticularProject: {
         type:Object,
-        default: ()=>{}
+        default: () => ({})
     },
     separateArrays : {type:Object,required:true},
 })

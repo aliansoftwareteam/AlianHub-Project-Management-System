@@ -2,10 +2,10 @@ name: CI
 
 on:
   pull_request:
-    branches: [beta, main, staging]
+    branches: [main, staging]
     types: [opened, synchronize, reopened, ready_for_review]
   push:
-    branches: [beta, main, staging]
+    branches: [main, staging]
 
 concurrency:
   group: ci-${{ github.ref }}
@@ -91,7 +91,7 @@ jobs:
 
   mcp-conformance:
     needs: changes
-    if: needs.changes.outputs.code == 'true' && (github.event_name == 'pull_request' || github.ref == 'refs/heads/beta')
+    if: needs.changes.outputs.code == 'true' && (github.event_name == 'pull_request' || github.ref == 'refs/heads/staging')
     runs-on: ubuntu-latest
     timeout-minutes: 15
     services:
@@ -133,7 +133,7 @@ jobs:
   e2e-build:
     name: e2e build
     needs: changes
-    if: needs.changes.outputs.code == 'true' && (github.event_name == 'pull_request' || github.ref == 'refs/heads/beta')
+    if: needs.changes.outputs.code == 'true' && (github.event_name == 'pull_request' || github.ref == 'refs/heads/staging')
     runs-on: ubuntu-latest
     timeout-minutes: 15
     defaults:
@@ -278,7 +278,7 @@ jobs:
   # instead of being skipped: a skipped job satisfies a required check.
   e2e:
     needs: [changes, integration, e2e-build, e2e-shard]
-    if: always() && needs.changes.outputs.code == 'true' && (github.event_name == 'pull_request' || github.ref == 'refs/heads/beta')
+    if: always() && needs.changes.outputs.code == 'true' && (github.event_name == 'pull_request' || github.ref == 'refs/heads/staging')
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:

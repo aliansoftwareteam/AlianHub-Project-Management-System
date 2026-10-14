@@ -145,7 +145,7 @@ const props = defineProps({
     },
     item: {
         type: Object,
-        default: () => {}
+        default: () => ({})
     },
     /* { task, height } while one task is being placed under a parent; null in every other mode. */
     parentRule: {

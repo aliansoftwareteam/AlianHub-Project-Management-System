@@ -111,7 +111,7 @@ const props = defineProps({
     },
     watchers: {
         type: Object,
-        default: () => {}
+        default: () => ({})
     },
     options: {
         type: Array,

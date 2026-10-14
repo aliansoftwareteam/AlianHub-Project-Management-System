@@ -26,6 +26,8 @@
 .show__userlist{
     max-height: 300px;
     bottom: 65px;
+    border: 1px solid var(--hairline);
+    box-shadow: var(--shadow-pop);
 }
 .user__profile{
    object-fit:cover;

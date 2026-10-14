@@ -41,11 +41,11 @@ The `task-manager` skill in [.claude/skills/task-manager/](.claude/skills/task-m
 - After adding keys to `en.js`, run `npm run i18n:backfill` — it fills every other locale (machine-translated when `TRANSLATE_API_KEY` is set, English copy otherwise) and records the keys in `<locale>.pending.json` for review. Pending files are sorted and timestamp-free so different keys merge cleanly; on a conflict keep both sides' keys and re-run the backfill.
 - `npm run i18n:check` (also `tests/conventions/i18n-check.test.js`) fails when a locale lacks a key or a `.vue` file grows past its baseline in `scripts/i18n-allowlist.json`; the baseline may only shrink.
 
-### Rule 4 — Every merge to beta is a numbered build
+### Rule 4 — Every merge to staging is a numbered build
 
 - The running version is derived from git, never hand-edited: `npm run version:show` prints it (`<next>-beta.<build>`, e.g. `14.36.0-beta.59`), and release-please alone edits `package.json` and `CHANGELOG.md`.
-- After merging PRs into `beta`, run `npm run version:log` and commit `docs/BETA-LOG.md` in the follow-up docs PR that ticks task progress, naming the build numbers those merges became.
-- After merges that add or change a route, run `npm run api:doc` in that same docs PR and commit `docs/API.md` and `docs/api/openapi.json`; `npm run api:doc:check` fails while they are stale. A feature PR leaves both files alone, so two PRs that each add a route cannot break `beta`.
+- After merging PRs into `staging`, run `npm run version:log` and commit `docs/BETA-LOG.md` in the follow-up docs PR into `staging` that ticks task progress, naming the build numbers those merges became.
+- After merges that add or change a route, run `npm run api:doc` in that same docs PR and commit `docs/API.md` and `docs/api/openapi.json`; `npm run api:doc:check` fails while they are stale. A feature PR leaves both files alone, so two PRs that each add a route cannot break `staging`.
 - Commit and PR titles stay Conventional Commits, because the next version is computed from them (`feat` → minor, `!` or `BREAKING CHANGE` → major, anything else → patch).
 
 ### Rule 5 — Every colour comes from a token

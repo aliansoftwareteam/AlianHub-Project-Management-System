@@ -29,9 +29,9 @@ button.rp-stat:disabled { cursor: default; }
 .rp-stat__label { font: var(--text-label); letter-spacing: .04em; text-transform: uppercase; color: var(--ink-2); display: block; }
 .rp-stat__value { font: 600 22px/1.15 var(--font-ui); letter-spacing: -.5px; margin-top: 3px; display: block; color: var(--ink); }
 .rp-stat__unit { font-size: 12px; font-weight: 400; color: var(--ink-2); }
-.rp-stat__value.is-ok { color: var(--ok); }
-.rp-stat__value.is-warn { color: var(--warn); }
-.rp-stat__value.is-danger { color: var(--danger); }
+.rp-stat__value.is-ok { color: var(--ok-ink); }
+.rp-stat__value.is-warn { color: var(--warn-ink); }
+.rp-stat__value.is-danger { color: var(--danger-ink); }
 
 .rp-two { display: grid; grid-template-columns: 1.35fr 1fr; gap: 12px; align-items: stretch; }
 .rp-two--even { grid-template-columns: 1fr 1fr; }
