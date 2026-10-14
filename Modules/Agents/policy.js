@@ -63,4 +63,14 @@ const decide = ({ agent = {}, action, params = {}, rating = null, run = null, ta
     return out(DECISION.ACT, `${key} is a reversible task-scoped write with no money in it`);
 };
 
-module.exports = { DECISION, SCOPES, REVIEW_LEVEL, decide, escalations, isNever, isComplete };
+/* The built-in Workspace Guide is asked by a mention, so its one reply comment on that task posts at any autonomy;
+ * every other write it makes still goes through decide(). */
+const isMentionReply = ({ agent = {}, action, params = {}, run = null, task = null }) => Boolean(agent.builtIn)
+    && agent.builtIn === require('./workspaceGuide').KEY
+    && action === 'task.comment'
+    && Boolean(run && run.trigger === 'mention' && task && task._id)
+    && String(params.taskId || '') === String(task._id);
+
+const mentionReply = (rating) => ({ decision: DECISION.ACT, reason: 'the Workspace Guide answers on the task it was mentioned on', rating: isComplete(rating) ? { ...rating } : null });
+
+module.exports = { DECISION, SCOPES, REVIEW_LEVEL, decide, isMentionReply, mentionReply, escalations, isNever, isComplete };

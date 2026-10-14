@@ -598,6 +598,7 @@ exports.createCompanyV2 = async (req, res) => {
             await withoutStopping("the sample project", () => seedSampleProject({ companyId, uid: bodyData.userId, teamFocus: bodyData.teamFocus }));
         }
         await withoutStopping("the notification defaults", () => ensureNotificationDefaults(companyId, bodyData.userId));
+        await withoutStopping("the Workspace Guide", () => require("../Agents/workspaceGuide").onCompanyCreated(companyId, bodyData.userId));
         vectorStore.prepareCompany(companyId);
         await withoutStopping("the referral code", async () => {
             await storeRefferalCode(companyId, bodyData.userId);

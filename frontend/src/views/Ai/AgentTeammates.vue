@@ -103,6 +103,7 @@
                             </div>
 
                             <p class="parity-lead" style="margin-top:10px">{{ $t('Parity.no_seat') }}</p>
+                            <WorkspaceGuideAdd :state="workspaceGuide" :can-manage="canManage" @added="load" />
                         </div>
                     </section>
                 </div>
@@ -147,6 +148,7 @@ import PersonMemberRow from "./PersonMemberRow.vue";
 import AgentMentionBox from "./AgentMentionBox.vue";
 import AgentPicker from "./AgentPicker.vue";
 import AgentOutcomes from "./AgentOutcomes.vue";
+import WorkspaceGuideAdd from "./WorkspaceGuideAdd.vue";
 import { useParity } from "./useParity";
 import { reasonOf } from "./useAgents";
 import { useAgentAccess } from "./agentAccess";
@@ -162,11 +164,12 @@ const { getUser } = useGetterFunctions();
 const companyId = inject("$companyId");
 const userId = inject("$userId");
 const { agents, registryManifest, runs, loadAgents, loadRegistry, loadRuns, startRun, stopRun } = useParity();
-const { mayStop } = useAgentAccess();
+const { mayStop, canManage } = useAgentAccess();
 
 const tabs = ["all", "people", "agents"];
 const view = ref("all");
 const people = ref([]);
+const workspaceGuide = ref("");
 const task = ref(null);
 const taskQuery = ref("");
 const taskResults = ref([]);
@@ -292,7 +295,9 @@ const onStop = async (run) => {
 
 const loadPeople = async () => {
     const res = await apiRequest("get", env.AGENT_TEAM);
-    if (res?.data?.status) people.value = res.data.data.people || [];
+    if (!res?.data?.status) return;
+    people.value = res.data.data.people || [];
+    workspaceGuide.value = res.data.data.workspaceGuide || "";
 };
 
 const load = async () => {

@@ -146,6 +146,7 @@ const MANAGED = [
     ['deleting an agent', 'DELETE /api/v2/agents/:id', () => ({ params: { id: AGENT_ID }, done: () => agent().deletedStatusKey === 1 }), 403],
     ['pausing an agent', 'POST /api/v2/agents/:id/pause', () => ({ params: { id: AGENT_ID }, done: () => agent().paused === true }), 403],
     ['resuming an agent', 'POST /api/v2/agents/:id/resume', () => { agent().paused = true; return { params: { id: AGENT_ID }, done: () => agent().paused === false }; }, 403],
+    ['adding the Workspace Guide', 'POST /api/v2/agents/workspace-guide', () => ({ done: () => rows(SCHEMA_TYPE.AGENTS).some((row) => row.builtIn === 'workspace-guide') }), 403],
     ['pausing every agent', 'POST /api/v2/agents/pause-all', () => ({ done: () => agent().paused === true }), 403],
     ['saving a revision of an agent', 'POST /api/v2/agents/:id/revisions', () => ({ params: { id: AGENT_ID }, body: { state: 'candidate', autonomy: 3 }, done: () => revisions().some((row) => row.state === 'candidate') }), 403],
     ['making a revision live', 'POST /api/v2/agents/:id/revisions/:n/promote', async () => {

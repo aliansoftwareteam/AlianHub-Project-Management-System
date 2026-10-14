@@ -33,7 +33,10 @@ const rows = (res) => (ok(res) ? res.data.data : []);
 
 /* The service layer rejects on any non-2xx, so the API's own refusal ("Agent is
  * paused", "Spend cap reached") lives on error.response — never on res.data. */
-export const reasonOf = (error, fallbackKey) => error?.response?.data?.statusText
+const REFUSAL_KEYS = Object.freeze({ built_in_locked: "Ai.built_in_locked" });
+
+export const reasonOf = (error, fallbackKey) => (REFUSAL_KEYS[error?.response?.data?.code] && i18n.global.t(REFUSAL_KEYS[error.response.data.code]))
+    || error?.response?.data?.statusText
     || error?.response?.data?.message
     || (error?.message && !/^Request failed with status code/.test(error.message) ? error.message : "")
     || i18n.global.t(fallbackKey);
@@ -202,7 +205,7 @@ export function useAgents() {
 
     const saveAgent = async (agent) => {
         const out = agent._id
-            ? await request("put", `${env.AGENTS}/${agent._id}`, agent, "Ai.save_failed")
+            ? await request("put", `${env.AGENTS}/${agent._id}`, agent.builtIn ? { name: agent.name } : agent, "Ai.save_failed")
             : await request("post", env.AGENTS, agent, "Ai.save_failed");
         await loadAgents();
         return out.data;

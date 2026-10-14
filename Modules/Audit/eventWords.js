@@ -191,6 +191,7 @@ const ACTIONS = Object.freeze({
     'agent.pause': 'Pause an agent',
     'agent.resume': 'Resume an agent',
     'agent.pause_all': 'Pause all agents',
+    'agent.workspace_guide.add': 'Add the Workspace Guide',
     'agent.settings.edit': 'Change the AI settings',
     'agent.routing_policy.edit': 'Change how work is shared out to agents',
     'agent.role_playbook.edit': 'Edit the playbook of an agent role',

@@ -193,11 +193,110 @@ describe('/execute builds the plan /plan proposed', () => {
         orchestrator.executePlan.mockImplementationOnce(() => new Promise((resolve) => { finish = resolve; }));
         const planId = planStash.rememberPlan({ uid: OWNER, companyId: C, plan: storedPlan() });
         expect((await execute({ planId, source: 'other' })).body.status).toBe(true);
-        expect((await execute({ planId, source: 'other' })).code).toBe(410);
+        const second = await execute({ planId, source: 'other' });
+        expect(second.code).toBe(409);
+        expect(second.body).toEqual({ status: false, statusText: 'This plan is already being built.', code: 'PLAN_IN_USE' });
         finish({ ok: false, error: 'rolled back' });
         await sleep(10);
         expect((await execute({ planId, source: 'other' })).body.status).toBe(true);
         expect(orchestrator.executePlan).toHaveBeenCalledTimes(2);
+    });
+
+    it('starts exactly one build when two /execute calls for the same plan race', async () => {
+        const planId = planStash.rememberPlan({ uid: OWNER, companyId: C, plan: storedPlan() });
+        const [a, b] = await Promise.all([
+            post('/api/v1/ai/project/execute', req({ planId, source: 'other' })),
+            post('/api/v1/ai/project/execute', req({ planId, source: 'other' })),
+        ]);
+        await sleep(250);
+        expect([a, b].filter((r) => r.body.status === true)).toHaveLength(1);
+        expect([a, b].map((r) => r.code).sort()).toEqual([200, 409]);
+        expect(orchestrator.executePlan).toHaveBeenCalledTimes(1);
+    });
+
+    it('holds a plan for a build with a claim shorter than the plan\'s life, which lapses so the person can retry', async () => {
+        orchestrator.executePlan.mockImplementationOnce(() => new Promise(() => {}));
+        const planId = planStash.rememberPlan({ uid: OWNER, companyId: C, plan: storedPlan() });
+        expect((await execute({ planId, source: 'other' })).body.status).toBe(true);
+        const claim = planStash.cacheKey('planclaim', OWNER, planId);
+        expect(planStash.CLAIM_TTL_SECONDS).toBeLessThan(planStash.PLAN_TTL_SECONDS);
+        expect(myCache.getTtl(claim) - Date.now()).toBeLessThanOrEqual(planStash.CLAIM_TTL_SECONDS * 1000);
+        expect((await execute({ planId, source: 'other' })).code).toBe(409);
+        myCache.del(claim);
+        expect((await execute({ planId, source: 'other' })).body.status).toBe(true);
+        expect(orchestrator.executePlan).toHaveBeenCalledTimes(2);
+    });
+
+    it('keeps a lapsed build from freeing or using up the plan another build has since claimed', async () => {
+        let finishA;
+        orchestrator.executePlan.mockImplementationOnce(() => new Promise((resolve) => { finishA = resolve; }));
+        orchestrator.executePlan.mockImplementationOnce(() => new Promise(() => {}));
+        const planId = planStash.rememberPlan({ uid: OWNER, companyId: C, plan: storedPlan() });
+        expect((await execute({ planId, source: 'other' })).body.status).toBe(true);
+        myCache.del(planStash.cacheKey('planclaim', OWNER, planId));
+        expect((await execute({ planId, source: 'other' })).body.status).toBe(true);
+        finishA({ ok: true });
+        await sleep(10);
+        expect(planStash.storedPlan({ uid: OWNER, companyId: C, planId })).toBeTruthy();
+        expect(planStash.isClaimed({ uid: OWNER, planId })).toBe(true);
+        expect((await execute({ planId, source: 'other' })).code).toBe(409);
+    });
+
+    it('releases a claim only for the token that holds it', () => {
+        const planId = planStash.rememberPlan({ uid: OWNER, companyId: C, plan: storedPlan() });
+        const token = planStash.claimPlan({ uid: OWNER, planId });
+        expect(planStash.claimPlan({ uid: OWNER, planId })).toBeNull();
+        expect(planStash.releasePlan({ uid: OWNER, planId, token: 'f'.repeat(24) })).toBe(false);
+        expect(planStash.releasePlan({ uid: OWNER, planId })).toBe(false);
+        expect(planStash.forgetPlan({ uid: OWNER, planId, token: 'f'.repeat(24) })).toBe(false);
+        expect(planStash.forgetPlan({ uid: OWNER, planId })).toBe(false);
+        expect(planStash.isClaimed({ uid: OWNER, planId })).toBe(true);
+        expect(planStash.releasePlan({ uid: OWNER, planId, token })).toBe(true);
+        expect(planStash.isClaimed({ uid: OWNER, planId })).toBe(false);
+    });
+
+    it('renews the claim while the build runs, and stops when it settles', async () => {
+        const planId = planStash.rememberPlan({ uid: OWNER, companyId: C, plan: storedPlan() });
+        const claim = { uid: OWNER, planId, token: planStash.claimPlan({ uid: OWNER, planId }) };
+        const key = planStash.cacheKey('planclaim', OWNER, planId);
+        myCache.ttl(key, 1);
+        let finish;
+        const running = planStash.keepClaimWhile(claim, new Promise((resolve) => { finish = resolve; }), { every: 20 });
+        await sleep(60);
+        expect(myCache.getTtl(key) - Date.now()).toBeGreaterThan(60 * 1000);
+        finish('done');
+        expect(await running).toBe('done');
+        myCache.ttl(key, 1);
+        await sleep(60);
+        expect(myCache.getTtl(key) - Date.now()).toBeLessThanOrEqual(1000);
+    });
+
+    it('frees the plan when the build throws', async () => {
+        orchestrator.executePlan.mockRejectedValueOnce(new Error('boom'));
+        const planId = planStash.rememberPlan({ uid: OWNER, companyId: C, plan: storedPlan() });
+        await execute({ planId, source: 'other' });
+        expect(planStash.isClaimed({ uid: OWNER, planId })).toBe(false);
+        expect((await execute({ planId, source: 'other' })).body.status).toBe(true);
+    });
+
+    it('never pushes out a plan being built, and refuses a new plan when every kept plan is being built', async () => {
+        const ids = [1, 2, 3].map(() => planStash.rememberPlan({ uid: OWNER, companyId: C, plan: storedPlan() }));
+        const token = planStash.claimPlan({ uid: OWNER, planId: ids[0] });
+        const fourth = planStash.rememberPlan({ uid: OWNER, companyId: C, plan: storedPlan() });
+        expect(ids.map((planId) => Boolean(planStash.storedPlan({ uid: OWNER, companyId: C, planId })))).toEqual([true, false, true]);
+        planStash.claimPlan({ uid: OWNER, planId: ids[2] });
+        planStash.claimPlan({ uid: OWNER, planId: fourth });
+        expect(planStash.rememberPlan({ uid: OWNER, companyId: C, plan: storedPlan() })).toBeNull();
+        [ids[0], ids[2], fourth].forEach((planId) => expect(planStash.storedPlan({ uid: OWNER, companyId: C, planId })).toBeTruthy());
+
+        const r = await post('/api/v1/ai/project/plan', req({ description: 'A shop for bikes that sells online and ships.' }));
+        expect(r.code).toBe(409);
+        expect(r.body.code).toBe('PLANS_BUSY');
+        expect(mockChat).not.toHaveBeenCalled();
+
+        planStash.releasePlan({ uid: OWNER, planId: ids[0], token });
+        expect(planStash.rememberPlan({ uid: OWNER, companyId: C, plan: storedPlan() })).toEqual(expect.any(String));
+        expect(planStash.storedPlan({ uid: OWNER, companyId: C, planId: ids[0] })).toBeNull();
     });
 
     it('keeps the last three plans a person generated', () => {
@@ -249,6 +348,21 @@ describe('the brief and the guide come from the server copy', () => {
         expect(built().guide.stages).toEqual(GUIDE.stages);
         expect(built().guide.markdown.startsWith('## My stages')).toBe(true);
         expect(built().guide.markdown).toHaveLength(20000);
+    });
+
+    it('stores an empty guide when the person cleared it, and the drafted one when the guide was not edited', async () => {
+        const cleared = planStash.rememberPlan({ uid: OWNER, companyId: C, plan: storedPlan(), approvedBrief: BRIEF });
+        planStash.rememberGuide({ uid: OWNER, companyId: C, planId: cleared, guide: { ...GUIDE, markdown: '## Stages\n1. Build' } });
+        await execute({ planId: cleared, source: 'other', edits: { guideMarkdown: '' } });
+        expect(built().guide.markdown).toBe('');
+        const { projectFields } = jest.requireActual('../Modules/AIProjectGenerator/executeAgents');
+        expect(projectFields({ guide: built().guide }).aiGuide.markdown).toBe('');
+
+        orchestrator.executePlan.mockClear();
+        const kept = planStash.rememberPlan({ uid: OWNER, companyId: C, plan: storedPlan(), approvedBrief: BRIEF });
+        planStash.rememberGuide({ uid: OWNER, companyId: C, planId: kept, guide: { ...GUIDE, markdown: '## Stages\n1. Build' } });
+        await execute({ planId: kept, source: 'other', edits: {} });
+        expect(built().guide.markdown).toBe('## Stages\n1. Build');
     });
 
     it('ignores a guide rewording when no guide was drafted for the plan', async () => {

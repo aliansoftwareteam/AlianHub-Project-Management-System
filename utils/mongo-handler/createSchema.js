@@ -297,6 +297,7 @@ agentWorkMarksSchema.index({ ref: 1 });
 const agentsSchema = new Schema(schema.agents, {strict: true, timestamps: true});
 agentsSchema.index({ paused: 1 });
 agentsSchema.index({ ownerId: 1 });
+agentsSchema.index({ builtIn: 1 }, { unique: true, partialFilterExpression: { builtIn: { $type: 'string' } } });
 
 const agentRunsSchema = new Schema(schema.agentRuns, {strict: true, timestamps: true});
 agentRunsSchema.index({ agentId: 1, startedAt: -1 });
