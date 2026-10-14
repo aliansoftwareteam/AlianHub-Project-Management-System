@@ -6,6 +6,7 @@ const { taskIdMatch } = require('../../Comments/helpers/taskIdMatch');
 const { scheduleReconciliation } = require('./reconcileTaskCount');
 const { placeDescendants } = require('./taskTree');
 const socketEmitter = require('../../../event/socketEventEmitter');
+const { announceListCount } = require('../../Sprints/helpers/listEvents');
 
 const asObjectId = (id) => (/^[0-9a-fA-F]{24}$/.test(String(id || '')) ? new mongoose.Types.ObjectId(String(id)) : null);
 
@@ -23,7 +24,7 @@ const sprintPlacementOf = async (companyId, sprint) => {
 
 const changeSprintCount = (companyId, sprintId, by) => Promise.resolve(MongoDbCrudOpration(companyId, {
     type: SCHEMA_TYPE.SPRINTS, data: [{ _id: asObjectId(sprintId) }, { $inc: { tasks: by } }],
-}, 'updateOne')).catch((error) => {
+}, 'updateOne')).then(() => announceListCount(companyId, { _id: sprintId })).catch((error) => {
     logger.error(`error in update task count : ${error}`);
     scheduleReconciliation(companyId, sprintId);
 });

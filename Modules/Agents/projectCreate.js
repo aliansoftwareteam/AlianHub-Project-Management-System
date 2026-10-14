@@ -174,6 +174,20 @@ const carryOut = async (given) => {
     return partsMade(given).catch((error) => noneMade(given.draft, error.message));
 };
 
+const listsMade = (parts) => parts.some((entry) => entry.part === 'lists' && entry.items.some((item) => item.made));
+
+/* Every project starts with an empty list called "List". When the plan made lists of its own, that one only gets in the
+ * way, so it goes to the trash as a person's Delete would, and stays wherever that is refused. */
+const dropStarterLists = async ({ companyId, who, projectId, starters }) => {
+    for (const sprintId of starters) {
+        await require('./workRequests').withdrawList({ companyId, who, projectId, sprintId }).catch(() => null);
+    }
+};
+
+const startingLists = async (companyId, projectId) => listOf(await MongoDbCrudOpration(companyId, {
+    type: SCHEMA_TYPE.SPRINTS, data: [{ projectId: { $in: idForms(projectId) }, deletedStatusKey: { $ne: TRASHED } }, { _id: 1 }],
+}, 'find')).map((row) => idOf(row._id));
+
 const notMadeIn = (parts, draft) => {
     const described = parts.filter((entry) => entry.part === DESCRIPTION && entry.error).map((entry) => ({ part: DESCRIPTION, name: DESCRIPTION, error: entry.error }));
     return [...described, ...plans.notMadeIn(parts.filter((entry) => entry.part !== DESCRIPTION), draft)];
@@ -222,7 +236,9 @@ const executors = {
         const approver = { uid: approverId, via: requester.via, mark: requester.mark ? { ...requester.mark, userId: approverId } : null };
         const project = await createAs({ companyId, who: approver, name: draft.name });
         const projectId = idOf(project._id);
+        const starters = await startingLists(companyId, projectId);
         const parts = await carryOut({ companyId, requester, approver, projectId, draft });
+        if (listsMade(parts)) await dropStarterLists({ companyId, who: approver, projectId, starters });
         const url = addressOf(companyId, projectId);
         return {
             result: {
