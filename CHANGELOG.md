@@ -16,6 +16,18 @@ from [Conventional Commits](https://www.conventionalcommits.org/) on `main`.
 
 ---
 
+## [14.38.1](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/compare/v14.38.0...v14.38.1) (2026-10-14)
+
+
+### 📘 Documentation
+
+* **readme:** a product landing page layout ([13733b3](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/13733b3a379433eb8a28dfae77c54882290714e8))
+* **readme:** a product landing page layout ([7035ed9](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/7035ed9f43ab88705f6563087969b67790c92125))
+* **readme:** lead with AI and add an AI section ([97d0f78](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/97d0f78ccc2e5c228adb98efeb063d9b8632a326))
+* **readme:** one workspace for every team ([9701d94](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/9701d9477dac9bee87738f551029fc897ec78818))
+* **readme:** replace the old screenshots with the current app ([2cd4a26](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/2cd4a26c5c7105b8e7ec23865562882c6bf5a7ca))
+* **readme:** replace the old screenshots with the current app ([a8d233a](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/a8d233abbf10adae29401ebdd625fde4cda3d0a3))
+
 ## [14.38.0](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/compare/v14.37.0...v14.38.0) (2026-10-14)
 
 
