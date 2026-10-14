@@ -4,10 +4,9 @@
             <span v-if="step === 'login' && showRegister">{{ $t('Auth.new_here') }} <router-link to="/signup">{{ $t('Auth.create_account') }}</router-link></span>
         </template>
 
-        <!-- 5a: login -->
         <form v-if="step === 'login'" novalidate @submit.prevent="handleSubmit">
-            <h1 class="auth__title">{{ $t('Auth.welcome_back') }}</h1>
-            <p class="auth__lead">{{ $t('Auth.login_to_workspace') }}</p>
+            <h1 class="auth__title">{{ $t('Auth.log_in') }}</h1>
+            <p class="auth__lead" data-test="login-lead">{{ showRegister ? $t('Auth.login_to_workspace') : $t('Auth.no_account_ask_admin') }}</p>
 
             <div v-if="shownBanner" class="auth__banner" :class="`auth__banner--${shownBanner.kind}`">
                 <ShellIcon :name="shownBanner.kind === 'ok' ? 'check' : 'alert'" :size="15" />

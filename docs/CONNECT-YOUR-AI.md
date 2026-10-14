@@ -39,9 +39,18 @@ With the extra permissions on the consent screen, and unless your admin has swit
 
 ## Steps
 
+### Before you start: an account
+
+You need an AlianHub account before your AI can connect. AlianHub has no page where a person makes their own account. You get one in one of two ways:
+
+- An owner or admin of your workspace invites you. You open the link in the invitation and choose a password.
+- You install AlianHub yourself. The install wizard makes the first workspace and your account as its owner.
+
+If you have no account, ask your workspace admin to invite you. When your AI app opens AlianHub before you have an account, you only see the log-in page.
+
 ### On the Connect your AI page
 
-1. In AlianHub, open AI in the left menu, then **Connect your AI**. When you sign up for the first time, this is the last step, called "One last step". You can choose **Skip for now** and come back later.
+1. In AlianHub, open AI in the left menu, then **Connect your AI**. The first time you join a workspace, or finish the install wizard, this page is the last step, called "One last step". You can choose **Skip for now** and come back later.
 2. Pick your app and follow its steps. The page shows an address to paste. Copy it with the **Copy** button.
    - Connecting by address is on for a new server, and an owner can switch it on under Settings, Instance, AI on a server set up earlier. If the page says it is off, ask them to switch it on, and use a token (below) until then.
 3. The line at the top of the page changes by itself when your AI app makes its first call. It then says "Connected" and when the app was last seen.

@@ -292,6 +292,7 @@ export default {
     Auth: {
         welcome_back: "Welcome back",
         login_to_workspace: "Log in to your workspace.",
+        no_account_ask_admin: "Log in to your workspace. No account yet? Ask your workspace admin to invite you.",
         new_here: "New here?",
         continue_with: "Continue with {provider}",
         show_password: "Show password",
