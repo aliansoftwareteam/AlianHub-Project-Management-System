@@ -143,7 +143,8 @@
     "version:stamp": "node scripts/build-info.js --write",
     "version:log": "node scripts/build-info.js --log --ref origin/staging",
     "prepare": "node .husky/install.mjs || true",
-    "readme:screenshots": "node scripts/readme-screenshots.js"
+    "readme:screenshots": "node scripts/readme-screenshots.js",
+    "demo:video": "node scripts/demo-video.js"
   },
   "author": "Alian Software <https://alianhub.com>",
   "license": "AGPL-3.0-or-later",

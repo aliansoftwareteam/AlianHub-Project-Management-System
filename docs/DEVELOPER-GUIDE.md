@@ -126,6 +126,24 @@ A pull request that changes a core screen on purpose carries the new PNGs in the
 
 The job is not a required check yet (`continue-on-error: true`). To make it one: commit the baseline, tune the tolerance, remove that line from the workflow and add **Core screens** to the required checks of `staging`.
 
+### Product videos
+
+`npm run demo:video` records two videos of the made-up Northwind Studio workspace: `promo-60s` (one minute, six captioned scenes and an end card) and `how-to-use` (about three minutes, eight chapters). Nothing is committed; the files go to `~/.claude/projects/-Users-mevil-Alian-Hub/handoff/<today>/videos/` unless `--out <dir>` says otherwise.
+
+```bash
+npm run e2e:db -- --port 27142        # a disposable MongoDB; never 27017, the script drops every database it finds
+cd frontend && npm run build && cd ..  # the harness serves frontend/dist
+npm run demo:video -- --mongo-url mongodb://127.0.0.1:27142 [--only promo|how]
+```
+
+**How it works.** `scripts/demo-video.js` boots the e2e harness server against that database, seeds the people, lists, tasks, time, comments, agents and a dashboard (`scripts/demo-video/seed.js`), then films each scene with Playwright at 1440x900 (`promo.js`, `howTo.js`). A cursor, captions and title cards are drawn into the page (`overlay.js`), and the caption timings are written as `.srt` alongside each video.
+
+**No real AI, no real GitHub.** The server's AI provider is `openai_compatible`, pointed at `scripts/demo-video/scriptedModel.js`, a local endpoint that answers each prompt from the fixed website-relaunch plan in `websiteRelaunchPlan.js`; captions of AI scenes say "(example)". The pull request is played through the app's own GitHub sync (`githubPullRequest.js`) with a stand-in GitHub API, as `tests/app-connections-github.test.js` does, so no token exists and nothing reaches github.com.
+
+**Outputs.** `.webm`, `.srt` and, when `ffmpeg` is on the path, a trimmed `.mp4`, a poster PNG for each video and a 9:16 `promo-60s-vertical.mp4`. Without `ffmpeg` the webm is untrimmed and the rest is skipped. The run prints a folder of review frames, one per scene: look at them before sharing the videos.
+
+**Changing a scene.** A scene drives the app by visible text and roles, so a renamed button breaks the take; the run stops with a screenshot of the screen it could not use. The promo keeps to sixty seconds by ending each scene at a mark on the clock; when the app gets slower, shorten a hold rather than move the marks.
+
 ## Change it
 
 ### Requests and tenants
