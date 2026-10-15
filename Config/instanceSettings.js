@@ -38,11 +38,21 @@ function lockedKeys() {
     return locked;
 }
 
+/* The console shows a model's catalogue default as its value, and a field left at its
+ * default is never saved. Without this a saved key sat beside an empty model, the
+ * provider counted as unconfigured, and the first other configured one answered. */
+const MODEL_KEYS = ['AI_MODEL', 'ANTHROPIC_MODEL', 'DEEPSEEK_MODEL'];
+
 function applyInstanceSettings(values) {
     const lockedSet = new Set(lockedKeys());
     const applicable = Object.fromEntries(Object.entries(values).filter(([key]) => byKey.has(key) && !byKey.get(key).readOnly && !lockedSet.has(key)));
+    const applied = Object.keys(applicable);
+    for (const key of MODEL_KEYS) {
+        if (lockedSet.has(key)) continue;
+        if (applicable[key] === '' || (applicable[key] === undefined && !isSet(process.env[key]))) applicable[key] = byKey.get(key).default;
+    }
     applyEnvMap(applicable, { override: true });
-    return Object.keys(applicable);
+    return applied;
 }
 
 function decodeStored(stored, logger) {
