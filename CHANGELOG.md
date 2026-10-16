@@ -16,6 +16,42 @@ from [Conventional Commits](https://www.conventionalcommits.org/) on `main`.
 
 ---
 
+## [14.39.0](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/compare/v14.38.1...v14.39.0) (2026-10-14)
+
+
+### 🚀 Features
+
+* **inbox:** an approved change offers a link to the project it made or changed ([bec74b5](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/bec74b5dcc52af9ff4da44cc2556a16a88457f21))
+
+
+### 🐛 Bug Fixes
+
+* **auth:** keep the new invitee's session across the reload; keep the undo button's own rule ([733ff0d](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/733ff0d9b85f9e03de000671123b1be765c8e535))
+* **auth:** set up a new invitee's notifications on the session that carries the workspace ([94a828c](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/94a828ca5b5ce08412cb1582f35085d4dcf2687d))
+* **auth:** the log-in page says how to get an account on an invitation-only server ([f931e1c](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/f931e1c315c764f79e1c21d8b97a85f98d6aef50))
+* **auth:** the log-in page says how to get an account on an invitation-only server ([33f0618](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/33f06187bf412bf31ae383fc7603450f77e0ba50))
+* defects from the 046 leftover hand check on staging ([af2d746](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/af2d7466808d1eda59527ef1b9f39ca5d31556ee))
+* defects from the 046 leftover hand check on staging ([b278601](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/b2786019aa4f0934cb73e16ddd840d2d320511ad))
+* **frontend:** object and array props default to a value, not undefined ([e346161](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/e3461612019e9c400f5a984720de9dbd50d3d52e))
+* **frontend:** object and array props default to a value, not undefined ([0479256](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/04792561826e1cc3fbd5f6bac235b847f2075b7e))
+* **frontend:** read optional fields of object props that now default to {} ([dff0292](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/dff02929e456baead1b412063b183f09a9bdc5a4))
+* **home:** what next points at the person's own work before the sample project ([c5a8242](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/c5a82425590d93091186193b810587d9aec672a6))
+* keep the muted My Work placeholder readable under its opacity cue ([1fd8f34](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/1fd8f3482feff0f19ff7f5e64269ca3c79ef9b29))
+* **lists:** announce task-count changes and drop the empty starter list from an AI-planned project ([35d831f](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/35d831f44883cb24cc68758458a15180c054d306))
+* newcomer run 2 and hand-check findings ([fc13864](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/fc13864905f773962bf56219865bc18ec57aee50))
+* **onboarding:** sign a new invitee in and keep the tour card off the first rows ([14f4863](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/14f4863b53237a30d1a1db98139e9db3f55bd11a))
+* review of [#1681](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/issues/1681) — sign out on a failed join, scope the tile scrim, reset the Open link ([4c1e49a](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/4c1e49a742d0323f8148d12dd8b2e5ec9eaca4eb))
+* **ui:** readable project letter tiles and an explained empty archive view ([31f27cb](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/31f27cb02a08744799bd941b94871a534e69fcdf))
+
+
+### 📘 Documentation
+
+* **047:** newcomer run 2 from the install wizard on path A ([d2778a3](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/d2778a368b82c9382d1595ca4a164f2f0995d124))
+* **047:** newcomer run 2 on the connect path ([c16a2d9](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/c16a2d9a29a0195ddc35e46dfc1c19ed005be7db))
+* **047:** newcomer run 2 on the connect path ([b5dff5e](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/b5dff5ebd9427175386e2b6a57e8751d23bdad0c))
+* **agents:** the guide lists all eight company blueprints ([1346aea](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/1346aea04fa2691c3d0f5ec0f418e60be0e9aa81))
+* **agents:** the guide lists all eight company blueprints ([4b43c5d](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/4b43c5d5acab0bfe10f2af7eefb8bc3ef0d2ffb9))
+
 ## [14.38.1](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/compare/v14.38.0...v14.38.1) (2026-10-14)
 
 

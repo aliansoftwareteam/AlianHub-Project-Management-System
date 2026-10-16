@@ -20,7 +20,7 @@
                         <button :disabled="!currentCompany?.planFeature?.projectWisePermisson" v-else class="project-permission-bg-white permissionButton project-permission-border-primary project-permission-blue mr-010 cursor-pointer project-permission-font-size-16 disableButton" :class="[{'disableButton project-permission-font-size-16':isSpinner}]">{{$t('Permissions.reset_permission')}}</button>
                     </div>
                 </div>
-                <SecurityPermissions v-if="projectRawRules && projectRawRules.length > 0" :from="'project_rules'" :projectData="projectData" :isSpinnerProject="isSpinner"></SecurityPermissions> 
+                <SecurityPermissions v-if="projectRawRules && projectRawRules.length > 0" :from="'project_rules'" :planAllowed="currentCompany?.planFeature?.projectWisePermisson" :projectData="projectData" :isSpinnerProject="isSpinner"></SecurityPermissions> 
                 <div v-if="projectRawRules.length <= 0 && !currentCompany?.planFeature?.projectWisePermisson">
                     <UpgradePlan
                     :buttonText="$t('Upgrades.upgrade_your_plan')"
