@@ -11890,6 +11890,7 @@ export default {
         login_with: "Log in with",
         star: "Star on GitHub",
         deploy: "Deploy your own",
+        try_demo: "Try the demo",
     },
     Setup: {
         guide_link: "Admin guide",

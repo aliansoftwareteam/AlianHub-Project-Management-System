@@ -71,6 +71,9 @@
                 </button>
                 <button v-if="magicLinkOn" type="button" class="ah-btn ah-btn--secondary" :disabled="busy" @click="sendMagicLink">{{ $t('Auth.email_me_link') }}</button>
             </div>
+            <div v-if="canTryDemo" class="auth__actions">
+                <button type="button" class="ah-btn ah-btn--secondary" data-test="try-demo" :disabled="busy" @click="tryDemo">{{ $t('Demo.try_demo') }}</button>
+            </div>
 
             <div class="auth__remember">
                 <label><input v-model="rememberMe" type="checkbox" class="ah-check" :disabled="busy" />{{ $t('Auth.keep_signed_in') }}</label>
@@ -165,7 +168,7 @@
 <script setup>
 
 defineOptions({ name: "LoginPage" });
-import { computed, inject, nextTick, onMounted, onUnmounted, reactive, ref } from "vue";
+import { computed, inject, nextTick, onMounted, onUnmounted, reactive, ref, watch } from "vue";
 import { useRoute, useRouter } from "vue-router";
 import { useStore } from "vuex";
 import { useI18n } from "vue-i18n";
@@ -196,12 +199,26 @@ const magicLinkOn = computed(() => publicConfig.auth.magicLink === true);
 const step = ref("login");
 const busy = ref(false);
 const showPassword = ref(false);
-const rememberMe = ref(false);
+const rememberedEmail = readRememberedEmail();
+const rememberMe = ref(Boolean(rememberedEmail));
 const banner = ref(null);
 const shownBanner = computed(() => (away.value ? { kind: "warn", text: t("Auth.offline_sign_in") } : banner.value));
 const emailInput = ref(null);
-const form = reactive({ email: localStorage.getItem("ForgotEmail") || "", password: "" });
+const form = reactive({ email: rememberedEmail || localStorage.getItem("ForgotEmail") || "", password: "" });
 const errors = reactive({ email: "", password: "" });
+
+const demo = computed(() => (brand.value.demoMode === true
+    ? { email: String(brand.value.demoEmail || "").trim().toLowerCase(), password: String(brand.value.demoPassword || "") }
+    : null));
+const canTryDemo = computed(() => Boolean(demo.value?.email && demo.value.password));
+// Brand settings usually arrive after this page mounts; whatever is already in the fields wins.
+let demoFilled = false;
+watch(demo, (account) => {
+    if (demoFilled || !account) return;
+    demoFilled = true;
+    if (!form.email) form.email = account.email;
+    if (!form.password && account.email && form.email.toLowerCase() === account.email) form.password = account.password;
+}, { immediate: true });
 const userData = ref(null);
 const workspaces = ref([]);
 const pendingUserId = ref("");
@@ -228,8 +245,6 @@ const sessionExpired = () => {
     }
 };
 onMounted(() => {
-    const rememberedEmail = readRememberedEmail();
-    if (rememberedEmail) { form.email = rememberedEmail; rememberMe.value = true; }
     if (sessionExpired()) banner.value = { kind: "warn", text: t("Auth.session_expired") };
     if (route.query.reason === "expired") banner.value = { kind: "warn", text: t("Auth.two_factor_session_expired") };
     if (route.query.magic === "invalid") banner.value = { kind: "danger", text: t("Auth.magic_invalid") };
@@ -256,6 +271,12 @@ const resendWait = ref(0);
 
 const updateUserStatus = (uid) => apiRequestWithoutCompnay("put", env.USER_UPATE, { userId: uid, updateObject: { isOnline: true, lastActive: new Date() } }).catch(() => {});
 const userCompanyStatusCheck = (uid) => apiRequestWithoutCompnay("post", env.USER_AND_COMAPNY_CHECK, { userId: uid });
+
+const tryDemo = () => {
+    form.email = demo.value.email;
+    form.password = demo.value.password;
+    handleSubmit();
+};
 
 const handleSubmit = async () => {
     if (!validate()) return;

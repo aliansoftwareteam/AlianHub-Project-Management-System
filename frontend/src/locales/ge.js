@@ -11602,7 +11602,8 @@ export default {
         "banner": "You're on the AlianHub live demo — data may reset periodically.",
         "login_with": "Log in with",
         "star": "Star on GitHub",
-        "deploy": "Deploy your own"
+        "deploy": "Deploy your own",
+        "try_demo": "Try the demo"
     },
     "Setup": {
         "guide_link": "Admin guide",
