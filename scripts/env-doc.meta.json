@@ -422,17 +422,17 @@
   },
   "DEMO_EMAIL": {
     "group": "general",
-    "description": "Email of the demo account shown on the login page when DEMO_MODE is on.",
+    "description": "Email of the demo account, shown in the demo banner and filled into the login form when DEMO_MODE is on.",
     "default": ""
   },
   "DEMO_MODE": {
     "group": "general",
-    "description": "Set to true to show the demo login banner and credentials.",
+    "description": "Set to true to show the demo banner and credentials, fill them into the login form, and offer a one-click \"Try the demo\" button when DEMO_EMAIL and DEMO_PASSWORD are both set.",
     "default": "false"
   },
   "DEMO_PASSWORD": {
     "group": "general",
-    "description": "Password of the demo account shown when DEMO_MODE is on.",
+    "description": "Password of the demo account, shown in the demo banner and filled into the login form when DEMO_MODE is on. Keep it in step with the account: \"Try the demo\" signs in with it, and repeated failures lock the shared account.",
     "secret": true
   },
   "DISABLE_PERMISSION_ENFORCEMENT": {
