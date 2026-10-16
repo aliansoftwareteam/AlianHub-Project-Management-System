@@ -98,6 +98,10 @@
         },
         isSpinnerProject:{
             type:Boolean,
+        },
+        planAllowed:{
+            type:Boolean,
+            default:true
         }
     })
     //computed
