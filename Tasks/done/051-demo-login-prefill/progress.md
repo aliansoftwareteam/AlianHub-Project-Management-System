@@ -14,7 +14,7 @@
 
 ## Last step
 
-Committed on `feat/demo-login-prefill` (from `origin/staging`), pushed, and opened as a `feat(auth)` PR into `staging`. Left: review and merge. Then the follow-up docs PR (`npm run version:log`, `docs/BETA-LOG.md`) and moving this task to `done/`.
+Done. Merged into `staging` as build 2 (`14.40.0-beta.2`, PR #1688). Not promoted to `main`.
 
 ## Blockers
 
@@ -50,3 +50,6 @@ None.
   - The full backend unit suite (1,175 files) was not run to the end on this machine for lack of memory. This task changes no backend code.
 - `core.autocrlf=true` here: after git rewrites `.env.example` / `docs/ENV.md` with CRLF, `env:doc:check` reports them out of date. `node scripts/env-doc.js` writes LF again, with no content change.
 - The user approved pushing. Committed as harmit001, pushed `feat/demo-login-prefill` and opened the PR into `staging`. `frontend/.env.example` (line endings only) and the separate backlog task 050 were left out of the commit.
+- PR #1688: CI attempt 1 failed only `app-shell-worker.spec.js` in e2e shard 2/3, a service-worker cache check on a fake app that doesn't touch this change; staging's own CI was green. Re-running the failed jobs passed. harmit001 merged it into `staging` on 2026-10-16 (merge commit `aaad0d932`). On the user's instruction it is not merged on to `main`.
+- Follow-up docs PR: `npm run version:log` lists #1688 as build 2, `14.40.0-beta.2` (build 1 is #1685), counting from `v14.39.0`. No route changed, so no `api:doc`.
+- Closed. The real-instance sign-in was checked only against a stubbed login endpoint (the right demo credentials sent). A first sign-in on the live demo with real DEMO_* values is still worth a glance after deploy.

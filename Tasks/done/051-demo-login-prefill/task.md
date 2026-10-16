@@ -1,7 +1,7 @@
 ---
 id: 051
 title: Demo login — fill in the demo account and add a one-click "Try the demo" button
-status: active
+status: done
 priority: medium
 depends_on: []
 created: 2026-10-16
@@ -58,24 +58,24 @@ So the credentials already reach the browser. This task only puts them into the 
 ## Acceptance criteria
 
 **Filling in the form**
-- [ ] With `DEMO_MODE="true"` and both `DEMO_EMAIL` and `DEMO_PASSWORD` set, a fresh visit to `/login` (cleared localStorage) shows both fields filled in. Pressing **Sign in** signs into the demo account.
-- [ ] Filling in works whether brand settings arrive after the login page mounts (first load) or are already in the store (going back to `/login` inside the app).
-- [ ] With `DEMO_MODE="true"` and only `DEMO_EMAIL` set, only the email field is filled in. The password stays empty.
-- [ ] If the email field already holds a different address (remembered email or `ForgotEmail`), it is kept and the password field stays empty.
-- [ ] Text the visitor typed before brand settings arrived is never overwritten.
-- [ ] The password field stays masked (`type="password"`), and the show/hide eye works as before.
-- [ ] Both filled fields can be edited and cleared like normal input. Validation and error messages behave as they do today.
+- [x] With `DEMO_MODE="true"` and both `DEMO_EMAIL` and `DEMO_PASSWORD` set, a fresh visit to `/login` (cleared localStorage) shows both fields filled in. Pressing **Sign in** signs into the demo account.
+- [x] Filling in works whether brand settings arrive after the login page mounts (first load) or are already in the store (going back to `/login` inside the app).
+- [x] With `DEMO_MODE="true"` and only `DEMO_EMAIL` set, only the email field is filled in. The password stays empty.
+- [x] If the email field already holds a different address (remembered email or `ForgotEmail`), it is kept and the password field stays empty.
+- [x] Text the visitor typed before brand settings arrived is never overwritten.
+- [x] The password field stays masked (`type="password"`), and the show/hide eye works as before.
+- [x] Both filled fields can be edited and cleared like normal input. Validation and error messages behave as they do today.
 
 **Try the demo button**
-- [ ] With `DEMO_MODE="true"` and both `DEMO_EMAIL` and `DEMO_PASSWORD` set, **Try the demo** shows directly below **Sign in** (and below **Email me a link** when that is shown), full width, on desktop and on mobile widths.
-- [ ] One click signs into the demo account and lands where **Sign in** would, including `redirect_url`, the workspace picker and 2FA if the account has it. This holds even when the visitor has edited or cleared the fields first.
-- [ ] While the sign-in is running, the button is disabled. A wrong `DEMO_PASSWORD` shows the usual "email or password is incorrect" message under the password field.
-- [ ] Pressing Enter in the form still runs **Sign in**, not **Try the demo**.
-- [ ] The button is hidden when `DEMO_MODE` is not `"true"`, or when either `DEMO_EMAIL` or `DEMO_PASSWORD` is empty.
+- [x] With `DEMO_MODE="true"` and both `DEMO_EMAIL` and `DEMO_PASSWORD` set, **Try the demo** shows directly below **Sign in** (and below **Email me a link** when that is shown), full width, on desktop and on mobile widths.
+- [x] One click signs into the demo account and lands where **Sign in** would, including `redirect_url`, the workspace picker and 2FA if the account has it. This holds even when the visitor has edited or cleared the fields first.
+- [x] While the sign-in is running, the button is disabled. A wrong `DEMO_PASSWORD` shows the usual "email or password is incorrect" message under the password field.
+- [x] Pressing Enter in the form still runs **Sign in**, not **Try the demo**.
+- [x] The button is hidden when `DEMO_MODE` is not `"true"`, or when either `DEMO_EMAIL` or `DEMO_PASSWORD` is empty.
 
 **Demo mode off and checks**
-- [ ] With `DEMO_MODE="false"`, or the variable unset or set to any value other than `true`, both fields stay empty, the button is hidden, and the brand-settings response has no `demoEmail` / `demoPassword`.
-- [ ] The new frontend spec and backend test pass. `npm test`, `cd frontend && npm test`, `npm run i18n:check`, `npm run style:check` and `npm run env:doc:check` all pass.
+- [x] With `DEMO_MODE="false"`, or the variable unset or set to any value other than `true`, both fields stay empty, the button is hidden, and the brand-settings response has no `demoEmail` / `demoPassword`.
+- [x] The new frontend spec and backend test pass. `npm test`, `cd frontend && npm test`, `npm run i18n:check`, `npm run style:check` and `npm run env:doc:check` all pass.
 
 ## Constraints & notes
 - **i18n (Rule 3)**: the only new string is `Demo.try_demo: "Try the demo"`, added to the existing `Demo` namespace in `frontend/src/locales/en.js`. Run `npm run i18n:backfill` afterwards and commit the locale files and the `.pending.json` files. Adding the key must not push `Login.vue` past its baseline in `scripts/i18n-allowlist.json`.
