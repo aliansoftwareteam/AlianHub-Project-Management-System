@@ -1,7 +1,7 @@
 module.exports = {
     key: 'swiftlogix',
     industry: 'logistics',
-    company: { name: 'SwiftLogix', domain: 'swiftlogix' },
+    company: { name: 'Logistics · SwiftLogix', domain: 'swiftlogix' },
     owner: { title: 'Head of Operations' },
     people: [
         { key: 'marco', firstName: 'Marco', lastName: 'Rossi', title: 'Transport Planner', role: 'admin', designations: ['Manager', 'Operations Executive'] },

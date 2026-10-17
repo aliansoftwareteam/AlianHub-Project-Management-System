@@ -1,7 +1,7 @@
 module.exports = {
     key: 'peoplefirst',
     industry: 'hr',
-    company: { name: 'PeopleFirst HR', domain: 'peoplefirst' },
+    company: { name: 'HR & People · PeopleFirst', domain: 'peoplefirst' },
     owner: { title: 'Head of People' },
     people: [
         { key: 'olivia', firstName: 'Olivia', lastName: 'Grant', title: 'Talent Acquisition Lead', role: 'admin', designations: ['Manager'] },
@@ -397,7 +397,7 @@ module.exports = {
     dashboard: { name: 'People operations', project: 'onb', cards: ['tasks_by_status', 'at_risk', 'due_soon', 'project_pulse'] },
     guide: {
         project: 'hire',
-        intro: 'PeopleFirst HR runs hiring, onboarding and compliance for a 60-person company. You are signed in as the **Head of People**. **Hiring Pipeline** follows every candidate, **Onboarding** takes each new starter through their first 30 days, and **Compliance and Training** keeps every date that matters. Role agents take notes, draft and watch dates; people decide.',
+        intro: 'PeopleFirst runs hiring, onboarding and compliance for a 60-person company. You are signed in as the **Head of People**. **Hiring Pipeline** follows every candidate, **Onboarding** takes each new starter through their first 30 days, and **Compliance and Training** keeps every date that matters. Role agents take notes, draft and watch dates; people decide.',
         tryThis: [
             'Open **Hiring Pipeline** on the Board. William Osei is in **Offer accepted**: when Olivia moved him, the automation assigned Sofia, told IT and People Operations, and posted the next steps.',
             'Open **Inbox → Approvals**. The Onboarding Coordinator has William\'s first-weeks plan ready, and the Document Drafter has Amara\'s offer letter. Approve one: the subtasks or the comment are created for real, with Undo for 15 minutes.',

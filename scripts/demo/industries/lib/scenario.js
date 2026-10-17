@@ -381,10 +381,11 @@ function workflowSection(scenario, { agentName, nameOf, templateName }) {
         const { task } = taskRef(scenario, own.run.task);
         const gate = listOf(own.steps).find((step) => step.approval);
         const chain = listOf(own.steps).map((step) => (step.agent ? agentName(step.agent) : `**${step.approval.title}** (approved by ${nameOf(step.approval.owner)})`)).join(' → ');
-        const finished = stepsBeforeGate(own).map((step) => agentName(step.agent));
+        const finished = stepsBeforeGate(own).map((step) => `the ${agentName(step.agent)}`);
+        const finishedText = finished.length > 1 ? `${finished.slice(0, -1).join(', ')} and ${finished[finished.length - 1]}` : finished[0];
         const waitsFor = gate.approval.owner === OWNER ? 'your approval' : `the approval of ${nameOf(gate.approval.owner)}`;
         lines.push(
-            `**${own.name}** is switched on: ${chain}. ${nameOf(own.run.by)} started it on **${task.name}**. The ${finished.join(' and the ')} finished ${finished.length === 1 ? 'its step' : 'their steps'}, so it waits for ${waitsFor} in **AI → Inbox → Approvals** and under **Waiting on you** on Home.`,
+            `**${own.name}** is switched on: ${chain}. ${nameOf(own.run.by)} started it on **${task.name}**. ${finishedText.charAt(0).toUpperCase()}${finishedText.slice(1)} finished ${finished.length === 1 ? 'its step' : 'their steps'}, so it waits for ${waitsFor} in **AI → Inbox → Approvals** and under **Waiting on you** on Home.`,
             '',
         );
     }

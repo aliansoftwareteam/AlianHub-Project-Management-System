@@ -494,8 +494,13 @@ async function stopAutomations() {
     engine._setDriver(null);
 }
 
+// The event bus holds a task's emits for 2 seconds (DEBOUNCE_MS in event/domainEventBus.js) before a rule sees them,
+// so a move near the end of a story has no run to count yet; stopping the engine then would drop it.
+const EVENT_WINDOW_MS = 3000;
+
 async function settleAutomations(companyId, since, timeoutMs = 30000) {
     const deadline = Date.now() + timeoutMs;
+    await sleep(EVENT_WINDOW_MS);
     for (;;) {
         await sleep(1000);
         const open = await crud(companyId, SCHEMA_TYPE.AUTOMATION_RUNS, [{ createdAt: { $gte: since }, status: { $in: ['queued', 'running', 'retrying'] } }], 'countDocuments');

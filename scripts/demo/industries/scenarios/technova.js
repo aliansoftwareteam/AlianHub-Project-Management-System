@@ -1,7 +1,7 @@
 module.exports = {
     key: 'technova',
     industry: 'it',
-    company: { name: 'TechNova Solutions', domain: 'technova' },
+    company: { name: 'IT & Software · TechNova', domain: 'technova' },
     owner: { title: 'VP of Engineering' },
     people: [
         { key: 'aisha', firstName: 'Aisha', lastName: 'Rahman', title: 'Support Lead', role: 'admin', designations: ['Manager'] },
@@ -445,7 +445,7 @@ module.exports = {
     dashboard: { name: 'Engineering and support', project: 'eng', cards: ['tasks_by_status', 'at_risk', 'project_pulse', 'due_soon'] },
     guide: {
         project: 'sup',
-        intro: 'TechNova Solutions builds a B2B software platform. You are signed in as the **VP of Engineering**. Work flows across three projects: **Customer Support** sorts and answers requests, **Platform Engineering** builds the release, and **IT Operations** runs incidents and changes. Role agents triage, plan and write things up; people decide.',
+        intro: 'TechNova builds a B2B software platform. You are signed in as the **VP of Engineering**. Work flows across three projects: **Customer Support** sorts and answers requests, **Platform Engineering** builds the release, and **IT Operations** runs incidents and changes. Role agents triage, plan and write things up; people decide.',
         tryThis: [
             'Open **Customer Support** on the Board. SUP-2201 and SUP-2205 are **Escalated to engineering**: when Aisha moved them, the automation set them to High, assigned Grace and posted the SLA comment.',
             'Open **SUP-2201**: the Bug Triager wrote it up with steps to reproduce, and it is blocked by the engineering bug in Platform Engineering.',

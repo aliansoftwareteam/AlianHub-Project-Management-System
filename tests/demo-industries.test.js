@@ -15,6 +15,17 @@ describe('industry demo scenarios', () => {
         expect(validateScenario(scenario, checks)).toEqual([]);
     });
 
+    test('every company name leads with its industry, so the workspace picker reads as an industry menu', () => {
+        SCENARIOS.forEach((scenario) => expect(scenario.company.name).toMatch(/^[A-Z][^·]+ · \S/));
+        expect(new Set(SCENARIOS.map((scenario) => scenario.company.name.split(' · ')[0])).size).toBe(SCENARIOS.length);
+    });
+
+    test('there is a company for every blueprint the role playbooks cover', () => {
+        const blueprints = new Set(SCENARIOS.flatMap((scenario) => scenario.agents.filter((agent) => agent.role).map((agent) => agent.role.split('/')[0])));
+        ['it-company', 'manufacturing', 'agency', 'ecommerce', 'professional-services', 'construction', 'education', 'clinic']
+            .forEach((blueprint) => expect(blueprints.has(blueprint)).toBe(true));
+    });
+
     test('every scenario routes work, hands some of it over and runs a workflow to an approval', () => {
         SCENARIOS.forEach((scenario) => {
             expect(Object.keys(scenario.routing).length).toBeGreaterThan(0);

@@ -11610,6 +11610,13 @@ export default {
         "industry_finance": "Finance and accounting",
         "industry_logistics": "Logistics and supply chain",
         "industry_hr": "People operations",
+        "industry_manufacturing": "Manufacturing",
+        "industry_agency": "Marketing agency",
+        "industry_ecommerce": "E-commerce",
+        "industry_construction": "Construction",
+        "industry_education": "Schools and education",
+        "industry_healthcare": "Healthcare clinic",
+        "industry_services": "Professional services",
         "switch_industry": "Switch industry",
         "guide": "Guide"
     },

@@ -1,7 +1,7 @@
 module.exports = {
     key: 'finedge',
     industry: 'finance',
-    company: { name: 'FinEdge Finance', domain: 'finedge' },
+    company: { name: 'Finance & Accounting · FinEdge', domain: 'finedge' },
     owner: { title: 'Finance Controller' },
     people: [
         { key: 'maya', firstName: 'Maya', lastName: 'Chen', title: 'Accounts Payable Lead', role: 'admin', designations: ['Manager'] },
@@ -447,7 +447,7 @@ module.exports = {
     guide: {
         project: 'ap',
         intro: [
-            'FinEdge Finance runs its own finance operations and bills advisory clients in AlianHub. You are signed in as the **Finance Controller**. Three processes run side by side: **Accounts Payable** (supplier invoices with three-way matching), the **Month-End Close** (a five-day close calendar) and **Client Billing** (time to invoice). Role agents prepare and check; people approve.',
+            'FinEdge runs its own finance operations and bills advisory clients in AlianHub. You are signed in as the **Finance Controller**. Three processes run side by side: **Accounts Payable** (supplier invoices with three-way matching), the **Month-End Close** (a five-day close calendar) and **Client Billing** (time to invoice). Role agents prepare and check; people approve.',
         ].join('\n'),
         tryThis: [
             'Open **Accounts Payable** on the Board. INV-4523 and INV-4529 sit in **Exception**: when Daniel moved them there, the automation set them to High, assigned Maya and left the next-steps comment.',
