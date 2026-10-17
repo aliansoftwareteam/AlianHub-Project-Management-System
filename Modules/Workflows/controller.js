@@ -12,6 +12,7 @@ const { MongoDbCrudOpration } = require('../../utils/mongo-handler/mongoQueries'
 const store = require('./store');
 const approvals = require('./approvals');
 const people = require('./people');
+const { withWaitingFor } = require('./waitingFor');
 const flag = require('./flag');
 const executors = require('./executors');
 const queue = require('./queue');
@@ -114,7 +115,7 @@ const withoutCredentialIds = (step) => {
     return row;
 };
 
-const stepsOf = async (companyId, run) => ((await store.listSteps(companyId, run._id)) || []).map(withoutCredentialIds);
+const stepsOf = async (companyId, run) => withWaitingFor(companyId, run._id, ((await store.listSteps(companyId, run._id)) || []).map(withoutCredentialIds));
 
 /* The session an external_agent step waits on. Its activities are the task's, so only a reader who can open the
  * task gets them, as the task panel's strip would; anyone else sees the state alone. */
