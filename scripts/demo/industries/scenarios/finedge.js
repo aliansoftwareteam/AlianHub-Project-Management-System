@@ -387,6 +387,45 @@ module.exports = {
         },
         { comment: 'bill.vertex', by: 'tom', text: 'Draft is ready. Vertex asked for every invoice to quote their PO 7781.' },
     ],
+    routing: {
+        ap: [
+            { agent: 'recon', types: ['Invoice'] },
+        ],
+        close: [
+            { agent: 'review', types: ['Reconciliation', 'Journal entry'] },
+            { agent: 'deadline', types: ['Report'] },
+        ],
+        bill: [
+            { agent: 'timesheets', statuses: ['Time capture', 'Timesheet review'] },
+            { agent: 'invoices', statuses: ['Draft invoice'] },
+            { agent: 'invoices', types: ['Write-off request'] },
+        ],
+    },
+    handOvers: [
+        { task: 'ap.inv-4529', by: 'maya' },
+        { task: 'close.revenue-cutoff', by: 'priya' },
+        { task: 'bill.vertex', by: 'tom' },
+    ],
+    workflows: {
+        own: {
+            key: 'invoice-exception',
+            name: 'Accounts payable: an invoice exception',
+            description: 'The Reconciliation Checker explains the variance and how to settle it, the Finance Controller approves the settlement, and the checker matches the credit note and releases the invoice to the payment run.',
+            steps: [
+                { id: 'sExplain', agent: 'recon' },
+                {
+                    id: 'sSettleOk',
+                    approval: {
+                        title: 'Approve how the exception is settled',
+                        prompt: 'The variance against the purchase order and the goods receipt is explained on the invoice, with a credit note or a corrected invoice to ask for. Approve to settle it that way, or reject to keep the invoice on hold.',
+                        owner: 'you',
+                    },
+                },
+                { id: 'sRelease', agent: 'recon' },
+            ],
+            run: { task: 'ap.inv-4523', by: 'maya' },
+        },
+    },
     goals: [
         {
             name: 'Close the month in five business days',

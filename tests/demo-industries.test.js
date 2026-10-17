@@ -1,16 +1,27 @@
 const { SCENARIOS } = require('../scripts/demo/industries/scenarios');
-const { validateScenario, guideMarkdown } = require('../scripts/demo/industries/lib/scenario');
+const { validateScenario, guideMarkdown, ruleFor, statusAfterStory } = require('../scripts/demo/industries/lib/scenario');
 const { targetProblem, isShowcaseCompany, isShowcasePerson, emailFor, MARK } = require('../scripts/demo/industries/lib/guard');
-const { buildShowcase, roleExists, roleName } = require('../scripts/demo/industries/lib/build');
+const { buildShowcase, roleExists, roleName, templateExists, templateName } = require('../scripts/demo/industries/lib/build');
 const { dropShowcase } = require('../scripts/demo/industries/lib/drop');
 const { markdownBlocks } = require('../scripts/demo/industries/lib/blocks');
 
 const clone = (value) => JSON.parse(JSON.stringify(value));
 const finedge = () => clone(SCENARIOS.find((scenario) => scenario.key === 'finedge'));
+const technova = () => clone(SCENARIOS.find((scenario) => scenario.key === 'technova'));
+const checks = { roleExists, templateExists };
 
 describe('industry demo scenarios', () => {
     test.each(SCENARIOS.map((scenario) => [scenario.key, scenario]))('%s is coherent', (key, scenario) => {
-        expect(validateScenario(scenario, { roleExists })).toEqual([]);
+        expect(validateScenario(scenario, checks)).toEqual([]);
+    });
+
+    test('every scenario routes work, hands some of it over and runs a workflow to an approval', () => {
+        SCENARIOS.forEach((scenario) => {
+            expect(Object.keys(scenario.routing).length).toBeGreaterThan(0);
+            expect(scenario.handOvers.length).toBeGreaterThan(0);
+            expect(scenario.workflows.own.steps.some((step) => step.approval)).toBe(true);
+            expect(scenario.workflows.own.steps[0].agent).toBeTruthy();
+        });
     });
 
     test('keys, industries, domains and project codes are unique across scenarios', () => {
@@ -44,13 +55,85 @@ describe('industry demo scenarios', () => {
         broken.projects[0].tasks[2].due = -4;
         broken.agents[0].role = 'finance/not-a-role';
         broken.story.push({ ...broken.story.find((event) => event.proposal) });
-        const problems = validateScenario(broken, { roleExists }).join('\n');
+        const problems = validateScenario(broken, checks).join('\n');
         expect(problems).toMatch(/exactly one "default_active" status, has 2/);
         expect(problems).toMatch(/status "Lost" is not one of the project's/);
         expect(problems).toMatch(/"nobody" is not a person/);
         expect(problems).toMatch(/open and past due/);
         expect(problems).toMatch(/has no playbook/);
         expect(problems).toMatch(/only one run per agent and task may be open/);
+    });
+
+    test('the validator names what is wrong with routing, hand-overs and workflows', () => {
+        const broken = technova();
+        broken.routing.sup.push({ agent: 'scribe', types: ['Ticket'] }, { agent: 'digest', types: ['Ticket'] }, { agent: 'support', types: ['Incident'] }, { agent: 'support' });
+        broken.handOvers.push(
+            { task: 'sup.second-admin', by: 'aisha' },
+            { task: 'sup.rate-limit', by: 'leo' },
+            { task: 'sup.csv', by: 'aisha' },
+            { task: 'sup.rate-limit', by: 'aisha' },
+        );
+        broken.workflows.templates.push('not-a-template');
+        broken.workflows.own.steps[2].approval.owner = 'nobody';
+        broken.workflows.own.steps.push({ id: 'plan2', agent: 'digest' });
+        broken.workflows.own.run.by = 'leo';
+        const problems = validateScenario(broken, checks).join('\n');
+        expect(problems).toMatch(/routing\.sup\.2: agent "scribe" does not work in sup/);
+        expect(problems).toMatch(/agent "digest" has no role/);
+        expect(problems).toMatch(/type "Incident" is not one of sup's/);
+        expect(problems).toMatch(/routing\.sup\.5: needs at least one of types, tags, statuses/);
+        expect(problems).toMatch(/sup\.second-admin is closed once the story has played/);
+        expect(problems).toMatch(/"leo" does not lead sup/);
+        expect(problems).toMatch(/sup\.csv is the workflow's task/);
+        expect(problems).toMatch(/"sup\.rate-limit" is handed over twice/);
+        expect(problems).toMatch(/"not-a-template" is not a ready-made workflow/);
+        expect(problems).toMatch(/owner "nobody" must be you or a member/);
+        expect(problems).toMatch(/id must be "s" followed by letters or digits/);
+        expect(problems).toMatch(/"leo" cannot start a workflow/);
+    });
+
+    test('a workflow needs an approval after its first hand-over, on a task the story leaves open', () => {
+        const noGate = technova();
+        noGate.workflows.own.steps = noGate.workflows.own.steps.filter((step) => !step.approval);
+        expect(validateScenario(noGate, checks).join('\n')).toMatch(/has no approval for a person to decide/);
+        const gateFirst = technova();
+        gateFirst.workflows.own.steps.unshift({ id: 'sFirst', approval: { title: 'Go?', prompt: 'Approve.', owner: 'you' } });
+        expect(validateScenario(gateFirst, checks).join('\n')).toMatch(/starts with an approval/);
+        const closed = technova();
+        closed.workflows.own.run.task = 'ops.inc-297';
+        expect(validateScenario(closed, checks).join('\n')).toMatch(/ops\.inc-297 is closed once the story has played/);
+    });
+
+    test('routing reads a task as the story leaves it, and the first matching rule wins', () => {
+        const scenarios = Object.fromEntries(SCENARIOS.map((scenario) => [scenario.key, scenario]));
+        expect(statusAfterStory(scenarios.swiftlogix, 'ship.sh-88214')).toBe('Delayed');
+        expect(ruleFor(scenarios.swiftlogix, 'ship.sh-88214').agent).toBe('triage');
+        expect(ruleFor(scenarios.swiftlogix, 'ship.sh-88250').agent).toBe('tracker');
+        expect(ruleFor(scenarios.technova, 'sup.dark-mode')).toBeNull();
+        expect(ruleFor(scenarios.finedge, 'bill.orchid-wo').agent).toBe('invoices');
+    });
+
+    test('the guide describes the dispatcher and the workflow only when they were seeded', () => {
+        const scenario = technova();
+        const options = { roleName, templateName, ownerName: 'Demo Visitor' };
+        const off = guideMarkdown(scenario, options);
+        expect(off).not.toMatch(/Who routes the work|## Workflows|Company view|AI → Inbox → Approvals/);
+        const on = guideMarkdown(scenario, { ...options, seeded: { dispatcher: true, workflows: true } });
+        expect(on).toMatch(/## Who routes the work/);
+        expect(on).toContain('| Customer Support | Bug report | Bug Triager |');
+        expect(on).toContain('| Platform Engineering | Story or Bug | Tech Lead |');
+        expect(on).toMatch(/## Workflows/);
+        expect(on).toContain('**Support to Engineering: a customer bug** and **Engineering: feature from design to release**');
+        expect(on).toContain('Support Agent → Bug Triager → **Pull the fix into this sprint** (approved by Demo Visitor (VP of Engineering)) → Tech Lead');
+        expect(on).toMatch(/Aisha Rahman started it on \*\*SUP-2201 · CSV export of invoices times out\*\*/);
+        expect(on).toMatch(/it waits for your approval in \*\*AI → Inbox → Approvals\*\*/);
+        expect(on).toMatch(/open \*\*Pull the fix into this sprint\*\* and approve it\. The workflow carries on for real: it hands \*\*SUP-2201\*\* to the \*\*Tech Lead\*\*/);
+        expect(on).toContain('The Support Agent and the Bug Triager finished their steps');
+        expect(on).toMatch(/accept the dispatcher's suggestion of the \*\*Bug Triager\*\*/);
+        expect(on).toMatch(/the roles finishing their steps before the approval were written for this demo/);
+        const dispatcherOnly = guideMarkdown(scenario, { ...options, seeded: { dispatcher: true, workflows: false } });
+        expect(dispatcherOnly).toMatch(/## Who routes the work/);
+        expect(dispatcherOnly).not.toMatch(/## Workflows|AI → Inbox → Approvals/);
     });
 
     test('the guide says what is real, simulated and illustrative, and lists every step', () => {
@@ -91,7 +174,7 @@ describe('industry demo guard', () => {
 });
 
 /* An adapter that records what the build asks of the app, in order. */
-function fakeAdapter() {
+function fakeAdapter({ dispatcher = true, workflows = true } = {}) {
     let n = 0;
     const id = () => (n += 1).toString(16).padStart(24, '0');
     const calls = [];
@@ -124,6 +207,16 @@ function fakeAdapter() {
         startAutomations: record('startAutomations', true),
         stopAutomations: record('stopAutomations'),
         settleAutomations: record('settleAutomations', [{ ruleName: 'r', status: 'success' }]),
+        features: () => ({ dispatcher, workflows }),
+        saveDispatcher: record('saveDispatcher'),
+        routeTask: record('routeTask', { state: 'suggested' }),
+        acceptSuggestion: record('acceptSuggestion'),
+        installTemplate: record('installTemplate', () => id()),
+        createWorkflow: record('createWorkflow', () => id()),
+        enableWorkflow: record('enableWorkflow'),
+        startWorkflow: record('startWorkflow', () => id()),
+        finishHandOver: record('finishHandOver'),
+        waitingApproval: record('waitingApproval', { status: 'pending' }),
         personComment: record('personComment', () => id()),
         moveTask: record('moveTask'),
         simulatedRun: record('simulatedRun', () => ({ _id: id() })),
@@ -183,6 +276,91 @@ describe('building an industry company', () => {
         const proposal = adapter.named('simulatedProposal')[0].args;
         expect(proposal.changes.map((change) => change.action)).toEqual(['task.update', 'task.comment']);
         expect(proposal.changes[0].params.fields).toEqual({ Task_Priority: 'HIGH' });
+    });
+
+    test.each(SCENARIOS.map((scenario) => [scenario.key, scenario]))('%s switches the dispatcher on, runs its workflow to the approval, then routes and hands over', async (key, scenario) => {
+        const adapter = fakeAdapter();
+        const { report } = await buildShowcase({ scenario, owner, adapter });
+        const routed = scenario.projects.filter((project) => scenario.routing[project.key]);
+        const own = scenario.workflows.own;
+        const beforeGate = own.steps.slice(0, own.steps.findIndex((step) => step.approval));
+
+        expect(adapter.named('saveDispatcher')).toHaveLength(scenario.projects.length);
+        adapter.named('saveDispatcher').forEach(({ args }) => expect(args.settings).toMatchObject({ mode: 'suggest', roles: expect.any(Array) }));
+        expect(adapter.named('installTemplate').map((call) => call.args.key)).toEqual(scenario.workflows.templates || []);
+        expect(adapter.named('finishHandOver').map((call) => call.args.stepId)).toEqual(beforeGate.map((step) => step.id));
+        expect(adapter.named('routeTask')).toHaveLength(routed.reduce((sum, project) => sum + project.tasks.length, 0));
+        expect(adapter.named('acceptSuggestion')).toHaveLength(scenario.handOvers.length);
+        expect(report).toMatchObject({ workflowRuns: 1, simulatedSteps: beforeGate.length, handOvers: scenario.handOvers.length });
+
+        const order = adapter.calls.map((call) => call.name);
+        const last = (name) => order.lastIndexOf(name);
+        expect(order.indexOf('stopAutomations')).toBeLessThan(order.indexOf('saveDispatcher'));
+        expect(last('saveDispatcher')).toBeLessThan(order.indexOf('startWorkflow'));
+        expect(order.indexOf('enableWorkflow')).toBeLessThan(order.indexOf('startWorkflow'));
+        expect(last('finishHandOver')).toBeLessThan(order.indexOf('routeTask'));
+        expect(last('routeTask')).toBeLessThan(order.indexOf('acceptSuggestion'));
+        expect(last('acceptSuggestion')).toBeLessThan(order.indexOf('createGuidePage'));
+
+        const guide = adapter.named('createGuidePage')[0].args.markdown;
+        expect(guide).toMatch(/## Who routes the work/);
+        expect(guide).toContain(own.name);
+        expect(adapter.named('updateCompanyMarker')[0].args.marker.layers).toEqual({ dispatcher: true, workflows: true });
+    });
+
+    test('the dispatcher stores the project\'s own type, status and tag keys, and turns on the roles the workflow hands to', async () => {
+        const adapter = fakeAdapter();
+        await buildShowcase({ scenario: clone(SCENARIOS.find((scenario) => scenario.key === 'swiftlogix')), owner, adapter });
+        const ship = adapter.named('saveDispatcher')[0].args.settings;
+        expect(ship.rules).toEqual([
+            { role: 'ecommerce/order-issue-triage', when: { statusKeys: [103, 102] } },
+            { role: 'manufacturing/delivery-tracker', when: { taskTypeKeys: [200] } },
+            { role: 'ecommerce/order-issue-triage', when: { taskTypeKeys: [201] } },
+        ]);
+        expect(ship.roles).toEqual(expect.arrayContaining(['ecommerce/order-issue-triage', 'manufacturing/delivery-tracker', 'manufacturing/customer-update-writer']));
+
+        const tech = fakeAdapter();
+        await buildShowcase({ scenario: technova(), owner, adapter: tech });
+        const sup = tech.named('saveDispatcher')[0].args.settings;
+        expect(sup.roles).toEqual(['it-company/support-agent', 'it-company/bug-triager', 'it-company/tech-lead']);
+    });
+
+    test('the workflow is saved as hand-overs and an approval the demo account owns, then started by its admin on the task', async () => {
+        const adapter = fakeAdapter();
+        await buildShowcase({ scenario: technova(), owner, adapter });
+        const { steps } = adapter.named('createWorkflow')[0].args.definition;
+        expect(steps.map((step) => [step.id, step.type, step.dependsOn])).toEqual([
+            ['sTriage', 'role_handoff', []],
+            ['sFile', 'role_handoff', ['sTriage']],
+            ['sSprintOk', 'human_approval', ['sFile']],
+            ['sPlan', 'role_handoff', ['sSprintOk']],
+        ]);
+        expect(steps[0].config).toEqual({ role: 'it-company/support-agent' });
+        expect(steps[2].config).toMatchObject({ ownerUserId: owner.userId, onReject: 'skip', deadlineMs: 7 * 24 * 60 * 60 * 1000 });
+        const start = adapter.named('startWorkflow')[0].args;
+        expect(start).toMatchObject({ name: 'Customer bug: from support to the sprint · SUP-2201', taskId: expect.any(String), projectId: expect.any(String) });
+        const aisha = adapter.named('addMember').find((call) => call.args.email === 'aisha.rahman@technova.demo.test');
+        expect(start.userId).toBe(aisha.args.userId);
+    });
+
+    test('with the flags off, neither part is written and the guide leaves them out', async () => {
+        const adapter = fakeAdapter({ dispatcher: false, workflows: false });
+        const lines = [];
+        await buildShowcase({ scenario: technova(), owner, adapter, log: (line) => lines.push(line) });
+        ['saveDispatcher', 'routeTask', 'acceptSuggestion', 'installTemplate', 'createWorkflow', 'startWorkflow', 'finishHandOver']
+            .forEach((name) => expect(adapter.named(name)).toHaveLength(0));
+        expect(adapter.named('createGuidePage')[0].args.markdown).not.toMatch(/Who routes the work|## Workflows/);
+        expect(adapter.named('updateCompanyMarker')[0].args.marker.layers).toEqual({ dispatcher: false, workflows: false });
+        expect(lines.join('\n')).toMatch(/DISPATCHER is off/);
+    });
+
+    test('with the workflow engine off, the dispatcher part is still written', async () => {
+        const adapter = fakeAdapter({ dispatcher: true, workflows: false });
+        await buildShowcase({ scenario: technova(), owner, adapter });
+        expect(adapter.named('saveDispatcher').length).toBeGreaterThan(0);
+        expect(adapter.named('acceptSuggestion').length).toBeGreaterThan(0);
+        expect(adapter.named('createWorkflow')).toHaveLength(0);
+        expect(adapter.named('createGuidePage')[0].args.markdown).not.toMatch(/## Workflows/);
     });
 
     test('an incoherent scenario writes nothing', async () => {

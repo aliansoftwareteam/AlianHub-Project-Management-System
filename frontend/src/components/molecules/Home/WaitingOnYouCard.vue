@@ -11,7 +11,7 @@
             <li v-for="item in top" :key="`${item.kind}:${item.id}`" class="hwait__row" :class="{ 'is-open': isReviewing(item) }" data-test="waiting-row">
                 <div class="hwait__text">
                     <span class="hwait__what">{{ item.what }}</span>
-                    <span class="hwait__who">{{ item.who }} <SimulatedChip v-if="item.source && item.source.simulated" /></span>
+                    <span class="hwait__who"><span class="hwait__name">{{ item.who }}</span><SimulatedChip v-if="item.source && item.source.simulated" /></span>
                     <span v-if="item.kind === 'proposal'" class="hwait__why" data-test="waiting-why"><span class="ah-label">{{ $t('Ai.why') }}</span> {{ item.why || $t('Time.why_no_reason') }}</span>
                 </div>
                 <div class="hwait__actions">
@@ -181,7 +181,9 @@ onMounted(() => { load().catch(() => {}); });
 .hwait__row:last-child { border-bottom: 0; }
 .hwait__text { display: flex; flex-direction: column; gap: 2px; min-width: 0; flex: 1 1 auto; }
 .hwait__what { font: 500 var(--fs-md, 13px)/1.35 var(--font-ui); color: var(--ink); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.hwait__who { font: 400 var(--fs-sm, 11.5px)/1.3 var(--font-ui); color: var(--ink-2); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.hwait__who { display: flex; align-items: center; gap: 6px; min-width: 0; font: 400 var(--fs-sm, 11.5px)/1.3 var(--font-ui); color: var(--ink-2); }
+.hwait__name { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.hwait__who > .ah-chip { flex: none; }
 .hwait__why { font: 400 var(--fs-sm, 11.5px)/1.35 var(--font-ui); color: var(--ink-2); overflow-wrap: anywhere; }
 .hwait__actions { display: flex; gap: 6px; flex: none; }
 .hwait__row.is-open { flex-wrap: wrap; }

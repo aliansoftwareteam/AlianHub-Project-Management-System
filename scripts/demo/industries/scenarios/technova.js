@@ -383,6 +383,48 @@ module.exports = {
             ],
         },
     ],
+    routing: {
+        sup: [
+            { agent: 'support', types: ['Ticket'] },
+            { agent: 'triager', types: ['Bug report'] },
+        ],
+        eng: [
+            { agent: 'techlead', types: ['Story', 'Bug'] },
+            { agent: 'release', types: ['Chore'] },
+        ],
+        ops: [
+            { agent: 'scribe', types: ['Incident'] },
+            { agent: 'release', types: ['Change'] },
+        ],
+    },
+    handOvers: [
+        { task: 'sup.double-charge', by: 'aisha' },
+        { task: 'sup.import', by: 'aisha' },
+        { task: 'eng.webhook-retries', by: 'grace' },
+        { task: 'ops.inc-311', by: 'raj' },
+    ],
+    workflows: {
+        templates: ['support-customer-bug', 'engineering-design-to-release'],
+        own: {
+            key: 'customer-bug-to-sprint',
+            name: 'Customer bug: from support to the sprint',
+            description: 'Support sorts the request, the Bug Triager files it for engineering, the VP of Engineering approves pulling the fix into the current sprint, and the Tech Lead plans it.',
+            steps: [
+                { id: 'sTriage', agent: 'support' },
+                { id: 'sFile', agent: 'triager' },
+                {
+                    id: 'sSprintOk',
+                    approval: {
+                        title: 'Pull the fix into this sprint',
+                        prompt: 'The bug is filed with steps to reproduce and a priority. Approve to hand it to the Tech Lead for this sprint, or reject to leave it in the backlog.',
+                        owner: 'you',
+                    },
+                },
+                { id: 'sPlan', agent: 'techlead' },
+            ],
+            run: { task: 'sup.csv', by: 'aisha' },
+        },
+    },
     goals: [
         {
             name: 'Ship release 4.18',

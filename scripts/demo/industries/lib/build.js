@@ -1,11 +1,16 @@
 const crypto = require('crypto');
 const { SCHEMA_TYPE } = require('../../../../Config/schemaType');
 const { MARK, emailFor, isShowcasePerson } = require('./guard');
-const { OWNER, validateScenario, taskRef, projectOf, agentOf, statusOf, fullName, guideMarkdown } = require('./scenario');
+const {
+    OWNER, validateScenario, taskRef, projectOf, agentOf, statusOf, fullName, guideMarkdown, rolesIn, ownWorkflow, stepsBeforeGate, shortName,
+} = require('./scenario');
 
 const randomPassword = () => crypto.randomBytes(18).toString('base64url');
 const listOf = (value) => (Array.isArray(value) ? value : []);
 const tagUid = (projectCode, name) => `${projectCode.toLowerCase()}-${name}`.replace(/[^a-z0-9-]/g, '').slice(0, 40);
+const DAY_MS = 24 * 60 * 60 * 1000;
+// A seeded approval outlives the engine's three-day default, so a demo between nightly resets never shows it expired.
+const APPROVAL_DEADLINE_MS = 7 * DAY_MS;
 
 const playbooks = () => require('../../../../Modules/Agents/rolePlaybooks');
 const roleExists = (key) => {
@@ -17,9 +22,12 @@ const roleName = (key) => {
     const role = playbooks().find(blueprint, slug);
     return role ? role.name : key;
 };
+const workflowTemplates = () => require('../../../../Modules/Workflows/templates');
+const templateExists = (key) => Boolean(workflowTemplates().find(key));
+const templateName = (key) => (workflowTemplates().find(key) || { name: key }).name;
 
 const assertCoherent = (scenario) => {
-    const problems = validateScenario(scenario, { roleExists });
+    const problems = validateScenario(scenario, { roleExists, templateExists });
     if (problems.length) throw new Error(`The ${scenario.key} scenario is not coherent:\n  ${problems.join('\n  ')}`);
 };
 
@@ -265,10 +273,102 @@ async function seedGoals({ scenario, companyId, owner, byProject, adapter }) {
     }
 }
 
+/* A scenario rule names types, statuses and tags; the dispatcher stores the project's own keys and tag ids. */
+const routingRule = (scenario, rule, made) => ({
+    role: agentOf(scenario, rule.agent).role,
+    when: {
+        ...(listOf(rule.types).length ? { taskTypeKeys: rule.types.map((name) => Number(made.types.get(name).key)) } : {}),
+        ...(listOf(rule.statuses).length ? { statusKeys: rule.statuses.map((name) => Number(made.statuses.get(name).key)) } : {}),
+        ...(listOf(rule.tags).length ? { tags: rule.tags.map((name) => made.tags.get(name)) } : {}),
+    },
+});
+
+/* Every project with a role agent gets its dispatcher in suggest mode, its roles on and the scenario's rules. */
+async function seedDispatcher({ scenario, companyId, owner, byProject, adapter, report }) {
+    for (const made of byProject.values()) {
+        const roles = rolesIn(scenario, made.project.key);
+        if (!roles.length) continue;
+        const rules = listOf((scenario.routing || {})[made.project.key]).map((rule) => routingRule(scenario, rule, made));
+        await adapter.saveDispatcher({ companyId, projectId: made.projectId, userId: owner.userId, settings: { mode: 'suggest', roles, rules } });
+        report.routingRules += rules.length;
+    }
+}
+
+/* The dispatcher's own routing of every open task in a project that has rules: suggestions, or Needs routing. */
+async function routeWork({ scenario, companyId, byProject, adapter, report }) {
+    for (const made of byProject.values()) {
+        if (!listOf((scenario.routing || {})[made.project.key]).length) continue;
+        for (const task of listOf(made.project.tasks)) {
+            const decision = await adapter.routeTask({ companyId, taskId: made.tasks.get(task.key) });
+            if (decision && decision.state === 'suggested') report.suggestions += 1;
+            if (decision && decision.state === 'needs_routing') report.needsRouting += 1;
+        }
+    }
+}
+
+/* A lead accepting the suggestion puts the task in the suggested role's queue. */
+async function seedHandOvers({ scenario, companyId, people, byProject, adapter, report }) {
+    for (const handOver of listOf(scenario.handOvers)) {
+        const { project, task } = taskRef(scenario, handOver.task);
+        await adapter.acceptSuggestion({
+            companyId,
+            taskId: byProject.get(project.key).tasks.get(task.key),
+            actor: { id: people[handOver.by].userId, Employee_Name: people[handOver.by].name },
+        });
+        report.handOvers += 1;
+    }
+}
+
+const workflowSteps = (scenario, own, people) => listOf(own.steps).map((step, index, steps) => {
+    const dependsOn = index ? [steps[index - 1].id] : [];
+    if (step.agent) return { id: step.id, type: 'role_handoff', dependsOn, config: { role: agentOf(scenario, step.agent).role } };
+    return {
+        id: step.id,
+        type: 'human_approval',
+        dependsOn,
+        config: { title: step.approval.title, prompt: step.approval.prompt, ownerUserId: people[step.approval.owner].userId, deadlineMs: APPROVAL_DEADLINE_MS, onReject: 'skip' },
+    };
+});
+
+/* The fitting ready-made workflows, installed switched off, and the scenario's own, switched on and run on its task.
+ * The engine hands the task to each role for real; each role finishing its part before the approval is simulated. */
+async function seedWorkflows({ scenario, companyId, owner, people, agents, byProject, adapter, report, log }) {
+    for (const key of listOf(scenario.workflows.templates)) {
+        await adapter.installTemplate({ companyId, userId: owner.userId, key });
+        report.workflows += 1;
+    }
+    const own = ownWorkflow(scenario);
+    if (!own) return;
+    const definitionId = await adapter.createWorkflow({
+        companyId, userId: owner.userId, definition: { name: own.name, description: own.description, steps: workflowSteps(scenario, own, people) },
+    });
+    report.workflows += 1;
+    await adapter.enableWorkflow({ companyId, userId: owner.userId, definitionId });
+    const { project, task } = taskRef(scenario, own.run.task);
+    const made = byProject.get(project.key);
+    const runId = await adapter.startWorkflow({
+        companyId,
+        userId: people[own.run.by].userId,
+        definitionId,
+        taskId: made.tasks.get(task.key),
+        projectId: made.projectId,
+        name: `${own.name} · ${shortName(task)}`,
+    });
+    report.workflowRuns += 1;
+    for (const step of stepsBeforeGate(own)) {
+        await adapter.finishHandOver({ companyId, runId, stepId: step.id, finishedBy: agents[step.agent].name });
+        report.simulatedSteps += 1;
+    }
+    if (!(await adapter.waitingApproval({ companyId, runId }))) log(`  warning: the "${own.name}" run did not reach its approval`);
+}
+
 /* One industry company, from nothing to presentation-ready. */
 async function buildShowcase({ scenario, owner, adapter, log = () => {} }) {
     assertCoherent(scenario);
-    const report = { people: 0, projects: 0, tasks: 0, agents: 0, automations: 0, comments: 0, moves: 0, automationRuns: 0, simulatedRuns: 0, proposals: 0 };
+    const report = {
+        people: 0, projects: 0, tasks: 0, agents: 0, automations: 0, comments: 0, moves: 0, automationRuns: 0, simulatedRuns: 0, proposals: 0,
+        routingRules: 0, suggestions: 0, needsRouting: 0, handOvers: 0, workflows: 0, workflowRuns: 0, simulatedSteps: 0,
+    };
     const marker = { by: MARK, key: scenario.key, industry: scenario.industry, ownerId: owner.userId };
     log(`${scenario.company.name}`);
     const companyId = await adapter.createCompany({ ownerId: owner.userId, email: owner.email, name: scenario.company.name, marker });
@@ -305,19 +405,33 @@ async function buildShowcase({ scenario, owner, adapter, log = () => {} }) {
     if (scenario.dashboard) {
         await adapter.createDashboard({ companyId, ownerId: owner.userId, projectId: byProject.get(scenario.dashboard.project).projectId, dashboard: { name: scenario.dashboard.name, cards: scenario.dashboard.cards } });
     }
+
+    const features = adapter.features();
+    const layers = { dispatcher: features.dispatcher, workflows: features.dispatcher && features.workflows && Boolean(scenario.workflows) };
+    if (layers.dispatcher) await seedDispatcher({ scenario, companyId, owner, byProject, adapter, report });
+    else log('  DISPATCHER is off: no routing and no Company view');
+    if (layers.workflows) await seedWorkflows({ scenario, companyId, owner, people, agents, byProject, adapter, report, log });
+    else if (scenario.workflows) log('  WORKFLOW_ENGINE and DISPATCHER are not both on: no workflows');
+    if (layers.dispatcher) {
+        await routeWork({ scenario, companyId, byProject, adapter, report });
+        await seedHandOvers({ scenario, companyId, people, byProject, adapter, report });
+        log(`  dispatcher: ${report.suggestions} suggestions, ${report.needsRouting} needing routing, ${report.handOvers} in role queues`);
+    }
+    if (layers.workflows) log(`  workflows: ${report.workflows} saved, ${report.workflowRuns} run waiting for its approval`);
+
     const guideProject = byProject.get(scenario.guide.project);
     const guidePageId = await adapter.createGuidePage({
         companyId,
         ownerId: owner.userId,
         projectId: guideProject.projectId,
         title: `Start here: ${scenario.company.name}`,
-        markdown: guideMarkdown(scenario, { roleName, ownerName: owner.name }),
+        markdown: guideMarkdown(scenario, { roleName, ownerName: owner.name, templateName, seeded: layers }),
     });
-    await adapter.updateCompanyMarker({ companyId, marker: { ...marker, guidePageId, guideProjectId: guideProject.projectId } });
+    await adapter.updateCompanyMarker({ companyId, marker: { ...marker, guidePageId, guideProjectId: guideProject.projectId, layers } });
     log(`  done: ${report.automationRuns} automation runs, ${report.simulatedRuns} simulated runs, ${report.proposals} proposals`);
     return { companyId, report };
 }
 
 const findShowcaseCompanies = async (adapter) => (await adapter.find(adapter.GLOBAL, SCHEMA_TYPE.COMPANIES, { 'demoShowcase.by': MARK }));
 
-module.exports = { buildShowcase, findShowcaseCompanies, assertCoherent, roleExists, roleName, projectOf, agentOf, statusOf };
+module.exports = { buildShowcase, findShowcaseCompanies, assertCoherent, roleExists, roleName, templateExists, templateName, projectOf, agentOf, statusOf };

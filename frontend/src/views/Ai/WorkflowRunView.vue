@@ -17,6 +17,7 @@
                     <div class="wf-run__head" data-test="run-head">
                         <span class="ah-h3">{{ run.name || run.workflowId }}</span>
                         <span class="ah-chip" :class="runChip" data-test="run-status">{{ $t(`Workflows.status_${runStatus}`) }}</span>
+                        <SimulatedChip v-if="run.simulated" />
                         <span class="ah-small" data-test="run-totals">{{ $t('Workflows.run_totals', { settled: totals.settled, total: totals.total }) }}</span>
                         <span class="ah-mono ah-small" data-test="run-cost">{{ $t('Workflows.cost_usd', { usd: totals.costUsd.toFixed(2) }) }}</span>
                     </div>
@@ -103,6 +104,7 @@ import { useRoute } from "vue-router";
 import { useI18n } from "vue-i18n";
 import { useToast } from "vue-toast-notification";
 import EmptyState from "@/components/atom/EmptyState/EmptyState.vue";
+import SimulatedChip from "@/components/atom/SimulatedChip/SimulatedChip.vue";
 import AiSidebar from "./AiSidebar.vue";
 import WorkflowStepRow from "./WorkflowStepRow.vue";
 import WorkflowFailedStep from "./WorkflowFailedStep.vue";

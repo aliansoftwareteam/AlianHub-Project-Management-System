@@ -1597,6 +1597,8 @@ const schema = {
     workflowRuns: {
         workflowId: { type: String, required: true },
         name: { type: String, required: false },
+        // A run scripts/demo/industries drove: some of its steps were finished by the seed, not by the role. The UI labels it.
+        simulated: { type: Boolean, required: false },
         source: { type: String, default: 'automation_rule', required: false },
         // Unique when present: what makes a redelivered trigger a no-op rather than a second run.
         dedupeKey: { type: String, required: false },
@@ -1682,6 +1684,8 @@ const schema = {
         waitingSince: { type: Date, required: false },
         // When a role_handoff step put its task in the role's queue; the step's deadline counts from here.
         handedAt: { type: Date, required: false },
+        // A hand-over scripts/demo/industries finished for the role, which never ran. The UI labels it.
+        simulated: { type: Boolean, required: false },
         waitUntil: { type: Date, required: false },
         waitReason: { type: String, required: false },
         approvalId: { type: String, required: false },

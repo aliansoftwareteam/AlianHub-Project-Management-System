@@ -13149,6 +13149,8 @@ export default {
         type_loop: "Loop",
         type_automation_rule: "Automation rule",
         type_external_agent: "Outside agent",
+        type_role_handoff: "Hand to a role",
+        handoff_finished_by: "Finished by {name}",
         type_unknown: "Unknown step",
         blocked_title: "This run is blocked",
         blocked_at_step: "At step {stepId}",

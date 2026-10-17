@@ -21,6 +21,12 @@ const chosen = (only) => {
     return SCENARIOS.filter((scenario) => keys.includes(scenario.key));
 };
 
+/* The parts a company built while a flag was off lacks now that the flag is on. */
+const missingLayers = (layers = {}, features) => [
+    features.dispatcher && !layers.dispatcher ? 'the dispatcher' : '',
+    features.dispatcher && features.workflows && !layers.workflows ? 'the workflows' : '',
+].filter(Boolean);
+
 const saveCredentials = (entry) => {
     if (fs.existsSync(CREDENTIALS_PATH)) fs.chmodSync(CREDENTIALS_PATH, FILE_MODE);
     fs.writeFileSync(CREDENTIALS_PATH, `${JSON.stringify(entry, null, 2)}\n`, { mode: FILE_MODE });
@@ -75,7 +81,8 @@ run(async () => {
     for (const scenario of scenarios) {
         const have = present.find((company) => company.demoShowcase.key === scenario.key);
         if (have && have.demoShowcase.guidePageId) {
-            out(`${scenario.company.name} is already here (${have._id}); --reset rebuilds it.`);
+            const missing = missingLayers(have.demoShowcase.layers, adapter.features());
+            out(`${scenario.company.name} is already here (${have._id}); --reset rebuilds it${missing.length ? ` and adds ${missing.join(' and ')}` : ''}.`);
             continue;
         }
         // A company without its guide stopped halfway through an earlier run.

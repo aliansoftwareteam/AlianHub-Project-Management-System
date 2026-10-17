@@ -6,7 +6,7 @@
 
 export const STEP_TYPES = Object.freeze([
     "agent_run", "tool_call", "human_approval", "fan_out", "fan_in",
-    "condition", "wait", "timer", "loop", "automation_rule", "external_agent"
+    "condition", "wait", "timer", "loop", "automation_rule", "external_agent", "role_handoff"
 ]);
 
 export const STEP_STATUSES = Object.freeze(["pending", "running", "success", "failed", "skipped", "stopped"]);

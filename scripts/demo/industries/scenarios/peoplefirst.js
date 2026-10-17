@@ -333,6 +333,44 @@ module.exports = {
         },
         { comment: 'comp.dsar', by: 'ahmed', text: 'Identity verified. Pulling records from the HR system and the ticketing tool; the response is due in 12 days.' },
     ],
+    routing: {
+        hire: [
+            { agent: 'notes', statuses: ['Interviewing'] },
+            { agent: 'drafter', statuses: ['Offer'] },
+        ],
+        onb: [
+            { agent: 'onboarding', types: ['Onboarding plan', 'Equipment'] },
+        ],
+        comp: [
+            { agent: 'credentials', types: ['Certification'] },
+            { agent: 'training', types: ['Training'] },
+        ],
+    },
+    handOvers: [
+        { task: 'hire.diego', by: 'olivia' },
+        { task: 'onb.pedro', by: 'sofia' },
+        { task: 'comp.gdpr', by: 'ahmed' },
+    ],
+    workflows: {
+        own: {
+            key: 'offer-to-first-day',
+            name: 'Hiring: from the offer to the first day',
+            description: 'The Document Drafter drafts the offer letter with every point to check marked, the Head of People approves it inside the salary band, and the Onboarding Coordinator builds the first-weeks plan.',
+            steps: [
+                { id: 'sDraft', agent: 'drafter' },
+                {
+                    id: 'sOfferOk',
+                    approval: {
+                        title: 'Approve the offer',
+                        prompt: 'The offer letter is drafted with every point to check marked. Approve it inside the salary band, or reject it with a comment for the recruiter.',
+                        owner: 'you',
+                    },
+                },
+                { id: 'sPlan', agent: 'onboarding' },
+            ],
+            run: { task: 'hire.amara', by: 'olivia' },
+        },
+    },
     goals: [
         {
             name: 'Fill this quarter\'s open roles',

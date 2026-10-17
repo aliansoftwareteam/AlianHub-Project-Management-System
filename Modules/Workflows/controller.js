@@ -485,6 +485,7 @@ const approvalRow = (request, run, step, names) => {
         })),
         createdAt: request.createdAt || null,
         context: request.context || {},
+        simulated: Boolean(run && run.simulated),
         run: run ? { _id: String(run._id), name: run.name || '', workflowId: run.workflowId, status: run.status, startedBy: run.startedBy || null } : null,
         step: step ? { stepId: step.stepId, type: step.type, status: step.status, waitUntil: step.waitUntil || null } : null,
     };

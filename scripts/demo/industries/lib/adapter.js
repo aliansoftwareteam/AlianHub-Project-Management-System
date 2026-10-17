@@ -42,7 +42,8 @@ const viaHandler = (handler, { companyId, uid, body, params = {} }) => new Promi
             else reject(new Error((payload && (payload.statusText || payload.message)) || 'The app refused the request.'));
         },
     };
-    Promise.resolve(handler({ headers: { companyid: companyId }, uid, body, params, query: {} }, res)).catch(reject);
+    // `aud` is the company the session token names, which the tenant check of the workflow routes reads.
+    Promise.resolve(handler({ headers: { companyid: companyId }, aud: companyId, uid, body, params, query: {} }, res)).catch(reject);
 });
 
 const dayFromToday = (days) => {
@@ -488,6 +489,9 @@ async function startAutomations() {
 async function stopAutomations() {
     const engine = require('../../../../Modules/Automations/engine');
     await engine.stop();
+    // Stopped, the in-process queue has no handlers left; without a driver, a workflow run started later ticks in
+    // process (Modules/Workflows/queue.js), as on an instance that never started the engine.
+    engine._setDriver(null);
 }
 
 async function settleAutomations(companyId, since, timeoutMs = 30000) {
@@ -499,6 +503,75 @@ async function settleAutomations(companyId, since, timeoutMs = 30000) {
     }
     return find(companyId, SCHEMA_TYPE.AUTOMATION_RUNS, { createdAt: { $gte: since } }, { ruleName: 1, status: 1 });
 }
+
+const features = () => ({
+    dispatcher: require('../../../../Modules/AssignmentRules/dispatcher/flag').enabled(),
+    workflows: require('../../../../Modules/Workflows/flag').roleHandoffSteps(),
+});
+
+async function saveDispatcher({ companyId, projectId, userId, settings }) {
+    const controller = require('../../../../Modules/AssignmentRules/dispatcher/controller');
+    return viaHandler(controller.saveSettings, { companyId, uid: userId, params: { projectId: String(projectId) }, body: settings });
+}
+
+/* The dispatcher's own routing of one task, as a task event would start it; its rules only, no model. */
+const routeTask = ({ companyId, taskId }) => require('../../../../Modules/AssignmentRules/dispatcher/gate').route({ companyId, taskId: String(taskId), trigger: 'create' });
+
+async function acceptSuggestion({ companyId, taskId, actor }) {
+    const decisions = require('../../../../Modules/AssignmentRules/dispatcher/decisions');
+    const { decision } = await decisions.forTask(companyId, actor.id, String(taskId));
+    if (!decision || decision.state !== 'suggested') throw new Error(`Task ${taskId} has no routing suggestion to accept.`);
+    return decisions.accept(companyId, actor, String(taskId), decision._id);
+}
+
+const workflowRoutes = () => require('../../../../Modules/Workflows/controller');
+
+async function installTemplate({ companyId, userId, key }) {
+    const saved = await viaHandler(workflowRoutes().installTemplate, { companyId, uid: userId, params: { key } });
+    return String(plain(saved)._id);
+}
+
+async function createWorkflow({ companyId, userId, definition }) {
+    const saved = await viaHandler(workflowRoutes().createDefinition, { companyId, uid: userId, body: definition });
+    return String(plain(saved)._id);
+}
+
+const enableWorkflow = ({ companyId, userId, definitionId }) => viaHandler(workflowRoutes().setDefinitionEnabled, {
+    companyId, uid: userId, params: { id: String(definitionId) }, body: { enabled: true },
+});
+
+async function startWorkflow({ companyId, userId, definitionId, taskId, projectId, name }) {
+    const started = await viaHandler(workflowRoutes().startRun, {
+        companyId, uid: userId, body: { definitionId: String(definitionId), taskId: String(taskId), projectId: String(projectId), name },
+    });
+    return String(plain(started.run)._id);
+}
+
+/* What a role does when it finishes a hand-over (the write `queue.release` makes with `finished`), done by the seed
+ * because no agent ran: the queue row, the step and its run are marked simulated. The engine then moves on. */
+async function finishHandOver({ companyId, runId, stepId, finishedBy }) {
+    const store = require('../../../../Modules/Workflows/store');
+    const engine = require('../../../../Modules/Workflows/engine');
+    const findings = require('../../../../Modules/Agents/manager/findings');
+    const run = plain(await store.getRun(companyId, runId));
+    const step = ((await store.listSteps(companyId, runId)) || []).map(plain).find((one) => one.stepId === stepId);
+    if (!step || step.type !== 'role_handoff' || step.status !== 'pending' || !step.handedAt) {
+        throw new Error(`${run.name}: step ${stepId} is not waiting for its role (${step ? step.status : 'missing'}${step && step.error ? `: ${step.error}` : ''}).`);
+    }
+    const taskId = (step.config && step.config.taskId) || run.taskId;
+    const now = new Date();
+    const finished = await crud(companyId, SCHEMA_TYPE.PROJECT_FINDINGS, [
+        { key: `${findings.HANDED_OVER}:${taskId}`, status: findings.STATUS.OPEN, 'facts.role': step.config.role },
+        { $unset: { claim: '' }, $set: { status: findings.STATUS.CLOSED, closedAt: now, leftQueue: { why: findings.LEFT.FINISHED, userId: '', name: finishedBy, at: now, simulated: true } } },
+    ], 'updateOne');
+    if (!finished || !finished.modifiedCount) throw new Error(`${run.name}: ${step.config.role} holds no queue row for step ${stepId}.`);
+    await crud(companyId, SCHEMA_TYPE.WORKFLOW_STEP_RUNS, [{ runId: String(runId), stepId }, { $set: { simulated: true } }, UNTOUCHED], 'updateOne');
+    await crud(companyId, SCHEMA_TYPE.WORKFLOW_RUNS, [{ _id: oid(runId) }, { $set: { simulated: true } }, UNTOUCHED], 'updateOne');
+    await store.wakeStep(companyId, runId, stepId);
+    await engine.tick(companyId, String(runId), {});
+}
+
+const waitingApproval = ({ companyId, runId }) => findOne(companyId, SCHEMA_TYPE.WORKFLOW_APPROVALS, { runId: String(runId), status: 'pending' });
 
 /* Goals, dashboard, guide */
 
@@ -572,6 +645,16 @@ module.exports = {
     startAutomations,
     stopAutomations,
     settleAutomations,
+    features,
+    saveDispatcher,
+    routeTask,
+    acceptSuggestion,
+    installTemplate,
+    createWorkflow,
+    enableWorkflow,
+    startWorkflow,
+    finishHandOver,
+    waitingApproval,
     createGoal,
     createDashboard,
     createGuidePage,

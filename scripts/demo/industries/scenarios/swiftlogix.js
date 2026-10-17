@@ -366,6 +366,46 @@ module.exports = {
         },
         { comment: 'wh.wo-5517', by: 'hannah', text: 'The reefer trailer from Coldline reaches Dock 3 at 16:00.' },
     ],
+    routing: {
+        ship: [
+            { agent: 'triage', statuses: ['Exception', 'Delayed'] },
+            { agent: 'tracker', types: ['Shipment'] },
+            { agent: 'triage', types: ['Claim'] },
+        ],
+        wh: [
+            { agent: 'dispatch', types: ['Outbound order'] },
+            { agent: 'stock', types: ['Replenishment', 'Cycle count'] },
+        ],
+        supp: [
+            { agent: 'suppliers', types: ['Purchase order'] },
+        ],
+    },
+    handOvers: [
+        { task: 'ship.sh-88227', by: 'marco' },
+        { task: 'wh.wo-5512', by: 'kenji' },
+        { task: 'supp.po-7790', by: 'lucas' },
+    ],
+    workflows: {
+        own: {
+            key: 'shipment-exception-update',
+            name: 'Shipments: from an exception to the customer update',
+            description: 'The Order Issue Triage agent classifies the exception and names the next step, the Customer Update Writer drafts the message, a person sends it and approves, and the Delivery Tracker follows the shipment to delivery.',
+            steps: [
+                { id: 'sTriage', agent: 'triage' },
+                { id: 'sDraft', agent: 'updates' },
+                {
+                    id: 'sSendOk',
+                    approval: {
+                        title: 'Send the customer update',
+                        prompt: 'The update is drafted on the shipment. Send it to the customer yourself, then approve; agents never send messages outside AlianHub.',
+                        owner: 'you',
+                    },
+                },
+                { id: 'sTrack', agent: 'tracker' },
+            ],
+            run: { task: 'ship.sh-88231', by: 'marco' },
+        },
+    },
     goals: [
         {
             name: 'On-time delivery at 95% or better',

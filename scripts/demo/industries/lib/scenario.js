@@ -30,7 +30,124 @@ const taskRef = (scenario, ref) => {
     return task ? { project, task } : null;
 };
 
-function validateScenario(scenario, { roleExists = () => true } = {}) {
+const ROUTING_CONDITIONS = Object.freeze(['types', 'tags', 'statuses']);
+const STEP_ID = /^s[A-Za-z0-9]{1,30}$/;
+const CLOSED_TYPES = Object.freeze(['done', 'close']);
+
+const statusAfterStory = (scenario, ref) => listOf(scenario.story)
+    .filter((event) => event.move === ref)
+    .reduce((status, event) => event.to, (taskRef(scenario, ref) || { task: {} }).task.status);
+
+const isOpenAfterStory = (scenario, ref) => {
+    const found = taskRef(scenario, ref);
+    const status = found && statusOf(found.project, statusAfterStory(scenario, ref));
+    return Boolean(status) && !CLOSED_TYPES.includes(status.type);
+};
+
+/* The dispatcher's first matching rule for a task as the story leaves it: every condition a rule names must hold, and
+ * a list holds when the task has any of its values (Modules/AssignmentRules/dispatcher/settings.js). */
+const ruleFor = (scenario, ref) => {
+    const found = taskRef(scenario, ref);
+    if (!found) return null;
+    const { project, task } = found;
+    const have = {
+        types: [task.type || (listOf(project.types)[0] || {}).name],
+        tags: listOf(task.tags),
+        statuses: [statusAfterStory(scenario, ref)],
+    };
+    return listOf((scenario.routing || {})[project.key]).find((rule) => ROUTING_CONDITIONS.some((kind) => listOf(rule[kind]).length)
+        && ROUTING_CONDITIONS.every((kind) => !listOf(rule[kind]).length || listOf(rule[kind]).some((value) => have[kind].includes(value)))) || null;
+};
+
+const ownWorkflow = (scenario) => (scenario.workflows && scenario.workflows.own) || null;
+
+/* The hand-overs a role finished before the run reached its first approval: written by the seed, so simulated. */
+const stepsBeforeGate = (workflow) => {
+    const steps = listOf(workflow && workflow.steps);
+    const gate = steps.findIndex((step) => step.approval);
+    return gate < 0 ? steps : steps.slice(0, gate);
+};
+
+/* The roles the dispatcher turns on in a project: its role agents', and those the scenario's workflow hands its task
+ * to when that task is in the project, since a hand-over needs its role on where the task lives. */
+const rolesIn = (scenario, projectKey) => {
+    const own = ownWorkflow(scenario);
+    const run = own && own.run ? taskRef(scenario, own.run.task) : null;
+    const keys = [
+        ...listOf(scenario.agents).filter((agent) => listOf(agent.projects).includes(projectKey)).map((agent) => agent.key),
+        ...(run && run.project.key === projectKey ? listOf(own.steps).filter((step) => step.agent).map((step) => step.agent) : []),
+    ];
+    return [...new Set(keys.map((key) => (agentOf(scenario, key) || {}).role).filter(Boolean))];
+};
+
+function validateLayers(scenario, say, { templateExists }) {
+    const people = listOf(scenario.people);
+    const roleOf = (key) => (key === OWNER ? 'admin' : ((people.find((person) => person.key === key) || {}).role || null));
+    const roleAgent = (where, key, projectKey) => {
+        const agent = agentOf(scenario, key);
+        if (!agent) say(where, `agent "${key}" does not exist`);
+        else if (!agent.role) say(where, `agent "${key}" has no role, so no task can be handed to it`);
+        else if (projectKey && !listOf(agent.projects).includes(projectKey)) say(where, `agent "${key}" does not work in ${projectKey}`);
+    };
+
+    const routing = scenario.routing || {};
+    Object.entries(routing).forEach(([projectKey, rules]) => {
+        const at = `routing.${projectKey}`;
+        const project = projectOf(scenario, projectKey);
+        if (!project) { say(at, `project "${projectKey}" does not exist`); return; }
+        if (!listOf(rules).length) say(at, 'has no rules');
+        listOf(rules).forEach((rule, index) => {
+            const where = `${at}.${index}`;
+            roleAgent(where, rule.agent, projectKey);
+            if (!ROUTING_CONDITIONS.some((kind) => listOf(rule[kind]).length)) say(where, `needs at least one of ${ROUTING_CONDITIONS.join(', ')}`);
+            listOf(rule.types).forEach((name) => { if (!listOf(project.types).some((type) => type.name === name)) say(where, `type "${name}" is not one of ${projectKey}'s`); });
+            listOf(rule.tags).forEach((name) => { if (!listOf(project.tags).some((tag) => tag.name === name)) say(where, `tag "${name}" is not one of ${projectKey}'s`); });
+            listOf(rule.statuses).forEach((name) => { if (!statusOf(project, name)) say(where, `status "${name}" is not one of ${projectKey}'s`); });
+        });
+    });
+
+    const own = ownWorkflow(scenario);
+    const runTask = own && own.run ? own.run.task : null;
+    duplicates(listOf(scenario.handOvers).map((handOver) => handOver.task)).forEach((ref) => say('handOvers', `"${ref}" is handed over twice`));
+    listOf(scenario.handOvers).forEach((handOver, index) => {
+        const at = `handOvers.${index}`;
+        const target = taskRef(scenario, handOver.task);
+        if (!target) { say(at, `"${handOver.task}" is not a task`); return; }
+        if (!isOpenAfterStory(scenario, handOver.task)) say(at, `${handOver.task} is closed once the story has played, and the dispatcher routes only open work`);
+        else if (!ruleFor(scenario, handOver.task)) say(at, `no routing rule in ${target.project.key} matches ${handOver.task}`);
+        if (handOver.task === runTask) say(at, `${handOver.task} is the workflow's task, which the dispatcher leaves alone`);
+        if (handOver.by !== OWNER && handOver.by !== target.project.lead) say(at, `"${handOver.by}" does not lead ${target.project.key}; the lead or ${OWNER} accepts a suggestion`);
+    });
+
+    const workflows = scenario.workflows || {};
+    duplicates(listOf(workflows.templates)).forEach((key) => say('workflows.templates', `"${key}" appears twice`));
+    listOf(workflows.templates).forEach((key) => { if (!templateExists(key)) say('workflows.templates', `"${key}" is not a ready-made workflow`); });
+    if (!own) return;
+    const at = 'workflows.own';
+    if (!KEY.test(String(own.key || ''))) say(at, 'key must be lower-case letters, digits or dashes');
+    if (!String(own.name || '').trim() || !String(own.description || '').trim()) say(at, 'needs a name and a description');
+    const steps = listOf(own.steps);
+    duplicates(steps.map((step) => step.id)).forEach((id) => say(`${at}.steps`, `"${id}" appears twice`));
+    steps.forEach((step, index) => {
+        const where = `${at}.steps.${step.id || index}`;
+        if (!STEP_ID.test(String(step.id || ''))) say(where, 'id must be "s" followed by letters or digits');
+        if (Boolean(step.agent) === Boolean(step.approval)) say(where, 'needs exactly one of agent or approval');
+        if (step.agent) roleAgent(where, step.agent);
+        if (step.approval) {
+            if (!String(step.approval.title || '').trim() || !String(step.approval.prompt || '').trim()) say(where, 'an approval needs a title and a prompt');
+            if (!['admin', 'member'].includes(roleOf(step.approval.owner))) say(where, `owner "${step.approval.owner}" must be ${OWNER} or a member who is not a guest`);
+        }
+    });
+    const gate = steps.findIndex((step) => step.approval);
+    if (gate < 0) say(at, 'has no approval for a person to decide');
+    if (gate === 0) say(at, 'starts with an approval; its first step hands the task to a role');
+    if (!own.run) { say(`${at}.run`, 'is missing'); return; }
+    if (!taskRef(scenario, own.run.task)) say(`${at}.run`, `"${own.run.task}" is not a task`);
+    else if (!isOpenAfterStory(scenario, own.run.task)) say(`${at}.run`, `${own.run.task} is closed once the story has played; a role can only be handed open work`);
+    if (roleOf(own.run.by) !== 'admin') say(`${at}.run`, `"${own.run.by}" cannot start a workflow; ${OWNER} or an admin does`);
+}
+
+function validateScenario(scenario, { roleExists = () => true, templateExists = () => true } = {}) {
     const problems = [];
     const say = (where, what) => problems.push(`${scenario && scenario.key ? scenario.key : '?'}: ${where}: ${what}`);
     if (!scenario || typeof scenario !== 'object') return ['scenario is not an object'];
@@ -211,6 +328,7 @@ function validateScenario(scenario, { roleExists = () => true } = {}) {
     if (!scenario.guide || !String(scenario.guide.intro || '').trim()) say('guide.intro', 'is missing');
     if (!projectOf(scenario, scenario.guide && scenario.guide.project)) say('guide.project', 'must name the project the guide lives in');
     if (!listOf(scenario.guide && scenario.guide.tryThis).length) say('guide.tryThis', 'is empty');
+    validateLayers(scenario, say, { templateExists });
     return problems;
 }
 
@@ -228,12 +346,92 @@ const thenText = (step, nameOf) => {
     return '';
 };
 
-/* The guide's sections that come from the data, so they never drift from what the seed made. */
-function guideMarkdown(scenario, { roleName = (key) => key, ownerName = 'You' } = {}) {
+const conditionText = (rule) => [
+    listOf(rule.types).join(' or '),
+    listOf(rule.statuses).length ? `in ${listOf(rule.statuses).join(' or ')}` : '',
+    listOf(rule.tags).length ? `tagged ${listOf(rule.tags).join(' or ')}` : '',
+].filter(Boolean).join(', ');
+
+/* The part of a task's name a person says aloud: "SUP-2201 · CSV export…" is SUP-2201. */
+const shortName = (task) => String(task.name).split(' · ')[0];
+
+function routingSection(scenario, agentName) {
+    const rows = Object.entries(scenario.routing || {}).flatMap(([projectKey, rules]) => listOf(rules)
+        .map((rule) => `| ${projectOf(scenario, projectKey).name} | ${conditionText(rule)} | ${agentName(rule.agent)} |`));
+    return [
+        '## Who routes the work',
+        '',
+        'Each project\'s dispatcher suggests who takes a task, from the rules below and without an AI model. The project lead sees the suggestion on the task; accepting it puts the task in that role\'s queue. A task no rule matches waits under **Needs routing** for the lead.',
+        '',
+        '| Project | When the task is | Suggested role |',
+        '| --- | --- | --- |',
+        ...rows,
+        '',
+        'Open **AI → Company view**: the org chart shows each role, its agent and who supervises it, and the flow board shows the work waiting for each role.',
+        '',
+    ];
+}
+
+function workflowSection(scenario, { agentName, nameOf, templateName }) {
+    const own = ownWorkflow(scenario);
+    const templates = listOf(scenario.workflows && scenario.workflows.templates);
+    const lines = ['## Workflows', ''];
+    if (templates.length) lines.push(`Ready-made workflows installed, switched off until someone turns them on: ${templates.map((key) => `**${templateName(key)}**`).join(' and ')}.`, '');
+    if (own) {
+        const { task } = taskRef(scenario, own.run.task);
+        const gate = listOf(own.steps).find((step) => step.approval);
+        const chain = listOf(own.steps).map((step) => (step.agent ? agentName(step.agent) : `**${step.approval.title}** (approved by ${nameOf(step.approval.owner)})`)).join(' → ');
+        const finished = stepsBeforeGate(own).map((step) => agentName(step.agent));
+        const waitsFor = gate.approval.owner === OWNER ? 'your approval' : `the approval of ${nameOf(gate.approval.owner)}`;
+        lines.push(
+            `**${own.name}** is switched on: ${chain}. ${nameOf(own.run.by)} started it on **${task.name}**. The ${finished.join(' and the ')} finished ${finished.length === 1 ? 'its step' : 'their steps'}, so it waits for ${waitsFor} in **AI → Inbox → Approvals** and under **Waiting on you** on Home.`,
+            '',
+        );
+    }
+    return lines;
+}
+
+const routingTry = (scenario, agentName) => {
+    const own = ownWorkflow(scenario);
+    const taken = new Set([...listOf(scenario.handOvers).map((handOver) => handOver.task), own && own.run ? own.run.task : null]);
+    const refs = listOf(scenario.projects).flatMap((project) => listOf(project.tasks).map((task) => `${project.key}.${task.key}`));
+    const ref = refs.find((one) => !taken.has(one) && isOpenAfterStory(scenario, one) && ruleFor(scenario, one));
+    const intro = 'Open **AI → Company view**: the org chart shows the roles and the flow board the work waiting for each.';
+    if (!ref) return intro;
+    return `${intro} Then open **${taskRef(scenario, ref).task.name}**, accept the dispatcher's suggestion of the **${agentName(ruleFor(scenario, ref).agent)}**, and the task moves into that role's queue.`;
+};
+
+const workflowTry = (scenario, { agentName, nameOf }) => {
+    const own = ownWorkflow(scenario);
+    const steps = listOf(own.steps);
+    const gate = steps.findIndex((step) => step.approval);
+    const next = steps[gate + 1];
+    const task = shortName(taskRef(scenario, own.run.task).task);
+    let then = 'the run finishes';
+    if (next && next.agent) then = `it hands **${task}** to the **${agentName(next.agent)}**, whose queue on the Company view now holds it`;
+    else if (next) then = `it asks ${nameOf(next.approval.owner)} for the next approval`;
+    return `In **AI → Inbox → Approvals**, open **${steps[gate].approval.title}** and approve it. The workflow carries on for real: ${then}.`;
+};
+
+/* The guide's sections that come from the data, so they never drift from what the seed made. A part the instance
+ * did not switch on (`seeded`) is left out, so a visitor never reads about a screen they cannot open. */
+function guideMarkdown(scenario, { roleName = (key) => key, ownerName = 'You', templateName = (key) => key, seeded = {} } = {}) {
     const nameOf = (key) => (key === OWNER ? `${ownerName} (${scenario.owner.title})` : (() => {
         const person = listOf(scenario.people).find((p) => p.key === key);
         return person ? fullName(person) : key;
     })());
+    const agentName = (key) => {
+        const agent = agentOf(scenario, key);
+        return agent ? agent.name || roleName(agent.role) : key;
+    };
+    const routed = Boolean(seeded.dispatcher && scenario.routing);
+    const workflows = Boolean(seeded.workflows && scenario.workflows);
+    const ran = workflows && Boolean(ownWorkflow(scenario));
+    const tryThis = [
+        ...listOf(scenario.guide.tryThis),
+        ...(routed ? [routingTry(scenario, agentName)] : []),
+        ...(ran ? [workflowTry(scenario, { agentName, nameOf })] : []),
+    ];
     const lines = [
         scenario.guide.intro.trim(),
         '',
@@ -268,18 +466,30 @@ function guideMarkdown(scenario, { roleName = (key) => key, ownerName = 'You' } 
         '',
         ...listOf(scenario.automations).map((rule) => `- **${rule.name}**: when ${whenText(rule)} in ${projectOf(scenario, rule.project).name}, it ${listOf(rule.then).map((step) => thenText(step, nameOf)).filter(Boolean).join(', ')}.`),
         '',
+        ...(routed ? routingSection(scenario, agentName) : []),
+        ...(workflows ? workflowSection(scenario, { agentName, nameOf, templateName }) : []),
         '## Try this',
         '',
-        ...listOf(scenario.guide.tryThis).map((step, index) => `${index + 1}. ${step}`),
+        ...tryThis.map((step, index) => `${index + 1}. ${step}`),
         '',
         '## What is real, simulated and illustrative',
         '',
-        '- **Real**: the projects, pipelines, fields, automations, approvals, dashboards and goals are ordinary AlianHub features working on this data. Moving a card fires its automation; approving a proposal applies its changes; the digest agent really runs.',
-        '- **Simulated**: earlier agent runs, the comments they left and the proposals waiting for approval were written for this demo to show how each agent works. They are marked Simulated and cost nothing. Connect an AI model and switch an agent on to see it run for real.',
+        [
+            '- **Real**: the projects, pipelines, fields, automations, approvals, dashboards and goals are ordinary AlianHub features working on this data. Moving a card fires its automation; approving a proposal applies its changes; the digest agent really runs.',
+            routed ? 'The dispatcher\'s suggestions come from its rules, with no AI model, and the leads accepted the hand-overs now in the queues.' : '',
+            ran ? 'The workflow run, its approval and what happens once you decide are real.' : '',
+        ].filter(Boolean).join(' '),
+        [
+            '- **Simulated**: earlier agent runs, the comments they left and the proposals waiting for approval were written for this demo to show how each agent works. They are marked Simulated and cost nothing. Connect an AI model and switch an agent on to see it run for real.',
+            ran ? 'In the workflow run, the roles finishing their steps before the approval were written for this demo too; the run and those steps carry the same label.' : '',
+        ].filter(Boolean).join(' '),
         '- **Illustrative**: the company, people, customers, suppliers and amounts are fictional.',
         '',
     ];
     return lines.join('\n');
 }
 
-module.exports = { OWNER, PRIORITIES, CARDS, validateScenario, taskRef, projectOf, agentOf, statusOf, fullName, guideMarkdown };
+module.exports = {
+    OWNER, PRIORITIES, CARDS, validateScenario, taskRef, projectOf, agentOf, statusOf, fullName, guideMarkdown,
+    statusAfterStory, isOpenAfterStory, ruleFor, ownWorkflow, stepsBeforeGate, rolesIn, shortName,
+};

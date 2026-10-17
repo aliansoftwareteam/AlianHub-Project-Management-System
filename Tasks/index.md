@@ -58,3 +58,4 @@ Auto-maintained registry of all tasks. Reflects YAML frontmatter from each `task
 | 048 | Team agent packs — role agents per team, workflows, a dispatcher and company blueprints | active | medium | 047 | active/048-team-agent-packs |
 | 051 | Demo login — fill in the demo account and add a one-click "Try the demo" button | done | medium | — | done/051-demo-login-prefill |
 | 052 | Industry demo experience — one demo company per industry, built from shared scenario data | active | high | — | active/052-industry-demo-experience |
+| 053 | Industry demos — the dispatcher, the Company view and workflow runs | active | high | 052 | active/053-industry-demo-agentic-layers |

@@ -7,6 +7,7 @@
         <div class="ai-detail__crumb">
             <span>{{ approval.run?.name || approval.workflowId || $t('Workflows.run_title') }}</span>
             <span>· {{ $t('Workflows.approval_step', { stepId: approval.stepId }) }}</span>
+            <SimulatedChip v-if="approval.simulated" />
         </div>
         <h2 class="ai-detail__what">{{ approval.title || $t('Workflows.approval_untitled') }}</h2>
 
@@ -71,6 +72,7 @@ import { useRoute } from "vue-router";
 import { useStore } from "vuex";
 import moment from "moment";
 import ShellIcon from "@/components/organisms/Shell/ShellIcon.vue";
+import SimulatedChip from "@/components/atom/SimulatedChip/SimulatedChip.vue";
 import { canDecide, deadlineOf, escalationOf, handoversOf, ownerOf } from "./workflowApprovals";
 import { membersOnly } from "@/views/Workflows/approvalOwners";
 
