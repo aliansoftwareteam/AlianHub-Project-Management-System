@@ -3,6 +3,7 @@
         <div v-if="error" class="ah-field__error">{{ error }}</div>
         <div v-else-if="!run" class="ah-empty">{{ $t('Ai.loading') }}</div>
         <template v-else>
+            <p v-if="run.simulated" class="ah-small run-detail__waiting" data-test="run-simulated"><SimulatedChip /></p>
             <p v-if="unreached" class="ah-small run-detail__waiting" data-test="episode-not-reached">{{ $t('Ai.episode_not_reached') }}</p>
             <div v-else-if="episode" class="run-episode" data-test="episode">
                 <span class="ah-label">{{ $t('Ai.episode_title') }}</span>
@@ -106,6 +107,7 @@ import { useToast } from "vue-toast-notification";
 import { useAgents, revertControlState, undoDeadlineOf, pinnedRevisionOf } from "./useAgents";
 import { useAgentAccess } from "./agentAccess";
 import { normaliseEpisode, declinedLine as declinedText } from "./episodeText";
+import SimulatedChip from "@/components/atom/SimulatedChip/SimulatedChip.vue";
 import AgentRunReplay from "./AgentRunReplay.vue";
 import AgentRunTrace from "./AgentRunTrace.vue";
 import { taintKindLabel, taintSourcesOf } from "./taintText";

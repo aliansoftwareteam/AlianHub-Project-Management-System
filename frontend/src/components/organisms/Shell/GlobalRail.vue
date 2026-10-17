@@ -128,7 +128,10 @@
                             <div class="ah-label ah-pop__label">{{ $t('Shell.switch_workspace') }}</div>
                             <button v-for="company in otherCompanies" :key="company._id" type="button" class="ah-pop__item" :class="{ 'is-disabled': company.isDisable }" role="menuitem" @click="switchCompany(company)">
                                 <span class="ah-avatar ah-avatar--sm">{{ (company.Cst_CompanyName || '?').charAt(0).toUpperCase() }}</span>
-                                <span class="text-ellipsis">{{ company.Cst_CompanyName }}</span>
+                                <span class="ah-rail__me-text">
+                                    <span class="text-ellipsis">{{ company.Cst_CompanyName }}</span>
+                                    <span v-if="industryOf(company)" class="ah-small">{{ industryOf(company) }}</span>
+                                </span>
                             </button>
                         </template>
                         <div class="ah-pop__sep"></div>
@@ -161,6 +164,7 @@ import { useI18n } from "vue-i18n";
 import KeyHint from "@/components/atom/KeyHint/KeyHint.vue";
 import { ariaKeyShortcuts, openShortcutSheet, shortcutHint } from "@/composable/shortcuts";
 import { useInboxUnread } from "./inboxUnread";
+import { useDemoIndustry } from "@/composable/useDemoIndustry";
 
 const emit = defineEmits(["change"]);
 const companyId = inject("$companyId");
@@ -174,6 +178,7 @@ const { rail, more, isActive, moreActive } = useNavItems(companyId);
 const { unread, badge } = useInboxUnread();
 
 const { t } = useI18n();
+const { industryOf } = useDemoIndustry();
 const newTaskTitle = computed(() => {
     const keys = shortcutHint("create-task", t);
     return keys ? t("Shortcuts.with_keys", { label: t("QuickCreate.rail_title"), keys }) : t("QuickCreate.rail_title");

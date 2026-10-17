@@ -1227,6 +1227,8 @@ const schema = {
     },
     agentRuns: {
         agentId: { type: String, required: true },
+        // A run scripts/demo/industries wrote to show how the agent works; no model ran. The UI labels it.
+        simulated: { type: Boolean, required: false },
         agentName: { type: String, required: false },
         taskId: { type: String, required: false },
         projectId: { type: mongoose.Schema.Types.Mixed, required: false, set: objectIdIfHex },
@@ -1489,6 +1491,8 @@ const schema = {
     },
     agentProposals: {
         agentId: { type: String, required: true },
+        // Written by scripts/demo/industries rather than by a run; approving it still applies its changes for real.
+        simulated: { type: Boolean, required: false },
         agentName: { type: String, required: false },
         runId: { type: String, required: false },
         taskId: { type: String, required: false },
@@ -2658,6 +2662,8 @@ const schema = {
         demo: { type: Boolean, required: false },
         // Set only by scripts/seed-scale.js; its --drop deletes no user without it.
         scaleSeed: { type: String, required: false },
+        // Set only by scripts/demo/industries on the people it makes; its --drop deletes no user without it.
+        demoShowcase: { type: String, required: false },
         "legacyId": {
             type: String,
             required: false
@@ -2956,6 +2962,8 @@ const schema = {
     companies: {
         // { by, anchor } — set only by scripts/seed-scale.js, which writes to and drops no company without it.
         scaleSeed: { type: Object, required: false },
+        // { by, key, industry, guidePageId } — set only by scripts/demo/industries, which writes to and drops no company without it.
+        demoShowcase: { type: Object, required: false },
         // The id of the migration that wrote this row for a workspace opened without one; its down() deletes no row without it.
         rowRepairedBy: { type: String, required: false },
         // { allowedModes: ['workspace','personal','local'], requireCheckBeforeDone, connectedPaused, connectedPausedBy, connectedPausedAt }
@@ -4655,6 +4663,8 @@ const schema = {
         },
         transcript: { type: String, required: false },
         isAgent: { type: Boolean, required: false },
+        // An agent comment scripts/demo/industries wrote for a simulated run; the UI labels it.
+        simulated: { type: Boolean, required: false },
         agentName: { type: String, required: false },
         // 27c attribution. Without these the fields were stripped on save and every
         // agent comment read as posted by the person who approved it.

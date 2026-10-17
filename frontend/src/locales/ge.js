@@ -11603,7 +11603,15 @@ export default {
         "login_with": "Log in with",
         "star": "Star on GitHub",
         "deploy": "Deploy your own",
-        "try_demo": "Try the demo"
+        "try_demo": "Try the demo",
+        "simulated": "Simulated",
+        "simulated_hint": "Written for this demo to show how the agent works. No AI model ran.",
+        "industry_it": "IT and software",
+        "industry_finance": "Finance and accounting",
+        "industry_logistics": "Logistics and supply chain",
+        "industry_hr": "People operations",
+        "switch_industry": "Switch industry",
+        "guide": "Guide"
     },
     "Setup": {
         "guide_link": "Admin guide",

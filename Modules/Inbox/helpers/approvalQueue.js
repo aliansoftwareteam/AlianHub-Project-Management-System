@@ -57,6 +57,7 @@ const toRow = (previews, batches = new Map(), viewer = null, mine = () => false)
     // approval.refusalFor refuses an edited approval of a change a connected agent filed.
     editable: proposal.source !== SOURCE_MCP,
     tainted: Boolean(proposal.taint && proposal.taint.reason),
+    simulated: proposal.simulated === true,
     taskId: proposal.taskId ? String(proposal.taskId) : '',
     projectId: proposal.projectId ? String(proposal.projectId) : '',
     createdAt: proposal.createdAt,

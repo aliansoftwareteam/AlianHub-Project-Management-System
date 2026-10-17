@@ -11,7 +11,7 @@
             <li v-for="item in top" :key="`${item.kind}:${item.id}`" class="hwait__row" :class="{ 'is-open': isReviewing(item) }" data-test="waiting-row">
                 <div class="hwait__text">
                     <span class="hwait__what">{{ item.what }}</span>
-                    <span class="hwait__who">{{ item.who }}</span>
+                    <span class="hwait__who">{{ item.who }} <SimulatedChip v-if="item.source && item.source.simulated" /></span>
                     <span v-if="item.kind === 'proposal'" class="hwait__why" data-test="waiting-why"><span class="ah-label">{{ $t('Ai.why') }}</span> {{ item.why || $t('Time.why_no_reason') }}</span>
                 </div>
                 <div class="hwait__actions">
@@ -57,6 +57,7 @@ import { useStore } from "vuex";
 import { useI18n } from "vue-i18n";
 import { useToast } from "vue-toast-notification";
 import ShellIcon from "@/components/organisms/Shell/ShellIcon.vue";
+import SimulatedChip from "@/components/atom/SimulatedChip/SimulatedChip.vue";
 import IntentPreview from "@/components/molecules/IntentPreview/IntentPreview.vue";
 import { hasParts } from "@/components/molecules/IntentPreview/planPicks";
 import { usePlanChoices } from "@/components/molecules/IntentPreview/planChoices";

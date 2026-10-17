@@ -87,6 +87,7 @@
                             <span class="ai-item__agent">{{ p.agentName }}</span>
                             <span v-if="p.gate" class="ah-chip ah-chip--warn" data-test="proposal-gate">{{ gateChip(p.gate) }}</span>
                             <span v-if="p.taint" class="ah-chip ah-chip--warn ah-chip--mono" data-test="proposal-tainted">{{ $t('Audit.tainted') }}</span>
+                            <SimulatedChip v-if="p.simulated" />
                             <span v-if="p.status !== 'pending'" class="ah-chip ah-chip--mono">{{ $t(`Ai.status_${p.status}`) }}</span>
                             <span v-if="waitingDaysOf(p)" class="ah-chip ah-chip--warn" data-test="proposal-waiting">{{ t('Ai.waiting_days', { n: waitingDaysOf(p) }, waitingDaysOf(p)) }}</span>
                             <span class="ai-item__time ah-mono">{{ shortTime(p.createdAt) }}</span>
@@ -127,6 +128,7 @@
 
                     <div class="ai-detail__crumb">
                         <span>{{ selected.agentName }}</span>
+                        <SimulatedChip v-if="selected.simulated" />
                         <span v-if="selected.runId">· {{ $t('Ai.run_n', { n: String(selected.runId).slice(-4) }) }}</span>
                         <span v-if="selectedSkillSource">· <span data-test="proposal-skill-source">{{ selectedSkillSource }}</span></span>
                         <span>· {{ shortTime(selected.createdAt) }}</span>
@@ -239,6 +241,7 @@ import moment from "moment";
 import { clockText } from "@/utils/clockText";
 import ShellIcon from "@/components/organisms/Shell/ShellIcon.vue";
 import EmptyState from "@/components/atom/EmptyState/EmptyState.vue";
+import SimulatedChip from "@/components/atom/SimulatedChip/SimulatedChip.vue";
 import AiFeedback from "@/components/molecules/AiFeedback/AiFeedback.vue";
 import IntentPreview from "@/components/molecules/IntentPreview/IntentPreview.vue";
 import { intentSummary } from "@/components/molecules/IntentPreview/intentLines";
