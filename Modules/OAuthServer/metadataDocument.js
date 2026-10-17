@@ -14,7 +14,6 @@ const FAILURE_BACKOFF_MS = 5000;
 const MAX_CACHE_MS = 24 * 60 * 60 * 1000;
 const MAX_CACHED = 1000;
 const MAX_NAME_LENGTH = 200;
-const ALLOWED_GRANTS = ['authorization_code', 'refresh_token'];
 
 class MetadataDocumentError extends Error {
     constructor(message) {
@@ -64,7 +63,8 @@ const clientOf = (clientId, doc) => {
     const method = doc.token_endpoint_auth_method === undefined ? 'none' : doc.token_endpoint_auth_method;
     if (method !== 'none') refuse('a client metadata document client must be a public client (token_endpoint_auth_method "none")');
     if (doc.client_secret !== undefined) refuse('a client metadata document must not carry a client_secret');
-    if (doc.grant_types !== undefined && !(Array.isArray(doc.grant_types) && doc.grant_types.every((g) => ALLOWED_GRANTS.includes(g)))) refuse('the client metadata document asks for an unsupported grant type');
+    // Grant types this server does not run are ignored, as scopes are (Claude's names jwt-bearer); only the code flow must be there.
+    if (doc.grant_types !== undefined && !(Array.isArray(doc.grant_types) && doc.grant_types.includes('authorization_code'))) refuse('the client metadata document does not name the authorization_code grant');
     if (doc.response_types !== undefined && !(Array.isArray(doc.response_types) && doc.response_types.every((t) => t === 'code'))) refuse('the client metadata document asks for an unsupported response type');
     return {
         clientId,

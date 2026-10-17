@@ -883,6 +883,15 @@ describe('client ID metadata documents at /oauth/authorize', () => {
         seen.push(res.body.access_token, res.body.refresh_token);
     });
 
+    it('completes the flow for a document that also names grants this server does not run, as Claude\'s does', async () => {
+        await start();
+        serve(doc({ grant_types: ['authorization_code', 'refresh_token', 'urn:ietf:params:oauth:grant-type:jwt-bearer'], response_types: ['code'] }));
+        const client = { clientId: CIMD_ID };
+        const res = await exchange(client, await codeFor(client));
+        expect(res.status).toBe(200);
+        seen.push(res.body.access_token, res.body.refresh_token);
+    });
+
     it('caches the document and fetches it again once the cache runs out', async () => {
         await start();
         serve(doc(), { 'cache-control': 'max-age=600' });
@@ -903,6 +912,7 @@ describe('client ID metadata documents at /oauth/authorize', () => {
         ['lists a plain http redirect on a public host', doc({ redirect_uris: ['http://agent.s10s2.test/cb'] })],
         ['asks for a client secret method', doc({ token_endpoint_auth_method: 'client_secret_basic' })],
         ['carries a client_secret', doc({ client_secret: 'x' })],
+        ['names no authorization_code grant', doc({ grant_types: ['refresh_token'] })],
     ])('refuses a document that %s, without redirecting', async (label, body) => {
         await start();
         serve(body);
@@ -995,6 +1005,25 @@ describe('dynamic client registration (RFC 7591)', () => {
         const tokens = await exchange(client, await codeFor(client));
         expect(tokens.status).toBe(200);
         seen.push(tokens.body.access_token, tokens.body.refresh_token);
+    });
+
+    it('registers a client that names grants this server does not run, answering with the ones it does', async () => {
+        await start({ MCP_OAUTH_DCR: 'on' });
+        const res = await fetch(`${base}/oauth/register`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ client_name: 'S10S2 dcr', redirect_uris: [REDIRECT], token_endpoint_auth_method: 'none', grant_types: ['authorization_code', 'refresh_token', 'urn:ietf:params:oauth:grant-type:jwt-bearer'] }) });
+        expect(res.status).toBe(201);
+        const body = await res.json();
+        expect(body.grant_types).toEqual(['authorization_code', 'refresh_token']);
+        const client = { clientId: body.client_id };
+        const tokens = await exchange(client, await codeFor(client));
+        expect(tokens.status).toBe(200);
+        seen.push(tokens.body.access_token, tokens.body.refresh_token);
+    });
+
+    it('refuses grant_types that leave out authorization_code', async () => {
+        await start({ MCP_OAUTH_DCR: 'on' });
+        const res = await fetch(`${base}/oauth/register`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ client_name: 'x', redirect_uris: [REDIRECT], token_endpoint_auth_method: 'none', grant_types: ['client_credentials'] }) });
+        expect(res.status).toBe(400);
+        expect((await res.json()).error).toBe('invalid_client_metadata');
     });
 
     it('refuses a redirect URI that is neither https nor loopback', async () => {
