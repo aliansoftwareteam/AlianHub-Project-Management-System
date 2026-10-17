@@ -107,6 +107,19 @@ const takeBack = async (companyId, { run, step, taskId, role, action = AUDIT.WIT
     return true;
 };
 
+const WAITS = Object.freeze({
+    finish: (role) => `waiting for ${role} to finish`,
+    agents_off: (role) => `waiting for agents to be switched on again before ${role} gets the task`,
+    agents_off_held: (role) => `waiting for agents to be switched on again; ${role} holds the task`,
+});
+
+/* The wait a step's reason records, with the role's name, so a reader can say it without printing the role's key. */
+const waitOf = (step) => {
+    const role = String(((step || {}).config || {}).role || '');
+    const why = Object.keys(WAITS).find((key) => WAITS[key](role) === (step || {}).waitReason);
+    return why ? { kind: 'role', why, role, name: dispatcher().settings.roleName(role) || role } : null;
+};
+
 const RUN_MARGIN_MS = 60 * 1000;
 
 /* The step's own deadline from the hand-over, cut short to a minute before the run's so there is time to withdraw. */
@@ -158,12 +171,12 @@ const execute = async ({ companyId, run, step }) => {
         if (until <= now) throw deterministic(`${where}: the deadline ${until.toISOString()} passed before ${role} got the task`);
         if (gate.roleProblem(await settings.load(companyId, task.ProjectID), role)) throw deterministic(`${where}: the role "${role}" is not on for this task's project`);
         if (await queue.paused(companyId, task.ProjectID)) {
-            return waitUntil(`waiting for agents to be switched on again before ${role} gets the task`, until, {
+            return waitUntil(WAITS.agents_off(role), until, {
                 pollMs: flag.roleHandoffPollMs(), set: since, recheck: async () => !(await queue.paused(companyId, task.ProjectID)),
             });
         }
         await handOver({ companyId, run, step, task, role });
-        return waitForRole(`waiting for ${role} to finish`, deadlineOf(now, config, run, now), { handedAt: now });
+        return waitForRole(WAITS.finish(role), deadlineOf(now, config, run, now), { handedAt: now });
     }
 
     const position = standing(await queueRow(companyId, task, findings), role, findings);
@@ -189,8 +202,8 @@ const execute = async ({ companyId, run, step }) => {
         await takeBack(companyId, { run, step, taskId, role, action: AUDIT.TIMED_OUT, more: { deadlineAt: deadlineAt.toISOString() } });
         throw deterministic(`${where}: ${role} did not finish by ${deadlineAt.toISOString()}; the task was taken out of its queue`);
     }
-    if (await queue.paused(companyId, task.ProjectID)) return waitForRole(`waiting for agents to be switched on again; ${role} holds the task`, deadlineAt);
-    return waitForRole(`waiting for ${role} to finish`, deadlineAt);
+    if (await queue.paused(companyId, task.ProjectID)) return waitForRole(WAITS.agents_off_held(role), deadlineAt);
+    return waitForRole(WAITS.finish(role), deadlineAt);
 };
 
 /* The engine's word that the step ended without succeeding: failed, refused, skipped by a person, or its run ended
@@ -210,4 +223,4 @@ const register = () => {
 
 register();
 
-module.exports = { TYPE, CONTRACT, AUDIT, execute, ended, register };
+module.exports = { TYPE, CONTRACT, AUDIT, execute, ended, register, waitOf };
