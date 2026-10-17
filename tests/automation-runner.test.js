@@ -11,6 +11,7 @@ const runner = require('../Modules/Automations/engine/runner');
 const matcher = require('../Modules/Automations/engine/matcher');
 const registry = require('../Modules/Automations/engine/registry');
 const { createInlineDriver } = require('../Modules/Automations/engine/queue');
+const logger = require('../Config/loggerConfig');
 
 const TASK_ID = '507f1f77bcf86cd799439011';
 const PROJECT_ID = '507f1f77bcf86cd799439012';
@@ -252,5 +253,58 @@ describe('queue adapter', () => {
         const d = createInlineDriver();
         await d.start();
         await expect(d.enqueue('missing', {})).rejects.toThrow('no handler defined');
+    });
+
+    describe('a job booked for later on the inline driver', () => {
+        const LATER_MS = 30000;
+        const later = () => new Date(Date.now() + LATER_MS);
+
+        beforeEach(() => { jest.useFakeTimers(); });
+        afterEach(() => { jest.useRealTimers(); });
+
+        it('is booked without holding the enqueue of a job that waits and looks again', async () => {
+            const d = createInlineDriver();
+            let looks = 0;
+            d.define('wait', async (job) => {
+                looks += 1;
+                await d.enqueue('wait', job.attrs.data, { runAt: later() });
+            });
+            await d.start();
+
+            await d.enqueue('wait', { runId: 'r1' });
+            expect(looks).toBe(1);
+
+            await jest.advanceTimersByTimeAsync(LATER_MS);
+            expect(looks).toBe(2);
+            await d.stop();
+        });
+
+        it('never runs once the driver has stopped', async () => {
+            const d = createInlineDriver();
+            const seen = [];
+            d.define('j', async (job) => { seen.push(job.attrs.data); });
+            await d.start();
+
+            await d.enqueue('j', { runId: 'r1' }, { runAt: later() });
+            await d.stop();
+            await jest.advanceTimersByTimeAsync(LATER_MS * 2);
+
+            expect(seen).toEqual([]);
+            expect(jest.getTimerCount()).toBe(0);
+        });
+
+        it('is logged when it fails rather than left unhandled', async () => {
+            const error = jest.spyOn(logger, 'error').mockImplementation(() => {});
+            const d = createInlineDriver();
+            d.define('j', async () => { throw new Error('store is down'); });
+            await d.start();
+
+            await d.enqueue('j', {}, { runAt: later() });
+            await jest.advanceTimersByTimeAsync(LATER_MS);
+
+            expect(error).toHaveBeenCalledWith(expect.stringContaining('store is down'));
+            error.mockRestore();
+            await d.stop();
+        });
     });
 });

@@ -186,6 +186,11 @@ not failing and a step waiting on a person must not exhaust a retry budget meant
 for a step that is broken. `stepTypes.blockedReason(steps)` is what a run view
 reads to say what a blocked run is blocked on.
 
+`waitReason` is the engine's line and names people and roles by id and key. The
+run API also puts `waitingFor` on a step waiting on an approval (the owner's name
+from the approval row, or the owning role) or on a role hand-over (the role's
+display name and which wait it is), and the run page words the banner from that.
+
 ## Approvals
 
 The request is a row of its own in `workflow_approvals`, unique on
