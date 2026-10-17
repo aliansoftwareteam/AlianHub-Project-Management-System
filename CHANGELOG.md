@@ -16,6 +16,32 @@ from [Conventional Commits](https://www.conventionalcommits.org/) on `main`.
 
 ---
 
+## [14.40.0](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/compare/v14.39.0...v14.40.0) (2026-10-17)
+
+
+### 🚀 Features
+
+* **auth:** fill in the demo account and add a one-click "Try the demo" button ([aaad0d9](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/aaad0d932f7a8f555fde97b4f4e845f7de7de2f7))
+* **auth:** fill in the demo account and add a one-click "Try the demo" button ([7b6a5ba](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/7b6a5bad00fb16c1a07fbd8b3ed247471f289802))
+
+
+### 🐛 Bug Fixes
+
+* **automations:** book a delayed job on the inline queue instead of awaiting it ([9e43a33](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/9e43a33823dc249c0e07b868d7545ab161f82074))
+* **automations:** book a delayed job on the inline queue instead of awaiting it ([0752af1](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/0752af11347664cae4fc21a0fbae27b4a2526b90))
+* **oauth:** accept clients that name grant types the server does not run ([4e21a8a](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/4e21a8a387e7138f06588bad11e9220c972d5253))
+* **oauth:** accept clients that name grant types the server does not run ([d0e9eee](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/d0e9eee20561f7a17282f4f5dbe8fd104b27f59c))
+* **permissions:** gate project-wise permission UI by plan feature ([044d623](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/044d62320832422052884dd972cddd8935cb4bfe))
+* **permissions:** gate project-wise permission UI by plan feature ([bbd92ba](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/bbd92baf155c17616570a9017c8302d58f40bddb))
+* **workflows:** name who a waiting run waits for instead of a user id ([3781591](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/378159149cd630b16b64377af521d029e158ef41))
+* **workflows:** name who a waiting run waits for instead of a user id ([c8e861c](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/c8e861c51a58ebbf17c5e5c650c7bfae9e524c2e))
+
+
+### 📘 Documentation
+
+* beta log to build 2 and close task 051 (demo login) ([f93418a](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/f93418abcfa892b6bdbdf42d08366826e9911e81))
+* beta log to build 2 and close task 051 (demo login) ([5de9215](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/5de921512599084a1d6a7ff379583e9d5ee111e8))
+
 ## [14.39.0](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/compare/v14.38.1...v14.39.0) (2026-10-14)
 
 
