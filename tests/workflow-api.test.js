@@ -14,6 +14,7 @@ const queue = require('../Modules/Workflows/queue');
 const access = require('../Modules/Agents/access');
 const revert = require('../Modules/Agents/revert');
 const approvals = require('../Modules/Workflows/approvals');
+const people = require('../Modules/Workflows/people');
 const controller = require('../Modules/Workflows/controller');
 const scheduler = require('../Modules/Workflows/scheduler');
 const stepTypes = require('../Modules/Workflows/stepTypes');
@@ -129,6 +130,62 @@ describe('a step row in an answer', () => {
             expect(text).not.toContain(PREVIOUS);
         }
         expect(answeredWithSteps.sort()).toEqual([...ROUTES_WITH_STEP_ROWS].sort());
+    });
+});
+
+describe('a waiting step names who it waits for', () => {
+    const PERSON = '6ad3295d1e45ee45ed4270e3';
+    const ROLE = 'it-company/qa-engineer';
+    const waiting = (over) => ({ runId: RUN_ID, stepId: 'sAsk', index: 0, type: 'human_approval', status: 'pending', approvalId: 'ap1', waitReason: `waiting for user ${PERSON} to approve`, ...over });
+
+    const read = async (steps) => {
+        store.getRun.mockResolvedValue({ _id: RUN_ID, status: 'running', startedBy: OWNER });
+        store.listSteps.mockResolvedValue(steps);
+        const res = resSpy();
+        await controller.getRun(reqFor({ params: { id: RUN_ID } }), res);
+        expect(res.statusCode).toBe(200);
+        return res.body.data.steps;
+    };
+
+    it('names the approval’s current owner, read from the approval rather than the reason', async () => {
+        approvals.get.mockResolvedValue({ ownerUserId: MEMBER, ownerRole: null, escalatedAt: new Date() });
+        people.namesOf.mockResolvedValue({ [MEMBER]: 'Asha Rao' });
+        const [step] = await read([waiting()]);
+
+        expect(approvals.get).toHaveBeenCalledWith(COMPANY, RUN_ID, 'sAsk');
+        expect(people.namesOf).toHaveBeenCalledWith([MEMBER]);
+        expect(step.waitingFor).toEqual({ kind: 'approval', name: 'Asha Rao', role: null, escalated: true });
+        expect(step.waitReason).toBe(`waiting for user ${PERSON} to approve`);
+    });
+
+    it('names the owning role when the approval names no person, and nobody when the person is gone', async () => {
+        approvals.get.mockResolvedValue({ ownerUserId: null, ownerRole: 'marketing lead' });
+        people.namesOf.mockResolvedValue({});
+        expect((await read([waiting({ waitReason: 'waiting for marketing lead to approve' })]))[0].waitingFor).toEqual({ kind: 'approval', name: null, role: 'marketing lead', escalated: false });
+
+        approvals.get.mockResolvedValue({ ownerUserId: PERSON });
+        expect((await read([waiting()]))[0].waitingFor).toEqual({ kind: 'approval', name: null, role: null, escalated: false });
+    });
+
+    it('names a hand-over’s role by its display name, for each wait the step writes', async () => {
+        const steps = await read([
+            waiting({ stepId: 'sQa', type: 'role_handoff', approvalId: undefined, config: { role: ROLE }, waitReason: `waiting for ${ROLE} to finish` }),
+            waiting({ stepId: 'sOff', type: 'role_handoff', approvalId: undefined, config: { role: ROLE }, waitReason: `waiting for agents to be switched on again before ${ROLE} gets the task` }),
+            waiting({ stepId: 'sHeld', type: 'role_handoff', approvalId: undefined, config: { role: ROLE }, waitReason: `waiting for agents to be switched on again; ${ROLE} holds the task` }),
+        ]);
+        expect(steps.map((step) => step.waitingFor)).toEqual(['finish', 'agents_off', 'agents_off_held'].map((why) => ({ kind: 'role', why, role: ROLE, name: 'QA Engineer' })));
+        expect(approvals.get).not.toHaveBeenCalled();
+    });
+
+    it('adds nothing to a step that is not waiting, or whose wait it does not know', async () => {
+        const steps = await read([
+            waiting({ status: 'success', waitReason: null }),
+            waiting({ stepId: 'sLoop', type: 'loop', approvalId: undefined, waitReason: 'iteration 2 of at most 5' }),
+            waiting({ stepId: 'sOdd', type: 'role_handoff', approvalId: undefined, config: { role: ROLE }, waitReason: 'waiting for something new' }),
+        ]);
+        expect(steps.map((step) => step.waitingFor)).toEqual([undefined, undefined, undefined]);
+        expect(approvals.get).not.toHaveBeenCalled();
+        expect(people.namesOf).not.toHaveBeenCalled();
     });
 });
 

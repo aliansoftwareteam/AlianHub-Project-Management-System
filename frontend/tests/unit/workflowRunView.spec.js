@@ -108,6 +108,49 @@ describe('WorkflowRunView', () => {
         expect(wrapper.find('[data-test="blocked-also"]').text()).toContain('"n":1');
     });
 
+    const waitingOn = async (over) => (await mountView({ run: run(), steps: [step({ status: 'pending', finishedAt: null, ...over })] })).find('[data-test="blocked"]');
+
+    it('names the person an approval waits for instead of their user id', async () => {
+        const banner = await waitingOn({
+            type: 'human_approval', approvalId: 'ap1', waitReason: 'waiting for user 6ad3295d1e45ee45ed4270e3 to approve',
+            waitingFor: { kind: 'approval', name: 'Asha Rao', role: null, escalated: false }
+        });
+        expect(banner.find('[data-test="blocked-reason"]').text()).toBe('Workflows.waiting_approval_person {"name":"Asha Rao"}');
+        expect(banner.text()).not.toContain('6ad3295d1e45ee45ed4270e3');
+        expect(banner.find('[data-test="blocked-escalated"]').exists()).toBe(false);
+    });
+
+    it('says an escalated approval was escalated, and names the owning role or nobody when there is no person', async () => {
+        const escalated = await waitingOn({ type: 'human_approval', waitReason: 'waiting for user x to approve (escalated)', waitingFor: { kind: 'approval', name: 'Ravi', role: null, escalated: true } });
+        expect(escalated.find('[data-test="blocked-escalated"]').text()).toBe('Workflows.approval_escalated');
+
+        const role = await waitingOn({ type: 'human_approval', waitReason: 'waiting for marketing lead to approve', waitingFor: { kind: 'approval', name: null, role: 'marketing lead', escalated: false } });
+        expect(role.find('[data-test="blocked-reason"]').text()).toBe('Workflows.waiting_approval_role {"role":"marketing lead"}');
+
+        const left = await waitingOn({ type: 'human_approval', waitReason: 'waiting for user 6ad3295d1e45ee45ed4270e3 to approve', waitingFor: { kind: 'approval', name: null, role: null, escalated: false } });
+        expect(left.find('[data-test="blocked-reason"]').text()).toContain('Workflows.waiting_approval_anyone');
+        expect(left.text()).not.toContain('6ad3295d1e45ee45ed4270e3');
+    });
+
+    it('names the role a hand-over waits for by its display name, not its key', async () => {
+        const finishing = await waitingOn({
+            type: 'role_handoff', waitReason: 'waiting for it-company/tech-lead to finish',
+            waitingFor: { kind: 'role', why: 'finish', role: 'it-company/tech-lead', name: 'Tech Lead' }
+        });
+        expect(finishing.find('[data-test="blocked-reason"]').text()).toBe('Workflows.waiting_role_finish {"role":"Tech Lead"}');
+
+        const paused = await waitingOn({
+            type: 'role_handoff', waitReason: 'waiting for agents to be switched on again; it-company/tech-lead holds the task',
+            waitingFor: { kind: 'role', why: 'agents_off_held', role: 'it-company/tech-lead', name: 'Tech Lead' }
+        });
+        expect(paused.find('[data-test="blocked-reason"]').text()).toBe('Workflows.waiting_role_agents_off_held {"role":"Tech Lead"}');
+    });
+
+    it('falls back to the engine’s reason for a wait it cannot name', async () => {
+        const banner = await waitingOn({ type: 'role_handoff', waitReason: 'waiting for something new', waitingFor: { kind: 'role', why: 'something_new', role: 'x/y', name: 'Y' } });
+        expect(banner.find('[data-test="blocked-reason"]').text()).toBe('waiting for something new');
+    });
+
     it('offers only skip on a deterministic failure, and retry with its backoff on a transient one', async () => {
         const deterministic = await mountView({
             run: run({ status: 'failed' }),

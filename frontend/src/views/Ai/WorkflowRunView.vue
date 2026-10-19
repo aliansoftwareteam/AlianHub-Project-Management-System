@@ -25,7 +25,8 @@
                     <div v-if="blocked" class="wf-blocked" :class="{ 'wf-blocked--terminal': blocked.terminal }" data-test="blocked">
                         <span class="ah-label">{{ $t(blocked.terminal ? 'Workflows.blocked_title' : 'Workflows.waiting_title') }}</span>
                         <span v-if="blocked.terminal" class="ah-chip ah-chip--danger" data-test="blocked-code">{{ $t(`Workflows.blocked_${blocked.code}`) }}</span>
-                        <p class="wf-blocked__reason" data-test="blocked-reason">{{ blocked.reason }}</p>
+                        <span v-else-if="blocked.waitingFor?.escalated" class="ah-chip ah-chip--warn" data-test="blocked-escalated">{{ $t('Workflows.approval_escalated') }}</span>
+                        <p class="wf-blocked__reason" data-test="blocked-reason">{{ blockedText }}</p>
                         <p class="ah-small" data-test="blocked-step">{{ $t('Workflows.blocked_at_step', { stepId: blocked.stepId }) }}</p>
                         <p v-if="!blocked.terminal && blocked.also > 0" class="ah-small" data-test="blocked-also">{{ $t('Workflows.waiting_also', { n: blocked.also }, blocked.also) }}</p>
                     </div>
@@ -112,7 +113,7 @@ import WorkflowLoopCounter from "./WorkflowLoopCounter.vue";
 import TaskAgentStrip from "@/components/organisms/TaskDetailOverlay/TaskAgentStrip.vue";
 import { useAgentAccess } from "./agentAccess";
 import { useWorkflowRun } from "./useWorkflowRun";
-import { recoveryControlOf, runStatusOf, sessionStripOf } from "./workflowRun";
+import { recoveryControlOf, runStatusOf, sessionStripOf, waitMessageOf } from "./workflowRun";
 
 defineOptions({ name: "WorkflowRunView" });
 
@@ -131,6 +132,11 @@ const lineageLink = computed(() => ({ name: "WorkflowLineage", params: { cid: ro
 const runStatus = computed(() => runStatusOf(run.value));
 const RUN_CHIPS = { success: "ah-chip--ok", failed: "ah-chip--danger", blocked: "ah-chip--danger", running: "ah-chip--brand", queued: "ah-chip--warn", stopped: "ah-chip--dark" };
 const runChip = computed(() => RUN_CHIPS[runStatus.value] || "ah-chip--dark");
+
+const blockedText = computed(() => {
+    const message = waitMessageOf(blocked.value);
+    return message ? t(message.key, message.params) : blocked.value?.reason || "";
+});
 
 const resumable = (step) => recoveryControlOf(step) === "resume";
 

@@ -151,10 +151,12 @@ exports.revoke = async (req, res) => {
 exports.register = async (req, res) => {
     try {
         const body = req.body && typeof req.body === 'object' && !Buffer.isBuffer(req.body) ? req.body : {};
-        const grantTypes = body.grant_types === undefined ? ['authorization_code'] : body.grant_types;
-        if (!Array.isArray(grantTypes) || !grantTypes.every((g) => ['authorization_code', 'refresh_token'].includes(g))) {
-            return oauthError(res, 400, 'invalid_client_metadata', 'grant_types may only name authorization_code and refresh_token');
+        const askedGrants = body.grant_types === undefined ? ['authorization_code'] : body.grant_types;
+        if (!Array.isArray(askedGrants) || !askedGrants.includes('authorization_code')) {
+            return oauthError(res, 400, 'invalid_client_metadata', 'grant_types must include authorization_code');
         }
+        // RFC 7591 section 3.2.1 lets the answer narrow what was asked: a client naming grants this server does not run still registers.
+        const grantTypes = ['authorization_code', 'refresh_token'].filter((g) => askedGrants.includes(g));
         if (body.response_types !== undefined && !(Array.isArray(body.response_types) && body.response_types.every((t) => t === 'code'))) {
             return oauthError(res, 400, 'invalid_client_metadata', 'response_types may only name code');
         }

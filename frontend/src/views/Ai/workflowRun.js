@@ -189,9 +189,28 @@ export const blockedOf = (run, steps = []) => {
         stepId: String(first.stepId),
         type: stepTypeOf(first),
         reason: String(first.waitReason),
+        waitingFor: first.waitingFor || null,
         until: first.waitUntil || null,
         also: waiting.length - 1
     };
+};
+
+export const ROLE_WAITS = Object.freeze(["finish", "agents_off", "agents_off_held"]);
+
+/* The banner's sentence as an i18n key and its values, built from who the API says the step waits for. Null when
+ * it named nobody, and the view shows the engine's own reason instead. */
+export const waitMessageOf = (blocked) => {
+    const on = blocked?.waitingFor;
+    if (!on) return null;
+    if (on.kind === "approval") {
+        if (on.name) return { key: "Workflows.waiting_approval_person", params: { name: on.name } };
+        if (on.role) return { key: "Workflows.waiting_approval_role", params: { role: on.role } };
+        return { key: "Workflows.waiting_approval_anyone", params: {} };
+    }
+    if (on.kind === "role" && ROLE_WAITS.includes(on.why)) {
+        return { key: `Workflows.waiting_role_${on.why}`, params: { role: on.name || on.role } };
+    }
+    return null;
 };
 
 export const runTotalsOf = (steps = []) => ({
