@@ -31,6 +31,9 @@
 - Validated against the owner's demo database rather than an empty local one (no local MongoDB on this machine). A second plain run created nothing; `--reset` removed and rebuilt all four, removing the demo account with the last company that held it.
 - Seen but not caused by this work: in the browser pane, a list or task status menu opens at the far right edge of the viewport; the item had to be triggered by script.
 
+### 2026-10-19
+- Merged into `staging` in [#1696](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/pull/1696) (build 7, `14.40.0-beta.7`), together with tasks 053 and 054; the beta log records the build in the follow-up docs PR.
+
 ## Last step
 
-Done and validated locally; waiting for the owner to review, then a `feat` PR into staging. On the live demo, run the command with `--owner <DEMO_EMAIL>` after the PR ships.
+Done. On the live demo, run `npm run demo:industries -- --owner <DEMO_EMAIL>` (with the `--only` list the database can hold; see `docs/DEMO-INDUSTRIES.md`) once the release is deployed; until then the industry companies there belong to `demo.visitor@industries.demo.test`.

@@ -1,7 +1,7 @@
 ---
 id: 054
 title: Industry demos for every blueprint, named by industry
-status: active
+status: done
 priority: high
 depends_on: [053]
 created: 2026-10-17

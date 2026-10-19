@@ -1,7 +1,7 @@
 ---
 id: 052
 title: Industry demo experience — one demo company per industry, built from shared scenario data
-status: active
+status: done
 priority: high
 depends_on: []
 created: 2026-10-17

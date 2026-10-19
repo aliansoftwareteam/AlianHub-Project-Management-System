@@ -35,6 +35,9 @@
 - With both flags off (PeopleFirst, real database): the company builds, the command says each part is off, no dispatcher settings, decisions, workflow rows or guide sections are written, the marker records `layers: { dispatcher: false, workflows: false }`, and a later plain run with the flags on says `--reset` adds them. Rebuilt with the flags on afterwards.
 - TechNova and FinEdge rebuilt afterwards (`--reset --only technova,finedge`) so TechNova's approval waits again and both guides carry the final wording; a plain second run creates nothing.
 
+### 2026-10-19
+- Merged into `staging` in [#1696](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/pull/1696) (build 7, `14.40.0-beta.7`), together with tasks 052 and 054; the beta log records the build in the follow-up docs PR.
+
 ## Last step
 
-Committed on the task branch on top of the 052 snapshot. Next: rebase onto task 052 once it is committed, then a `feat` PR into `staging` after 052's.
+Done. The demo shows these parts on an instance with `DISPATCHER=on` and `WORKFLOW_ENGINE=on`.
