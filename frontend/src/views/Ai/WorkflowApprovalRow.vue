@@ -3,6 +3,7 @@
         <div class="ai-item__top">
             <span class="ai-item__agent" data-test="approval-row-owner">{{ ownerLabel }}</span>
             <span v-if="escalated" class="ah-chip ah-chip--warn ah-chip--mono" data-test="approval-row-escalated">{{ $t('Workflows.approval_escalated') }}</span>
+            <SimulatedChip v-if="approval.simulated" />
             <span v-if="deadline" class="ah-chip ah-chip--mono" :class="deadlineChip" data-test="approval-row-deadline">{{ deadlineLabel }}</span>
         </div>
         <div class="ai-item__what">{{ approval.title || $t('Workflows.approval_untitled') }}</div>
@@ -14,6 +15,7 @@
 import { computed } from "vue";
 import { useI18n } from "vue-i18n";
 import moment from "moment";
+import SimulatedChip from "@/components/atom/SimulatedChip/SimulatedChip.vue";
 import { deadlineOf, escalationOf, ownerOf } from "./workflowApprovals";
 
 defineOptions({ name: "WorkflowApprovalRow" });

@@ -59,6 +59,7 @@
                     <span class="aq__what"><strong>{{ whoOf(p) }}</strong> {{ t('Inbox.wants_to') }} {{ titleOf(p) }}</span>
                     <span v-if="p.locked" class="ah-chip ah-chip--warn" data-test="queue-locked">{{ t(LOCKED_CHIPS[p.lockedWhy] || 'Inbox.queue_locked') }}</span>
                     <span v-if="p.tainted" class="ah-chip ah-chip--warn">{{ t('Audit.tainted') }}</span>
+                    <SimulatedChip v-if="p.simulated" />
                     <time v-if="stamp(p.createdAt)" class="aq__when" :datetime="p.createdAt" :title="fullText(p.createdAt)">{{ stamp(p.createdAt) }}</time>
                 </div>
 
@@ -224,6 +225,7 @@ import { useI18n } from 'vue-i18n';
 import { useGetterFunctions } from '@/composable';
 import { sendProposalDecision } from '@/composable/agentProposals';
 import ShellIcon from '@/components/organisms/Shell/ShellIcon.vue';
+import SimulatedChip from '@/components/atom/SimulatedChip/SimulatedChip.vue';
 import IntentPreview from '@/components/molecules/IntentPreview/IntentPreview.vue';
 import { intentSummary, intentTitle } from '@/components/molecules/IntentPreview/intentLines';
 import { keptSummary, partsChoice } from '@/components/molecules/IntentPreview/planPicks';

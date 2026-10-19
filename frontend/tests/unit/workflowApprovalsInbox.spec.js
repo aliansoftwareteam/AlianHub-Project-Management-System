@@ -96,6 +96,15 @@ describe('AiInbox workflow approvals', () => {
         expect(wrapper.find('[data-test="approval-owner"]').text()).toBe('Dana Reed');
         expect(wrapper.find('[data-test="approval-deadline"]').text()).toContain('approval_deadline_at');
         expect(wrapper.find('[data-test="approval-escalation"]').text()).toContain('Sam Ali');
+        expect(wrapper.find('[data-test="simulated-chip"]').exists()).toBe(false);
+    });
+
+    it('labels an approval on a run whose earlier steps were simulated, in the list and the detail', async () => {
+        const wrapper = await openApprovals({ rows: [approval({ simulated: true })] });
+        const row = wrapper.find('[data-test="approval-row"]');
+        expect(row.find('[data-test="simulated-chip"]').exists()).toBe(true);
+        await row.trigger('click');
+        expect(wrapper.find('[data-test="approval-detail"] [data-test="simulated-chip"]').exists()).toBe(true);
     });
 
     it('decides an approval and takes it out of the queue', async () => {

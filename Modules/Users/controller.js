@@ -117,9 +117,12 @@ exports.checkUserAndCompany = async (req, res) => {
             // The workspace switcher on the login screen needs every workspace, not only the last one.
             MongoDbCrudOpration('global', {
                 type: dbCollections.COMPANIES,
-                data: [{ _id: { $in: assigned.map(toObjectId) } }, { Cst_CompanyName: 1, Cst_profileImage: 1, isDisable: 1 }]
+                data: [{ _id: { $in: assigned.map(toObjectId) } }, { Cst_CompanyName: 1, Cst_profileImage: 1, isDisable: 1, 'demoShowcase.industry': 1 }]
             }, "find")
-                .then((list) => (list || []).map((c) => ({ _id: c._id, Cst_CompanyName: c.Cst_CompanyName, Cst_profileImage: c.Cst_profileImage || '', isDisable: c.isDisable === true })))
+                .then((list) => (list || []).map((c) => ({
+                    _id: c._id, Cst_CompanyName: c.Cst_CompanyName, Cst_profileImage: c.Cst_profileImage || '', isDisable: c.isDisable === true,
+                    ...(c.demoShowcase && c.demoShowcase.industry ? { demoIndustry: c.demoShowcase.industry } : {}),
+                })))
                 .catch(() => []),
         ]);
         if (!company) {
