@@ -32,9 +32,15 @@ const saveCredentials = (entry) => {
     fs.writeFileSync(CREDENTIALS_PATH, `${JSON.stringify(entry, null, 2)}\n`, { mode: FILE_MODE });
 };
 
+const ownerEmail = (args) => String(args.owner || process.env.DEMO_EMAIL || emailFor(DEFAULT_OWNER.domain, DEFAULT_OWNER)).trim().toLowerCase();
+
+/* Who survives --purge: the demo account, DEMO_EMAIL, and the comma list in DEMO_KEEP_EMAILS (the instance's admins). */
+const keptEmails = (args) => [ownerEmail(args), process.env.DEMO_EMAIL, ...String(process.env.DEMO_KEEP_EMAILS || '').split(',')]
+    .map((email) => String(email || '').trim().toLowerCase()).filter(Boolean);
+
 /* The account every demo company belongs to: --owner, else DEMO_EMAIL, else one the command makes. */
 async function resolveOwner(adapter, args) {
-    const email = String(args.owner || process.env.DEMO_EMAIL || emailFor(DEFAULT_OWNER.domain, DEFAULT_OWNER)).trim().toLowerCase();
+    const email = ownerEmail(args);
     const existing = await adapter.findUserByEmail(email);
     if (existing) return { userId: String(existing._id), email, name: existing.Employee_Name || email, created: false };
     const password = process.env.DEMO_EMAIL && email === String(process.env.DEMO_EMAIL).trim().toLowerCase() && process.env.DEMO_PASSWORD
@@ -72,7 +78,14 @@ run(async () => {
             const result = await dropShowcase({ companyId: company._id, adapter });
             out(`Removed ${result.name} (${result.companyId}): ${Object.entries(result.removed).map(([what, n]) => `${what} ${n}`).join(', ')}`);
         }
+        if (args.purge) {
+            const { purgeVisitors } = require('./lib/purge');
+            const removed = await purgeVisitors({ adapter, keepEmails: keptEmails(args), log: out });
+            out(`Purged everything else: ${Object.entries(removed).map(([what, n]) => `${what} ${n}`).join(', ')}`);
+        }
         if (args.drop) return;
+    } else if (args.purge) {
+        throw new Error('--purge goes with --reset or --drop.');
     }
 
     const owner = await resolveOwner(adapter, args);

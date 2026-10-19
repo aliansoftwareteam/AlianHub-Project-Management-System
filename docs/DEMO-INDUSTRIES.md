@@ -27,6 +27,7 @@ npm run demo:industries                           # build the demo companies tha
 npm run demo:industries -- --only finedge,technova
 npm run demo:industries -- --reset                # drop and build again (all, or --only)
 npm run demo:industries -- --drop                 # remove them
+npm run demo:industries -- --reset --purge        # DEMO_MODE only: also remove every other company and account
 npm run demo:industries -- --owner you@example.com
 npm run demo:industries -- --list
 ```
@@ -44,10 +45,10 @@ Every company is a database of its own with about 44 collections. A shared-tier 
 
 1. Set `DEMO_MODE="true"`, `DEMO_EMAIL` and `DEMO_PASSWORD` (already the case on demo.alianhub.com).
 2. Run `npm run demo:industries` on the server. With `DEMO_MODE="true"` it accepts the instance's database; anywhere else it only runs against `localhost`.
-3. A first-time visitor clicks **Try the demo**, picks an industry in the workspace picker, and lands on Home. The banner then shows the industry, a **Guide** link to the company's Start-here page and **Switch industry** (the profile menu, where each company shows its industry).
-4. Reset on a schedule, for example nightly: `0 3 * * * cd /app && npm run demo:industries -- --reset`, with the same `--only` list the database was seeded with when it cannot hold all eleven (see above).
+3. A first-time visitor clicks **Try the demo**, picks an industry in the workspace picker, and lands on Home. The banner shows the industry in a demo company, and in every company **Guide** (the company's Start-here page, else the first demo company's, else the help site), **Switch industry** (the profile menu, where each company shows its industry), **Star on GitHub** and **Deploy your own**.
+4. Reset on a schedule, for example nightly: `0 3 * * * cd /app && npm run demo:industries -- --reset --purge`, with the same `--only` list the database was seeded with when it cannot hold all eleven (see above).
 
-The instance's own placeholder workspace stays as it is; remove it from Settings if visitors should only see the industries.
+`--purge` returns the instance to the demo companies alone: every other company (the instance's placeholder workspace and each workspace a visitor made, with its database, files and bucket) and every account that signed up are removed. It keeps the demo account, `DEMO_EMAIL`, the demo companies' people and the comma list in `DEMO_KEEP_EMAILS` (put the instance admins there). It refuses unless `DEMO_MODE="true"`.
 
 To preview a branch locally against the demo instance's database, run the local server with `MIGRATIONS_AUTO=false`, `CRON_ENABLED=false`, `AUTOMATION_QUEUE_DRIVER=inline` and `KNOWLEDGE_INDEXER=off`, so it neither migrates the shared database nor takes the live server's queued jobs, reminders or indexing.
 

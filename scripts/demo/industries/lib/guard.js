@@ -30,4 +30,4 @@ const isShowcasePerson = (user) => Boolean(user) && user.demoShowcase === MARK
 const emailFor = (domain, person) => `${person.firstName}.${person.lastName}@${domain}.${EMAIL_DOMAIN}`
     .toLowerCase().replace(/[^a-z0-9.@-]/g, '');
 
-module.exports = { MARK, EMAIL_DOMAIN, OBJECT_ID, targetProblem, assertTarget, isShowcaseCompany, isShowcasePerson, emailFor };
+module.exports = { MARK, EMAIL_DOMAIN, OBJECT_ID, isDemoInstance, targetProblem, assertTarget, isShowcaseCompany, isShowcasePerson, emailFor };

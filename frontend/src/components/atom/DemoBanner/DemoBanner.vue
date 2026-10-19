@@ -7,11 +7,10 @@
             </span>
         </span>
         <span class="demo-banner__links">
-            <template v-if="showcase">
-                <span class="demo-banner__industry" data-test="demo-industry">{{ industryOf(current) }}</span>
-                <router-link v-if="guideRoute" :to="guideRoute" data-test="demo-guide">{{ $t('Demo.guide') }}</router-link>
-                <button v-if="otherShowcases.length" type="button" data-test="demo-switch" @click.stop="openSwitcher">{{ $t('Demo.switch_industry') }}</button>
-            </template>
+            <span v-if="showcase" class="demo-banner__industry" data-test="demo-industry">{{ industryOf(current) }}</span>
+            <router-link v-if="guideRoute" :to="guideRoute" data-test="demo-guide">{{ $t('Demo.guide') }}</router-link>
+            <a v-else :href="helpUrl" target="_blank" rel="noopener noreferrer" data-test="demo-guide">{{ $t('Demo.guide') }}</a>
+            <button type="button" data-test="demo-switch" @click.stop="openSwitcher">{{ $t('Demo.switch_industry') }}</button>
             <a :href="githubUrl" target="_blank" rel="noopener noreferrer">⭐ {{ $t('Demo.star') }}</a>
             <a :href="deployUrl" target="_blank" rel="noopener noreferrer">{{ $t('Demo.deploy') }}</a>
         </span>
@@ -30,6 +29,7 @@ const { industryOf } = useDemoIndustry();
 
 const GITHUB_URL = 'https://github.com/aliansoftwareteam/AlianHub-Project-Management-System';
 const DEPLOY_URL = 'https://github.com/aliansoftwareteam/AlianHub-Project-Management-System#quick-start';
+const HELP_URL = 'https://help.alianhub.com';
 
 const brand = computed(() => store.getters['brandSettingTab/brandSettings'] || {});
 const demoMode = computed(() => brand.value.demoMode === true);
@@ -37,13 +37,16 @@ const demoEmail = computed(() => brand.value.demoEmail || '');
 const demoPassword = computed(() => brand.value.demoPassword || '');
 const githubUrl = GITHUB_URL;
 const deployUrl = DEPLOY_URL;
+const helpUrl = HELP_URL;
 
 const companies = computed(() => store.getters['settings/companies'] || []);
 const current = computed(() => companies.value.find((company) => String(company._id) === String(unref(companyId) || '')) || null);
 const showcase = computed(() => (industryKeyOf(current.value) ? current.value.demoShowcase || {} : null));
-const otherShowcases = computed(() => companies.value.filter((company) => industryKeyOf(company) && company !== current.value));
-const guideRoute = computed(() => (showcase.value && showcase.value.guidePageId
-    ? { name: 'PageEditor', params: { cid: String(current.value._id), pageId: String(showcase.value.guidePageId) } }
+// In a workspace a visitor made, the guide is the first demo company's they belong to.
+const guideCompany = computed(() => (showcase.value && showcase.value.guidePageId ? current.value
+    : companies.value.find((company) => industryKeyOf(company) && company.demoShowcase && company.demoShowcase.guidePageId) || null));
+const guideRoute = computed(() => (guideCompany.value
+    ? { name: 'PageEditor', params: { cid: String(guideCompany.value._id), pageId: String(guideCompany.value.demoShowcase.guidePageId) } }
     : null));
 
 // The workspace list with each industry lives in the rail's profile menu.

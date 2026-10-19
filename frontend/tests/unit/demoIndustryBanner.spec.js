@@ -38,17 +38,25 @@ describe('demo banner in an industry demo company', () => {
         expect(shellState.profileOpen).toBe(true);
     });
 
-    it('offers no switch when this is the only industry company', () => {
+    it('keeps all four links when this is the only industry company', () => {
         const wrapper = mountBanner('c1', [FINEDGE, PLAIN]);
         expect(wrapper.find('[data-test="demo-industry"]').exists()).toBe(true);
-        expect(wrapper.find('[data-test="demo-switch"]').exists()).toBe(false);
+        expect(wrapper.find('[data-test="demo-switch"]').exists()).toBe(true);
     });
 
-    it('stays the plain banner in an ordinary company', () => {
-        const wrapper = mountBanner('c3', [FINEDGE, SWIFT, PLAIN]);
-        expect(wrapper.find('.demo-banner').exists()).toBe(true);
+    it('in a workspace a visitor made, links the guide of their first demo company', () => {
+        const wrapper = mountBanner('c3', [PLAIN, SWIFT, FINEDGE]);
         expect(wrapper.find('[data-test="demo-industry"]').exists()).toBe(false);
-        expect(wrapper.find('[data-test="demo-guide"]').exists()).toBe(false);
+        expect(JSON.parse(wrapper.find('[data-test="demo-guide"]').attributes('data-to'))).toEqual({ name: 'PageEditor', params: { cid: 'c2', pageId: 'p2' } });
+        expect(wrapper.find('[data-test="demo-switch"]').exists()).toBe(true);
+    });
+
+    it('with no demo company at all, links the help site and still offers the switch', () => {
+        const wrapper = mountBanner('c3', [PLAIN]);
+        expect(wrapper.find('[data-test="demo-guide"]').attributes('href')).toBe('https://help.alianhub.com');
+        expect(wrapper.find('[data-test="demo-switch"]').exists()).toBe(true);
+        expect(wrapper.text()).toContain('Demo.star');
+        expect(wrapper.text()).toContain('Demo.deploy');
     });
 
     it('shows nothing when demo mode is off', () => {

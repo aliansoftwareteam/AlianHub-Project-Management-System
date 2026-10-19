@@ -3,6 +3,7 @@ const { validateScenario, guideMarkdown, ruleFor, statusAfterStory } = require('
 const { targetProblem, isShowcaseCompany, isShowcasePerson, emailFor, MARK } = require('../scripts/demo/industries/lib/guard');
 const { buildShowcase, roleExists, roleName, templateExists, templateName } = require('../scripts/demo/industries/lib/build');
 const { dropShowcase } = require('../scripts/demo/industries/lib/drop');
+const { purgeVisitors } = require('../scripts/demo/industries/lib/purge');
 const { markdownBlocks } = require('../scripts/demo/industries/lib/blocks');
 
 const clone = (value) => JSON.parse(JSON.stringify(value));
@@ -423,6 +424,47 @@ describe('removing an industry company', () => {
         const unlinkVisitor = adapter.writes.find((write) => write.method === 'updateOne' && write.data[0]._id === visitor._id);
         expect(unlinkVisitor.data[1]).toEqual({ $pull: { AssignCompany: companyId }, $unset: { lastSelectedCompany: 1 } });
         expect(adapter.writes.some((write) => write.dropped === companyId)).toBe(true);
+    });
+});
+
+describe('purging a demo instance', () => {
+    const SHOWCASE = { _id: 'a'.repeat(24), Cst_CompanyName: 'TechNova', demoShowcase: { by: MARK } };
+    const LIVE = { _id: 'b'.repeat(24), Cst_CompanyName: 'Mahkamah Putrajaya' };
+    const TRIAL = { _id: 'c'.repeat(24), Cst_CompanyName: 'My trial workspace' };
+    const people = [
+        { _id: '1'.repeat(24), Employee_Email: 'owner@example.com' },
+        { _id: '2'.repeat(24), Employee_Email: 'admin@alianhub.com' },
+        { _id: '3'.repeat(24), Employee_Email: 'maya.chen@technova.demo.test', demoShowcase: MARK },
+        { _id: '4'.repeat(24), Employee_Email: 'someone@gmail.com' },
+    ];
+    const purgeAdapter = () => {
+        const writes = [];
+        return {
+            GLOBAL: 'global',
+            writes,
+            oid: (value) => value,
+            find: async (db, type) => (type === 'companies' ? [SHOWCASE, LIVE, TRIAL] : people),
+            globalWrite: async (type, method, ...data) => { writes.push({ type, method, data }); return { deletedCount: 1 }; },
+            dropCompany: async (id) => writes.push({ dropped: id }),
+        };
+    };
+    const env = { DEMO_MODE: 'true' };
+
+    test('refuses anywhere DEMO_MODE is not "true"', async () => {
+        const adapter = purgeAdapter();
+        await expect(purgeVisitors({ adapter, keepEmails: ['owner@example.com'], env: {} })).rejects.toThrow(/DEMO_MODE/);
+        expect(adapter.writes).toHaveLength(0);
+    });
+
+    test('drops every company but the demo ones, and every account but the kept and the demo people', async () => {
+        const adapter = purgeAdapter();
+        const removed = await purgeVisitors({ adapter, keepEmails: ['Owner@Example.com', 'admin@alianhub.com'], env });
+        expect(adapter.writes.filter((write) => write.dropped).map((write) => write.dropped)).toEqual([LIVE._id, TRIAL._id]);
+        expect(removed.companies).toBe(2);
+        const rowDeletes = adapter.writes.filter((write) => write.type === 'companies' && write.method === 'deleteOne');
+        rowDeletes.forEach((write) => expect(write.data[0]['demoShowcase.by']).toEqual({ $ne: MARK }));
+        const userDelete = adapter.writes.find((write) => write.type === 'users' && write.method === 'deleteMany');
+        expect(userDelete.data[0]._id.$in).toEqual(['4'.repeat(24)]);
     });
 });
 
