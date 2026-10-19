@@ -4,6 +4,8 @@
         <span class="ah-mono wf-step__id" data-test="step-id">{{ step.stepId }}</span>
         <span class="ah-chip ah-chip--dark wf-step__type" data-test="step-type">{{ $t(`Workflows.type_${type}`) }}</span>
         <span class="ah-chip wf-step__status" :class="chipClass" data-test="step-status">{{ $t(`Workflows.status_${status}`) }}</span>
+        <SimulatedChip v-if="step.simulated" />
+        <span v-if="finishedBy" class="ah-small" data-test="step-finished-by">{{ $t('Workflows.handoff_finished_by', { name: finishedBy }) }}</span>
         <span class="ah-small wf-step__duration" data-test="step-duration">{{ durationLabel }}</span>
         <span class="ah-mono ah-small wf-step__cost" data-test="step-cost">{{ costLabel }}</span>
         <span class="wf-step__spacer"></span>
@@ -14,6 +16,7 @@
 <script setup>
 import { computed } from "vue";
 import { useI18n } from "vue-i18n";
+import SimulatedChip from "@/components/atom/SimulatedChip/SimulatedChip.vue";
 import { durationMsOf, stepCostOf, stepStatusOf, stepTypeOf } from "./workflowRun";
 
 defineOptions({ name: "WorkflowStepRow" });
@@ -27,6 +30,7 @@ const { t } = useI18n();
 
 const status = computed(() => stepStatusOf(props.step));
 const type = computed(() => stepTypeOf(props.step));
+const finishedBy = computed(() => (type.value === "role_handoff" && props.step.output?.outcome === "finished" ? props.step.output.finishedBy || "" : ""));
 
 const CHIPS = { success: "ah-chip--ok", failed: "ah-chip--danger", running: "ah-chip--brand", pending: "ah-chip--warn", skipped: "ah-chip--dark", stopped: "ah-chip--dark" };
 const DOTS = { success: "ah-dot--ok", failed: "ah-dot--danger", running: "ah-dot--ok", pending: "ah-dot--warn" };

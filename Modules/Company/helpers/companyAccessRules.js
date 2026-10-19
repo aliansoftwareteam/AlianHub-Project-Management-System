@@ -7,7 +7,7 @@ const MEMBER_STAGES = ['$match', '$project', '$sort', '$limit', '$skip', '$addFi
  * (plan and billing records, agent and AI settings, key handles) is for its owners and admins. */
 const COMPANY_MEMBER_FIELDS = Object.freeze(['_id', 'Cst_CompanyName', 'Cst_profileImage', 'Cst_Phone', 'Cst_DialCode', 'Cst_Country', 'Cst_countryCode',
     'Cst_State', 'Cst_stateCode', 'Cst_City', 'Cst_LogTimeDays', 'trackerEstimateLimit', 'workingDays', 'teamFocus', 'planFeature', 'projectCount',
-    'bucketSize', 'aiTotalRequestedCount', 'isDisable', 'userId', 'legacyId', 'createdAt', 'updatedAt']);
+    'bucketSize', 'aiTotalRequestedCount', 'isDisable', 'userId', 'legacyId', 'createdAt', 'updatedAt', 'demoShowcase']);
 
 const memberCompanyView = (row) => {
     const plain = row && typeof row.toJSON === 'function' ? row.toJSON() : row;

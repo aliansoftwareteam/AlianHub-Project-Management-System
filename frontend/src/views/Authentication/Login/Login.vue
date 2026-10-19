@@ -151,7 +151,7 @@
                     <span class="ah-avatar">{{ (w.Cst_CompanyName || '?').charAt(0).toUpperCase() }}</span>
                     <span>
                         <strong>{{ w.Cst_CompanyName }}</strong>
-                        <span>{{ w.isDisable ? $t('Auth.workspace_disabled') : (w.roleName || '') }}</span>
+                        <span>{{ w.isDisable ? $t('Auth.workspace_disabled') : [industryOf(w), w.roleName].filter(Boolean).join(' · ') }}</span>
                     </span>
                     <ShellIcon name="chevron" :size="15" class="auth__ws-go" />
                 </button>
@@ -181,8 +181,10 @@ import * as env from "@/config/env";
 import { publicConfig, enabledProviders } from "@/config/publicConfig";
 import { forgetRememberedEmail, readRememberedEmail, saveRememberedEmail } from "@/utils/rememberedLogin";
 import { away } from "@/offline";
+import { useDemoIndustry } from "@/composable/useDemoIndustry";
 
 const { t } = useI18n();
+const { industryOf } = useDemoIndustry();
 const $toast = useToast();
 const router = useRouter();
 const route = useRoute();

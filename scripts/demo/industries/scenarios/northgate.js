@@ -1,0 +1,533 @@
+const LEVELS = ['Ground', 'Level 1', 'Level 2', 'Level 3', 'Level 4', 'Level 5', 'Roof', 'Whole building'];
+const TRADES = ['Frame', 'Envelope', 'Roofing', 'Drylining', 'Mechanical', 'Electrical', 'Lifts', 'Joinery', 'Finishes'];
+
+module.exports = {
+    key: 'northgate',
+    industry: 'construction',
+    company: { name: 'Construction · Northgate', domain: 'northgate' },
+    owner: { title: 'Project Director' },
+    people: [
+        { key: 'kwame', firstName: 'Kwame', lastName: 'Asante', title: 'Site Manager', role: 'admin', designations: ['Manager', 'Operations Executive'] },
+        { key: 'sofia', firstName: 'Sofia', lastName: 'Marino', title: 'Design Manager', role: 'admin', designations: ['Manager'] },
+        { key: 'rohan', firstName: 'Rohan', lastName: 'Kapoor', title: 'Quantity Surveyor', role: 'member', designations: ['Accountant'] },
+        { key: 'bridget', firstName: 'Bridget', lastName: 'Doyle', title: 'Health, Safety and Quality Lead', role: 'member', designations: ['Operations Executive'] },
+        { key: 'tomasz', firstName: 'Tomasz', lastName: 'Zielinski', title: 'Package Manager', role: 'member', designations: ['Operations Executive'] },
+        { key: 'david', firstName: 'David', lastName: 'Lindqvist', title: 'Project Architect, Lindqvist Hale Architects', role: 'guest', designations: ['Consultant'] },
+    ],
+    projects: [
+        {
+            key: 'site',
+            name: 'Site Works',
+            code: 'SITE',
+            color: '#B45309',
+            lead: 'kwame',
+            members: ['kwame', 'tomasz', 'rohan', 'bridget'],
+            views: ['board', 'list', 'table', 'gantt', 'dashboard'],
+            summary: [
+                'Riverside Apartments (six storeys, 48 flats) in work packages by floor and trade, from planned to complete. Each package names its subcontractor and how far it has got.',
+                '',
+                '- A blocked package alerts the Project Director and the Design Manager at once, because a crew standing still costs money every day.',
+                '- The Subcontractor Follow-up watches each package\'s dates and drafts the reminders a person sends.',
+                '- The Material Order Preparer turns the plan and approved changes into order requests; the Site Daily Digest reports progress.',
+            ].join('\n'),
+            stages: [
+                { name: 'Planned', goal: 'Subcontractor, start date and materials confirmed.' },
+                { name: 'In progress', goal: 'Crew on site; progress recorded every week.' },
+                { name: 'Blocked', goal: 'Stopped, with the cause, who owes the answer and by when.' },
+                { name: 'Inspection', goal: 'Finished; waiting for the quality check before the next trade covers it.' },
+                { name: 'Complete', goal: 'Inspected and accepted; the next trade can start.' },
+            ],
+            essentials: ['A package on the critical path', 'Work stopped by a design question'],
+            escalations: ['A crew stood down for more than a day', 'A package that moves the weathertight date'],
+            statuses: [
+                { name: 'Planned', type: 'default_active', color: '#64748B' },
+                { name: 'In progress', type: 'active', color: '#2563EB' },
+                { name: 'Blocked', type: 'active', color: '#DC2626' },
+                { name: 'Inspection', type: 'active', color: '#D97706' },
+                { name: 'Complete', type: 'close', color: '#16A34A' },
+            ],
+            types: [
+                { name: 'Work package', icon: 'wall', color: '#B45309' },
+                { name: 'Material order', icon: 'truck-delivery', color: '#0891B2' },
+                { name: 'Site record', icon: 'clipboard-text', color: '#64748B' },
+            ],
+            fields: [
+                { key: 'level', title: 'Level', type: 'dropdown', options: LEVELS },
+                { key: 'trade', title: 'Trade', type: 'dropdown', options: TRADES },
+                { key: 'subcontractor', title: 'Subcontractor', type: 'text' },
+                { key: 'progress', title: 'Percent complete', type: 'number' },
+            ],
+            tags: [
+                { name: 'critical-path', color: '#DC2626' },
+                { name: 'weather-sensitive', color: '#0891B2' },
+                { name: 'waiting-on-design', color: '#7C3AED' },
+            ],
+            tasks: [
+                {
+                    key: 'wp-frame', name: 'WP-11 · Concrete frame, ground to level 5 and roof slab', type: 'Work package', status: 'Complete', priority: 'MEDIUM', assignees: ['kwame'], due: -21,
+                    fields: { level: 'Whole building', trade: 'Frame', subcontractor: 'Castlebrook Concrete', progress: 100 }, tags: ['critical-path'],
+                    description: 'Topped out three weeks ago, two days ahead of the programme. Cube results for every pour are in the quality file.',
+                },
+                {
+                    key: 'wp-roof', name: 'WP-18 · Roof membrane, insulation and parapets', type: 'Work package', status: 'In progress', priority: 'HIGH', assignees: ['tomasz'], due: 4,
+                    fields: { level: 'Roof', trade: 'Roofing', subcontractor: 'Skyline Roofing', progress: 60 }, tags: ['critical-path', 'weather-sensitive'],
+                    description: 'Membrane down on two of the three roof bays. The last bay and the parapet cappings need two dry days. The building is weathertight once this and WP-21 are done.',
+                },
+                {
+                    key: 'wp-windows', name: 'WP-21 · Windows and balcony doors, level 5', type: 'Work package', status: 'In progress', priority: 'MEDIUM', assignees: ['tomasz'], due: 6,
+                    fields: { level: 'Level 5', trade: 'Envelope', subcontractor: 'Clearview Glazing', progress: 45 }, tags: ['critical-path', 'weather-sensitive'],
+                    description: 'Ground to level 4 are glazed. Level 5 has 9 of 20 openings fitted; Clearview committed a second crew that has not started yet.',
+                },
+                {
+                    key: 'wp-firstfix-l3', name: 'WP-22 · Mechanical and electrical first fix, level 3', type: 'Work package', status: 'In progress', priority: 'MEDIUM', assignees: ['tomasz'], due: 1,
+                    fields: { level: 'Level 3', trade: 'Mechanical', subcontractor: 'Brightwater M&E', progress: 90 },
+                    checklist: [
+                        { text: 'Heating and water pipework', done: true },
+                        { text: 'Cable containment and first-fix wiring', done: true },
+                        { text: 'Pressure test booked', done: true },
+                        { text: 'Close-up inspection before boarding' },
+                    ],
+                },
+                {
+                    key: 'wp-firstfix-l4', name: 'WP-26 · Mechanical and electrical first fix, level 4', type: 'Work package', status: 'In progress', priority: 'MEDIUM', assignees: ['tomasz'], due: 5,
+                    fields: { level: 'Level 4', trade: 'Electrical', subcontractor: 'Brightwater M&E', progress: 40 },
+                },
+                {
+                    key: 'wp-dryline-l2', name: 'WP-23 · Drylining, level 2 flats', type: 'Work package', status: 'Inspection', priority: 'MEDIUM', assignees: ['tomasz'], due: 0,
+                    fields: { level: 'Level 2', trade: 'Drylining', subcontractor: 'Partition Pro Interiors', progress: 100 },
+                    description: 'Boarded, taped and jointed. Waiting for the quality inspection before the decorators start.',
+                },
+                {
+                    key: 'wp-dryline-l3', name: 'WP-24 · Drylining, level 3 flats', type: 'Work package', status: 'In progress', priority: 'HIGH', assignees: ['tomasz'], due: -1, overdue: true,
+                    fields: { level: 'Level 3', trade: 'Drylining', subcontractor: 'Partition Pro Interiors', progress: 35 }, tags: ['critical-path', 'waiting-on-design'],
+                    blockedBy: ['rfi.rfi-027', 'mo-112'],
+                    description: 'The flats are boarded up to the corridor. The corridor walls are on hold: drawing A-L3-201 rev C shows a 60-minute wall and the fire strategy asks for 90 minutes (RFI-027).',
+                    subtasks: [
+                        { name: 'Move the Partition Pro fixers to level 2 snagging while level 3 waits', status: 'In progress', priority: 'MEDIUM', due: 0 },
+                    ],
+                },
+                {
+                    key: 'wp-lift', name: 'WP-29 · Lift installation, core A', type: 'Work package', status: 'Planned', priority: 'MEDIUM', assignees: ['kwame'], due: 12,
+                    fields: { level: 'Whole building', trade: 'Lifts', subcontractor: 'Ascend Lifts', progress: 0 },
+                    description: 'Ascend starts once the shaft is handed over clean. The pit depth was confirmed in RFI-021.',
+                },
+                {
+                    key: 'wp-kitchens', name: 'WP-31 · Kitchens and bathrooms, level 1 flats', type: 'Work package', status: 'Planned', priority: 'MEDIUM', assignees: ['tomasz'], due: 8,
+                    fields: { level: 'Level 1', trade: 'Finishes', subcontractor: 'Oakline Interiors', progress: 0 },
+                },
+                {
+                    key: 'mo-112', name: 'MO-112 · Fire-rated plasterboard for the level 3 corridors', type: 'Material order', status: 'Planned', priority: 'HIGH', assignees: ['tomasz'], due: 2,
+                    fields: { level: 'Level 3', trade: 'Drylining', subcontractor: 'Partition Pro Interiors' }, tags: ['critical-path'],
+                    blockedBy: ['rfi.vo-014'],
+                    description: 'One extra layer of 15 mm fire-rated board each side of the level 3 corridor walls, once VO-014 is approved. Merchant lead time: 5 working days.',
+                },
+                {
+                    key: 'digest', name: 'Site daily digest', type: 'Site record', status: 'In progress', priority: 'LOW', assignees: ['you'], due: 5,
+                    description: 'Where the Site Daily Digest agent posts its board summary. Run it from AI, Agents, Run now, and pick this task.',
+                },
+            ],
+        },
+        {
+            key: 'rfi',
+            name: 'RFIs and Variations',
+            code: 'RFI',
+            color: '#6D28D9',
+            lead: 'sofia',
+            members: ['sofia', 'rohan', 'kwame', 'tomasz', 'david'],
+            views: ['board', 'list', 'table', 'calendar', 'docs'],
+            summary: [
+                'Every question to the design team and every change to the contract for Riverside. An RFI asks the architect; a variation records what the answer changes, its cost, its time and who approved it.',
+                '',
+                '- The RFI Tracker writes and chases RFIs and says which work waits on each one.',
+                '- The Change Order Recorder records each variation from its instruction, with cost and time.',
+                '- An answered RFI goes back to the site manager automatically. No changed work starts without an approved variation.',
+            ].join('\n'),
+            stages: [
+                { name: 'Raised', goal: 'Question or change written with drawing, location and who raised it.' },
+                { name: 'With the architect', goal: 'Sent with a response date, usually 5 working days.' },
+                { name: 'Answered', goal: 'Answer received; site checks whether it changes cost or time.' },
+                { name: 'Being priced', goal: 'The quantity surveyor prices labour, materials and programme.' },
+                { name: 'Awaiting approval', goal: 'The Project Director approves before it goes to the client.' },
+                { name: 'Agreed', goal: 'Instruction in writing; the work can start.' },
+                { name: 'Closed', goal: 'Work done or the question settled.' },
+            ],
+            essentials: ['An RFI past its response date', 'Any fire safety question'],
+            escalations: ['Work started without a written instruction', 'A variation above £10,000'],
+            statuses: [
+                { name: 'Raised', type: 'default_active', color: '#64748B' },
+                { name: 'With the architect', type: 'active', color: '#2563EB' },
+                { name: 'Answered', type: 'active', color: '#0891B2' },
+                { name: 'Being priced', type: 'active', color: '#D97706' },
+                { name: 'Awaiting approval', type: 'active', color: '#9333EA' },
+                { name: 'Agreed', type: 'done', color: '#0D9488' },
+                { name: 'Closed', type: 'close', color: '#16A34A' },
+            ],
+            types: [
+                { name: 'RFI', icon: 'file-question', color: '#6D28D9' },
+                { name: 'Variation', icon: 'swap-horizontal', color: '#D97706' },
+                { name: 'Site instruction', icon: 'file-sign', color: '#0891B2' },
+            ],
+            fields: [
+                { key: 'drawing', title: 'Drawing reference', type: 'text' },
+                { key: 'level', title: 'Level', type: 'dropdown', options: LEVELS },
+                { key: 'respond', title: 'Response due', type: 'date' },
+                { key: 'cost', title: 'Cost impact', type: 'money', currency: 'GBP' },
+                { key: 'days', title: 'Time impact (working days)', type: 'number' },
+                { key: 'raisedBy', title: 'Raised by', type: 'dropdown', options: ['Site', 'Subcontractor', 'Client', 'Architect'] },
+            ],
+            tags: [
+                { name: 'fire-safety', color: '#DC2626' },
+                { name: 'client-change', color: '#2563EB' },
+                { name: 'holds-work', color: '#D97706' },
+            ],
+            tasks: [
+                {
+                    key: 'rfi-027', name: 'RFI-027 · Fire rating of the level 3 corridor walls', type: 'RFI', status: 'With the architect', priority: 'HIGH', assignees: ['sofia'], due: 0,
+                    fields: { drawing: 'A-L3-201 rev C', level: 'Level 3', respond: 0, raisedBy: 'Subcontractor' }, tags: ['fire-safety', 'holds-work'],
+                    description: 'Drawing A-L3-201 rev C shows the level 3 corridor walls as 60-minute partitions. The fire strategy (rev D, section 4.2) asks for 90 minutes on every protected corridor above level 2. Proposed answer: the 90-minute system, two layers of 15 mm fire-rated board each side. Drylining of the corridors has stopped until this is answered.',
+                    checklist: [
+                        { text: 'Mark up the corridor walls on A-L3-201 rev C', done: true },
+                        { text: 'Quote section 4.2 of the fire strategy, rev D', done: true },
+                        { text: 'Architect\'s answer' },
+                        { text: 'Fire engineer confirms the system' },
+                    ],
+                },
+                {
+                    key: 'rfi-025', name: 'RFI-025 · Balustrade fixings at the balcony slab edge', type: 'RFI', status: 'With the architect', priority: 'HIGH', assignees: ['sofia'], due: -2, overdue: true,
+                    fields: { drawing: 'S-BAL-104 rev B', level: 'Level 3', respond: -2, raisedBy: 'Subcontractor' }, tags: ['holds-work'],
+                    description: 'The balustrade supplier\'s fixings need 120 mm edge distance; the slab edge detail gives 90 mm. Holds the balustrades on levels 3 to 5.',
+                },
+                {
+                    key: 'rfi-029', name: 'RFI-029 · Balcony drainage outlets, level 5', type: 'RFI', status: 'Raised', priority: 'MEDIUM', assignees: ['kwame'], due: 5,
+                    fields: { drawing: 'A-L5-230 rev A', level: 'Level 5', respond: 7, raisedBy: 'Site' },
+                    description: 'The outlets on the drawing sit under the balcony door thresholds. Proposed: move each outlet 300 mm toward the balustrade.',
+                },
+                {
+                    key: 'rfi-024', name: 'RFI-024 · Kitchen extract route past the level 1 transfer beam', type: 'RFI', status: 'Answered', priority: 'MEDIUM', assignees: ['kwame'], due: 1,
+                    fields: { drawing: 'M-L1-112 rev B', level: 'Level 1', respond: -3, raisedBy: 'Subcontractor' },
+                    description: 'Answered: no coring through the beam. The structural engineer accepted a route below it, with a 50 mm lower ceiling in the hallways of flats 1.01 and 1.02.',
+                },
+                {
+                    key: 'rfi-021', name: 'RFI-021 · Lift pit depth against the supplier drawing', type: 'RFI', status: 'Closed', priority: 'LOW', assignees: ['sofia'], due: -9,
+                    fields: { drawing: 'S-GF-020 rev C', level: 'Ground', respond: -12, raisedBy: 'Subcontractor' },
+                },
+                {
+                    key: 'vo-014', name: 'VO-014 · Level 3 corridor walls upgraded to 90-minute fire rating', type: 'Variation', status: 'Being priced', priority: 'HIGH', assignees: ['rohan'], due: 2,
+                    fields: { drawing: 'A-L3-201 rev D', level: 'Level 3', cost: 6850, days: 4, raisedBy: 'Architect' }, tags: ['fire-safety', 'holds-work'],
+                    blockedBy: ['rfi-027'],
+                    description: 'Follows the answer to RFI-027: one extra layer of fire-rated board each side of 64 m of corridor wall, with fire stopping at the heads. Estimate: £6,850 and 4 working days on level 3 drylining.',
+                    subtasks: [
+                        { name: 'Partition Pro quote for the extra board layer', status: 'Being priced', priority: 'HIGH', due: 1 },
+                    ],
+                },
+                {
+                    key: 'vo-016', name: 'VO-016 · Fire stopping at the enlarged level 4 risers', type: 'Variation', status: 'Being priced', priority: 'MEDIUM', assignees: ['rohan'], due: 3,
+                    fields: { drawing: 'M-L4-310 rev C', level: 'Level 4', cost: 3920, days: 2, raisedBy: 'Client' }, tags: ['fire-safety', 'client-change'],
+                    description: 'The client\'s M&E designer enlarged 14 riser openings on level 4 in revision C. Each needs a larger fire stopping collar and board.',
+                },
+                {
+                    key: 'vo-012', name: 'VO-012 · Client upgrade: engineered oak floors in the level 5 flats', type: 'Variation', status: 'Awaiting approval', priority: 'MEDIUM', assignees: ['you'], lead: 'sofia', due: 2,
+                    fields: { drawing: 'A-L5-401 rev A', level: 'Level 5', cost: 18400, days: 6, raisedBy: 'Client' }, tags: ['client-change'],
+                    description: 'The client asked for engineered oak instead of vinyl planks in the 8 flats on level 5. Priced by Rohan at £18,400 and 6 working days for the floor layers, inside the finishes float. Needs your sign-off before it goes to the client.',
+                },
+                {
+                    key: 'vo-009', name: 'VO-009 · Bin store door moved to the side street', type: 'Variation', status: 'Agreed', priority: 'LOW', assignees: ['rohan'], due: -4,
+                    fields: { drawing: 'A-GF-101 rev E', level: 'Ground', cost: 2150, days: 1, raisedBy: 'Client' }, tags: ['client-change'],
+                },
+                {
+                    key: 'vo-007', name: 'VO-007 · Extra fire door to the ground floor plant room', type: 'Variation', status: 'Closed', priority: 'LOW', assignees: ['rohan'], due: -12,
+                    fields: { drawing: 'A-GF-101 rev D', level: 'Ground', cost: 1640, days: 0, raisedBy: 'Architect' }, tags: ['fire-safety'],
+                },
+                {
+                    key: 'si-033', name: 'SI-033 · Architect\'s instruction: balcony soffits in anthracite grey', type: 'Site instruction', status: 'Raised', priority: 'LOW', assignees: ['sofia'], due: 3,
+                    fields: { drawing: 'A-EL-301 rev F', level: 'Whole building', raisedBy: 'Architect' },
+                    description: 'Received by email from David. Check whether the soffit boards are already ordered in white; if they are, this becomes a variation.',
+                },
+            ],
+        },
+        {
+            key: 'qsh',
+            name: 'Quality, Safety and Handover',
+            code: 'QSH',
+            color: '#0F766E',
+            lead: 'bridget',
+            members: ['bridget', 'kwame', 'tomasz'],
+            views: ['board', 'list', 'table', 'calendar'],
+            summary: [
+                'Snags, inspections, safety checks and the handover pack for Riverside. Levels 1 and 2, the first 16 flats, hand over first.',
+                '',
+                '- The Snag List Keeper records each defect once and chases it until the site manager accepts the fix.',
+                '- A failed inspection goes back to the package manager automatically, with a re-inspection subtask.',
+                '- The Safety Checklist prepares the week\'s checks; the Handover Pack Builder keeps the index and chases what is missing.',
+            ].join('\n'),
+            stages: [
+                { name: 'Open', goal: 'Recorded with location, trade and severity.' },
+                { name: 'In progress', goal: 'The trade is fixing it, or the document is being collected.' },
+                { name: 'Ready for inspection', goal: 'Fixed; waiting for the quality or safety lead.' },
+                { name: 'Failed inspection', goal: 'Not accepted; back to the trade with the reason.' },
+                { name: 'Accepted', goal: 'Inspected and accepted.' },
+                { name: 'Closed', goal: 'Filed in the handover pack.' },
+            ],
+            essentials: ['Anything that blocks use of a flat or a corridor', 'Any fire safety item'],
+            escalations: ['A failed safety check', 'An open snag in a flat due for handover this week'],
+            statuses: [
+                { name: 'Open', type: 'default_active', color: '#64748B' },
+                { name: 'In progress', type: 'active', color: '#2563EB' },
+                { name: 'Ready for inspection', type: 'active', color: '#D97706' },
+                { name: 'Failed inspection', type: 'active', color: '#DC2626' },
+                { name: 'Accepted', type: 'done', color: '#0D9488' },
+                { name: 'Closed', type: 'close', color: '#16A34A' },
+            ],
+            types: [
+                { name: 'Snag', icon: 'alert-circle', color: '#DC2626' },
+                { name: 'Inspection', icon: 'clipboard-check', color: '#0F766E' },
+                { name: 'Safety check', icon: 'hard-hat', color: '#EA580C' },
+                { name: 'Handover document', icon: 'folder-check', color: '#2563EB' },
+            ],
+            fields: [
+                { key: 'level', title: 'Level', type: 'dropdown', options: LEVELS },
+                { key: 'location', title: 'Location', type: 'text' },
+                { key: 'trade', title: 'Trade', type: 'dropdown', options: TRADES },
+                { key: 'subcontractor', title: 'Subcontractor', type: 'text' },
+                { key: 'severity', title: 'Severity', type: 'dropdown', options: ['Blocks use', 'Before handover', 'Minor'] },
+            ],
+            tags: [
+                { name: 'blocks-handover', color: '#DC2626' },
+                { name: 'safety', color: '#EA580C' },
+                { name: 'repeat-defect', color: '#7C3AED' },
+            ],
+            tasks: [
+                {
+                    key: 'sng-211', name: 'SNG-211 · Level 2 corridor: fire door does not latch', type: 'Snag', status: 'Open', priority: 'HIGH', assignees: ['bridget'], due: 1,
+                    fields: { level: 'Level 2', location: 'Corridor door D2.03', trade: 'Joinery', subcontractor: 'Oakline Interiors', severity: 'Blocks use' }, tags: ['blocks-handover', 'safety'],
+                    description: 'The closer pulls the door to, but the latch does not engage. Found on the level 2 walk-round. A fire door must latch on its own before the corridor can be used.',
+                },
+                {
+                    key: 'sng-203', name: 'SNG-203 · Flat 2.04: bathroom door binds on the frame', type: 'Snag', status: 'In progress', priority: 'MEDIUM', assignees: ['tomasz'], due: 3,
+                    fields: { level: 'Level 2', location: 'Flat 2.04', trade: 'Joinery', subcontractor: 'Oakline Interiors', severity: 'Before handover' }, tags: ['repeat-defect'],
+                },
+                {
+                    key: 'sng-207', name: 'SNG-207 · Flat 2.06: cracked tile beside the shower tray', type: 'Snag', status: 'Ready for inspection', priority: 'LOW', assignees: ['tomasz'], due: 2,
+                    fields: { level: 'Level 2', location: 'Flat 2.06', trade: 'Finishes', subcontractor: 'Tilecraft', severity: 'Before handover' },
+                },
+                {
+                    key: 'sng-198', name: 'SNG-198 · Flat 1.02: loose socket outlet in the kitchen', type: 'Snag', status: 'Closed', priority: 'LOW', assignees: ['tomasz'], due: -3,
+                    fields: { level: 'Level 1', location: 'Flat 1.02', trade: 'Electrical', subcontractor: 'Brightwater M&E', severity: 'Minor' },
+                },
+                {
+                    key: 'itp-028', name: 'ITP-028 · Fire stopping at the level 2 risers', type: 'Inspection', status: 'Ready for inspection', priority: 'HIGH', assignees: ['bridget'], due: 0,
+                    fields: { level: 'Level 2', location: 'Risers R1 to R4', trade: 'Mechanical', subcontractor: 'Brightwater M&E', severity: 'Blocks use' }, tags: ['blocks-handover'],
+                    checklist: [
+                        { text: 'Photo of every penetration', done: true },
+                        { text: 'Product labels match the fire strategy', done: true },
+                        { text: 'No gaps around the pipe sleeves' },
+                        { text: 'Riser doors fitted and labelled' },
+                    ],
+                },
+                {
+                    key: 'itp-026', name: 'ITP-026 · Heating pipework pressure test, level 2', type: 'Inspection', status: 'Accepted', priority: 'MEDIUM', assignees: ['bridget'], due: -2,
+                    fields: { level: 'Level 2', location: 'All flats', trade: 'Mechanical', subcontractor: 'Brightwater M&E' },
+                },
+                {
+                    key: 'saf-044', name: 'SAF-044 · Weekly scaffold inspection, north and east elevations', type: 'Safety check', status: 'Open', priority: 'HIGH', assignees: ['bridget'], due: 0,
+                    fields: { level: 'Whole building', location: 'North and east elevations', subcontractor: 'Apex Scaffolding' }, tags: ['safety'],
+                    checklist: ['Ties and anchors at every lift', 'Boards, guard rails and toe boards', 'Loading bay gates closed', 'Scaffold tag updated and signed'],
+                },
+                {
+                    key: 'saf-041', name: 'SAF-041 · Edge protection at the roof parapets', type: 'Safety check', status: 'In progress', priority: 'HIGH', assignees: ['kwame'], due: -1, overdue: true,
+                    fields: { level: 'Roof', location: 'East parapet', trade: 'Roofing', subcontractor: 'Skyline Roofing', severity: 'Blocks use' }, tags: ['safety'],
+                    description: 'Two guard rail sections were taken down for the parapet cappings and not put back. Roof access is closed until they are refitted and Bridget signs it off.',
+                },
+                {
+                    key: 'ho-001', name: 'HO-001 · Handover pack, levels 1 and 2', type: 'Handover document', status: 'Open', priority: 'HIGH', assignees: ['you'], lead: 'bridget', due: 10,
+                    fields: { location: 'Levels 1 and 2, 16 flats' }, tags: ['blocks-handover'],
+                    blockedBy: ['sng-211', 'itp-028'],
+                    description: 'Everything the client is owed to accept the first 16 flats: as-built drawings, test certificates, warranties, manuals and the snag close-out. The fire engineer signs off before the client walk-round.',
+                    checklist: [
+                        { text: 'As-built drawings', done: true },
+                        { text: 'Electrical test certificates', done: true },
+                        { text: 'Fire door certificates' },
+                        { text: 'Fire stopping record with photos' },
+                        { text: 'Boiler and heating commissioning' },
+                        { text: 'Snag close-out' },
+                    ],
+                },
+                {
+                    key: 'ho-004', name: 'HO-004 · Operation and maintenance manuals, heating and ventilation', type: 'Handover document', status: 'In progress', priority: 'MEDIUM', assignees: ['tomasz'], due: 7,
+                    fields: { level: 'Whole building', trade: 'Mechanical', subcontractor: 'Brightwater M&E' },
+                    subtasks: [
+                        { name: 'Brightwater to send the boiler and ventilation unit manuals', status: 'Open', priority: 'MEDIUM', due: 4 },
+                    ],
+                },
+            ],
+        },
+    ],
+    agents: [
+        { key: 'rfi', role: 'construction/rfi-tracker', projects: ['rfi'], does: 'Writes site questions up as RFIs, chases the answer date and says which work waits on which RFI.' },
+        { key: 'variations', role: 'construction/change-order-recorder', projects: ['rfi'], does: 'Records each variation from its instruction, with its cost and time effect, and keeps the variation log.' },
+        { key: 'materials', role: 'construction/material-order-preparer', projects: ['site'], does: 'Turns the plan and approved changes into order requests with quantity, specification and order-by date.' },
+        { key: 'subcontractors', role: 'construction/subcontractor-follow-up', projects: ['site'], does: 'Watches each package\'s committed dates and drafts the reminders a person sends.' },
+        { key: 'snags', role: 'construction/snag-list-keeper', projects: ['qsh'], does: 'Records each defect once with location, trade and owner, and chases it until the fix is accepted.' },
+        { key: 'safety', role: 'construction/safety-checklist', projects: ['qsh'], does: 'Prepares the safety checklists for the day\'s work and follows up failed items until they are closed.' },
+        { key: 'handover', role: 'construction/handover-pack-builder', projects: ['qsh'], does: 'Keeps the handover pack index, counts what is in and chases what is missing.' },
+        { key: 'digest', skill: 'digest.ceo', name: 'Site Daily Digest', description: 'Posts a short digest of the site: what moved, what is blocked, what is late.', projects: ['site'], does: 'Counts the Site Works board and posts what moved, what is blocked and what is late.' },
+    ],
+    automations: [
+        {
+            name: 'A blocked package alerts the Project Director',
+            project: 'site',
+            when: { statusTo: 'Blocked' },
+            then: [
+                { priority: 'HIGH' },
+                { notify: { people: ['you', 'sofia'], message: 'A work package on Riverside is blocked.' } },
+                { comment: 'Blocked: the Project Director and the Design Manager were notified. Note what is needed to restart, who owes it and by when, and move the crew if the stop lasts more than a day.' },
+            ],
+        },
+        {
+            name: 'An answered RFI goes back to site',
+            project: 'rfi',
+            when: { statusTo: 'Answered' },
+            then: [
+                { assign: ['kwame'] },
+                { notify: { people: ['kwame', 'tomasz'], message: 'The architect answered an RFI. Check whether it changes the work on site.' } },
+                { comment: 'Answer received. Site checks it against the work; if it changes cost or time, raise a variation before the work starts. No written instruction, no changed work.' },
+            ],
+        },
+        {
+            name: 'A failed inspection goes back to the trade',
+            project: 'qsh',
+            when: { statusTo: 'Failed inspection' },
+            then: [
+                { priority: 'HIGH' },
+                { assign: ['tomasz'] },
+                { subtask: 'Re-inspect once the fix is done' },
+            ],
+        },
+    ],
+    story: [
+        { comment: 'site.wp-dryline-l3', by: 'tomasz', text: 'Partition Pro stopped at the corridor line on level 3. The flats are boarded; the corridor walls wait for RFI-027. I have moved four of their six fixers to level 2 snagging so we lose as little time as possible.' },
+        { move: 'site.wp-dryline-l3', to: 'Blocked', by: 'kwame' },
+        {
+            agentRun: 'rfi', task: 'rfi.rfi-025', summary: 'Chased RFI-025, two working days past its response date.',
+            text: 'RFI-025 went to Lindqvist Hale Architects 7 working days ago with a 5-day response time, so it is 2 days overdue. Waiting on it: the balustrades on levels 3 to 5 and the glass order. No earlier RFI answers the edge distance. Reminder drafted for Sofia to send: "Could you confirm the balustrade fixing at the slab edge? The supplier needs 120 mm edge distance and S-BAL-104 rev B gives 90 mm. The glass is waiting on this detail."',
+        },
+        { comment: 'rfi.rfi-027', by: 'david', text: 'Answer: use the 90-minute system on every level 3 corridor wall, two layers of 15 mm fire-rated board each side, as section 4.2 of the fire strategy. Drawing A-L3-201 rev D follows today.' },
+        { move: 'rfi.rfi-027', to: 'Answered', by: 'sofia' },
+        { move: 'rfi.vo-016', to: 'Awaiting approval', by: 'rohan' },
+        { comment: 'rfi.vo-016', by: 'rohan', text: 'Priced at £3,920 for 14 openings: collars and board £1,660, labour £2,260. Two working days for Brightwater, inside the level 4 float if it is approved this week.' },
+        {
+            agentRun: 'materials', task: 'site.mo-112', summary: 'Prepared the order request for the level 3 fire-rated board.',
+            text: 'Order request, ready for the buyer once VO-014 is approved: 15 mm fire-rated plasterboard, 1200 × 2400 mm, 116 sheets (64 m of corridor wall, one extra layer each side, waste as measured by Tomasz); fire-rated sealant, 40 tubes. Deliver to Riverside, level 3, by the hoist. Merchant lead time is 5 working days, so it must be ordered by tomorrow for the drylining to restart next week.',
+        },
+        { move: 'qsh.itp-028', to: 'Failed inspection', by: 'bridget' },
+        { comment: 'qsh.itp-028', by: 'bridget', text: 'Three of 22 penetrations in risers R2 and R3 have gaps of 10 to 15 mm around the pipe sleeves. Photos are on the task. The riser doors stay off until it is re-inspected.' },
+        {
+            agentRun: 'safety', task: 'qsh.saf-044', summary: 'Prepared the weekly scaffold checklist with last week\'s open action.',
+            text: 'Weekly scaffold inspection, north and east elevations: the 4 standard items plus last week\'s open action, the missing toe board at lift 5 on the east elevation. Today\'s work at height is the roof parapets and the level 5 windows, so check that the loading bay gate at lift 6 stays closed outside deliveries. Bridget signs the checklist.',
+        },
+        {
+            proposal: 'snags', task: 'qsh.sng-211', summary: 'Asked to send SNG-211 to Tomasz so Oakline fixes the fire door this week.',
+            what: 'Assign SNG-211 to Tomasz to get Oakline back for the fire door',
+            why: 'A fire door that does not latch blocks use of the level 2 corridor and the handover of levels 1 and 2. Oakline hung the door; Tomasz manages their package.',
+            changes: [
+                { assign: ['tomasz'] },
+                { comment: 'Snag for Oakline Interiors through Tomasz: corridor door D2.03 does not latch under its closer. It blocks the handover of levels 1 and 2. Kwame accepts the fix.' },
+            ],
+            priority: 'high',
+        },
+        {
+            proposal: 'handover', task: 'qsh.ho-001', summary: 'Counted the handover pack for levels 1 and 2 and listed what is missing.',
+            what: 'Add the missing fire door certificates to the handover pack as a subtask',
+            why: '27 of 34 documents for levels 1 and 2 are in. The fire door certificates and the fire stopping record are missing, and the fire engineer will not sign off without them.',
+            changes: [
+                { subtask: { title: 'Collect the fire door certificates for levels 1 and 2', description: 'From Oakline Interiors: one certificate per door set, 22 doors.' } },
+                { comment: 'Handover pack, levels 1 and 2: 27 of 34 documents in. Missing: fire door certificates (Oakline), fire stopping record (Brightwater, once ITP-028 passes), boiler commissioning (Brightwater) and 4 others listed in the index. Open items blocking handover: SNG-211 and ITP-028.' },
+            ],
+        },
+        {
+            proposal: 'subcontractors', task: 'site.wp-windows', summary: 'Found Clearview Glazing three days behind on level 5 and drafted a reminder.',
+            what: 'Move the WP-21 due date by three days and remind Clearview about the second crew',
+            why: 'Clearview has fitted 9 of 20 openings on level 5 with one crew. The second crew they committed has not started, and at the current rate they finish three working days late.',
+            changes: [
+                { due: 9 },
+                { comment: 'Draft for Tomasz to send to Clearview Glazing: "Your second crew was due on level 5 two days ago and has not started. Can you confirm their start date today? The hoist is yours every morning until 10:00 from tomorrow."' },
+            ],
+        },
+        { comment: 'rfi.vo-012', by: 'sofia', text: 'The client\'s representative has seen the oak sample board and likes it. Once you approve, I will send the price for their written instruction.' },
+    ],
+    routing: {
+        site: [
+            { agent: 'subcontractors', types: ['Work package'] },
+            { agent: 'materials', types: ['Material order'] },
+        ],
+        rfi: [
+            { agent: 'rfi', types: ['RFI'] },
+            { agent: 'variations', types: ['Variation'] },
+        ],
+        qsh: [
+            { agent: 'snags', types: ['Snag'] },
+            { agent: 'safety', types: ['Safety check'] },
+            { agent: 'handover', types: ['Handover document'] },
+        ],
+    },
+    handOvers: [
+        { task: 'site.wp-dryline-l3', by: 'kwame' },
+        { task: 'rfi.rfi-025', by: 'sofia' },
+        { task: 'qsh.sng-211', by: 'bridget' },
+    ],
+    workflows: {
+        own: {
+            key: 'variation-from-rfi',
+            name: 'Variation: from RFI to approved change',
+            description: 'The RFI Tracker links the architect\'s answer and the drawing revision, the Change Order Recorder records the variation with its cost and time, the Project Director approves it, and the Material Order Preparer prepares the order for what the change needs.',
+            steps: [
+                { id: 'sLink', agent: 'rfi' },
+                { id: 'sRecord', agent: 'variations' },
+                {
+                    id: 'sApprove',
+                    approval: {
+                        title: 'Approve the variation',
+                        prompt: 'The variation is recorded on the task with the RFI answer, the drawing revision, its cost and its time effect. Approve to instruct the change and hand it to the Material Order Preparer, or reject to keep the original specification and go back to the architect.',
+                        owner: 'you',
+                    },
+                },
+                { id: 'sOrder', agent: 'materials' },
+            ],
+            run: { task: 'rfi.vo-014', by: 'sofia' },
+        },
+    },
+    goals: [
+        {
+            name: 'Hand over levels 1 and 2',
+            description: 'The first 16 flats snag-free, inspected and documented, ready for the client walk-round.',
+            color: '#0F766E',
+            targets: [
+                { name: 'Snags, inspections and handover pack for levels 1 and 2', kind: 'tasks', tasks: ['qsh.sng-211', 'qsh.sng-203', 'qsh.sng-207', 'qsh.sng-198', 'qsh.itp-028', 'qsh.itp-026', 'qsh.ho-001'] },
+                { name: 'Fire engineer signs off levels 1 and 2', kind: 'boolean', done: false },
+            ],
+        },
+        {
+            name: 'Make Riverside weathertight',
+            description: 'Frame, roof and windows finished, so the fit-out on the upper floors is protected.',
+            color: '#B45309',
+            targets: [
+                { name: 'Envelope packages complete', kind: 'tasks', tasks: ['site.wp-frame', 'site.wp-roof', 'site.wp-windows'] },
+                { name: 'No reportable safety incident on site this quarter', kind: 'boolean', done: true },
+            ],
+        },
+    ],
+    dashboard: { name: 'Riverside site overview', project: 'site', cards: ['tasks_by_status', 'at_risk', 'due_soon', 'project_pulse'] },
+    guide: {
+        project: 'site',
+        intro: 'Northgate is a building contractor, and this workspace follows its live site, Riverside Apartments: six storeys and 48 flats, from frame to handover. You are signed in as the **Project Director**. Three processes run side by side: **Site Works** (work packages by floor and trade), **RFIs and Variations** (questions to the architect and the changes they cause) and **Quality, Safety and Handover** (snags, inspections, safety checks and the handover pack). Role agents record, chase and prepare; people decide.',
+        tryThis: [
+            'Open **Site Works** on the Board. WP-24 (level 3 drylining) is **Blocked**: when Kwame moved it there, the automation set it to High, alerted you and Sofia and asked what is needed to restart. It waits on RFI-027 and on the board order MO-112, which waits on VO-014.',
+            'In **RFIs and Variations**, open **RFI-027**: David answered it and Sofia moved it to **Answered**, so the automation gave it to Kwame and told Tomasz. **RFI-025** is two days overdue; the RFI Tracker chased it and named the work waiting on it.',
+            'Move **WP-26** (level 4 first fix) to **Blocked** yourself and watch the same automation fire. Every run is listed under **Automations** in the AI section.',
+            'In **Quality, Safety and Handover**, **ITP-028** failed its fire stopping inspection: the automation set it to High, assigned Tomasz and added the re-inspection subtask. It blocks **HO-001**, the handover pack assigned to you.',
+            'Open **Inbox → Approvals**. The Snag List Keeper wants SNG-211 (a fire door that does not latch) sent to Tomasz, the Handover Pack Builder lists what HO-001 is missing, and the Subcontractor Follow-up proposes a new date for WP-21. Approve one: the change is applied for real, with Undo for 15 minutes.',
+            'In **AI → Agents**, click **Run now** on the **Site Daily Digest** and pick **Site daily digest**. It runs for real, with no AI model, and posts a digest counted from the board on that task.',
+            'Open **Goals** and the **Riverside site overview** dashboard: both are counted from the tasks, so they change as you move work.',
+        ],
+    },
+};

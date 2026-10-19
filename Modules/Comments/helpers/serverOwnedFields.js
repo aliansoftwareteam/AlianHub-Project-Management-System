@@ -3,7 +3,7 @@
  * alone. A client posting or editing a comment never carries them. */
 const SERVER_OWNED_FIELDS = Object.freeze([
     '_id', '__v', 'createdAt', 'updatedAt',
-    'isAgent', 'agentName', 'actorType', 'agentId', 'viaAccount', 'runId', 'automationName',
+    'isAgent', 'agentName', 'actorType', 'agentId', 'viaAccount', 'runId', 'automationName', 'simulated',
     'legacyId', 'reactions',
 ]);
 
