@@ -1,7 +1,7 @@
 ---
 id: 053
 title: Industry demos — the dispatcher, the Company view and workflow runs
-status: active
+status: done
 priority: high
 depends_on: [052]
 created: 2026-10-17

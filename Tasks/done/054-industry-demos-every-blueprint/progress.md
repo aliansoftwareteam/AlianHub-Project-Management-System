@@ -23,6 +23,9 @@
 - Browser (local build on :4100, both flags on, safety switches): the workspace picker lists the eight, each name leading with its industry; School · Maple Grove's Home shows the workflow approval with the Simulated chip and the proposals; its AI → Company view shows the education org chart (seven roles, supervised by the demo account) and the flow board.
 - The full reset removed the demo account with the last company that held it and recreated it with `DEMO_PASSWORD` (052's behaviour); a server already signed in needs a fresh sign-in.
 
+### 2026-10-19
+- Merged into `staging` in [#1696](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/pull/1696) (build 7, `14.40.0-beta.7`), together with tasks 052 and 053; the beta log records the build in the follow-up docs PR.
+
 ## Last step
 
-Uncommitted on the 053 branch, waiting for the owner's word on committing 052, 053 and this.
+Done. The shared demo database holds the eight blueprint companies; FinEdge, SwiftLogix and PeopleFirst are seeded only where the database has room.
