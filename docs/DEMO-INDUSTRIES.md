@@ -78,8 +78,6 @@ Approving the gate is real: the run resumes and hands the task to the next role'
 
 Restart a server after switching a flag; the dispatcher reads it on every call, but the workflow engine registers the hand-over step at start.
 
-On a server with `AUTOMATION_QUEUE_DRIVER=inline` (the local preview below), approving a gate is applied at once, but the browser's request stays open while the next hand-over waits, because the inline queue holds a delayed re-check until it has run; reload the page. The default queue answers straight away.
-
 ## What is real, simulated and illustrative
 
 | | In the demo |
