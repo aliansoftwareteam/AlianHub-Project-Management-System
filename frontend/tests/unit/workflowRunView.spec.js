@@ -272,4 +272,26 @@ describe('WorkflowRunView', () => {
         expect(row.find('[data-test="step-cost"]').text()).toContain('"usd":"0.42"');
         expect(wrapper.find('[data-test="run-cost"]').text()).toContain('"usd":"0.42"');
     });
+
+    it('names a hand-over to a role and who finished it, and labels a simulated run and step', async () => {
+        const wrapper = await mountView({
+            run: run({ simulated: true }),
+            steps: [
+                step({ stepId: 'sFile', type: 'role_handoff', simulated: true, output: { role: 'it-company/bug-triager', taskId: 't1', outcome: 'finished', finishedBy: 'Bug Triager' } }),
+                step({ stepId: 'sOk', index: 1, type: 'human_approval', status: 'pending', finishedAt: null, output: {} }),
+            ]
+        });
+        const [handOver, approval] = wrapper.findAll('[data-test="step"]');
+        expect(handOver.find('[data-test="step-type"]').text()).toBe('Workflows.type_role_handoff');
+        expect(handOver.find('[data-test="step-finished-by"]').text()).toBe('Workflows.handoff_finished_by {"name":"Bug Triager"}');
+        expect(handOver.find('[data-test="simulated-chip"]').exists()).toBe(true);
+        expect(approval.find('[data-test="simulated-chip"]').exists()).toBe(false);
+        expect(approval.find('[data-test="step-finished-by"]').exists()).toBe(false);
+        expect(wrapper.find('[data-test="run-head"] [data-test="simulated-chip"]').exists()).toBe(true);
+    });
+
+    it('leaves a run that really ran unlabelled', async () => {
+        const wrapper = await mountView({ run: run(), steps: [step()] });
+        expect(wrapper.find('[data-test="simulated-chip"]').exists()).toBe(false);
+    });
 });

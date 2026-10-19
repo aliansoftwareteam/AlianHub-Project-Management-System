@@ -125,6 +125,7 @@
     "demo:seed": "node scripts/demo/seedDemoTeam.js",
     "demo:unseed": "node scripts/demo/unseedDemoTeam.js",
     "demo:token": "node scripts/demo/sessionToken.js",
+    "demo:industries": "node scripts/demo/industries/seedIndustries.js",
     "atlas": "node scripts/screenshot-atlas.js",
     "atlas:compare": "node scripts/screenshot-compare.js",
     "visual": "node e2e/visual/run.js",

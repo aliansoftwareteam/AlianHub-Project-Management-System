@@ -39,6 +39,7 @@
                         </span>
                         <span v-if="showUser && !message.sent && agentAuthor" class="ah-chip ah-chip--agent ah-chip--mono mr-5px">{{ $t('Comments.agent_tag') }}</span>
                         <span v-else-if="showUser && !message.sent && automationAuthor" class="ah-chip ah-chip--automation ah-chip--mono mr-5px">{{ $t('Comments.automation_tag') }}</span>
+                        <SimulatedChip v-if="showUser && !message.sent && agentAuthor && message.simulated" class="mr-5px" />
                         <span class="comment-font-size-12 font-weight-300 comment-gray text-lowercase show" v-if="showMessageTime">
                             {{getDateType(new Date(message.createdAt).getTime())}}
                         </span>
@@ -210,6 +211,7 @@ import { commentHtml, commentPlainText } from '@/utils/commentHtml';
 import { agentAuthorOf, agentReplyHtml, automationAuthorOf, pageRefIds } from '@/utils/agentComment';
 
 // COMPONENTS
+import SimulatedChip from "@/components/atom/SimulatedChip/SimulatedChip.vue"
 import WasabiImageComp from "@/components/atom/WasabiIamgeCompp/WasabiIamgeCompp.vue"
 import WasabiAudioComp from "@/components/atom/wasabiComps/wasabAudio.vue"
 import WasabiVideoComp from "@/components/atom/wasabiComps/wasabVideo.vue"

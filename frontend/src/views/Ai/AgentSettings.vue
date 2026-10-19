@@ -154,6 +154,7 @@
                                     <span class="ah-mono ai-audit__at">{{ time(run.startedAt) }}</span>
                                     <span class="ai-audit__what">{{ run.skill ? skillLabel(t, run.skill) : run.trigger || $t('Ai.run') }}</span>
                                     <span class="ah-chip" :class="runChip(run)" data-test="run-status">{{ runStatus(run) }}</span>
+                                    <SimulatedChip v-if="run.simulated" />
                                     <span v-if="run.revertedAt" class="ah-chip ah-chip--dark">{{ $t('Ai.reverted_chip') }}</span>
                                     <span v-if="refusalCount(run)" class="ah-chip ah-chip--warn">{{ $t('Ai.refused_n', { n: refusalCount(run) }) }}</span>
                                     <button type="button" class="ah-btn ah-btn--ghost ah-btn--sm" @click="toggleRun(run._id)">{{ expandedRun === run._id ? $t('Ai.hide_details') : $t('Ai.run_details') }}</button>
@@ -198,6 +199,7 @@ import { useI18n } from "vue-i18n";
 import { useToast } from "vue-toast-notification";
 import { clockText } from "@/utils/clockText";
 import ShellIcon from "@/components/organisms/Shell/ShellIcon.vue";
+import SimulatedChip from "@/components/atom/SimulatedChip/SimulatedChip.vue";
 import AiSidebar from "./AiSidebar.vue";
 import AgentRunDetail from "./AgentRunDetail.vue";
 import AgentRevisionHistory from "./AgentRevisionHistory.vue";
