@@ -16,6 +16,32 @@ from [Conventional Commits](https://www.conventionalcommits.org/) on `main`.
 
 ---
 
+## [14.40.0](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/compare/v14.39.0...v14.40.0) (2026-10-19)
+
+
+### 🚀 Features
+
+* **auth:** fill in the demo account and add a one-click "Try the demo" button ([7b6a5ba](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/7b6a5bad00fb16c1a07fbd8b3ed247471f289802))
+* **demo:** an industry demo for every company blueprint, named by industry ([55beb79](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/55beb7999e0e8881dc4fcb963d4089cb4f2ca9bd))
+* **demo:** dispatcher, Company view and workflow runs in the industry demos ([29bfc0d](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/29bfc0dab66403b9ca245b977c8604e0b14c9d3d))
+* **demo:** industry demo companies with role agents, automations, routing and workflows ([149fb19](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/149fb192d94df5d99d92d6f0209ca0d613bf342f))
+
+
+### 🐛 Bug Fixes
+
+* **automations:** book a delayed job on the inline queue instead of awaiting it ([0752af1](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/0752af11347664cae4fc21a0fbae27b4a2526b90))
+* **oauth:** accept clients that name grant types the server does not run ([d0e9eee](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/d0e9eee20561f7a17282f4f5dbe8fd104b27f59c))
+* **permissions:** gate project-wise permission UI by plan feature ([bbd92ba](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/bbd92baf155c17616570a9017c8302d58f40bddb))
+* **workflows:** name who a waiting run waits for instead of a user id ([c8e861c](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/c8e861c51a58ebbf17c5e5c650c7bfae9e524c2e))
+
+
+### 📘 Documentation
+
+* beta log to build 2 and close task 051 (demo login) ([5de9215](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/5de921512599084a1d6a7ff379583e9d5ee111e8))
+* beta log to build 7 and close tasks 052 to 054 (industry demos) ([f3cd8f1](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/f3cd8f1ac4ef8e78b4447c063e267f22fd08dcd2))
+* beta log to build 8 and record the Claude connector fix in task 018 ([b189b15](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/b189b15f722700243c0899042130fd6b20f84ea6))
+* **demo:** drop the note that inline-queue approvals hang ([bbbc80f](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/bbbc80f40f7b3124b953e72c9205dfe8ea010eeb))
+
 ## [14.39.0](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/compare/v14.38.1...v14.39.0) (2026-10-14)
 
 
