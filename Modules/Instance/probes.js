@@ -30,7 +30,7 @@ async function probeMail(values = {}) {
         const port = Number(pick(values, 'NODEMAILER_PORT')) || 587;
         const transporter = nodemailer.createTransport({
             host, port, secure: port === 465,
-            auth: { user: pick(values, 'NODEMAILER_EMAIL'), pass: pick(values, 'NODEMAILER_EMAIL_PASSWORD') },
+            auth: { user: pick(values, 'NODEMAILER_USER') || pick(values, 'NODEMAILER_EMAIL'), pass: pick(values, 'NODEMAILER_EMAIL_PASSWORD') },
             tls: { rejectUnauthorized: false },
             connectionTimeout: PROBE_TIMEOUT_MS,
         });

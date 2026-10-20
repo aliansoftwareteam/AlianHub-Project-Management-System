@@ -27,6 +27,7 @@ module.exports = {
     APIURL: process.env.APIURL,
     WEBURL: process.env.WEBURL,
 
+    NODEMAILER_USER: process.env.NODEMAILER_USER,
     NODEMAILER_EMAIL: process.env.NODEMAILER_EMAIL,
     NODEMAILER_EMAIL_PASSWORD : process.env.NODEMAILER_EMAIL_PASSWORD,
     NODEMAILER_HOST: process.env.NODEMAILER_HOST,
