@@ -1,5 +1,5 @@
 <template>
-    <teleport to="#my-sidebar" v-if="visible">
+    <teleport :to="popoverHost" v-if="visible">
         <div
             class="position-fi justify-content-end sidebar"
             v-if="unMount ? visible : true"
@@ -124,9 +124,11 @@ import ShellIcon from "@/components/organisms/Shell/ShellIcon.vue";
 import { useCustomComposable } from "@/composable";
 import { useFocusTrap } from "@/composable/useFocusTrap";
 import { useEscapeLayer } from "@/composable/useEscapeLayer";
+import { usePopoverLayer } from "@/composable/popoverLayer";
 
 // USE COMPOSABLES
 const { debounce } = useCustomComposable();
+const popoverHost = usePopoverLayer("#my-sidebar");
 
 // IMAGES
 const closeBlueImage = require("@/assets/images/svg/CloseSidebar.svg");
