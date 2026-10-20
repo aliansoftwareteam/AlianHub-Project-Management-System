@@ -60,3 +60,4 @@ Auto-maintained registry of all tasks. Reflects YAML frontmatter from each `task
 | 052 | Industry demo experience — one demo company per industry, built from shared scenario data | done | high | — | done/052-industry-demo-experience |
 | 053 | Industry demos — the dispatcher, the Company view and workflow runs | done | high | 052 | done/053-industry-demo-agentic-layers |
 | 054 | Industry demos for every blueprint, named by industry | done | high | 053 | done/054-industry-demos-every-blueprint |
+| 055 | Create Project modal — Member, Skills, Source and Due date pickers open above the modal | active | high | — | active/055-create-project-field-popovers |

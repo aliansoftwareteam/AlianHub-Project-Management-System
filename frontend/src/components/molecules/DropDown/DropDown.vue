@@ -7,7 +7,7 @@
                 </slot>
             </template>
         </DropDownTrigger>
-        <teleport to="#my-dropdown" v-if="dropdownVisible">
+        <teleport :to="popoverHost" v-if="dropdownVisible">
             <div class="position-fi dropdown-back-drop cursor-default" :style="[{'z-index':zIndex}]" v-if="dropdownVisible && !hover" @click.stop="buttonClick()"/>
             <div :id="panelId" v-bind="panelAttrs" @click.stop="onPanelClick" @keydown="onPanelKeydown" @keyup="onPanelKeyup" @focusin="rememberFocus" class="border-radius-8-px box-shadow-serach drop-down-menu" :style="[{'z-index':zIndex}]" :class="{'dd-tokens': themed, 'bg-white gray border': !themed, 'drop-down-hide' : !bind, 'desktop-view position-fi' : clientWidth > 767, 'mobile-view position-fi' : clientWidth <= 767, ...bodyClass}" v-if="dropdownVisible">
                 <slot name="head" v-if="clientWidth > 767">
@@ -49,8 +49,10 @@
 import {Comment, Fragment, computed, defineProps, h, isVNode, nextTick, onBeforeUnmount, provide, ref, watch} from "vue";
 import { useCustomComposable } from "@/composable";
 import { followPanelSize, positionPanel } from "./panelPlacement";
+import { usePopoverLayer } from "@/composable/popoverLayer";
 
 const {debounce, makeUniqueId} = useCustomComposable();
+const popoverHost = usePopoverLayer("#my-dropdown");
 
 const closeIcon = require("@/assets/images/svg/CloseSidebar.svg");
 

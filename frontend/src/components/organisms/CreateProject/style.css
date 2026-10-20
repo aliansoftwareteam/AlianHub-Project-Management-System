@@ -1,5 +1,6 @@
 .ah-cp { position: fixed; inset: 0; z-index: 1050; display: grid; place-items: center; padding: 24px; }
 .ah-cp__backdrop { position: absolute; inset: 0; background: rgba(23, 22, 28, .45); }
+.ah-cp__layer { position: absolute; top: 0; left: 0; z-index: 1; }
 .ah-cp__modal {
     position: relative; width: 900px; max-width: 100%; height: 560px; max-height: calc(100dvh - 48px);
     background: var(--surface); border-radius: var(--r-modal); box-shadow: var(--shadow-modal);

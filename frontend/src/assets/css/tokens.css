@@ -534,12 +534,12 @@ html, body, #app {
 #my-image-slider { position: relative; z-index: 100; }
 
 /* Teleported panels sit below the legacy 46px header. The redesigned shell has no such header,
-   so they would float that far down it. Set on #app, not .ah-app: the teleport hosts are its
-   children and only inherit custom properties through it. */
-#app { --legacy-header-h: 46px; }
-#app:has(.ah-app) { --legacy-header-h: 0px; }
+   so they would float that far down it. Set on :root, not .ah-app: panels are teleported into
+   hosts outside it, some (a dialog's popover layer) outside #app too. */
+:root { --legacy-header-h: 46px; }
+:root:has(.ah-app) { --legacy-header-h: 0px; }
 @media (max-width: 767px) {
-    #app { --legacy-header-h: 0px; }
+    :root { --legacy-header-h: 0px; }
 }
 
 /* Legacy (not yet restyled) views keep dark text on their white surfaces in dark mode;
