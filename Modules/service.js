@@ -24,8 +24,8 @@ exports.SendEmail = async (subject, html, toMail, isHtml, cb) => {
             port: config.NODEMAILER_PORT,
             secure: config.NODEMAILER_PORT == 465, // true for 465, false for other ports
             auth: {
-                user: config.NODEMAILER_EMAIL, // generated ethereal user
-                pass: config.NODEMAILER_EMAIL_PASSWORD, // generated ethereal password
+                user: config.NODEMAILER_USER || config.NODEMAILER_EMAIL,
+                pass: config.NODEMAILER_EMAIL_PASSWORD,
             },
             tls: {
                 rejectUnauthorized: !allowSelfSigned
@@ -75,8 +75,8 @@ exports.SendNotificationEmail = async (subject, html, toMail, isHtml, cb) => {
             port: config.NODEMAILER_PORT,
             secure: config.NODEMAILER_PORT == 465, // true for 465, false for other ports
             auth: {
-                user: config.NODEMAILER_EMAIL, // generated ethereal user
-                pass: config.NODEMAILER_EMAIL_PASSWORD, // generated ethereal password
+                user: config.NODEMAILER_USER || config.NODEMAILER_EMAIL,
+                pass: config.NODEMAILER_EMAIL_PASSWORD,
             },
             tls: {
                 rejectUnauthorized: !allowSelfSigned
@@ -125,8 +125,8 @@ exports.sendAttachMail = (subject, html, toMail,attachMents, cb) => {
         port: config.NODEMAILER_PORT,
         secure: config.NODEMAILER_PORT == 465, // true for 465, false for other ports
         auth: {
-            user: config.NODEMAILER_EMAIL, // generated ethereal user
-            pass: config.NODEMAILER_EMAIL_PASSWORD, // generated ethereal password
+            user: config.NODEMAILER_USER || config.NODEMAILER_EMAIL,
+            pass: config.NODEMAILER_EMAIL_PASSWORD,
         },
         tls: {
             rejectUnauthorized: !allowSelfSigned

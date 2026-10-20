@@ -487,9 +487,20 @@ html, body, #app {
 }
 
 /* ---------- shell ---------- */
+/* The demo, offline and maintenance banners sit above the shell, so the shell takes what they leave
+   rather than a full 100dvh, which pushed the page past the window and scrolled the rail. */
+.ah-root:has(> .ah-app) {
+    display: flex;
+    flex-direction: column;
+    height: 100dvh;
+    overflow: hidden;
+    overflow: clip;
+}
+.ah-root > :not(.ah-app) { flex: none; }
 .ah-app {
     display: flex;
-    height: 100dvh;
+    flex: 1 1 auto;
+    min-height: 0;
     width: 100vw;
     /* `hidden` still lets focus scroll the shell, and nothing on screen scrolls it back; `clip` cannot be scrolled at all. */
     overflow: hidden;
@@ -499,7 +510,7 @@ html, body, #app {
 .ah-app__main {
     flex: 1;
     min-width: 0;
-    height: 100dvh;
+    min-height: 0;
     display: flex;
     flex-direction: column;
     position: relative;
@@ -511,7 +522,6 @@ html, body, #app {
 }
 @media (max-width: 767px) {
     .ah-app { flex-direction: column; }
-    .ah-app__main { height: calc(100dvh - var(--tabbar-h)); }
 }
 
 /* Teleport hosts (main.js) are empty, zero-height divs appended to #app. Without a stacking

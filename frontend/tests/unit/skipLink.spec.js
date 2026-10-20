@@ -17,7 +17,7 @@ afterEach(() => {
 describe('the skip link', () => {
     it('is the first thing App renders, ahead of the banners and the rail', () => {
         const template = APP.slice(APP.indexOf('<template>') + '<template>'.length);
-        expect(template).toMatch(/^\s*<div>\s*<SkipLink\s*\/>/);
+        expect(template).toMatch(/^\s*<div[^>]*>\s*<SkipLink\s*\/>/);
         expect(APP).toMatch(/<main[^>]*id="ah-main"/);
     });
 

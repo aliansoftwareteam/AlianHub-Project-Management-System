@@ -1,5 +1,5 @@
 <template>
-	<div>
+	<div class="ah-root">
 		<SkipLink/>
 		<OfflineBanner/>
 		<UpdateReadyNotice/>
