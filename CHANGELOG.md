@@ -16,6 +16,14 @@ from [Conventional Commits](https://www.conventionalcommits.org/) on `main`.
 
 ---
 
+## [14.40.2](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/compare/v14.40.1...v14.40.2) (2026-10-20)
+
+
+### 🐛 Bug Fixes
+
+* **projects:** the new-project pickers open above the modal ([a45023a](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/a45023a66399c8cc8e070aa5f681ad1070ce93f0))
+* **projects:** the new-project pickers open above the modal ([a2184f3](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/a2184f38c09b7415d83d4ad29a2a1e76d58c8395))
+
 ## [14.40.1](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/compare/v14.40.0...v14.40.1) (2026-10-20)
 
 
