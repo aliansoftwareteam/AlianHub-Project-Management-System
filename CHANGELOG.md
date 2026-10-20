@@ -16,6 +16,14 @@ from [Conventional Commits](https://www.conventionalcommits.org/) on `main`.
 
 ---
 
+## [14.40.1](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/compare/v14.40.0...v14.40.1) (2026-10-20)
+
+
+### 🐛 Bug Fixes
+
+* allow a separate SMTP login user (NODEMAILER_USER) ([d5b6240](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/d5b6240204c1355ae11ea55a8f48fae5ddfd633d))
+* **shell:** fit the app shell under the demo banner ([079e770](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/079e7706d21b68fd3ea6bfeadc2a46f708f64afc))
+
 ## [14.40.0](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/compare/v14.39.0...v14.40.0) (2026-10-19)
 
 
