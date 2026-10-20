@@ -24,7 +24,8 @@ const CATALOG = [
 
     field('NODEMAILER_HOST', 'mail', 'text', { label: 'SMTP host' }),
     field('NODEMAILER_PORT', 'mail', 'number', { default: '587', label: 'SMTP port', help: '587 (STARTTLS) or 465 (TLS).' }),
-    field('NODEMAILER_EMAIL', 'mail', 'text', { label: 'SMTP user / from address' }),
+    field('NODEMAILER_USER', 'mail', 'text', { label: 'SMTP username', help: 'Only when the login differs from the from address, e.g. an Amazon SES Mail Manager endpoint ID.' }),
+    field('NODEMAILER_EMAIL', 'mail', 'text', { label: 'From address', help: 'Also the SMTP login when no username is set.' }),
     field('NODEMAILER_EMAIL_PASSWORD', 'mail', 'secret', { label: 'SMTP password' }),
     field('RESEND_API_KEY', 'mail', 'secret', { label: 'Resend API key', help: 'When set, Resend is used instead of SMTP.' }),
     field('RESEND_FROM_EMAIL', 'mail', 'text', { label: 'Resend from address' }),

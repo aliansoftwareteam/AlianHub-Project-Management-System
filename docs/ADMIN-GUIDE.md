@@ -80,7 +80,7 @@ Each group with something to test has a **Test** button that tries the values yo
 `APP_NAME`, `WEBURL` (the address people open; used in emails and OAuth callbacks), `APIURL` (same, with a trailing slash), `CRON_TZ`.
 
 ### Mail
-Either SMTP (`NODEMAILER_HOST`, `NODEMAILER_PORT` 587 or 465, `NODEMAILER_EMAIL`, `NODEMAILER_EMAIL_PASSWORD`) or Resend (`RESEND_API_KEY`, `RESEND_FROM_EMAIL`). When a Resend key is set it is used. Test performs an SMTP login or a Resend API call. Without mail, invitations and password resets cannot be sent; the readiness card on the Health page reminds you.
+Either SMTP (`NODEMAILER_HOST`, `NODEMAILER_PORT` 587 or 465, `NODEMAILER_EMAIL` as the From address, `NODEMAILER_EMAIL_PASSWORD`, and optionally `NODEMAILER_USER` when the SMTP login is not the From address, such as an Amazon SES Mail Manager endpoint ID) or Resend (`RESEND_API_KEY`, `RESEND_FROM_EMAIL`). When a Resend key is set it is used. Test performs an SMTP login or a Resend API call. Without mail, invitations and password resets cannot be sent; the readiness card on the Health page reminds you.
 
 ### Storage
 `STORAGE_TYPE=server` keeps uploads on disk under `storage/` (a volume in Docker). `wasabi` uses any S3-compatible bucket: `WASABI_ACCESS_KEY`, `WASABI_SECRET_ACCESS_KEY`, `WASABIENDPOINT`, `WASABI_REGION`, `USERPROFILEBUCKET`. Test checks that the directory is writable or that the bucket answers. Changing the driver needs a restart and does not move existing files.

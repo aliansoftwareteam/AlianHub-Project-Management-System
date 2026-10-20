@@ -880,7 +880,7 @@
   },
   "NODEMAILER_EMAIL": {
     "group": "mail",
-    "description": "SMTP username / From address.",
+    "description": "From address; also the SMTP login when NODEMAILER_USER is unset.",
     "default": "your@email.com"
   },
   "NODEMAILER_EMAIL_PASSWORD": {
@@ -897,6 +897,11 @@
     "group": "general",
     "description": "587 (STARTTLS) or 465 (SSL)",
     "default": "587"
+  },
+  "NODEMAILER_USER": {
+    "group": "mail",
+    "description": "SMTP login, only when it differs from NODEMAILER_EMAIL (e.g. an Amazon SES Mail Manager ingress endpoint ID). NODEMAILER_EMAIL stays the From address.",
+    "default": ""
   },
   "NODE_ENV": {
     "group": "server",
