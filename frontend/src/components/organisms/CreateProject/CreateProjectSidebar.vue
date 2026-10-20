@@ -1,6 +1,6 @@
 <template>
     <teleport to="body">
-        <div v-if="isVisible && !aiOpen" class="ah-cp" role="dialog" aria-modal="true" :aria-label="$t('Auth.new_project')" @keydown.esc="close">
+        <div v-if="isVisible && !aiOpen" class="ah-cp" role="dialog" aria-modal="true" :aria-label="$t('Auth.new_project')" @keydown.esc.capture="noteEscapeStart" @keydown.esc="onEscape">
             <div class="ah-cp__backdrop" @click="!busy && close()"></div>
             <div class="ah-cp__modal">
                 <aside class="ah-cp__left">
@@ -137,7 +137,7 @@
                             </div>
                             <div v-else class="ah-field">
                                 <label class="ah-field__label">{{ $t('Auth.due_date') }}</label>
-                                <VueDatePicker v-model="form.dueDate" :placeholder="$t('PlaceHolder.Select_Project_Due_Date')" auto-apply :close-on-auto-apply="true" :min-date="new Date()" :enable-time-picker="false" />
+                                <VueDatePicker ref="dueDatePicker" v-model="form.dueDate" :placeholder="$t('PlaceHolder.Select_Project_Due_Date')" auto-apply :close-on-auto-apply="true" :min-date="new Date()" :enable-time-picker="false" teleport @open="dueDateOpen = true" @closed="dueDateOpen = false" />
                             </div>
                         </div>
                         <div class="ah-cp__row">
@@ -154,7 +154,7 @@
                         </div>
                         <div v-if="isUpwork(form.source)" class="ah-field">
                             <label class="ah-field__label">{{ $t('Auth.due_date') }}</label>
-                            <VueDatePicker v-model="form.dueDate" :placeholder="$t('PlaceHolder.Select_Project_Due_Date')" auto-apply :close-on-auto-apply="true" :min-date="new Date()" :enable-time-picker="false" />
+                            <VueDatePicker ref="dueDatePicker" v-model="form.dueDate" :placeholder="$t('PlaceHolder.Select_Project_Due_Date')" auto-apply :close-on-auto-apply="true" :min-date="new Date()" :enable-time-picker="false" teleport @open="dueDateOpen = true" @closed="dueDateOpen = false" />
                         </div>
                         <div v-if="appCatalog.length" class="ah-field">
                             <div class="ah-field__label">{{ $t('Apps.pick_title') }}</div>
@@ -175,6 +175,7 @@
                     </form>
                 </section>
             </div>
+            <div ref="popoverLayer" class="ah-cp__layer"></div>
         </div>
     </teleport>
     <AiProjectCreator v-if="aiOpen" :visible="aiOpen" @close="aiOpen = false" @created="onAiCreated" />
@@ -209,6 +210,7 @@ import SavedProjectTemplates from "./SavedProjectTemplates.vue";
 import { useTemplateProject } from "./templateProject";
 import { countsText, useProjectTemplates } from "@/views/Projects/projectTemplates";
 import { companyCurrency } from "@/utils/companyCurrency";
+import { providePopoverLayer } from "@/composable/popoverLayer";
 
 const props = defineProps({
     isActiveCreateSidebar: { type: Boolean, default: false },
@@ -248,6 +250,9 @@ const aiOpen = ref(false);
 const busy = ref(false);
 const banner = ref("");
 const nameInput = ref(null);
+const popoverLayer = providePopoverLayer();
+const dueDatePicker = ref(null);
+const dueDateOpen = ref(false);
 
 const initialName = props.initialName.trim().slice(0, 100);
 const form = reactive({ name: initialName, key: keyFromName(initialName), keyTouched: false, isPrivate: false, source: DEFAULT_SOURCE, proposalId: "", dueDate: "", leads: [], skills: [], includeSamples: true, apps: [] });
@@ -335,6 +340,15 @@ const close = () => {
     isVisible.value = false;
     emit("closeSidebar", false);
     emit("click:closeSidebar", false);
+};
+
+/* The date field closes its calendar on Esc before the key bubbles here, so whether the calendar
+   was open is read on the way down. */
+let escapeWhileDateOpen = false;
+const noteEscapeStart = () => { escapeWhileDateOpen = dueDateOpen.value; };
+const onEscape = () => {
+    if (escapeWhileDateOpen) dueDatePicker.value?.closeMenu();
+    else close();
 };
 
 const userData = () => {
