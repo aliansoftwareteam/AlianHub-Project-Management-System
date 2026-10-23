@@ -9,7 +9,7 @@ created: 2026-10-23
 
 # 056 — Personal app connectors for AI and agents (PRD)
 
-Status: backlog · PRD v1, generated 2026-10-23 from the owner interview · corrections and the open questions (section 14) are answered later.
+Status: backlog · PRD v1.1, 2026-10-23 · open questions answered by the owner (decisions 13–17); owner corrections still to come.
 
 Builds on the connector work of task 046 (`Tasks/active/046-better-than-clickup/design-connectors.md`, slices 1–3 built) and changes several of its decisions (section 3).
 
@@ -34,6 +34,18 @@ Success measures:
 - Every connector call is attributable from the audit log to a person, an agent or MCP client, and a connection.
 - The existing Slack, GitHub and Google Calendar paths are removed after migrating onto the module.
 
+Connectors in scope:
+
+| Connector | Status |
+|---|---|
+| Google: Calendar, Meet, Drive | pilot (Calendar connection exists; Gmail follows later, decision 15) |
+| GitHub | exists per workspace; moves to personal |
+| Slack | exists per workspace; moves to personal |
+| Dropbox | exists as the attachment picker; moves to the module |
+| HubSpot, ClickUp, Notion, Upwork, Outlook, Supabase, Canva, Figma | new, easiest first |
+| Wispr Flow | new; research first, dropped if no usable API or export |
+| Shopify | optional, last |
+
 ## 3. Decisions (owner, 2026-10-23)
 
 1. **Personal only.** A connection is owned by one person and used only on that person's behalf. No workspace-owned or shared connections.
@@ -48,6 +60,11 @@ Success measures:
 10. **Google is one connection per Google account** with products ticked (Gmail, Drive, Meet, Calendar); only ticked products' scopes are asked for, more added later by incremental consent.
 11. **Google is the pilot** for the new module.
 12. **Wispr Flow:** research decides; dropped if there is nothing to connect to.
+13. **MCP writes are approved in the AlianHub Inbox**, as proposals only the connection's owner approves, the way held MCP calls already work. Never inline in the AI client.
+14. **Usage limits.** Defaults per person: 500 reads and 50 write proposals a day across their connections; per agent: 200 reads a day. A workspace owner or admin may change them for the workspace, a member or an agent, up to a ceiling the instance admin sets in `.env`.
+15. **Gmail is not in the Google pilot.** The pilot ships Calendar, Meet and Drive (picked files, `drive.file`). Gmail's supported production path is a company's own Internal Google app through the company override; Gmail on the Alian-hosted instance waits for the owner's decision on Google verification and the yearly CASA assessment, made later from lab quotes. Customers run both hosted and self-hosted, and users are mostly on company Google Workspace domains, some on personal Gmail.
+16. **The Drive/Dropbox attachment picker joins the module.** It uses the person's Google connection (Drive ticked) and a Dropbox provider, with the instance or company app instead of an app per person. A person's connection is never usable by anyone else; the shared OAuth app gives nobody access to anyone's account.
+17. **Connector order after Google: easiest first**, ranked by the Phase 0 research on build effort and app-review time. Shopify stays optional and last.
 
 ## 4. Users and roles
 
@@ -79,7 +96,7 @@ Success measures:
 | `integration_connections` catalogue | `Modules/Integrations` (`helpers/integrationsRules.js` `CATALOG`) | workspace | Slack slash command, GitHub PAT, GitLab, an unread `google_calendar` client id/secret, Teams webhook, Zapier, iframe |
 | App connections (GitHub sync) | `Modules/Integrations/appConnections`, flag `APP_CONNECTIONS` | workspace, repos per project (049) | OAuth with PKCE, 5-minute cron, per-repo cursor and backoff, acts as `connectedBy`; `registry.js` is a sync-only interface |
 | Agent connectors `connector_connections` | `Modules/Agents/connectors`, routes `Modules/Connectors`, flag `CONNECTORS` | Slack: workspace bot. Google Calendar: per person | Own Google client, PKCE, 4-step connect, tokens in the secrets store by handle, refresh on use, revoke on disconnect and member removal. No tools; `usableTokenHandle` has no production caller. Lookup `findOne(userId, connector)` |
-| `cloud_storage_connections` | `Modules/CloudStorage` | per person | Drive/Dropbox attachment picker with the person's own OAuth app; access token reaches the browser; disconnect does not revoke; client secret may be stored unsealed (to verify) |
+| `cloud_storage_connections` | `Modules/CloudStorage` | per person | Drive/Dropbox attachment picker. Each person registers their own OAuth app; the client secret is stored unsealed (`sanitizeAppConfig`, `controller.js` `saveSettings`) while tokens are encrypted; a short-lived access token goes to the browser for Google's picker; disconnect only blanks tokens and never revokes; nothing ends it when a member leaves. Picked files are attached as a link or imported as a copy using the session person's own token |
 
 Reused as is: the secrets store (`Config/secrets.js`, kind `connector`), the state/PKCE/fragment-complete flow (`googleConnection.js`), membership at use and `memberDeparted.js`, the agent registry with `proposeOnly` and proposals, MCP proposals waiting in the Inbox (`Modules/Mcp/propose.js`, `approval.js`), MCP tool scopes (`Modules/Mcp/scopes.js`), connector taint and no web fetch after a connector read (`taint.js`, `agentFetch.js`), read caps (`readLimits.js`), the egress allow-list (`Instance/egress.js`), backoff (`appConnections/backoff.js`), the audit words `connector.*`.
 
@@ -110,7 +127,7 @@ Reused as is: the secrets store (`Config/secrets.js`, kind `connector`), the sta
 
 ### 7.4 Credentials
 
-- **FR-15** Access and refresh tokens live only in the secrets store under kind `connector`, by handle. No route, log, socket event, audit row or browser ever receives one.
+- **FR-15** Access and refresh tokens live only in the secrets store under kind `connector`, by handle. No route, log, socket event, audit row or browser ever receives one. One exception: the attachment picker (FR-39) hands the connection's owner, in their own session, a short-lived `drive.file` access token for Google's picker; never a refresh token, never to anyone else.
 - **FR-16** The module refuses to switch on without `SECRETS_STORE` and a usable `SECRETS_KEY`, with one startup log line and the reason on the admin screen.
 - **FR-17** Tokens are refreshed on use, one attempt; `invalid_grant` (or the provider's equivalent) marks the connection `broken` and notifies the person; other failures fail that one call only.
 
@@ -119,7 +136,7 @@ Reused as is: the secrets store (`Config/secrets.js`, kind `connector`), the sta
 - **FR-18** A tool is defined once in its provider: key (`<provider>.<object>.<verb>`, e.g. `hubspot.deal.search`), label, read or write, required scope, input schema, output shape and caps. From that one definition it is registered in the agent registry and as an MCP tool.
 - **FR-19** A call uses only the connection of the person the run works for (who started it or owns the schedule) or the person behind the MCP token or grant. No connection: refused with "connect <provider> on My connections". The one-account rule means no account choice now; the call takes a `connectionId` parameter reserved for several accounts later.
 - **FR-20** Reads return text only, capped per read and per run (per-provider defaults, based on `readLimits.js`), and taint the run with kind `connector` and a ref such as `hubspot:<hash of the object id>`. After a connector read the run makes no web fetch.
-- **FR-21** Writes are `proposeOnly` at every autonomy level, from both paths. MCP writes are filed as proposals that wait in the AlianHub Inbox, like other held MCP calls (assumed; open question 1).
+- **FR-21** Writes are `proposeOnly` at every autonomy level, from both paths. MCP writes are filed as proposals that wait in the AlianHub Inbox, like other held MCP calls (`Modules/Mcp/propose.js`); the tool's reply says so. No write is approved inside the AI client.
 - **FR-22** A new gate `connection_owner`: only the person who owns the connection may approve its writes. An owner or admin may not approve on their behalf.
 - **FR-23** The approval card shows exactly what will go out (recipient or target, title, the whole text, attachments if any); what is approved is what is sent; an edit is re-validated and shown again. One attempt per approval; the result or error is kept on the proposal.
 - **FR-24** Every provider call goes through `agentFetch` in the workspace's egress context; the provider's hosts come from its definition, so the "Allow host" prompt names them.
@@ -130,7 +147,7 @@ Reused as is: the secrets store (`Config/secrets.js`, kind `connector`), the sta
 - **FR-26** Audit: one `connector.call` row per call (person, agent or MCP client, connection, provider, tool, outcome, counts), never content or ids in clear. Also `connector.connect`, `connector.products_changed`, `connector.broken`, `connector.revoke`, `connector.app_set`.
 - **FR-27** Health: status (`pending`, `connected`, `broken`, `reauth_required`, `revoked`), token expiry, last used, last error; the person is notified when action is needed.
 - **FR-28** Usage: counts per connection, person and agent by day; shown to the person on their connection and to admins in the overview.
-- **FR-29** Limits: provider rate limits honoured with backoff and `Retry-After`; per-person and per-agent daily call quotas an admin can set (defaults in open question 2); the run's existing spend and daily-run limits apply unchanged.
+- **FR-29** Limits: provider rate limits honoured with backoff and `Retry-After`. Daily quotas with defaults of 500 reads and 50 write proposals per person (across their connections) and 200 reads per agent. An owner or admin sets them for the workspace, a member or an agent, never above the instance ceiling in `.env`. A call over quota is refused with the limit and when it resets. The run's existing spend and daily-run limits apply unchanged.
 - **FR-30** Admin overview: per member, each connection's provider, products, scopes, status, connected and last-used dates, usage, and an "End connection" action. Not the account's email or label (the 046 rule), never tokens.
 
 ### 7.7 Screens
@@ -146,6 +163,8 @@ Reused as is: the secrets store (`Config/secrets.js`, kind `connector`), the sta
 - **FR-36** Slack becomes a personal OAuth provider (user token); `slack.channel.read` and `slack.message.post` are redefined on the person's token and the channels their Slack user can see. The bot token, signing secret and allow-list are retired, their secrets revoked, and admins told. Slack needs an HTTPS redirect, so local development uses a tunnel.
 - **FR-37** GitHub becomes a personal OAuth provider; `pull_request.get` and new link tools use the caller's own connection. The workspace connection, repo-to-project mapping, cron runner and their screens (task 049) are retired with a migration; admins are told before it runs.
 - **FR-38** The Slack slash command and the other `integration_connections` catalogue entries are not connectors and stay as they are.
+- **FR-39** The Drive/Dropbox attachment picker uses the module: Drive through the person's Google connection with Drive ticked (`drive.file`), Dropbox through a Dropbox provider. The per-person app settings go; the instance or company app is used. Existing `cloud_storage_connections` rows are migrated or the person is asked to reconnect once, and their stored client secrets are deleted.
+- **FR-40** A picker token and a file import are available only to the connection's owner, taken from their own session; no route accepts another person's id. A file attached as a link opens for others only as Google or Dropbox sharing allows; a file imported as a copy is stored like an upload and seen by whoever can see the task. Nobody can browse or pick from another person's account.
 
 ## 8. Data model
 
@@ -198,17 +217,18 @@ Write routes are wrapped in `agentsRefused`; audit, socket emit and cache clear 
 | Phase | Output | Done when |
 |---|---|---|
 | 0 Research | `resources/research-matrix.md`: per connector auth type, per-person support, API reach and least scopes, app review needed, token life, limits, callback constraints, verdict | Owner accepts the matrix and the connector order |
-| 1 Module | FR-1 to FR-34, with Google as the pilot provider (Gmail, Drive, Meet tools; Calendar connection) | A member connects Google, ticks products, and both an agent run and MCP read and propose writes on it; the admin overview and audit show it |
-| 2 Migration | FR-35 to FR-38 | Calendar, Slack and GitHub run on the module; old paths removed |
-| 3 Connectors | One provider at a time in the research's order | Each passes the acceptance criteria below |
+| 1 Module | FR-1 to FR-34, with Google as the pilot provider: Calendar, Meet and Drive (`drive.file`) tools; no Gmail | A member connects Google, ticks products, and both an agent run and MCP read and propose writes on it; the admin overview and audit show it |
+| 2 Migration | FR-35 to FR-40 | Calendar, Slack, GitHub and the Drive/Dropbox picker run on the module; old paths removed |
+| 3 Connectors | One provider at a time, easiest first by the research's ranking; Gmail once its production path is decided; Shopify optional and last | Each passes the acceptance criteria below |
 
-Phase 0 questions to settle beyond the matrix: Wispr Flow (any API or export); Supabase (Management API, or data in a project database); Outlook (Microsoft Graph, multi-tenant app, tenant admin consent); Meet (Meet REST API scopes); Drive (`drive.file` vs a restricted read scope); Upwork (API key application and terms); Canva, Figma, HubSpot, Shopify (public app review); per-instance vs per-company review for a self-hosted product.
+Phase 0 questions to settle beyond the matrix: Wispr Flow (any API or export); Supabase (Management API, or data in a project database); Outlook (Microsoft Graph, multi-tenant app, tenant admin consent); Meet (Meet REST API scopes and their sensitivity); Upwork (API key application and terms); Canva, Figma, HubSpot, Shopify (public app review); per-instance vs per-company review for a self-hosted product; current CASA lab quotes for Gmail on the hosted instance (indicative 2026 figures: about $500–$6,000 a year in lab fees at budget labs, far more at premium firms, plus fix-up time; reassessed every 12 months). The matrix ends with the ranking for Phase 3.
 
 ## 12. Out of scope
 
 - Workspace-owned or shared connections.
 - Background sync for any connector (later, per connector).
 - Writes to outside services without approval; sending Gmail (drafts at most).
+- Gmail in the Google pilot.
 - Several accounts per person in the screens (the data model allows it).
 - The integration catalogue (slash command, webhooks, Zapier, iframe).
 
@@ -219,24 +239,26 @@ Phase 0 questions to settle beyond the matrix: Wispr Flow (any API or export); S
 - Two people in one workspace connect the same provider with different accounts; each person's built-in runs and MCP client reach only their own account; a person with no connection is refused with a clear reason.
 - No route, log, socket event or audit row contains a token or client secret (asserted in tests); nothing switches on without the secrets store.
 - Every outside write from either path becomes a proposal only the connection's owner can approve; an admin's approval is refused; what is sent equals what was approved.
-- Every call writes one audit row; usage counts match the calls; a quota stops calls with a clear reason.
+- Every call writes one audit row; usage counts match the calls; a quota stops calls with a clear reason; an admin cannot set a quota above the instance ceiling.
+- An MCP write from a person's own AI waits in the Inbox and only that person can approve it.
+- The attachment picker works from a person's module connection with no per-person app; another person's session cannot get a picker token or import through it; disconnecting revokes at the provider.
 - An admin sees members' connections, scopes, status and usage and can end one, but no route lets them use it.
 - Removing or deactivating a member revokes their connections at the provider and clears their secrets; the sweep catches a removal made while the provider was off.
 - A company OAuth app replaces the instance default for that workspace only; replacing it marks its connections for reconnect.
-- Google Calendar, Slack and GitHub run on the module; the old workspace paths are gone, with migrations that are safe to run twice.
+- Google Calendar, Slack, GitHub and the attachment picker run on the module; the old paths are gone, with migrations that are safe to run twice.
 - Every provider is tested against a fake provider; i18n, style and API-doc checks pass.
 
-## 14. Open questions (to be answered later)
+## 14. Open questions
 
-1. **MCP writes:** approved in AlianHub's Inbox (assumed in FR-21) or inline in the person's Claude or ChatGPT?
-2. **Quota defaults:** limits per person and per agent, and who may change them.
-3. **Gmail in production:** Google verification and the security assessment, testing mode, or one Workspace domain; who does this on a self-hosted instance.
-4. **Drive/Dropbox attachment picker:** fold into the module (fixing the browser token and the client secret storage), or leave it.
-5. **Connector order** after Google (set with the research).
+The five questions of v1 were answered on 2026-10-23 (decisions 13–17). Still open:
+
+1. **Gmail on the Alian-hosted instance:** fund Google verification and the yearly CASA assessment, or not. The owner decides from current lab quotes gathered in Phase 0.
 
 ## 15. Risks
 
 - **Provider review:** restricted Google scopes, Upwork API access and public-app review at Canva, Shopify and others can block production use regardless of the build; the matrix must surface this early.
+- **Gmail for personal accounts:** until the hosted app is verified, people on personal @gmail.com addresses on the hosted instance have no Gmail connector; only company Internal apps work.
+- **Picker migration:** members who used the old picker must reconnect once if their grant cannot be carried over, since it was issued by their own app.
 - **Losing GitHub sync:** retiring task 049's automatic PR linking is a visible regression for teams that rely on it; admins are told before migration.
 - **Slack user tokens** reach everything the person can see in Slack; read tools must still be capped and tainted, and writes approved.
 - **Prompt injection** through connector content (mail, Slack, CRM notes): taint, no web fetch after a read, and approval for every write are the defence; no tool may bypass them.
