@@ -2,7 +2,7 @@
     <div class="ah-card projectInfoDiv" :class="[{'opacity-5 pointer-event-none' : item?.isRestrict === true}]">
         <div class="projectInfoTopLine d-flex align-items-center justify-content-between font-ui">
             <div class="d-flex align-items-center project__inToplinetextimg-wrapper">
-                <button type="button" class="pls__star-btn" :class="{ 'is-on': isStarred('project', item?._id), 'pls__star-btn--locked': activeTab !== 0 }" :title="$t('Projects.favourite')" :aria-label="$t('Projects.favourite')" :aria-pressed="isStarred('project', item?._id)" @click="!item.isRestrict ? updateFavourite(item) : ''">
+                <button type="button" class="pls__star-btn" :class="{ 'is-on': isStarred('project', item?._id), 'pls__star-btn--locked': !editable }" :title="$t('Projects.favourite')" :aria-label="$t('Projects.favourite')" :aria-pressed="isStarred('project', item?._id)" @click="!item.isRestrict ? updateFavourite(item) : ''">
                     <span class="ah-mask-icon pls__star" :style="maskOf(isStarred('project', item?._id) ? projectStar : blankStar)" aria-hidden="true"></span>
                 </button>
                 <span class="ah-letter-tile ProjectFirstLatter d-flex align-items-center justify-content-center text-uppercase" v-if="item.projectIcon.type === 'color'" :style="[{'background-color': item.projectIcon.type === 'color' ? item.projectIcon.data : ''}]">{{item.ProjectName ? item.ProjectName.charAt(0) : ''}}</span>
@@ -12,31 +12,17 @@
                     :data="{url: item.projectIcon.data}"
                 />
                 <p class="pls__name d-block text-ellipsis"><span>{{item.ProjectCode}}</span> | <span :title="item.ProjectName">{{item.ProjectName}}</span></p>
-                <a v-if="activeTab === 0" class="pls__go d-flex text-decoration-none cursor-pointer" href.prevent="#" @click="!item.isRestrict ? redirectProjectList(item) : ''"><span class="ah-mask-icon pls__go-icon" :style="maskOf(projectGoToLink)" aria-hidden="true"></span>{{ $t('Projects.go_to_project') }}</a>
+                <span v-if="showsClosedChip" class="ah-chip" data-test="closed-chip">{{ $t('Projects.closed_chip') }}</span>
+                <a v-if="canOpen" class="pls__go d-flex text-decoration-none cursor-pointer" href.prevent="#" @click="!item.isRestrict ? redirectProjectList(item) : ''"><span class="ah-mask-icon pls__go-icon" :style="maskOf(projectGoToLink)" aria-hidden="true"></span>{{ $t('Projects.go_to_project') }}</a>
             </div>
-            <DropDown v-if="checkPermission('settings.settings_project_list') == true && checkPermission('project.project_details') == true && checkPermission('project.project_close') == true" mode="menu" :bodyClass="{'setting__project-dropdown' : true}">
+            <DropDown v-if="menu.length" mode="menu" :bodyClass="{'setting__project-dropdown' : true}">
                 <template #button>
                     <span class="ah-mask-icon setting__dots" :style="maskOf(dots)" role="img" :aria-label="$t('Projects.project_actions', { name: item.ProjectName })"></span>
                 </template>
                 <template #options>
-                    <DropDownOption v-if="item.deletedStatusKey === 2" @click="!item.isRestrict ? unarchiveProject(item) : ''">
+                    <DropDownOption v-for="action in menu" :key="action.key" :data-test="`project-action-${action.key}`" @click="!item.isRestrict ? choose(action.key) : ''">
                         <div class="d-flex align-items-center setting__close-project">
-                            {{$t('Projects.restore_project')}}
-                        </div>
-                    </DropDownOption>
-                    <DropDownOption v-if="item.deletedStatusKey === 2" @click="showSidebar=true">
-                        <div class="d-flex align-items-center setting__close-project">
-                            {{$t('Projects.delete_project')}}
-                        </div>
-                    </DropDownOption>
-                    <DropDownOption v-if="item.statusType !== 'close' && item.deletedStatusKey !== 2" @click="showSidebar=true">
-                        <div class="d-flex align-items-center setting__close-project">
-                            {{ $t('Projects.close_project') }}
-                        </div>
-                    </DropDownOption>
-                    <DropDownOption @click="!item.isRestrict ? colseProject(item,'reopen') : ''" v-if="item.statusType === 'close'">
-                        <div class="d-flex align-items-center setting__close-project">
-                            {{ $t('Projects.reopen_project') }}
+                            {{ $t(action.label) }}
                         </div>
                     </DropDownOption>
                 </template>
@@ -54,7 +40,7 @@
                         @selected="changeAssignee('add', $event,item)"
                         @removed="changeAssignee('remove', $event,item)"
                         :numOfUsers="1"
-                        :addUser="checkPermission('project.project_assignee') === true && activeTab === 0"
+                        :addUser="checkPermission('project.project_assignee') === true && editable"
                         :isDisplayTeam="false"
                     />
                 </div>
@@ -63,8 +49,8 @@
                 <div class="p__sharewith-wrapper">
                     <span class="sub-title-span pls__label d-block">{{$t('Projects.share_with')}}</span>
                     <div class="share-with-wrapperdata d-flex align-items-center justify-content-start">
-                        <button type="button" class="ah-btn ah-btn--sm pls__share" @click="!item.isRestrict ? updateProjectSpace(item,'public') : ''" :class="{ 'ah-btn--outline': item.isPrivateSpace === false, 'ah-btn--secondary': item.isPrivateSpace !== false, 'pls__share--locked': activeTab !== 0 }">{{$t('Projects.everyone')}}</button>                    
-                        <button type="button" class="ah-btn ah-btn--sm pls__share" @click="!item.isRestrict ? updateProjectSpace(item,'private') : ''" :class="{ 'ah-btn--outline': item.isPrivateSpace === true, 'ah-btn--secondary': item.isPrivateSpace !== true, 'pls__share--locked': activeTab !== 0 }">{{$t('Projects.private')}}</button>
+                        <button type="button" class="ah-btn ah-btn--sm pls__share" @click="!item.isRestrict ? updateProjectSpace(item,'public') : ''" :class="{ 'ah-btn--outline': item.isPrivateSpace === false, 'ah-btn--secondary': item.isPrivateSpace !== false, 'pls__share--locked': !editable }">{{$t('Projects.everyone')}}</button>                    
+                        <button type="button" class="ah-btn ah-btn--sm pls__share" @click="!item.isRestrict ? updateProjectSpace(item,'private') : ''" :class="{ 'ah-btn--outline': item.isPrivateSpace === true, 'ah-btn--secondary': item.isPrivateSpace !== true, 'pls__share--locked': !editable }">{{$t('Projects.private')}}</button>
                     </div>
                 </div>
             </div>
@@ -74,7 +60,7 @@
                     <ul class="pro_block d-flex align-items-center justify-content-start flex-wrap" @click="!item.isRestrict ? openEditSidebar(item,'projectStatus') : ''">
                         <li class="projectDataColorli" v-for="(statusObj,statusKey) in item.projectStatusData"
                         :key="statusKey">
-                            <span class="pls__status ah-status-ink" :class="[{'cursor-pointer' : activeTab === 0}]" :style="statusChipStyle({ textColor: statusObj.textColor, bgColor: statusObj.backgroundColor })">
+                            <span class="pls__status ah-status-ink" :class="[{'cursor-pointer' : editable}]" :style="statusChipStyle({ textColor: statusObj.textColor, bgColor: statusObj.backgroundColor })">
                                 {{statusObj.name}}
                             </span>
                         </li>
@@ -86,9 +72,9 @@
                     <span class="sub-title-span pls__label d-block">{{$t('Projects.task_type')}}</span>
                     <ul class="d-flex task_type_statusul" @click="!item.isRestrict ? openEditSidebar(item,'taskType') : ''">
                         <li class="projectDataColorli" v-for="(taskType,taskTypeKey) in item.taskTypeCounts" :key="taskTypeKey">
-                            <div class="task_type d-flex align-items-center" :class="[{'cursor-pointer' : activeTab === 0}]">
+                            <div class="task_type d-flex align-items-center" :class="[{'cursor-pointer' : editable}]">
                                 <TaskTypeIcon :taskType="taskType" :style="[{'height':'13.85px','width':'13.85px'}]" />
-                                <span class="ml-8px" :class="[{'cursor-pointer' : activeTab === 0}]">{{taskType.name}}</span>
+                                <span class="ml-8px" :class="[{'cursor-pointer' : editable}]">{{taskType.name}}</span>
                             </div>
                         </li>
                     </ul>
@@ -99,7 +85,7 @@
                     <span class="sub-title-span pls__label d-block">{{$t('Templates.task_status')}}</span>
                     <ul class="d-flex task_type_statusul" @click="!item.isRestrict ? openEditSidebar(item,'taskStatus') : ''">
                         <li class="cursor_pointer projectDataColorli" v-for="(statusObj,statusKey) in item.taskStatusData" :key="statusKey">
-                            <span class="pls__status ah-status-ink" :style="statusChipStyle(statusObj)" :class="[{'cursor-pointer' : activeTab === 0}]">
+                            <span class="pls__status ah-status-ink" :style="statusChipStyle(statusObj)" :class="[{'cursor-pointer' : editable}]">
                                 {{statusObj.name}}
                             </span>
                         </li>
@@ -114,7 +100,7 @@
                         class="pls__apps"
                         :apps="appref"
                         :modelValue="processedApps"
-                        :disabled="!!item.isRestrict || activeTab === 1 || settingPermission !== true || projectDetailPremission !== true"
+                        :disabled="!!item.isRestrict || !editable || settingPermission !== true || projectDetailPremission !== true"
                         @toggle="(key) => updateApp(item, { key })"
                     />
                     <ul class="d-flex" v-else>
@@ -128,7 +114,7 @@
                 <div class="p__requiredViews-wrapper">
                     <span class="sub-title-span pls__label d-block">{{$t('Projects.required_view')}}</span>
                     <ul class="d-flex flex-wrap" v-if="requireComp && requireComp.length > 0" >
-                        <li class="pro_block cursor_pointer projectDataColorli" :class="[{'cursor-pointer' : activeTab === 0}]" v-for="(requireObj,requireKey) in requireComp" :key="requireKey">
+                        <li class="pro_block cursor_pointer projectDataColorli" :class="[{'cursor-pointer' : editable}]" v-for="(requireObj,requireKey) in requireComp" :key="requireKey">
                             <span v-if="item.ProjectRequiredComponent?.filter((x) => x.keyName === requireObj.keyName).length > 0" class="ah-mask-icon erp_app def_req is-on mr-10px" :style="maskOf(projectComponentsIcons(requireObj.keyName).activeIcon)" role="img"
                             @click="!item.isRestrict ? (item.ProjectRequiredComponent.length > 1 ? updateTabs(item,requireObj,'unRead'):null) : ''" :title="requireObj.name || $t('Projects.not_available')" :aria-label="requireObj.name || $t('Projects.not_available')"></span>
                             <span v-else class="ah-mask-icon erp_app tab_req mr-10px" :style="maskOf(projectComponentsIcons(requireObj.keyName).icon)" role="img" @click="!item.isRestrict ? updateTabs(item,requireObj,'read') : ''" :title="requireObj.name || $t('Projects.not_available')" :aria-label="requireObj.name || $t('Projects.not_available')"></span>
@@ -143,13 +129,14 @@
             </div>
         </div>
         <ConfirmationSidebar
+            v-if="confirming"
             v-model="showSidebar"
-            :title="`${item.deletedStatusKey === 0 ? $t('Projects.close') : item.deletedStatusKey === 1 ? $t('Projects.archive') : $t('Projects.delete')}`"
-            :message="item.deletedStatusKey === 0 ? $t('conformationmsg.archive0mesg') : item.deletedStatusKey === 1 ? $t('conformationmsg.archive') : $t('conformationmsg.delete')"
-            :confirmationString="`${item.deletedStatusKey === 0 ? 'close' : item.deletedStatusKey === 1 ? 'archive' : 'delete'}`"
-            :acceptButtonClass="item.deletedStatusKey === 1 ? 'btn-primary': 'btn-danger'"
-            :acceptButton="`${item.deletedStatusKey === 0 ? $t('Projects.close') : item.deletedStatusKey === 1 ? $t('Projects.archive') : $t('Projects.delete')}`"
-            @confirm="item.deletedStatusKey === 0 ? colseProject(item, 'close') : item.deletedStatusKey === 2 ? deleteProject(item, 1) : ''"
+            :title="$t(confirming.title)"
+            :message="$t(confirming.message)"
+            :confirmationString="pending"
+            :acceptButtonClass="confirming.danger ? 'btn-danger' : 'btn-primary'"
+            :acceptButton="$t(confirming.title)"
+            @confirm="run(pending)"
         />
     </div>
     <ProjectSettingSidebar v-if="openSidebarInProject" :sidebarTitle="sidebarTitle" :projectData="item" :openSidebarInProject="openSidebarInProject" @isSidebarProjectSetting="openSidebarInProject = false" />
@@ -178,17 +165,33 @@ import { apiRequest } from "@/services";
 import * as env from '@/config/env';
 import ConfirmationSidebar from "@/components/molecules/ConfirmationSidebar/ConfirmationSidebar.vue"
 import { useI18n } from "vue-i18n";
+import { lifecycleOf, reopenStatusOf, ACTIVE, ARCHIVED, CLOSED } from "@/utils/lifecycle";
 const { t } = useI18n();
 
 const props = defineProps({
     item: {
         type: Object,
         default: () => ({})
-    },
-    activeTab:{
-        type: Number
     }
 });
+
+const ACTIONS = {
+    close: { label: 'Projects.close_project', permission: 'project.project_close' },
+    reopen: { label: 'Projects.reopen_project', permission: 'project.project_close' },
+    archive: { label: 'Projects.archive_project', permission: 'project.project_delete' },
+    restore: { label: 'Projects.restore_project', permission: 'project.project_delete' },
+    delete: { label: 'Projects.delete_project', permission: 'project.project_delete' },
+};
+const MENU_BY_STATE = {
+    [ACTIVE]: ['close', 'archive'],
+    [CLOSED]: ['reopen', 'archive'],
+    [ARCHIVED]: ['restore', 'delete'],
+};
+const CONFIRMS = {
+    close: { title: 'Projects.close', message: 'conformationmsg.archive0mesg', danger: true },
+    archive: { title: 'Projects.archive', message: 'conformationmsg.archive_project', danger: false },
+    delete: { title: 'Projects.delete', message: 'conformationmsg.delete', danger: true },
+};
 const { isFavourite: isStarred, toggleFavourite } = useFavourites();
 const {getters,commit} = useStore();
 const {checkPermission} = useCustomComposable();
@@ -225,6 +228,19 @@ const projectDetailPremission = computed(() => checkPermission("project.project_
 const taskStatusPermission = computed(() => checkPermission("task.task_status", true, {gettersVal: getters}))
 const projectStatusPermission = computed(() => checkPermission("project.project_status_change", true, {gettersVal: getters}))
 
+const state = computed(() => lifecycleOf(props.item, 'project'));
+const editable = computed(() => state.value === ACTIVE);
+const canOpen = computed(() => props.item.statusType !== 'close');
+const showsClosedChip = computed(() => state.value === ARCHIVED && props.item.statusType === 'close');
+const menu = computed(() => {
+    if (settingPermission.value !== true || projectDetailPremission.value !== true) return [];
+    return (MENU_BY_STATE[state.value] || [])
+        .filter((key) => checkPermission(ACTIONS[key].permission, props.item.isGlobalPermission) === true)
+        .map((key) => ({ key, label: ACTIONS[key].label }));
+});
+const pending = ref('');
+const confirming = computed(() => CONFIRMS[pending.value] || null);
+
 function redirectProjectList (data) {
     router.push({ name: 'Project', params: {cid: companyId.value, id: data._id}});
 }
@@ -232,14 +248,14 @@ function updateFavourite(projectData) {
     if(settingPermission.value !== true || projectDetailPremission.value !== true){
         return;
     }
-    if(props.activeTab === 1){
+    if(!editable.value){
         return;
     }
     toggleFavourite({ type: 'project', id: String(projectData._id), name: projectData.ProjectName || '' });
 }
 const changeAssignee = async (type, user,projectData) => {
     try {
-        if(props.activeTab === 1){
+        if(!editable.value){
             return;
         }
         let queryObj;
@@ -278,7 +294,7 @@ function updateProjectSpace (projectObj,type) {
         if(settingPermission.value !== true || projectDetailPremission.value !== true){
             return;
         }
-        if(props.activeTab === 1){
+        if(!editable.value){
             return;
         }
         let space = type == 'public' ? false : true;
@@ -294,7 +310,7 @@ async function updateApp (item,appObj) {
         if (settingPermission.value !== true || projectDetailPremission.value !== true) {
             return;
         }
-        if(props.activeTab === 1){
+        if(!editable.value){
             return;
         }
 
@@ -361,7 +377,7 @@ async function updateTabs (item,appObj,type) {
         if(settingPermission.value !== true || projectDetailPremission.value !== true){
             return;
         }
-        if(props.activeTab === 1){
+        if(!editable.value){
             return;
         }
         if((appObj.setAsDefault == true && type == 'unRead')){
@@ -392,7 +408,7 @@ async function updateTabs (item,appObj,type) {
 
 function openEditSidebar(projectObj, type){
     try{ 
-        if(props.activeTab === 1){
+        if(!editable.value){
             return;
         }
         if(settingPermission.value !== true || projectDetailPremission.value !== true){
@@ -411,96 +427,41 @@ function openEditSidebar(projectObj, type){
     }
 }
 
-async function colseProject (project,type) {
-    try {
-        if(settingPermission.value !== true || projectDetailPremission.value !== true){
-            return;
-        }
-        let updateObject = {}
-        let status;
-        if(type === 'close'){
-            status = project.projectStatusData.find((x) => x.type === "close");
-            updateObject.status = status.value;
-            updateObject.statusType = status.type;
-        }else{
-            status = project.projectStatusData.find((x) => x.default === true);
-            if (!status) {
-                status = project.projectStatusData.find((x) => x.type === "default_active");
-                if (!status) {
-                    status = project.projectStatusData[0];
-                }
-            }
-            updateObject.status = status.value;
-            updateObject.statusType = status.type;
-           
-    
-        }
-        await apiRequest("put",`/api/v1/${env.PROJECTACTIONS}/${project._id}`,{updateObject: updateObject});
-        commit('projectData/projectLocalUpdate', {itemData:  {...project,...updateObject},projectId:project._id,key:'RemoveProject',subKey: '',userId: ''});
-        if(type === 'reopen') {
-            restoreChildTasks(project._id);
-        } else {
-            restoreChildTasks(project._id, 8);
-        }
-        $toast.success(t('Toast.Updated_successfully'),{position: 'top-right'});
-        showSidebar.value = false;
-    } catch (error) {
-        console.error(error);
+function updateFor(action, project) {
+    if (action === 'close') {
+        const status = project.projectStatusData.find((x) => x.type === "close");
+        return status ? { status: status.value, statusType: status.type } : null;
     }
+    if (action === 'reopen') {
+        const status = reopenStatusOf(project);
+        return status ? { status: status.value, statusType: status.type } : null;
+    }
+    return { deletedStatusKey: { archive: 2, restore: 0, delete: 1 }[action] };
 }
 
-
-async function deleteProject(project, deletedStatusKey) {
-    try {
-        showSidebar.value = false
-        let updateObject = {};
-        updateObject.deletedStatusKey = deletedStatusKey;
-
-        await apiRequest("put",`/api/v1/${env.PROJECTACTIONS}/${project._id}`,{updateObject: updateObject});
-        commit('projectData/projectLocalUpdate', {itemData:  {...project,...updateObject},projectId:project._id,key:'RemoveProject',subKey: '',userId: ''});
-        deleteChildTasks(project);
-        commit('projectData/mutateProjects', [{ op: "modified", data: { ...project, ...updateObject } }]);
-        $toast.success(t('Toast.Deleted_successfully'), { position: 'top-right' });
-    } catch (error) {
-        console.error(error);
+function choose(action) {
+    if (CONFIRMS[action]) {
+        pending.value = action;
+        showSidebar.value = true;
+        return;
     }
+    run(action);
 }
 
-async function deleteChildTasks(project) {
+/* The server moves the project's tasks with it (Project/helpers/projectLifecycle). */
+async function run(action) {
+    const project = props.item;
+    const updateObject = updateFor(action, project);
+    showSidebar.value = false;
+    if (!updateObject) return;
     try {
-        let body = {
-            findObject: {deletedStatusKey: { $in: [0, undefined] }},
-            updateObject: { $set: { deletedStatusKey: 1 } },
-        }
-        await apiRequest("put", `/api/v1/${env.PROJECTALLTASKUPDATE}/${project._id}`,body);
+        await apiRequest("put",`/api/v1/${env.PROJECTACTIONS}/${project._id}`,{updateObject});
+        commit('projectData/projectLocalUpdate', {itemData: {...project,...updateObject},projectId:project._id,key:'RemoveProject',subKey: '',userId: ''});
+        if (action === 'delete') commit('projectData/mutateProjects', [{ op: "modified", data: { ...project, ...updateObject } }]);
+        $toast.success(t(action === 'delete' ? 'Toast.Deleted_successfully' : 'Toast.Updated_successfully'),{position: 'top-right'});
     } catch (error) {
-        console.error(error)
-    }
-}
-
-async function unarchiveProject(project) {
-    try {
-        let updateObject = {deletedStatusKey: 0}
-        await apiRequest("put",`/api/v1/${env.PROJECTACTIONS}/${project._id}`,{updateObject: updateObject});
-        commit('projectData/projectLocalUpdate', {itemData:  {...project,...updateObject},projectId:project._id,key:'RemoveProject',subKey: '',userId: ''});
-        restoreChildTasks(project._id, 7);
-        $toast.success(t('Toast.Updated_successfully'),{position: 'top-right'});
-    } catch (error) {
-        console.error("ERROR in unarchive project: ", error);
-    }
-}
-
-async function restoreChildTasks(projectId, restoreKey = 8) {
-    // UPDATE CHILD TASKS | TYPESENE
-    try {
-        let taskDeleteStatusKey = 0;
-        let body = {
-            findObject: { deletedStatusKey:restoreKey },
-            updateObject: {deletedStatusKey: taskDeleteStatusKey}
-        }
-        await apiRequest("put", `/api/v1/${env.PROJECTALLTASKUPDATE}/${projectId}`,body);
-    } catch (error) {
-        console.error(`ERROR in update sprint tasks: `, error);
+        $toast.error(t('Toast.something_went_wrong'),{position: 'top-right'});
+        console.error(`ERROR in ${action} project: `, error);
     }
 }
 

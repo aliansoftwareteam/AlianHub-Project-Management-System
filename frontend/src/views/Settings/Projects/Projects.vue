@@ -9,28 +9,30 @@
             <div class="lising_mainDiv p-1 position-re">
                 <div class="totalCountActiveClose d-flex justify-content-between position-re">
                     <input type="text" class="ah-input project-search" v-model="searchValue" :placeholder="$t('PlaceHolder.search')" :aria-label="$t('PlaceHolder.search')"/>
-                    <div class="d-flex">
-                        <span class="tab-option" @click="activeTab = 0" :class="{'activeTab': activeTab === 0}">{{$t('Projects.all_project')}} ({{filterActiveProjects && filterActiveProjects.length ? filterActiveProjects.length : 0 }})</span>
-                        <span class="tab-option" @click="activeTab = 1" :class="{'activeTab': activeTab === 1}">{{$t('Projects.closed_project')}} ({{filterCloseProject && filterCloseProject.length ? filterCloseProject.length : 0}})</span>
+                    <div class="d-flex" role="tablist">
+                        <span
+                            v-for="tab in TABS"
+                            :key="tab.state"
+                            class="tab-option"
+                            :class="{'activeTab': activeTab === tab.state}"
+                            role="tab"
+                            tabindex="0"
+                            :aria-selected="activeTab === tab.state"
+                            :data-test="`projects-tab-${tab.state}`"
+                            @click="activeTab = tab.state"
+                            @keydown.enter="activeTab = tab.state"
+                        >{{ $t(tab.label) }} ({{ buckets[tab.state].length }})</span>
                     </div>
                 </div>
-                <div v-if="activeTabProjects?.length">
+                <div v-if="activeTabProjects.length">
                   <ProjectsListingSetting
-                    v-for="(item, itemIndex) in paginatedItems"
-                    :key="'item'+itemIndex"
+                    v-for="item in paginatedItems"
+                    :key="item._id"
                     :item="item"
-                    :activeTab="activeTab"
                   />
 
             <div v-if="clientWidth > 1024" class="pagination">
-                  <div class="showingEntries">
-                        <div v-if="activeTabProjects === filterActiveProjects">
-                            {{ $t('Projects.showing_entries', { from: Math.min((currentPage - 1) * itemsPerPage + 1, filterActiveProjects.length), to: Math.min(currentPage * itemsPerPage, filterActiveProjects.length), total: filterActiveProjects.length }) }}
-                       </div>
-                        <div v-else-if="activeTabProjects === filterCloseProject">
-                            {{ $t('Projects.showing_entries', { from: (currentPage - 1) * itemsPerPage + 1, to: Math.min(currentPage * itemsPerPage, filterCloseProject.length), total: filterCloseProject.length }) }}
-                        </div>
-                 </div>
+                  <div class="showingEntries">{{ shownEntries }}</div>
                 <div class="page_button">
 
                             <div  @click="goToPreviousPage"  :disabled="currentPage === 1">
@@ -55,7 +57,7 @@
                 </div>
 
 
-                <div v-if="allProjects.length " class="itemsPerPageSelect">
+                <div class="itemsPerPageSelect">
                         <label for="itemsPerPageSelect">{{$t('Projects.items_per_page') +' :'}}</label>
                         <select id="itemsPerPageSelect" v-model="itemsPerPage" @change="updatePagination">
                             <option :value="5">5</option>
@@ -90,16 +92,9 @@
                          </div>
                 </div>
                 <div :class="[clientWidth > 576 ? 'd-flex' : '','justify-content-between','align-items-center']">
-                    <div class="showingEntries">
-                            <div v-if="activeTabProjects === filterActiveProjects">
-                                {{ $t('Projects.showing_entries', { from: Math.min((currentPage - 1) * itemsPerPage + 1, filterActiveProjects.length), to: Math.min(currentPage * itemsPerPage, filterActiveProjects.length), total: filterActiveProjects.length }) }}
-                           </div>
-                            <div v-else-if="activeTabProjects === filterCloseProject">
-                                {{ $t('Projects.showing_entries', { from: (currentPage - 1) * itemsPerPage + 1, to: Math.min(currentPage * itemsPerPage, filterCloseProject.length), total: filterCloseProject.length }) }}
-                            </div>
-                     </div>
-    
-                    <div v-if="allProjects.length " class="itemsPerPageSelect">
+                    <div class="showingEntries">{{ shownEntries }}</div>
+
+                    <div class="itemsPerPageSelect">
                             <label for="itemsPerPageSelect">{{$t('Projects.items_per_page') +' :'}}</label>
                             <select id="itemsPerPageSelect" v-model="itemsPerPage" @change="updatePagination">
                                 <option :value="5">5</option>
@@ -133,13 +128,21 @@ import { useProjectsHelper } from '@/views/Projects/helper';
 import { useStore } from 'vuex';
 import { useCustomComposable } from "@/composable";
 import { maskOf } from "@/utils/iconMask";
+import { useI18n } from "vue-i18n";
+import { lifecycleOf, ACTIVE, ARCHIVED, CLOSED } from "@/utils/lifecycle";
 
+const TABS = [
+    { state: ACTIVE, label: 'Projects.tab_open' },
+    { state: ARCHIVED, label: 'Projects.tab_archived' },
+    { state: CLOSED, label: 'Projects.tab_closed' },
+];
 
+const { t } = useI18n();
 const { dispatchProjects} = useProjectsHelper();
 const {checkPermission} = useCustomComposable();
 const {getters} = useStore();
 const searchValue = ref("");
-const activeTab = ref(0);
+const activeTab = ref(ACTIVE);
 const noSearch = require("@/assets/images/svg/No-Search-Result.svg")
 const previousArrow = require("@/assets/images/svg/right_arrow.svg")
 const nextArrow = require("@/assets/images/svg/left_arrow.svg")
@@ -167,47 +170,26 @@ function updatePagination() {
   currentPage.value = 1;
 }
 
-const allProjects = computed(()=> {
-    if ((searchValue.value).trim()) {
-     let allPro = getters["projectData/projects"].data.filter((x) => x.ProjectName.toLowerCase()?.includes(searchValue.value.toLowerCase().trim()) || x.ProjectCode.toLowerCase()?.includes(searchValue.value.toLowerCase().trim()))
-     return allPro        
-    } else {
-        return getters["projectData/projects"].data
-    }
-})
+const matchesSearch = (project, term) => !term
+    || String(project.ProjectName || '').toLowerCase().includes(term)
+    || String(project.ProjectCode || '').toLowerCase().includes(term);
 
-           
-    
-const closeProjects = computed(()=> {
-    if (searchValue.value.trim()) {
-        let allPro = getters["projectData/closeProject"].data.filter((x) => x.ProjectName.toLowerCase()?.includes(searchValue.value.toLowerCase()) || x.ProjectCode.toLowerCase()?.includes(searchValue.value.toLowerCase()))
-        return allPro
-    } else {
-        return getters["projectData/closeProject"].data
-    }
-})
-
-const filterActiveProjects = computed(() => {
-    let activeProject = allProjects.value
-    activeProject && activeProject.sort((a,b) => a.Created_At > b.Created_At ? -1 : 1)
-    return activeProject?.filter((ele)=>{return ele.deletedStatusKey !== 1 && ele.deletedStatusKey !== 2}) || [];
-})
-
-
-const filterCloseProject = computed(() => {
-    let closeProject = closeProjects.value
-    closeProject && closeProject.sort((a,b) => a.Created_At > b.Created_At ? -1 : 1)
-    return closeProject;
-})
-
-
-const activeTabProjects = computed(() => {
-    if (activeTab.value === 0)
-    return filterActiveProjects.value;
-return filterCloseProject.value;
+const buckets = computed(() => {
+    const term = searchValue.value.trim().toLowerCase();
+    const byState = { [ACTIVE]: [], [ARCHIVED]: [], [CLOSED]: [] };
+    (getters["projectData/allProjects"]?.data || [])
+        .filter((project) => !project.isPersonal && matchesSearch(project, term))
+        .sort((a, b) => (a.Created_At > b.Created_At ? -1 : 1))
+        .forEach((project) => byState[lifecycleOf(project, 'project')]?.push(project));
+    return byState;
 });
 
+const activeTabProjects = computed(() => buckets.value[activeTab.value]);
 
+const shownEntries = computed(() => {
+    const total = activeTabProjects.value.length;
+    return t('Projects.showing_entries', { from: Math.min((currentPage.value - 1) * itemsPerPage.value + 1, total), to: Math.min(currentPage.value * itemsPerPage.value, total), total });
+});
 
 
 const paginatedItems = computed(() => {

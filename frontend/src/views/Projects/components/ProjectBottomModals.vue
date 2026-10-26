@@ -22,7 +22,7 @@
             :modelValue="showSidebar"
             @update:modelValue="(v) => $emit('update:showSidebar', v)"
             :title="`${archive === 0 ? $t('Projects.close') : archive === 1 ? $t('Projects.archive') : $t('Projects.delete')}`"
-            :message="archive === 0 ? $t('conformationmsg.archive0mesg') : archive === 1 ? $t('conformationmsg.archive') : $t('conformationmsg.delete')"
+            :message="archive === 0 ? $t('conformationmsg.archive0mesg') : archive === 1 ? $t('conformationmsg.archive_project') : $t('conformationmsg.delete')"
             :confirmationString="`${archive === 0 ? 'close' : archive === 1 ? 'archive' : 'delete'}`"
             :acceptButtonClass="archive === 1 ? 'btn-primary' : 'btn-danger'"
             :acceptButton="`${archive === 0 ? $t('Projects.close') : archive === 1 ? $t('Projects.archive') : $t('Projects.delete')}`"

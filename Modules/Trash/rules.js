@@ -48,12 +48,10 @@ const toRow = (kind, doc) => ({
     ...KINDS[kind].row(doc)
 });
 
-/* Restoring a container brings back the tasks it took with it. A trashed
-   project set its tasks to 1 and an archived one to 7; a trashed list set
-   its tasks to 1 (the sprint write itself already restores the 4s). A folder's
-   own write restores its subfolders and tasks, so it names no filter here. */
+/* Restoring a list brings back the tasks it trashed (the sprint write itself
+   already restores the 4s). A folder's own write restores its subfolders and
+   tasks, and a project's tasks follow Project/helpers/projectLifecycle. */
 const childRestoreFilter = (kind, id, ObjectId) => {
-    if (kind === 'projects') return { ProjectID: new ObjectId(id), deletedStatusKey: { $in: [TRASHED, 7] } };
     if (kind === 'lists') return { sprintId: new ObjectId(id), deletedStatusKey: TRASHED };
     return null;
 };

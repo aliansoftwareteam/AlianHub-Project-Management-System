@@ -5,12 +5,11 @@ import { useI18n } from 'vue-i18n';
 import { useFavourites } from '@/composable/favourites';
 import * as env from '@/config/env';
 import { apiRequest } from '@/services';
-import { keyFor, ACTIVE, ARCHIVED, TRASHED } from '@/utils/lifecycle';
+import { keyFor, ARCHIVED, TRASHED } from '@/utils/lifecycle';
 
 /* `archive` is the pending mode: 0 close · 1 archive · 2 delete. */
 const MODE_CLOSE = 0;
 const MODE_ARCHIVE = 1;
-const MODE_DELETE = 2;
 
 export function useProjectLifecycle(projectData) {
     const { commit } = useStore();
@@ -23,43 +22,7 @@ export function useProjectLifecycle(projectData) {
     const showSidebar = ref(false);
     const showSpinner = ref(false);
 
-    function updateChildTasks(restore = false, ProjectId = '') {
-        try {
-            const mode = archive.value;
-            // Tasks inherit 8 from a closed project and 7 from an archived one; a deleted project trashes them.
-            const inherited = mode === MODE_CLOSE ? 8 : 7;
-            let taskDeleteStatusKey = 0;
-            let deletedStatusKey;
-            if (restore) {
-                deletedStatusKey = mode ? 8 : 7;
-                taskDeleteStatusKey = keyFor('task', ACTIVE);
-            } else {
-                deletedStatusKey = keyFor('task', ACTIVE);
-                taskDeleteStatusKey = mode === MODE_DELETE ? keyFor('task', TRASHED) : inherited;
-            }
-            try {
-                const object = {
-                    firstParameter: {
-                        objId: { ProjectID: ProjectId },
-                        deletedStatusKey,
-                    },
-                    secondParameter: { $set: { deletedStatusKey: taskDeleteStatusKey } },
-                    key: 'updateMany',
-                    isConvertFirstParameter: true,
-                    isConvertSecondParameter: false,
-                };
-
-                apiRequest('put', env.TASK, object).catch((error) => {
-                    console.error(error);
-                });
-            } catch (error) {
-                console.error(error);
-            }
-        } catch (error) {
-            console.error('ERROR in update tasks: ', error);
-        }
-    }
-
+    /* The server moves the project's tasks with it (Project/helpers/projectLifecycle). */
     async function updateProject(value = null) {
         showSpinner.value = true;
         const updateObject = {};
@@ -74,8 +37,6 @@ export function useProjectLifecycle(projectData) {
             await apiRequest('put', `/api/v1/${env.PROJECTACTIONS}/${projectData.value._id}`, { updateObject: { ...updateObject } });
             showSidebar.value = false;
             showSpinner.value = false;
-            const ProjectId = JSON.parse(JSON.stringify(projectData.value._id));
-            updateChildTasks(value !== null, ProjectId);
             const type = value !== null ? 'restored' : archive.value === MODE_CLOSE ? 'closed' : archive.value === MODE_ARCHIVE ? 'archived' : 'deleted';
             $toast.success(t(`Toast.Project ${type} successfully`), { position: 'top-right' });
             commit('projectData/projectLocalUpdate', { itemData: { ...projectData.value, ...updateObject }, projectId: projectData.value._id, key: value === null ? 'RemoveProject' : 'AddProject', subKey: '', userId: '' });

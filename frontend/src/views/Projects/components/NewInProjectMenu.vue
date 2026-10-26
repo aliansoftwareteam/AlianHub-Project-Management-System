@@ -6,7 +6,9 @@
             :aria-expanded="open"
             :disabled="projectData?.status === 'close'"
             @click.stop="open = !open"
-        >+ {{ $t('Projects.new') }}</button>
+        >
+            <ShellIcon name="plus" :size="14" />{{ $t('Projects.new') }}
+        </button>
         <div v-if="open" class="ah-pop nip__pop" role="menu" @click.stop>
             <button v-if="canTask" type="button" class="ah-pop__item" role="menuitem" @click="newTask">
                 <ShellIcon name="plus" :size="14" />{{ $t('Projects.new_menu_task') }}

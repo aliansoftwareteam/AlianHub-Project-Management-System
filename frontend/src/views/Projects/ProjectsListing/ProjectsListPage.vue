@@ -4,6 +4,21 @@
             <h1 class="ah-h1">{{ $t('Projects.title') }}</h1>
             <span class="pl2__counts">{{ $t('Projects.counts', { active: activeCount, archived: archivedCount }) }}</span>
             <div class="pl2__head-actions">
+                <div class="pl2__search">
+                    <ShellIcon name="search" :size="14" class="pl2__search-icon" />
+                    <input
+                        v-model="search"
+                        type="search"
+                        class="ah-input pl2__search-input"
+                        data-test="project-search"
+                        :placeholder="$t('Projects.search_placeholder')"
+                        :aria-label="$t('Projects.search_placeholder')"
+                        @keydown.esc="search = ''"
+                    />
+                    <button v-if="search" type="button" class="pl2__search-clear" :aria-label="$t('Projects.search_clear')" :title="$t('Projects.search_clear')" @click="search = ''">
+                        <ShellIcon name="x" :size="12" />
+                    </button>
+                </div>
                 <div class="pl2__filter">
                     <button type="button" class="ah-btn ah-btn--secondary ah-btn--sm" :class="{ 'is-on': filterOn }" @click.stop="menuFor = ''; filterOpen = !filterOpen">
                         <ShellIcon name="grip" :size="14" />{{ $t('Projects.filter') }}
@@ -112,6 +127,11 @@
             </div>
         </div>
 
+        <div v-else-if="searchTerm" class="ah-empty" data-test="project-search-empty">
+            {{ $t('Projects.search_empty', { query: search.trim() }) }}
+            <button type="button" class="ah-btn ah-btn--secondary ah-btn--sm" @click="search = ''">{{ $t('Projects.search_clear') }}</button>
+        </div>
+
         <div v-else-if="showArchived" class="ah-empty">
             {{ $t('Projects.empty_archived') }}
             <button type="button" class="ah-btn ah-btn--secondary ah-btn--sm" @click="showArchived = false">{{ $t('Projects.active_only') }}</button>
@@ -188,6 +208,8 @@ const showArchived = ref(false);
 const isArchived = (project) => lifecycleOf(project, 'project') === ARCHIVED;
 const onlyFavourites = ref(localStorage.getItem('favoriteFilter') === 'true');
 const filterOpen = ref(false);
+const search = ref('');
+const searchTerm = computed(() => search.value.trim().toLowerCase());
 const menuFor = ref('');
 const creating = ref(false);
 const createName = ref('');
@@ -218,6 +240,7 @@ const isFavourite = (project) => isStarred('project', project._id);
 const rows = computed(() => {
     let list = visible.value.filter((p) => (showArchived.value ? isArchived(p) : !isArchived(p)));
     if (onlyFavourites.value) list = list.filter(isFavourite);
+    if (searchTerm.value) list = list.filter((p) => [p.ProjectName, p.ProjectCode].some((v) => String(v || '').toLowerCase().includes(searchTerm.value)));
     const rank = (p) => (isFavourite(p) ? 0 : 1);
     return [...list].sort((a, b) => rank(a) - rank(b) || new Date(b.createdAt || 0) - new Date(a.createdAt || 0));
 });

@@ -637,7 +637,7 @@ async function updateProject(value = null) {
         await apiRequest("put", `/api/v1/${env.PROJECTACTIONS}/${propItem.value._id}`, {updateObject: { ...updateObject }});
         showSidebar.value = false;
         showSpinner.value = false;
-        updateChildTasks(value !== null);
+        if (value === null) resetCommentCounts();
         const type = `${value !== null ? 'restored' : archive.value === 0 ? 'closed' : 'deleted'}`;
         $toast.success(t(`Toast.Project ${type} successfully`), {position: 'top-right'});
         emits('projectAction',{...propItem.value,...updateObject},value === null || archive.value === 0 ? 'RemoveProject' : 'AddProject');
@@ -649,54 +649,14 @@ async function updateProject(value = null) {
     }
 }
 
-async function updateChildTasks(restore = false) {
-    try {
-        let dsk = archive.value;
-            let taskDeleteStatusKey = 0;
-            let deletedStatusKey;
-            if(restore) {
-                deletedStatusKey = dsk ? 8 : 7;
-                taskDeleteStatusKey = 0;
-            } else {
-                deletedStatusKey = 0
-                if(dsk === 1 || dsk === 0) {
-                    taskDeleteStatusKey = (dsk === 0 ? 8 : 7)
-                } else if(dsk === 2) {
-                    taskDeleteStatusKey = 1
-                }
-            }
-
-            try {
-                let body = {
-                    findObject: { deletedStatusKey:deletedStatusKey },
-                    updateObject: {deletedStatusKey: taskDeleteStatusKey}
-                }
-                await apiRequest("put", `/api/v1/${env.PROJECTALLTASKUPDATE}/${propItem.value._id}`,body);
-
-                if(taskDeleteStatusKey !== 0) {
-                    // RESET PROJECT COUNTS
-                    const axiosData = {
-                        companyId: companyId.value,
-                        searchKey: `project_${propItem.value._id}_`
-                    };
-                    apiRequest("post", env.UNSET_COMMENTS_COUNT, axiosData)
-                    .catch((error) => {
-                        console.error("ERROR: ", error);
-                    })
-
-                    // RESET TASK COUNTS
-                    axiosData.searchKey=`task_${propItem.value._id}_`;
-                    apiRequest("post", env.UNSET_COMMENTS_COUNT, axiosData)
-                    .catch((error) => {
-                        console.error("ERROR: ", error);
-                    })
-                }
-            } catch (error) {
-                console.error(error)
-            }
-    } catch (error) {
-        console.error(`ERROR in update tasks: `, error);
-    }
+/* The server moves the project's tasks with it (Project/helpers/projectLifecycle); the unread counts are cleared here. */
+function resetCommentCounts() {
+    ['project', 'task'].forEach((scope) => {
+        apiRequest("post", env.UNSET_COMMENTS_COUNT, { companyId: companyId.value, searchKey: `${scope}_${propItem.value._id}_` })
+            .catch((error) => {
+                console.error("ERROR: ", error);
+            });
+    });
 }
 
 const userActivityClick = async () => {

@@ -184,27 +184,15 @@ a.ph2__sprint:focus-visible { outline: none; box-shadow: var(--focus); }
 /* The vertical margins space the two rows of a wrapped bar; on one row they fit inside --toolbar-h. */
 .ph2__tree, .ph2__actions { margin-block: 4px; }
 
-.ph2 .ah-btn--ghost { padding: 0 6px; line-height: 0; }
-.ph2 .ah-btn--ghost img { vertical-align: middle; }
-.ph2 .open__watcher { width: var(--control-h, 30px); height: var(--control-h, 30px); padding: 0; background: var(--surface); color: var(--ink-2); border-color: var(--border); }
-.ph2 .open__watcher:hover { background: var(--surface-hover); }
+.ph2__actions .ah-btn--secondary > svg { flex: none; color: var(--ink-2); }
+.ph2__actions .ph2__ai > svg { color: var(--brand); }
+.ph2__actions .ph2__icon-btn { width: var(--control-h, 30px); padding: 0; }
+.ph2__actions .ph2__icon-btn:hover:not(:disabled) > svg { color: var(--ink); }
+.ph2__actions .ph2__watchers { gap: 6px; padding: 0 var(--sp-3); }
+.ph2__count { font: 600 var(--fs-xs, 10.5px)/1 var(--font-mono); color: var(--ink-2); }
+
 .ph2 .dot-btn { display: inline-flex; align-items: center; justify-content: center; color: var(--ink-2); }
 .ph2 .dot-btn:hover { color: var(--ink); }
-
-.ph2 .sprint-watcher-count {
-    background-color: var(--fill);
-    color: var(--ink-2);
-    font: 600 var(--fs-xs, 10.5px)/1 var(--font-mono);
-    line-height: 16px;
-}
-
-.ph2__ai {
-    border-color: var(--brand-border);
-    color: var(--brand);
-    background: var(--surface);
-    font-weight: 600;
-}
-.ph2__ai:hover { background: var(--brand-tint); }
 
 .ph2__agents {
     display: flex;

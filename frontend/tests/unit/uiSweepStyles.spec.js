@@ -58,8 +58,8 @@ describe('project header icons in dark mode', () => {
     });
 
     test('the watchers button border follows the theme', () => {
-        const css = read('views/Projects/components/project-header.css');
-        expect(ruleBody(css, '.ph2 .open__watcher')).toMatch(/border-color:\s*var\(--border\)/);
+        expect(read('views/Projects/components/ProjectActionsBar.vue')).toContain('class="ah-btn ah-btn--secondary ah-btn--sm ph2__watchers"');
+        expect(ruleBody(read('assets/css/tokens.css'), '.ah-btn--secondary')).toMatch(/border-color:\s*var\(--border\)/);
     });
 });
 

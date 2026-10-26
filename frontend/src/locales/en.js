@@ -6810,6 +6810,9 @@ export default {
         archived_only: "Archived projects",
         favourites_only: "Favourites only",
         portfolio_view: "Portfolio view",
+        search_placeholder: "Search projects",
+        search_clear: "Clear search",
+        search_empty: "No projects match \"{query}\".",
         new_project: "New project",
         col_project: "Project",
         col_health: "Health",
@@ -6824,6 +6827,11 @@ export default {
         restore: "Restore",
         archive: "Archive",
         close_project: "Close project",
+        archive_project: "Archive project",
+        tab_open: "Open",
+        tab_archived: "Archived",
+        tab_closed: "Closed",
+        closed_chip: "Closed",
         project_actions: "Actions for {name}",
         delete: "Delete",
         row_menu: "Project actions",
@@ -7534,6 +7542,8 @@ export default {
         archive_task: "This task is hidden from its list and nothing in it is lost. Turn on Show Archive to see it or to restore it.",
         archive0mesg:
             "Type project name to confirm that you really do wish to close this project",
+        archive_project:
+            "This project and its tasks move to Archived. Nothing is lost: restore it any time and it comes back exactly as it was.",
         sprintclosemsg:
             "Type the word below to confirm that you really do wish to close this list",
         type: "Type",
@@ -13600,6 +13610,9 @@ export default {
         rename_folder: "Rename {folder}",
         list_actions: "Actions for {list}",
         rename_list: "Rename {list}",
+        search_placeholder: "Search projects",
+        search_clear: "Clear search",
+        search_empty: "No projects match \"{query}\".",
     },
     TaskTemplates: {
         save_as: "Save as template",

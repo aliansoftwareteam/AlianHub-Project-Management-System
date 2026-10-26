@@ -13,7 +13,7 @@ async function newProject(loginAs, label) {
 }
 
 async function chooseNew(page, item) {
-    await page.getByRole('button', { name: '+ New', exact: true }).click();
+    await page.getByRole('button', { name: 'New', exact: true }).click();
     await page.getByRole('menuitem', { name: item, exact: true }).click();
 }
 

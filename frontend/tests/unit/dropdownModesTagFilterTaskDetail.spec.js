@@ -128,7 +128,12 @@ describe('the task detail header', () => {
         await open(trigger);
         expect(trigger.getAttribute('aria-expanded')).toBe('true');
         expect(popupOf(trigger).getAttribute('role')).toBe('menu');
-        expect(popupOf(trigger).querySelectorAll('[role="menuitem"]').length).toBeGreaterThan(0);
+        const items = [...popupOf(trigger).querySelectorAll('[role="menuitem"]')];
+        expect(items.length).toBeGreaterThan(0);
+        items.forEach((item) => {
+            expect(item.querySelector('img')).toBeNull();
+            expect(item.querySelector('.ah-menu-row > svg')).not.toBeNull();
+        });
     });
 
     describe('"Count toward a goal…" in that menu', () => {
@@ -170,11 +175,30 @@ describe('the task detail header', () => {
         });
     });
 
+    it('draws its menu and watchers triggers as the header\'s small bordered buttons, with no image icons', async () => {
+        await mountOn(TaskDetailAction, props, provide);
+        const triggers = [triggerNamed('TaskPanel.more_actions'), document.querySelector('.watcher-action [aria-haspopup]')];
+        triggers.forEach((trigger) => {
+            expect([...trigger.classList]).toEqual(expect.arrayContaining(['ah-btn', 'ah-btn--secondary', 'ah-btn--sm']));
+            expect(trigger.querySelector('img')).toBeNull();
+            expect(trigger.querySelector('svg')).not.toBeNull();
+        });
+    });
+
+    it('lists the people who can watch as soon as it opens, before the task\'s watchers change', async () => {
+        await mountOn(TaskDetailAction, props, provide);
+        const trigger = document.querySelector('.watcher-action [aria-haspopup]');
+        await open(trigger);
+        const names = [...popupOf(trigger).querySelectorAll('[role="option"]')].map((o) => o.textContent.trim());
+        expect(names).toEqual(['Name user-1', 'Name user-2']);
+    });
+
     it('opens a listbox of watchers that marks who is watching', async () => {
         await mountOn(TaskDetailAction, { ...props, watchers: [] }, provide);
         await wrapper.setProps({ watchers: ['user-1'] });
         const trigger = document.querySelector('.watcher-action [aria-haspopup]');
         expect(trigger.classList.contains('task-action__btn')).toBe(true);
+        expect(trigger.querySelector('.watcher-count').textContent).toBe('1');
         expect(trigger.getAttribute('aria-haspopup')).toBe('listbox');
 
         await open(trigger);

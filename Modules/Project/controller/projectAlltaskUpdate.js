@@ -3,11 +3,11 @@ const { MongoDbCrudOpration,validateObjectId } = require("../../../utils/mongo-h
 const mongoose = require("mongoose")
 
 /*
- * The web app sends this route only from the project close, delete, archive and restore flows
- * (ProjectsListingSetting.vue, Item.vue), and only ever moves deletedStatusKey. The filter may carry
- * $in because the delete cascade matches tasks with no key; JSON turns that undefined into null.
- * ProjectsListingSetting.vue sends the update already wrapped in $set; wrapping it again would name a
- * "$set" field that the strict schema drops, so the write would match every task and change none.
+ * The project update now moves a project's tasks itself (Project/helpers/projectLifecycle); this route
+ * stays for clients built before that, and only ever moves deletedStatusKey. The filter may carry
+ * $in because their delete cascade matches tasks with no key; JSON turns that undefined into null.
+ * Some send the update already wrapped in $set; wrapping it again would name a "$set" field that the
+ * strict schema drops, so the write would match every task and change none.
  */
 const FILTER_FIELDS = ['ProjectID', 'deletedStatusKey'];
 const UPDATE_FIELD = 'deletedStatusKey';
