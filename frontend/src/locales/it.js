@@ -6752,6 +6752,9 @@ export default {
         "archived_only": "Archived projects",
         "favourites_only": "Favourites only",
         "portfolio_view": "Portfolio view",
+        "search_placeholder": "Search projects",
+        "search_clear": "Clear search",
+        "search_empty": "No projects match \"{query}\".",
         "new_project": "New project",
         "col_project": "Project",
         "col_health": "Health",
@@ -13312,7 +13315,10 @@ export default {
         "folder_actions": "Actions for {folder}",
         "rename_folder": "Rename {folder}",
         "list_actions": "Actions for {list}",
-        "rename_list": "Rename {list}"
+        "rename_list": "Rename {list}",
+        "search_placeholder": "Search projects",
+        "search_clear": "Clear search",
+        "search_empty": "No projects match \"{query}\"."
     },
     "TaskTemplates": {
         "save_as": "Save as template",
