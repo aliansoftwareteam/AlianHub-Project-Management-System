@@ -1,4 +1,4 @@
-const { lifecycleOf, keyFor, isActive, ACTIVE, ARCHIVED, CLOSED, TRASHED } = require('../frontend/src/utils/lifecycle');
+const { lifecycleOf, keyFor, isActive, reopenStatusOf, ACTIVE, ARCHIVED, CLOSED, TRASHED } = require('../frontend/src/utils/lifecycle');
 
 describe('lifecycleOf — projects', () => {
     test.each([
@@ -48,4 +48,35 @@ describe('keyFor', () => {
 test('isActive is the ACTIVE shorthand', () => {
     expect(isActive({ deletedStatusKey: 0 }, 'task')).toBe(true);
     expect(isActive({ deletedStatusKey: 2 }, 'project')).toBe(false);
+});
+
+describe('reopenStatusOf', () => {
+    const statuses = [
+        { value: 'open', type: 'default_active' },
+        { value: 'in_testing', type: 'active' },
+        { value: 'planning', type: 'active', default: true },
+        { value: 'close', type: 'close' }
+    ];
+
+    test('returns the status the project had when it was closed', () => {
+        expect(reopenStatusOf({ projectStatusData: statuses, statusBeforeClose: 'in_testing' }).value).toBe('in_testing');
+    });
+
+    test.each([
+        ['nothing was kept', undefined],
+        ['the kept status was removed', 'in_review'],
+        ['the kept status is a close one', 'close']
+    ])('falls back to the default when %s', (_why, kept) => {
+        expect(reopenStatusOf({ projectStatusData: statuses, statusBeforeClose: kept }).value).toBe('planning');
+    });
+
+    test('then to the default active status, then to the first open one', () => {
+        expect(reopenStatusOf({ projectStatusData: statuses.map(({ default: _d, ...status }) => status) }).value).toBe('open');
+        expect(reopenStatusOf({ projectStatusData: [{ value: 'close', type: 'close' }, { value: 'doing', type: 'active' }] }).value).toBe('doing');
+    });
+
+    test('a project with no open status has nothing to reopen to', () => {
+        expect(reopenStatusOf({ projectStatusData: [{ value: 'close', type: 'close' }] })).toBeNull();
+        expect(reopenStatusOf({})).toBeNull();
+    });
 });

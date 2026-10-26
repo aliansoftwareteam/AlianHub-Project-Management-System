@@ -182,7 +182,6 @@ module.exports.DELETE_USER_CHAT = '/api/v1/deleteUserChat';
 module.exports.SAVE_BRAND_SETTINGS_INFORMATION = '/api/v1/saveBrandSettingsData';
 module.exports.GET_BRAND_SETTINGS_INFORMATION = '/api/v1/getBrandSettingsData';
 module.exports.PROJECTACTIONS = 'project';
-module.exports.PROJECTALLTASKUPDATE = 'project/allTask';
 module.exports.GET_SPRINT_OR_PROJECT= 'project/sprintFolder';
 module.exports.PROJECTSPRINTUPDATE = 'project/sprint';
 module.exports.COMPANYACTIONS = '/api/v1/company';

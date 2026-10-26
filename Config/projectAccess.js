@@ -59,7 +59,7 @@ const FIELD_PERMISSIONS = {
 const SERVER_ONLY_FIELDS = new Set([
     '_id', 'CompanyId', 'companyId', 'projectCreatedBy', 'personalOwner', 'isPersonal', 'isRestrict',
     'sprintsObj', 'sprintsfolders', 'lastTaskId', 'milestoneAmount', 'proposalIdNumeric',
-    'lastProjectActivity', 'userActivity', 'legacyId', 'demo',
+    'lastProjectActivity', 'userActivity', 'legacyId', 'demo', 'statusBeforeClose', 'trashedFromKey',
     ...PROJECT_AGENT_FIELDS,
 ]);
 

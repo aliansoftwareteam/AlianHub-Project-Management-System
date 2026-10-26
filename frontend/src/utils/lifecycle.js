@@ -43,4 +43,14 @@ function keyFor(kind, state) {
 
 const isActive = (doc, kind) => lifecycleOf(doc, kind) === ACTIVE;
 
-module.exports = { ACTIVE, ARCHIVED, CLOSED, TRASHED, lifecycleOf, keyFor, isActive };
+/* The status a reopened project returns to: the one it had when it was closed, while the project still offers it. */
+function reopenStatusOf(project) {
+    const statuses = ((project && project.projectStatusData) || []).filter((status) => status && status.type !== 'close');
+    return statuses.find((status) => status.value === project.statusBeforeClose)
+        || statuses.find((status) => status.default === true)
+        || statuses.find((status) => status.type === 'default_active')
+        || statuses[0]
+        || null;
+}
+
+module.exports = { ACTIVE, ARCHIVED, CLOSED, TRASHED, lifecycleOf, keyFor, isActive, reopenStatusOf };

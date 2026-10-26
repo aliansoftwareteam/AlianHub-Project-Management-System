@@ -7,6 +7,7 @@ const { TRASHED, quotaStatus, syncProjectQuota, privacyChange, syncProjectType }
 const logger = require('../../../Config/loggerConfig');
 const knowledgeEvents = require('../../Knowledge/ingest/events');
 const { recordProjectChanges } = require('../helpers/projectHistory');
+const { touchesLifecycle, planLifecycle, readLifecycle, applyMove } = require('../helpers/projectLifecycle');
 const { checkWorkingDays } = require('../../Company/helpers/workingDays');
 const socketEmitter = require('../../../event/socketEventEmitter');
 const { holdProjectDescription, ProjectDescriptionRefused } = require('../helpers/projectDescription');
@@ -204,9 +205,15 @@ exports.updateProject = async (req, res) => {
         }
         const week = guardWorkingDays(updateObject, key);
         if (week.error) return res.status(400).json({ status: false, statusText: week.error, message: week.error });
-        exports.updateProjectInternal(companyId, projectId, updateObject, key, arrayFilters).then((project) => {
-            if (project) socketEmitter.emit('update', { type: 'update', companyId: String(companyId), ...savedChange(project, updateObject, key), module: 'project' });
-            recordProjectChanges({ companyId, projectId, actorId: req.uid, previous: project, updateObject, key, arrayFilters, timeZone: req.body.timeZone })
+        const lifecycle = touchesLifecycle(updateObject, key) ? planLifecycle((await readLifecycle(companyId, projectId)) || {}, updateObject) : null;
+        const written = lifecycle ? { ...updateObject, ...lifecycle.stamp } : updateObject;
+        exports.updateProjectInternal(companyId, projectId, written, key, arrayFilters).then(async (project) => {
+            if (project && lifecycle) {
+                await applyMove(companyId, projectId, lifecycle.move)
+                    .catch((error) => logger.error(`project task cascade failed for ${projectId}: ${(error && error.message) || error}`));
+            }
+            if (project) socketEmitter.emit('update', { type: 'update', companyId: String(companyId), ...savedChange(project, written, key), module: 'project' });
+            recordProjectChanges({ companyId, projectId, actorId: req.uid, previous: project, updateObject: written, key, arrayFilters, timeZone: req.body.timeZone })
                 .catch((error) => logger.error(`project history after update failed: ${(error && error.message) || error}`));
             return res.status(200).json(project);
         }).catch((error) => {

@@ -7,8 +7,8 @@ const OBJECT_ID = /^[a-f0-9]{24}$/i;
 const CASCADE_OPERATION = 'updateMany';
 const ALLOWED_OPERATIONS = Object.freeze([CASCADE_OPERATION]);
 
-/* A project close, archive, delete or restore moves its tasks between these keys (frontend useProjectLifecycle);
-   each transition needs the permission the project menu checks before offering that action. */
+/* Clients built before the project update moved tasks itself (Project/helpers/projectLifecycle) send a project
+   close, archive, delete or restore's task move here; each transition needs the permission the project menu checks. */
 const CASCADE_PERMISSIONS = Object.freeze({
     '0>8': 'project.project_close',
     '0>7': 'project.project_delete',

@@ -49,8 +49,8 @@ describe('rules', () => {
         expect(rules.listQuery('tasks').options.limit).toBe(rules.MAX_ROWS);
     });
 
-    test('containers restore the tasks they trashed; tasks and docs restore nothing else', () => {
-        expect(rules.childRestoreFilter('projects', String(ID), mongoose.Types.ObjectId)).toEqual({ ProjectID: ID, deletedStatusKey: { $in: [1, 7] } });
+    test('a list restores the tasks it trashed; projects, tasks and docs name no filter here', () => {
+        expect(rules.childRestoreFilter('projects', String(ID), mongoose.Types.ObjectId)).toBeNull();
         expect(rules.childRestoreFilter('lists', String(ID), mongoose.Types.ObjectId)).toEqual({ sprintId: ID, deletedStatusKey: 1 });
         expect(rules.childRestoreFilter('tasks', String(ID), mongoose.Types.ObjectId)).toBeNull();
         expect(rules.childRestoreFilter('folders', String(ID), mongoose.Types.ObjectId)).toBeNull();
@@ -92,18 +92,36 @@ describe('PUT /api/v2/trash/:kind/:id/restore', () => {
         expect(res.status).toHaveBeenCalledWith(400);
     });
 
-    test('projects: existing project write, then the tasks it took along', async () => {
+    const storedProject = (project) => MongoDbCrudOpration.mockImplementation(async (companyId, query, method) => {
+        if (query.type === 'projects' && method === 'findOne') return project;
+        if (method === 'find') return [{ _id: PROJECT }];
+        return { acknowledged: true };
+    });
+    const taskWrites = () => MongoDbCrudOpration.mock.calls.filter(([, query, method]) => query.type === 'tasks' && method === 'updateMany').map(([, query]) => query.data);
+    afterEach(() => MongoDbCrudOpration.mockReset());
+
+    test('projects: an archived project that was deleted comes back archived, with only the tasks it took along', async () => {
+        storedProject({ _id: ID, deletedStatusKey: 1, trashedFromKey: 2 });
         const res = mockRes();
         await ctrl.restore(req({ params: { kind: 'projects', id: String(ID) } }), res);
-        expect(updateProjectInternal).toHaveBeenCalledWith(COMPANY, String(ID), { deletedStatusKey: 0 });
-        const [companyId, query, method] = MongoDbCrudOpration.mock.calls[0];
-        expect([companyId, method, query.type]).toEqual([COMPANY, 'updateMany', 'tasks']);
-        expect(query.data[0]).toEqual({ ProjectID: ID, deletedStatusKey: { $in: [1, 7] } });
-        expect(query.data[1]).toEqual({ $set: { deletedStatusKey: 0 } });
+        expect(updateProjectInternal).toHaveBeenCalledWith(COMPANY, String(ID), { deletedStatusKey: 2, trashedFromKey: null });
+        const [[filter, update]] = taskWrites();
+        expect(filter).toMatchObject({ ProjectID: ID, deletedStatusKey: 1, trashedWithProject: true });
+        expect(update).toEqual({ $set: { deletedStatusKey: 7 }, $unset: { trashedWithProject: '' } });
         expect(res.send).toHaveBeenCalledWith({ status: true, statusText: 'Restored.', data: { kind: 'projects', id: String(ID) } });
     });
 
+    test('projects: one deleted before the restore point was kept comes back open with every task its old restore took', async () => {
+        storedProject({ _id: ID, deletedStatusKey: 1 });
+        await ctrl.restore(req({ params: { kind: 'projects', id: String(ID) } }), mockRes());
+        expect(updateProjectInternal).toHaveBeenCalledWith(COMPANY, String(ID), { deletedStatusKey: 0 });
+        const [[filter, update]] = taskWrites();
+        expect(filter).toMatchObject({ ProjectID: ID, deletedStatusKey: { $in: [1, 7] } });
+        expect(update).toEqual({ $set: { deletedStatusKey: 0 } });
+    });
+
     test('projects: the people who may open it are told it is back', async () => {
+        storedProject({ _id: ID, deletedStatusKey: 1, trashedFromKey: 0 });
         const emit = require('../event/socketEventEmitter');
         const spy = jest.spyOn(emit, 'emit').mockImplementation(() => true);
         await ctrl.restore(req({ params: { kind: 'projects', id: String(ID) } }), mockRes());

@@ -22,6 +22,7 @@ const { MongoDbCrudOpration } = require('../../utils/mongo-handler/mongoQueries'
 const logger = require('../../Config/loggerConfig');
 const socketEmitter = require('../../event/socketEventEmitter');
 const { idForms } = require('../../utils/mongo-handler/objectIdKeys');
+const { planLifecycle, applyMove } = require('../Project/helpers/projectLifecycle');
 
 let HandleHistory = null;
 try {
@@ -141,10 +142,9 @@ async function projectHasActivitySince(companyId, projectId, cutoff) {
 // ----- close one project (mirrors the manual "Close Project" flow) ---------
 
 /**
- * Set the project to its close-type status + move its active tasks to the
- * closed-project state (deletedStatusKey 8), same as the manual flow in
- * Item.vue. History + socket so open boards update live. Returns true on
- * close, false when skipped (no close-type status defined on the project).
+ * Close the project exactly as the manual Close does (Project/helpers/projectLifecycle):
+ * close-type status, the status it had kept for Reopen, and its live tasks moved with it.
+ * Returns false when skipped (no close-type status defined on the project).
  */
 async function closeOneProject(companyId, project, inactiveMonths) {
     const closeStatus = Array.isArray(project.projectStatusData)
@@ -155,26 +155,20 @@ async function closeOneProject(companyId, project, inactiveMonths) {
         return false;
     }
 
+    const closing = { status: closeStatus.value, statusType: 'close' };
+    const { stamp, move } = planLifecycle(project, closing);
     const updated = await MongoDbCrudOpration(companyId, {
         type: SCHEMA_TYPE.PROJECTS,
         data: [
             { _id: project._id },
-            { $set: { status: closeStatus.value, statusType: 'close' } },
+            { $set: { ...closing, ...stamp } },
             { returnDocument: 'after' },
         ],
     }, 'findOneAndUpdate');
     if (!updated) return false;
 
-    // Move active tasks into the closed-project state (0 → 8), same as the
-    // manual close's updateChildTasks(). Best-effort — the project is closed
-    // regardless of the bulk task update.
-    await MongoDbCrudOpration(companyId, {
-        type: SCHEMA_TYPE.TASKS,
-        data: [
-            { ProjectID: project._id, deletedStatusKey: 0 },
-            { $set: { deletedStatusKey: 8 } },
-        ],
-    }, 'updateMany').catch((error) => {
+    // Best-effort: the project is closed even if its tasks fail to move. A nightly run tells no open board task by task.
+    await applyMove(companyId, project._id, move, { announce: false }).catch((error) => {
         logger.error(`${LOG_PREFIX} child-task update failed for project ${project._id}: ${error.message}`);
     });
 
@@ -208,7 +202,7 @@ async function runAutoCloseForCompany(companyId, inactiveMonths) {
                 deletedStatusKey: { $in: [0, undefined] },
                 createdAt: { $lt: cutoff },
             },
-            '_id ProjectName status statusType projectStatusData createdAt',
+            '_id ProjectName status statusType deletedStatusKey projectStatusData createdAt',
         ],
     }, 'find').catch((error) => {
         logger.error(`${LOG_PREFIX} could not list projects for company ${companyId}: ${error.message}`);
