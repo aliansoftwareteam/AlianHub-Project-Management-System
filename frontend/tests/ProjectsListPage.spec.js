@@ -39,11 +39,11 @@ import ProjectsListPage from '@/views/Projects/ProjectsListing/ProjectsListPage.
 
 const project = { _id: 'proj-1', ProjectName: 'Alpha', deletedStatusKey: 0, favouriteTasks: [] };
 
-function mountPage(query = {}) {
+function mountPage(query = {}, projects = [project]) {
     currentRoute.value = reactive({ params: { cid: 'company-1' }, query });
     const store = createStore({
         getters: {
-            'projectData/allProjects': () => ({ data: [project] }),
+            'projectData/allProjects': () => ({ data: projects }),
             'settings/selectedCompany': () => ({})
         }
     });
@@ -139,5 +139,45 @@ describe('ProjectsListPage header when projects already exist', () => {
         await flushPromises();
         await createAi(wrapper).trigger('click');
         expect(wrapper.findComponent({ name: 'AiProjectCreator' }).exists()).toBe(true);
+    });
+});
+
+describe('ProjectsListPage search', () => {
+    const projects = [
+        project,
+        { _id: 'proj-2', ProjectName: 'Shopify Store Locator', ProjectCode: 'SSL', deletedStatusKey: 0, favouriteTasks: [] },
+        { _id: 'proj-3', ProjectName: 'Marketing Team Task', ProjectCode: 'MKT', deletedStatusKey: 0, favouriteTasks: [] }
+    ];
+    const titles = (wrapper) => wrapper.findAll('.pl2__title').map((el) => el.text());
+    const search = (wrapper) => wrapper.find('[data-test="project-search"]');
+
+    it('narrows the rows by name or code, ignoring case', async () => {
+        const wrapper = mountPage({}, projects);
+        await flushPromises();
+        expect(titles(wrapper)).toHaveLength(3);
+        await search(wrapper).setValue('  shopify ');
+        expect(titles(wrapper)).toEqual(['Shopify Store Locator']);
+        await search(wrapper).setValue('mkt');
+        expect(titles(wrapper)).toEqual(['Marketing Team Task']);
+    });
+
+    it('says nothing matched and clears back to every project', async () => {
+        const wrapper = mountPage({}, projects);
+        await flushPromises();
+        await search(wrapper).setValue('zzz');
+        expect(titles(wrapper)).toHaveLength(0);
+        const empty = wrapper.find('[data-test="project-search-empty"]');
+        expect(empty.exists()).toBe(true);
+        await empty.find('button').trigger('click');
+        expect(titles(wrapper)).toHaveLength(3);
+    });
+
+    it('clears on Escape', async () => {
+        const wrapper = mountPage({}, projects);
+        await flushPromises();
+        await search(wrapper).setValue('alpha');
+        expect(titles(wrapper)).toEqual(['Alpha']);
+        await search(wrapper).trigger('keydown', { key: 'Escape' });
+        expect(titles(wrapper)).toHaveLength(3);
     });
 });
