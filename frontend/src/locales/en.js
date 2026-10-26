@@ -13603,6 +13603,9 @@ export default {
         rename_folder: "Rename {folder}",
         list_actions: "Actions for {list}",
         rename_list: "Rename {list}",
+        search_placeholder: "Search projects",
+        search_clear: "Clear search",
+        search_empty: "No projects match \"{query}\".",
     },
     TaskTemplates: {
         save_as: "Save as template",
