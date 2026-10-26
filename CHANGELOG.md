@@ -16,6 +16,32 @@ from [Conventional Commits](https://www.conventionalcommits.org/) on `main`.
 
 ---
 
+## [14.41.0](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/compare/v14.40.2...v14.41.0) (2026-10-26)
+
+
+### 🚀 Features
+
+* **projects:** open, archived and closed tabs; restore returns the exact previous state ([d7ecdc5](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/d7ecdc5f2fa893cc6373a84706eada096a591e3f))
+* **projects:** open, archived and closed tabs; restore returns the exact previous state ([d49a6fa](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/d49a6fa33fa94427b84f8fb541d8ee891b374dad))
+* **projects:** search the project tree sidebar ([f244b04](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/f244b04c237fdccc48d6b93665df1c9769d96438))
+* **projects:** search the projects list by name or code ([fd97db3](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/fd97db3d7e410e0a375477b95d4efbde2f25fb33))
+* **projects:** search the projects list by name or code ([845cfd5](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/845cfd5f2d94b9d3a712282b6baa3540280bb6d3))
+* **scripts:** record the product demo and how-to videos ([7b69651](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/7b69651c9df7b23ab1c2b1bedcbf209cc06165e8))
+
+
+### 🐛 Bug Fixes
+
+* env update ([155e160](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/155e16055a37eb22b3e1df9a54aa88807432cbd5))
+* **projects:** the header buttons, task panel controls and menus share one style ([a55512e](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/a55512e7592e6770c2a6cc590728ee06094beb55))
+* **projects:** the header buttons, task panel controls and menus share one style ([354635c](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/354635cfa90625926ccab4f210dc07f7ccf639ff))
+
+
+### 📘 Documentation
+
+* **tasks:** add task 056, PRD for personal app connectors ([5af2467](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/5af246723094ac93047f4b0ed4111b97f6c5920c))
+* **tasks:** add task 056, PRD for personal app connectors ([fa1f4a5](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/fa1f4a514ad0b0054566406af31a57c0b767d232))
+* **tasks:** answer the open questions in the task 056 PRD ([10c7721](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/10c77219cd5d3a8dce590ab03c7a0f232431a3c6))
+
 ## [14.40.2](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/compare/v14.40.1...v14.40.2) (2026-10-20)
 
 
