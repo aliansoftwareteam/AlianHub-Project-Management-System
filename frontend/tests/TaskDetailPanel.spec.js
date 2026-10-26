@@ -139,6 +139,16 @@ describe('TaskDetailPanel', () => {
         expect(call.task._id).toBe('task-1');
     });
 
+    it('draws Expand, Minimize and close as the same small bordered button', async () => {
+        const wrapper = mountPanel();
+        await flushPromises();
+        const head = wrapper.get('.ah-detail__head-actions');
+        const buttons = [...head.findAll(':scope > button.ah-btn')];
+        expect(buttons.map((b) => b.text())).toEqual([t('TaskPanel.expand'), t('TaskPanel.minimize'), '']);
+        buttons.forEach((button) => expect(button.classes()).toEqual(expect.arrayContaining(['ah-btn', 'ah-btn--secondary', 'ah-btn--sm'])));
+        expect(wrapper.get('[data-test="task-panel-close"]').classes()).toContain('ah-detail__head-icon');
+    });
+
     it('puts no checkbox beside the title, so the type icon is not read as a second one', async () => {
         const wrapper = mountPanel();
         await flushPromises();

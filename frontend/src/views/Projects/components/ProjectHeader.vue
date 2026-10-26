@@ -59,8 +59,8 @@
                 </button>
                 <ProjectGithubChip v-if="project?._id && !project?.isPersonal" :project-id="String(project._id)" />
                 <slot name="actions"></slot>
-                <button v-if="showAiAssist" type="button" class="ah-btn ah-btn--sm ph2__ai" @click="$emit('ai-assist')">
-                    <span aria-hidden="true">✦</span>{{ $t('Projects.ai_assist') }}
+                <button v-if="showAiAssist" type="button" class="ah-btn ah-btn--secondary ah-btn--sm ph2__ai" @click="$emit('ai-assist')">
+                    <ShellIcon name="ai" :size="14" />{{ $t('Projects.ai_assist') }}
                 </button>
                 <button v-if="showAddTask" type="button" class="ah-btn ah-btn--primary ah-btn--sm" @click="$emit('add-task')">+ {{ $t('Projects.task') }}</button>
             </div>

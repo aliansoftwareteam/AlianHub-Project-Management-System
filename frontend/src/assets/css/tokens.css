@@ -806,6 +806,12 @@ html, body, #app {
 .ah-pop__sep { height: 1px; background: var(--hairline); margin: 6px 4px; }
 .ah-pop__label { padding: 8px 10px 4px; }
 
+/* The content of a DropDownOption row, which already brings its own padding and hover. */
+.ah-menu-row { display: flex; align-items: center; gap: 10px; min-width: 0; font: 500 13px/1.2 var(--font-ui); color: var(--ink); }
+.ah-menu-row > svg { flex: none; color: var(--ink-2); }
+.ah-menu-row--danger, .ah-menu-row--danger > svg { color: var(--danger-ink); }
+.ah-menu-row--phone { min-height: 36px; gap: 16px; font-size: 16px; font-weight: 400; }
+
 /* An icon file drawn as a mask (`--mask-icon`, set by maskOf): it shows in the current text
    colour, not the one baked into the file, so it stays readable in either theme. */
 .ah-mask-icon {

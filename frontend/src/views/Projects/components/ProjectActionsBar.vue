@@ -1,36 +1,36 @@
 <template>
     <div class="list-head-right">
-        <ul class="d-flex align-items-center m-0">
-            <li v-if="clientWidth > 767 && canAutomate" class="mr-10px">
+        <ul class="d-flex align-items-center m-0 pab-row">
+            <li v-if="clientWidth > 767 && canAutomate">
                 <button type="button" class="ah-btn ah-btn--secondary ah-btn--sm" data-test="project-automate" :title="$t('Projects.automate_title')" @click="openAutomate">
                     <ShellIcon name="automations" :size="14" />{{ $t('Projects.automate') }}
                 </button>
             </li>
             <li v-if="clientWidth > 767">
-                <button type="button" class="ah-btn ah-btn--ghost ah-btn--sm" :aria-label="$t('Projects.files_links')" :title="$t('Projects.files_links')" @click="$emit('openSidebar', 'filesLinks')">
-                    <img id="projectviewfiles_driver" :src="fileLinks" alt="" aria-hidden="true"/>
-                </button>
-            </li>
-            <li class="ml-10px" v-if="clientWidth > 767" :class="clientWidth>767 ? 'mr-10px' : 'm-0'">
-                <button type="button" class="ah-btn ah-btn--ghost ah-btn--sm" :aria-label="$t('Projects.audio_files')" :title="$t('Projects.audio_files')" @click="$emit('openSidebar', 'audio')">
-                    <img id="projectviewaudio_driver" :src="audio" alt="" aria-hidden="true"/>
+                <button id="projectviewfiles_driver" type="button" class="ah-btn ah-btn--secondary ah-btn--sm ph2__icon-btn" :aria-label="$t('Projects.files_links')" :title="$t('Projects.files_links')" @click="$emit('openSidebar', 'filesLinks')">
+                    <ShellIcon name="paperclip" :size="14" />
                 </button>
             </li>
             <li v-if="clientWidth > 767">
-                <div class="position-re">
-                    <button
-                        type="button"
-                        class="d-flex align-items-center justify-content-center border border-radius-5-px open__watcher cursor-pointer"
-                        :aria-label="$t('Projects.watchers_count', { n: watcherCount }, watcherCount)"
-                        :title="$t('Projects.watchers')"
-                        @click="$emit('openWatcher')"
-                    >
-                        <img id="projectviewwatch_driver" :src="eyeIcon" alt="" aria-hidden="true">
-                    </button>
-                    <span class="sprint-watcher-count" aria-hidden="true">{{ watcherCount }}</span>
-                </div>
+                <button id="projectviewaudio_driver" type="button" class="ah-btn ah-btn--secondary ah-btn--sm ph2__icon-btn" :aria-label="$t('Projects.audio_files')" :title="$t('Projects.audio_files')" @click="$emit('openSidebar', 'audio')">
+                    <ShellIcon name="mic" :size="14" />
+                </button>
             </li>
-            <li :style="[{marginLeft : clientWidth > 767 ? '1rem' : '20px'}]" class="audio-list-wrapper">
+            <li v-if="clientWidth > 767">
+                <button
+                    id="projectviewwatch_driver"
+                    type="button"
+                    class="ah-btn ah-btn--secondary ah-btn--sm ph2__watchers"
+                    data-test="project-watchers"
+                    :aria-label="$t('Projects.watchers_count', { n: watcherCount }, watcherCount)"
+                    :title="$t('Projects.watchers')"
+                    @click="$emit('openWatcher')"
+                >
+                    <ShellIcon name="eye" :size="14" />
+                    <span class="ph2__count" aria-hidden="true">{{ watcherCount }}</span>
+                </button>
+            </li>
+            <li :style="clientWidth > 767 ? null : { marginLeft: '20px' }" class="audio-list-wrapper">
                 <DropDown mode="menu" maxHeight="64dvh" class="audio_dropdown" :bodyClass="{'assigneelist-audiofile-dropdown' : true}">
                     <template #head v-if="clientWidth <= 767">
                         <div class="mobiledropdown-projecttitleimage-wrapper">
@@ -47,8 +47,14 @@
                         </div>
                     </template>
                     <template #button="{ triggerAttrs }">
-                        <button type="button" class="cursor-pointer dot-btn border-0" :aria-label="$t('Projects.more_features')" :title="$t('Projects.more_features')" v-bind="triggerAttrs">
-                            <ShellIcon id="projectoptions_driver" name="more" :size="clientWidth > 767 ? 20 : 24" />
+                        <button
+                            type="button"
+                            :class="clientWidth > 767 ? 'ah-btn ah-btn--secondary ah-btn--sm ph2__icon-btn' : 'cursor-pointer dot-btn border-0'"
+                            :aria-label="$t('Projects.more_features')"
+                            :title="$t('Projects.more_features')"
+                            v-bind="triggerAttrs"
+                        >
+                            <ShellIcon id="projectoptions_driver" name="more" :size="clientWidth > 767 ? 14 : 24" />
                         </button>
                     </template>
                     <template #options>
@@ -70,91 +76,71 @@
                             </div>
                             <template v-if="clientWidth <= 767">
                                 <DropDownOption @click="$emit('openWatcher')">
-                                    <div :style="[{padding : clientWidth <= 767 ? '10px 0px !important' : '3.5px 10px !important'}]" class="d-flex align-items-center">
-                                        <div class="position-re mr-15px">
-                                            <div class="d-flex align-items-center justify-content-center border border-radius-5-px open__watcher">
-                                                <img :src="eyeIcon" alt="">
-                                            </div>
-                                            <span class="sprint-watcher-count" aria-hidden="true">{{ watcherCount }}</span>
-                                        </div>
-                                        <span :class="{'project-actions-bar-font-size-16': clientWidth <= 767 }" class="project-actions-bar-font-weight-400 gray4b">{{ $t('Projects.watchers') }}</span>
+                                    <div :class="rowClass">
+                                        <ShellIcon name="eye" :size="iconSize" />
+                                        <span>{{ $t('Projects.watchers') }}</span>
+                                        <span class="pab-count" aria-hidden="true">{{ watcherCount }}</span>
                                     </div>
                                 </DropDownOption>
                                 <DropDownOption @click="$emit('openSidebar', 'filesLinks')">
-                                    <div class="d-flex align-items-center project-mobile-desc avtar-options" :class="`${clientWidth <= 767 ? 'project_detail_dropdown_wrapper' : ''}`">
-                                        <div class="d-flex align-items-center">
-                                            <img :src="fileLink" alt="" class="mr-20px"/>
-                                        </div>
-                                        <span :class="{'project-actions-bar-font-size-16': clientWidth <= 767 }" class="project-actions-bar-font-weight-400 gray4b">{{ $t('Projects.files_links') }}</span>
+                                    <div :class="rowClass">
+                                        <ShellIcon name="paperclip" :size="iconSize" />
+                                        <span>{{ $t('Projects.files_links') }}</span>
                                     </div>
                                 </DropDownOption>
-                                <DropDownOption @click="$emit('openSidebar', 'audio')" class="border-bottom pb-20px">
-                                    <div class="d-flex align-items-center project-mobile-desc avtar-options" :class="`${clientWidth <= 767 ? 'project_detail_dropdown_wrapper' : ''}`">
-                                        <div class="d-flex align-items-center">
-                                            <img :src="audioLinkMobile" alt="" class="mr-20px"/>
-                                        </div>
-                                        <span :class="{'project-actions-bar-font-size-16': clientWidth <= 767 }" class="project-actions-bar-font-weight-400 gray4b">{{ $t('Projects.audio_files') }}</span>
+                                <DropDownOption @click="$emit('openSidebar', 'audio')">
+                                    <div :class="rowClass">
+                                        <ShellIcon name="mic" :size="iconSize" />
+                                        <span>{{ $t('Projects.audio_files') }}</span>
                                     </div>
                                 </DropDownOption>
                             </template>
                             <DropDownOption v-if="clientWidth <= 767 && canAutomate" data-test="project-automate-menu" @click="openAutomate">
-                                <div class="d-flex align-items-center project-mobile-desc avtar-options project_detail_dropdown_wrapper">
-                                    <div class="d-flex align-items-center mr-20px">
-                                        <ShellIcon name="automations" :size="18" />
-                                    </div>
-                                    <span class="project-actions-bar-font-size-16 project-actions-bar-font-weight-400 gray4b">{{ $t('Projects.automate') }}</span>
+                                <div :class="rowClass">
+                                    <ShellIcon name="automations" :size="iconSize" />
+                                    <span>{{ $t('Projects.automate') }}</span>
                                 </div>
                             </DropDownOption>
                             <DropDownOption @click="$emit('openPermissionSidebar')" v-if="checkPermission('settings.settings_security_permissions') !== null">
-                                <div class="d-flex align-items-center project-mobile-desc avtar-options" :class="`${clientWidth <= 767 ? 'project_detail_dropdown_wrapper' : ''}`">
-                                    <div class="d-flex align-items-center">
-                                        <span class="ah-mask-icon pab-lock mr-20px" :style="maskOf(lockIcon)" aria-hidden="true"></span>
-                                    </div>
-                                    <span :class="{'project-actions-bar-font-size-16': clientWidth <= 767 }" class="project-actions-bar-font-weight-400 gray4b">{{ $t('Projects.project_permissions') }}</span>
+                                <div :class="rowClass">
+                                    <ShellIcon name="lock" :size="iconSize" />
+                                    <span>{{ $t('Projects.project_permissions') }}</span>
                                 </div>
                             </DropDownOption>
                             <DropDownOption @click="$emit('startEditName')" v-if="checkPermission('project.project_name_edit',projectData.isGlobalPermission) === true">
-                                <div class="d-flex align-items-center project-mobile-desc avtar-options" :class="`${clientWidth <= 767 ? 'project_detail_dropdown_wrapper' : ''}`">
-                                    <div class="d-flex align-items-center">
-                                        <img :src="listIcon" alt="" class="mr-20px">
-                                    </div>
-                                    <span :class="{'project-actions-bar-font-size-16': clientWidth <= 767 }" class="project-actions-bar-font-weight-400 gray4b">{{ $t('Projects.rename') }}</span>
+                                <div :class="rowClass">
+                                    <ShellIcon name="edit" :size="iconSize" />
+                                    <span>{{ $t('Projects.rename') }}</span>
                                 </div>
                             </DropDownOption>
                             <DropDownOption @click="$emit('openColorAvatar')" v-if="checkPermission('project.project_create',projectData.isGlobalPermission) === true">
-                                <div class="d-flex align-items-center project-mobile-desc avtar-options" :class="`${clientWidth <= 767 ? 'project_detail_dropdown_wrapper' : ''}`">
-                                    <div class="d-flex align-items-center">
-                                        <img :src="colorPalletIcon" alt="" class="mr-20px">
-                                    </div>
-                                    <span :class="{'project-actions-bar-font-size-16': clientWidth <= 767 }" class="project-actions-bar-font-weight-400 gray4b">{{ $t('Projects.color_avatar') }}</span>
+                                <div :class="rowClass">
+                                    <ShellIcon name="palette" :size="iconSize" />
+                                    <span>{{ $t('Projects.color_avatar') }}</span>
                                 </div>
                             </DropDownOption>
                             <DropDownOption v-if="canDuplicate" data-test="duplicate-project" @click="duplicating = true">
-                                <div class="pab-duplicate" :class="{ 'pab-duplicate--phone': clientWidth <= 767 }">
-                                    <ShellIcon name="copy" :size="clientWidth <= 767 ? 18 : 15" />
+                                <div :class="rowClass">
+                                    <ShellIcon name="copy" :size="iconSize" />
                                     <span>{{ $t('Projects.duplicate_project') }}</span>
                                 </div>
                             </DropDownOption>
                             <DropDownOption v-if="canDuplicate" data-test="save-project-template" @click="savingTemplate = true">
-                                <div class="pab-duplicate" :class="{ 'pab-duplicate--phone': clientWidth <= 767 }">
-                                    <ShellIcon name="star" :size="clientWidth <= 767 ? 18 : 15" />
+                                <div :class="rowClass">
+                                    <ShellIcon name="template" :size="iconSize" />
                                     <span>{{ $t('Projects.template_save_entry') }}</span>
                                 </div>
                             </DropDownOption>
                             <DropDownOption @click="$emit('archiveProject', 0)" v-if="checkPermission('project.project_close',projectData.isGlobalPermission) === true">
-                                <div class="d-flex align-items-center project-mobile-desc avtar-options" :class="`${clientWidth <= 767 ? 'project_detail_dropdown_wrapper' : ''}`">
-                                    <div class="d-flex align-items-center">
-                                        <img :src="cancelIcon" alt="" class="mr-20px">
-                                    </div>
-                                    <span :class="{'project-actions-bar-font-size-16': clientWidth <= 767 }" class="project-actions-bar-font-weight-400 gray4b">{{ $t('Projects.close_project') }}</span>
+                                <div :class="rowClass">
+                                    <ShellIcon name="xCircle" :size="iconSize" />
+                                    <span>{{ $t('Projects.close_project') }}</span>
                                 </div>
                             </DropDownOption>
                             <DropDownOption v-if="checkPermission('project.project_delete',projectData.isGlobalPermission) === true" @click="$emit('archiveProject', 2)">
-                                <div class="d-flex align-items-center project-mobile-desc avtar-options" :class="`${clientWidth <= 767 ? 'project_detail_dropdown_wrapper' : ''}`">
-                                    <div class="d-flex align-items-center">
-                                        <img :src="deleteIcon" alt="" class="mr-20px">
-                                    </div>
-                                    <span :class="{'project-actions-bar-font-size-16': clientWidth <= 767 }" class="project-actions-bar-font-weight-400 gray4b">{{ $t('Projects.delete') }}</span>
+                                <div :class="[rowClass, 'ah-menu-row--danger']">
+                                    <ShellIcon name="trash" :size="iconSize" />
+                                    <span>{{ $t('Projects.delete') }}</span>
                                 </div>
                             </DropDownOption>
                         </div>
@@ -179,7 +165,6 @@ import WasabiImage from '@/components/atom/WasabiIamgeCompp/WasabiIamgeCompp.vue
 import DuplicateProjectDialog from '@/components/molecules/DuplicateProjectDialog/DuplicateProjectDialog.vue';
 import SaveProjectTemplateDialog from '@/components/molecules/SaveProjectTemplateDialog/SaveProjectTemplateDialog.vue';
 import { useCustomComposable } from '@/composable';
-import { maskOf } from '@/utils/iconMask';
 
 const { checkPermission } = useCustomComposable();
 
@@ -191,6 +176,8 @@ const props = defineProps({
 });
 
 const watcherCount = computed(() => Object.keys(props.projectData?.watchers || {}).length);
+const rowClass = computed(() => ['ah-menu-row', { 'ah-menu-row--phone': props.clientWidth <= 767 }]);
+const iconSize = computed(() => (props.clientWidth <= 767 ? 18 : 15));
 
 /* The server judges a duplicate and a template on the company's rules, as it does a create, so the project's own rules are not read here. */
 const canDuplicate = computed(() => props.projectData?.isPersonal !== true && checkPermission('project.project_create') === true);
@@ -209,23 +196,11 @@ const openAutomate = () => router.push({
 });
 
 defineEmits(['openSidebar', 'openWatcher', 'changeAssignee', 'openPermissionSidebar', 'startEditName', 'openColorAvatar', 'archiveProject']);
-
-const fileLinks = require('@/assets/images/svg/Fileslinks.svg');
-const audio = require('@/assets/images/svg/Voice_Record.svg');
-const audioLinkMobile = require('@/assets/images/svg/AudioLink.svg');
-const fileLink = require('@/assets/images/svg/Files_links.svg');
-const eyeIcon = require('@/assets/images/svg/PriorityIcon/watchProjectEye.svg');
-const lockIcon = require('@/assets/images/lock.png');
-const listIcon = require('@/assets/images/svg/edit_rename_icon.svg');
-const colorPalletIcon = require('@/assets/images/svg/palette.svg');
-const cancelIcon = require('@/assets/images/svg/cancel.svg');
-const deleteIcon = require('@/assets/images/svg/Delete_Icon.svg');
 </script>
 
 <style scoped>
-.pab-duplicate { display: flex; align-items: center; gap: 20px; font-size: 12px; font-weight: 400; color: var(--ink-2); }
-.pab-duplicate--phone { height: 50px; font-size: 16px; color: var(--ink); }
-.pab-lock { width: 15px; height: 20px; color: var(--ink-2); }
+.pab-row { gap: var(--sp-2); }
+.pab-count { margin-left: auto; font: 600 var(--fs-xs, 10.5px)/1 var(--font-mono); color: var(--ink-2); }
 </style>
 
 <style scoped>
@@ -240,11 +215,5 @@ const deleteIcon = require('@/assets/images/svg/Delete_Icon.svg');
 }
 .project-actions-bar-font-weight-bold {
     font-weight: bold;
-}
-.project-actions-bar-font-weight-400 {
-    font-weight: 400 !important;
-}
-.project-actions-bar-font-size-16 {
-    font-size: 16px;
 }
 </style>

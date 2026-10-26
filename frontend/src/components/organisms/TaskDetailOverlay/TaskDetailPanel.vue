@@ -70,10 +70,10 @@
                     ><ShellIcon name="chevronDown" :size="15" /></button>
                 </div>
                 <button v-if="!isMobile && !expanded" type="button" class="ah-btn ah-btn--secondary ah-btn--sm" @click="$emit('expand')">
-                    <ShellIcon name="expand" :size="13" />{{ $t('TaskPanel.expand') }}
+                    <ShellIcon name="expand" :size="14" />{{ $t('TaskPanel.expand') }}
                 </button>
                 <button v-if="!isMobile" type="button" class="ah-btn ah-btn--secondary ah-btn--sm" @click="$emit('minimize')">
-                    <ShellIcon name="minimize" :size="13" />{{ $t('TaskPanel.minimize') }}
+                    <ShellIcon name="minimize" :size="14" />{{ $t('TaskPanel.minimize') }}
                 </button>
                 <TaskDetailAction
                     v-if="task && task._id && projectData._id"
@@ -85,8 +85,8 @@
                     @update:watchers="(id, type) => updateWatchers(id, type)"
                     @close="$emit('close')"
                 />
-                <button v-if="!isMobile" type="button" class="ah-detail__icon-btn" :aria-label="$t('TaskPanel.close')" :title="`${$t('TaskPanel.close')} · Esc`" @click="$emit('close')">
-                    <ShellIcon name="x" :size="15" />
+                <button v-if="!isMobile" type="button" class="ah-btn ah-btn--secondary ah-btn--sm ah-detail__head-icon" data-test="task-panel-close" :aria-label="$t('TaskPanel.close')" :title="`${$t('TaskPanel.close')} · Esc`" @click="$emit('close')">
+                    <ShellIcon name="x" :size="14" />
                 </button>
             </div>
         </header>

@@ -30,37 +30,9 @@ ul.task-detail-action-ul li a {
     background-color: var(--surface);
     border: 6px;
 }
-.task-detail-action .watcher-action {
-    margin-right: 16px;
-    margin-left: 0px;
-    display: flex!important;
-    justify-content: center;
-    align-items: center!important;
-    border-radius: 6px!important;
-    border: 1px solid var(--border)!important;
-}
 .task-detail-action .watcher-action .watcher-count {
-    position: absolute;
-    top: 13px;
-    background-color: var(--surface-2);
-    box-shadow: 0 0 0 1px var(--border);
-    border-radius: 20px;
-    display: block;
-    font-family: var(--font-ui);
-    font-style: normal;
-    font-weight: 500;
-    font-size: 9px;
-    line-height: 16px;
-    color: var(--ink);
-    height: 15px;
-    width: 15px;
-    text-align: center;
-    right: -8px;
-}
-.task-detail-action .watcher-action .task-action__btn{
-    width:30px;
-    height:30px;
-    line-height: 28px;
+    font: 600 var(--fs-xs, 10.5px)/1 var(--font-mono);
+    color: var(--ink-2);
 }
 .task-detail-action .close-icon {
     background: var(--fill);
@@ -94,10 +66,6 @@ ul.task-detail-action-ul li a {
     justify-content: center;
     align-items: center!important;
 }
-.copyIcon{
-    width: 11px !important;
-    height: 11px !important;
-}
 .horizontalDocs .bg-white.gray.border.border-radius-5-px.z-index-2.box-shadow-5.drop-down-menu.z-index-7.desktop-view.position-fi {
     left: 1639.12px !important;
     top: 67.7969px !important;
@@ -106,47 +74,31 @@ ul.task-detail-action-ul li a {
 .dropdown-label{
     padding-left: 12px;
 }
-.watcher__action-dropdown .search-project-filter {
+.watcher__action-dropdown {
     min-width: 241px !important;
-    padding: 5px 10px 5px !important;
 }
-.watcher__action-dropdown{
-    border-radius: 12px !important;
-}
-.watcher__action-dropdown .drop-down-item {
-    padding: 5px 10px !important;
-    margin-bottom: 5px;
-    border-radius: 6px !important;
-}
-.watcher__action-dropdown
-{
-    right: 65px !important;
-    min-width: 241px !important;
-    margin-left: -40px;
-    margin-top: 10px;
-
+.watcher__action-dropdown .search__text {
+    box-sizing: border-box;
 }
 .watcher__action-dropdown .search__text::placeholder{
-    font-size: 14px !important;
     color: var(--ink-2) !important;
 }
-.wasabi__emp-image{
-    border: 2px solid var(--surface) !important; 
-    width: 30px !important;
-    height: 30px !important;
-    border-radius: 30px !important;
-
+.watcher__action-dropdown .drop-down-item {
+    gap: 10px;
+    padding: 6px 10px !important;
+    margin-bottom: 2px;
+    border-radius: 7px !important;
+    font: 500 13px/1.2 var(--font-ui);
 }
-.employee__profile-img{
-    width: 25px; 
-    height: 25px;
-    border-radius: 25px;
-
+.watcher__action-dropdown :is(.wasabi__emp-image, .employee__profile-img) {
+    width: 24px !important;
+    height: 24px !important;
+    border: 0 !important;
+    border-radius: 50% !important;
+    flex: none;
 }
+.watcher__action-dropdown .deleted__icon { color: var(--danger-ink); flex: none; }
 @media(max-width: 767px){
-    .watcher__action-dropdown{right: unset !important;margin-left: 0;margin-top: 0;}
-    .watcher__action-dropdown .search-project-filter {padding: 10px!important;}
-    .watcher__action-dropdown{border-radius: 12px !important;}
     .watcher__action-dropdown .drop-down-item {padding: 10px !important;margin-bottom: 10px;border-radius: 8px !important;}
 }
 /* Personal reminder modal (COLLAB-03) */
@@ -197,6 +149,3 @@ ul.task-detail-action-ul li a {
     justify-content: space-between;
     margin-top: 4px;
 }
-/* On the button that also carries d-flex, the utility decides; :where() adds no weight. */
-.task-action__btn:where(:not(.d-flex)) { display: inline-flex; }
-.task-action__btn { align-items: center; justify-content: center; padding: 0; border: 0; background: none; color: inherit; cursor: pointer; }
