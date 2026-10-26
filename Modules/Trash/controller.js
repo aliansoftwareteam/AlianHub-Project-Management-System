@@ -15,6 +15,7 @@ const { sessionActor } = require('../Tasks/helpers/taskWriteFields');
 const { announce } = require('../Goals/goalStore');
 const { removeCache } = require('../../utils/commonFunctions');
 const { announceProject } = require('../Project/helpers/projectEvents');
+const { readLifecycle, planLifecycle, restoreTargetOf, applyMove } = require('../Project/helpers/projectLifecycle');
 
 const ObjectId = mongoose.Types.ObjectId;
 
@@ -53,9 +54,12 @@ const restoreChildren = (companyId, kind, id) => {
 };
 
 const restoreProject = async (companyId, id) => {
-    await updateProjectInternal(companyId, id, { deletedStatusKey: 0 });
-    await restoreChildren(companyId, 'projects', id);
-    announceProject(companyId, 'update', { _id: id }, { deletedStatusKey: 0 });
+    const before = (await readLifecycle(companyId, id)) || {};
+    const back = { deletedStatusKey: restoreTargetOf(before) };
+    const { stamp, move } = planLifecycle(before, back);
+    await updateProjectInternal(companyId, id, { ...back, ...stamp });
+    await applyMove(companyId, id, move);
+    announceProject(companyId, 'update', { _id: id }, back);
 };
 
 const restoreList = async (companyId, id, userData) => {

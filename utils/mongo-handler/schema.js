@@ -267,6 +267,8 @@ const schema = {
             type: Boolean,
             required: false
         },
+        // Set on the tasks that went to the trash with their project, so a task trashed on its own stays there when the project is restored.
+        trashedWithProject: { type: Boolean, required: false },
         // A mainChat conversation with an agent (Modules/Agents/chatAgents); its one assignee is the person.
         agentId: { type: String, required: false },
         agentName: { type: String, required: false },
@@ -3845,6 +3847,9 @@ const schema = {
             type: String,
             required: true,
         },
+        // Kept by Project/helpers/projectLifecycle so Reopen and a Trash restore return the state before.
+        statusBeforeClose: { type: String, required: false },
+        trashedFromKey: { type: Number, required: false },
         // Per-project sprint cadence. Shaped like the existing autoArchive and
         // autoCloseProjects rules so the nightly cron that reads it follows a
         // pattern already in the codebase.

@@ -62,3 +62,4 @@ Auto-maintained registry of all tasks. Reflects YAML frontmatter from each `task
 | 054 | Industry demos for every blueprint, named by industry | done | high | 053 | done/054-industry-demos-every-blueprint |
 | 055 | Create Project modal — Member, Skills, Source and Due date pickers open above the modal | active | high | — | active/055-create-project-field-popovers |
 | 056 | Personal app connectors for AI and agents — one reusable module, then connectors one by one | backlog | high | — | backlog/056-personal-app-connectors |
+| 057 | Projects settings — Open, Archived and Closed tabs; every undo returns the exact previous state | active | high | — | active/057-project-lifecycle-tabs |
