@@ -8,12 +8,12 @@
 - [x] Settings › Projects tabs and per-state row menu
 - [x] Web cascades removed; project archive confirmation; i18n keys
 - [x] Unit tests, `i18n:check`, `style:check`
-- [ ] Integration test against a real database (written; runs in CI)
+- [x] Integration test against a real database (passes in CI)
 - [ ] In-app check
 
 ## Last step
 
-Implementation done and unit-tested; full suites running; PR next.
+Merged into `staging` as build 7 (`14.41.0-beta.7`, #1712) and in the `staging` → `main` promotion (#1713). Left: the in-app check on the staging server, then the acceptance criteria.
 
 ## Blockers
 
@@ -32,3 +32,4 @@ No local MongoDB (Docker Desktop is not running and no `.env` exists), so the in
 - Full suites in four (backend) and two (frontend) shards. Every failure also fails on a clean `staging` checkout or passes when run alone (Windows path separators, phone CSS tokens, native crashes in the knowledge file parser, timeouts under load).
 - Added `tests/integration/project-lifecycle.int.test.js` (archive/restore, close/archive/restore/reopen, archived → trash → Trash restore) against a real database; it runs in CI.
 - Tests: `tests/project-lifecycle.test.js` (lifecycle table, undo round-trips, the writes), `reopenStatusOf` in `tests/lifecycle-mapping.test.js`, Trash restore in `tests/trash-controller.test.js`, `frontend/tests/unit/settingsProjectsTabs.spec.js`. `i18n:check` and `style:check` pass.
+- #1712 merged into `staging` as build 7, `14.41.0-beta.7` (`d7ecdc5f`). The push CI on that commit is green, `tests/integration/project-lifecycle.int.test.js` included, and the staging deploy succeeded. It is part of the promotion to `main` in #1713, which should release as 14.41.0.
