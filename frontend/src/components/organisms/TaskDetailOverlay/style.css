@@ -75,6 +75,9 @@
 .ah-detail__nav-pos { font: 500 var(--fs-xs, 10.5px) var(--font-mono); color: var(--ink-2); min-width: 34px; text-align: center; }
 .ah-detail__head-actions { margin-left: auto; display: flex; align-items: center; gap: 6px; flex: none; }
 .ah-detail__head .ah-btn--sm { height: var(--control-h-sm, 28px); padding: 0 9px; font-size: var(--fs-sm, 12px); font-weight: 500; border-radius: var(--r-md, 7px); gap: 6px; }
+.ah-detail__head .ah-btn--secondary > svg { flex: none; color: var(--ink-2); }
+.ah-detail__head .ah-detail__head-icon { width: var(--control-h-sm, 28px); padding: 0; }
+.ah-detail__head .ah-detail__head-icon:hover:not(:disabled) > svg { color: var(--ink); }
 .ah-detail__icon-btn {
     width: var(--control-h-sm, 28px); height: var(--control-h-sm, 28px); display: inline-flex; align-items: center; justify-content: center;
     border: 0; background: transparent; border-radius: var(--r-md, 7px); color: var(--ink-2); cursor: pointer;
@@ -86,16 +89,10 @@
 .ah-detail__send-icon { transform: rotate(-90deg); }
 
 /* "⋯" menu + watchers reuse TaskDetailAction; its file/audio shortcuts live in the tabs now. */
-.ah-detail__more .task-detail-action-ul { display: flex; align-items: center; gap: 4px; margin: 0; padding: 0; list-style: none; }
-.ah-detail__more .task-detail-action-ul > li { width: auto !important; height: auto !important; margin: 0 !important; }
+.ah-detail__more .task-detail-action-ul { display: flex; align-items: center; gap: 6px; margin: 0; padding: 0; list-style: none; }
+.ah-detail__more .task-detail-action-ul > li { width: auto !important; height: auto !important; margin: 0 !important; background: none; }
 .ah-detail__more .task-detail-action-ul > li:not(.horizontalDocs):not(.watcher-action) { display: none !important; }
-.ah-detail__more .task-detail-action-ul > li.horizontalDocs,
-.ah-detail__more .task-detail-action-ul > li.watcher-action {
-    display: inline-flex; align-items: center; justify-content: center;
-    min-width: var(--control-h-sm, 28px); height: var(--control-h-sm, 28px); padding: 0 6px;
-    border: 1px solid var(--border); border-radius: var(--r-md, 7px); background: var(--surface);
-}
-.ah-detail__more .task-detail-action-ul > li img { width: 16px; height: 16px; object-fit: contain; }
+.ah-detail__more .task-action__watchers { gap: 5px; padding: 0 8px; }
 
 /* ---------- agent strip (README "five surfaces" #3) ---------- */
 .ah-agent-strip {

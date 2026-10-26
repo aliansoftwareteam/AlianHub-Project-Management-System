@@ -238,7 +238,7 @@
     "frontend/src/views/Projects/ListView/ListView.vue": { "colours": 0, "legacyClasses": 1 },
     "frontend/src/views/Projects/Projects.vue": { "colours": 0, "legacyClasses": 7 },
     "frontend/src/views/Projects/components/NewInProjectMenu.vue": { "colours": 1, "legacyClasses": 0 },
-    "frontend/src/views/Projects/components/ProjectActionsBar.vue": { "colours": 0, "legacyClasses": 11 },
+    "frontend/src/views/Projects/components/ProjectActionsBar.vue": { "colours": 0, "legacyClasses": 2 },
     "frontend/src/views/Projects/components/ProjectSidebars.vue": { "colours": 0, "legacyClasses": 2 },
     "frontend/src/views/Projects/components/ProjectTreePanel.vue": { "colours": 1, "legacyClasses": 0 },
     "frontend/src/views/Projects/components/project-filters.css": { "colours": 1, "legacyClasses": 0 },

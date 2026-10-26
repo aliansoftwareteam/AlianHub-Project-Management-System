@@ -123,11 +123,12 @@ describe('sidebar hosts that carried their own colours', () => {
 });
 
 describe('weak spots of the themed menu', () => {
-    test('the lock of a private project is a mask, not a grey image', () => {
+    test('every entry of the project menu draws a line icon in the text colour, not an image file', () => {
         const template = templateOf(read('views/Projects/components/ProjectActionsBar.vue'));
-        expect(template).not.toMatch(/<img :src="lockIcon"/);
-        expect(template).toMatch(/class="ah-mask-icon [^"]*" :style="maskOf\(lockIcon\)"/);
-        expect(ruleBody(stylesOf('views/Projects/components/ProjectActionsBar.vue'), '.pab-lock')).toMatch(/width:\s*15px;\s*height:\s*20px;\s*color:\s*var\(--ink-2\)/);
+        const menu = template.slice(template.indexOf('id="projectoptionslist_driver"'));
+        expect(menu).not.toMatch(/<img\b/);
+        expect(menu).not.toContain('maskOf(');
+        expect(menu).toContain('<ShellIcon name="lock"');
     });
 
     test('count chips and checkbox marks inside a menu take tokens', () => {

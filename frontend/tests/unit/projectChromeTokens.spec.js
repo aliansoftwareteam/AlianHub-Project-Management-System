@@ -542,11 +542,9 @@ describe('the saved-view bar and the header leftovers', () => {
         expect(size(SAVED_VIEW_BAR, '.svb__btn', 'height', 'phone')).toBe(px('var(--control-h)', ENV.phone));
     });
 
-    it('the watchers button is a small control like the buttons beside it', () => {
-        ['width', 'height'].forEach((side) => {
-            expect(declared(HEADER_CSS, '.ph2 .open__watcher', side)).toBe('var(--control-h, 30px)');
-            expect(computed(declared(HEADER_CSS, '.ph2 .open__watcher', side), ENV.dense)).toBe('26px');
-        });
+    it('an icon-only header button is as wide as the small buttons beside it are tall', () => {
+        expect(declared(HEADER_CSS, '.ph2__actions .ph2__icon-btn', 'width')).toBe('var(--control-h, 30px)');
+        expect(computed(declared(HEADER_CSS, '.ph2__actions .ph2__icon-btn', 'width'), ENV.dense)).toBe('26px');
         expect(computed(declared('assets/css/tokens.css', '.ah-btn--sm', 'height'), ENV.dense)).toBe('26px');
     });
 });

@@ -69,7 +69,6 @@ describe('the task panel paints from tokens', () => {
     // The rest of that stylesheet paints the watcher menu, which is a legacy white dropdown in both themes.
     test.each([
         '.task-detail-action ul li',
-        '.task-detail-action .watcher-action',
         '.task-detail-action .watcher-action .watcher-count',
         '.task-detail-action .close-icon',
         '.reminder-modal',
@@ -81,10 +80,16 @@ describe('the task panel paints from tokens', () => {
         expect(hardCodedColours(rule)).toEqual([]);
     });
 
-    test('the watcher count is an opaque theme chip over the button border', () => {
-        const badge = ruleBody(read('components/molecules/TaskDetailAction/style.css'), '.task-detail-action .watcher-action .watcher-count');
-        expect(badge).toMatch(/background-color:\s*var\(--surface-2\)/);
-        expect(badge).toMatch(/color:\s*var\(--ink\)/);
+    test('the watchers list is placed under its button by the dropdown, not pinned to a fixed right edge', () => {
+        const css = read('components/molecules/TaskDetailAction/style.css');
+        expect(css).not.toMatch(/\.watcher__action-dropdown\s*\{[^}]*\bright:/);
+        expect(css).not.toMatch(/\.watcher__action-dropdown\s*\{[^}]*margin-left:/);
+    });
+
+    test('the watcher count is muted text inside the button, not a chip floated over its border', () => {
+        const count = ruleBody(read('components/molecules/TaskDetailAction/style.css'), '.task-detail-action .watcher-action .watcher-count');
+        expect(count).toMatch(/color:\s*var\(--ink-2\)/);
+        expect(count).not.toMatch(/position:\s*absolute/);
     });
 });
 

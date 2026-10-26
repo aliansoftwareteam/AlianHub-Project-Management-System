@@ -44,3 +44,24 @@ describe('the Automate button in the project actions bar', () => {
         expect(push).toHaveBeenCalledWith(EXPECTED);
     });
 });
+
+describe('the project actions bar on a desktop', () => {
+    it('draws Automate, files, audio, watchers and more as the same small bordered button', () => {
+        const wrapper = mountBar(1);
+        const buttons = wrapper.findAll('button');
+        expect(buttons).toHaveLength(5);
+        buttons.forEach((button) => expect(button.classes()).toEqual(expect.arrayContaining(['ah-btn', 'ah-btn--secondary', 'ah-btn--sm'])));
+        expect(wrapper.find('img').exists()).toBe(false);
+    });
+
+    it('shows the watcher count inside the watchers button', () => {
+        const wrapper = mount(ProjectActionsBar, {
+            props: { projectData: { _id: 'p1', ProjectName: 'Web', watchers: { u1: true, u2: true } }, clientWidth: 1280 },
+            global: {
+                plugins: [createStore({ modules: { settings: { namespaced: true, getters: { companyUserDetail: () => ({ roleType: 3 }) } } } })],
+                stubs: { DropDown, DropDownOption, Assignee: true, WasabiImage: true },
+            },
+        });
+        expect(wrapper.find('[data-test="project-watchers"] .ph2__count').text()).toBe('2');
+    });
+});
