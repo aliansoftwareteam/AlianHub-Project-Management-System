@@ -4,12 +4,12 @@ const mongoRef = require('../../../utils/mongo-handler/mongoQueries');
 const sendMail = require("../../service.js");
 const config = require("../../../Config/config");
 const { dbCollections } = require('../../../Config/collections');
-const { ACCOUNT_MAIL_ANSWER, isActivationPending } = require('../helpers/accountMail');
+const { ACCOUNT_MAIL_ANSWER, refusesPasswordMail } = require('../helpers/accountMail');
 
 exports.generateResetToken = () => crypto.randomBytes(32).toString('hex');
 
 const sendResetLink = async ({ email, token: clientToken, tokenId }) => {
-    if (await isActivationPending(email)) return;
+    if (await refusesPasswordMail(email)) return;
     const account = await mongoRef.MongoDbCrudOpration('global', {
         type: dbCollections.USERS,
         data: [{ Employee_Email: email }]

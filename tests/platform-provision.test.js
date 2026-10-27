@@ -37,7 +37,7 @@ const DAY = 24 * 60 * 60 * 1000;
 const hostingMode = require('../Config/hostingMode');
 const { recordAudit } = require('../Modules/Audit/recorder');
 const { createFirstCompany } = require('../Modules/Setup/createCompany');
-const { isActivationPending } = require('../Modules/Auth/helpers/accountMail');
+const { refusesPasswordMail } = require('../Modules/Auth/helpers/accountMail');
 const { APP_LOCALES } = require('../Modules/Platform/provision');
 const platformAudit = require('../Modules/Platform/platformAudit');
 
@@ -105,7 +105,7 @@ describe('headless provisioning', () => {
     });
 
     it('keeps an activation-pending owner out of every password mail', async () => {
-        expect(await isActivationPending('maya@acme.com')).toBe(true);
+        expect(await refusesPasswordMail('maya@acme.com')).toBe(true);
     });
 
     it('answers the same order again with the same ids and a fresh link that revokes the last', async () => {
@@ -158,7 +158,7 @@ describe('activation', () => {
         expect(res.body.data.uid).toBe(String(owner._id));
         expect(owner.activationPending).toBeUndefined();
         expect(authOf(owner._id).passwordHash).toEqual(expect.any(String));
-        expect(await isActivationPending('maya@acme.com')).toBe(false);
+        expect(await refusesPasswordMail('maya@acme.com')).toBe(false);
         expect((await call('POST', '/api/v2/auth/activate', { token, password: 'Str0ng!pass' })).body).toMatchObject({ status: false, key: 'expired' });
     });
 

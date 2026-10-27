@@ -2,15 +2,19 @@ const helperCtr = require('../helper');
 
 const ACCOUNT_MAIL_ANSWER = "If an account needs it, we've sent a link.";
 
-/* A hosted instance's owner the platform created has no password until the activation link is used;
- * no reset, set-password or sign-in mail goes to that account before then. */
-const isActivationPending = async (email) => {
+/* Hosted only: an owner the platform created has no password until the activation link is used,
+ * and the AlianHub Support account signs in through support-session links alone. Neither is sent a
+ * reset, set-password or sign-in mail. */
+const refusesPasswordMail = async (email) => {
     const address = typeof email === 'string' ? email.trim().toLowerCase() : '';
     if (!address || !require('../../../Config/hostingMode').isManaged()) return false;
     const { MongoDbCrudOpration } = require('../../../utils/mongo-handler/mongoQueries');
     const { dbCollections } = require('../../../Config/collections');
-    const user = await MongoDbCrudOpration(dbCollections.GLOBAL, { type: dbCollections.USERS, data: [{ Employee_Email: address, activationPending: true }, { activationPending: 1 }] }, 'findOne');
-    return Boolean(user && user.activationPending === true);
+    const user = await MongoDbCrudOpration(dbCollections.GLOBAL, {
+        type: dbCollections.USERS,
+        data: [{ Employee_Email: address, $or: [{ activationPending: true }, { isSupportUser: true }] }, { activationPending: 1, isSupportUser: 1 }],
+    }, 'findOne');
+    return Boolean(user && (user.activationPending === true || user.isSupportUser === true));
 };
 
 /* Every request counts, not only failed ones, because the answer no longer says whether a
@@ -24,4 +28,4 @@ const limitAccountMailRequests = (req, res, next) => {
     });
 };
 
-module.exports = { ACCOUNT_MAIL_ANSWER, isActivationPending, limitAccountMailRequests };
+module.exports = { ACCOUNT_MAIL_ANSWER, refusesPasswordMail, limitAccountMailRequests };

@@ -151,6 +151,10 @@ describe('a support session', () => {
         expect(support.supportAccess()).toMatchObject({ active: true, staffName: 'Ravi K.' });
     });
 
+    it('is never sent a password mail', async () => {
+        expect(await require('../Modules/Auth/helpers/accountMail').refusesPasswordMail('support@alianhub.com')).toBe(true);
+    });
+
     it('never counts as a seat', async () => {
         usage._resetForTests();
         expect((await usage.buildUsage()).seats.active).toBe(1);
