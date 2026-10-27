@@ -100,7 +100,7 @@ async function agendaCounts() {
 
 async function storageHealth() {
     const type = process.env.STORAGE_TYPE || 'server';
-    const probe = await PROBES.storage();
+    const probe = await PROBES.storage({}, { roundTrip: false });
     const out = { type, ok: probe.status, detail: probe.statusText };
     if (type === 'server' && probe.status && fs.statfs) {
         try {

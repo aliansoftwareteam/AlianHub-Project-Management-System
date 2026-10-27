@@ -144,6 +144,7 @@ const SCHEMA_TYPE = {
     OAUTH_CLIENT_APPROVALS: "oauth_client_approvals",
     SCHEMA_VERSIONS: "schema_versions",
     INSTANCE_SETTINGS: "instance_settings",
+    STORAGE_USAGE: "storage_usage",
     AGENT_SESSIONS: "agent_sessions",
     AGENT_SESSION_ENDPOINTS: "agent_session_endpoints",
     ASK_THREADS: "ask_threads",

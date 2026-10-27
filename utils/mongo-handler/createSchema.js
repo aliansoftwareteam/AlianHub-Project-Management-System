@@ -456,6 +456,7 @@ oauthGrantsSchema.index({ userId: 1, createdAt: -1 });
 const oauthClientApprovalsSchema = new Schema(schema.oauthClientApprovals, {strict: true, timestamps: false});
 oauthClientApprovalsSchema.index({ companyId: 1, clientId: 1 }, { unique: true, name: 'company_client' });
 oauthClientApprovalsSchema.index({ companyId: 1, status: 1 });
+const storageUsageSchema = new Schema(schema.storageUsage, {strict: true, timestamps: false});
 
 const cspReportsSchema = new Schema(schema.cspReports, {strict: true, timestamps: false});
 cspReportsSchema.index({ day: 1, directive: 1, blockedHost: 1, documentPath: 1 }, { unique: true, name: 'report_key' });
@@ -648,6 +649,7 @@ module.exports = {
     oauthGrantsSchema,
     oauthTokensSchema,
     oauthClientApprovalsSchema,
+    storageUsageSchema,
     historySchema,
     userIdSchema, 
     usersSchema,

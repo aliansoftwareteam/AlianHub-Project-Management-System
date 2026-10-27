@@ -101,8 +101,9 @@ describe('POST /api/v1/wasabi/deleteFile', () => {
         const r = await remove({ companyId: COMPANY_A, path: `Reminders/${COMPANY_A}/${USER}/note.txt` });
 
         expect(r.status).toBe(200);
-        expect(s3Send).toHaveBeenCalledTimes(1);
-        expect(s3Send.mock.calls[0][0].input.Bucket).toBe(COMPANY_A);
+        const deletes = s3Send.mock.calls.map(([command]) => command).filter((command) => command.name === 'DeleteObject');
+        expect(deletes).toHaveLength(1);
+        expect(s3Send.mock.calls.every(([command]) => command.input.Bucket === COMPANY_A)).toBe(true);
     });
 });
 

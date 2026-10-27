@@ -8,6 +8,7 @@ const thumbnailArray = require("../../../thumbnail.json");
 const jwt = require("jsonwebtoken");
 const { sendStoredFile } = require("./helpers/downloadHeaders.js");
 const { refuseUnverifiedBucket } = require("../bucketAccess");
+const diskUsage = require("../../../common-storage/diskUsage");
 
 /**
  * @description Create a bucket for the specified database.
@@ -184,7 +185,8 @@ exports.uploadFileOnStorage = async(req, res) => {
             thumbnailArray[index].size.forEach((thu)=>{
                 promises.push(uploadStorageThumbnailFile(req.body.path,thu.height,thu.width,bucketId,req.file))
             })
-            Promise.allSettled(promises).then(()=>{
+            Promise.allSettled(promises).then((results)=>{
+                diskUsage.countWritten(bucketId, [req.file.path, ...results.filter((r) => r.status === 'fulfilled').map((r) => r.value)]);
                 return res.status(200).send({
                     status: true,
                     statusText: req.body.path
@@ -204,6 +206,7 @@ exports.uploadFileOnStorage = async(req, res) => {
             });
         }
     } else {
+        diskUsage.countWritten(bucketId, [req.file.path]);
         return res.status(200).send({
             status: true,
             statusText: req.body.path
@@ -324,6 +327,7 @@ exports.removeFileFromStorage = (req,res) => {
     if(req.query.thubmkey) {
         let index = thumbnailArray.findIndex(x => x.key === req.query.thubmkey);
         let promises = [];
+        const thumbnails = [];
         if(index!== -1) {
             thumbnailArray[index].size.forEach((thu) => {
                 let filePath;
@@ -342,14 +346,19 @@ exports.removeFileFromStorage = (req,res) => {
                     filePath = path.join(__dirname, '../../../storage', bucketId, `${baseName}-${thu.height}x${thu.width}.${extension}`);
                 }
                 if (fs.existsSync(filePath)) {
+                    thumbnails.push(filePath);
                     promises.push(fs.promises.unlink(filePath));
                 }
             });
+            const thumbnailSizes = diskUsage.sized(thumbnails);
             Promise.allSettled(promises).then(()=>{
+                diskUsage.countRemoved(bucketId, thumbnailSizes);
                 const filePath = exports.resolveBucketFile(bucketId, filepath);
                 // fs.chmodSync(filePath, 0o666);
                 if (fs.existsSync(filePath)) {
+                    const removed = diskUsage.sized([filePath]);
                     fs.unlinkSync(filePath);
+                    diskUsage.countRemoved(bucketId, removed);
                     res.status(200).send({
                         status: true,
                         statusText: 'File deleted successfully'
@@ -370,7 +379,9 @@ exports.removeFileFromStorage = (req,res) => {
     } else {
         const filePath = exports.resolveBucketFile(bucketId, filepath);
         if (fs.existsSync(filePath)) {
+            const removed = diskUsage.sized([filePath]);
             fs.unlinkSync(filePath);
+            diskUsage.countRemoved(bucketId, removed);
             res.status(200).send({
                 status: true,
                 statusText: 'File deleted successfully'
@@ -416,6 +427,7 @@ exports.uploadBase64FileOnServerStorage = (req,res) => {
                 fs.mkdirSync(path.dirname(dirPath), { recursive: true });
             }
             
+            const previousSize = diskUsage.fileSize(dirPath);
             fs.writeFile(dirPath, buffer, (err) => {
                 if (err) {
                     res.status(400).send({
@@ -423,6 +435,7 @@ exports.uploadBase64FileOnServerStorage = (req,res) => {
                         statusText: 'Error generating thumbnail'
                     })
                 } else {
+                    diskUsage.countWritten(bucketId, [dirPath], previousSize === null ? [] : [previousSize]);
                     res.status(200).send({
                         status: true,
                         statusText: req.body.path
