@@ -7,12 +7,13 @@
 - [x] PR 4 — everyday AI by right: Ask AI and writing help, work with agents, app connectors, connect your own AI; web entries hidden per right
 - [x] Unit, convention and web test suites run and compared with a clean `staging`
 - [ ] Integration tests (`tests/integration`) — need a throwaway MongoDB (`E2E_MONGODB_URL`, not port 27017); none on this machine
-- [ ] Local review by the user, then the PR into `staging`
+- [x] Local review against the demo database (owner screens and the owner's side of every approval)
+- [ ] PR into `staging` — branch merged with `staging` and ready, not pushed
 - [ ] Docs PR after merge — beta log, `npm run api:doc` (new routes below)
-- [ ] Browser sweep as owner, admin, member with and without each right, guest
+- [ ] Browser sweep as admin, member with and without each right, guest (the owner's side is done)
 
 ## Last step
-All four slices built on `feat/ai-access-by-role` and committed; not pushed. Waiting for the user's local review.
+Reviewed locally, two bugs fixed, `staging` merged in (agent settings tabs), task renumbered 060. Ready for the PR into `staging`; not pushed.
 
 ## Blockers
 - Integration tests need a MongoDB the tests may wipe. Docker Desktop is not running here.
@@ -67,3 +68,8 @@ Database:
   - Bug found and fixed: no approval notice was ever saved, because `workspaceNotice.sendNotice` left out the `uniqueId` the notifications schema requires (the OAuth client approval notices on `staging` have the same gap). The row now carries one; `tests/workspace-notice.test.js` checks a notice against the real schema. After the fix Leo got both notices and his bell went up.
   - Cleanup left TechNova as before: agents, revisions, skills, runs, notices, bell counts and the 99 rules match; 7 audit rows of the decisions stay, since the audit chain must not be edited.
   - Related tests after both fixes: 98 files (2,297 tests) and 87 schema, rules and migration files (1,435 tests) pass.
+- Renumbered to 060: `staging` took 059 for the agent settings tabs. Merged `origin/staging` (3 commits): the settings page is now tabbed, so the approval panel sits above the tabs, "Who can use this agent" sits on the Projects tab (and marks it unsaved), and an agent's maker gets the Save bar ("Submit for approval") and the Delete tab; History stays owner/admin. Two cases added to `agentSettingsTabs.spec.js`.
+- Test results after the merge, compared with a clean `staging` on this machine:
+  - Backend unit and conventions: 1,210 files, 32,095 tests. 18 files fail: 15 fail on `staging` too (the 9 unit and 6 convention files listed above); company-create-half-made, knowledge-task-changes and instruction-guard-patterns time out only under load and pass alone.
+  - Web: 734 files, 11,623 tests. 15 files fail, the same set as before the merge (13 fail on `staging` too; appWithoutWorkspace and taskOverlayHeadings only under load).
+  - i18n check and style check pass.
