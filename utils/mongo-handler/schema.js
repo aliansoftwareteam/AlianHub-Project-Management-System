@@ -3186,6 +3186,10 @@ const schema = {
             type : Number,
             required : false
         },
+        trackshotSize: {
+            type: Number,
+            required: false,
+        },
         isPaymentFailed: {
             type: Boolean,
             required: false,

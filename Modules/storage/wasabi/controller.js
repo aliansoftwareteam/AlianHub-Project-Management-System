@@ -13,7 +13,7 @@ const {myCache, requestHandler} = require('../../../Config/config');
 const { updateCompanyFun, getCompanyDataFun } = require('../../Company/controller/updateCompany.js');
 const { isProfileUpload, refuseUnverifiedBucket } = require('../bucketAccess');
 const { logUploadFailures } = require('../uploadFailures');
-const { isRowTrackshotKey } = require('../../../common-storage/taskFileKeys');
+const { isRowTrackshotKey, isScreenshotStorageKey } = require('../../../common-storage/taskFileKeys');
 /**
  * S3 client configuration for create bucket
  */
@@ -903,9 +903,11 @@ exports.getBucketSizeCompanyWise = async(companyId) => {
         await s3Client.send(listObjectsCommand)
         .then(async(data) => {
             let totalSize = 0;
+            let screenshotSize = 0;
 
             data.Contents.forEach((obj) => {
                 totalSize += obj.Size;
+                if (isScreenshotStorageKey(obj.Key)) screenshotSize += obj.Size;
             });
 
             let mongoObj = {
@@ -916,7 +918,8 @@ exports.getBucketSizeCompanyWise = async(companyId) => {
                     },
                     {
                         $set: {
-                            bucketSize: `${totalSize / (1024 * 1024)}`
+                            bucketSize: `${totalSize / (1024 * 1024)}`,
+                            trackshotSize: screenshotSize / (1024 * 1024)
                         }
                     }
                 ]

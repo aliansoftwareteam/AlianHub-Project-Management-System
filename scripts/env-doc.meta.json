@@ -584,6 +584,10 @@
     "description": "optional: override the Google axios timeout (default: LLM_TIMEOUT_MS for thinking models, 4 min for the rest)",
     "default": "600000"
   },
+  "HOSTING_MODE": {
+    "group": "server",
+    "description": "Set to managed on an instance AlianHub hosts for a customer. The desktop tracker's handshake then reports the instance as managed, and the tracker card links owners to the portal at PLATFORM_URL. Unset means self-hosted."
+  },
   "HEALTH_DB_TIMEOUT_MS": {
     "group": "general",
     "description": "How long /health waits for the database ping before reporting it down (default 2000).",
@@ -942,6 +946,10 @@
     "description": "Server-side permission checks for browser sessions: off (they pass as before), report (they pass, and each would-be denial is recorded in permission_decisions) or enforce (they are refused, and a check that cannot complete fails closed). The default for every workspace; a company row's permissionEnforcement.mode overrides it. Anything unrecognised reads as off. API tokens are always enforced on the keys they were refused on before, including nine task actions; on every other task write in Config/taskWritePermissions.js they follow this mode like browser sessions. A task write body that names another company or an id that cannot be read is refused for API tokens in every mode, and follows this mode for browser sessions. Also editable under Instance > Settings > Security.",
     "default": "off"
   },
+  "PLATFORM_URL": {
+    "group": "server",
+    "description": "Address of the AlianHub Cloud portal, read only when HOSTING_MODE is managed: the desktop tracker card links owners and admins there to add the time tracker."
+  },
   "PORT": {
     "group": "server",
     "description": "TCP port the HTTP server listens on.",
@@ -1063,6 +1071,16 @@
   "TRACKER_PKCE_LEGACY_UNTIL": {
     "group": "auth",
     "description": "ISO date from which desktop tracker builds that sign in without a PKCE verifier are refused. Unset (the default) keeps those builds working; an unparseable value reads as unset."
+  },
+  "TRACKER_MIN_VERSION": {
+    "group": "general",
+    "description": "Oldest desktop tracker version this server accepts, sent in the tracker handshake; an older tracker asks its user to update before it connects. Raise it only once the matching tracker release is on the stable channel.",
+    "default": "6.0.0"
+  },
+  "TRACKER_UPDATE_URL": {
+    "group": "general",
+    "description": "Address of the desktop tracker update feed, holding a stable and a beta folder with the latest.yml files the tracker build writes. Settings > Time tracking offers the newest stable download from it. Set to off on an instance without internet access; the downloads uploaded under Admin > Tracker are offered instead.",
+    "default": "https://downloads.alianhub.com/tracker"
   },
   "TRACKSHOT_RETENTION_DAYS": {
     "group": "storage",

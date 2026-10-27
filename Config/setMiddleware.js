@@ -10,6 +10,7 @@ const verifyJWTTokenWithCRoute = [
     // "/api/v1/timetracker/capture",
     // "/api/v1/timeTracker/start",
     "/api/v2/manualLogtime",
+    "/api/v2/tracker/desktop-app",
     "/api/v2/deleteManualLogtime",
     "/api/v2/timeTracker/start",
     "/api/v2/timetracker/end",

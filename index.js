@@ -100,6 +100,7 @@ function initializeControllers() {
     require('./Modules/Milestone/init.js').init(app);
     require('./Modules/Company/init.js').init(app);
     require('./Modules/trackerDownload/init.js').init(app);
+    require('./Modules/DesktopTracker/init').init(app);
     require('./Modules/notification/notification-middleware/init').init(app);
     require('./Modules/notification/prepare-notification-data/init').init(app);
     require('./Modules/projectSetting/init').init(app);

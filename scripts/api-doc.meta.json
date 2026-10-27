@@ -4864,6 +4864,8 @@
         "POST /api/v2/invoices/:id/paid": { "stability": "beta", "summary": "Marks an invoice as paid." },
         "DELETE /api/v2/invoices/:id": { "stability": "beta", "summary": "Deletes a draft invoice." },
         "GET /api/v2/changelog": { "stability": "internal", "summary": "The product changelog shown in the web app." },
+        "GET /api/v2/tracker/handshake": { "stability": "beta", "summary": "What the desktop tracker reads before anyone signs in. Public. Answers with `data`: `app` (always `alianhub`), `version` (the server's), `name` and `logoUrl` (the ones the sign-in page shows), `tracker` with `enabled` (whether any workspace here has the time tracker in its plan) and `minVersion` (the oldest tracker this server accepts), and `managed` (whether AlianHub hosts this instance)." },
+        "GET /api/v2/tracker/desktop-app": { "stability": "internal", "summary": "The desktop tracker card on Settings > Time tracking. Any signed-in member of the workspace may call it. Reads nothing. Answers with `data`: `enabled` (the plan has the time tracker), `seats` (`used` and `limit`, empty for no limit), `release` (the newest stable tracker from the update feed with one download per system, or empty), `screenshots` (`bytes` stored, empty until the nightly count runs, and `retention` with `enabled` and `maxAgeMonths`), `managed` and `portalUrl`." },
         "GET /api/v1/task/:id": { "stability": "beta", "summary": "Reads one task by its id." },
         "GET /api/v1/project/:id": { "stability": "beta", "summary": "Reads one project by its id." },
         "GET /api/v2/setup/status": { "stability": "internal", "summary": "Whether the instance has been set up." },

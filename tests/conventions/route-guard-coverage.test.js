@@ -103,6 +103,7 @@ const PUBLIC_ROUTES = [
     'GET /api/v1/getBrandSettingsData',
     'GET /api/v2/changelog',
     'GET /api/v1/tracker',
+    'GET /api/v2/tracker/handshake',
     'GET /api/v1/getTime',
     'GET /api/v1/getEmailTemplates',
     'GET /pickers/google-drive',

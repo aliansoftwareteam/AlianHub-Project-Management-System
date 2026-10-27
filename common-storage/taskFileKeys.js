@@ -91,9 +91,13 @@ const isRowTrackshotKey = (rowId, key) => {
     return Boolean(named) && named.timeSheetId === asText(rowId).toLowerCase();
 };
 
+/* A capture and its thumbnails share the timer's folder. */
+const isScreenshotStorageKey = (key) => /^Project\/[^/]+\/Sprint\/[^/]+\/TimeLog\//i.test(asText(key).replace(/\\/g, '/'));
+
 module.exports = {
     trackshotKey,
     isRowTrackshotKey,
+    isScreenshotStorageKey,
     mayAttachKey,
     isTaskStoredFile,
     clipKey,
