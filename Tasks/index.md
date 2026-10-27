@@ -63,3 +63,4 @@ Auto-maintained registry of all tasks. Reflects YAML frontmatter from each `task
 | 055 | Create Project modal — Member, Skills, Source and Due date pickers open above the modal | active | high | — | active/055-create-project-field-popovers |
 | 056 | Personal app connectors for AI and agents — one reusable module, then connectors one by one | backlog | high | — | backlog/056-personal-app-connectors |
 | 057 | Projects settings — Open, Archived and Closed tabs; every undo returns the exact previous state | active | high | — | active/057-project-lifecycle-tabs |
+| 058 | Tracker timesheet — every screenshot card shows its image box and a loading state from the first paint | active | medium | — | active/058-tracker-screenshot-loading-placeholder |
