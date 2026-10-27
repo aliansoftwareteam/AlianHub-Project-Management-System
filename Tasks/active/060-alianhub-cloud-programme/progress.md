@@ -8,21 +8,17 @@
 - [x] DigitalOcean research and API decision (resources/digitalocean.md)
 - [x] Child PRDs 061–073 written
 - [x] Owner answers the first questions (27 Oct 2026; Q3 and Q6 left open on purpose)
-- [ ] M1 build (061–066) merged to staging
+- [ ] M1 build (061–066) merged to staging — built on local branches 28 Oct 2026, not pushed
 - [ ] M2 infrastructure: orchestrator, host agent, upgrades, backups on DigitalOcean
-- [ ] M3 portal and back office (plans by invite code / staff approval)
+- [ ] M3 portal and back office (plans by invite code / staff approval) — built in the local `alianhub-cloud` repository 28 Oct 2026; needs a GitHub repository
 - [ ] M4 DigitalOcean limits raised, production hosts, hardening and drills
 - [ ] M5 payment gateway and public launch
 
 ## Last step
-
-All PRDs written and updated with the owner's answers and order. Plan not committed yet: the owner
-is reviewing it on the phone.
+M1 and M3 built while the owner was away (28 Oct 2026). M1 sits on six local branches, stacked 061 → 062 (with 063 merged in) → 064, plus 063, 065 and 066 on their own; M3 sits in the local repository `F:/Projects/alianhub-cloud`. Nothing is pushed: the owner decides when the branches go up as PRs to staging and where the cloud repository lives.
 
 ## Blockers
-
-None for M1. Q3 (payment provider) is needed only at M5; Q6 (shared vs dedicated servers) before
-production hosts in M4.
+M2 (infrastructure) needs the DigitalOcean, Cloudflare, Wasabi and Resend accounts. Q3 (payment provider) is needed only at M5; Q6 (shared vs dedicated servers) before production hosts in M4. Signing the tracker needs an Apple Developer account and a Windows signing certificate.
 
 ## Log
 
@@ -44,3 +40,14 @@ production hosts in M4.
 - Owner's order: infrastructure first, DigitalOcean limits second to last, payment gateway last.
   Phases re-cut to M1 build → M2 infrastructure → M3 portal + back office → M4 scale + harden →
   M5 payments + launch.
+
+### 2026-10-28
+- Owner: "Start with M1 … continue it then start with M3", while away from the PC. Plan committed on
+  `docs/alianhub-cloud-plan` (from staging); 061–066, then 067 and 072, moved to active.
+- M1 branches: `feat/managed-mode-settings` (061), `feat/s3-prefix-storage` (063),
+  `feat/managed-docker-stack` (065), `feat/tracker-any-workspace` (066), `feat/platform-api` (062, on
+  061 with 063 merged in), `feat/plan-entitlements` (064, on 062). Each task's progress.md lists what
+  ran and what could not run here (no Docker daemon, no MongoDB, no real buckets or certificates).
+- M3: new local repository `F:/Projects/alianhub-cloud` — foundation, portal (067) and back office
+  (072) merged into `main`; lint, 320 tests and the build pass. Until M5 plans come from invite
+  codes or staff-approved plan requests.

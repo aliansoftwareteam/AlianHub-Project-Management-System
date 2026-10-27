@@ -65,8 +65,8 @@ The ROADMAP already lists "Managed cloud hosting (we run it for you)" as a paid 
 
 | ID | Task | Delivers |
 |---|---|---|
-| [067](../../backlog/067-cloud-portal/task.md) | Cloud portal | Sign-up, plan and subdomain pickers, live provisioning screen, customer dashboard (checkout waits for M5) |
-| [072](../../backlog/072-cloud-back-office/task.md) | Back office | Staff console: customers, instances, jobs, hosts, catalog, manual actions, dashboards |
+| [067](../067-cloud-portal/task.md) | Cloud portal | Sign-up, plan and subdomain pickers, live provisioning screen, customer dashboard (checkout waits for M5) |
+| [072](../072-cloud-back-office/task.md) | Back office | Staff console: customers, instances, jobs, hosts, catalog, manual actions, dashboards |
 
 ### Phase M4 — scale and harden
 

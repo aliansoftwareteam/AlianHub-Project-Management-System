@@ -1,7 +1,7 @@
 ---
 id: 072
 title: Cloud back office — the staff console at ops.alianhub.com
-status: backlog
+status: active
 priority: high
 depends_on: [060, 067, 068, 069]
 created: 2026-10-27

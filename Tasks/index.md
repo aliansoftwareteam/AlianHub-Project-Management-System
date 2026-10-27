@@ -72,10 +72,10 @@ Auto-maintained registry of all tasks. Reflects YAML frontmatter from each `task
 | 064 | Plan entitlements — limits enforced on the server, read-only and suspended states, Plan & usage page | active | high | 060, 061, 062, 063 | active/064-plan-entitlements |
 | 065 | Hosting-ready image and compose template — many customers per server, one command up | active | high | 060, 061, 062 | active/065-managed-docker-stack |
 | 066 | Time tracker add-on — one signed build that connects to any workspace | active | medium | 060, 064 | active/066-tracker-any-workspace |
-| 067 | Cloud portal — sign-up, plans, subdomain, checkout and the customer dashboard | backlog | high | 060, 062, 064, 068, 069 | backlog/067-cloud-portal |
+| 067 | Cloud portal — sign-up, plans, subdomain, checkout and the customer dashboard | active | high | 060, 062, 064, 068, 069 | active/067-cloud-portal |
 | 068 | Cloud billing — subscriptions, add-ons, dunning, tax and the revenue ledger | backlog | high | 060 | backlog/068-cloud-billing |
 | 069 | Provisioning orchestrator and host agent — paid to live in three minutes, and every change after | backlog | high | 060, 062, 065, 070 | backlog/069-provisioning-orchestrator |
 | 070 | Hosting infrastructure on DigitalOcean — account, hosts, network, edge, TLS, registry, storage, mail | backlog | high | 060, 065 | backlog/070-hosting-infrastructure |
 | 071 | Fleet operations — staged upgrades, nightly backups, restore, monitoring and on-call | backlog | high | 060, 065, 069, 070 | backlog/071-fleet-operations |
-| 072 | Cloud back office — the staff console at ops.alianhub.com | backlog | high | 060, 067, 068, 069 | backlog/072-cloud-back-office |
+| 072 | Cloud back office — the staff console at ops.alianhub.com | active | high | 060, 067, 068, 069 | active/072-cloud-back-office |
 | 073 | Cloud launch readiness — legal, emails, support, security review, beta and go/no-go | backlog | high | 060, 067, 068, 069, 070, 071, 072 | backlog/073-cloud-launch-readiness |

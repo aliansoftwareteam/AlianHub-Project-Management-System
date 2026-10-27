@@ -1,7 +1,7 @@
 ---
 id: 067
 title: Cloud portal — sign-up, plans, subdomain, checkout and the customer dashboard
-status: backlog
+status: active
 priority: high
 depends_on: [060, 062, 064, 068, 069]
 created: 2026-10-27
