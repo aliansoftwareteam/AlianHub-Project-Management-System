@@ -41,7 +41,7 @@ function exitGracefully({ exit = (code) => process.exit(code), drainMs = DRAIN_M
 }
 
 function audit(req) {
-    const companyId = String(req.body?.companyId || '');
+    const companyId = String(req.body?.companyId || ''); // tenant-scoping: the instance owner names the workspace whose audit log records the restart
     logger.warn(`[instance] restart requested by ${req.instanceAdmin}${req.uid ? ` ${req.uid}` : ''}`);
     if (!OBJECT_ID.test(companyId)) return;
     recordAudit(companyId, {

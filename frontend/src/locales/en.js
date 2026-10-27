@@ -9135,6 +9135,7 @@ export default {
         audit_amended: "Added to an earlier record",
         audit_person_redacted: "Removed a person's details from the audit log",
         instance_audit_redact_person: "Asked to remove a person's details from the audit log",
+        instance_restart: "Restarted the instance",
         permission_refused: "Tried something their role does not allow",
         permission_enforcement_mode: "Changed how permissions are enforced",
         ai_instruction_pattern_added: "Added a pattern for spotting hidden instructions",

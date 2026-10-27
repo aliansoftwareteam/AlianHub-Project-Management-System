@@ -2660,6 +2660,7 @@
     "AuditEvents.goal_restore": "Restored a goal",
     "AuditEvents.goal_update": "Changed a goal",
     "AuditEvents.instance_audit_redact_person": "Asked to remove a person's details from the audit log",
+    "AuditEvents.instance_restart": "Restarted the instance",
     "AuditEvents.knowledge_erase_document": "Removed a document from AI search",
     "AuditEvents.knowledge_erase_person": "Removed a person's content from AI search",
     "AuditEvents.knowledge_exclusion_remove": "Let AI search read something again",

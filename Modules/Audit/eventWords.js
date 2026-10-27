@@ -24,6 +24,7 @@ const EVENTS = Object.freeze({
     'audit.amended': 'Added to an earlier record',
     'audit.person_redacted': 'Removed a person\'s details from the audit log',
     'instance.audit_redact_person': 'Asked to remove a person\'s details from the audit log',
+    'instance.restart': 'Restarted the instance',
     'permission.refused': 'Tried something their role does not allow',
     'permission.enforcement_mode': 'Changed how permissions are enforced',
     'ai.instruction_pattern_added': 'Added a pattern for spotting hidden instructions',
