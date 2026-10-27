@@ -206,6 +206,12 @@ const describe = () => describeSettings({
 });
 
 /* What the login page and the SPA shell may know before anyone is logged in. */
+/* The login page says a workspace is suspended, and until when its data is kept, before anyone types a password. */
+function hostedLifecycle() {
+    const { state, graceUntil } = require('../Modules/Platform/lifecycle').lifecycleState();
+    return { lifecycle: state, graceUntil: graceUntil || null };
+}
+
 function publicConfig() {
     const env = (key) => process.env[key] || '';
     const on = (key) => env(key) === 'true';
@@ -229,7 +235,7 @@ function publicConfig() {
         },
         demoMode: env('DEMO_MODE') === 'true',
         mcpOAuth: require('../Modules/OAuthServer/config').isOn(process.env),
-        hosting: { mode: hostingMode.mode(), portalUrl: hostingMode.portalUrl(), ...(hostingMode.isManaged() ? { lifecycle: require('../Modules/Platform/lifecycle').lifecycle() } : {}) },
+        hosting: { mode: hostingMode.mode(), portalUrl: hostingMode.portalUrl(), ...(hostingMode.isManaged() ? hostedLifecycle() : {}) },
     };
 }
 

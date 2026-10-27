@@ -43,6 +43,7 @@ class RefusedError extends Error {
 }
 
 const oid = tools.oid;
+const INSTANCE_LOCKED = 'Nothing can be changed while the workspace is read-only or suspended.';
 const OBJECT_ID = /^[0-9a-fA-F]{24}$/;
 const { LINK_KINDS } = require('./taskRequests');
 
@@ -583,6 +584,7 @@ const perform = async ({ companyId, actor, action, params = {}, reason = '', cos
         throw await refusal(companyId, actor, { action, params, reason: held, ip, taint });
     }
     if (!check.action.write) return { result: null, auditId: null, undo: null };
+    if (!require('../Entitlements/lifecycleGuard').writable()) throw await refusal(companyId, actor, { action, params, reason: INSTANCE_LOCKED, ip, taint });
     const exec = executors[action];
     if (!exec) throw new tools.DeterministicError(`${action} is not ready to be used yet, so nothing was changed.`);
 

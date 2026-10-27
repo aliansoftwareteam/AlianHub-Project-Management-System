@@ -16,6 +16,8 @@ const { revokeMemberTokens } = require('../../ApiTokens/memberTokens');
 const { endMemberConnections } = require('../../Agents/connectors/memberDeparted');
 const logger = require('../../../Config/loggerConfig');
 const { releaseMemberSeat } = require('../../Company/helpers/companyCounters');
+const { acceptanceRefusal } = require('../../Entitlements/guards');
+const { answerRefusal } = require('../../Entitlements/answers');
 
 const OBJECT_ID_PATTERN = /^[a-f0-9]{24}$/i;
 const ACTIVE = 2;
@@ -322,6 +324,11 @@ exports.updateMember = async (req, res) => {
         if (!verdict.ok) {
             return refuse(res, verdict.code, verdict.statusText);
         }
+        const nextSeat = { ...subject, ...data };
+        if (!holdsSeat(subject) && holdsSeat(nextSeat) && subject.userId) {
+            const noSeat = await acceptanceRefusal({ userId: subject.userId, email: subject.userEmail, roleType: nextSeat.roleType });
+            if (noSeat) return answerRefusal(res, noSeat);
+        }
 
         // Losing the seat, the invite or the member role all strand whoever reports here.
         const becomesGuest = data.roleType !== undefined && data.roleType !== null && Number(data.roleType) === reportingLine.GUEST_ROLE;
@@ -457,6 +464,9 @@ exports.rootUpdateMember = async (req, res) => {
         if (!verdict.ok) {
             return refuse(res, verdict.code, verdict.statusText);
         }
+
+        const noSeat = await acceptanceRefusal({ userId: req.uid, email: invite.userEmail, roleType: invite.roleType });
+        if (noSeat) return answerRefusal(res, noSeat);
 
         const accepted = { userId: String(req.uid), status: ACTIVE };
         const response = await MongoDbCrudOpration(companyId, {

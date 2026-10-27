@@ -25,7 +25,7 @@ const sendResetLink = async ({ email, token: clientToken, tokenId }) => {
     const mail = require("../../Template/forgotPassword")(userEmail, link);
     sendMail.SendEmail(mail.subject, mail.mail, userEmail, true, (result) => {
         if (!result.status) logger.error(`Forgot password email: ${result.error}`);
-    });
+    }, { accountMail: true });
 };
 
 /* The same answer whether or not the address has an account; the answer does not wait for the mail. */

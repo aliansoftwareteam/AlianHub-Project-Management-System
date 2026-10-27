@@ -10,6 +10,7 @@ const fieldsOnly = multer({
     fileFilter: (req, file, cb) => cb(null, false),
 });
 const { agentsRefused } = require('../Agents/guard');
+const { requireWorkspaceRoom } = require('../Entitlements/guards');
 
 exports.init = (app) => {
     /**
@@ -116,7 +117,7 @@ exports.init = (app) => {
     /**
      * Create a new Company and Add company In wasabi.
      */
-	app.post("/api/v2/company/create", agentsRefused('workspace.create'), fieldsOnly.single("file"), ctrl.createCompanyV2);
+	app.post("/api/v2/company/create", agentsRefused('workspace.create'), requireWorkspaceRoom, fieldsOnly.single("file"), ctrl.createCompanyV2);
 	app.get("/api/v1/freeCompanyCount/:userId", ctrl.checkFreeCompanyCountsApi);
 	// The audience is frozen at login, so the membership re-check is what stops a removed
 	// member reaching a handler that drops the whole database.

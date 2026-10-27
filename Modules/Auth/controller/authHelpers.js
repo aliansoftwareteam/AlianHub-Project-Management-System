@@ -248,7 +248,7 @@ const mailSetPasswordLink = async (email, isLoginType) => {
     const mail = require("../../Template/passwordExpiredMail")(email, `${base}/#/set-new-password/${token}`);
     sendMail.SendEmail(mail.subject, mail.mail, email, true, (result) => {
         if (!result.status) logger.error(`Set password mail was not sent: ${result.error}`);
-    });
+    }, { accountMail: true });
 };
 
 /* Blocked and unverified are only said after the right password, so no answer tells someone
@@ -361,7 +361,7 @@ exports.sendForgotPassword = (req, res, next) => {
                     req.errorMessageObject = {message: result.error};
                     next();
                 }
-            });
+            }, { accountMail: true });
         }).catch((error) => {
             req.errorMessageObject = {message: serviceCtr.mongoErrorMessage(error)};
             next();

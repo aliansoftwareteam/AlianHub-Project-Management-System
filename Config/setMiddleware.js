@@ -378,6 +378,8 @@ const verifyJWTTokenWithCRoute = [
     '/api/v1/dashboard',
     '/api/v1/dashboards',
     '/api/v1/cardcomponent',
+    // Plan & usage (Modules/Entitlements): any member reads it; owners and admins also see storage per workspace.
+    '/api/v2/plan/usage',
     // Not listed, on purpose (Modules/OAuthServer, MCP_OAUTH): /.well-known/oauth-authorization-server and /oauth/* are
     // public by design, since a client reaches them before anyone holds a token and the token endpoint authenticates
     // the client itself; /api/v2/oauth-clients, /api/v2/oauth-client-approvals and /api/v2/oauth-grants check the
@@ -386,6 +388,7 @@ const verifyJWTTokenWithCRoute = [
 const verifyJWTToken = [
     "/api/v2/company/delete",
     "/api/v2/company/create",
+    "/api/v2/plan/workspaces",
     "/api/v1/freeCompanyCount",
     "/api/v1/getUserProfile",
     "/api/v1/getTaskTypeImage",
@@ -442,6 +445,14 @@ const verifyJWTToken = [
     '/api/v1/customeModals/submitButtonHandle'
 ];
 
+
+/* Before every route (064): a hosted instance that is read-only or suspended refuses here, and the
+ * desktop tracker's own routes answer only while its add-on is on. Self-hosted both pass everything. */
+exports.setPlanGuards = (app) => {
+    const { lifecycleGuard, trackerGate } = require('../Modules/Entitlements');
+    app.use(lifecycleGuard);
+    app.use(trackerGate);
+};
 
 /**
  * Middleware With CompanyId

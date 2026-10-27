@@ -137,6 +137,14 @@ exports.initSocket = (server) => {
         socket.customData = {userRole};
         const namespace = socket.nsp;
 
+        // Suspended (064): the socket stays open so the lifecycle broadcast still reaches it, but no event it sends runs.
+        socket.use(([event], next) => {
+            const refusal = require('../Modules/Entitlements/lifecycleGuard').socketEventRefusal(event);
+            if (!refusal) return next();
+            socket.emit('INSTANCE_LOCKED', { code: refusal });
+            return undefined;
+        });
+
         // A handshake only proves the session was live when the socket opened. Every event
         // re-checks it, so a socket whose session has since ended is closed on its next one.
         socket.use((_event, next) => {

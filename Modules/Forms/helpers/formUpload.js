@@ -221,6 +221,10 @@ const storeSubmissionFiles = async ({ companyId, form, questions, incoming }) =>
                 userId: String((form.userSnapshot && form.userSnapshot.id) || form.createdBy || ''),
             });
         } catch (e) {
+            if (e && e.planLimit) {
+                errors[question.id] = e.message;
+                continue;
+            }
             logger.error(`form upload: storing failed (${e.message})`);
             errors[question.id] = `${UPLOAD_MESSAGE.UPLOAD_FAILED} ${REPICK}`;
         }

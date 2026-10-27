@@ -6,6 +6,7 @@ const { MongoDbCrudOpration } = require('../../utils/mongo-handler/mongoQueries'
 const { instanceStorageUsage } = require('../../common-storage/storageUsage');
 const { currentEntitlements } = require('./entitlements');
 const { STATE_IDS, readState } = require('./platformState');
+const { storageLevel } = require('../Entitlements/checks');
 
 const CACHE_MS = 60 * 1000;
 const DAY_MS = 24 * 60 * 60 * 1000;
@@ -100,6 +101,7 @@ async function buildUsage(now = Date.now()) {
         storage: {
             bytes: storage.bytes,
             limit: limits.storageBytes ?? null,
+            level: storageLevel({ usedBytes: storage.bytes, limit: limits.storageBytes }),
             byWorkspace: storage.byWorkspace.map((row) => ({ companyId: row.companyId, name: names.get(row.companyId) || '', bytes: row.bytes })),
         },
         timeTracker: { seatsUsed: seats.trackerSeats, limit: timeTracker.enabled === false ? 0 : (timeTracker.seats ?? null) },

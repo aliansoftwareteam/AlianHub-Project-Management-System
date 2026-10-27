@@ -1,5 +1,6 @@
 const { SCHEMA_TYPE } = require('../../../Config/schemaType');
 const { planObj } = require('../defaultSubscriptionData');
+const { planFeatureFor } = require('../../Entitlements/entitlements');
 const { normaliseFocus } = require('../../createProject/sampleTasks');
 const { COUNTRY_NOT_ASKED } = require('./companyDetails');
 
@@ -38,7 +39,7 @@ const companyRowFor = (companyMongoId, bodyData) => ({
         companyData: [{ users: 1 }],
         Cst_stateCode: bodyData.Cst_stateCode,
         Cst_countryCode: bodyData.Cst_countryCode,
-        planFeature: planObj,
+        planFeature: planFeatureFor(planObj),
     }
 });
 

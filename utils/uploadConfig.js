@@ -14,8 +14,11 @@ const path = require('path');
  *   null if the input is unsafe.
  */
 
+const ENV_MAX_FILE_BYTES = Number(process.env.UPLOAD_MAX_FILE_BYTES || 100 * 1024 * 1024); // 100 MB
+
+// A getter, because busboy reads it per request: a hosted plan's largest file (064) cuts the stream off there.
 const DEFAULT_LIMITS = {
-    fileSize: Number(process.env.UPLOAD_MAX_FILE_BYTES || 100 * 1024 * 1024), // 100 MB
+    get fileSize() { return require('../Modules/Entitlements/uploads').maxUploadBytes(ENV_MAX_FILE_BYTES); },
     files: Number(process.env.UPLOAD_MAX_FILES || 20),
 };
 

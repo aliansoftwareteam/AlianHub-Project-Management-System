@@ -9,6 +9,7 @@ async function boot({ pull = true } = {}) {
     const steps = [
         ['lifecycle', () => require('./lifecycle').loadLifecycle()],
         ['entitlements', () => require('./entitlements').loadEntitlements()],
+        ['plan', () => require('../Entitlements').bootEntitlements()],
         ['support session', () => require('./supportSession').loadSupportSession()],
     ];
     for (const [name, run] of steps) {
