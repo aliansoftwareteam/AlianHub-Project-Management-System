@@ -528,7 +528,7 @@ onMounted(load);
 .ai-never { margin: 14px 0 0; padding-top: 12px; border-top: 1px solid var(--hairline); font: var(--text-small); color: var(--ink-2); display: flex; flex-direction: column; gap: 4px; }
 .ai-never strong { color: var(--ink); }
 .ai-scope__tools { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; margin-bottom: 10px; }
-.ai-scope__search { flex: 1 1 220px; min-width: 0; }
+.ah-input.ai-scope__search { flex: 1 1 220px; min-width: 0; }
 .ai-scope__count { color: var(--ink-2); white-space: nowrap; }
 .ai-scope__grid {
     display: grid; grid-template-columns: repeat(auto-fill, minmax(min(220px, 100%), 1fr)); gap: 2px 10px;
