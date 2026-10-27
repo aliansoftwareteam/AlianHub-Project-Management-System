@@ -2,7 +2,7 @@ const fs = require('fs');
 const path = require('path');
 const axios = require('axios');
 const nodemailer = require('nodemailer');
-const { S3Client, HeadBucketCommand } = require('@aws-sdk/client-s3');
+const { resolveS3Config, prefixProblem } = require('../../common-storage/s3Config');
 const { withTimeout } = require('./health');
 const compatibleClient = require('../AICore/llmProvider/compatibleClient');
 
@@ -41,7 +41,9 @@ async function probeMail(values = {}) {
     }
 }
 
-async function probeStorage(values = {}) {
+/* The console's Test button writes, reads back and deletes an object under the prefix (roundTrip);
+ * the health page only checks the bucket or prefix can be reached, and writes nothing. */
+async function probeStorage(values = {}, { roundTrip = true } = {}) {
     try {
         const type = pick(values, 'STORAGE_TYPE') || 'server';
         if (type === 'server') {
@@ -51,15 +53,23 @@ async function probeStorage(values = {}) {
             fs.unlinkSync(marker);
             return ok(`Local storage at ${STORAGE_ROOT} is writable.`, { type, path: STORAGE_ROOT });
         }
-        const bucket = pick(values, 'USERPROFILEBUCKET');
-        if (!bucket) return fail(new Error('USERPROFILEBUCKET is not set.'));
-        const client = new S3Client({
-            region: pick(values, 'WASABI_REGION') || 'us-east-1',
-            endpoint: pick(values, 'WASABIENDPOINT'),
-            credentials: { accessKeyId: pick(values, 'WASABI_ACCESS_KEY'), secretAccessKey: pick(values, 'WASABI_SECRET_ACCESS_KEY') },
-        });
-        await withTimeout(client.send(new HeadBucketCommand({ Bucket: bucket })), PROBE_TIMEOUT_MS, 'Wasabi');
-        return ok(`Bucket ${bucket} is reachable.`, { type, bucket });
+        const typed = Object.fromEntries(Object.entries(values || {}).filter(([, value]) => value !== undefined && value !== null && value !== ''));
+        const cfg = resolveS3Config({ ...process.env, ...typed });
+        const bucket = cfg.prefixMode ? cfg.bucket : cfg.profileBucket;
+        if (!bucket) return fail(new Error('Set S3_BUCKET (one bucket for everything), or USERPROFILEBUCKET for a bucket per workspace.'));
+        if (prefixProblem(cfg.prefix)) return fail(new Error('S3_PREFIX may not contain empty, "." or ".." parts.'));
+        const { buildS3Client } = require('../../common-storage/s3Client');
+        const { layoutOf } = require('../../common-storage/s3Layout');
+        const { storeOf } = require('../../common-storage/s3Store');
+        const client = buildS3Client(cfg);
+        const store = storeOf({ client: () => client, layout: () => layoutOf(cfg), counter: null });
+        const where = cfg.prefixMode && cfg.prefix ? `${bucket}/${cfg.prefix}` : bucket;
+        if (roundTrip) {
+            await withTimeout(store.roundTrip(), PROBE_TIMEOUT_MS, 'Storage');
+            return ok(`Wrote, read back and deleted a test object in ${where}.`, { type, bucket, prefix: cfg.prefix, roundTrip: true });
+        }
+        await withTimeout(store.reach(), PROBE_TIMEOUT_MS, 'Storage');
+        return ok(`Bucket ${where} is reachable.`, { type, bucket, ...(cfg.prefixMode ? { prefix: cfg.prefix } : {}) });
     } catch (error) {
         return fail(error);
     }
