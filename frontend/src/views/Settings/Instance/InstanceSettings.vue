@@ -87,7 +87,7 @@ const restartKeys = ref([]);
 const testResult = ref(null);
 let baseline = {};
 
-const visible = computed(() => rows.value.filter((r) => r.group === group.value));
+const visible = computed(() => rows.value.filter((r) => r.group === group.value && !r.hidden));
 const testable = computed(() => TESTABLE.includes(group.value));
 const dirty = computed(() => Object.keys(draft).some((k) => draft[k] !== baseline[k]) || Object.values(clear).some(Boolean));
 const label = (row) => (te(`Instance.f_${row.key}`) ? t(`Instance.f_${row.key}`) : row.label);

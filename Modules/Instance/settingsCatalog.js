@@ -1,9 +1,11 @@
 /* Every setting the Instance console can hold. `restart` marks a value read at
  * module load (storage driver, security middleware, cron zone); everything else
  * takes effect on save. Labels and help are English on purpose: the page
- * translates group and field names through InstanceV2.*, these are the fallback. */
+ * translates group and field names through InstanceV2.*, these are the fallback.
+ * `legacy` fields are shown only while they hold a value: an older name a newer field replaces. */
 const { allowlistError } = require('../Webhooks/helpers/privateHostAllowlist');
 const { baseUrlError } = require('../AICore/llmProvider/compatibleClient');
+const { prefixProblem } = require('../../common-storage/s3Config');
 
 const GROUPS = ['general', 'mail', 'storage', 'ai', 'auth', 'calling', 'security'];
 
@@ -30,14 +32,22 @@ const CATALOG = [
     field('RESEND_API_KEY', 'mail', 'secret', { label: 'Resend API key', help: 'When set, Resend is used instead of SMTP.' }),
     field('RESEND_FROM_EMAIL', 'mail', 'text', { label: 'Resend from address' }),
 
-    field('STORAGE_TYPE', 'storage', 'select', { default: 'server', options: ['server', 'wasabi'], label: 'Storage driver', restart: true }),
-    field('WASABI_ACCESS_KEY', 'storage', 'text', { label: 'Wasabi access key', restart: true }),
-    field('WASABI_SECRET_ACCESS_KEY', 'storage', 'secret', { label: 'Wasabi secret key', restart: true }),
-    field('WASABI_USERID', 'storage', 'text', { label: 'Wasabi user id', restart: true }),
-    field('WASABIENDPOINT', 'storage', 'text', { default: 'https://s3.wasabisys.com', label: 'S3 endpoint', restart: true }),
-    field('WASABI_REGION', 'storage', 'text', { default: 'us-east-1', label: 'Region', restart: true }),
-    field('IAM_ENDPOINT', 'storage', 'text', { default: 'https://iam.wasabisys.com', label: 'IAM endpoint', restart: true }),
-    field('USERPROFILEBUCKET', 'storage', 'text', { label: 'Public assets bucket', restart: true }),
+    field('STORAGE_TYPE', 'storage', 'select', { default: 'server', options: ['server', 's3', 'wasabi'], label: 'Storage driver', restart: true }),
+    field('S3_ENDPOINT', 'storage', 'text', { label: 'Storage address', help: 'e.g. https://blr1.digitaloceanspaces.com or https://s3.ap-southeast-1.wasabisys.com. Empty uses Amazon S3.' }),
+    field('S3_REGION', 'storage', 'text', { label: 'Region', help: 'e.g. blr1 or us-east-1.' }),
+    field('S3_BUCKET', 'storage', 'text', { label: 'Bucket', help: 'One bucket for everything. Leave empty to keep a bucket per workspace.' }),
+    field('S3_PREFIX', 'storage', 'text', { label: 'Key prefix', help: 'Optional, e.g. prod/. Every file is stored under it, inside the bucket above.', validate: prefixProblem }),
+    field('S3_ACCESS_KEY', 'storage', 'text', { label: 'Access key' }),
+    field('S3_SECRET_KEY', 'storage', 'secret', { label: 'Secret key' }),
+    field('S3_FORCE_PATH_STYLE', 'storage', 'boolean', { default: 'false', label: 'Bucket in the path', help: 'On for MinIO and other servers that cannot take the bucket name in the host name.' }),
+    field('S3_PUBLIC_BASE_URL', 'storage', 'text', { label: 'Public files address', help: 'Optional address (a CDN) that serves public files such as email images.' }),
+    field('USERPROFILEBUCKET', 'storage', 'text', { label: 'Public assets bucket', help: 'With a bucket per workspace only: the bucket for avatars and public files.' }),
+    field('WASABI_ACCESS_KEY', 'storage', 'text', { label: 'Wasabi access key', legacy: true }),
+    field('WASABI_SECRET_ACCESS_KEY', 'storage', 'secret', { label: 'Wasabi secret key', legacy: true }),
+    field('WASABI_USERID', 'storage', 'text', { label: 'Wasabi user id', legacy: true }),
+    field('WASABIENDPOINT', 'storage', 'text', { default: 'https://s3.wasabisys.com', label: 'Wasabi endpoint', legacy: true }),
+    field('WASABI_REGION', 'storage', 'text', { default: 'us-east-1', label: 'Wasabi region', legacy: true }),
+    field('IAM_ENDPOINT', 'storage', 'text', { default: 'https://iam.wasabisys.com', label: 'IAM endpoint', legacy: true }),
 
     field('AI_ENABLED', 'ai', 'boolean', {
         default: 'true',
@@ -180,6 +190,7 @@ function describeSettings({ saved = {}, env = {}, locked = [] }) {
             key: def.key, group: def.group, type: def.type, secret: def.secret, label: def.label, help: def.help || '',
             options: def.options || null, default: fallback, restart: Boolean(def.restart), public: Boolean(def.public),
             value, source, locked: source === 'env' || Boolean(def.readOnly), readOnly: Boolean(def.readOnly),
+            hidden: Boolean(def.legacy) && source !== 'env' && source !== 'saved',
         };
     });
 }

@@ -215,6 +215,41 @@
     "description": "Secret of at least 32 characters that keys the audit chain hash, so someone who can write to the database cannot recompute it. Rows chained under one key only verify under that key; keep it out of the database and its backups. It also keys the pseudonyms that redacting a person in audit rows writes (erased-user-<hash of the user id>), falling back to JWT_SECRET when this key is unset or invalid; after the key changes a person gets a new pseudonym, and running the redaction again changes nothing already redacted. The key cannot change once AUDIT_CHAIN has been on: rows, chain heads and anchors do not record which key signed them, so under a new key every older chained row would read as broken. The first start with AUDIT_CHAIN on and a valid key stores a fingerprint of the key (an HMAC-SHA256 of a fixed label under it, never the key) in the audit_chain_key collection of the global database; every later start with AUDIT_CHAIN on and a different key refuses to start, logging a fatal error and exiting with status 1, until the previous key is set back. With AUDIT_CHAIN off nothing is checked or stored, and a missing or short key still only turns the chain off.",
     "secret": true
   },
+  "S3_ACCESS_KEY": {
+    "group": "storage",
+    "description": "Access key for object storage. Falls back to WASABI_ACCESS_KEY. A new key applies to the next request, with no restart.",
+    "secret": true
+  },
+  "S3_BUCKET": {
+    "group": "storage",
+    "description": "One bucket for every file (prefix mode). Set: files go to <S3_PREFIX><companyId>/… and avatars and public files to <S3_PREFIX>public/…, and no bucket is ever created or deleted. Empty: each workspace keeps a bucket named after its id and public files go to USERPROFILEBUCKET, as before. Move an install with npm run storage:migrate -- --to-prefix."
+  },
+  "S3_ENDPOINT": {
+    "group": "storage",
+    "description": "Address of the S3-compatible service, e.g. https://blr1.digitaloceanspaces.com, https://s3.ap-southeast-1.wasabisys.com or http://minio:9000. Falls back to WASABIENDPOINT; empty uses Amazon S3. Applied without a restart."
+  },
+  "S3_FORCE_PATH_STYLE": {
+    "group": "storage",
+    "description": "true puts the bucket in the URL path instead of the host name, for MinIO and similar servers.",
+    "default": "false"
+  },
+  "S3_PREFIX": {
+    "group": "storage",
+    "description": "Optional key prefix inside S3_BUCKET, e.g. ins_01jd3k8w/ or prod/. A trailing slash is added when missing; empty, \".\" and \"..\" parts are refused."
+  },
+  "S3_PUBLIC_BASE_URL": {
+    "group": "storage",
+    "description": "Optional address (a CDN) that serves public files such as email images, as <S3_PUBLIC_BASE_URL>/<key>. In prefix mode it should serve <S3_BUCKET>/<S3_PREFIX>public/; the bucket itself is never made public."
+  },
+  "S3_REGION": {
+    "group": "storage",
+    "description": "Region of the S3-compatible service, e.g. blr1 or us-east-1. Falls back to WASABI_REGION."
+  },
+  "S3_SECRET_KEY": {
+    "group": "storage",
+    "description": "Secret key for object storage. Falls back to WASABI_SECRET_ACCESS_KEY.",
+    "secret": true
+  },
   "SECRETS_STORE": {
     "group": "security",
     "description": "Set to true to keep integration and webhook secrets in a per-company secrets store, referenced by handle: a new or updated secret is sealed with AES-256-GCM under SECRETS_KEY and bound to its company and handle, the integration or webhook document keeps only the handle, every create, rotation, revocation and failed lookup is audited, and owners and admins see each secret's name, kind, key id and dates under Settings → Integrations, where they can rotate or revoke it. Migration 031 moves existing secrets in when this is on while it runs. Needs SECRETS_KEY; with a missing or short key the store refuses every read and write, connecting an integration or adding a webhook is refused rather than saved outside the store, and an error is logged. Unset or false keeps secrets sealed on their documents as before; a handle already written still resolves while a key is set, and a secret saved while this is off replaces the handle on its document, so the newest value is always the one in use. Turning this off again: the old store copy is revoked when SECRETS_KEY is still set, and otherwise marked, then revoked by `npm run secrets:reencrypt` (or by migration 031 when it runs again) once a key is set.",
@@ -1048,7 +1083,7 @@
   },
   "STORAGE_TYPE": {
     "group": "storage",
-    "description": "wasabi | server. With server, uploads are served from the app's own origin, and whatever CSP_MODE is: every upload response carries X-Content-Type-Options: nosniff and a sandboxing Content-Security-Policy; images (including SVG), PDF, plain text, audio and video still preview inline; every other file (scripts, HTML, XML, unknown types) downloads as application/octet-stream.",
+    "description": "s3 | wasabi | server. s3 and wasabi are the same S3-compatible driver (see the S3_* variables). With server, uploads are served from the app's own origin, and whatever CSP_MODE is: every upload response carries X-Content-Type-Options: nosniff and a sandboxing Content-Security-Policy; images (including SVG), PDF, plain text, audio and video still preview inline; every other file (scripts, HTML, XML, unknown types) downloads as application/octet-stream.",
     "required": true,
     "default": "wasabi"
   },
@@ -1118,7 +1153,7 @@
   },
   "USERPROFILEBUCKET": {
     "group": "storage",
-    "description": "Bucket that holds user profile pictures.",
+    "description": "With a bucket per workspace (S3_BUCKET empty): the bucket that holds avatars and public files. Not used in prefix mode.",
     "default": "your-bucket-name"
   },
   "VUE_APP_AFFILIATEON": {
@@ -1208,22 +1243,22 @@
   },
   "WASABIENDPOINT": {
     "group": "storage",
-    "description": "Wasabi S3 endpoint.",
+    "description": "Older name of S3_ENDPOINT, still read when S3_ENDPOINT is empty.",
     "default": "https://s3.wasabisys.com"
   },
   "WASABI_ACCESS_KEY": {
     "group": "storage",
-    "description": "Wasabi access key.",
+    "description": "Older name of S3_ACCESS_KEY, still read when S3_ACCESS_KEY is empty.",
     "secret": true
   },
   "WASABI_REGION": {
     "group": "storage",
-    "description": "Wasabi region.",
+    "description": "Older name of S3_REGION, still read when S3_REGION is empty.",
     "default": "us-east-1"
   },
   "WASABI_SECRET_ACCESS_KEY": {
     "group": "storage",
-    "description": "Wasabi secret access key.",
+    "description": "Older name of S3_SECRET_KEY, still read when S3_SECRET_KEY is empty.",
     "secret": true
   },
   "WASABI_USERID": {
