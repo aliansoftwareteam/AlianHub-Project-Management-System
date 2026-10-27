@@ -12,6 +12,7 @@
 <script setup>
 import { defineProps,inject } from 'vue';
 import { useRouter } from 'vue-router';
+import { openUpgrade } from "@/composable/upgradeLink";
 
 const companyId = inject("$companyId");
 defineProps({
@@ -21,7 +22,7 @@ defineProps({
 const router = useRouter();
 
 const navigateToUpgrade = () => {
-    router.push({ name: 'Upgrade', params: { cid: companyId.value } });
+    openUpgrade(router, companyId.value);
 };
 </script>
 
