@@ -127,7 +127,7 @@ async function seatRefusal(people, { includePending = false } = {}) {
     const planLimits = limits();
     if (unlimited(planLimits.seats) && unlimited(planLimits.guests)) return null;
     let snapshot = await seatSnapshot();
-    if (nearLimit(snapshot, planLimits)) snapshot = await seatSnapshot({ fresh: true });
+    if ((people || []).length > 1 || nearLimit(snapshot, planLimits)) snapshot = await seatSnapshot({ fresh: true });
     const verdict = judgeSeats(snapshot, people, planLimits, { includePending });
     return verdict.ok ? null : verdict;
 }
