@@ -78,7 +78,10 @@ function refuseBadBoot({ env = process.env, log = console.error, exit = (code) =
 
 const setPortalUrl = (url) => { portalOverride = String(url || ''); };
 
-const portalUrl = () => (isManaged() ? portalOverride || process.env.PLATFORM_URL || '' : '');
+function portalUrl() {
+    if (!isManaged()) return '';
+    return portalOverride || process.env.PLATFORM_URL || '';
+}
 
 module.exports = {
     MODES, mode, isManaged, platform, ed25519PublicKey, bootProblems, refuseBadBoot, setPortalUrl, portalUrl,

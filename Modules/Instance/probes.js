@@ -5,8 +5,13 @@ const nodemailer = require('nodemailer');
 const { S3Client, HeadBucketCommand } = require('@aws-sdk/client-s3');
 const { withTimeout } = require('./health');
 const compatibleClient = require('../AICore/llmProvider/compatibleClient');
+const hostingMode = require('../../Config/hostingMode');
 
 const PROBE_TIMEOUT_MS = 10000;
+/* DigitalOcean drops these on every Droplet, so on a hosted instance a timeout there is the
+ * provider's block, not a slow server. */
+const BLOCKED_SMTP_PORTS = [25, 465, 587];
+const SMTP_PORT_BLOCKED = "Our hosting provider blocks this port. Use an API key (Resend) or your provider's alternate port, such as 2525.";
 const STORAGE_ROOT = path.join(__dirname, '..', '..', 'storage');
 
 const ok = (statusText, data) => ({ status: true, statusText, data });
@@ -16,7 +21,10 @@ const fail = (error) => ({ status: false, statusText: error?.message || String(e
  * environment, so the console can test what an operator typed before saving. */
 const pick = (values, key) => (values && values[key] !== undefined && values[key] !== '' ? values[key] : process.env[key]);
 
+const isTimeout = (error) => error?.code === 'ETIMEDOUT' || /timed? ?out/i.test(error?.message || '');
+
 async function probeMail(values = {}) {
+    let port = null;
     try {
         const resendKey = pick(values, 'RESEND_API_KEY');
         if (resendKey) {
@@ -27,7 +35,7 @@ async function probeMail(values = {}) {
         }
         const host = pick(values, 'NODEMAILER_HOST');
         if (!host) return fail(new Error('No mail provider configured: set SMTP (NODEMAILER_*) or RESEND_API_KEY.'));
-        const port = Number(pick(values, 'NODEMAILER_PORT')) || 587;
+        port = Number(pick(values, 'NODEMAILER_PORT')) || 587;
         const transporter = nodemailer.createTransport({
             host, port, secure: port === 465,
             auth: { user: pick(values, 'NODEMAILER_USER') || pick(values, 'NODEMAILER_EMAIL'), pass: pick(values, 'NODEMAILER_EMAIL_PASSWORD') },
@@ -37,6 +45,7 @@ async function probeMail(values = {}) {
         await withTimeout(transporter.verify(), PROBE_TIMEOUT_MS, 'SMTP');
         return ok(`SMTP login to ${host}:${port} succeeded.`, { provider: 'smtp' });
     } catch (error) {
+        if (port && BLOCKED_SMTP_PORTS.includes(port) && hostingMode.isManaged() && isTimeout(error)) return { ...fail(new Error(SMTP_PORT_BLOCKED)), data: { code: 'smtp_port_blocked', port } };
         return fail(error);
     }
 }

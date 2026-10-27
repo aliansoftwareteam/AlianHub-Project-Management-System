@@ -2,1497 +2,1806 @@
   "AGENT_ACT_BUDGET_MS": {
     "group": "ai",
     "description": "Wall-clock budget for the act phase of an agent run, added to the model timeout when sizing the job lock (default 5 min).",
-    "default": "300000"
+    "default": "300000",
+    "managed": "fixed"
   },
   "AGENT_ALERTS_INTERVAL_MINUTES": {
     "group": "jobs",
     "description": "Minutes between runs of the agent rate-alert evaluator (error rate, approval rate, cost forecast, queue age).",
-    "default": "15"
+    "default": "15",
+    "managed": "fixed"
   },
   "AGENT_SCHEDULE_TICK_SECONDS": {
     "group": "jobs",
     "description": "Seconds between ticks of the agent schedule runner, which starts the scheduled report runs of L3 agents. Minimum 15; a slot missed by more than an hour is skipped, not caught up.",
-    "default": "60"
+    "default": "60",
+    "managed": "fixed"
   },
   "AUTOMATION_DUE_DATE_TICK_SECONDS": {
     "group": "jobs",
     "description": "Seconds between checks for tasks whose due date has passed, which fire the \"Task due date passes\" automation trigger. Minimum 60. Each check fires at most 200 tasks per workspace, oldest first, and looks back 24 hours, so a due date missed by more than a day is skipped, not caught up.",
-    "default": "300"
+    "default": "300",
+    "managed": "fixed"
   },
   "AGENT_EGRESS_ALLOWLIST": {
     "group": "security",
     "description": "Set to true to route every agent fetch through the workspace egress gateway: a workspace whose list under Instance > Egress names hosts lets its agents fetch those hosts only, checked on every redirect hop and again against the resolved address, with each refusal audited as agent.egress_refused naming the host. Entries are exact hostnames or *.suffix patterns with an optional port; an entry without a port allows that host on any port and over plain http as well as https, so write host:443 to allow https on its default port only. Wildcards on shared-hosting and wildcard-DNS suffixes (*.github.io, *.nip.io, ...) are refused. A workspace with no list, and every workspace while this is unset or false, fetches as before: public hosts allowed, private, metadata and link-local hosts refused. Private hosts stay refused even when listed. Turning this on also judges NAT64, 6to4 and IPv4-compatible IPv6 addresses by the IPv4 address they carry, and that rule is shared, so it applies to webhook URL checks on save and to the Integrations public-URL check as well. Not behind the gateway: model provider and embeddings calls, SMTP, file storage, and webhooks fired by task changes an agent makes.",
-    "default": "false"
+    "default": "false",
+    "managed": "fixed"
   },
   "AGENT_PERFORMANCE_READ": {
     "group": "ai",
     "description": "The performance.read agent action: \"on\" registers it and offers it over MCP, so an agent can read logged time, estimate against actual, sprint velocity and cumulative flow for up to 5 projects over at most 120 days, as the person behind the agent and with each query and its numbers kept in the replay record; default \"off\" leaves the registry and the MCP tool list as they were.",
-    "default": "off"
+    "default": "off",
+    "managed": "fixed"
   },
   "AGENT_PROPOSAL_STUCK_MINUTES": {
     "group": "jobs",
     "description": "Minutes an agent proposal may sit in 'applying' before the reaper fails it.",
-    "default": "10"
+    "default": "10",
+    "managed": "fixed"
   },
   "AGENT_TAINT_ROUTING": {
     "group": "security",
     "description": "Set to on (or true) to mark an agent run as tainted once its context takes in content from outside the workspace's own members (a fetched page, an email-in body, a form submission, a webhook payload, uploaded file text or a retrieved passage whose origin is external) or when the instruction guard flags instruction-shaped text in what reaches the model (recorded as instruction task:<id>; the text still reaches the model inside the data block), and to route a tainted run's risky writes (any escalation under the risk rating, or a write outside the run's own project) to approval with a reason that names the taint. The run, its replay rows, its audit rows and its proposals record where the content came from (a host, an id or a hash), never the content. Unset, it is on while any of MCP_TOOLS_DATA, MCP_TOOLS_MANAGE, MCP_TOOLS_WORK or MCP_OAUTH is on (all four are by default), so a risky write by an outside AI app waits for a person. An explicit value here always wins, and only here: the instance settings page (Security) shows its state but cannot change it; off leaves runs, decisions and records exactly as they were.",
-    "default": "on"
+    "default": "on",
+    "managed": "fixed"
   },
   "AI_API_KEY": {
     "group": "ai",
     "description": "API key for the configured LLM provider (LLM_PROVIDER).",
-    "secret": true
+    "secret": true,
+    "managed": "customer"
   },
   "AI_MAX_TASK_MINUTES": {
     "group": "ai",
-    "description": "Upper bound, in minutes, for a task the AI project generator may plan."
+    "description": "Upper bound, in minutes, for a task the AI project generator may plan.",
+    "managed": "fixed"
   },
   "AI_MODEL": {
     "group": "ai",
     "description": "recommended: gpt-4o or gpt-4.1 for best instruction-following on complex plans",
-    "default": "gpt-4.1"
+    "default": "gpt-4.1",
+    "managed": "customer"
   },
   "AI_MODEL_ROUTER": {
     "group": "ai",
     "description": "model router: \"on\" lets a caller pick the provider and model per call and lets the workspace routing policy name a model per task class; default \"off\" keeps the single configured provider answering everything, so a saved policy changes nothing",
-    "default": "off"
+    "default": "off",
+    "managed": "fixed"
   },
   "AI_REPLAY": {
     "group": "ai",
     "description": "Which model calls keep a replay record (prompt, raw response, model, revisions; redacted): off, agent (agent runs only) or all.",
-    "default": "agent"
+    "default": "agent",
+    "managed": "customer"
   },
   "AI_REPLAY_RETENTION_DAYS": {
     "group": "ai",
     "description": "Days a replay record is kept before the TTL index deletes it.",
-    "default": "30"
+    "default": "30",
+    "managed": "fixed"
   },
   "AI_BUDGET_CACHE_MS": {
     "group": "ai",
     "description": "How long a workspace's AI budget settings are kept in memory before the next call reads them again; a change made in settings is seen at once on this server.",
-    "default": "60000"
+    "default": "60000",
+    "managed": "fixed"
   },
   "AI_RESERVATION_TTL_MS": {
     "group": "ai",
     "description": "How long a budget reservation holds a workspace's money before it is treated as stranded and stops counting; a process killed mid-call leaves one behind.",
-    "default": "900000"
+    "default": "900000",
+    "managed": "fixed"
   },
   "AI_ROUTER_BACKOFF_MAX_MS": {
     "group": "ai",
     "description": "ceiling for one backoff wait, and for a retry-after hint the provider returns",
-    "default": "8000"
+    "default": "8000",
+    "managed": "fixed"
   },
   "AI_ROUTER_BACKOFF_MS": {
     "group": "ai",
     "description": "base delay for the jittered exponential backoff between retries of a transient provider error",
-    "default": "500"
+    "default": "500",
+    "managed": "fixed"
   },
   "AI_ROUTER_BREAKER_COOLDOWN_MS": {
     "group": "ai",
     "description": "how long a breaker stays open before it half-opens for one probe; doubles on each failed probe",
-    "default": "30000"
+    "default": "30000",
+    "managed": "fixed"
   },
   "AI_ROUTER_BREAKER_MAX_COOLDOWN_MS": {
     "group": "ai",
     "description": "ceiling for the doubling breaker cooldown",
-    "default": "300000"
+    "default": "300000",
+    "managed": "fixed"
   },
   "AI_ROUTER_BREAKER_THRESHOLD": {
     "group": "ai",
     "description": "share of provider-caused failures in the window that opens the breaker (0..1)",
-    "default": "0.5"
+    "default": "0.5",
+    "managed": "fixed"
   },
   "AI_ROUTER_BREAKER_VOLUME": {
     "group": "ai",
     "description": "calls needed in the health window before the circuit breaker may open, so one bad call cannot trip it",
-    "default": "5"
+    "default": "5",
+    "managed": "fixed"
   },
   "AI_ROUTER_DEFAULT_RPM": {
     "group": "ai",
     "description": "requests per minute for a provider with no entry in AI_ROUTER_RATE_LIMITS; 0 means no bucket",
-    "default": "0"
+    "default": "0",
+    "managed": "fixed"
   },
   "AI_ROUTER_HEALTH_SAMPLES": {
     "group": "ai",
     "description": "most recent calls kept per provider and model in the health window",
-    "default": "50"
+    "default": "50",
+    "managed": "fixed"
   },
   "AI_ROUTER_HEALTH_WINDOW_MS": {
     "group": "ai",
     "description": "how far back the per-provider health window looks when computing success rate, latency and the breaker",
-    "default": "300000"
+    "default": "300000",
+    "managed": "fixed"
   },
   "AI_ROUTER_MAX_ATTEMPTS": {
     "group": "ai",
     "description": "attempts on one provider before the router fails over to the next candidate (router flag on only)",
-    "default": "2"
+    "default": "2",
+    "managed": "fixed"
   },
   "AI_ROUTER_RATE_LIMITS": {
     "group": "ai",
     "description": "per-provider request-per-minute budgets as token buckets, e.g. \"openai:500,anthropic:200\"; empty means no bucket",
-    "default": ""
+    "default": "",
+    "managed": "fixed"
   },
   "AI_ROUTER_RATE_WAIT_MS": {
     "group": "ai",
     "description": "longest the router waits for a rate-limit token before taking the next candidate instead",
-    "default": "2000"
+    "default": "2000",
+    "managed": "fixed"
   },
   "ATLAS_TOKEN": {
     "group": "general",
     "description": "Session token the screenshot atlas (npm run atlas) signs in with; set it on the command line for one run, not in .env.",
     "secret": true,
-    "required": false
+    "required": false,
+    "managed": "dev"
   },
   "ATLAS_TOKEN_FILE": {
     "group": "general",
     "description": "Path of a file holding the session token for npm run atlas, read when ATLAS_TOKEN is unset.",
-    "required": false
+    "required": false,
+    "managed": "dev"
   },
   "ALIANHUB_DOCKER": {
     "group": "general",
     "description": "Set by the Docker image so defaults suit a container (storage under /app/storage).",
     "secret": false,
-    "required": false
+    "required": false,
+    "managed": "fixed"
   },
   "ANTHROPIC_API_KEY": {
     "group": "ai",
     "description": "Anthropic API key, used when LLM_PROVIDER is anthropic.",
-    "secret": true
+    "secret": true,
+    "managed": "customer"
   },
   "ANTHROPIC_MODEL": {
     "group": "ai",
     "description": "current Sonnet 4.5 model id",
-    "default": "claude-sonnet-4-5-20250929"
+    "default": "claude-sonnet-4-5-20250929",
+    "managed": "customer"
   },
   "ANTHROPIC_TIMEOUT_MS": {
     "group": "ai",
     "description": "optional: override the Anthropic SDK timeout (default LLM_TIMEOUT_MS, 10 min); the agent job lock is derived from the largest provider timeout",
-    "default": "600000"
+    "default": "600000",
+    "managed": "fixed"
   },
   "APIKEY": {
     "group": "integrations",
     "description": "Firebase web API key used by the server for push notifications.",
-    "secret": true
+    "secret": true,
+    "managed": "bootstrap"
   },
   "APIURL": {
     "group": "server",
     "description": "Public base URL of this API, with a trailing slash (used in emails, OAuth callbacks and share links).",
     "required": true,
-    "default": ""
+    "default": "",
+    "managed": "bootstrap"
   },
   "API_TOKEN_MAX_DAYS": {
     "group": "security",
     "description": "Longest lifetime, in days, of an API token while API_TOKEN_STRICT is on. Can only lower the 365-day maximum: a value above 365 or not a whole number of days is ignored with a warning at boot. Ignored while API_TOKEN_STRICT is off.",
-    "default": "365"
+    "default": "365",
+    "managed": "fixed"
   },
   "API_TOKEN_STRICT": {
     "group": "security",
     "description": "Set to true to require an expiry and at least one scope on every new API token, and to allow a token without an expiry only to be revoked. A token without an expiry keeps working for 30 days from the later of its creation and when this was first on for the instance (recorded once as apiTokenStrictSince on the instance settings document and kept across backup restores), then stops. A new token may last at most API_TOKEN_MAX_DAYS (365 by default); an older token that expires later works for that many days from the later of its creation and when the maximum first applied (recorded once as apiTokenMaxLifetimeSince, also kept across restores), then stops. Unset or false keeps the old rules.",
-    "default": "false"
+    "default": "false",
+    "managed": "fixed"
   },
   "APPID": {
     "group": "integrations",
-    "description": "Firebase app id."
+    "description": "Firebase app id.",
+    "managed": "bootstrap"
   },
   "APP_NAME": {
     "group": "server",
     "description": "Product name shown in emails and page titles.",
-    "default": "Alian Hub"
+    "default": "Alian Hub",
+    "managed": "customer"
   },
   "APP_SHELL_WORKER": {
     "group": "security",
     "description": "Set to off to withdraw the web app's service worker from every browser: /sw.js then answers with a worker that deletes every cache it holds for this address, unregisters itself and handles no requests, so the next page load of each browser runs without one. People keep working; the app no longer opens without a network until this is unset and they load the page again. Unset or on serves the worker of the build. Read on each request, so a change through the environment needs a restart and nothing else.",
-    "default": "on"
+    "default": "on",
+    "managed": "fixed"
   },
   "AUDIT_CHAIN": {
     "group": "security",
     "description": "Set to true to chain every new audit row per company: each row carries a sequence number, the previous row's hash and an HMAC-SHA256 keyed with AUDIT_CHAIN_KEY, a change to a row is appended as a new row instead of editing it, retention anchors the rows it deletes and keeps audit rows at least as long as agent runs, and the audit log reports each row as verified, broken or unchained. Names, email, IP address and user agent are outside the hash. Needs AUDIT_CHAIN_KEY; without a valid key the chain stays off and an error is logged. Unset or false keeps rows unchained and edited in place.",
-    "default": "false"
+    "default": "false",
+    "managed": "fixed"
   },
   "AUDIT_CHAIN_KEY": {
     "group": "security",
     "description": "Secret of at least 32 characters that keys the audit chain hash, so someone who can write to the database cannot recompute it. Rows chained under one key only verify under that key; keep it out of the database and its backups. It also keys the pseudonyms that redacting a person in audit rows writes (erased-user-<hash of the user id>), falling back to JWT_SECRET when this key is unset or invalid; after the key changes a person gets a new pseudonym, and running the redaction again changes nothing already redacted. The key cannot change once AUDIT_CHAIN has been on: rows, chain heads and anchors do not record which key signed them, so under a new key every older chained row would read as broken. The first start with AUDIT_CHAIN on and a valid key stores a fingerprint of the key (an HMAC-SHA256 of a fixed label under it, never the key) in the audit_chain_key collection of the global database; every later start with AUDIT_CHAIN on and a different key refuses to start, logging a fatal error and exiting with status 1, until the previous key is set back. With AUDIT_CHAIN off nothing is checked or stored, and a missing or short key still only turns the chain off.",
-    "secret": true
+    "secret": true,
+    "managed": "bootstrap"
   },
   "SECRETS_STORE": {
     "group": "security",
     "description": "Set to true to keep integration and webhook secrets in a per-company secrets store, referenced by handle: a new or updated secret is sealed with AES-256-GCM under SECRETS_KEY and bound to its company and handle, the integration or webhook document keeps only the handle, every create, rotation, revocation and failed lookup is audited, and owners and admins see each secret's name, kind, key id and dates under Settings → Integrations, where they can rotate or revoke it. Migration 031 moves existing secrets in when this is on while it runs. Needs SECRETS_KEY; with a missing or short key the store refuses every read and write, connecting an integration or adding a webhook is refused rather than saved outside the store, and an error is logged. Unset or false keeps secrets sealed on their documents as before; a handle already written still resolves while a key is set, and a secret saved while this is off replaces the handle on its document, so the newest value is always the one in use. Turning this off again: the old store copy is revoked when SECRETS_KEY is still set, and otherwise marked, then revoked by `npm run secrets:reencrypt` (or by migration 031 when it runs again) once a key is set.",
-    "default": "false"
+    "default": "false",
+    "managed": "fixed"
   },
   "SECRETS_KEY": {
     "group": "security",
     "description": "Key of at least 32 characters that seals the secrets store, separate from JWT_SECRET. Each stored secret records the id of the key that sealed it (derived from the stretched key, so it is no shortcut for guessing the key); keep the key out of the database and its backups. To rotate, move the old value to SECRETS_KEY_PREVIOUS, set the new one here, restart, and run `npm run secrets:reencrypt`.",
-    "secret": true
+    "secret": true,
+    "managed": "bootstrap"
   },
   "SECRETS_KEY_PREVIOUS": {
     "group": "security",
     "description": "The previous SECRETS_KEY during a key rotation: secrets sealed under it still resolve, and `npm run secrets:reencrypt` reseals every company under SECRETS_KEY, writes an audit row per company and prints how many live secrets are still on this key. Unset it only when that command says it is safe to.",
-    "secret": true
+    "secret": true,
+    "managed": "bootstrap"
   },
   "AUDIT_EXPORT_MAX_ROWS": {
     "group": "security",
     "description": "Most rows one audit-log CSV export streams; a last row says when the filter held more. Can only lower the hard cap.",
-    "default": "100000"
+    "default": "100000",
+    "managed": "fixed"
   },
   "AUDIT_RETENTION_DAYS": {
     "group": "security",
-    "description": "Days to keep audit-log entries before the recorder prunes them."
+    "description": "Days to keep audit-log entries before the recorder prunes them.",
+    "managed": "customer"
   },
   "AUTH_RATE_LIMIT_BLOCK_MS": {
     "group": "security",
     "description": "How long an IP stays blocked after too many failed logins.",
-    "default": "1800000"
+    "default": "1800000",
+    "managed": "fixed"
   },
   "AUTH_RATE_LIMIT_MAX_ATTEMPTS": {
     "group": "security",
     "description": "Failed login attempts allowed per window before blocking.",
-    "default": "5"
+    "default": "5",
+    "managed": "fixed"
   },
   "AUTH_RATE_LIMIT_WINDOW_MS": {
     "group": "security",
     "description": "Window over which failed login attempts are counted.",
-    "default": "900000"
+    "default": "900000",
+    "managed": "fixed"
   },
   "AUTODOMAIN": {
     "group": "integrations",
-    "description": "Firebase auth domain."
+    "description": "Firebase auth domain.",
+    "managed": "bootstrap"
   },
   "AUTOMATION_CONCURRENCY": {
     "group": "jobs",
     "description": "Automation runs processed in parallel.",
-    "default": "5"
+    "default": "5",
+    "managed": "fixed"
   },
   "AUTOMATION_ENGINE": {
     "group": "jobs",
     "description": "Set to false to stop the automation engine from starting.",
-    "default": "true"
+    "default": "true",
+    "managed": "fixed"
   },
   "AUTOMATION_EVENT_LOG": {
     "group": "jobs",
-    "description": "Set to true to record every domain event in automation_event_log for debugging automations."
+    "description": "Set to true to record every domain event in automation_event_log for debugging automations.",
+    "managed": "fixed"
   },
   "AUTOMATION_QUEUE_DRIVER": {
     "group": "jobs",
     "description": "Queue driver for automation runs (agenda or memory).",
-    "default": "agenda"
+    "default": "agenda",
+    "managed": "fixed"
   },
   "AWS_SES_FROM_DEFAULT": {
     "group": "mail",
-    "description": "Default From address when mail is sent through AWS SES."
+    "description": "Default From address when mail is sent through AWS SES.",
+    "managed": "fixed"
   },
   "AWS_SES_KEY": {
     "group": "mail",
     "description": "AWS access key for SES mail delivery.",
-    "secret": true
+    "secret": true,
+    "managed": "fixed"
   },
   "AWS_SES_REGION": {
     "group": "mail",
-    "description": "AWS region of the SES account."
+    "description": "AWS region of the SES account.",
+    "managed": "fixed"
   },
   "AWS_SES_SECRET": {
     "group": "mail",
     "description": "AWS secret key for SES mail delivery.",
-    "secret": true
+    "secret": true,
+    "managed": "fixed"
   },
   "BACKUP_DIR": {
     "group": "general",
     "description": "Directory where in-app backups are written (default backups/).",
     "secret": false,
-    "required": false
+    "required": false,
+    "managed": "fixed"
   },
   "BODY_LIMIT": {
     "group": "limits",
     "description": "Maximum JSON/urlencoded/raw request body (body-parser size string).",
-    "default": "2mb"
+    "default": "2mb",
+    "managed": "fixed"
   },
   "BUILD_INFO_GIT_TIMEOUT_MS": {
     "group": "server",
     "description": "Per-command timeout, in ms, for the git calls that resolve the running version. On timeout the server reports channel unknown and retries in the background.",
-    "default": "10000"
+    "default": "10000",
+    "managed": "fixed"
   },
   "CLOUD_STORAGE_ENC_KEY": {
     "group": "storage",
     "description": "Key used to encrypt cloud-storage provider credentials at rest.",
-    "secret": true
+    "secret": true,
+    "managed": "bootstrap"
   },
   "CLOUD_STORAGE_MAX_IMPORT_BYTES": {
     "group": "limits",
-    "description": "Largest file the cloud-storage importer will copy into a project."
+    "description": "Largest file the cloud-storage importer will copy into a project.",
+    "managed": "fixed"
   },
   "APP_CONNECTIONS": {
     "group": "integrations",
     "description": "Set to true to switch on App connections: the Integrations > App connections page, and a job that every 5 minutes reads the apps an owner or admin has connected and linked to projects, one company at a time. Default off: no job runs and the page says so. With the GitHub app connected, the job lists the pull requests of its owner/repo updated since the last check, finds the task keys (such as AP-479) in each title, branch name and description among the projects linked to that repo and open to the person who connected it, adds the pull request link and a comment to the task when it opens, and a comment and the move to In review when it merges (never Done). Each event is acted on once per task. A failing app is tried again after 5 minutes, then 10, doubling up to 6 hours, and the page shows the last error.",
-    "default": "false"
+    "default": "false",
+    "managed": "fixed"
   },
   "CONNECTORS": {
     "group": "integrations",
     "description": "Agent connectors to switch on, as a list separated by commas: slack and google_calendar. Default off: no connector route, no connector action in the agent registry and no section on the Integrations screen. With slack named, an owner or admin connects the workspace's Slack app under Integrations > Slack (the bot token and the signing secret go straight into the secrets store under the kind connector and are never shown again) and chooses the channels agents may post to; an agent can then propose a Slack message (slack.message.post), and nothing is sent until an owner or admin approves the exact channel and text in the AI Inbox. Needs SECRETS_STORE with a usable SECRETS_KEY and AGENT_TAINT_ROUTING on: without them the connector stays off, the server says why in one startup log line and the Integrations screen shows the same reason. While AGENT_EGRESS_ALLOWLIST is on and the workspace has a host list, slack.com must be on it. With google_calendar named, each member connects their own Google account on the Connections page: this slice ships the connection only (no calendar is read or written yet). Its access and refresh tokens go to the secrets store, the connection ends when the member disconnects, an owner or admin ends it, or the member is removed, and nobody else can use it. It needs the same two settings plus CONNECTOR_GOOGLE_CLIENT_ID and CONNECTOR_GOOGLE_CLIENT_SECRET, and APIURL, from which the redirect address <APIURL>/api/v1/connector-oauth/google/callback is built; that host list must then also hold oauth2.googleapis.com.",
-    "default": "off"
+    "default": "off",
+    "managed": "fixed"
   },
   "CONNECTOR_GOOGLE_CLIENT_ID": {
     "group": "integrations",
-    "description": "Client id of the Google OAuth client the connectors use (CONNECTORS=google_calendar). A separate client from the sign-in one: never reuse GOOGLE_CLIENT_ID, because the sign-in exchange answers to the browser and connector tokens must never leave the server. Create it in the Google Cloud console as a Web application with the redirect address <APIURL>/api/v1/connector-oauth/google/callback. Not a secret."
+    "description": "Client id of the Google OAuth client the connectors use (CONNECTORS=google_calendar). A separate client from the sign-in one: never reuse GOOGLE_CLIENT_ID, because the sign-in exchange answers to the browser and connector tokens must never leave the server. Create it in the Google Cloud console as a Web application with the redirect address <APIURL>/api/v1/connector-oauth/google/callback. Not a secret.",
+    "managed": "fixed"
   },
   "CONNECTOR_GOOGLE_CLIENT_SECRET": {
     "group": "integrations",
     "description": "Client secret of that Google OAuth client. Type it into .env yourself; it is sent only to Google's token endpoint and is never logged, stored in the database or shown. Without both this and CONNECTOR_GOOGLE_CLIENT_ID the google_calendar connector stays off and the server says so in one startup log line.",
-    "secret": true
+    "secret": true,
+    "managed": "fixed"
   },
   "CORS_ORIGINS": {
     "group": "security",
     "description": "Extra origins allowed by CORS, comma-separated (WEBURL and APIURL are always allowed).",
-    "default": "http://localhost:8080"
+    "default": "http://localhost:8080",
+    "managed": "fixed"
   },
   "CRON_ENABLED": {
     "group": "general",
     "description": "Run the scheduled jobs in this process (default true; set false on extra replicas).",
     "secret": false,
-    "required": false
+    "required": false,
+    "managed": "fixed"
   },
   "CRON_TZ": {
     "group": "jobs",
     "description": "IANA time zone for scheduled jobs (reminders, digests).",
-    "default": "UTC"
+    "default": "UTC",
+    "managed": "customer"
   },
   "CSP_EXTRA_CONNECT_SRC": {
     "group": "security",
-    "description": "Extra hosts for the connect-src directive of the content security policy (API, XHR and websocket calls), separated by spaces and written with their scheme, such as https://cdn.example.com or https://*.example.com. Quotes, keywords such as 'unsafe-eval', semicolons, commas, schemes on their own, a bare * and a wildcard over a top-level domain, a public suffix or a shared hosting domain stop the server at boot, whatever CSP_MODE is. Read at boot."
+    "description": "Extra hosts for the connect-src directive of the content security policy (API, XHR and websocket calls), separated by spaces and written with their scheme, such as https://cdn.example.com or https://*.example.com. Quotes, keywords such as 'unsafe-eval', semicolons, commas, schemes on their own, a bare * and a wildcard over a top-level domain, a public suffix or a shared hosting domain stop the server at boot, whatever CSP_MODE is. Read at boot.",
+    "managed": "fixed"
   },
   "CSP_EXTRA_FONT_SRC": {
     "group": "security",
-    "description": "Extra hosts for the font-src directive of the content security policy (fonts), separated by spaces and written with their scheme, such as https://cdn.example.com or https://*.example.com. Quotes, keywords such as 'unsafe-eval', semicolons, commas, schemes on their own, a bare * and a wildcard over a top-level domain, a public suffix or a shared hosting domain stop the server at boot, whatever CSP_MODE is. Read at boot."
+    "description": "Extra hosts for the font-src directive of the content security policy (fonts), separated by spaces and written with their scheme, such as https://cdn.example.com or https://*.example.com. Quotes, keywords such as 'unsafe-eval', semicolons, commas, schemes on their own, a bare * and a wildcard over a top-level domain, a public suffix or a shared hosting domain stop the server at boot, whatever CSP_MODE is. Read at boot.",
+    "managed": "fixed"
   },
   "CSP_EXTRA_FORM_ACTION": {
     "group": "security",
-    "description": "Extra hosts for the form-action directive of the content security policy (form posts), separated by spaces and written with their scheme, such as https://cdn.example.com or https://*.example.com. Quotes, keywords such as 'unsafe-eval', semicolons, commas, schemes on their own, a bare * and a wildcard over a top-level domain, a public suffix or a shared hosting domain stop the server at boot, whatever CSP_MODE is. Read at boot."
+    "description": "Extra hosts for the form-action directive of the content security policy (form posts), separated by spaces and written with their scheme, such as https://cdn.example.com or https://*.example.com. Quotes, keywords such as 'unsafe-eval', semicolons, commas, schemes on their own, a bare * and a wildcard over a top-level domain, a public suffix or a shared hosting domain stop the server at boot, whatever CSP_MODE is. Read at boot.",
+    "managed": "fixed"
   },
   "CSP_EXTRA_FRAME_ANCESTORS": {
     "group": "security",
-    "description": "Extra hosts for the frame-ancestors directive of the content security policy (sites that may frame AlianHub), separated by spaces and written with their scheme, such as https://cdn.example.com or https://*.example.com. Quotes, keywords such as 'unsafe-eval', semicolons, commas, schemes on their own, a bare * and a wildcard over a top-level domain, a public suffix or a shared hosting domain stop the server at boot, whatever CSP_MODE is. Read at boot."
+    "description": "Extra hosts for the frame-ancestors directive of the content security policy (sites that may frame AlianHub), separated by spaces and written with their scheme, such as https://cdn.example.com or https://*.example.com. Quotes, keywords such as 'unsafe-eval', semicolons, commas, schemes on their own, a bare * and a wildcard over a top-level domain, a public suffix or a shared hosting domain stop the server at boot, whatever CSP_MODE is. Read at boot.",
+    "managed": "fixed"
   },
   "CSP_EXTRA_FRAME_SRC": {
     "group": "security",
-    "description": "Extra hosts for the frame-src directive of the content security policy (framed pages), separated by spaces and written with their scheme, such as https://cdn.example.com or https://*.example.com. Quotes, keywords such as 'unsafe-eval', semicolons, commas, schemes on their own, a bare * and a wildcard over a top-level domain, a public suffix or a shared hosting domain stop the server at boot, whatever CSP_MODE is. Read at boot."
+    "description": "Extra hosts for the frame-src directive of the content security policy (framed pages), separated by spaces and written with their scheme, such as https://cdn.example.com or https://*.example.com. Quotes, keywords such as 'unsafe-eval', semicolons, commas, schemes on their own, a bare * and a wildcard over a top-level domain, a public suffix or a shared hosting domain stop the server at boot, whatever CSP_MODE is. Read at boot.",
+    "managed": "fixed"
   },
   "CSP_EXTRA_IMG_SRC": {
     "group": "security",
-    "description": "Extra hosts for the img-src directive of the content security policy (images), separated by spaces and written with their scheme, such as https://cdn.example.com or https://*.example.com. Quotes, keywords such as 'unsafe-eval', semicolons, commas, schemes on their own, a bare * and a wildcard over a top-level domain, a public suffix or a shared hosting domain stop the server at boot, whatever CSP_MODE is. Read at boot."
+    "description": "Extra hosts for the img-src directive of the content security policy (images), separated by spaces and written with their scheme, such as https://cdn.example.com or https://*.example.com. Quotes, keywords such as 'unsafe-eval', semicolons, commas, schemes on their own, a bare * and a wildcard over a top-level domain, a public suffix or a shared hosting domain stop the server at boot, whatever CSP_MODE is. Read at boot.",
+    "managed": "fixed"
   },
   "CSP_EXTRA_MEDIA_SRC": {
     "group": "security",
-    "description": "Extra hosts for the media-src directive of the content security policy (audio and video), separated by spaces and written with their scheme, such as https://cdn.example.com or https://*.example.com. Quotes, keywords such as 'unsafe-eval', semicolons, commas, schemes on their own, a bare * and a wildcard over a top-level domain, a public suffix or a shared hosting domain stop the server at boot, whatever CSP_MODE is. Read at boot."
+    "description": "Extra hosts for the media-src directive of the content security policy (audio and video), separated by spaces and written with their scheme, such as https://cdn.example.com or https://*.example.com. Quotes, keywords such as 'unsafe-eval', semicolons, commas, schemes on their own, a bare * and a wildcard over a top-level domain, a public suffix or a shared hosting domain stop the server at boot, whatever CSP_MODE is. Read at boot.",
+    "managed": "fixed"
   },
   "CSP_EXTRA_SCRIPT_SRC": {
     "group": "security",
-    "description": "Extra hosts for the script-src directive of the content security policy (scripts), separated by spaces and written with their scheme, such as https://cdn.example.com or https://*.example.com. Quotes, keywords such as 'unsafe-eval', semicolons, commas, schemes on their own, a bare * and a wildcard over a top-level domain, a public suffix or a shared hosting domain stop the server at boot, whatever CSP_MODE is. In script-src and worker-src, sources must be https, may not be on a domain where anyone can publish (github.io, googleusercontent.com, githubusercontent.com and similar) must name exact hosts (no wildcard), and on a package CDN (cdn.jsdelivr.net, unpkg.com, cdnjs.cloudflare.com) must name one package and its version. Read at boot."
+    "description": "Extra hosts for the script-src directive of the content security policy (scripts), separated by spaces and written with their scheme, such as https://cdn.example.com or https://*.example.com. Quotes, keywords such as 'unsafe-eval', semicolons, commas, schemes on their own, a bare * and a wildcard over a top-level domain, a public suffix or a shared hosting domain stop the server at boot, whatever CSP_MODE is. In script-src and worker-src, sources must be https, may not be on a domain where anyone can publish (github.io, googleusercontent.com, githubusercontent.com and similar) must name exact hosts (no wildcard), and on a package CDN (cdn.jsdelivr.net, unpkg.com, cdnjs.cloudflare.com) must name one package and its version. Read at boot.",
+    "managed": "fixed"
   },
   "CSP_EXTRA_STYLE_SRC": {
     "group": "security",
-    "description": "Extra hosts for the style-src directive of the content security policy (style sheets), separated by spaces and written with their scheme, such as https://cdn.example.com or https://*.example.com. Quotes, keywords such as 'unsafe-eval', semicolons, commas, schemes on their own, a bare * and a wildcard over a top-level domain, a public suffix or a shared hosting domain stop the server at boot, whatever CSP_MODE is. Read at boot."
+    "description": "Extra hosts for the style-src directive of the content security policy (style sheets), separated by spaces and written with their scheme, such as https://cdn.example.com or https://*.example.com. Quotes, keywords such as 'unsafe-eval', semicolons, commas, schemes on their own, a bare * and a wildcard over a top-level domain, a public suffix or a shared hosting domain stop the server at boot, whatever CSP_MODE is. Read at boot.",
+    "managed": "fixed"
   },
   "CSP_EXTRA_WORKER_SRC": {
     "group": "security",
-    "description": "Extra hosts for the worker-src directive of the content security policy (workers), separated by spaces and written with their scheme, such as https://cdn.example.com or https://*.example.com. Quotes, keywords such as 'unsafe-eval', semicolons, commas, schemes on their own, a bare * and a wildcard over a top-level domain, a public suffix or a shared hosting domain stop the server at boot, whatever CSP_MODE is. In script-src and worker-src, sources must be https, may not be on a domain where anyone can publish (github.io, googleusercontent.com, githubusercontent.com and similar) must name exact hosts (no wildcard), and on a package CDN (cdn.jsdelivr.net, unpkg.com, cdnjs.cloudflare.com) must name one package and its version. Read at boot."
+    "description": "Extra hosts for the worker-src directive of the content security policy (workers), separated by spaces and written with their scheme, such as https://cdn.example.com or https://*.example.com. Quotes, keywords such as 'unsafe-eval', semicolons, commas, schemes on their own, a bare * and a wildcard over a top-level domain, a public suffix or a shared hosting domain stop the server at boot, whatever CSP_MODE is. In script-src and worker-src, sources must be https, may not be on a domain where anyone can publish (github.io, googleusercontent.com, githubusercontent.com and similar) must name exact hosts (no wildcard), and on a package CDN (cdn.jsdelivr.net, unpkg.com, cdnjs.cloudflare.com) must name one package and its version. Read at boot.",
+    "managed": "fixed"
   },
   "CSP_MODE": {
     "group": "security",
     "description": "Content security policy: off (no policy header, the default), report (Content-Security-Policy-Report-Only: nothing is blocked, and what would be is counted under Instance > Enforcement) or enforce (Content-Security-Policy: the browser blocks it). The policy is built on the first request from the storage endpoint and whether push is configured (restart to change them), and follows WEBURL and APIURL when they change; the public share and form pages keep their own stricter policy, and the Google Drive picker runs in its own popup page (/pickers/google-drive) whose policy allows eval for Google's picker script only, so installs using Drive may run enforce. Violation reports go to POST /api/v2/csp-report, which keeps the day, directive, blocked host and page path shape for 30 days and nothing else. Run report until the list is quiet, then enforce. An unknown value stops the server at boot. Read at boot.",
-    "default": "off"
+    "default": "off",
+    "managed": "fixed"
   },
   "DEEPSEEK_API_KEY": {
     "group": "ai",
     "description": "DeepSeek API key, used when LLM_PROVIDER is deepseek.",
-    "secret": true
+    "secret": true,
+    "managed": "customer"
   },
   "DEEPSEEK_BASE_URL": {
     "group": "ai",
     "description": "optional: override DeepSeek base URL (e.g. for a compatible proxy)",
-    "default": "https://api.deepseek.com"
+    "default": "https://api.deepseek.com",
+    "managed": "fixed"
   },
   "DEEPSEEK_MODEL": {
     "group": "ai",
     "description": "deepseek-chat / deepseek-reasoner / deepseek-v4-flash / deepseek-v4-pro (all V4: 1M ctx, up to 384K output)",
-    "default": "deepseek-v4-flash"
+    "default": "deepseek-v4-flash",
+    "managed": "customer"
   },
   "DEEPSEEK_TIMEOUT_MS": {
     "group": "ai",
     "description": "optional: override the DeepSeek axios timeout (default: LLM_TIMEOUT_MS for reasoner, 4 min for chat); the agent job lock is derived from the largest provider timeout",
-    "default": "600000"
+    "default": "600000",
+    "managed": "fixed"
   },
   "DEMO_EMAIL": {
     "group": "general",
     "description": "Email of the demo account, shown in the demo banner and filled into the login form when DEMO_MODE is on.",
-    "default": ""
+    "default": "",
+    "managed": "dev"
   },
   "DEMO_MODE": {
     "group": "general",
     "description": "Set to true to show the demo banner and credentials, fill them into the login form, and offer a one-click \"Try the demo\" button when DEMO_EMAIL and DEMO_PASSWORD are both set.",
-    "default": "false"
+    "default": "false",
+    "managed": "dev"
   },
   "DEMO_PASSWORD": {
     "group": "general",
     "description": "Password of the demo account, shown in the demo banner and filled into the login form when DEMO_MODE is on. Keep it in step with the account: \"Try the demo\" signs in with it, and repeated failures lock the shared account.",
-    "secret": true
+    "secret": true,
+    "managed": "dev"
   },
   "DISABLE_PERMISSION_ENFORCEMENT": {
     "group": "security",
-    "description": "Emergency switch, never for normal running. Set to true to skip the per-key permission checks for API tokens and project edits and the task list rule on task reads, and to judge a workspace set to enforce in report mode: recorded, never refused. That covers browser sessions and API tokens on the task actions mapped after the first nine (Config/taskWritePermissions.js). Role guards stay on for API tokens, and so does the refusal of a task write body that names another company or an id that cannot be read."
+    "description": "Emergency switch, never for normal running. Set to true to skip the per-key permission checks for API tokens and project edits and the task list rule on task reads, and to judge a workspace set to enforce in report mode: recorded, never refused. That covers browser sessions and API tokens on the task actions mapped after the first nine (Config/taskWritePermissions.js). Role guards stay on for API tokens, and so does the refusal of a task write body that names another company or an id that cannot be read.",
+    "managed": "fixed"
   },
   "EMAIL_IN_DOMAIN": {
     "group": "mail",
     "description": "Domain of the inbound-email addresses that create tasks.",
-    "default": "inbox.alianhub.com"
+    "default": "inbox.alianhub.com",
+    "managed": "bootstrap"
   },
   "ENDPOINT_KEY": {
     "group": "security",
     "description": "Shared key expected by the internal service endpoints.",
-    "secret": true
+    "secret": true,
+    "managed": "bootstrap"
   },
   "ERRORRECIVEREMAIL": {
     "group": "general",
     "description": "Email to receive error alerts",
-    "default": "admin@yourdomain.com"
+    "default": "admin@yourdomain.com",
+    "managed": "bootstrap"
   },
   "ESTIMATE_SAMPLES": {
     "group": "ai",
-    "description": "Number of historical tasks sampled when the AI estimates effort."
+    "description": "Number of historical tasks sampled when the AI estimates effort.",
+    "managed": "fixed"
   },
   "ESTIMATE_TARGET": {
     "group": "ai",
     "description": "Target accuracy band the AI estimator calibrates against.",
-    "default": ""
+    "default": "",
+    "managed": "fixed"
   },
   "EXTERNAL_AGENT_SESSIONS": {
     "group": "ai",
     "description": "Set to on (true, 1 and yes mean the same) to let a person delegate a task to an approved outside OAuth client (MCP_OAUTH). The person must be able to edit the task and hold a live grant to that client in the workspace; the assignee stays, and an unassigned task is given to the delegating person, who is notified. A task in a private sprint can be delegated only by a member of that sprint and only to a client whose workspace approval has the private-sprint opt-in; without the approvals collection it is refused. An owner or admin sets each client's delivery URL under PUT /api/v2/agent-sessions/endpoints (https on a public host, or http to a host in WEBHOOK_ALLOWED_PRIVATE_HOSTS, and on the workspace egress allowlist when AGENT_EGRESS_ALLOWLIST is on) and receives its signing secret once. Delegating sends a webhook through the agents' egress gateway, with X-AlianHub-Timestamp (Unix seconds) and X-AlianHub-Signature, sha256= the HMAC-SHA256 of <timestamp>.<body> under that secret; receivers should reject a timestamp more than 300 seconds from their clock (replayWindowSeconds in the body), carrying the session id, the task and a five-minute session handle, never a token; the ten-second first-activity clock starts when the client answers 2xx, and an untaken offer is marked unresponsive then, a late first activity is refused however it arrives (a sweep every 15 seconds and on boot decides timers lost to a restart). The client reports over /mcp with the tools session.activity (thought, action, elicitation, response or error, 4000 characters, 60 a minute), session.complete and session.fail, each needing tasks:write, the session's own client and grant, an open session and a person behind the grant who can still open the task; the first call carries the handle. Sessions count as tainted and are audited as the client acting for the person. Revoking the grant, the client or its workspace approval, withdrawing the private-sprint opt-in, or moving the task into a private sprint the delegating person is not on marks open sessions revoked. An unassigned task can be delegated only by someone who may assign it. The task panel's agent strip shows the session and its latest activities, pushed over the task's socket room to people who can open the task. Unset or off registers none of this (no routes, no JWT prefix, no session tools or scopes, no socket relay) and the strip, the MCP tool list and the socket rooms are as before.",
-    "default": "off"
+    "default": "off",
+    "managed": "fixed"
   },
   "EXTERNAL_AGENT_STEPS": {
     "group": "ai",
     "description": "Set to on (true, 1 and yes mean the same), with EXTERNAL_AGENT_SESSIONS and WORKFLOW_ENGINE on, to register the external_agent workflow step type: its config names an outside OAuth client approved in the workspace (clientId), a task (taskId, or the task the run was started on) and an optional deadline (deadlineMs, default one hour, never past the run's own). On its first claim the step delegates the task to that client as the person who started the run, one session per run and step however often it is claimed, and waits without holding a worker; it succeeds with the session's response when the client completes it, and fails, without retrying, when the client reports an error, the session goes unresponsive or is revoked, or the deadline passes, which also closes the session. Every session call and every tool call from the grant of a session bound to a waiting step is checked live: the session open, the run running, the step still waiting for that session, and the grant and client approval live; a failed check refuses the call and closes the session. A call with an access token whose grant was revoked is answered 401, revokes the sessions that grant held on waiting steps, fails those steps with the reason and records the refusal as the client acting for the delegating person. The step never hands its step credential to the client. Unset or off, the step type is not registered, offered to the builder or accepted in a definition.",
-    "default": "off"
+    "default": "off",
+    "managed": "fixed"
   },
   "FATAL_FLUSH_TIMEOUT_MS": {
     "group": "logging",
     "description": "Upper bound, in milliseconds, that a fatal crash waits for flushers (log files, telemetry exporter, crash report mail) before the process exits with 1.",
-    "default": "3000"
+    "default": "3000",
+    "managed": "fixed"
   },
   "FORM_MAX_FILES": {
     "group": "limits",
     "description": "Maximum attachments on one public form submission.",
-    "default": "3"
+    "default": "3",
+    "managed": "fixed"
   },
   "FORM_MAX_FILE_BYTES": {
     "group": "limits",
-    "description": "Maximum size of one public form attachment."
+    "description": "Maximum size of one public form attachment.",
+    "managed": "fixed"
   },
   "FREE_COMPANY_COUNT": {
     "group": "billing",
-    "description": "Companies a user may create on the free plan."
+    "description": "Companies a user may create on the free plan.",
+    "managed": "fixed"
   },
   "GENERAL_REMINDERS_CRON": {
     "group": "jobs",
-    "description": "Cron expression for the general reminders scheduler."
+    "description": "Cron expression for the general reminders scheduler.",
+    "managed": "fixed"
   },
   "GITHUB_BASE_OAUTH_URL": {
     "group": "integrations",
     "description": "authorize + access_token base",
-    "default": "https://github.com/login/oauth"
+    "default": "https://github.com/login/oauth",
+    "managed": "customer"
   },
   "GITHUB_CLIENT_ID": {
     "group": "integrations",
-    "description": "GitHub OAuth app client id."
+    "description": "GitHub OAuth app client id.",
+    "managed": "customer"
   },
   "GITHUB_CLIENT_SECRET": {
     "group": "integrations",
     "description": "GitHub OAuth app client secret.",
-    "secret": true
+    "secret": true,
+    "managed": "customer"
   },
   "GITHUB_CONNECT_CLIENT_ID": {
     "group": "integrations",
-    "description": "GitHub OAuth app client id for one-click GitHub on App connections; its callback URL is APIURL + /api/v1/github-connect/callback. Falls back to GITHUB_CLIENT_ID."
+    "description": "GitHub OAuth app client id for one-click GitHub on App connections; its callback URL is APIURL + /api/v1/github-connect/callback. Falls back to GITHUB_CLIENT_ID.",
+    "managed": "fixed"
   },
   "GITHUB_CONNECT_CLIENT_SECRET": {
     "group": "integrations",
     "description": "Client secret of the one-click GitHub OAuth app. Falls back to GITHUB_CLIENT_SECRET.",
-    "secret": true
+    "secret": true,
+    "managed": "fixed"
   },
   "GITHUB_TOKEN": {
     "group": "integrations",
     "description": "Token used to read release notes from GitHub for the changelog page.",
-    "secret": true
+    "secret": true,
+    "managed": "fixed"
   },
   "GITLAB_BASE_API_URL": {
     "group": "integrations",
     "description": "used to verify the identity (/user)",
-    "default": "https://gitlab.com/api/v4"
+    "default": "https://gitlab.com/api/v4",
+    "managed": "customer"
   },
   "GITLAB_BASE_OAUTH_URL": {
     "group": "integrations",
     "description": "authorize + token base",
-    "default": "https://gitlab.com/oauth"
+    "default": "https://gitlab.com/oauth",
+    "managed": "customer"
   },
   "GITLAB_CLIENT_ID": {
     "group": "integrations",
-    "description": "GitLab OAuth app client id."
+    "description": "GitLab OAuth app client id.",
+    "managed": "customer"
   },
   "GITLAB_CLIENT_SECRET": {
     "group": "integrations",
     "description": "GitLab OAuth app client secret.",
-    "secret": true
+    "secret": true,
+    "managed": "customer"
   },
   "GLOBAL_RATE_LIMIT_PER_MIN": {
     "group": "security",
-    "description": "Requests per minute allowed per IP by the global rate limiter."
+    "description": "Requests per minute allowed per IP by the global rate limiter.",
+    "managed": "platform"
   },
   "GOOGLE_API_KEY": {
     "group": "ai",
     "description": "Google AI Studio API key, used when LLM_PROVIDER is google.",
-    "secret": true
+    "secret": true,
+    "managed": "fixed"
   },
   "GOOGLE_BASE_URL": {
     "group": "ai",
     "description": "optional: override the Google generative-language base URL (e.g. for a compatible proxy)",
-    "default": "https://generativelanguage.googleapis.com"
+    "default": "https://generativelanguage.googleapis.com",
+    "managed": "fixed"
   },
   "GOOGLE_CLIENT_ID": {
     "group": "integrations",
-    "description": "used for token exchange AND id-token verification"
+    "description": "used for token exchange AND id-token verification",
+    "managed": "customer"
   },
   "GOOGLE_CLIENT_SECRET": {
     "group": "integrations",
     "description": "Google OAuth client secret.",
-    "secret": true
+    "secret": true,
+    "managed": "customer"
   },
   "GOOGLE_MODEL": {
     "group": "ai",
     "description": "Gemini model id, e.g. gemini-3-flash / gemini-3-pro / gemini-2.5-flash",
-    "default": "gemini-3-flash"
+    "default": "gemini-3-flash",
+    "managed": "fixed"
   },
   "GOOGLE_OAUTH_CLIENT_ID": {
     "group": "integrations",
-    "description": "Google OAuth client id accepted when verifying Google sign-in tokens."
+    "description": "Google OAuth client id accepted when verifying Google sign-in tokens.",
+    "managed": "fixed"
   },
   "GOOGLE_OAUTH_URL": {
     "group": "integrations",
     "description": "Google token endpoint",
-    "default": "https://oauth2.googleapis.com/token"
+    "default": "https://oauth2.googleapis.com/token",
+    "managed": "fixed"
   },
   "GOOGLE_TIMEOUT_MS": {
     "group": "ai",
     "description": "optional: override the Google axios timeout (default: LLM_TIMEOUT_MS for thinking models, 4 min for the rest)",
-    "default": "600000"
+    "default": "600000",
+    "managed": "fixed"
   },
   "HEALTH_DB_TIMEOUT_MS": {
     "group": "general",
     "description": "How long /health waits for the database ping before reporting it down (default 2000).",
     "secret": false,
-    "required": false
+    "required": false,
+    "managed": "fixed"
   },
   "HELMET_ENABLED": {
     "group": "security",
     "description": "Send the helmet security headers (default true).",
     "secret": false,
-    "required": false
+    "required": false,
+    "managed": "platform"
   },
   "IAM_ENDPOINT": {
     "group": "storage",
     "description": "Wasabi IAM endpoint used when provisioning per-company storage users.",
-    "default": "https://iam.wasabisys.com"
+    "default": "https://iam.wasabisys.com",
+    "managed": "platform"
   },
   "INSTANCE_ADMIN_KEY": {
     "group": "security",
     "description": "Shared key that grants the instance-admin API without a product-owner session.",
     "secret": true,
-    "default": ""
+    "default": "",
+    "managed": "fixed"
   },
   "JWT_ALGORITHM": {
     "group": "auth",
     "description": "Algorithm used to sign JWTs.",
-    "default": "HS256"
+    "default": "HS256",
+    "managed": "fixed"
   },
   "JWT_EXP": {
     "group": "auth",
     "description": "Access token lifetime (jsonwebtoken duration string).",
-    "default": "24h"
+    "default": "24h",
+    "managed": "fixed"
   },
   "JWT_SECRET": {
     "group": "auth",
     "description": "Secret used to sign JWTs and derive encryption keys. Also keys audit redaction pseudonyms when AUDIT_CHAIN_KEY is unset or invalid.",
     "required": true,
     "secret": true,
-    "default": "your_jwt_secret_here"
+    "default": "your_jwt_secret_here",
+    "managed": "bootstrap"
   },
   "KNOWLEDGE_RETRIEVAL": {
     "group": "ai",
     "description": "Knowledge retrieval for Ask: \"off\" gathers sources exactly as before (task fields and page titles by regular expression); \"tenant\" searches tasks, page bodies and comments through the full-text indexes, and the caller's own call transcripts, with access control applied at query time, for a company whose knowledgeRetrieval.mode is \"on\" or \"hybrid\"; \"all\" does so for every company except one set to \"off\". A company in \"hybrid\" also has its chunks embedded as they are indexed (KNOWLEDGE_EMBEDDING_MODEL, with the OpenAI instance key) and each question embedded once, and its answers fuse the lexical and vector candidates by reciprocal rank under the same access filter; \"on\" stays lexical.",
-    "default": "off"
+    "default": "off",
+    "managed": "fixed"
   },
   "KNOWLEDGE_FIGURES_MAX_TIME_MS": {
     "group": "ai",
     "description": "How long, in milliseconds, the database may spend reading one workspace's knowledge figures for the instance console before the console says the figures timed out.",
-    "default": "10000"
+    "default": "10000",
+    "managed": "fixed"
   },
   "KNOWLEDGE_EMBED_QUERY_TIMEOUT_MS": {
     "group": "ai",
     "description": "How long a question waits for its embedding before Ask answers from the lexical side alone (the backend then reads \"lexical (embed timed out)\"). Embedding at ingest keeps the provider's own timeout.",
-    "default": "2000"
+    "default": "2000",
+    "managed": "fixed"
   },
   "KNOWLEDGE_FILE_MAX_BYTES": {
     "group": "ai",
     "description": "The largest task attachment, in bytes, whose text the knowledge indexer extracts. A larger file is recorded as skipped and never read.",
-    "default": "10485760"
+    "default": "10485760",
+    "managed": "fixed"
   },
   "KNOWLEDGE_FILE_MAX_CHARS": {
     "group": "ai",
     "description": "How many characters of one file's text the knowledge indexer keeps; the rest is cut and a truncation marker added.",
-    "default": "200000"
+    "default": "200000",
+    "managed": "fixed"
   },
   "KNOWLEDGE_FILE_TIMEOUT_MS": {
     "group": "ai",
     "description": "How long the knowledge indexer lets one file's parser run before stopping its thread and recording the file as timed out. A failed or timed-out file is retried at most twice.",
-    "default": "20000"
+    "default": "20000",
+    "managed": "fixed"
   },
   "KNOWLEDGE_FILE_MAX_PAGES": {
     "group": "ai",
     "description": "How many pages of a PDF the knowledge indexer reads.",
-    "default": "200"
+    "default": "200",
+    "managed": "fixed"
   },
   "KNOWLEDGE_FILE_MAX_SHEETS": {
     "group": "ai",
     "description": "How many sheets of a spreadsheet the knowledge indexer reads.",
-    "default": "20"
+    "default": "20",
+    "managed": "fixed"
   },
   "KNOWLEDGE_FILE_MAX_PARSE_MEMORY_BYTES": {
     "group": "ai",
     "description": "How much memory one file's parser thread may hold (its heap plus off-heap buffers, measured by the thread itself where the parser yields, with the process's resident growth watched as a backstop for a parser that never yields) before the knowledge indexer stops it and records the file for a retry. By default twice KNOWLEDGE_FILE_MAX_UNZIPPED_BYTES (the rebuilt archive plus one entry being copied into it) plus 128 MB for the parser.",
-    "default": "2 x KNOWLEDGE_FILE_MAX_UNZIPPED_BYTES + 134217728"
+    "default": "2 x KNOWLEDGE_FILE_MAX_UNZIPPED_BYTES + 134217728",
+    "managed": "fixed"
   },
   "KNOWLEDGE_FILE_MAX_ROWS": {
     "group": "ai",
     "description": "How many rows of each sheet or CSV the knowledge indexer reads.",
-    "default": "5000"
+    "default": "5000",
+    "managed": "fixed"
   },
   "KNOWLEDGE_FILE_MAX_UNZIPPED_BYTES": {
     "group": "ai",
     "description": "The most a DOCX or XLSX may inflate to. The knowledge indexer refuses one that declares more without opening it, and inflates every entry itself against this budget, whatever the archive declares, before a parser sees it.",
-    "default": "104857600"
+    "default": "104857600",
+    "managed": "fixed"
   },
   "KNOWLEDGE_FLAG_CACHE_TTL_SECONDS": {
     "group": "ai",
     "description": "Seconds a company's knowledgeRetrieval and knowledgeIndexer modes are kept after one read, so a question, a sync and a retry share it; 0 reads the row on every call, which the e2e harness sets so a test sees a switch it just flipped.",
-    "default": "30"
+    "default": "30",
+    "managed": "fixed"
   },
   "KNOWLEDGE_EMBEDDING_MODEL": {
     "group": "ai",
     "description": "The OpenAI embedding model a hybrid company's chunks and questions are embedded with. It must have a price on file (text-embedding-3-small and text-embedding-3-large do; LLM_PRICING adds another); a change re-embeds each chunk on its next write and, a batch per run, from the recurring knowledge.backfill job.",
-    "default": "text-embedding-3-small"
+    "default": "text-embedding-3-small",
+    "managed": "fixed"
   },
   "OPENAI_EMBEDDINGS_URL": {
     "group": "ai",
     "description": "The endpoint the OpenAI provider posts embeddings to. Point it at an Azure deployment, a proxy or a self-hosted server that speaks the same API; the e2e harness points it at a stub. Chat completions are unaffected.",
-    "default": "https://api.openai.com/v1/embeddings"
+    "default": "https://api.openai.com/v1/embeddings",
+    "managed": "fixed"
   },
   "KNOWLEDGE_INDEXER": {
     "group": "ai",
     "description": "Knowledge indexer: \"off\" subscribes to nothing and reads or writes no chunk; \"tenant\" ingests page, comment, call-notes, project-guide and task-attachment events into knowledge_chunks (pages and guides split on headings; attachment text extracted off the request path within the KNOWLEDGE_FILE_* limits; tombstoned on delete, on a deleted task or a removed attachment for comments and files, on project trash for pages, comments, guides and files, and on a member's departure for private pages), backfills each source separately, and lets retrieval read a source's passages from the chunks once that source's backfill is complete, for a company whose knowledgeIndexer.mode is \"on\"; \"all\" does so for every company except one set to \"off\".",
-    "default": "off"
+    "default": "off",
+    "managed": "fixed"
   },
   "KNOWLEDGE_TOMBSTONE_RETENTION_DAYS": {
     "group": "ai",
     "description": "Days a tombstoned knowledge chunk (a deleted, trashed, departed or removed source) is kept before the knowledge.backfill job removes it, once a day per company. A tombstone the indexer reads back (a deleted task's comments and files, a departed member's agent notes, a file's skip or failure outcome) keeps its row with the text and vector emptied; a file still owed an extraction is left alone. 0 keeps every tombstone.",
-    "default": "30"
+    "default": "30",
+    "managed": "fixed"
   },
   "KNOWLEDGE_AGENT_MEMORY": {
     "group": "ai",
     "description": "Agent memory in the knowledge index: \"off\" publishes and indexes nothing, so agent notes stay in the LangGraph store only; \"on\", for a company whose knowledge indexer is on, indexes each agent note (agent_memory, namespace agent/<agentId>/note) into knowledge_chunks under scope \"agent\" off the memory events, backfills existing notes in the knowledge.memory.backfill job, and lets an agent's own runs retrieve its notes once that backfill is complete: only within the run's visible set (the starter's projects, narrowed to the agent's), only when every project the note was formed in is in that set, ranked below what people wrote, and with origin \"external\" when a tainted run formed it. People asking through Ask never see agent notes.",
-    "default": "off"
+    "default": "off",
+    "managed": "fixed"
   },
   "LLM_MAX_TOKENS_CLARIFY": {
     "group": "ai",
     "description": "cap for follow-up Q&A",
     "external": true,
-    "default": "2000"
+    "default": "2000",
+    "managed": "fixed"
   },
   "LLM_MAX_TOKENS_PLAN": {
     "group": "ai",
     "description": "cap for the planning call (raise if you see \"ran out of output token budget\")",
     "secret": true,
-    "default": "32000"
+    "default": "32000",
+    "managed": "fixed"
   },
   "LLM_PRICING": {
     "group": "ai",
     "description": "JSON map of model name to per-token prices used to report AI spend.",
-    "default": ""
+    "default": "",
+    "managed": "customer"
   },
   "LLM_PROVIDER": {
     "group": "ai",
     "description": "openai | anthropic | deepseek",
-    "default": ""
+    "default": "",
+    "managed": "customer"
   },
   "LLM_REGION": {
     "group": "ai",
     "description": "optional: the inference region the provider is pinned to; shown read-only in the agent settings (GET /api/v2/agents/settings)",
-    "default": ""
+    "default": "",
+    "managed": "fixed"
   },
   "LLM_TIMEOUT_MS": {
     "group": "ai",
     "description": "Model call timeout every provider inherits unless overridden per provider (default 10 min). The agent job lock is model timeout + AGENT_ACT_BUDGET_MS + 2 min.",
-    "default": "600000"
+    "default": "600000",
+    "managed": "fixed"
   },
   "LOG_DATE_PATTERN": {
     "group": "logging",
     "description": "Date pattern appended to rotated log file names.",
-    "default": "YYYY-MM-DD"
+    "default": "YYYY-MM-DD",
+    "managed": "fixed"
   },
   "LOG_DIR": {
     "group": "logging",
     "description": "Directory that receives the rotated log files.",
-    "default": "log"
+    "default": "log",
+    "managed": "fixed"
   },
   "LOG_FORMAT": {
     "group": "logging",
     "description": "Log file record format: text (one formatted line) or json (one { ts, level, label, requestId, traceId, message } record per line).",
-    "default": "text"
+    "default": "text",
+    "managed": "fixed"
   },
   "LOG_MAX_FILES": {
     "group": "logging",
     "description": "Retention window for rotated log files (winston-daily-rotate-file).",
-    "default": "14d"
+    "default": "14d",
+    "managed": "fixed"
   },
   "LOG_MAX_SIZE": {
     "group": "logging",
     "description": "Size at which a log file rotates.",
-    "default": "20m"
+    "default": "20m",
+    "managed": "fixed"
   },
   "MAGIC_LINK_ENABLED": {
     "group": "auth",
     "description": "Set to false to disable passwordless magic-link sign-in.",
-    "default": "true"
+    "default": "true",
+    "managed": "customer"
   },
   "MAX_IMAGE_FILE_BYTES": {
     "group": "limits",
     "description": "Largest image accepted for processing.",
-    "default": "26214400"
+    "default": "26214400",
+    "managed": "fixed"
   },
   "MAX_IMAGE_PIXELS": {
     "group": "limits",
     "description": "Largest image, in pixels, accepted for processing (decompression-bomb guard).",
-    "default": "50000000"
+    "default": "50000000",
+    "managed": "fixed"
   },
   "MCP_CURSOR_SECRET": {
     "group": "security",
-    "description": "Key that signs the MCP list cursors (HMAC-SHA256) while MCP_TOOLS_V2 is on. A cursor is bound to the company, the caller, the token and the query, and expires after an hour. Unset derives a key from JWT_SECRET; changing it ends the cursors in flight. With MCP_TOOLS_V2 on the server refuses to start when it is set but shorter than 32 characters or equal to JWT_SECRET."
+    "description": "Key that signs the MCP list cursors (HMAC-SHA256) while MCP_TOOLS_V2 is on. A cursor is bound to the company, the caller, the token and the query, and expires after an hour. Unset derives a key from JWT_SECRET; changing it ends the cursors in flight. With MCP_TOOLS_V2 on the server refuses to start when it is set but shorter than 32 characters or equal to JWT_SECRET.",
+    "managed": "fixed"
   },
   "MCP_TOOLS_DATA": {
     "group": "ai",
     "description": "MCP data tools: \"on\" registers and offers projects.list, project.get, sprints.list, statuses.list, comments.list, pages.search, page.get and timesheet.read (reads), and comment.create and timelog.create (the caller's own time), each a rated registry action that answers only what the person behind the token can open in the web app and needs its own OAuth scope. Unset means on for a new install; set it to off (false, 0 or no) to turn the tools off, which leaves the registry and the MCP tool list as they were. Every write still needs the person's own access in the web app and, for an outside AI app, the scopes that person granted it on the consent screen. An install that already had a workspace before this default changed keeps it off: migration 074 records off in the instance settings (Settings, Instance, AI), where an owner can turn it on.",
-    "default": "on"
+    "default": "on",
+    "managed": "customer"
   },
   "MCP_TOOLS_MANAGE": {
     "group": "ai",
     "description": "MCP management tools: \"on\" registers and offers, to a personal access token created with the tasks:manage grant or an OAuth token holding the tasks:manage scope, fields.list, subtasks.list, members.list, task.history and task.links.list (reads), task.update, task.assign, task.field.set, task.move, task.archive, task.restore, comment.update and tasks.batch (up to 50 writes in one call that names more than one task and so waits for a person as one proposal; a call on one task, which is applied at once, takes 25), and fuller forms of tasks.search, task.get, task.create, subtask.create, task.comment and task.status.set (any status of the task's project, Done included, recorded as closed through the agent and unchecked); and, to a token created with the docs:manage grant or an OAuth token holding the docs:manage scope, page.create and page.update. Each write runs through the web app's own route preparation and handlers as the person behind the token. A grant is chosen when the token is created and never added afterwards, so a token made earlier lists and runs exactly what it did before; an OAuth client is given a manage scope only as MCP_OAUTH describes. Unset means on for a new install; set it to off (false, 0 or no) to turn the tools off, which leaves the registry and the MCP tool list as they were. Every write still needs the person's own access in the web app and, for an outside AI app, the scopes that person granted it on the consent screen. An install that already had a workspace before this default changed keeps it off: migration 074 records off in the instance settings (Settings, Instance, AI), where an owner can turn it on.",
-    "default": "on"
+    "default": "on",
+    "managed": "customer"
   },
   "MCP_TOOLS_WORK": {
     "group": "ai",
     "description": "MCP everyday work tools: \"on\" registers and offers tags.list, task.relations.list, task.lists.list, lists.list, page.comments.list, goals.list and goal.get (reads), and task.tags.add, task.tags.remove, task.relation.add, task.relation.remove, list.create, list.rename, list.move, page.comment.create, page.comment.reply, page.comment.assign, goal.target.set, goal.target.sources.add, goal.target.sources.remove, task.lists.add and task.lists.remove (writes), and lets tasks.search take a list (sprintId) for every token. A read needs the read scope and a write the write scope; none needs a manage grant, so every token that reads or writes gains them. Each answers only what the person behind the token can open in the web app, stays inside the projects a token was narrowed to, and each write runs through the web app's own route handlers as that person, under the permission the route asks for. Nothing here deletes or archives. For an OAuth client under AGENT_TAINT_ROUTING, a write that reaches past one task (a link, a list change, a task added to or taken out of another list, a doc comment, a change to a goal) is refused, or filed as a proposal when the token holds tasks:manage (links, lists and goals) or docs:manage (doc comments). A goal belongs to no project: a token narrowed to some projects reads a goal only when everything the goal counts is inside them, and changes no goal. A list a task is added to gives nobody access to the task: a search by list answers an added task only to a caller who can open its home list. Unset means on for a new install; set it to off (false, 0 or no) to turn the tools off, which leaves the registry and the MCP tool list as they were. Every write still needs the person's own access in the web app and, for an outside AI app, the scopes that person granted it on the consent screen. An install that already had a workspace before this default changed keeps it off: migration 074 records off in the instance settings (Settings, Instance, AI), where an owner can turn it on.",
-    "default": "on"
+    "default": "on",
+    "managed": "customer"
   },
   "MCP_TOOLS_V2": {
     "group": "ai",
     "description": "MCP tools v2: \"on\" puts human names and a ref next to the ids in tool results (only names the caller may see), pages every list tool with an opaque cursor (default 25, at most 100 per page), annotates every tool with readOnlyHint, destructiveHint, idempotentHint and openWorldHint from its action rating, and turns a destructive call (an irreversible or workspace-scope write) into a proposal a person approves in the Inbox instead of acting. Default \"off\" keeps the tool list and result shapes as they were.",
-    "default": "off"
+    "default": "off",
+    "managed": "fixed"
   },
   "DISPATCHER": {
     "group": "ai",
     "description": "The dispatcher: \"on\" lets a project's owner or admin switch its dispatcher to suggest or apply (Project > Agents). Each task created or changed in such a project is then routed to a role from Modules/Agents/roles: the project's routing rules first, in order (task type, tags, priority, status, list and custom field values), a model guess only when one is plugged in, a model is configured and the guess reaches the project's confidence, otherwise the task waits in the project's Needs routing list. Suggest shows the role on the task for a lead to accept, dismiss or change; apply puts the task in the role's agent work queue at once. A role off for the project, a paused project and paused connected agents route nothing. Every routing and every lead's choice is written to the audit log. Default \"off\" routes nothing and closes the dispatcher's write routes.",
-    "default": "off"
+    "default": "off",
+    "managed": "fixed"
   },
   "MCP_ROLE_PROMPTS": {
     "group": "ai",
     "description": "Role playbooks for a connected AI: \"on\" offers each role playbook in Modules/Agents/roles as a ready-made MCP prompt (work_as_<role>, with an optional request), listed only to a connection that may run every tool the role's playbook names, and lets a signed-in member of a workspace download a role as a Claude skill (a zip holding <name>/SKILL.md) from /api/v2/agents/roles/<blueprint>/<role>/skill. A prompt and a skill are fixed text: they give the AI no tool and no right it did not have. Default \"off\" leaves the MCP prompt list as it was and refuses the download.",
-    "default": "off"
+    "default": "off",
+    "managed": "fixed"
   },
   "MEASUREMENTID": {
     "group": "integrations",
-    "description": "Firebase analytics measurement id."
+    "description": "Firebase analytics measurement id.",
+    "managed": "bootstrap"
   },
   "MEMBERSHIP_CACHE_TTL_SECONDS": {
     "group": "security",
     "description": "Seconds a user-company membership check is cached before MongoDB is asked again.",
-    "default": "60"
+    "default": "60",
+    "managed": "fixed"
   },
   "MESSAGINGSENDERID": {
     "group": "integrations",
-    "description": "Firebase messaging sender id."
+    "description": "Firebase messaging sender id.",
+    "managed": "bootstrap"
   },
   "MIGRATIONS_AUTO": {
     "group": "general",
     "description": "Apply pending migrations at boot (default true; false only reports them).",
     "secret": false,
-    "required": false
+    "required": false,
+    "managed": "bootstrap"
   },
   "MONGODB_URL": {
     "group": "general",
     "description": "mongo connection string (no trailing slash)",
     "required": true,
-    "default": ""
+    "default": "",
+    "managed": "bootstrap"
   },
   "MONGO_CLOUD_URL": {
     "group": "general",
     "description": "Documented in .env.example; not read by the current code.",
     "external": true,
-    "default": "https://cloud.mongodb.com/api"
+    "default": "https://cloud.mongodb.com/api",
+    "managed": "dev"
   },
   "MONGO_CONNECT_TIMEOUT_MS": {
     "group": "database",
     "description": "How long a new MongoDB connection may take to establish (default 60000).",
-    "default": "60000"
+    "default": "60000",
+    "managed": "fixed"
   },
   "MONGO_MIN_POOL_SIZE": {
     "group": "database",
-    "description": "Minimum connections kept open per company database."
+    "description": "Minimum connections kept open per company database.",
+    "managed": "fixed"
   },
   "MONGO_POOL_SIZE": {
     "group": "database",
-    "description": "Maximum connections per company database."
+    "description": "Maximum connections per company database.",
+    "managed": "fixed"
   },
   "MONGO_SERVER_SELECTION_TIMEOUT_MS": {
     "group": "database",
     "description": "How long the MongoDB driver waits to find a usable server before failing an operation (default 60000).",
-    "default": "60000"
+    "default": "60000",
+    "managed": "fixed"
   },
   "MONGO_SOCKET_TIMEOUT_MS": {
     "group": "database",
     "description": "Inactivity timeout on a MongoDB socket before it is closed (default 300000).",
-    "default": "300000"
+    "default": "300000",
+    "managed": "fixed"
   },
   "MONGO_WAIT_QUEUE_TIMEOUT_MS": {
     "group": "database",
-    "description": "How long a query waits for a free connection before failing."
+    "description": "How long a query waits for a free connection before failing.",
+    "managed": "fixed"
   },
   "NODEMAILER_ALLOW_SELF_SIGNED": {
     "group": "mail",
     "description": "Accept self-signed certificates from the SMTP server.",
-    "default": ""
+    "default": "",
+    "managed": "fixed"
   },
   "NODEMAILER_EMAIL": {
     "group": "mail",
     "description": "From address; also the SMTP login when NODEMAILER_USER is unset.",
-    "default": "your@email.com"
+    "default": "your@email.com",
+    "managed": "platform"
   },
   "NODEMAILER_EMAIL_PASSWORD": {
     "group": "general",
     "description": "Use app password for Gmail",
-    "secret": true
+    "secret": true,
+    "managed": "platform"
   },
   "NODEMAILER_HOST": {
     "group": "mail",
     "description": "SMTP host.",
-    "default": "smtp.gmail.com"
+    "default": "smtp.gmail.com",
+    "managed": "platform"
   },
   "NODEMAILER_PORT": {
     "group": "general",
     "description": "587 (STARTTLS) or 465 (SSL)",
-    "default": "587"
+    "default": "587",
+    "managed": "platform"
   },
   "NODEMAILER_USER": {
     "group": "mail",
     "description": "SMTP login, only when it differs from NODEMAILER_EMAIL (e.g. an Amazon SES Mail Manager ingress endpoint ID). NODEMAILER_EMAIL stays the From address.",
-    "default": ""
+    "default": "",
+    "managed": "platform"
   },
   "NODE_ENV": {
     "group": "server",
     "description": "development | production",
-    "default": "development"
+    "default": "development",
+    "managed": "fixed"
   },
   "NOOFPRESETCOMPANY": {
     "group": "general",
     "description": "Number of preset companies seeded at first run.",
-    "default": "10"
+    "default": "10",
+    "managed": "fixed"
   },
   "NOTIFICATIONACTIVETIME": {
     "group": "jobs",
-    "description": "Minutes a user counts as active for notification batching."
+    "description": "Minutes a user counts as active for notification batching.",
+    "managed": "fixed"
   },
   "OPENAI_TIMEOUT_MS": {
     "group": "ai",
     "description": "optional: override the OpenAI axios timeout (default: LLM_TIMEOUT_MS for reasoning/gpt-5, 4 min for others); the agent job lock is derived from the largest provider timeout",
-    "default": "600000"
+    "default": "600000",
+    "managed": "fixed"
   },
   "OTEL_EXPORTER_OTLP_ENDPOINT": {
     "group": "logging",
     "description": "OTLP/HTTP collector base URL (traces go to <endpoint>/v1/traces). Unset keeps the OpenTelemetry SDK and exporter off; trace ids are still recorded.",
-    "default": ""
+    "default": "",
+    "managed": "bootstrap"
   },
   "OTEL_SERVICE_NAME": {
     "group": "logging",
     "description": "service.name reported on exported spans.",
-    "default": "alianhub"
+    "default": "alianhub",
+    "managed": "fixed"
   },
   "PERMISSION_ENFORCEMENT_CACHE_TTL_SECONDS": {
     "group": "security",
     "description": "Seconds a workspace's own permissionEnforcement.mode is cached before the company row is read again; 0 reads it on every guarded request. A failed read inherits the instance default for 5 seconds whatever this is set to.",
-    "default": "30"
+    "default": "30",
+    "managed": "fixed"
   },
   "PERMISSION_ENFORCEMENT_MODE": {
     "group": "security",
     "description": "Server-side permission checks for browser sessions: off (they pass as before), report (they pass, and each would-be denial is recorded in permission_decisions) or enforce (they are refused, and a check that cannot complete fails closed). The default for every workspace; a company row's permissionEnforcement.mode overrides it. Anything unrecognised reads as off. API tokens are always enforced on the keys they were refused on before, including nine task actions; on every other task write in Config/taskWritePermissions.js they follow this mode like browser sessions. A task write body that names another company or an id that cannot be read is refused for API tokens in every mode, and follows this mode for browser sessions. Also editable under Instance > Settings > Security.",
-    "default": "off"
+    "default": "off",
+    "managed": "customer"
   },
   "PORT": {
     "group": "server",
     "description": "TCP port the HTTP server listens on.",
     "required": true,
-    "default": "4000"
+    "default": "4000",
+    "managed": "fixed"
   },
   "PRECOMPANYKEY": {
     "group": "security",
     "description": "Random key for the preset company routes, presented in the x-preset-key header; generated at setup.",
     "required": true,
     "secret": true,
-    "default": "your_preset_key"
+    "default": "your_preset_key",
+    "managed": "bootstrap"
   },
   "PROJECTID": {
     "group": "integrations",
-    "description": "Firebase project id."
+    "description": "Firebase project id.",
+    "managed": "bootstrap"
   },
   "REFRESH_TOKEN_REUSE_GRACE_SECONDS": {
     "group": "auth",
     "description": "Seconds after a refresh token is rotated during which presenting the old one again is refused without revoking the session, so parallel requests or tabs do not log the user out. Past this window a reused token revokes the session.",
-    "default": "10"
+    "default": "10",
+    "managed": "fixed"
   },
   "RESEND_API_KEY": {
     "group": "general",
     "description": "Get from resend.com",
-    "secret": true
+    "secret": true,
+    "managed": "platform"
   },
   "RESEND_FROM_EMAIL": {
     "group": "general",
     "description": "Use verified domain in production",
-    "default": "onboarding@resend.dev"
+    "default": "onboarding@resend.dev",
+    "managed": "platform"
   },
   "S3_CONNECTION_TIMEOUT_MS": {
     "group": "storage",
-    "description": "Connection timeout for S3-compatible storage calls."
+    "description": "Connection timeout for S3-compatible storage calls.",
+    "managed": "fixed"
   },
   "S3_SOCKET_TIMEOUT_MS": {
     "group": "storage",
-    "description": "Socket timeout for S3-compatible storage calls."
+    "description": "Socket timeout for S3-compatible storage calls.",
+    "managed": "fixed"
   },
   "SERVER_HEADERS_TIMEOUT_MS": {
     "group": "server",
     "description": "How long the HTTP server waits for a full request header block; always kept above the keep-alive timeout (default 66000).",
-    "default": "66000"
+    "default": "66000",
+    "managed": "fixed"
   },
   "SERVER_KEEP_ALIVE_TIMEOUT_MS": {
     "group": "server",
     "description": "Idle keep-alive timeout of the HTTP server; keep it above the idle timeout of any proxy in front (default 65000).",
-    "default": "65000"
+    "default": "65000",
+    "managed": "fixed"
   },
   "SERVER_REQUEST_TIMEOUT_MS": {
     "group": "server",
     "description": "How long the HTTP server waits to receive a whole request (default 300000). Server-sent event streams are exempt.",
-    "default": "300000"
+    "default": "300000",
+    "managed": "fixed"
   },
   "SERVICE_FILE": {
     "group": "integrations",
     "description": "Path to Firebase service account JSON (must be inside project root)",
-    "default": "./firebase-adminsdk.json"
+    "default": "./firebase-adminsdk.json",
+    "managed": "bootstrap"
   },
   "SESSIONEXPIREDTIME": {
     "group": "auth",
     "description": "Idle time after which a login session expires.",
-    "default": "172800"
+    "default": "172800",
+    "managed": "fixed"
   },
   "SESSION_COOKIE_HTTPONLY": {
     "group": "auth",
-    "description": "Set to on to mark the session cookies httpOnly so page JavaScript can no longer read them: the server reads the access token from the cookie when no Authorization header is sent, the socket handshake and the refresh endpoint do the same, and the web app authenticates by cookie instead of copying tokens into headers. Tracker, CLI and API-token clients are unaffected (they send headers and bodies, never cookies). Unset or off keeps readable cookies as before."
+    "description": "Set to on to mark the session cookies httpOnly so page JavaScript can no longer read them: the server reads the access token from the cookie when no Authorization header is sent, the socket handshake and the refresh endpoint do the same, and the web app authenticates by cookie instead of copying tokens into headers. Tracker, CLI and API-token clients are unaffected (they send headers and bodies, never cookies). Unset or off keeps readable cookies as before.",
+    "managed": "fixed"
   },
   "SKILL_EXTERNAL_READS": {
     "group": "security",
     "description": "Declared external reads in data skills: \"on\" offers the url and api readers in the Skill Library, each naming one exact host, a path template, GET only, at most 512 KB, 10 s and 3 redirects, and optionally the handle of a skill_read workspace secret. A skill is saved only when every declared host is on the workspace egress allowlist (an empty list refuses them all, and private or reserved hosts are refused even when listed), and a raw secret anywhere in the skill body is refused. The built-in pr.summary skill (alias risk.flags) reads its pull request this way from github.com, patch-diff.githubusercontent.com or gitlab.com, each of which must be on the workspace egress allowlist. Default \"off\" hides the readers and refuses them on save; a skill that declares one, pr.summary included, is listed as unavailable with the reason, and running it fails with external_reads_not_available before anything is fetched. It also gates Research this on the task panel, which additionally needs a web-search tool; none ships yet, so Research stays hidden and its endpoint answers research_not_available.",
-    "default": "off"
+    "default": "off",
+    "managed": "fixed"
   },
   "SOCKETIO_ADMIN_PASSWORD_HASH": {
     "group": "security",
     "description": "bcrypt hash of the Socket.IO admin UI password; the UI stays off while unset.",
     "secret": true,
-    "default": "$2a$12$HHemhzmTrC8Dmf2Gd9v/Teo9oiCxfYJb.St3HKMBx1L3wJmZLeX5u"
+    "default": "$2a$12$HHemhzmTrC8Dmf2Gd9v/Teo9oiCxfYJb.St3HKMBx1L3wJmZLeX5u",
+    "managed": "fixed"
   },
   "SOCKETIO_ADMIN_USERNAME": {
     "group": "security",
     "description": "Username for the Socket.IO admin UI; the UI stays off while unset.",
-    "default": "alian"
+    "default": "alian",
+    "managed": "fixed"
   },
   "STEP_CREDENTIALS": {
     "group": "security",
     "description": "Set to on to give the platform its own service identities and mint a step-scoped credential per workflow step: the workflow engine, its worker, the knowledge indexer and the model router record their rows as service:<name> instead of a borrowed user, and when the engine claims a step it signs a short-lived credential carrying the company, run, step, fencing token, actor context and allowed actions that expires one lease after it was minted, is re-minted whenever a heartbeat extends the lease, and is checked against the live step row whenever an agent step's actor presents it to perform an action. The tokens screen lists live credentials as step-scoped. Unset or off keeps today's behaviour: no credential is minted and rows are attributed as before.",
-    "default": "off"
+    "default": "off",
+    "managed": "fixed"
   },
   "STEP_CREDENTIAL_SECRET": {
     "group": "security",
     "description": "Key material for signing step-scoped credentials (STEP_CREDENTIALS). Derived with scrypt, never used as-is; falls back to JWT_SECRET, so set a dedicated secret in production so rotating JWT_SECRET does not invalidate credentials of steps in flight, and keep it out of the database and its backups.",
-    "secret": true
+    "secret": true,
+    "managed": "fixed"
   },
   "STORAGEBUCKET": {
     "group": "integrations",
-    "description": "Firebase storage bucket."
+    "description": "Firebase storage bucket.",
+    "managed": "bootstrap"
   },
   "STORAGE_DOWNLOAD_SCOPE": {
     "group": "storage",
     "description": "Which stored files a signed download link is issued for. report (the default): every link is issued as before, and each one enforce would refuse is logged as 'stored-file download would be refused' with the key's layout type (task_attachment, channel_comment, form_upload, unknown, ...), a reason category (not_found, no_access, invalid_path, unknown) and a running count per pair, never the key or path. enforce: a link is issued only for a file attached to a record the caller may open (a task, project, comment, channel, direct message, form, clip, reminder, timesheet screenshot, or a company settings image); any other key answers 404 with code STORED_FILE_NOT_AVAILABLE. The same mode governs task attachment writes: under report a task attachment that names a file not stored for that task is written and logged as 'attachment write would be refused' with a reason category (other_task, form_upload, clip, unknown) and a count; under enforce it is refused with 400 ATTACHMENT_KEY_NOT_OWN. An attachment url that is not text is refused in both modes. Removing or uploading a stored file does not follow this switch: those routes always check that the caller may change the record the file belongs to, and refuse a key outside every layout (logged as 'stored-file remove refused' or 'stored-file upload refused' with the layout type and the key's shape, never an id or a file name). A file on a doc comment does not follow it either: its link is issued only to someone who can read the doc, in both modes. Anything else reads as report. Switch plan: run one release on report, check the logged counts, and set enforce once no layout other than unknown shows refusals that a legitimate screen caused.",
-    "default": "report"
+    "default": "report",
+    "managed": "fixed"
   },
   "STORAGE_TYPE": {
     "group": "storage",
     "description": "wasabi | server. With server, uploads are served from the app's own origin, and whatever CSP_MODE is: every upload response carries X-Content-Type-Options: nosniff and a sandboxing Content-Security-Policy; images (including SVG), PDF, plain text, audio and video still preview inline; every other file (scripts, HTML, XML, unknown types) downloads as application/octet-stream.",
     "required": true,
-    "default": "wasabi"
+    "default": "wasabi",
+    "managed": "bootstrap"
   },
   "SUPPORT_MAIL": {
     "group": "mail",
-    "description": "Mailbox that gets a copy of each message the support account (VUE_APP_USEREMAIL) posts in the support project (VUE_APP_SUPPORT_PROJECTID). Unset: no support mail is sent."
+    "description": "Mailbox that gets a copy of each message the support account (VUE_APP_USEREMAIL) posts in the support project (VUE_APP_SUPPORT_PROJECTID). Unset: no support mail is sent.",
+    "managed": "fixed"
   },
   "TENANT_PROVIDER_KEYS": {
     "group": "ai",
-    "description": "Set to on to let each workspace pay for model calls with its own provider keys: owners and admins set one key per provider under Settings, kept in the secrets store by handle with only the handle on the company row, and every model call and embedding run for that workspace is billed to its key, or to the instance key while none is set. A set key that will not open refuses the call rather than billing the instance owner. Needs SECRETS_STORE with SECRETS_KEY; unset or off keeps every call on the instance keys."
+    "description": "Set to on to let each workspace pay for model calls with its own provider keys: owners and admins set one key per provider under Settings, kept in the secrets store by handle with only the handle on the company row, and every model call and embedding run for that workspace is billed to its key, or to the instance key while none is set. A set key that will not open refuses the call rather than billing the instance owner. Needs SECRETS_STORE with SECRETS_KEY; unset or off keeps every call on the instance keys.",
+    "managed": "fixed"
   },
   "TRACKER_PKCE_LEGACY_UNTIL": {
     "group": "auth",
-    "description": "ISO date from which desktop tracker builds that sign in without a PKCE verifier are refused. Unset (the default) keeps those builds working; an unparseable value reads as unset."
+    "description": "ISO date from which desktop tracker builds that sign in without a PKCE verifier are refused. Unset (the default) keeps those builds working; an unparseable value reads as unset.",
+    "managed": "fixed"
   },
   "TRACKSHOT_RETENTION_DAYS": {
     "group": "storage",
     "description": "Days to keep time-tracker screenshots before deletion.",
-    "default": "180"
+    "default": "180",
+    "managed": "fixed"
   },
   "TRANSLATE_API_KEY": {
     "group": "general",
     "description": "Machine-translation key used by scripts/i18n-backfill.js; unset means English copies are written for review.",
     "secret": true,
-    "required": false
+    "required": false,
+    "managed": "dev"
   },
   "TRUST_PROXY": {
     "group": "server",
     "description": "Express trust proxy setting; loopback by default so X-Forwarded-For is honoured behind a local reverse proxy.",
-    "default": "loopback"
+    "default": "loopback",
+    "managed": "bootstrap"
   },
   "TURN_CREDENTIAL_TTL_SECONDS": {
     "group": "calling",
     "description": "Lifetime of TURN credentials minted from TURN_STATIC_AUTH_SECRET.",
     "secret": true,
-    "default": "3600"
+    "default": "3600",
+    "managed": "fixed"
   },
   "TWO_FACTOR_ENC_KEY": {
     "group": "auth",
     "description": "key material for encrypting TOTP secrets at rest",
-    "secret": true
+    "secret": true,
+    "managed": "bootstrap"
   },
   "TWO_FACTOR_ISSUER": {
     "group": "auth",
     "description": "label shown in the user's authenticator app",
-    "default": "AlianHub"
+    "default": "AlianHub",
+    "managed": "customer"
   },
   "TWO_FACTOR_TEMP_SECRET": {
     "group": "auth",
     "description": "signs the short-lived login second-step (temp) token",
     "secret": true,
-    "default": "${process.env.JWT_SECRET || ''}::2fa-temp"
+    "default": "${process.env.JWT_SECRET || ''}::2fa-temp",
+    "managed": "fixed"
   },
   "UNDER_MAINTENANCE": {
     "group": "server",
     "description": "true | false",
-    "default": "false"
+    "default": "false",
+    "managed": "fixed"
   },
   "UPLOAD_MAX_FILES": {
     "group": "limits",
     "description": "Maximum files per upload request.",
-    "default": "20"
+    "default": "20",
+    "managed": "fixed"
   },
   "UPLOAD_MAX_FILE_BYTES": {
     "group": "limits",
-    "description": "Maximum size of one uploaded file."
+    "description": "Maximum size of one uploaded file.",
+    "managed": "fixed"
   },
   "USERPROFILEBUCKET": {
     "group": "storage",
     "description": "Bucket that holds user profile pictures.",
-    "default": "your-bucket-name"
+    "default": "your-bucket-name",
+    "managed": "platform"
   },
   "VUE_APP_AFFILIATEON": {
     "group": "frontend",
-    "description": "Show the affiliate programme entry points."
+    "description": "Show the affiliate programme entry points.",
+    "managed": "fixed"
   },
   "VUE_APP_APIKEY": {
     "group": "frontend",
     "description": "Firebase web API key (push notifications).",
-    "secret": true
+    "secret": true,
+    "managed": "fixed"
   },
   "VUE_APP_APPID": {
     "group": "frontend",
-    "description": "Firebase app id."
+    "description": "Firebase app id.",
+    "managed": "fixed"
   },
   "VUE_APP_AUTHDOMAIN": {
     "group": "frontend",
-    "description": "Firebase auth domain."
+    "description": "Firebase auth domain.",
+    "managed": "fixed"
   },
   "VUE_APP_CUSTOMFIELDID": {
     "group": "frontend",
-    "description": "Custom field id used by the support product link."
+    "description": "Custom field id used by the support product link.",
+    "managed": "fixed"
   },
   "VUE_APP_CUSTOMFIELDPRODUCTID": {
     "group": "frontend",
-    "description": "Custom field id that stores the product on support tickets."
+    "description": "Custom field id that stores the product on support tickets.",
+    "managed": "fixed"
   },
   "VUE_APP_GITHUB_BASE_OAUTH_URL": {
     "group": "frontend",
-    "description": "GitHub OAuth authorize URL."
+    "description": "GitHub OAuth authorize URL.",
+    "managed": "fixed"
   },
   "VUE_APP_GITHUB_CLIENT_ID": {
     "group": "frontend",
-    "description": "GitHub OAuth client id for the login button."
+    "description": "GitHub OAuth client id for the login button.",
+    "managed": "fixed"
   },
   "VUE_APP_GITLAB_BASE_OAUTH_URL": {
     "group": "frontend",
-    "description": "GitLab OAuth authorize URL."
+    "description": "GitLab OAuth authorize URL.",
+    "managed": "fixed"
   },
   "VUE_APP_GITLAB_CLIENT_ID": {
     "group": "frontend",
-    "description": "GitLab OAuth client id for the login button."
+    "description": "GitLab OAuth client id for the login button.",
+    "managed": "fixed"
   },
   "VUE_APP_GOOGLE_CLIENT_ID": {
     "group": "frontend",
-    "description": "Google OAuth client id for the login button."
+    "description": "Google OAuth client id for the login button.",
+    "managed": "fixed"
   },
   "VUE_APP_IS_GITHUB_LOGIN": {
     "group": "frontend",
-    "description": "Show the GitHub login button."
+    "description": "Show the GitHub login button.",
+    "managed": "fixed"
   },
   "VUE_APP_IS_GITLAB_LOGIN": {
     "group": "frontend",
-    "description": "Show the GitLab login button."
+    "description": "Show the GitLab login button.",
+    "managed": "fixed"
   },
   "VUE_APP_IS_GOOGLE_LOGIN": {
     "group": "frontend",
-    "description": "Show the Google login button."
+    "description": "Show the Google login button.",
+    "managed": "fixed"
   },
   "VUE_APP_MEASUREMENTID": {
     "group": "frontend",
-    "description": "Firebase analytics measurement id."
+    "description": "Firebase analytics measurement id.",
+    "managed": "fixed"
   },
   "VUE_APP_MESSAGINGSENDERID": {
     "group": "frontend",
-    "description": "Firebase messaging sender id."
+    "description": "Firebase messaging sender id.",
+    "managed": "fixed"
   },
   "VUE_APP_PROJECTID": {
     "group": "frontend",
-    "description": "Firebase project id."
+    "description": "Firebase project id.",
+    "managed": "fixed"
   },
   "VUE_APP_STORAGEBUCKET": {
     "group": "frontend",
-    "description": "Firebase storage bucket."
+    "description": "Firebase storage bucket.",
+    "managed": "fixed"
   },
   "VUE_APP_STORAGE_TYPE": {
     "group": "frontend",
-    "description": "Storage backend the web app assumes (server or wasabi); mirror STORAGE_TYPE."
+    "description": "Storage backend the web app assumes (server or wasabi); mirror STORAGE_TYPE.",
+    "managed": "fixed"
   },
   "VUE_APP_SUPPORT_PROJECTID": {
     "group": "frontend",
-    "description": "Project id that receives support tickets raised from the app."
+    "description": "Project id that receives support tickets raised from the app.",
+    "managed": "fixed"
   },
   "VUE_APP_USEREMAIL": {
     "group": "frontend",
-    "description": "Default account email pre-filled on demo builds."
+    "description": "Default account email pre-filled on demo builds.",
+    "managed": "dev"
   },
   "WASABIENDPOINT": {
     "group": "storage",
     "description": "Wasabi S3 endpoint.",
-    "default": "https://s3.wasabisys.com"
+    "default": "https://s3.wasabisys.com",
+    "managed": "platform"
   },
   "WASABI_ACCESS_KEY": {
     "group": "storage",
     "description": "Wasabi access key.",
-    "secret": true
+    "secret": true,
+    "managed": "platform"
   },
   "WASABI_REGION": {
     "group": "storage",
     "description": "Wasabi region.",
-    "default": "us-east-1"
+    "default": "us-east-1",
+    "managed": "platform"
   },
   "WASABI_SECRET_ACCESS_KEY": {
     "group": "storage",
     "description": "Wasabi secret access key.",
-    "secret": true
+    "secret": true,
+    "managed": "platform"
   },
   "WASABI_USERID": {
     "group": "storage",
-    "description": "Wasabi account user id used for IAM policies."
+    "description": "Wasabi account user id used for IAM policies.",
+    "managed": "platform"
   },
   "WEBHOOK_ALLOWED_PRIVATE_HOSTS": {
     "group": "security",
     "description": "Private hosts webhooks may post to: exact hostnames or CIDR ranges, comma-separated (empty by default, so every private host is refused). Also editable under Instance > Settings > Security. Link-local and cloud metadata addresses stay blocked, and a range can be no wider than /8 (IPv4) or /32 (IPv6).",
     "secret": false,
-    "required": false
+    "required": false,
+    "managed": "platform"
   },
   "WEBURL": {
     "group": "server",
     "description": "Public base URL of the web app, used in emails and CORS.",
-    "default": "http://localhost:4000"
+    "default": "http://localhost:4000",
+    "managed": "bootstrap"
   },
   "WORKFLOW_ENGINE": {
     "group": "jobs",
     "description": "Durable workflow runs for automation rules: \"off\" runs a rule through the automation runner exactly as before, \"on\" makes it a one-node workflow run with a lease, a claim and engine-scheduled retries.",
-    "default": "off"
+    "default": "off",
+    "managed": "fixed"
   },
   "WORKFLOW_LEASE_MS": {
     "group": "jobs",
-    "description": "How long a claimed workflow step run keeps its lease before another worker may reclaim it. Defaults to the agent run lock, so the two cannot drift."
+    "description": "How long a claimed workflow step run keeps its lease before another worker may reclaim it. Defaults to the agent run lock, so the two cannot drift.",
+    "managed": "fixed"
   },
   "WORKFLOW_HEARTBEAT_MS": {
     "group": "jobs",
-    "description": "How often a running workflow step renews its lease. Defaults to a third of WORKFLOW_LEASE_MS."
+    "description": "How often a running workflow step renews its lease. Defaults to a third of WORKFLOW_LEASE_MS.",
+    "managed": "fixed"
   },
   "WORKFLOW_TENANT_CONCURRENCY": {
     "group": "jobs",
     "description": "Workflow step runs one tenant may have claimed at once, counted across every worker.",
-    "default": "5"
+    "default": "5",
+    "managed": "fixed"
   },
   "WORKFLOW_MAX_ATTEMPTS": {
     "group": "jobs",
     "description": "Attempts a workflow step gets before a transient failure is given up on.",
-    "default": "3"
+    "default": "3",
+    "managed": "fixed"
   },
   "WORKFLOW_BACKOFF_MS": {
     "group": "jobs",
     "description": "Comma-separated backoff ladder, in milliseconds, a transient workflow step failure waits between attempts.",
-    "default": "30000,120000,600000"
+    "default": "30000,120000,600000",
+    "managed": "fixed"
   },
   "WORKFLOW_MAX_FAN_OUT": {
     "group": "jobs",
     "description": "Children one fan-out step may expand into. A workflow definition may ask for fewer, never more; over the bound the step fails instead of doing part of the work.",
-    "default": "50"
+    "default": "50",
+    "managed": "fixed"
   },
   "WORKFLOW_MAX_LOOP_ITERATIONS": {
     "group": "jobs",
     "description": "Iterations a loop step may re-enter its body for. The ceiling a definition's own maxIterations is capped to.",
-    "default": "25"
+    "default": "25",
+    "managed": "fixed"
   },
   "WORKFLOW_MAX_RUNS_PER_HOUR": {
     "group": "jobs",
     "description": "Agent runs an hour, per company and per agent, that a workflow loop may admit an iteration for. The ceiling a loop's own maxRunsPerHour and a rule's stored limits.maxRunsPerHour are capped to; 0 means no ceiling for the installation.",
-    "default": "0"
+    "default": "0",
+    "managed": "fixed"
   },
   "WORKFLOW_RUN_LIMIT_CACHE_MS": {
     "group": "jobs",
     "description": "How long an hour of an agent's run start times is trusted before it is read again. The hour rolls in memory between reads; this is only how quickly a run another process started is noticed.",
-    "default": "60000"
+    "default": "60000",
+    "managed": "fixed"
   },
   "WORKFLOW_RUN_DEADLINE_MS": {
     "group": "jobs",
     "description": "Ceiling on how long a whole workflow run may take, in milliseconds. Each step takes its share and hands on what is left; a step asking for more than remains is refused and the run is marked blocked. Unset means no ceiling.",
-    "default": ""
+    "default": "",
+    "managed": "fixed"
   },
   "WORKFLOW_RUN_BUDGET_USD": {
     "group": "jobs",
     "description": "Ceiling on what a whole workflow run may spend, in dollars. Each step's cost is taken off the run's remaining budget; a step asking for more than remains is refused and the run is marked blocked. Unset means no ceiling.",
-    "default": ""
+    "default": "",
+    "managed": "fixed"
   },
   "WORKFLOW_APPROVAL_POLL_MS": {
     "group": "jobs",
     "description": "How often a workflow step waiting on a human approval is looked at again. A decision wakes the step immediately; this is the floor that notices a deadline nobody answered.",
-    "default": "300000"
+    "default": "300000",
+    "managed": "fixed"
   },
   "WORKFLOW_JOIN_POLL_MS": {
     "group": "jobs",
     "description": "How often a fan-in join or a loop checks whether the steps it is waiting on have finished.",
-    "default": "2000"
+    "default": "2000",
+    "managed": "fixed"
   },
   "WORKFLOW_APPROVAL_DEADLINE_MS": {
     "group": "jobs",
     "description": "Deadline given to an approval step whose definition names none, so a run cannot wait forever on a decision nobody will make.",
-    "default": "259200000"
+    "default": "259200000",
+    "managed": "fixed"
   },
   "KNOWLEDGE_VECTOR_STORE": {
     "group": "ai",
     "description": "Where hybrid knowledge retrieval searches vectors: \"local\" scores the newest chunks of each source in process from the tenant database (any MongoDB); \"atlas\", for hosted deployments on MongoDB Atlas, searches the same chunk rows with Atlas Vector Search through one knowledge_chunks_vector index in the database of each tenant whose knowledgeRetrieval mode is \"hybrid\", created or checked in the background at tenant creation and by the knowledge.backfill job (which also creates it once a tenant switches to hybrid), with the index state shown in the instance knowledge console. Atlas caps the number of search indexes a cluster may hold, lower on shared and free tiers, so check the tier's limit against the number of hybrid tenants. While a tenant's index is being checked, missing, building or the wrong size, or Atlas cannot answer, questions are answered from the lexical side. Any other value is read as \"local\".",
-    "default": "local"
+    "default": "local",
+    "managed": "fixed"
   },
   "KNOWLEDGE_ATLAS_NUM_CANDIDATES": {
     "group": "ai",
     "description": "With KNOWLEDGE_VECTOR_STORE=atlas, the fewest nearest chunks Atlas considers per source type for a question ($vectorSearch numCandidates); raised to KNOWLEDGE_ATLAS_CANDIDATE_RATIO times the limit when that is more, and at most 10000.",
-    "default": "1000"
+    "default": "1000",
+    "managed": "fixed"
   },
   "KNOWLEDGE_ATLAS_VECTOR_LIMIT": {
     "group": "ai",
     "description": "With KNOWLEDGE_VECTOR_STORE=atlas, how many chunks per source type Atlas returns for a question ($vectorSearch limit) before they are narrowed by access and collapsed to one passage per source; never fewer than the passages asked for.",
-    "default": "100"
+    "default": "100",
+    "managed": "fixed"
   },
   "KNOWLEDGE_ATLAS_MAX_TIME_MS": {
     "group": "ai",
     "description": "With KNOWLEDGE_VECTOR_STORE=atlas, how long, in milliseconds, one vector search may run before the question is answered from the lexical side (the backend then reads \"lexical (vector store timed out)\").",
-    "default": "3000"
+    "default": "3000",
+    "managed": "fixed"
   },
   "KNOWLEDGE_EMBEDDING_DIMENSIONS": {
     "group": "ai",
     "description": "With KNOWLEDGE_VECTOR_STORE=atlas, the vector size the Atlas index is built for. Leave unset to take it from a stored vector of KNOWLEDGE_EMBEDDING_MODEL, or from the model (1536 for text-embedding-3-small, 3072 for text-embedding-3-large); set it for any other model. A value that disagrees with a stored vector of the model, or with the model's known size, builds no index: the console shows the index as the wrong size and questions stay lexical.",
-    "default": ""
+    "default": "",
+    "managed": "fixed"
   },
   "KNOWLEDGE_ATLAS_CANDIDATE_RATIO": {
     "group": "ai",
     "description": "With KNOWLEDGE_VECTOR_STORE=atlas, how many candidates Atlas considers for each chunk it returns (numCandidates is at least this times the limit, at most 10000).",
-    "default": "10"
+    "default": "10",
+    "managed": "fixed"
   },
   "KNOWLEDGE_ATLAS_THIN_RESULTS": {
     "group": "ai",
     "description": "With KNOWLEDGE_VECTOR_STORE=atlas, when Atlas returns a full limit of chunks but fewer than this many passages survive the access check, the answer's backend reads \"lexical+vector-atlas(thin)\", so a vector side crowded out by chunks the asker may not see is visible.",
-    "default": "3"
+    "default": "3",
+    "managed": "fixed"
   },
   "KNOWLEDGE_ATLAS_INDEX_TIMEOUT_MS": {
     "group": "ai",
     "description": "With KNOWLEDGE_VECTOR_STORE=atlas, how long, in milliseconds, each step of a tenant's index check (listing, creating or updating the search index, reading a stored vector) may take before the check records the index state as timed out. Questions never wait on a check.",
-    "default": "5000"
+    "default": "5000",
+    "managed": "fixed"
   },
   "KNOWLEDGE_ATLAS_INDEX_BUDGET_MS": {
     "group": "ai",
     "description": "With KNOWLEDGE_VECTOR_STORE=atlas, how long, in milliseconds, the knowledge.backfill job gives one tenant's index check before moving on; tenants are checked four at a time.",
-    "default": "30000"
+    "default": "30000",
+    "managed": "fixed"
   },
   "MCP_OAUTH": {
     "group": "security",
     "description": "Set to both (on, true, 1 and yes mean the same) or only to run the OAuth 2.1 authorization server for the MCP endpoint (MCP authorization spec 2025-11-25): GET /.well-known/oauth-authorization-server, /oauth/authorize (authorization code with PKCE S256 only, resource required and equal to <issuer>/mcp, exact redirect URI match except that an http loopback redirect may use any port, https or loopback redirects; scope may be left out for read-only access), /oauth/token (single-use codes, rotating refresh tokens, a reused code or refresh token revokes its whole grant), /oauth/revoke (RFC 7009), and /api/v2/oauth-clients for workspace owners and admins to pre-register clients. Clients may also identify themselves with a client ID metadata document, fetched through the agents' SSRF-safe fetch (5 KB, 5 s, no redirects, one fetch per URL at a time, a failed URL retried after 5 s). Codes, tokens and client secrets are stored only as keyed hashes; every token is bound to one workspace, one person and the /mcp resource. A person answers each authorization on the consent screen, choosing one workspace in which an owner or admin has approved the client (Settings, Agent clients); revoking that approval, or the person revoking the grant under Accounts, Connected apps, ends it on the next call. On the resource side, GET /.well-known/oauth-protected-resource and /.well-known/oauth-protected-resource/mcp (RFC 9728) name the /mcp resource, this authorization server and the scopes tasks:read tasks:write projects:read docs:read time:read time:write, with tasks:manage and docs:manage added while MCP_TOOLS_MANAGE is on; a 401 from /mcp carries resource_metadata and the scopes the call needs; a call whose token lacks a scope answers 403 insufficient_scope naming it; access tokens in the query string are refused; initialize also negotiates protocol version 2025-11-25. /mcp accepts these access tokens in the Authorization header only: the token must be live, bound to the <issuer>/mcp resource, its grant unrevoked and within its cap, its client unrevoked; the token's workspace is the only workspace, so a companyId in the query or header naming another is refused with 403; its scopes decide every tool; a session cookie or Mcp-Session-Id is never authorization; the token is never forwarded to any outbound call; actions are audited as the outside client acting for the person who granted it (viaAccount external, clientId, grantId, delegatedBy), the API activity log names the client, and they count as tainted, so under AGENT_TAINT_ROUTING a risky write is refused with a reason saying it needs a person's approval, or, when the token holds the manage scope the tool needs, filed as a proposal that a person approves only while the grant is live and still holds that scope, the client is still approved for it, and the person still has a seat and can open the target; the manage scopes are never implied: a token holds tasks:manage or docs:manage only when the client asked for it, the person ticked it on the consent screen, where it starts unticked, and an owner or admin approved it for that client by name; an approval that names no scopes never includes them, a pre-registered client that named no scopes cannot be given them, and taking the scope out of the approval or the person withdrawing it takes effect on the next call; an unsupported MCP-Protocol-Version header is answered 400. With both, personal access tokens keep working (read grants every *:read scope, write every *:write, neither a manage scope); with only, a personal access token gets 401 with the challenge. Unset means both on a new install, unless the issuer (MCP_OAUTH_ISSUER or APIURL) is not one the server could boot with: then it stays off and the server says why in one startup log line. Set to off (false, 0 or no) to register none of these routes, and /mcp answers exactly as before. Dynamic client registration stays off unless MCP_OAUTH_DCR is on. An install that already had a workspace before this default changed keeps it off: migration 074 records off in the instance settings (Settings, Instance, AI), where an owner can turn it on.",
-    "default": "both"
+    "default": "both",
+    "managed": "customer"
   },
   "MCP_OAUTH_DCR": {
     "group": "security",
     "description": "With MCP_OAUTH on, set to on to open RFC 7591 dynamic client registration at /oauth/register and advertise it in the server metadata. Off by default: clients use a client ID metadata document or are pre-registered by a workspace owner or admin.",
-    "default": "off"
+    "default": "off",
+    "managed": "fixed"
   },
   "MCP_OAUTH_ISSUER": {
     "group": "security",
-    "description": "Issuer URL of the MCP authorization server, and the base of its endpoints and of the /mcp resource tokens are bound to. Defaults to APIURL. It must be an origin (no path, query or fragment) and https; plain http is accepted only on localhost, 127.0.0.1 or [::1] while NODE_ENV is unset, development or test. With MCP_OAUTH on, any other value stops the server at boot."
+    "description": "Issuer URL of the MCP authorization server, and the base of its endpoints and of the /mcp resource tokens are bound to. Defaults to APIURL. It must be an origin (no path, query or fragment) and https; plain http is accepted only on localhost, 127.0.0.1 or [::1] while NODE_ENV is unset, development or test. With MCP_OAUTH on, any other value stops the server at boot.",
+    "managed": "fixed"
   },
   "MCP_OAUTH_ACCESS_TOKEN_MINUTES": {
     "group": "security",
     "description": "Lifetime of an MCP OAuth access token, in minutes. Never longer than the grant it belongs to.",
-    "default": "15"
+    "default": "15",
+    "managed": "fixed"
   },
   "MCP_OAUTH_REFRESH_TOKEN_DAYS": {
     "group": "security",
     "description": "Lifetime of an MCP OAuth refresh token, in days. Each use spends it and issues a new one; never longer than the grant it belongs to.",
-    "default": "30"
+    "default": "30",
+    "managed": "fixed"
   },
   "MCP_OAUTH_GRANT_MAX_DAYS": {
     "group": "security",
     "description": "Longest an MCP OAuth grant lives, in days, however often its refresh token is rotated; after it the person authorizes the client again.",
-    "default": "90"
+    "default": "90",
+    "managed": "fixed"
   },
   "MCP_OAUTH_RATE_LIMIT_PER_MIN": {
     "group": "security",
     "description": "Requests per minute per client address to /oauth/authorize, and separately to /oauth/token with /oauth/revoke, before the MCP authorization server answers 429.",
-    "default": "30"
+    "default": "30",
+    "managed": "fixed"
   },
   "MCP_OAUTH_CLIENT_METADATA_CACHE_SECONDS": {
     "group": "security",
     "description": "How long a fetched client ID metadata document is cached when it sends no Cache-Control max-age (a max-age is followed up to a day; no-store is never cached).",
-    "default": "300"
+    "default": "300",
+    "managed": "fixed"
   },
   "MCP_OAUTH_TOKEN_SECRET": {
     "group": "security",
     "description": "Key for the keyed hashes under which MCP OAuth codes, tokens and client secrets are stored, separate from JWT_SECRET, which is used when this is unset. Changing it invalidates every issued token and every pre-registered client secret.",
-    "secret": true
+    "secret": true,
+    "managed": "fixed"
   },
   "AI_ENABLED": {
     "group": "ai",
     "description": "The instance-wide AI switch. Set to false to stop every AI call on this instance: no prompt, text or audio is sent to any model provider, AI screens say AI is turned off, agent runs are refused and knowledge chunks are written without vectors. Each workspace also has its own switch (Settings, owners and admins), stored on the company as aiSwitch.enabled; either one being off is enough. Also settable under Instance > Settings > AI.",
-    "default": "true"
+    "default": "true",
+    "managed": "customer"
   },
   "OPENAI_BASE_URL": {
     "group": "ai",
     "description": "Base URL for every OpenAI call (chat completions, embeddings, speech-to-text and the Test connection probe), for a proxy or a regional endpoint. OPENAI_EMBEDDINGS_URL still wins for embeddings when set. For a self-hosted model use the OpenAI-compatible provider instead.",
-    "default": "https://api.openai.com/v1"
+    "default": "https://api.openai.com/v1",
+    "managed": "customer"
   },
   "OPENAI_COMPATIBLE_BASE_URL": {
     "group": "ai",
     "description": "Base URL of a server that speaks the OpenAI Chat Completions and Embeddings API on your own network: Ollama (http://localhost:11434/v1), vLLM (http://host:8000/v1), LM Studio (http://host:1234/v1), LiteLLM or a company gateway. Select it with LLM_PROVIDER=openai_compatible. Loopback and private addresses are allowed for this one URL (it is set by the instance owner, never by a workspace user) through a dedicated client that refuses link-local and cloud metadata addresses, credentials or a query in the URL, and every redirect; agent fetches and webhooks keep their own private-address rules. While this provider answers chat, embeddings and speech-to-text go to it too and never to OpenAI, and it never fails over to another provider.",
-    "default": ""
+    "default": "",
+    "managed": "customer"
   },
   "OPENAI_COMPATIBLE_API_KEY": {
     "group": "ai",
     "description": "Optional bearer key for the OpenAI-compatible server; leave empty for Ollama or LM Studio. A workspace can bring its own under Settings > Routing policy when TENANT_PROVIDER_KEYS is on.",
-    "default": ""
+    "default": "",
+    "managed": "customer"
   },
   "OPENAI_COMPATIBLE_MODEL": {
     "group": "ai",
     "description": "Chat model name the OpenAI-compatible server knows (e.g. llama3.1:8b). With OPENAI_COMPATIBLE_BASE_URL set it is priced at 0 unless LLM_PRICING names a price, so it is never refused as unpriced; a model id that already has a vendor price keeps it.",
-    "default": ""
+    "default": "",
+    "managed": "customer"
   },
   "OPENAI_COMPATIBLE_EMBEDDINGS_MODEL": {
     "group": "ai",
     "description": "Embeddings model on the OpenAI-compatible server, used for knowledge search when that provider answers chat (e.g. nomic-embed-text, 768 dimensions). Priced at 0 like the chat model. Vectors are stored with their model name and a search only compares vectors of the current model, so a model with a different vector size is fine; changing the model means re-embedding each workspace under Instance > Knowledge. A server that starts answering the same model name with a different vector size is refused with that advice. With KNOWLEDGE_VECTOR_STORE=atlas set KNOWLEDGE_EMBEDDING_DIMENSIONS, or let the first stored vector decide. Without it, knowledge search stays lexical: embeddings never fall back to OpenAI.",
-    "default": ""
+    "default": "",
+    "managed": "customer"
   },
   "OPENAI_COMPATIBLE_MAX_OUTPUT_TOKENS": {
     "group": "ai",
     "description": "Output token ceiling sent to the OpenAI-compatible server as max_tokens. Local models often have an 8k context and vLLM refuses a max_tokens that does not fit; raise it for a model with a larger context.",
-    "default": "8192"
+    "default": "8192",
+    "managed": "fixed"
   },
   "OPENAI_COMPATIBLE_TIMEOUT_MS": {
     "group": "ai",
     "description": "Per-request timeout for the OpenAI-compatible server. Defaults to LLM_TIMEOUT_MS, since local inference is slow.",
-    "default": ""
+    "default": "",
+    "managed": "fixed"
   },
   "WHISPER_MODEL": {
     "group": "ai",
     "description": "Speech-to-text model for Talk to text. Audio goes to the OpenAI-compatible server when it answers chat (its /audio/transcriptions), otherwise to OpenAI at OPENAI_BASE_URL.",
-    "default": "whisper-1"
+    "default": "whisper-1",
+    "managed": "fixed"
   },
   "WHISPER_USD_PER_MINUTE": {
     "group": "ai",
     "description": "What a minute of Talk to text audio costs, in USD, booked to the workspace AI budget as feature transcription. Unset, audio sent to OpenAI is booked at whisper-1's list price (0.006) and audio sent to the OpenAI-compatible server at 0. Set it when WHISPER_MODEL names a model with another price.",
-    "default": "0.006"
+    "default": "0.006",
+    "managed": "fixed"
   },
   "AI_FIELD_BULK_MAX": {
     "group": "ai",
     "description": "Most tasks one AI field bulk fill may take; a larger selection is refused before any model call.",
-    "default": "200"
+    "default": "200",
+    "managed": "fixed"
   },
   "AI_FIELD_DAILY_LIMIT": {
     "group": "ai",
     "description": "AI field fills a workspace may make per UTC day, counted from the spend ledger; a bulk fill stops when it is reached.",
-    "default": "500"
+    "default": "500",
+    "managed": "customer"
   },
   "AI_FIELD_REFILL_DEBOUNCE_MS": {
     "group": "ai",
     "description": "How long an AI field with auto-refill waits after the last change to a task part it reads before it fills again.",
-    "default": "60000"
+    "default": "60000",
+    "managed": "fixed"
   },
   "WORKSPACE_GUIDE_AUTO_CREATE": {
     "group": "ai",
     "description": "Whether each workspace created from now on gets the built-in Workspace Guide agent. \"true\" (the default) adds it at creation; \"false\" adds none until an owner or admin adds it from the Team board. Existing workspaces are never changed by this setting, and a guide an admin removed is not made again.",
-    "default": "true"
+    "default": "true",
+    "managed": "customer"
   },
   "HOSTING_MODE": {
     "group": "general",
     "description": "self (the default) or managed. managed turns this into an AlianHub Cloud instance: the platform sets URLs, mail, storage, proxy and security values, which the Instance console then shows locked; the setup wizard, in-app billing and the backup, upgrade and log screens close. The server refuses to start in managed mode when INSTANCE_ID, PLATFORM_API_KEY, PLATFORM_PUBLIC_KEY, PLATFORM_URL, WEBURL or JWT_SECRET is missing or malformed, and on any other value here.",
-    "default": "self"
+    "default": "self",
+    "managed": "bootstrap"
   },
   "INSTANCE_ID": {
     "group": "general",
-    "description": "With HOSTING_MODE=managed, this instance's id on the AlianHub Cloud platform: ins_ followed by 20 to 32 lowercase letters or digits."
+    "description": "With HOSTING_MODE=managed, this instance's id on the AlianHub Cloud platform: ins_ followed by 20 to 32 lowercase letters or digits.",
+    "managed": "bootstrap"
   },
   "PLATFORM_URL": {
     "group": "general",
-    "description": "With HOSTING_MODE=managed, the https:// address of the AlianHub Cloud platform; also the account portal the app links to until entitlements name one."
+    "description": "With HOSTING_MODE=managed, the https:// address of the AlianHub Cloud platform; also the account portal the app links to until entitlements name one.",
+    "managed": "bootstrap"
   },
   "PLATFORM_PUBLIC_KEY": {
     "group": "security",
-    "description": "With HOSTING_MODE=managed, the Ed25519 public key that verifies what the platform signs: PEM, or base64 of the raw 32-byte key or of its SPKI DER."
+    "description": "With HOSTING_MODE=managed, the Ed25519 public key that verifies what the platform signs: PEM, or base64 of the raw 32-byte key or of its SPKI DER.",
+    "managed": "bootstrap"
   },
   "PLATFORM_API_KEY": {
     "group": "security",
     "description": "With HOSTING_MODE=managed, the key the platform presents to this instance; at least 32 characters.",
-    "secret": true
+    "secret": true,
+    "managed": "bootstrap"
   }
 }
