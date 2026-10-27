@@ -75,6 +75,7 @@ async function activityOf(excludedUserIds, now) {
 }
 
 async function buildUsage(now = Date.now()) {
+    await require('../../Config/lastSeen').flushSeen();
     const entitlements = currentEntitlements();
     const limits = entitlements.limits || {};
     const timeTracker = (entitlements.features && entitlements.features.timeTracker) || {};
