@@ -5,6 +5,8 @@ import { commentPlainText } from "@/utils/commentHtml";
 
 const clip = (value, max = 200) => String(value === undefined || value === null ? "" : value).slice(0, max);
 const DOC_COMMENT_KEYS = ["doc_comment_mention", "doc_comment_reply", "doc_comment_assigned"];
+const APPROVAL_KINDS = ["agent", "edit", "skill"];
+const approvalKindOf = (data) => (APPROVAL_KINDS.includes(data.kind) ? data.kind : "agent");
 
 const dayOf = (value) => {
     const date = new Date(value || "");
@@ -22,6 +24,13 @@ export const renderNotice = (it, { t, changeText }) => {
     }
     if (it.changeType === "agent_report" && REPORT_KEYS.includes(data.report)) {
         return escapeHtml(t("Inbox.agent_report", { agent: clip(data.agentName) || t("AiAlerts.unnamed_agent"), report: t(`Ai.report_${data.report}`) }));
+    }
+    if (it.changeType === "agent_approval_requested") {
+        return escapeHtml(t(`Inbox.agent_approval_requested_${approvalKindOf(data)}`, { name: clip(data.agentName) || t("AiAlerts.unnamed_agent") }));
+    }
+    if (it.changeType === "agent_approval_decided") {
+        const answer = escapeHtml(t(`Inbox.agent_approval_${data.approved ? "approved" : "declined"}_${approvalKindOf(data)}`, { name: clip(data.agentName) || t("AiAlerts.unnamed_agent") }));
+        return data.approved || !data.reason ? answer : `${answer} ${escapeHtml(t("Inbox.agent_approval_reason", { reason: clip(data.reason, 500) }))}`;
     }
     if (it.changeType === "oauth_client_approval") {
         return escapeHtml(t("Inbox.oauth_client_approval", { client: data.clientName || t("Inbox.unnamed_client") }));

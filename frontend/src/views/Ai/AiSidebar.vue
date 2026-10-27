@@ -81,7 +81,7 @@ const route = useRoute();
 const companyId = inject("$companyId");
 const { waiting, spend, pauseAll } = useAgents();
 const { running, refresh: refreshLive } = useLiveAgents();
-const { canManage } = useAgentAccess();
+const { canManage, canBuild, seesSkills, canAsk, canConnectOwnAi } = useAgentAccess();
 // The same policy the card in AI > Accounts sets (WorkspaceConnectedPause), so the two never disagree.
 const { policy, loadPolicy, saveConnectedPaused } = useAccounts();
 const socket = inject("$socket", null);
@@ -91,13 +91,14 @@ const connectedApps = ref(0);
 const paused = computed(() => Boolean(policy.value.connectedPaused));
 const canBeAtWork = computed(() => running.value > 0 || connectedApps.value > 0);
 
+// Each entry follows its row of Security & Permissions; the API refuses the rest anyway.
 const everyday = computed(() => [
-    { name: "AiAsk", label: "Parity.nav_ask", icon: "ai" },
+    ...(canAsk.value ? [{ name: "AiAsk", label: "Parity.nav_ask", icon: "ai" }] : []),
     { name: "AiInbox", label: "Ai.inbox", icon: "inbox", count: waiting.value },
     { name: "AiHub", label: "Ai.agents", icon: "agent" },
-    { name: "AiSkills", label: "Ai.skills", icon: "docs" },
+    ...(seesSkills.value || canBuild.value ? [{ name: "AiSkills", label: "Ai.skills", icon: "docs" }] : []),
     { name: "Connections", label: "Parity.nav_connections", icon: "integrations" },
-    { name: CONNECT_AI_ROUTE, label: "ConnectAi.title", icon: "key" }
+    ...(canConnectOwnAi.value ? [{ name: CONNECT_AI_ROUTE, label: "ConnectAi.title", icon: "key" }] : [])
 ]);
 
 const setup = computed(() => [

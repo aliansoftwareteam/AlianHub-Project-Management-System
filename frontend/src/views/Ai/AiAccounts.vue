@@ -240,7 +240,8 @@
                             <section class="ah-card">
                                 <div class="ah-card__head">
                                     <span class="ah-h3">{{ $t('Accounts.tokens_title') }}</span>
-                                    <button v-if="!minting" type="button" class="ah-btn ah-btn--primary ah-btn--sm" @click="minting = true">{{ $t('Accounts.new_token') }}</button>
+                                    <span v-if="!canConnectOwnAi" class="ah-small" data-test="mint-not-allowed">{{ $t('AgentAccess.own_ai_not_allowed') }}</span>
+                                    <button v-else-if="!minting" type="button" class="ah-btn ah-btn--primary ah-btn--sm" @click="minting = true">{{ $t('Accounts.new_token') }}</button>
                                 </div>
                                 <div class="ah-card__body">
                                     <div v-if="minted" class="acct-secret">
@@ -547,6 +548,7 @@ import { reasonOf } from "./useAgents";
 import { skillLabel } from "./plainLabels";
 import { mcpUrlFor } from "./mcpUrl";
 import { isOwnerOrAdmin } from "@/utils/roles";
+import { AI_RIGHT, useAiRights } from "@/composable/aiRights";
 
 // Coding-agent accounts (27a-d) and the CLI setup panel (26a). Every claim on
 // this page is one the backend actually makes: the modes and the policy come
@@ -565,6 +567,7 @@ const {
     loadAccount, loadTokens, loadTokensNeedingExpiry, loadStepCredentials, loadManifest, loadRuns, loadPeopleHours,
     savePolicy, linkAccount, unlinkAccount, mintToken, revokeToken, renewToken
 } = useAccounts();
+const canConnectOwnAi = useAiRights().mayUse(AI_RIGHT.EXTERNAL_CLIENTS);
 
 const oauthOn = ref(false);
 oauthAvailable().then((on) => { oauthOn.value = on; });

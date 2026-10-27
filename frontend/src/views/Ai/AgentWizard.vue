@@ -89,6 +89,7 @@
                             <span class="ah-field__hint">{{ $t('Ai.scope_lead') }}</span>
                             <p v-if="whyOf('scope')" class="ah-small aw__why" data-test="why-scope">{{ whyOf('scope') }}</p>
                         </div>
+                        <AgentAudience v-model:visibility="form.visibility" v-model:sharedWith="form.sharedWith" />
                         <div class="ah-field">
                             <label class="ah-field__label" for="aw-cap">{{ $t('Ai.spend_cap') }}</label>
                             <input id="aw-cap" v-model.number="form.spendCapUsd" type="number" min="0" step="1" class="ah-input" />
@@ -96,6 +97,7 @@
                         </div>
                     </template>
 
+                    <p v-if="step === 3 && !canManage" class="ah-small aw__why" data-test="wizard-approval">{{ $t('AgentAccess.waits_for_approval') }}</p>
                     <div v-if="errors.form" class="ah-field__error">{{ errors.form }}</div>
                 </div>
 
@@ -104,7 +106,7 @@
                     <div class="ah-toolbar__spacer"></div>
                     <button type="button" class="ah-btn ah-btn--secondary" @click="$emit('close')">{{ $t('Ai.cancel') }}</button>
                     <button v-if="step < 3" type="button" class="ah-btn ah-btn--primary" @click="next">{{ $t('Ai.next') }}</button>
-                    <button v-else type="button" class="ah-btn ah-btn--primary" :disabled="busy" @click="create">{{ busy ? $t('Ai.creating') : $t('Ai.create_agent') }}</button>
+                    <button v-else type="button" class="ah-btn ah-btn--primary" :disabled="busy || !audienceChosen" @click="create">{{ busy ? $t('Ai.creating') : (canManage ? $t('Ai.create_agent') : $t('AgentAccess.submit_for_approval')) }}</button>
                 </div>
             </div>
         </div>
@@ -123,6 +125,9 @@ import { actionLabel, autonomyAbout, autonomyName, autonomyTip, skillAbout, skil
 import { blankSchedule, describeSchedule, schedulePayload, scheduleForm, viewerTimeZone } from "./agentSchedule";
 import { apiRequest } from "@/services";
 import * as env from "@/config/env";
+import { useToast } from "vue-toast-notification";
+import AgentAudience from "./AgentAudience.vue";
+import { useAgentAccess } from "./agentAccess";
 
 defineOptions({ name: "AgentWizard" });
 
@@ -135,6 +140,8 @@ const SCHEDULED = 3;
 const { t } = useI18n();
 const { getters } = useStore();
 const { registryManifest, loadRegistry, saveAgent, skillManifest, loadSkills } = useAgents();
+const { canManage } = useAgentAccess();
+const $toast = useToast();
 const projects = computed(() => (getters["projectData/projects"]?.data || []).filter((p) => !p.deletedStatusKey));
 
 const step = ref(1);
@@ -159,9 +166,12 @@ const initialForm = (prefill) => ({
     allowedActions: [...(prefill?.allowedActions?.length ? prefill.allowedActions : NEW_AGENT_DEFAULTS.allowedActions)],
     autonomy: prefill && WIZARD_LEVELS.includes(prefill.autonomy) ? prefill.autonomy : NEW_AGENT_DEFAULTS.autonomy,
     spendCapUsd: Number(prefill?.spendCapUsd) > 0 ? Number(prefill.spendCapUsd) : NEW_AGENT_DEFAULTS.spendCapUsd,
-    projectIds: prefill ? openProjectIds(prefill.projectIds) : [...NEW_AGENT_DEFAULTS.projectIds]
+    projectIds: prefill ? openProjectIds(prefill.projectIds) : [...NEW_AGENT_DEFAULTS.projectIds],
+    visibility: "private",
+    sharedWith: { userIds: [], teamIds: [] }
 });
 const form = reactive(initialForm(props.prefill));
+const audienceChosen = computed(() => form.visibility !== "shared" || form.sharedWith.userIds.length + form.sharedWith.teamIds.length > 0);
 
 // Only a template brings a schedule; a builder draft never does, so a sentence cannot make an agent run unattended.
 const prefillSchedule = computed(() => (props.prefill && props.prefill.source === "template" && props.prefill.schedule) || null);
@@ -210,9 +220,12 @@ const create = async () => {
             autonomy: form.autonomy,
             spendCapUsd: form.spendCapUsd,
             projectIds: form.projectIds,
+            visibility: form.visibility,
+            sharedWith: form.sharedWith,
             skills: skillKeys.value.map((key) => ({ key, name: key, actions: form.allowedActions, enabled: true }))
         });
         if (scheduleOn.value && created && created._id) await saveSchedule(created._id);
+        if (created && created.approval && created.approval.state === "pending") $toast.info(t("AgentAccess.sent_for_approval", { name: created.name }), { position: "top-right" });
         emit("created");
     } catch (e) {
         errors.form = e.message;

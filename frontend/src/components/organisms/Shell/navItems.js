@@ -4,7 +4,7 @@ import { useStore } from "vuex";
 import { useCustomComposable } from "@/composable";
 import { isAiSectionRoute } from "@/router/ai/section";
 import { CONNECT_AI_ROUTE } from "@/router/ai/connect";
-import { aiReachable, canUseAi } from "@/composable/aiAvailability";
+import { aiAvailability, aiReachable, canUseAi } from "@/composable/aiAvailability";
 import { isOwnerOrAdmin as isOwnerOrAdminRole } from "@/utils/roles";
 import { canApprove } from "@/views/Approvals/approvalAccess";
 import { keepOnRail, shellState } from "./shellState";
@@ -103,7 +103,7 @@ export function useNavItems(companyId) {
     const inSimple = (item) => {
         if (item.key === "everything") return { ...item, label: "Shell.my_work", to: to("Everything", { query: { mine: "1" } }) };
         // Where the built-in AI cannot answer this person (no model on the server, say), Ask leads to connecting their own.
-        if (item.key === "ai") return { ...item, label: "Shell.ask", to: !canUseAi() && exists(CONNECT_AI_ROUTE) ? to(CONNECT_AI_ROUTE) : item.to };
+        if (item.key === "ai") return { ...item, label: "Shell.ask", to: !canUseAi() && aiAvailability.assistantAllowed !== false && exists(CONNECT_AI_ROUTE) ? to(CONNECT_AI_ROUTE) : item.to };
         return item;
     };
     const rail = computed(() => {
