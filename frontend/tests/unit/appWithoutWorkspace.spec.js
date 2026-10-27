@@ -77,6 +77,7 @@ const PAGES_THAT_NEED_NO_WORKSPACE = [
     ['the verify e-mail link', '/verify-email/u2/token-1', 'Verify_Email'],
     ['the reset password link', '/reset-password/token-1', 'Reset_Password'],
     ['the set a new password link', '/set-new-password/token-1', 'Set_New_Password'],
+    ['the activation link of a hosted owner', '/activate?token=token-1', 'Activate'],
 ];
 
 describe('a signed-in person', () => {
