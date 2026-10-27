@@ -1,3 +1,4 @@
+const { randomUUID } = require('crypto');
 const { SCHEMA_TYPE } = require('../../../Config/schemaType');
 const { ACTIVE_SEAT } = require('../../../Config/seatStatus');
 const { ROLE_OWNER, ROLE_ADMIN } = require('../../../Config/roleTypes');
@@ -23,7 +24,7 @@ const sendNotice = async (companyId, recipients, { key, type, message, changeDat
         const row = {
             key, type, changeType: key, message, changeData: changeData || {},
             projectId: scope, taskId: '', userId: String(from || ''), companyId: String(companyId),
-            assigneeUsers: [receiverID], notSeen: [receiverID], receiverID,
+            assigneeUsers: [receiverID], notSeen: [receiverID], receiverID, uniqueId: randomUUID(),
             notificationType: 'push', isSchedule: false, isSeen: false, notificationStatus: 'in-process', createdAt: now, updatedAt: now,
         };
         try {
