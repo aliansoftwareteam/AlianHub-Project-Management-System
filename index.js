@@ -262,5 +262,6 @@ async function applySavedSettings() {
         console.log("Server ready on " + config.PORT);
     });
     require('./Modules/Agents/engine/timeouts').applyServerTimeouts(server);
+    require('./Modules/Instance/restart').attach(server);
     initSocket(server);
 })();

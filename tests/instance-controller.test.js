@@ -108,7 +108,7 @@ afterEach(() => {
 describe('access and settings', () => {
     it('access reports how the caller got in', async () => {
         const res = await run(ctrl.access, { instanceAdmin: 'key' });
-        expect(res.body).toEqual({ status: true, statusText: 'Instance admin.', data: { allowed: true, via: 'key' } });
+        expect(res.body).toEqual({ status: true, statusText: 'Instance admin.', data: { allowed: true, via: 'key', managed: false } });
     });
 
     it('getSettings lists the groups, the described settings and whether they are loaded', async () => {
@@ -337,6 +337,62 @@ describe('health', () => {
         process.env.CRON_TZ = 'Asia/Kolkata';
         const res = await run(ctrl.health);
         expect(res.body.data.cron).toMatchObject({ enabled: false, tz: 'Asia/Kolkata' });
+    });
+
+    describe('on a hosted instance', () => {
+        const hostingMode = require('../Config/hostingMode');
+        const saved = { mode: process.env.HOSTING_MODE, platform: process.env.PLATFORM_URL };
+        beforeEach(() => {
+            hostingMode._resetForTests();
+            process.env.HOSTING_MODE = 'managed';
+            process.env.PLATFORM_URL = 'https://account.alianhub.com';
+            PROBES.storage.mockResolvedValue({ status: true, statusText: 'Bucket tenant-bucket-7 is reachable.' });
+            state.cron = { reminders: { lastRunAt: new Date('2026-10-28T02:00:00Z'), ok: false, error: 'connect ECONNREFUSED 10.0.0.7:27017' } };
+        });
+        afterEach(() => {
+            for (const [key, value] of [['HOSTING_MODE', saved.mode], ['PLATFORM_URL', saved.platform]]) {
+                if (value === undefined) delete process.env[key]; else process.env[key] = value;
+            }
+            state.cron = {};
+            hostingMode._resetForTests();
+        });
+
+        it('shows the owner green or red per part and nothing that names our side of the stack', async () => {
+            process.env.NODEMAILER_HOST = 'smtp.internal.alianhub';
+            PROBES.mail.mockResolvedValue({ status: true, statusText: 'SMTP login to smtp.internal.alianhub:587 succeeded.' });
+            const { data } = (await run(ctrl.health, { instanceAdmin: 'owner', query: { probe: 'mail' } })).body;
+            expect(data).toEqual({
+                managed: true,
+                status: 'ok',
+                version: '14.36.0-beta.9',
+                maintenance: false,
+                db: { ok: true },
+                storage: { ok: true },
+                mail: { configured: true, ok: true },
+                agenda: { pending: undefined, failed: undefined },
+                cron: { enabled: true, tz: 'UTC', jobs: { reminders: { lastRunAt: new Date('2026-10-28T02:00:00Z'), ok: false } } },
+                portalUrl: 'https://account.alianhub.com',
+            });
+            expect(JSON.stringify(data)).not.toMatch(/tenant-bucket|smtp\.internal|10\.0\.0\.7|nodeVersion|memoryRss/);
+        });
+
+        it('keeps the full answer for the platform', async () => {
+            const { data } = (await run(ctrl.health, { instanceAdmin: 'platform' })).body;
+            expect(data.storage.detail).toBe('Bucket tenant-bucket-7 is reachable.');
+            expect(data.nodeVersion).toBe(process.version);
+        });
+
+        it('trims host details from the stats for the owner but keeps the counts', async () => {
+            MongoDbCrudOpration.mockResolvedValueOnce(2).mockResolvedValueOnce(9);
+            const { data } = (await run(ctrl.stats, { instanceAdmin: 'owner' })).body;
+            expect(data).toMatchObject({ companies: 2, users: 9, version: '14.36.0-beta.9' });
+            expect(data).not.toHaveProperty('nodeVersion');
+            expect(data).not.toHaveProperty('uptimeSeconds');
+        });
+
+        it('says so in the access check, so the console can hide what it closed', async () => {
+            expect((await run(ctrl.access, { instanceAdmin: 'owner' })).body.data).toEqual({ allowed: true, via: 'owner', managed: true });
+        });
     });
 });
 
