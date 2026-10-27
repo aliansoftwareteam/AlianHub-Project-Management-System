@@ -111,6 +111,10 @@ exports.createMcpToken = async (req, res) => {
         const { name, mode, provider, projectIds, expiresInDays, label, scopes: askedScopes, grants: askedGrants } = req.body || {};
         if (!companyId || !userId) return res.send({ status: false, statusText: 'companyId and userId are required.' });
         if (req.apiToken) return res.status(403).send({ status: false, statusText: 'API tokens cannot mint tokens.' });
+        const aiRights = require('../../Config/aiRights');
+        if (!(await aiRights.mayUse(companyId, userId, aiRights.AI_RIGHT.EXTERNAL_CLIENTS))) {
+            return res.status(403).send({ status: false, statusText: aiRights.REFUSAL[aiRights.AI_RIGHT.EXTERNAL_CLIENTS] });
+        }
         const scopes = isStrict() && askedScopes !== undefined ? askedScopes : ['read', 'write'];
         const check = validateCreateInput({ name: name || 'CLI agent', scopes, expiresInDays });
         if (!check.valid) return refuseInput(res, check);

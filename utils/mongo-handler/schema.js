@@ -1225,6 +1225,12 @@ const schema = {
         rateLimitPerDay: { type: Number, required: false },
         // Overrides the skill's verifier floor (Modules/Agents/engine/confidence.js); null uses the skill's.
         confidenceFloor: { type: Number, required: false },
+        // { state: pending | approved | declined, requestedBy, requestedAt, decidedBy, decidedAt, reason } (Modules/Agents/agentApproval.js); none = approved
+        approval: { type: Object, required: false },
+        // private | shared | everyone (Modules/Agents/agentAudience.js); none = everyone
+        visibility: { type: String, required: false },
+        // { userIds: [], teamIds: [] } when visibility is shared
+        sharedWith: { type: Object, required: false },
         deletedStatusKey: { type: Number, default: 0, required: false },
     },
     agentRuns: {
@@ -1334,8 +1340,13 @@ const schema = {
     agentRevisions: {
         agentId: { type: String, required: true },
         n: { type: Number, required: true },
-        // draft | candidate | live | superseded — the only fields that change after creation are state and its timestamps
+        // draft | candidate | live | superseded | declined — the only fields that change after creation are state and its timestamps
         state: { type: String, required: true },
+        // a candidate someone who is not an owner or admin saved, waiting for one of them to promote or decline it
+        requestedApproval: { type: Boolean, required: false },
+        declinedBy: { type: String, required: false },
+        declinedAt: { type: Date, required: false },
+        declineReason: { type: String, required: false },
         // every agent field that affects a run, frozen at creation
         snapshot: { type: Object, required: true },
         // skill keys the revision executes
@@ -1490,6 +1501,10 @@ const schema = {
         declaredHosts: { type: [String], default: undefined, required: false },
         retiredAt: { type: Date, required: false },
         createdBy: { type: String, required: false },
+        // { state: pending | approved | declined, requestedBy, requestedAt, decidedBy, decidedAt, reason } on a skill someone who is not an owner or admin wrote
+        approval: { type: Object, required: false },
+        // { set, requestedBy, requestedAt }: their change to a live skill, applied when an owner or admin approves it
+        pendingChange: { type: Object, required: false },
     },
     agentProposals: {
         agentId: { type: String, required: true },

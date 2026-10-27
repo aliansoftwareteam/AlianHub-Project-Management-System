@@ -106,7 +106,7 @@ const assigneeIds = (task) => {
 /* One row per person and per agent, with what each is doing at this moment and
  * how loaded they are this week. A task the viewer cannot open is never named:
  * the row says only that its person or agent is busy. */
-const board = async (companyId, { hoursPerWeek = 40, viewerId } = {}) => {
+const board = async (companyId, { hoursPerWeek = 40, viewerId, seesAgent = () => true } = {}) => {
     const [taskFilter, sheetScope, viewerRole] = await Promise.all([
         taskFilterFor(companyId, viewerId),
         resolveSheetScope(companyId, viewerId, SHEET_PERMISSION.workload),
@@ -193,9 +193,11 @@ const board = async (companyId, { hoursPerWeek = 40, viewerId } = {}) => {
     (openRuns || []).forEach((r) => { if (!runsByAgent[String(r.agentId)]) runsByAgent[String(r.agentId)] = r; });
     const runTaskById = await tasksById(companyId, [...(openRuns || []), ...(recentRuns || [])].map((r) => r.taskId), taskFilter);
     const hiddenTask = (taskId) => scoped && Boolean(taskId) && !runTaskById[String(taskId)];
-    const hiddenRun = (run) => hiddenTask(run.taskId) || Boolean(privateWork && !readsRun(privateWork, run));
+    const seenAgents = (agents || []).filter(seesAgent);
+    const unseenAgentIds = new Set((agents || []).filter((a) => !seenAgents.includes(a)).map((a) => String(a._id)));
+    const hiddenRun = (run) => hiddenTask(run.taskId) || Boolean(privateWork && !readsRun(privateWork, run)) || unseenAgentIds.has(String(run.agentId));
 
-    const agentRows = (agents || []).map((a) => {
+    const agentRows = seenAgents.map((a) => {
         const run = runsByAgent[String(a._id)];
         const task = run ? runTaskById[String(run.taskId)] : null;
         const month = a.spendMonth && a.spendMonth.month === runs.monthKey() ? a.spendMonth : { usd: 0, runs: 0 };

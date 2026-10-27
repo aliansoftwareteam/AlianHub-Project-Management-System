@@ -2,9 +2,6 @@ const store = require('./store');
 const config = require('./config');
 const grants = require('./grants');
 const logger = require('../../Config/loggerConfig');
-const { SCHEMA_TYPE } = require('../../Config/schemaType');
-const { ACTIVE_SEAT } = require('../../Config/seatStatus');
-const { ROLE_OWNER, ROLE_ADMIN } = require('../../Config/roleTypes');
 
 const STATUS = Object.freeze({ PENDING: 'pending', APPROVED: 'approved', DENIED: 'denied', REVOKED: 'revoked' });
 const DAY_MS = 24 * 60 * 60 * 1000;
@@ -52,22 +49,13 @@ const audit = (companyId, actor, action, approval, meta = {}) => {
     }
 };
 
-const ownersAndAdmins = async (companyId) => {
-    const { MongoDbCrudOpration } = require('../../utils/mongo-handler/mongoQueries');
-    const rows = await MongoDbCrudOpration(String(companyId), {
-        type: SCHEMA_TYPE.COMPANY_USERS, data: [{ roleType: { $in: [ROLE_OWNER, ROLE_ADMIN] }, ...ACTIVE_SEAT }, { userId: 1 }],
-    }, 'find').catch(() => []);
-    return [...new Set((rows || []).map((row) => String(row.userId)).filter(Boolean))];
-};
-
 const NOTIFICATION_KEY = 'oauth_client_approval';
 // Not a project notification: the row names this scope where a project id would go, as the AI alerts do.
 const NOTIFICATION_SCOPE = 'oauth-clients';
 
-/* Written the way the AI alerts write theirs (company row, global copy with its socket event, bell counter),
- * since the shared notification helper only takes project and task notifications. The client names itself, so
- * its name travels in changeData and the Inbox renders it as text; the message carries no client-supplied text. */
+/* The client names itself, so its name travels in changeData and the Inbox renders it as text; the message carries no client-supplied text. */
 const notifyManagers = async (companyId, approval, requestedBy) => {
+    const { ownersAndAdmins, sendNotice } = require('../Inbox/helpers/workspaceNotice');
     let recipients;
     try {
         recipients = await ownersAndAdmins(companyId);
@@ -75,32 +63,11 @@ const notifyManagers = async (companyId, approval, requestedBy) => {
         logger.error(`oauth: approval request recipients for ${companyId} not read: ${error.message}`);
         return;
     }
-    const { MongoDbCrudOpration } = require('../../utils/mongo-handler/mongoQueries');
-    const { dbCollections } = require('../../Config/collections');
-    const now = new Date();
-    for (const receiverID of recipients) {
-        const row = {
-            key: NOTIFICATION_KEY, type: 'oauth', changeType: NOTIFICATION_KEY,
-            message: 'An outside agent asks to act for people in this workspace. An owner or admin can approve or deny it in Settings, Agent clients.',
-            changeData: { clientId: approval.clientId, clientName: approval.clientName || '', requestedScopes: approval.requestedScopes || [] },
-            projectId: NOTIFICATION_SCOPE, taskId: '', userId: String(requestedBy), companyId: String(companyId),
-            assigneeUsers: [receiverID], notSeen: [receiverID], receiverID,
-            notificationType: 'push', isSchedule: false, isSeen: false, notificationStatus: 'in-process', createdAt: now, updatedAt: now,
-        };
-        try {
-            // eslint-disable-next-line no-await-in-loop
-            const saved = await MongoDbCrudOpration(String(companyId), { type: SCHEMA_TYPE.NOTIFICATIONS, collection: dbCollections.NOTIFICATIONS, data: row }, 'save');
-            // eslint-disable-next-line no-await-in-loop
-            const globalRow = await MongoDbCrudOpration(dbCollections.GLOBAL, { type: dbCollections.NOTIFICATIONS, collection: dbCollections.NOTIFICATIONS, data: { ...row, notificationId: saved && (saved.id || saved._id) } }, 'save');
-            require('../../event/socketEventEmitter').emit('insert', { type: 'insert', data: globalRow, updatedFields: {}, module: 'globalNotification' });
-            const { updateUnReadCommentsCountFun } = require('../notification-count/controller');
-            // eslint-disable-next-line no-await-in-loop
-            await Promise.resolve(updateUnReadCommentsCountFun({ body: { companyId: String(companyId), key: 5, userIds: [receiverID], readAll: false } }))
-                .catch((error) => logger.warn(`oauth: notification count for ${receiverID} not bumped: ${error.message || error}`));
-        } catch (error) {
-            logger.error(`oauth: approval request notification for ${companyId} to ${receiverID} failed: ${error.message || error}`);
-        }
-    }
+    await sendNotice(companyId, recipients, {
+        key: NOTIFICATION_KEY, type: 'oauth', scope: NOTIFICATION_SCOPE, from: requestedBy, label: 'oauth: approval request',
+        message: 'An outside agent asks to act for people in this workspace. An owner or admin can approve or deny it in Settings, Agent clients.',
+        changeData: { clientId: approval.clientId, clientName: approval.clientName || '', requestedScopes: approval.requestedScopes || [] },
+    });
 };
 
 const isDuplicate = (error) => error && (error.code === 11000 || /E11000/.test(String(error.message)));

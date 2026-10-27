@@ -5,8 +5,10 @@
  * These checks are made in the handler and are always enforced, whatever PERMISSION_ENFORCEMENT_MODE
  * says for browser sessions: they replace owner/admin checks that were always enforced.
  */
-const { evaluatePermission, isWritable, isReadable } = require('./permissionGuard');
 const logger = require('./loggerConfig');
+
+// Required when used: the permission guard pulls in much of the app, and several of the modules it reaches use these rights.
+const guard = () => require('./permissionGuard');
 
 const SECTION = 'artificial_intelligence';
 
@@ -37,11 +39,11 @@ const REFUSAL = Object.freeze({
 const UNCHECKED = 'Your AI access could not be checked just now. Try again.';
 
 /* The stored value: null, false (Read), true (Read & Write), or a number for the skill risk. Throws when unreadable. */
-const aiRight = (companyId, uid, key) => evaluatePermission(companyId, uid, aiPath(key), { strict: true });
+const aiRight = (companyId, uid, key) => guard().evaluatePermission(companyId, uid, aiPath(key), { strict: true });
 
-const mayUse = async (companyId, uid, key) => isWritable(await aiRight(companyId, uid, key));
+const mayUse = async (companyId, uid, key) => guard().isWritable(await aiRight(companyId, uid, key));
 
-const maySee = async (companyId, uid, key) => isReadable(await aiRight(companyId, uid, key));
+const maySee = async (companyId, uid, key) => guard().isReadable(await aiRight(companyId, uid, key));
 
 /* 'low' | 'medium' | 'high', or null when the person's agents may use no skill at all. */
 const skillRiskCap = async (companyId, uid) => {
@@ -57,7 +59,7 @@ const requireAiRight = (key, { write = true } = {}) => Object.assign(async (req,
     const companyId = req.headers.companyid || '';
     try {
         const value = await aiRight(companyId, req.uid, key);
-        if (write ? isWritable(value) : isReadable(value)) return next();
+        if (write ? guard().isWritable(value) : guard().isReadable(value)) return next();
         const message = REFUSAL[key] || REFUSAL[AI_RIGHT.ASSISTANT];
         return res.status(403).json({ status: false, statusText: message, message, permission: aiPath(key) });
     } catch (error) {

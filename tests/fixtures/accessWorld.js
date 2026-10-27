@@ -1,4 +1,5 @@
 const { SCHEMA_TYPE } = require('../../Config/schemaType');
+const { seedAiRules } = require('./aiRules');
 
 /* One workspace: an owner, an admin, a member on everything private, a member outside it and a guest;
  * an open project with an open list and a private list, a private project, and the insider's personal list. */
@@ -58,6 +59,7 @@ const create = (mockDb) => {
         });
         const parent = mockDb.seed(SCHEMA_TYPE.RULES, { key: 'task', name: 'Task', isParent: true, roles: [] });
         TASK_KEYS.forEach((key) => mockDb.seed(SCHEMA_TYPE.RULES, { key, name: key, isParent: false, parentId: String(parent._id), roles: [{ key: 3, permission: true }, { key: 0, permission: true }] }));
+        seedAiRules(mockDb);
 
         const project = (_id, ProjectName, extra = {}) => mockDb.seed(SCHEMA_TYPE.PROJECTS, {
             _id, ProjectName, ProjectCode: ProjectName.slice(0, 3).toUpperCase(), CompanyId: CID, isPrivateSpace: false, isGlobalPermission: true, AssigneeUserId: [], deletedStatusKey: 0,

@@ -12,6 +12,7 @@ const { dailyRunLimitOf } = require('./dailyRunLimit');
 const { runClause } = require('./privateWork');
 const projectLimits = require('./projectLimits');
 const accounts = require('./accounts');
+const agentApproval = require('./agentApproval');
 const writerLimits = require('../../event/writerLimits');
 
 // Agent runs and spend. A run is the unit the rail footer counts ("2 running"),
@@ -68,6 +69,7 @@ const canStart = async (agent, { trigger, viaAccount, companyId, depth, projectI
     if (!agent) return { ok: false, reason: 'Agent not found.' };
     if (clampDepth(depth) >= MAX_DEPTH) return { ok: false, reason: LOOP_DEPTH_EXCEEDED, code: LOOP_DEPTH_EXCEEDED, depth: clampDepth(depth), maxDepth: MAX_DEPTH };
     if (agent.paused) return { ok: false, reason: `Agent is paused${agent.pausedReason ? ` (${agent.pausedReason})` : ''}.` };
+    if (!agentApproval.isApproved(agent)) return { ok: false, reason: agentApproval.refusalFor(agent), code: agentApproval.AWAITING_APPROVAL };
     if (companyId && await pausedIn(companyId, [projectId, ...(projectIds || [])].filter(Boolean))) return { ok: false, reason: PROJECT_PAUSED, code: 'project_paused' };
     try {
         await aiSwitch.assertAllowed(companyId);

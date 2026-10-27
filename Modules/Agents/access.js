@@ -1,4 +1,4 @@
-const { getRoleType, isPrivileged } = require('../../Config/permissionGuard');
+const { getRoleType, isPrivileged, isWritable, isReadable } = require('../../Config/permissionGuard');
 const { ROLE_GUEST } = require('../../Config/roleTypes');
 const { resolveActor, isAgent } = require('./actor');
 const scope = require('./scope');
@@ -7,6 +7,8 @@ const { MongoDbCrudOpration } = require('../../utils/mongo-handler/mongoQueries'
 const { hiddenSprintIds, canSeeSprintById } = require('../Sprints/helpers/sprintVisibility');
 const privateWork = require('./privateWork');
 const { idForms } = require('../../utils/mongo-handler/objectIdKeys');
+const aiRights = require('../../Config/aiRights');
+const { isCreator } = require('./agentAudience');
 
 const OBJECT_ID = /^[0-9a-fA-F]{24}$/;
 const GATE_OWNER_ADMIN = 'owner_admin';
@@ -40,6 +42,24 @@ const callerOf = async (req, companyId) => {
 const personOf = async (companyId, userId) => ({ actor: { kind: 'human', userId: String(userId) }, human: true, ...(await seatOf(companyId, userId)) });
 
 const canManageAgents = (caller) => Boolean(caller && caller.human && caller.privileged);
+
+const NO_RIGHTS = Object.freeze({ build: false, seesAll: false, writeSkills: false, seesSkills: false, use: false, skillRisk: null });
+const ALL_RIGHTS = Object.freeze({ build: true, seesAll: true, writeSkills: true, seesSkills: true, use: true, skillRisk: 'high' });
+
+/* What the caller's role lets them do with agents and skills (Config/aiRights.js). An agent never holds any. */
+const agentRightsOf = async (companyId, caller) => {
+    if (!caller || !caller.human) return NO_RIGHTS;
+    if (caller.privileged) return ALL_RIGHTS;
+    const uid = caller.actor.userId;
+    const { AI_RIGHT, aiRight } = aiRights;
+    const [agents, skills, use, skillRisk] = await Promise.all([
+        aiRight(companyId, uid, AI_RIGHT.AGENTS), aiRight(companyId, uid, AI_RIGHT.SKILLS), aiRight(companyId, uid, AI_RIGHT.AGENT_USE), aiRights.skillRiskCap(companyId, uid),
+    ]);
+    return { build: isWritable(agents), seesAll: isReadable(agents), writeSkills: isWritable(skills), seesSkills: isReadable(skills), use: isWritable(use), skillRisk };
+};
+
+/* An owner or admin changes any agent; a person whose role builds agents changes the ones they made. */
+const canEditAgent = (caller, rights, agent) => Boolean(caller && caller.human && (caller.privileged || (rights.build && isCreator(agent, caller.actor.userId))));
 
 const ownerOrManager = (caller, personId) => Boolean(caller && caller.human && (caller.privileged || sameId(personId, caller.actor.userId)));
 
@@ -186,6 +206,10 @@ const canSeeProposal = async (companyId, caller, proposal) => {
 
 const REFUSAL = Object.freeze({
     MANAGE: 'Only an Owner or an Admin can manage agents.',
+    BUILD: aiRights.REFUSAL[aiRights.AI_RIGHT.AGENTS],
+    OWN_AGENT: 'You can change only the agents you made. An Owner or an Admin can change any agent.',
+    SKILLS: aiRights.REFUSAL[aiRights.AI_RIGHT.SKILLS],
+    OWN_SKILL: 'You can change only the skills you wrote. An Owner or an Admin can change any skill.',
     CONTROL_RUN: 'Only an Owner, an Admin or the person who started the run can stop it.',
     UNDO_DECISION: 'Only an Owner, an Admin or the person who decided the proposal can undo it.',
     ACT_AS_AGENT: 'Only the agent itself can file a proposal in its name.',
@@ -194,7 +218,7 @@ const REFUSAL = Object.freeze({
 });
 
 module.exports = {
-    privileged, humanActor, callerOf, personOf, canManageAgents, canControlRun, canUndoDecision, canActAsAgent,
+    privileged, humanActor, callerOf, personOf, canManageAgents, agentRightsOf, canEditAgent, NO_RIGHTS, ALL_RIGHTS, canControlRun, canUndoDecision, canActAsAgent,
     visibleProjectIdsFor, agentProjectsFor, hiddenTaskIdsFor, canSeeTaskOf, projectScope, REFUSAL,
     privateWorkFor, readScopeOf, canSeeRun, readableRuns, canSeeProposal,
     GATE_OWNER_ADMIN, proposalScopeClause, decidesProposals, staysInside, reachesOutsideClause, isOwnProposal, askedForOf,

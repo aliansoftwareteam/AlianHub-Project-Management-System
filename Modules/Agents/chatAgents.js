@@ -9,6 +9,9 @@ const { threadOf, canPostToThread } = require('../Comments/helpers/threadWriteAc
 const { isAiAuthored } = require('../Comments/helpers/aiActor');
 const { parseAgentMentionIds, mentionsAsNames } = require('../Comments/helpers/parseMentions');
 const { ROLE_GUEST } = require('../../Config/roleTypes');
+const { APPROVED_CLAUSE } = require('./agentApproval');
+const audience = require('./agentAudience');
+const aiRights = require('../../Config/aiRights');
 
 /* Every comment passes through fromChatMessage, and most are no chat message for an agent: the rest loads on use. */
 const lazy = {
@@ -68,7 +71,7 @@ const emitComment = (companyId, type, data) => socketEmitter.emit(type, {
 });
 
 const liveAgents = async (companyId) => (await MongoDbCrudOpration(companyId, {
-    type: SCHEMA_TYPE.AGENTS, data: [{ deletedStatusKey: { $ne: 1 }, paused: { $ne: true } }, {}, { sort: { name: 1 } }],
+    type: SCHEMA_TYPE.AGENTS, data: [{ deletedStatusKey: { $ne: 1 }, paused: { $ne: true }, ...APPROVED_CLAUSE }, {}, { sort: { name: 1 } }],
 }, 'find')) || [];
 
 /* The agents a person may start from chat: never for a guest or while AI is off, and never one scoped only to
@@ -78,11 +81,12 @@ const usableAgents = async (companyId, uid) => {
     const role = await lazy.roles.getRoleType(companyId, uid);
     if (role === null || role === undefined || role === ROLE_GUEST) return [];
     if (!(await lazy.aiSwitch.allowed(companyId))) return [];
-    const [agents, visible] = await Promise.all([liveAgents(companyId), lazy.scope.visibleProjects(companyId, uid)]);
+    if (!(await aiRights.mayUse(companyId, uid, aiRights.AI_RIGHT.AGENT_USE).catch(() => false))) return [];
+    const [agents, visible, person] = await Promise.all([liveAgents(companyId), lazy.scope.visibleProjects(companyId, uid), audience.personOf(companyId, uid)]);
     const open = visible.map((p) => String(p._id));
     return agents.filter((agent) => {
         const scoped = idsOf(agent.projectIds);
-        return !scoped.length || scoped.some((id) => open.includes(id));
+        return (!scoped.length || scoped.some((id) => open.includes(id))) && audience.mayUse(agent, person);
     });
 };
 
