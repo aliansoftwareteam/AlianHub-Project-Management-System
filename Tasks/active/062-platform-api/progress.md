@@ -89,8 +89,9 @@ None for the app. The e2e waits for a managed-mode stack (065).
     064 (061 said 064 sets it).
   - **Usage**: `seats.active` counts guests too; `seats.guests` are people whose every live seat is a guest's;
     `pending` are invited addresses with no live seat anywhere. AI agents hold no `company_users` seat, so there is
-    nothing to subtract for them. `timeTracker.limit` is 0 while the add-on is off. `lastSeenAt` is written by
-    `Config/lastSeen.js` from the JWT middleware's session path, at most once an hour per person and process.
+    nothing to subtract for them. `timeTracker.limit` is 0 while the add-on is off. `lastSeenAt`: the JWT middleware's
+    session path only notes the moment in memory (hosted only); `Config/lastSeen.js` writes the notes every 5 minutes
+    in one bulk write, at most once an hour per person, and the usage report flushes first. No request writes it.
   - **Support session**: the account is created through `addUserMongodbV2` (no password) or reused; a customer account
     already using `support@alianhub.com` is refused (409). Seats are `company_users` rows with `isSupportUser: true`,
     admin role, in every non-deleted workspace; they are removed with its sessions at `expiresAt` (in-process timer plus
@@ -111,3 +112,6 @@ None for the app. The e2e waits for a managed-mode stack (065).
   key-only audit, rotation, support session seats, audit names, expiry, revoke), `platform-last-seen`,
   `member-list-fields` (support seat hidden), frontend `hostedOwnerLinks.spec.js`. Related suites pass (61 unit
   suites, 1,506 tests; 11 convention suites). `tests/api-doc.test.js` fails as before this task.
+- Fix after review: the first `lastSeenAt` version wrote from the request path, which three scoping suites caught as an
+  unexpected database call; moved to the flush above. `agent-rest-route-actions` now finds the platform routes and the
+  three public link routes listed in `tests/fixtures/agentRoutesOutsideProjects.js`.
