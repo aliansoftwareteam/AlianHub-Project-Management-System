@@ -26,16 +26,18 @@ What the compose file gives you:
 |---|---|
 | `app` | AlianHub (Node 20, the built web app served by the API) |
 | `mongo` | MongoDB 7 on the internal network only |
-| volume `alianhub_mongo_data` | the databases |
-| volume `alianhub_storage` | uploaded files when `STORAGE_TYPE=server` (the default in the image) |
-| volume `alianhub_logs` | rotating logs, readable from Settings › Instance › Logs |
-| volume `alianhub_backups` | archives written by Settings › Instance › Backups |
+| volume `<project>_alianhub_mongo_data` | the databases |
+| volume `<project>_alianhub_storage` | uploaded files when `STORAGE_TYPE=server` (the default in the image) |
+| volume `<project>_alianhub_logs` | rotating logs, readable from Settings › Instance › Logs |
+| volume `<project>_alianhub_backups` | archives written by Settings › Instance › Backups |
+
+`<project>` is the Compose project name: the folder that holds `docker-compose.yml`, or the name given with `-p` (or `COMPOSE_PROJECT_NAME` in `.env`). Containers and the network carry it too (`<project>-app-1`, `<project>-mongo-1`, `<project>_alianhub`).
 
 `MONGODB_URL` must be the server address only (`mongodb://mongo:27017`); the app creates one database per company under it. The container becomes **healthy** once `/health` answers 200, which needs the database.
 
 Anything else (mail, storage, AI, sign-in providers) is configured later from the app, or put in `.env` next to the compose file — the file is read by `docker compose` and passed to the container.
 
-The containers are named `alianhub`, `alianhub-mongo` and `alianhub-coturn`. Set `ALIANHUB_APP_CONTAINER`, `ALIANHUB_MONGO_CONTAINER` or `ALIANHUB_COTURN_CONTAINER` in `.env` to use other names, for example when a second copy runs on the same host.
+A second copy on the same host (staging next to production, a restore drill) needs only its own folder with its own `.env`, a project name and a free port: `APP_PORT=4001 docker compose -p staging up -d`. It gets its own containers, volumes and network.
 
 ### Bare metal (Node 20 + MongoDB)
 
@@ -161,6 +163,14 @@ Docker:
 docker compose pull && docker compose up -d
 ```
 
+**Installs created before container and volume names followed the project.** Earlier `docker-compose.yml` files fixed the names (containers `alianhub` and `alianhub-mongo`, volumes `alianhub_mongo_data`, `alianhub_storage`, `alianhub_logs`, `alianhub_backups`, network `alianhub`). If you replace that file with the current one, add one line to `.env` before `docker compose up -d`, or the install starts on new, empty volumes:
+
+```bash
+COMPOSE_FILE=docker-compose.yml:docker-compose.legacy.yml   # on Windows: docker-compose.yml;docker-compose.legacy.yml
+```
+
+and download `docker-compose.legacy.yml` next to `docker-compose.yml`. It restores the old names, so the data stays where it is. `ALIANHUB_APP_CONTAINER`, `ALIANHUB_MONGO_CONTAINER` and `ALIANHUB_COTURN_CONTAINER` still rename the containers under it. Running `docker compose pull && docker compose up -d` with the file you already have needs nothing.
+
 Bare metal:
 
 ```bash
@@ -214,7 +224,7 @@ Choose an archive, read its manifest (date, version, workspaces) and type its na
 3. drops every collection of each database named in the archive, including ones created after the backup, refills the ones the archive holds, and the files if they were included;
 4. reruns migrations, clears caches and reconnects to the database.
 
-Restore an archive taken by the same or an older version, never a newer one. A restore drill on a throwaway instance is the only way to know your backups work: install a second copy on a **separate machine or VM**, upload an archive there, restore it, log in. Do not run the drill as a second Compose project on the same host (`docker compose -p drill`): the volumes in `docker-compose.yml` have fixed names (`alianhub_mongo_data`, `alianhub_storage`), so the second project would attach to the live data, and restoring there would overwrite it.
+Restore an archive taken by the same or an older version, never a newer one. A restore drill on a throwaway instance is the only way to know your backups work: install a second copy, upload an archive there, restore it, log in. On the same host, run the drill from its own folder with its own `.env` as a separate project (`APP_PORT=4001 docker compose -p drill up -d`), never with `docker-compose.legacy.yml` loaded: that file fixes the volume names, so the drill would attach to the live data and restoring there would overwrite it.
 
 ### Alternatives
 
