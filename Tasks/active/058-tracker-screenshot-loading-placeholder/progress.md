@@ -11,7 +11,7 @@
 
 ## Last step
 
-Fix and spec done, nothing committed. Waiting for the user to review and say whether to commit and open the PR into `staging`.
+Merged into `staging` as build 9 (`14.41.0-beta.9`, #1716). Still open: watch an hour of the Tracker timesheet load on staging.
 
 ## Blockers
 
@@ -28,3 +28,4 @@ None.
 - Browser check in a throwaway Vite preview of the real `ScreenshotTime` panel with mocked storage calls, in dark and light themes. With the fix, every state has a 78px box in a 121px card. On the original files, a card still waiting for its URL is 38px tall (only its bottom line), which matches the report.
 - `style:check`, `i18n:check`, ESLint on the changed files, and `trackerDayOneCall.spec.js` all pass.
 - Not covered: a screenshot whose signed-URL request fails keeps the skeleton, because the shared `WasabiImage` renders it whenever it has no URL. Before this fix that card collapsed to its line. Left out of scope (see task.md).
+- #1716 merged into `staging` as build 9 (`14.41.0-beta.9`) after all 14 CI checks passed (backend, frontend, e2e and integration shards included). The live-page check is still open, so the task stays active.
