@@ -44,8 +44,9 @@ const PROJECT_RULES_TTL_SECONDS = 604800;
 // A project's own rules never hold these two keys, and checkPermission(path, false) grants them.
 const PROJECT_CONTEXT_GRANTED = ['project.project_list', 'project.public_projects'];
 
-// Project rules are seeded from the project and task sections only, and the web app never checks a settings or chat key against them.
-const isCompanyWideKey = (path) => ['settings.', 'chat.'].some((prefix) => String(path).startsWith(prefix));
+// Project rules are seeded from the project and task sections only, and the web app never checks a settings, chat or
+// AI right (Config/aiRights.js, every key `ai_`) against them. The AI token limit keeps reading a project's own rules.
+const isCompanyWideKey = (path) => ['settings.', 'chat.', 'artificial_intelligence.ai_'].some((prefix) => String(path).startsWith(prefix));
 
 // Runbook kill switch (DISABLE_PERMISSION_ENFORCEMENT=true): API tokens and project edits skip the per-key
 // checks, and a browser session set to enforce is judged in report mode instead. Role guards stay on for tokens.

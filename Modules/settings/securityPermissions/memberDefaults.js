@@ -15,11 +15,12 @@ const MEMBER_ROLE_TYPE = ROLE_MEMBER;
 //
 // false = Read, true = Read & Write, a number = the "Own (1) / Everyone (2)" selection fields.
 const MEMBER_DEFAULT_PERMISSIONS = Object.freeze({
-    // Sections. `settings` and `artificial_intelligence` are deliberately absent.
+    // Sections. `settings` is deliberately absent.
     project: false,
     task: true,
     chat: true,
     sheet_settings: false,
+    artificial_intelligence: true,
 
     // Projects: members work inside them, they do not administer them.
     project_list: false,
@@ -68,6 +69,24 @@ const MEMBER_DEFAULT_PERMISSIONS = Object.freeze({
 
     // Timesheets: their own only.
     user_timesheet: 1,
+
+    // AI: the everyday AI members had before the AI rows existed. Building agents, writing skills and
+    // seeing every agent stay with owners and admins until one of them grants it.
+    ai_assistant: true,
+    ai_agent_use: true,
+    ai_connectors: true,
+    ai_external_clients: true,
 });
 
-module.exports = { MEMBER_ROLE_TYPE, MEMBER_DEFAULT_PERMISSIONS };
+// Every other key gives a new guest entry Read. These give a guest nothing.
+const GUEST_DEFAULT_PERMISSIONS = Object.freeze({
+    ai_assistant: null,
+    ai_agent_use: null,
+    ai_agents: null,
+    ai_skills: null,
+    ai_skill_risk: null,
+    ai_connectors: null,
+    ai_external_clients: null,
+});
+
+module.exports = { MEMBER_ROLE_TYPE, MEMBER_DEFAULT_PERMISSIONS, GUEST_DEFAULT_PERMISSIONS };

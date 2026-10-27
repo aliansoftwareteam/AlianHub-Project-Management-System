@@ -69,7 +69,7 @@
     import * as env from '@/config/env';
     import { ROLE_MEMBER, isOwnerOrAdmin } from "@/utils/roles";
     defineOptions({ name: "SecurityPermissionsView" });
-    const SIMPLE_KEYS = ["project_list", "public_projects", "project_create", "task_create", "task_status", "task_assignee", "task_comment", "task_delete", "project_delete", "user_timesheet", "settings_invite_member"];
+    const SIMPLE_KEYS = ["project_list", "public_projects", "project_create", "task_create", "task_status", "task_assignee", "task_comment", "task_delete", "project_delete", "user_timesheet", "settings_invite_member", "ai_assistant", "ai_agents", "ai_skills"];
     const mode = ref("simple");
     const oldRules = ref([]);
     const loading = ref(true);
