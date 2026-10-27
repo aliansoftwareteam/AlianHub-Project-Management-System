@@ -1,4 +1,4 @@
-/* Task 059: AI rights by role on the web side — who builds and changes agents, the approval states the hub and the
+/* Task 060: AI rights by role on the web side — who builds and changes agents, the approval states the hub and the
    agent page show, who the agent is shared with, and the Inbox lines for approval requests and answers.
    The test setup stubs $t in templates to the key, so template text is checked by key and script text in English. */
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';

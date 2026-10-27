@@ -1,5 +1,5 @@
 ---
-id: 059
+id: 060
 title: AI access by role — per-role AI rights in Security & Permissions, owner/admin approval for agents and skills
 status: active
 priority: high
