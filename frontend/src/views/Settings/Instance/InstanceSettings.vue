@@ -8,11 +8,17 @@
                     <button v-for="g in groups" :key="g" type="button" class="ah-tab" :class="{ 'is-active': group === g }" @click="group = g">{{ $t(`Instance.group_${g}`) }}</button>
                 </div>
                 <div class="ah-toolbar__spacer"></div>
-                <button v-if="testable" type="button" class="ah-btn ah-btn--secondary ah-btn--sm" :disabled="busy" data-test="instance-settings-test" @click="test">{{ group === 'ai' ? $t('Instance.test_connection') : $t('Instance.test') }}</button>
-                <button type="button" class="ah-btn ah-btn--primary ah-btn--sm" :disabled="busy || !dirty" @click="save">{{ busy ? $t('Instance.saving') : $t('Instance.save') }}</button>
+                <button v-if="testable && !groupManaged" type="button" class="ah-btn ah-btn--secondary ah-btn--sm" :disabled="busy" data-test="instance-settings-test" @click="test">{{ group === 'ai' ? $t('Instance.test_connection') : $t('Instance.test') }}</button>
+                <button v-if="!groupManaged" type="button" class="ah-btn ah-btn--primary ah-btn--sm" :disabled="busy || !dirty" @click="save">{{ busy ? $t('Instance.saving') : $t('Instance.save') }}</button>
             </div>
 
-            <div v-if="restartKeys.length" class="in-banner in-banner--warn"><ShellIcon name="alert" :size="15" /><span>{{ $t('Instance.restart_needed', { keys: restartKeys.join(', ') }) }}</span></div>
+            <div v-if="restartKeys.length && hosted" class="in-banner in-banner--warn in-restart" data-test="instance-restart-banner">
+                <ShellIcon name="info" :size="15" />
+                <span>{{ restartState === 'restarting' ? $t('Instance.managed_restarting') : restartState === 'failed' ? $t('Instance.managed_restart_failed') : $t('Instance.managed_restart_needed', { n: restartKeys.length }, restartKeys.length) }}</span>
+                <button v-if="restartState !== 'restarting'" type="button" class="ah-btn ah-btn--primary ah-btn--sm" data-test="instance-restart-now" @click="restartNow">{{ $t('Instance.managed_restart_now') }}</button>
+                <span v-else class="ah-spin"></span>
+            </div>
+            <div v-else-if="restartKeys.length" class="in-banner in-banner--warn"><ShellIcon name="alert" :size="15" /><span>{{ $t('Instance.restart_needed', { keys: restartKeys.join(', ') }) }}</span></div>
             <div v-if="testResult" class="in-banner" :class="testResult.ok ? 'in-banner--ok' : 'in-banner--danger'" role="status"><ShellIcon :name="testResult.ok ? 'check' : 'alert'" :size="15" /><span>{{ testResult.text }}</span></div>
             <div v-if="testResult && testResult.models.length" class="in-models" data-test="instance-settings-models">
                 <span class="ah-label">{{ $t('Instance.test_models', { n: testResult.models.length }, testResult.models.length) }}</span>
@@ -20,19 +26,30 @@
                     <li v-for="model in testResult.models" :key="model"><code class="ah-mono">{{ model }}</code></li>
                 </ul>
             </div>
-            <p class="ah-small">{{ $t('Instance.settings_lead') }} <a :href="guide('configure')" target="_blank" rel="noopener">{{ $t('Instance.guide') }}</a></p>
+            <p class="ah-small">{{ hosted ? $t('Instance.managed_settings_lead') : $t('Instance.settings_lead') }} <a :href="guide('configure')" target="_blank" rel="noopener">{{ $t('Instance.guide') }}</a></p>
 
-            <section class="ah-card in-card">
+            <section v-if="groupManaged" class="ah-card in-card" data-test="instance-managed-card">
+                <div class="in-card__head"><ShellIcon name="lock" :size="15" /><span class="in-card__title">{{ managedGroupNames }}</span></div>
+                <p>{{ $t('Instance.managed_card_body') }}</p>
+                <a v-if="managedGroups.includes('mail')" href="#" data-test="instance-own-smtp" @click.prevent="openUpgrade(router, cid)">{{ $t('Instance.managed_own_smtp') }}</a>
+            </section>
+
+            <section v-else class="ah-card in-card">
                 <div v-for="row in visible" :key="row.key" class="in-field">
                     <div>
                         <label class="in-field__label" :for="`f-${row.key}`">
                             {{ label(row) }}
-                            <span v-if="row.locked" class="ah-chip ah-chip--mono" :title="$t('Instance.locked_help')">{{ $t('Instance.locked') }}</span>
+                            <span v-if="row.managed" class="ah-chip ah-chip--mono" :title="$t('Instance.managed_help')">{{ $t('Instance.managed_lock') }}</span>
+                            <span v-else-if="row.locked" class="ah-chip ah-chip--mono" :title="$t('Instance.locked_help')">{{ $t('Instance.locked') }}</span>
                             <span v-if="row.restart" class="ah-chip ah-chip--warn">{{ $t('Instance.restart') }}</span>
                         </label>
                         <div class="in-field__help">{{ help(row) }} <code class="ah-mono">{{ row.key }}</code></div>
                     </div>
-                    <div class="in-field__control">
+                    <div v-if="row.managed" class="in-field__control" :data-test="`instance-managed-${row.key}`">
+                        <span v-if="row.key === 'WEBURL' && publicConfig.webUrl" class="ah-mono">{{ publicConfig.webUrl }}</span>
+                        <span class="ah-small in-managed"><ShellIcon name="lock" :size="12" />{{ $t('Instance.managed_by_cloud') }}</span>
+                    </div>
+                    <div v-else class="in-field__control">
                         <select v-if="row.type === 'select'" :id="`f-${row.key}`" v-model="draft[row.key]" class="ah-input" :disabled="row.locked">
                             <option v-for="o in row.options" :key="o" :value="o">{{ optionLabel(row, o) }}</option>
                         </select>
@@ -58,12 +75,15 @@
 </template>
 
 <script setup>
-import { computed, onMounted, reactive, ref, watch } from "vue";
-import { useRoute } from "vue-router";
+import { computed, inject, onMounted, reactive, ref, watch } from "vue";
+import { useRoute, useRouter } from "vue-router";
 import { useI18n } from "vue-i18n";
 import { useToast } from "vue-toast-notification";
 import ShellIcon from "@/components/organisms/Shell/ShellIcon.vue";
 import { apiRequestWithoutCompnay } from "@/services";
+import { isManagedHosting, publicConfig } from "@/config/publicConfig";
+import { openUpgrade } from "@/composable/upgradeLink";
+import { restartAndWait } from "./restartInstance";
 import { useInstanceApi } from "./useInstanceApi";
 import InstanceAgents from "./InstanceAgents.vue";
 
@@ -72,7 +92,9 @@ defineOptions({ name: "InstanceSettings" });
 const { t, te } = useI18n();
 const $toast = useToast();
 const route = useRoute();
-const { get, put, message, guide, env } = useInstanceApi();
+const router = useRouter();
+const cid = inject("$companyId");
+const { get, post, put, message, guide, env } = useInstanceApi();
 
 const TESTABLE = ["mail", "storage", "ai"];
 const rows = ref([]);
@@ -85,10 +107,16 @@ const busy = ref(false);
 const error = ref("");
 const restartKeys = ref([]);
 const testResult = ref(null);
+const restartState = ref("idle");
 let baseline = {};
 
 const visible = computed(() => rows.value.filter((r) => r.group === group.value));
 const testable = computed(() => TESTABLE.includes(group.value));
+const hosted = computed(() => isManagedHosting());
+const allManaged = (list) => list.length > 0 && list.every((r) => r.managed);
+const groupManaged = computed(() => allManaged(visible.value));
+const managedGroups = computed(() => groups.value.filter((g) => allManaged(rows.value.filter((r) => r.group === g))));
+const managedGroupNames = computed(() => managedGroups.value.map((g) => t(`Instance.group_${g}`)).join(" · "));
 const dirty = computed(() => Object.keys(draft).some((k) => draft[k] !== baseline[k]) || Object.values(clear).some(Boolean));
 const label = (row) => (te(`Instance.f_${row.key}`) ? t(`Instance.f_${row.key}`) : row.label);
 const help = (row) => (te(`Instance.h_${row.key}`) ? t(`Instance.h_${row.key}`) : row.help);
@@ -153,9 +181,21 @@ async function test() {
         for (const row of visible.value) if (!row.locked && !row.secret) values[row.key] = draft[row.key]; else if (row.secret && draft[row.key]) values[row.key] = draft[row.key];
         const res = await apiRequestWithoutCompnay("post", env.INSTANCE_SETTINGS_TEST, { group: group.value, values }).catch((e) => ({ data: { status: false, statusText: message(e) } }));
         const models = Array.isArray(res?.data?.data?.models) ? res.data.data.models : [];
-        testResult.value = { ok: res?.data?.status === true, text: res?.data?.statusText || t("Instance.test_ok"), models };
+        const text = res?.data?.data?.code === "smtp_port_blocked" ? t("Instance.managed_smtp_blocked") : res?.data?.statusText || t("Instance.test_ok");
+        testResult.value = { ok: res?.data?.status === true, text, models };
     } finally {
         busy.value = false;
+    }
+}
+
+async function restartNow() {
+    restartState.value = "restarting";
+    try {
+        await restartAndWait({ post, companyId: cid?.value || "" });
+        window.location.reload();
+    } catch (e) {
+        restartState.value = "failed";
+        if (e?.response) $toast.error(message(e));
     }
 }
 
@@ -170,4 +210,7 @@ onMounted(load);
 .in-models { margin: 0 0 12px; }
 .in-models__list { display: flex; flex-wrap: wrap; gap: 6px; margin: 6px 0 0; padding: 0; list-style: none; }
 .in-models__list code { overflow-wrap: anywhere; }
+.in-managed { display: inline-flex; align-items: center; gap: 6px; }
+.in-restart { align-items: center; }
+.in-restart > span:not(.ah-spin) { flex: 1; }
 </style>
