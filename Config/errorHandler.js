@@ -12,9 +12,8 @@ const statusFor = (err) => {
 /* multer cut an upload off at the largest file allowed: said in the plan's words (064). */
 const tooLarge = (err) => {
     if (!(err && err.code === TOO_LARGE)) return null;
-    const { maxUploadBytes } = require('../Modules/Entitlements/uploads');
     const { refusalBody } = require('../Modules/Entitlements/answers');
-    const limit = maxUploadBytes(Number(process.env.UPLOAD_MAX_FILE_BYTES || 100 * 1024 * 1024));
+    const limit = require('../utils/uploadConfig').DEFAULT_LIMITS.fileSize;
     const { statusText, code } = refusalBody({ code: 'file_too_large', limit, used: 0 });
     return { statusText, code, limit };
 };
