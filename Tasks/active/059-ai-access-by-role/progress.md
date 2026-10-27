@@ -53,3 +53,17 @@ Database:
   - Web: 733 files, 11,604 tests. 15 files fail; 13 fail on `staging` too (token, phone and dark-mode specs, i18nProductionMessages, editorMarkup). appWithoutWorkspace and taskOverlayHeadings time out only under load and pass alone. accountTokenRenew and googleConnection failed from this work (their stores had no AI rows) and pass after the fixture update.
   - New tests: `tests/ai-access-rules.test.js` (23), `tests/agent-access-by-role.test.js` (37), `frontend/tests/unit/agentAccessByRole.spec.js` (15), plus cases added to the Google connection, MCP grant and token form tests.
   - i18n check, style check: pass.
+- Local review against the demo database (its companies are all public now, so only TechNova, owner screens only, nothing saved): the seven AI rows were added to TechNova with the grants of migration 078 and a snapshot to undo them; the server ran with migrations, cron, the agent engine and email off.
+  - Bug found and fixed: the rules schema in `utils/mongo-handler/schema.js` dropped `switchOnly` and `riskField`, so in every workspace the four everyday rows offered None/Read/Write and "Skills an agent may use" never showed its risk levels (Write stored `true`, read as any risk). Both flags are now in the schema; a test in `tests/ai-access-rules.test.js` checks every field an AI row is saved with survives the schema.
+  - Checked as owner: Security & Permissions (simple and advanced), AI hub chips, agent settings with "Who can use this agent" and the people picker, the New agent wizard (Private by default, "Create agent" for an owner), the skill library. Every AI request answered 200.
+  - Open question: migration 078 and the new member defaults switch on the Artificial Intelligence section for members, which `staging` left off on purpose; it also gates the AI entry of the project toolbar.
+- Tested end to end with the demo owner account in TechNova, with requests set up as from the member Leo Martins (two new agents, an edit of an approved agent, a skill), then removed again:
+  - A waiting agent: hub list "3 requests wait for your approval", "Created by" line, "Waiting for approval" banner; a run is refused with 409 even for the owner; Approve shows "Approved by … on <date>".
+  - Decline: the button stays off without a reason and the API answers 400; with a reason the agent shows "Declined by" with it, and Run now is off in the hub.
+  - A waiting edit: "A change from Leo Martins waits for approval", the approved version keeps running; Approve makes revision 2 live.
+  - A waiting skill: chip and Approve/Decline in the skill library; Approve turns it on.
+  - Owner's own agent: Private by default, works at once, sharing with one person saved as a live revision, deleted by typing its name.
+  - Matrix: Agents Read and skill risk "Low risk" saved for Member as `false` and `1`.
+  - Bug found and fixed: no approval notice was ever saved, because `workspaceNotice.sendNotice` left out the `uniqueId` the notifications schema requires (the OAuth client approval notices on `staging` have the same gap). The row now carries one; `tests/workspace-notice.test.js` checks a notice against the real schema. After the fix Leo got both notices and his bell went up.
+  - Cleanup left TechNova as before: agents, revisions, skills, runs, notices, bell counts and the 99 rules match; 7 audit rows of the decisions stay, since the audit chain must not be edited.
+  - Related tests after both fixes: 98 files (2,297 tests) and 87 schema, rules and migration files (1,435 tests) pass.
