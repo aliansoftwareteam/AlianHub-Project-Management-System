@@ -1,0 +1,16 @@
+version: 2
+updates:
+  # The Dockerfile pins node:20 Alpine by digest; this proposes the new digest
+  # when the image is rebuilt (security fixes) and new Node 20 patch releases.
+  # Moving to Node 22 is a fleet decision, so majors are ignored.
+  - package-ecosystem: docker
+    directory: /
+    target-branch: staging
+    schedule:
+      interval: weekly
+    ignore:
+      - dependency-name: node
+        update-types: ["version-update:semver-major"]
+    commit-message:
+      prefix: build
+      include: scope
