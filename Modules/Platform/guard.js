@@ -3,6 +3,7 @@ const hostingMode = require('../../Config/hostingMode');
 const logger = require('../../Config/loggerConfig');
 const { logCall } = require('./platformAudit');
 const { STATE_IDS, readState } = require('./platformState');
+const { requestAddress } = require('../../utils/requestAddress');
 
 const KEY_HEADER = 'x-platform-key';
 const FAILURE_WINDOW_MS = 60 * 1000;
@@ -43,7 +44,7 @@ async function keyMatches(given, now = Date.now()) {
 
 const failures = new Map();
 
-const sourceOf = (req) => String((req.socket && req.socket.remoteAddress) || req.ip || 'unknown');
+const sourceOf = (req) => requestAddress(req) || 'unknown';
 
 function blockedUntil(source, now) {
     const entry = failures.get(source);
