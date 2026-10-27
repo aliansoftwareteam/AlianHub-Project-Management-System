@@ -1,6 +1,7 @@
-appId: com.example.nextron
-productName: Alian Hub Time Tracker 2.0
-copyright: Copyright © 2025 Alian Software
+appId: com.alianhub.tracker
+productName: AlianHub Tracker
+executableName: alianhub-tracker
+copyright: Copyright © 2026 Alian Software
 directories:
   output: dist
   buildResources: resources
@@ -14,4 +15,53 @@ files:
     filter:
       - logo.png
       - traylogo.png
-publish: null
+# myapp stays registered for tracker 5's links: "Start in tracker" in the web app and older servers' sign-in.
+protocols:
+  - name: AlianHub Tracker
+    schemes:
+      - alianhub-tracker
+      - myapp
+# The tracker picks its channel folder at run time (main/helpers/updates.js); CI points this at
+# the beta folder for a beta tag so the latest*.yml files it writes name the right place.
+publish:
+  provider: generic
+  url: https://downloads.alianhub.com/tracker/stable/
+win:
+  icon: resources/logo.png
+  target: nsis
+  artifactName: AlianHub-Tracker-Setup-${version}.${ext}
+nsis:
+  oneClick: true
+  perMachine: false
+mac:
+  icon: resources/logo.png
+  category: public.app-category.productivity
+  target:
+    - target: dmg
+      arch: universal
+    - target: zip
+      arch: universal
+  artifactName: AlianHub-Tracker-${version}-${arch}.${ext}
+  hardenedRuntime: true
+  gatekeeperAssess: false
+  entitlements: resources/entitlements.mac.plist
+  entitlementsInherit: resources/entitlements.mac.plist
+  notarize: false
+linux:
+  icon: resources/logo.png
+  target:
+    - AppImage
+    - deb
+  category: Utility
+  maintainer: Alian Software <support@alianhub.com>
+  synopsis: Time tracking for AlianHub
+  description: AlianHub Tracker records time and screenshots against the tasks of any AlianHub workspace.
+  executableName: alianhub-tracker
+  artifactName: AlianHub-Tracker-${version}-${arch}.${ext}
+  desktop:
+    Name: AlianHub Tracker
+    MimeType: x-scheme-handler/alianhub-tracker;x-scheme-handler/myapp;
+    StartupNotify: "true"
+# latest-linux.yml lists only the AppImage; Modules/DesktopTracker/feed.js derives this name for the .deb.
+deb:
+  artifactName: AlianHub-Tracker-${version}-amd64.${ext}
