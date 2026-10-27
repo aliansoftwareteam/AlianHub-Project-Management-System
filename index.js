@@ -9,6 +9,7 @@ const bodyParser = require("body-parser");
 const config =  require('./Config/config.js');
 const { loadDotEnv, applyEnvMap } = require('./Config/applyEnv.js');
 loadDotEnv();
+require('./Config/hostingMode').refuseBadBoot();
 const { makeDefaultBrandSettings } = require("./Modules/Admin/common/controller.js");
 const { installCors } = require('./utils/cors.js');
 const { trustProxySetting } = require('./Config/trustProxy.js');

@@ -16,6 +16,7 @@ jest.mock('../Config/instanceSettings', () => ({
     describe: jest.fn(() => ({ mail: {} })),
     isLoaded: jest.fn(() => true),
     saveInstanceSettings: jest.fn(),
+    refusedKeys: jest.fn(() => ({})),
     publicConfig: jest.fn(),
 }));
 jest.mock('../Modules/Instance/settingsCatalog', () => ({ GROUPS: [{ key: 'mail' }], validateSettings: jest.fn() }));
@@ -123,6 +124,24 @@ describe('access and settings', () => {
         expect(res.body).toEqual({ status: false, statusText: 'Some settings are not valid.', data: { errors: { port: 'must be a number' } } });
         expect(settings.saveInstanceSettings).not.toHaveBeenCalled();
         expect(validateSettings).toHaveBeenCalledWith({ port: 'x' });
+    });
+
+    it('putSettings refuses a managed key by name with 400 and saves nothing', async () => {
+        settings.refusedKeys.mockReturnValueOnce({ NODEMAILER_HOST: 'managed' });
+        const res = await run(ctrl.putSettings, { instanceAdmin: 'owner', body: { NODEMAILER_HOST: 'smtp.example.com', APP_NAME: 'Acme' } });
+        expect(res.statusCode).toBe(400);
+        expect(res.body).toEqual({ status: false, statusText: 'Some settings are managed by AlianHub Cloud.', data: { errors: { NODEMAILER_HOST: 'managed' } } });
+        expect(settings.saveInstanceSettings).not.toHaveBeenCalled();
+        expect(validateSettings).not.toHaveBeenCalled();
+    });
+
+    it('putSettings refuses a key set in the environment instead of reporting a save that never applied', async () => {
+        settings.refusedKeys.mockReturnValueOnce({ NODEMAILER_HOST: 'locked' });
+        const res = await run(ctrl.putSettings, { body: { NODEMAILER_HOST: 'smtp.example.com' } });
+        expect(res.statusCode).toBe(400);
+        expect(res.body.statusText).toBe('Some settings are set in the environment and cannot be changed here.');
+        expect(res.body.data.errors).toEqual({ NODEMAILER_HOST: 'locked' });
+        expect(settings.saveInstanceSettings).not.toHaveBeenCalled();
     });
 
     it('putSettings validates an empty body rather than failing', async () => {

@@ -31,7 +31,13 @@ exports.access = (req, res) => ok(res, 'Instance admin.', { allowed: true, via: 
 
 exports.getSettings = (req, res) => ok(res, 'Instance settings.', { groups: GROUPS, settings: settings.describe(), loaded: settings.isLoaded() });
 
+/* A locked key used to be dropped silently, so the page reported a save that never applied. */
 exports.putSettings = async (req, res) => {
+    const refused = settings.refusedKeys(req.body || {});
+    if (Object.keys(refused).length) {
+        const managed = Object.values(refused).includes('managed');
+        return fail(res, 400, managed ? 'Some settings are managed by AlianHub Cloud.' : 'Some settings are set in the environment and cannot be changed here.', { errors: refused });
+    }
     const { values, errors, valid } = validateSettings(req.body || {});
     if (!valid) return fail(res, 400, 'Some settings are not valid.', { errors });
     try {
