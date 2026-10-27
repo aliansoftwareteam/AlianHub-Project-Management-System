@@ -18,6 +18,8 @@ const projectDailyLook = require("./Modules/Agents/manager/dailyLook");
 const projectTriage = require("./Modules/Agents/managerTriage");
 const appConnections = require("./Modules/Integrations/appConnections/scheduler");
 const storageReconcile = require("./common-storage/storageReconcile");
+const platformEntitlements = require("./Modules/Platform/entitlements");
+const platformSupport = require("./Modules/Platform/supportSession");
 
 // UTC unless the operator pins another zone: the only choice that survives a DST
 // switch, a container reboot or a base-image swap without shifting schedules.
@@ -56,5 +58,11 @@ job('recurringTasks', '*/15 * * * *', () => recurringTasks.runRecurringForAllCom
 job('reminders', '* * * * *', () => reminders.runRemindersForAllCompanies());
 job('appConnections', '*/5 * * * *', () => appConnections.runForAllCompanies());
 job('timeReminders', '0 17 * * *', () => timeReminders.runRemindersForAllCompanies());
+// Hosted only: a missed entitlements push is recovered within 6 hours, and a support session ends on
+// time even when the process restarted after it began.
+if (require("./Config/hostingMode").isManaged()) {
+    job('platformEntitlementsPull', `${Math.floor(Math.random() * 60)} */6 * * *`, () => platformEntitlements.pullEntitlements());
+    job('platformSupportExpiry', '* * * * *', () => platformSupport.expireDueSupportSession());
+}
 
 module.exports = { job, CRON_TZ };

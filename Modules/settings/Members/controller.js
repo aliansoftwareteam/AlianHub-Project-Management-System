@@ -81,6 +81,8 @@ exports.getMembers = async (req, res) => {
         const companyId = req.headers['companyid'];
         const cacheKey = `company_users:${companyId}`;
         const rowView = memberRowFor(await viewerOf(companyId, req.uid));
+        // The AlianHub Support seat is not a member: only that account itself sees its own row.
+        const listed = (rows) => rows.filter((row) => !row.isSupportUser || String(row.userId) === String(req.uid)).map(rowView);
 
         const cached = cachedMemberRows(companyId);
         if (cached) {
@@ -88,14 +90,14 @@ exports.getMembers = async (req, res) => {
                 'FromCache': 'true',
                 'cacheExpireTime': myCache.getTtl(cacheKey)
             });
-            return res.status(200).json({ status: true, data: cached.map(rowView) });
+            return res.status(200).json({ status: true, data: listed(cached) });
         }
 
         const response = await MongoDbCrudOpration(companyId, { type: SCHEMA_TYPE.COMPANY_USERS, data: [] }, 'find');
         myCache.set(cacheKey, JSON.stringify(response), 604800);
 
         if (response) {
-            return res.status(200).json({ status: true, data: response.map(rowView) });
+            return res.status(200).json({ status: true, data: listed(response) });
         } else {
             return res.status(404).json({ status: false });
         }

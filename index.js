@@ -110,6 +110,7 @@ function initializeControllers() {
     require('./Modules/notification-count/init').init(app);
     require('./Modules/trackerUserPermission/init').init(app);
     require('./Modules/Instance/init').init(app);
+    require('./Modules/Platform/init').init(app);
     require('./Modules/CspReport/init').init(app);
     require('./Modules/Pickers/init').init(app);
     require('./Modules/ScreenshotRetention/init').init(app);

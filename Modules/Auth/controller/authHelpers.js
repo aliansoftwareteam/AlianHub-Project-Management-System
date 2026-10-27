@@ -147,6 +147,12 @@ exports.insertAuthFun = async (reqData, cb) => {
             });
             return;
         }
+        // Only an explicit null from a server-side caller makes an account that has no password yet.
+        if (reqData.passwordless === true && reqData.password === null) {
+            const saved = await mongoC.MongoDbCrudOpration(dbCollections.GLOBAL, { type: dbCollections.USER_AUTH, data: { email: reqData.email } }, "save");
+            cb({ status: true, data: { email: reqData.email, _id: saved._id } });
+            return;
+        }
         if (!(reqData && reqData.password)) {
             cb({
                 status: false,
@@ -229,6 +235,7 @@ const storeInCurrentFormat = async (account, input) => {
 };
 
 const mailSetPasswordLink = async (email, isLoginType) => {
+    if (await require("../helpers/accountMail").isActivationPending(email)) return;
     const token = generateToken(600);
     const stored = await mongoC.MongoDbCrudOpration(dbCollections.GLOBAL, {
         type: dbCollections.USER_AUTH,

@@ -38,7 +38,7 @@ exports.requestMagicLink = async (req, res) => {
         config.myCache.set(limitKey, sent + 1, PER_EMAIL_WINDOW);
 
         const user = await findUserByEmail(email);
-        if (user && user._id && user.isEmailVerified !== false && user.isActive !== false) {
+        if (user && user._id && user.isEmailVerified !== false && user.isActive !== false && !user.activationPending && !user.isSupportUser) {
             const token = crypto.randomBytes(32).toString('base64url');
             config.myCache.set(`magic:${hash(token)}`, { uid: String(user._id), redirect: safeRedirect(req.body.redirect_url) }, TTL_SECONDS);
             const link = `${config.APIURL}api/v2/auth/magic-link/verify?token=${encodeURIComponent(token)}`;

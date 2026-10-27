@@ -25,6 +25,10 @@ const PUBLIC_ROUTES = [
     'POST /api/v2/sendForgotPasswordEmail',
     'POST /api/v2/checkPermission',
     'POST /api/v2/auth/invitation-preview',
+    // Hosted only (404 self-hosted): a one-time link token from the platform API is the credential.
+    'POST /api/v2/auth/platform-login',
+    'POST /api/v2/auth/activation/verify',
+    'POST /api/v2/auth/activate',
     // Exchanges a refresh token for a new access token, so it runs once the access token has expired.
     'POST /api/v2/generateToken',
     // Social sign-in: the provider's authorization code is the credential.
