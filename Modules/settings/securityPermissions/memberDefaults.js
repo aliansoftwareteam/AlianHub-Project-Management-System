@@ -78,15 +78,16 @@ const MEMBER_DEFAULT_PERMISSIONS = Object.freeze({
     ai_external_clients: true,
 });
 
-// Every other key gives a new guest entry Read. These give a guest nothing.
+// Every other key gives a new guest entry Read. These give a guest what migration 078 gives an existing one.
 const GUEST_DEFAULT_PERMISSIONS = Object.freeze({
-    ai_assistant: null,
+    artificial_intelligence: true,
+    ai_assistant: true,
     ai_agent_use: null,
     ai_agents: null,
     ai_skills: null,
     ai_skill_risk: null,
     ai_connectors: null,
-    ai_external_clients: null,
+    ai_external_clients: true,
 });
 
 module.exports = { MEMBER_ROLE_TYPE, MEMBER_DEFAULT_PERMISSIONS, GUEST_DEFAULT_PERMISSIONS };

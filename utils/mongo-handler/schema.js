@@ -3591,6 +3591,14 @@ const schema = {
         selectionField : {
             type: Boolean,
             required : false
+        },
+        switchOnly : {
+            type: Boolean,
+            required : false
+        },
+        riskField : {
+            type: Boolean,
+            required : false
         }
 
     },

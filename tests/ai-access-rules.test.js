@@ -68,13 +68,22 @@ describe('the AI rows of the catalogue', () => {
         expect(ruleFor(NEW, AI_RIGHT.SKILL_RISK).riskField).toBe(true);
     });
 
-    test('a new company gives a member the everyday AI and nothing to build with, and a guest no AI at all', async () => {
+    test('the rules schema keeps every field an AI row is saved with, or the matrix loses its switch and risk levels', async () => {
+        const { schema } = jest.requireActual('../utils/mongo-handler/schema');
         seedPeople(NEW);
         await importCompanyRules(NEW);
-        for (const key of EVERYDAY) {
-            expect(await right(NEW, 'member', key)).toBe(true);
-            expect(await right(NEW, 'guest', key)).toBeNull();
-        }
+        AI_KEYS.forEach((key) => {
+            Object.keys(ruleFor(NEW, key)).filter((field) => !['_id', 'createdAt', 'updatedAt'].includes(field))
+                .forEach((field) => expect([key, Object.keys(schema.rules)]).toEqual([key, expect.arrayContaining([field])]));
+        });
+    });
+
+    test('a new company gives a member the everyday AI, a guest Ask AI and their own AI, and neither anything to build with', async () => {
+        seedPeople(NEW);
+        await importCompanyRules(NEW);
+        for (const key of EVERYDAY) expect(await right(NEW, 'member', key)).toBe(true);
+        for (const key of [AI_RIGHT.ASSISTANT, AI_RIGHT.EXTERNAL_CLIENTS]) expect(await right(NEW, 'guest', key)).toBe(true);
+        for (const key of [AI_RIGHT.AGENT_USE, AI_RIGHT.CONNECTORS]) expect(await right(NEW, 'guest', key)).toBeNull();
         for (const key of [...BUILDING, AI_RIGHT.SKILL_RISK]) {
             expect(await right(NEW, 'member', key)).toBeNull();
             expect(await right(NEW, 'guest', key)).toBeNull();
@@ -173,7 +182,7 @@ describe('078-ai-access-rules', () => {
 
         expect(entryOf(OLD, AI_RIGHT.ASSISTANT, 4)).toMatchObject({ permission: null, seededBy: migration.SEEDED_BY });
         expect(entryOf(OLD, AI_RIGHT.AGENT_USE, 4)).toBeUndefined();
-        expect(await right(OLD, 'guest', AI_RIGHT.ASSISTANT)).toBeNull();
+        expect(await right(OLD, 'guest', AI_RIGHT.ASSISTANT)).toBe(true);
         expect(await right(OLD, 'member', AI_RIGHT.ASSISTANT)).toBe(true);
     });
 
