@@ -1,9 +1,6 @@
-import getConfig from 'next/config';
+import { workspaceUrl } from './workspaceBase';
 
-const { publicRuntimeConfig } = getConfig();
-const { APIURL } = publicRuntimeConfig || {};
-
-// The web app is a hash-router SPA served at APIURL (cf. Login: `${APIURL}/#/oauth2`).
+// The web app is a hash-router SPA served at the workspace address (cf. Login: `/#/oauth2`).
 // Task routes (frontend router/projects): with a folder →
 //   /:cid/project/:id/fs/:folderId/:sprintId/:taskId
 // without a folder →
@@ -14,7 +11,7 @@ export function buildTaskWebUrl({ cid, projectId, folderObjId, sprintId, taskId 
   const path = folderObjId
     ? `${base}/fs/${folderObjId}/${sprintId}/${taskId}`
     : `${base}/s/${sprintId}/${taskId}`;
-  return `${APIURL}/#${path}`;
+  return workspaceUrl(`/#${path}`);
 }
 
 // Open the task in the user's default browser via the main-process IPC.

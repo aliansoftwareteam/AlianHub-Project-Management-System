@@ -6,11 +6,15 @@
 // that way would arrive undefined.
 const { version: appVersion } = require('../package.json');
 
+// A self-hosted build may still bake in its server: it becomes the first workspace, nothing more.
+const defaultWorkspace = process.env.APIURL || '';
+
 /** @type {import('next').NextConfig} */
 module.exports = {
   output: 'export',
   env: {
     NEXT_PUBLIC_APP_VERSION: appVersion,
+    NEXT_PUBLIC_DEFAULT_WORKSPACE: defaultWorkspace,
   },
   distDir: process.env.NODE_ENV === 'production' ? '../app' : '.next',
   trailingSlash: true,
@@ -20,10 +24,4 @@ module.exports = {
   webpack: (config) => {
     return config
   },
-  serverRuntimeConfig: {
-    APIURL:process.env.APIURL,
-  },
-  publicRuntimeConfig:{
-    APIURL:process.env.APIURL,
-  }
 }
