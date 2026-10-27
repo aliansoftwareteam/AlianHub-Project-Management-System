@@ -183,6 +183,8 @@ import { forgetRememberedEmail, readRememberedEmail, saveRememberedEmail } from 
 import { away } from "@/offline";
 import { useDemoIndustry } from "@/composable/useDemoIndustry";
 
+const SSO_ERRORS = { not_allowed: "Auth.sso_not_allowed", seat_limit: "Plan.refused.seat_limit" };
+
 const { t } = useI18n();
 const { industryOf } = useDemoIndustry();
 const $toast = useToast();
@@ -215,6 +217,11 @@ const demo = computed(() => (brand.value.demoMode === true
 const canTryDemo = computed(() => Boolean(demo.value?.email && demo.value.password));
 // Brand settings usually arrive after this page mounts; whatever is already in the fields wins.
 let demoFilled = false;
+/* A suspended hosted workspace says so before anyone types a password (064). */
+watch(() => publicConfig.hosting?.lifecycle, (state) => {
+    if (state === "suspended") router.replace({ name: "Suspended" });
+}, { immediate: true });
+
 watch(demo, (account) => {
     if (demoFilled || !account) return;
     demoFilled = true;
@@ -251,7 +258,7 @@ onMounted(() => {
     if (route.query.reason === "expired") banner.value = { kind: "warn", text: t("Auth.two_factor_session_expired") };
     if (route.query.magic === "invalid") banner.value = { kind: "danger", text: t("Auth.magic_invalid") };
     if (route.query.magic === "disabled") banner.value = { kind: "warn", text: t("Auth.magic_unavailable") };
-    if (route.query.ssoError) banner.value = { kind: "danger", text: t(route.query.ssoError === "not_allowed" ? "Auth.sso_not_allowed" : "Auth.sso_failed") };
+    if (route.query.ssoError) banner.value = { kind: "danger", text: t(SSO_ERRORS[route.query.ssoError] || "Auth.sso_failed") };
     if (route.query.magic === "ok" && route.query.uid) {
         busy.value = true;
         proceedAfterAuth(String(route.query.uid)).catch(() => {

@@ -58,6 +58,15 @@ export default [
         }
     },
     {
+        path: '/suspended',
+        name: 'Suspended',
+        component: () => import(/* webpackChunkName: "Suspended" */ '@/views/Authentication/Suspended/Suspended.vue'),
+        meta: {
+            title: 'Suspended',
+            requiresAuth: false
+        }
+    },
+    {
         path: '/platform-login',
         name: 'Platform_Login',
         component: () => import(/* webpackChunkName: "Platform_Login" */ '@/views/Authentication/PlatformLogin/PlatformLogin.vue'),
