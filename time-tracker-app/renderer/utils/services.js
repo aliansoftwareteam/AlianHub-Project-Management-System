@@ -108,7 +108,6 @@ const requestAuth = (id) => {
         }).catch((error) => {
             console.error('error', error);
             if (error?.response?.data?.isLogout) {
-                pendingAuth = null;
                 logoutFunction()
                 .then(() => {
                     Router.push('/login');
@@ -116,12 +115,14 @@ const requestAuth = (id) => {
                 .catch((error) => {
                     console.error("ERROR: ", error);
                 });
-            } else {
-                reject(error);
             }
+            reject(error);
         });
     })
 };
+
+// A refresh that fails ends the request that asked for it, instead of leaving it waiting forever.
+const refreshed = () => getAuth(localStorage.getItem("userId")).then(() => true, () => false);
 
 export const apiRequest = (type, endPoint, data, dataType) => {
     return new Promise((resolve, reject) => {
@@ -148,8 +149,10 @@ export const apiRequest = (type, endPoint, data, dataType) => {
                             console.error("ERROR: ", error);
                         });
                     }else if (err?.response?.data?.isJwtError) {
-                        const userId = localStorage.getItem("userId");
-                        await getAuth(userId);
+                        if (!(await refreshed())) {
+                            reject(err);
+                            return;
+                        }
                         apiRequest(type, endPoint, data).then((sData)=>{
                             resolve(sData);
                         }).catch((err) => {
@@ -205,8 +208,10 @@ export const apiRequestFormData = (type, endPoint, data, dataType) => {
                             console.error("ERROR: ", error);
                         });
                     }else if (err?.response?.data?.isJwtError) {
-                        const userId = localStorage.getItem("userId");
-                        await getAuth(userId);
+                        if (!(await refreshed())) {
+                            reject(err);
+                            return;
+                        }
                         apiRequest(type, endPoint, data).then((sData)=>{
                             resolve(sData);
                         }).catch((err) => {
@@ -252,8 +257,10 @@ export const apiRequestWithoutCompnay = (type, endPoint, data) => {
                                 console.error("ERROR: ", error);
                             });
                         } else if (err?.response?.data?.isJwtError) {
-                        const userId = localStorage.getItem("userId");
-                        await getAuth(userId);
+                        if (!(await refreshed())) {
+                            reject(err);
+                            return;
+                        }
                         apiRequestWithoutCompnay(type, endPoint, data).then((sData)=>{
                             resolve(sData);
                         }).catch((err) => {
