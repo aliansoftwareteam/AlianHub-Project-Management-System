@@ -1,7 +1,7 @@
 ---
 id: 069
 title: Provisioning orchestrator and host agent — paid to live in three minutes, and every change after
-status: backlog
+status: active
 priority: high
 depends_on: [060, 062, 065, 070]
 created: 2026-10-27
@@ -22,6 +22,23 @@ Turn "this customer paid for Pro as `acme`" into a running, verified instance at
 add-on, suspension, subdomain change, upgrade, host move, cancellation, deletion. Every step is
 recorded, retried safely and resumable from the step that failed. The same engine drives a
 `cloudctl` command line first, so engineers can run the paid beta (M2) before the portal exists.
+
+## Decisions on 2026-10-28 (owner)
+
+- **DNS is AWS Route 53**, not Cloudflare: the `alianhub.com` hosted zone gets one `A` record per
+  tenant (`<sub>` → host IP, TTL 60) through the Route 53 API. No proxy sits in front, so TLS is a
+  Let's Encrypt wildcard `*.alianhub.com` issued by the control plane over a Route 53 DNS-01 challenge
+  and pushed to every host by the agent (`edge.tls`); a DigitalOcean Cloud Firewall leaves only
+  80/443 open to the world.
+- **Files: one Wasabi bucket per installation**, with its own Wasabi IAM user, inline policy and
+  access key, created at provisioning and pushed to the instance; all four are removed on delete.
+  Backups go to a separate Wasabi backups bucket through presigned PUT URLs.
+- **DigitalOcean, Route 53 and Wasabi keys are placeholders** in the control plane's `.env` until the
+  owner adds them (the accounts are tied to payment). Every adapter has a fake; `CLOUD_DRY_RUN=true`
+  logs each provider call instead of making it; `npm run cloud:check` proves each key with read-only
+  calls; the agent path is proven end to end on a local host before any key exists.
+- Hosts can also be **registered by hand** (`cloudctl host add --manual`): the agent runs on any
+  Docker machine, including the developer PC, so the cloud mode is testable without DigitalOcean.
 
 ## Where we start
 
@@ -60,8 +77,10 @@ recorded, retried safely and resumable from the step that failed. The same engin
 | Adapter | Interface | First implementation |
 |---|---|---|
 | `compute` | `createHost(spec)`, `getHost(id)`, `destroyHost(id)`, `listHosts()`, `attachVolume()` | DigitalOcean API v2: `POST /v2/droplets` (from the golden snapshot, `user_data`, VPC, tags), `GET /v2/actions/{id}`, `GET/DELETE /v2/droplets/{id}`, volumes, `POST /v2/projects/{id}/resources` |
-| `dns` | `upsertRecord(name, target)`, `deleteRecord(name)`, `getRecord(name)` | Cloudflare API, proxied `A` records (DigitalOcean DNS as the alternative) |
-| `objectStore` | `createTenantKey(instanceId)`, `revokeKey(id)`, `deletePrefix(instanceId)`, `prefixBytes(instanceId)`, `presignBackupPut(instanceId, key)` | Wasabi IAM (user + prefix policy per instance) for files; Spaces presigned URLs for backups; Spaces per-bucket keys (`POST /v2/spaces/keys`) as the fallback (Q26) |
+| `dns` | `upsertRecord(name, target)`, `deleteRecord(name)`, `getRecord(name)`, `upsertTxt` / `deleteTxt` (ACME) | AWS Route 53 `ChangeResourceRecordSets` on the `alianhub.com` hosted zone, `A` records, TTL 60 |
+| `objectStore` | `createTenant(instanceId)`, `hasTenant`, `deleteTenant`, `settingsFor` | Wasabi: a bucket per installation, IAM user + inline bucket policy + access key (S3 and IAM APIs) |
+| `backups` | `presignPut(key)`, `presignGet(key)`, `list(prefix)`, `remove(key)` | A Wasabi backups bucket; hosts only ever see presigned URLs |
+| `tls` | `issueWildcard(domain)`, `renewIfDue()` | Let's Encrypt (ACME v2) DNS-01 through the `dns` adapter |
 | `mailRelay` | `registerSender(instanceId)`, `setDailyCap(n)` | Resend HTTPS API (SMTP is blocked on Droplets) |
 | `registry` | `credentialsFor(host)`, `digestOf(version)` | DOCR mirror: `GET /v2/registries/alianhub/docker-credentials?read_write=false&expiry_seconds=3600`; GHCR fallback |
 | `uptime` | `createCanary(host)`, `deleteCanary(id)` | DigitalOcean `POST/DELETE /v2/uptime/checks` (one per host, not per tenant) |

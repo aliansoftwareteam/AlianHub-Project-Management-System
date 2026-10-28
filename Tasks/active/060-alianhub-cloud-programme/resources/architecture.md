@@ -383,11 +383,14 @@ carries an idempotency key; a job claimed but not reported in 10 minutes is re-q
 
 ## 15. Storage layout (task 063)
 
-- **Tenant files on Wasabi** (Q26): one tenants bucket per region, e.g.
-  `alianhub-cloud-tenants-ap-southeast-1`. Keys: `<instanceId>/<companyId>/<existing key>`; public
-  assets under `<instanceId>/public/…`.
-- One IAM user + policy per instance, allowed only `s3:*Object*` on `<bucket>/<instanceId>/*` and
-  `s3:ListBucket` with that prefix condition. A leaked key exposes one customer, not all.
+- **Tenant files on Wasabi** (Q26), **one bucket per installation** *(owner, 2026-10-28)*:
+  `ahc-<instanceId without ins_>` in the Wasabi region of the host. Keys inside it keep 063's layout
+  (`<instanceId>/<companyId>/<existing key>`), so moving to a shared bucket later is a copy, not a
+  code change.
+- One Wasabi IAM user + inline policy per installation, allowed `s3:*` on that bucket only. A leaked
+  key exposes one customer, not all. The control plane creates bucket, user, policy and access key
+  at provisioning (069 `storage_created`), pushes them to the instance, and removes all four on
+  delete.
   DigitalOcean Spaces cannot do this (keys are per bucket, not per prefix); the Spaces fallback is a
   bucket per shared host and per Business customer.
 - **Backups on DigitalOcean Spaces** in the launch region (`alianhub-cloud-backups-<region>`),
@@ -432,8 +435,15 @@ suspension) is already exercised by `cloudctl` and the back office.
    no inbound management port on tenant hosts.
 4. **Signed entitlements, fail-open on our outage.** The instance enforces limits locally.
 5. **Bootstrap in env, credentials by API.** Owner's instruction; credentials rotate without redeploy.
-6. **Prefix-per-instance S3 with per-instance IAM keys.** Isolation and the bucket-count ceiling.
-7. **Cloudflare in front of everything.** DNS API for per-tenant records, edge TLS, WAF, hides host IPs.
+6. **One Wasabi bucket and one IAM user per installation** *(owner, 2026-10-28; replaces the
+   prefix-per-instance plan)*. Created at provisioning, deleted with the instance; the default of
+   1,000 buckets per Wasabi account needs a raise before ~800 instances.
+7. **DNS on AWS Route 53, no proxy in front** *(owner, 2026-10-28; replaces Cloudflare)*. The
+   `alianhub.com` hosted zone gets one `A` record per tenant pointing at its host. TLS is one
+   Let's Encrypt wildcard `*.alianhub.com` certificate issued by the control plane over a Route 53
+   DNS-01 challenge and pushed to every host by the agent (hosts never hold AWS keys, and one
+   certificate avoids the duplicate-certificate rate limit). Hosts are reachable directly, so a
+   DigitalOcean Cloud Firewall allows only 80/443 from anywhere and SSH from the ops addresses.
 8. **One time-tracker build for every customer**, connecting by workspace address (task 066), instead of
    a build per customer — see that PRD for why, and Q11.
 9. **Build our own thin orchestrator** rather than adopting Coolify/CapRover/Portainer: the lifecycle
@@ -448,3 +458,11 @@ suspension) is already exercised by `cloudctl` and the back office.
     digest so hosts can still pull during a GitHub outage. No separate push workflow for customers.
 13. **Per-tenant health is polled by the control plane**, not DigitalOcean uptime checks (100 per
     account); DO checks cover the portal, status page and one canary per host.
+14. **Backups on Wasabi too** *(2026-10-28, owner chose Wasabi for S3)*: a separate
+    `alianhub-cloud-backups` bucket written only through presigned PUT URLs. Wasabi bills every
+    object for 90 days, so 7–14-day retention costs more than on Spaces; the backups adapter is one
+    file if that changes.
+15. **Credentials live only in the control plane's env**: `DO_API_TOKEN`, the Route 53 key
+    (`AWS_ACCESS_KEY_ID`/`AWS_SECRET_ACCESS_KEY`, limited to the one hosted zone), the Wasabi root
+    key that may create buckets and IAM users, and the ACME account key. `npm run cloud:check`
+    proves each with a read-only call before anything is created.
