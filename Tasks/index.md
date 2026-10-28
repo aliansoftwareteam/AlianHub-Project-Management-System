@@ -66,7 +66,7 @@ Auto-maintained registry of all tasks. Reflects YAML frontmatter from each `task
 | 058 | Tracker timesheet — every screenshot card shows its image box and a loading state from the first paint | active | medium | — | active/058-tracker-screenshot-loading-placeholder |
 | 059 | Agent settings page — tabs, a searchable project picker and one sticky Save bar | active | high | — | active/059-agent-settings-tabs |
 | 060 | AI access by role — per-role AI rights in Security & Permissions, owner/admin approval for agents and skills | active | high | — | active/060-ai-access-by-role |
-| 061 | Connectors research — confirm Google and Dropbox before the build | backlog | high | — | backlog/061-connectors-research-pilot-providers |
+| 061 | Connectors research — confirm Google and Dropbox before the build | active | high | — | active/061-connectors-research-pilot-providers |
 | 062 | Connectors research — matrix and ranking for the new connectors and Gmail | backlog | medium | — | backlog/062-connectors-research-new-providers |
 | 063 | Connectors — the two-track contract, provider definition format, registry and the Google provider file | backlog | high | — | backlog/063-connectors-provider-definition |
 | 064 | Connectors — data model: evolve connector_connections, add connector_apps and connector_usage | backlog | high | 063 | backlog/064-connectors-data-model |
