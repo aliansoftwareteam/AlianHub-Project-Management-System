@@ -1,6 +1,7 @@
 # shellcheck shell=bash disable=SC2034
-# Shared by up.sh, down.sh, restart.sh, destroy.sh and platform-call.sh. Every script prints
-# exactly one JSON line on stdout (what the host agent parses); everything for people goes to stderr.
+# Shared by up.sh, down.sh, restart.sh, destroy.sh, platform-call.sh, backup.sh and restore.sh.
+# Every script prints exactly one JSON line on stdout (what the host agent parses); everything for
+# people goes to stderr.
 
 readonly EXIT_OK=0
 readonly EXIT_FAILED=1
@@ -8,8 +9,10 @@ readonly EXIT_BAD_ENV=2
 readonly EXIT_PULL=3
 readonly EXIT_UNHEALTHY=4
 readonly EXIT_HOST=5
+readonly EXIT_TRANSFER=6
 
 readonly INSTANCE_ID_RX='^ins_[a-z0-9]{20,32}$'
+readonly TRANSFER_URL_RX='^https?://[^[:space:]"\\]+$'
 readonly EDGE_NETWORK=edge
 readonly FALLBACK_IMAGE=${ALIANHUB_FALLBACK_IMAGE:-ghcr.io/aliansoftwareteam/alianhub}
 
@@ -17,6 +20,9 @@ STARTED_MS=0
 INSTANCE_DIR=
 INSTANCE_ID=
 PROJECT=
+TRANSFER_URL=
+TRANSFER_ERROR=
+STAGED=
 declare -A ENV_VALUES=()
 
 log() { printf '%s\n' "$*" >&2; }
@@ -299,5 +305,62 @@ wait_ready() {
         sleep 2
     done
     printf '%s' "${last:-timed out after ${timeout}s}"
+    return 1
+}
+
+service_running() {
+    local id
+    id=$(container_of "$1")
+    [[ -n $id && $(docker inspect --format '{{.State.Running}}' "$id" 2>/dev/null) == true ]]
+}
+
+# read_url <url | ->: sets TRANSFER_URL. "-" reads it from the first line of stdin, which keeps a
+# presigned URL (a credential until it expires) out of the host's process list.
+read_url() {
+    local url=${1:-}
+    if [[ $url == - ]]; then
+        IFS= read -r url || true
+        url=${url%$'\r'}
+    fi
+    [[ -n $url ]] || fail "$EXIT_BAD_ENV" usage "usage: $(basename "$0") <instanceDir> <presigned URL | ->"
+    [[ $url =~ $TRANSFER_URL_RX ]] || fail "$EXIT_BAD_ENV" usage "the presigned URL must be an http(s) URL"
+    TRANSFER_URL=$url
+}
+
+# stage_file <purpose>: sets STAGED to a private temporary file that is removed on exit. It holds a
+# whole database dump, so BACKUP_TMPDIR may point at a volume with room for one.
+stage_file() {
+    local dir=${BACKUP_TMPDIR:-${TMPDIR:-/tmp}}
+    STAGED=$(umask 077 && mktemp "$dir/ahc-$1-${INSTANCE_ID}.XXXXXX") ||
+        fail "$EXIT_HOST" host_not_ready "cannot create a temporary file in $dir"
+    trap 'rm -f -- "$STAGED" "$STAGED.curl"' EXIT
+}
+
+file_bytes() { wc -c <"$1" | tr -d ' '; }
+
+sha256_of() {
+    if command -v sha256sum >/dev/null 2>&1; then
+        sha256sum "$1" | cut -d ' ' -f 1
+    else
+        shasum -a 256 "$1" | cut -d ' ' -f 1
+    fi
+}
+
+# transfer <curl args with --output…>: one request to TRANSFER_URL, which reaches curl through a
+# config on stdin rather than its command line. The status is checked here, not with --fail: some
+# curl releases (8.14) exit 0 for a 404 once --retry is set. On failure TRANSFER_ERROR says why,
+# with URLs cut out.
+transfer() {
+    local status message
+    status=$(printf 'url = "%s"\n' "$TRANSFER_URL" | curl --config - --silent --show-error \
+        --connect-timeout 20 --max-time "${TRANSFER_TIMEOUT:-3600}" --retry 3 --retry-delay 2 \
+        --write-out '%{http_code}' "$@" 2>"$STAGED.curl") || true
+    [[ $status =~ ^2[0-9][0-9]$ ]] && return 0
+    message=$(sed -E 's#[A-Za-z][A-Za-z0-9+.-]*://[^[:space:]]*#<url>#g' "$STAGED.curl" 2>/dev/null | tail -n 1)
+    if [[ ${status:-000} != 000 ]]; then
+        TRANSFER_ERROR="the object store answered HTTP $status"
+    else
+        TRANSFER_ERROR=${message:-curl could not reach the object store}
+    fi
     return 1
 }
