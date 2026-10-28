@@ -134,7 +134,7 @@ const resolvePeer = async (companyId, callerUid, chatId) => {
  * better and is the natural follow-up.
  */
 const postCallMessage = async (call, text) => {
-    if (!call.projectId || !call.chatId) return;
+    if (!call.projectId || !call.chatId || !require('../../Modules/Entitlements/lifecycleGuard').writable()) return;
     await MongoDbCrudOpration(call.companyId, {
         type: SCHEMA_TYPE.COMMENTS,
         data: {

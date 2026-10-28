@@ -20,6 +20,7 @@ const appConnections = require("./Modules/Integrations/appConnections/scheduler"
 const storageReconcile = require("./common-storage/storageReconcile");
 const platformEntitlements = require("./Modules/Platform/entitlements");
 const platformSupport = require("./Modules/Platform/supportSession");
+const { whenWritable } = require("./Modules/Entitlements/lifecycleGuard");
 
 // UTC unless the operator pins another zone: the only choice that survives a DST
 // switch, a container reboot or a base-image swap without shifting schedules.
@@ -36,33 +37,37 @@ const job = (name, rule, run) => schedule.scheduleJob({ rule, tz: CRON_TZ }, asy
     }
 });
 
+// Jobs that change work on people's behalf wait while a hosted instance is read-only or suspended (064).
+const writer = (name, rule, run) => job(name, rule, whenWritable(name, run));
+
 // Off-peak spread: the heavy cleanups sit at 00:30, 01:00, 02:00 and 03:00 so they
 // never stack on the midnight jobs.
 job('bucketSize', '0 0 * * *', () => handleBucketSizeUpdateCron());
 job('aiRequestCountReset', '0 0 * * *', () => aiRef.resetAiRequestCount());
-job('screenshotRetention', '30 0 * * *', () => screenshotRetention.runRetentionForAllCompanies());
-job('autoArchive', '0 1 * * *', () => autoArchive.runAutoArchiveForAllCompanies());
+writer('screenshotRetention', '30 0 * * *', () => screenshotRetention.runRetentionForAllCompanies());
+writer('autoArchive', '0 1 * * *', () => autoArchive.runAutoArchiveForAllCompanies());
 job('auditRetention', '0 2 * * *', () => auditRecorder.runAuditRetentionForAllCompanies());
 job('auditChainMirror', '* * * * *', () => require('./Modules/Audit/chain').flushMirrors());
-job('projectAutoClose', '0 3 * * *', () => projectClose.runAutoCloseForAllCompanies());
+writer('projectAutoClose', '0 3 * * *', () => projectClose.runAutoCloseForAllCompanies());
 job('ssoDomainRecheck', '30 3 * * *', () => ssoDomainRecheck.runSsoDomainRecheckForAllCompanies());
 // A random minute after 03:30, so the instances sharing a bucket do not all list it at once.
 job('storageUsage', `${30 + Math.floor(Math.random() * 30)} 3 * * *`, () => storageReconcile.reconcileAll());
 job('taskIndex', '0 * * * *', () => taskIndexRef.createUnIndexTask());
-job('scheduledReports', '0 * * * *', () => scheduledReports.runScheduledReportsForAllCompanies());
+writer('scheduledReports', '0 * * * *', () => scheduledReports.runScheduledReportsForAllCompanies());
 job('credentialExpiryNotices', '15 * * * *', () => credentialExpiryNotices.runForAllCompanies());
 // Hourly, yet a project is looked at once a day: each look takes the project's mark for the day first.
-job('projectDailyLook', '45 * * * *', () => projectDailyLook.runForAllCompanies());
-job('projectTriage', '50 * * * *', () => projectTriage.runForAllCompanies());
-job('recurringTasks', '*/15 * * * *', () => recurringTasks.runRecurringForAllCompanies());
-job('reminders', '* * * * *', () => reminders.runRemindersForAllCompanies());
-job('appConnections', '*/5 * * * *', () => appConnections.runForAllCompanies());
-job('timeReminders', '0 17 * * *', () => timeReminders.runRemindersForAllCompanies());
+writer('projectDailyLook', '45 * * * *', () => projectDailyLook.runForAllCompanies());
+writer('projectTriage', '50 * * * *', () => projectTriage.runForAllCompanies());
+writer('recurringTasks', '*/15 * * * *', () => recurringTasks.runRecurringForAllCompanies());
+writer('reminders', '* * * * *', () => reminders.runRemindersForAllCompanies());
+writer('appConnections', '*/5 * * * *', () => appConnections.runForAllCompanies());
+writer('timeReminders', '0 17 * * *', () => timeReminders.runRemindersForAllCompanies());
 // Hosted only: a missed entitlements push is recovered within 6 hours, and a support session ends on
 // time even when the process restarted after it began.
 if (require("./Config/hostingMode").isManaged()) {
     job('platformEntitlementsPull', `${Math.floor(Math.random() * 60)} */6 * * *`, () => platformEntitlements.pullEntitlements());
     job('platformSupportExpiry', '* * * * *', () => platformSupport.expireDueSupportSession());
+    job('mailQueue', '*/10 * * * *', () => require("./Modules/Entitlements/mailCap").flushQueue());
 }
 
-module.exports = { job, CRON_TZ };
+module.exports = { job, writer, CRON_TZ };

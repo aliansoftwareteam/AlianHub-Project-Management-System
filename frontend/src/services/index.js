@@ -7,6 +7,7 @@ import * as offline from '@/offline';
 import { dropWorkerRuntimeCaches } from '@/serviceWorker/registration';
 import { forgetLocalePrefs } from '@/views/Settings/Language/localePrefs';
 import { installBusyHandling } from './busy';
+import { installPlanAnswers } from './planAnswers';
 const { logOut } = useAuth();
 export const SESSION_EXPIRED_KEY = "ah.sessionExpired";
 const apiHost = env.API_URI;
@@ -24,7 +25,10 @@ export const axiosInstanceWithoutSecureWithFormData = axios.create({ baseURL: ap
     axiosInstanceWithoutCompanyWithFormData,
     axiosInstanceWithoutSecure,
     axiosInstanceWithoutSecureWithFormData
-].forEach(installBusyHandling);
+].forEach((instance) => {
+    installBusyHandling(instance);
+    installPlanAnswers(instance);
+});
 
 
 

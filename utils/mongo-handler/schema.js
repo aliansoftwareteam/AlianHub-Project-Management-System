@@ -5572,6 +5572,20 @@ const schema = {
         sent: { type: Number, required: false },
         updatedAt: { type: Date, required: false },
     },
+    // HOSTING_MODE=managed: mail held back by the daily cap (064), sent from the next UTC day on.
+    mailQueue: {
+        kind: { type: String, required: true },
+        subject: { type: String, required: false },
+        html: { type: String, required: false },
+        to: { type: mongoose.Schema.Types.Mixed, required: false },
+        isHtml: { type: Boolean, required: false },
+        attachments: { type: mongoose.Schema.Types.Mixed, required: false },
+        recipients: { type: Number, required: false },
+        queuedAt: { type: Date, required: true },
+        sendAfter: { type: Date, required: true },
+        attempts: { type: Number, required: false },
+        lastError: { type: String, required: false },
+    },
     // HOSTING_MODE=managed: one row per platform API call; never a request body.
     platformAudit: {
         at: { type: Date, required: true },

@@ -41,6 +41,7 @@ app.get("/", (req, res) => {
     res.sendFile(path.join(__dirname, './frontend/dist/index.html'));
 });
 app.use(require('./Modules/Instance/maintenance.js').maintenanceGuard);
+require('./Config/setMiddleware.js').setPlanGuards(app);
 app.use(require('./Config/billingRoutes').closeBillingWhenHosted);
 
 // ADD DEFAULT BRAND SETTINGS
@@ -111,6 +112,7 @@ function initializeControllers() {
     require('./Modules/trackerUserPermission/init').init(app);
     require('./Modules/Instance/init').init(app);
     require('./Modules/Platform/init').init(app);
+    require('./Modules/Entitlements/init').init(app);
     require('./Modules/CspReport/init').init(app);
     require('./Modules/Pickers/init').init(app);
     require('./Modules/ScreenshotRetention/init').init(app);

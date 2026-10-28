@@ -46,7 +46,7 @@ exports.requestMagicLink = async (req, res) => {
             await new Promise((resolve) => sendMail.SendEmail(mail.subject, mail.mail, email, true, (result) => {
                 if (!result.status) logger.error(`magic-link mail failed for ${email}: ${result.error}`);
                 resolve();
-            }));
+            }, { accountMail: true }));
         }
         return res.send({ status: true, statusText: 'If that address has an account, a login link is on its way.' });
     } catch (error) {

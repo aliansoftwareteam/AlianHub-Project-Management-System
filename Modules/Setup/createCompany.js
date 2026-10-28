@@ -12,6 +12,7 @@ const { COUNTRY_NOT_ASKED } = require('../Company/helpers/companyDetails');
 const { updateUserFun } = require('../Users/controller');
 const { storeRefferalCode } = require('../Affiliate/controller');
 const { planObj } = require('./defaultSubscriptionData');
+const { planFeatureFor } = require('../Entitlements/entitlements');
 const { createDemoProject } = require('./demoProject');
 const { ensureViewCatalogue } = require('../projectTabs/catalogue');
 const vectorStore = require('../Knowledge/vectorStore');
@@ -104,7 +105,7 @@ async function createFirstCompany({ userId, email, companyName, teamFocus = '', 
     }, 'findOneAndUpdate', companyId, userId);
     await updateCompanyFun(SCHEMA_TYPE.GOLBAL, {
         type: dbCollections.COMPANIES,
-        data: [{ _id: companyId }, { planFeature: planObj }],
+        data: [{ _id: companyId }, { planFeature: planFeatureFor(planObj) }],
     }, 'findOneAndUpdate', companyId);
     await storeRefferalCode(companyId, userId);
 

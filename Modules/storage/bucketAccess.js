@@ -18,7 +18,7 @@ const CREDIT_NOTES = 'InvoiceAndCreditNotes/';
 const CREDIT_NOTE_COMPANY = /^InvoiceAndCreditNotes\/CreditNotes\/([a-f0-9]{24})\//i;
 const LOOKUP_CACHE_TTL = 60;
 
-const refuse = (res, code, statusText, reason) => res.status(code).json({ status: false, statusText, message: statusText, ...(reason ? { code: reason } : {}) });
+const refuse = (res, code, statusText, reason, extra) => res.status(code).json({ status: false, statusText, message: statusText, ...(reason ? { code: reason } : {}), ...(extra || {}) });
 const refusal = (code, statusText) => ({ code, statusText });
 
 const inAudience = (aud, companyId) => {
@@ -154,9 +154,20 @@ async function accessRefusal(req, bucketId, filePath, profileRule) {
     return (await belongsToCompany(req, bucketId)) ? grantBucket(req, bucketId) : refusal(403, 'You do not have access to this bucket');
 }
 
+/* The plan's storage quota and largest file (064), once the caller may write here. Before multer has
+ * the file its size is unknown, so only a quota already spent refuses at that point. */
+async function planRefusal(bucketId, req) {
+    const entitlements = require('../Entitlements');
+    const found = await entitlements.uploadLimitRefusal(bucketId, entitlements.declaredUploadSize(req));
+    if (!found) return null;
+    const body = entitlements.refusalBody(found);
+    return { code: body.statusCode, statusText: body.statusText, reason: found.code, extra: { limit: found.limit, used: found.used } };
+}
+
 async function uploadRefusal(req, bucketId, filePath) {
     return (await accessRefusal(req, bucketId, filePath, PROFILE_WRITE))
-        || (safeRelativePath(filePath) ? null : refusal(400, 'Invalid path'));
+        || (safeRelativePath(filePath) ? null : refusal(400, 'Invalid path'))
+        || planRefusal(bucketId, req);
 }
 
 const isProfileUpload = (body) => Boolean(body) && (body.isUserProfile === true || body.isUserProfile === 'true');
@@ -186,7 +197,7 @@ function refuseUpload(findRefusal) {
             const found = req.uploadRefusal || await findRefusal(req);
             if (!found) return next();
             await discardStored(req);
-            return refuse(res, found.code, found.statusText, found.reason);
+            return refuse(res, found.code, found.statusText, found.reason, found.extra);
         } catch (error) {
             await discardStored(req);
             return refuse(res, 500, error.message);
@@ -226,6 +237,17 @@ function requireOwnBucket(pickBucketId) {
     };
 }
 
+function requirePlanRoom(pickBucketId) {
+    return async (req, res, next) => {
+        try {
+            const found = await planRefusal(pickBucketId(req), req);
+            return found ? refuse(res, found.code, found.statusText, found.reason, found.extra) : next();
+        } catch (error) {
+            return refuse(res, 500, error.message);
+        }
+    };
+}
+
 function requireSafeObjectPath(pickPath) {
     return (req, res, next) => (safeRelativePath(pickPath(req)) ? next() : refuse(res, 400, 'Invalid path'));
 }
@@ -242,6 +264,8 @@ module.exports = {
     mayRemoveProfileImage,
     mayReadProfileImage,
     uploadRefusal,
+    planRefusal,
+    requirePlanRoom,
     isProfileUpload,
     refuseUnverifiedBucket,
     refuseBeforeWrite,

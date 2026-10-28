@@ -159,7 +159,8 @@ const {
     oauthClientApprovalsSchema,
     storageUsageSchema,
     platformStateSchema,
-    platformAuditSchema
+    platformAuditSchema,
+    mailQueueSchema
 } = require('./createSchema');
 
 
@@ -477,6 +478,8 @@ exports.checkType = (type) => {
             return platformStateSchema
         case SCHEMA_TYPE.PLATFORM_AUDIT:
             return platformAuditSchema
+        case SCHEMA_TYPE.MAIL_QUEUE:
+            return mailQueueSchema
         default:
             return ""
     }
@@ -797,6 +800,8 @@ exports.tableType = (type) => {
                 return `${dbCollections.PLATFORM_STATE}`
         case SCHEMA_TYPE.PLATFORM_AUDIT:
                 return `${dbCollections.PLATFORM_AUDIT}`
+        case SCHEMA_TYPE.MAIL_QUEUE:
+                return `${dbCollections.MAIL_QUEUE}`
         default:
             return ""
     }

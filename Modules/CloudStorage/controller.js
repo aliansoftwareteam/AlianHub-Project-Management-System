@@ -652,6 +652,8 @@ exports.importFile = async (req, res) => {
         logger.info(`${LOG_PREFIX} imported ${filename} (${buffer.length} bytes) from ${provider} for user ${userId}`);
         return res.send({ status: true, statusText: 'Imported.', data: { url: storedPath, size: buffer.length, filename } });
     } catch (e) {
+        const entitlements = require('../Entitlements/answers');
+        if (entitlements.isRefusalError(e)) return res.status(e.statusCode).send(entitlements.refusalBody(e.refusal));
         // arraybuffer responseType means an error body arrives as bytes, not JSON —
         // decode it or the reason is lost and all you get is "status code 404".
         let payload = e.response && e.response.data;
@@ -679,6 +681,7 @@ exports.importFile = async (req, res) => {
  * rather than reimplementing either backend.
  */
 const storeImportedFile = async ({ companyId, storagePath, tmpPath, filename, size }) => {
+    await require('../Entitlements/uploads').assertUploadAllowed(companyId, size);
     const storageType = String(process.env.STORAGE_TYPE || 'wasabi');
     if (storageType === 'server') {
         // Server storage: multer normally writes straight to the final location,

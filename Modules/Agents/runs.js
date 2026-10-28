@@ -58,6 +58,8 @@ const pausedIn = async (companyId, projectIds) => ((await projectLimits.pausedAm
  * or each of several as `projectIds`: where agents are paused in one of them, the start is refused. */
 /* The model a run asks for, as AICore/modelCall picks it: the skill's pin, then the agent's. A pin
  * that validates is priced; one that does not is dropped at call time and the configured model runs. */
+const INSTANCE_LOCKED = 'Agents do not run while the workspace is read-only or suspended.';
+
 const priceCheckFor = (agent, skill) => {
     const pinned = (skill && skill.model) || (agent && agent.model) || null;
     if (pinned && require('../AICore/modelPin').validatePin(pinned).ok) return { ok: true };
@@ -68,6 +70,7 @@ const canStart = async (agent, { trigger, viaAccount, companyId, depth, projectI
     if (!agent) return { ok: false, reason: 'Agent not found.' };
     if (clampDepth(depth) >= MAX_DEPTH) return { ok: false, reason: LOOP_DEPTH_EXCEEDED, code: LOOP_DEPTH_EXCEEDED, depth: clampDepth(depth), maxDepth: MAX_DEPTH };
     if (agent.paused) return { ok: false, reason: `Agent is paused${agent.pausedReason ? ` (${agent.pausedReason})` : ''}.` };
+    if (!require('../Entitlements/lifecycleGuard').writable()) return { ok: false, reason: INSTANCE_LOCKED, code: 'instance_locked' };
     if (companyId && await pausedIn(companyId, [projectId, ...(projectIds || [])].filter(Boolean))) return { ok: false, reason: PROJECT_PAUSED, code: 'project_paused' };
     try {
         await aiSwitch.assertAllowed(companyId);

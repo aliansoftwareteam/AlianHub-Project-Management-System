@@ -10,6 +10,11 @@
         <form v-if="stage === 'name'" class="av2-auth-card" novalidate @submit.prevent="toFocus">
             <h2 class="auth__h">{{ $t('Auth.name_workspace') }}</h2>
             <p class="auth__p">{{ $t('Auth.name_workspace_lead') }}</p>
+            <p v-if="room && room.limit !== null" class="ah-small" data-test="workspace-count">{{ $t('Plan.workspaces_count', { count: room.count, limit: room.limit }) }}</p>
+            <div v-if="room && !room.canCreate" class="cc-limit" role="alert" data-test="workspace-limit">
+                <span>{{ $t('Plan.workspace_limit_reached', { limit: room.limit }) }}</span>
+                <a v-if="room.portalUrl" :href="room.portalUrl" target="_blank" rel="noopener" class="cc-limit__link">{{ $t('Plan.banner.add_workspaces') }}</a>
+            </div>
             <div class="av2-ws">
                 <span class="av2-ws-mark">{{ initial }}</span>
                 <div class="ah-field">
@@ -62,7 +67,7 @@
                 <div v-if="errors.referral" class="ah-field__error"><ShellIcon name="x" :size="12" />{{ errors.referral }}</div>
             </div>
 
-            <button type="submit" class="ah-btn ah-btn--primary ah-btn--block ah-btn--lg">{{ $t('Auth.continue') }}</button>
+            <button type="submit" class="ah-btn ah-btn--primary ah-btn--block ah-btn--lg" :disabled="room && !room.canCreate">{{ $t('Auth.continue') }}</button>
             <div class="auth__links" style="margin-top:28px">
                 <span class="ah-small">{{ $t('Auth.joining_team') }} <button type="button" class="av2-link-btn" @click="logOut()">{{ $t('Auth.use_invite_link') }}</button></span>
                 <button type="button" class="av2-link-btn av2-link-btn--muted" @click="logOut()">{{ $t('Auth.backlogin') }}</button>
@@ -115,6 +120,7 @@ import { useCustomComposable, useGetterFunctions } from "@/composable";
 import { apiRequestWithoutCompnay, getAuth, useAuth } from "@/services";
 import * as env from "@/config/env";
 import { connectAiWelcomePath } from "@/router/ai/connect";
+import { isManagedHosting } from "@/config/publicConfig";
 
 const { t, te } = useI18n();
 const router = useRouter();
@@ -135,6 +141,7 @@ const FOCUSES = ["software", "design", "marketing", "agency", "operations", "sup
 const affiliateOn = env.AFFILITAION_ON == "true";
 
 const stage = ref("name");
+const room = ref(null);
 const mainSpinner = ref(true);
 const banner = ref("");
 const progress = ref(0);
@@ -164,6 +171,11 @@ onMounted(async () => {
         if (companyId.value && localUserId && openExistingCompany(companyId.value)) return;
         if (!localUserId) { router.push({ name: "Log-in" }); return; }
         userId.value = localUserId;
+        if (isManagedHosting()) {
+            apiRequestWithoutCompnay("get", env.PLAN_WORKSPACES)
+                .then((res) => { room.value = res?.data?.data?.managed ? res.data.data : null; })
+                .catch(() => { room.value = null; });
+        }
         const result = await apiRequestWithoutCompnay("get", `${env.USER_UPATE}/${userId.value}`).catch(() => null);
         userEmail.value = result?.data?.Employee_Email || "";
     } finally {
@@ -282,4 +294,9 @@ const create = (withSample) => {
 
 <style>
 @import "../Authentication/authV2.css";
+</style>
+
+<style scoped>
+.cc-limit { display: flex; flex-wrap: wrap; gap: 8px; margin: 0 0 16px; padding: 10px 12px; border-radius: var(--r-input); background: var(--warn-bg); color: var(--warn-ink); font: var(--text-small); }
+.cc-limit__link { color: inherit; font-weight: 600; text-decoration: underline; }
 </style>

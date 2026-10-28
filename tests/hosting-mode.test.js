@@ -133,7 +133,7 @@ describe('what the SPA learns before login', () => {
         process.env.HOSTING_MODE = 'managed';
         process.env.PLATFORM_URL = 'https://account.alianhub.com';
         const { publicConfig } = require('../Config/instanceSettings');
-        expect(publicConfig().hosting).toEqual({ mode: 'managed', portalUrl: 'https://account.alianhub.com', lifecycle: 'active' });
+        expect(publicConfig().hosting).toEqual({ mode: 'managed', portalUrl: 'https://account.alianhub.com', lifecycle: 'active', graceUntil: null });
         hostingMode.setPortalUrl('https://account.alianhub.com/i/ins_1');
         expect(publicConfig().hosting.portalUrl).toBe('https://account.alianhub.com/i/ins_1');
     });

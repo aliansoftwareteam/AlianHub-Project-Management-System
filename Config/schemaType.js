@@ -147,6 +147,7 @@ const SCHEMA_TYPE = {
     STORAGE_USAGE: "storage_usage",
     PLATFORM_STATE: "platform_state",
     PLATFORM_AUDIT: "platform_audit",
+    MAIL_QUEUE: "mail_queue",
     AGENT_SESSIONS: "agent_sessions",
     AGENT_SESSION_ENDPOINTS: "agent_session_endpoints",
     ASK_THREADS: "ask_threads",

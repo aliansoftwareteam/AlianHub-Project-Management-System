@@ -103,10 +103,14 @@ describe('storing the plan', () => {
         expect(entitlements.storedVersion()).toBe(3);
     });
 
-    it('stores the plan and says so once while nothing enforces it yet', async () => {
+    it('hands every newer stored document to Modules/Entitlements (064), which enforces it', async () => {
+        const apply = jest.spyOn(require('../Modules/Entitlements'), 'applyEntitlements').mockResolvedValue({ applied: true });
         await entitlements.acceptEntitlementsToken(sign(payloadOf(1)));
         await entitlements.acceptEntitlementsToken(sign(payloadOf(2)));
-        expect(logger.info.mock.calls.filter(([line]) => /nothing enforces them yet/.test(line))).toHaveLength(1);
+        await entitlements.acceptEntitlementsToken(sign(payloadOf(2)));
+        expect(apply.mock.calls.map(([payload]) => payload.version)).toEqual([1, 2]);
+        expect(logger.info.mock.calls.filter(([line]) => /nothing enforces them yet/.test(line))).toHaveLength(0);
+        apply.mockRestore();
     });
 });
 

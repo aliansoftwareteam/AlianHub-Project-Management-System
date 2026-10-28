@@ -1,6 +1,11 @@
 <template>
     <div class="time_tracking_wapper" >
-        <div class="time_tracking_main overflow-auto">
+        <div v-if="addOnOff" class="tt-addon ah-card ah-card__body" data-test="tracker-addon">
+            <h2 class="ah-h3">{{ $t('Plan.tracker_addon_title') }}</h2>
+            <p class="ah-small">{{ $t('Plan.tracker_addon_body') }}</p>
+            <a v-if="portalUrl && privileged" :href="portalUrl" target="_blank" rel="noopener" class="ah-btn ah-btn--primary ah-btn--sm">{{ $t('Plan.tracker_addon_action') }}</a>
+        </div>
+        <div v-else class="time_tracking_main overflow-auto">
             <div class="timetracking-head">
                 <div class="d-flex justify-content-center h1-head">
                     <h1>{{ $t('TimeTracker.unlock') }}</h1>
@@ -47,7 +52,12 @@ const Mac = require("@/assets/images/svg/Mac.svg");
 const Linux = require("@/assets/images/svg/Linux.svg");
 const Download_icon = require("@/assets/images/svg/download_green.svg");
 import { useStore } from 'vuex';
+import { isManagedHosting, publicConfig } from "@/config/publicConfig";
+import { isOwnerOrAdmin } from "@/utils/roles";
 const { dispatch, getters } = useStore();
+const addOnOff = computed(() => isManagedHosting() && getters["settings/selectedCompany"]?.planFeature?.trackerTimesheet === false);
+const privileged = computed(() => isOwnerOrAdmin(getters["settings/companyUserDetail"]?.roleType));
+const portalUrl = computed(() => publicConfig.hosting?.portalUrl || "");
 const anchor = ref('')
 const imageObj = ref({Linux:Linux,Mac:Mac,Windows:Windows})
 const selectedData = ref('')
@@ -78,6 +88,7 @@ onMounted(() => {
 </style>
 
 <style scoped>
+.tt-addon { display: flex; flex-direction: column; align-items: flex-start; gap: 8px; max-width: 560px; margin: 24px auto; }
 .time-tracking-black {
     color: var(--ink);
 }
