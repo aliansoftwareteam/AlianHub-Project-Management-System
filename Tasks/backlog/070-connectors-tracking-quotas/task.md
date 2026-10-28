@@ -3,7 +3,7 @@ id: 070
 title: Connectors — audit, health, usage counts, quotas and provider backoff
 status: backlog
 priority: high
-depends_on: [064, 068]
+depends_on: [063, 068]
 created: 2026-10-28
 ---
 
@@ -24,6 +24,7 @@ Every connector call is attributable, counted and limited.
 
 ## Out of scope
 - Admin overview screen (072)
+- Quota settings screen (078)
 
 ## Acceptance criteria
 - [ ] One audit row per call; usage counts match calls
@@ -32,5 +33,6 @@ Every connector call is attributable, counted and limited.
 - [ ] A `Retry-After` from the provider delays the next call
 
 ## Constraints & notes
-- Depends on: 064, 068
-- Reuse `Modules/Integrations/appConnections/backoff.js`.
+- Track: B — tools (using that token safely)
+- Depends on: 063, 068
+- Writes `connector_usage` and connection health fields in the shape the contract (063) fixes; 064 creates the collection, so until it lands use the contract schema in tests. Reuse `Modules/Integrations/appConnections/backoff.js`.

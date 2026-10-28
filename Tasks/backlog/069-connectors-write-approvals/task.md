@@ -19,10 +19,10 @@ Nothing is sent to an outside service before the connection's owner sees exactly
 - MCP writes filed as proposals waiting in the Inbox; the tool reply says so (FR-21)
 - New gate `connection_owner`: an owner or admin cannot approve for someone else (FR-22)
 - Approved payload is what is sent; an edit is re-validated and shown again; one attempt; result or error kept on the proposal (FR-23)
-- Backend payload for the approval card (card UI in 072)
+- Backend payload for the approval card (card UI in 078)
 
 ## Out of scope
-- Approval card screens (072)
+- Approval card screens (078)
 
 ## Acceptance criteria
 - [ ] A write from an agent run and from MCP each becomes a proposal
@@ -31,5 +31,6 @@ Nothing is sent to an outside service before the connection's owner sees exactly
 - [ ] A second attempt on the same approval is refused
 
 ## Constraints & notes
+- Track: B — tools (using that token safely)
 - Depends on: 068
 - Reuse `Modules/Mcp/propose.js` and `approval.js`.

@@ -3,7 +3,7 @@ id: 075
 title: Connectors — GitHub as a personal, on-demand provider; retire the task 049 sync
 status: backlog
 priority: medium
-depends_on: [061, 069, 070, 072]
+depends_on: [069, 070, 078]
 created: 2026-10-28
 ---
 
@@ -15,7 +15,8 @@ Sub task of 056 (`Tasks/backlog/056-personal-app-connectors/task.md`, the PRD). 
 PRs are looked up and linked on request with the caller's own GitHub connection; the workspace sync is gone.
 
 ## Scope
-- GitHub provider definition
+- Research first: GitHub OAuth app vs GitHub App for personal on-demand PR lookup, scopes, token expiry, revoke; a GitHub row in `056-personal-app-connectors/resources/research-matrix.md`
+- GitHub provider definition in the contract's format
 - `pull_request.get` and new link tools on the caller's connection (FR-37)
 - Retire the workspace connection, repo-to-project mapping, cron runner and their screens, with a migration
 - Tell admins before the migration runs
@@ -31,4 +32,5 @@ PRs are looked up and linked on request with the caller's own GitHub connection;
 - [ ] Tested against a fake GitHub server
 
 ## Constraints & notes
-- Depends on: 061, 069, 070, 072
+- Track: B — tools (using that token safely)
+- Depends on: 069, 070, 078

@@ -3,7 +3,7 @@ id: 068
 title: Connectors — tool framework: one definition registered for agents and MCP
 status: backlog
 priority: high
-depends_on: [063, 066]
+depends_on: [063]
 created: 2026-10-28
 ---
 
@@ -35,5 +35,6 @@ A connector tool is defined once in its provider and becomes both an agent tool 
 - [ ] After a connector read the run cannot web-fetch
 
 ## Constraints & notes
-- Depends on: 063, 066
-- Reuse `readLimits.js`, `taint.js`, `agentFetch.js`, `Modules/Mcp/scopes.js`.
+- Track: B — tools (using that token safely)
+- Depends on: 063
+- Depends only on the contract part of 063, not its code: build against a stub `resolveConnection` and the fake provider server until track A's 066 lands. Reuse `readLimits.js`, `taint.js`, `agentFetch.js`, `Modules/Mcp/scopes.js`.

@@ -3,7 +3,7 @@ id: 056
 title: Personal app connectors for AI and agents — one reusable module, then connectors one by one
 status: backlog
 priority: high
-depends_on: [061, 062, 063, 064, 065, 066, 067, 068, 069, 070, 071, 072, 073, 074, 075, 076, 077]
+depends_on: [061, 062, 063, 064, 065, 066, 067, 068, 069, 070, 071, 072, 073, 074, 075, 076, 077, 078, 079]
 created: 2026-10-23
 ---
 
@@ -223,29 +223,36 @@ Write routes are wrapped in `agentsRefused`; audit, socket emit and cache clear 
 
 Phase 0 questions to settle beyond the matrix: Wispr Flow (any API or export); Supabase (Management API, or data in a project database); Outlook (Microsoft Graph, multi-tenant app, tenant admin consent); Meet (Meet REST API scopes and their sensitivity); Upwork (API key application and terms); Canva, Figma, HubSpot, Shopify (public app review); per-instance vs per-company review for a self-hosted product; current CASA lab quotes for Gmail on the hosted instance (indicative 2026 figures: about $500–$6,000 a year in lab fees at budget labs, far more at premium firms, plus fix-up time; reassessed every 12 months). The matrix ends with the ranking for Phase 3.
 
-### Sub tasks (split 2026-10-28)
+### Sub tasks (split 2026-10-28, two tracks)
 
-| Phase | Task | FRs | Depends on |
-|---|---|---|---|
-| 0 | 061 Research: Google, Slack, GitHub, Dropbox | — | — |
-| 0 | 062 Research: new connectors, Gmail CASA, Phase 3 ranking | — | — |
-| 1 | 063 Provider definition, registry, Google provider file | 1–3 | 061 |
-| 1 | 064 Data model | §8 | — |
-| 1 | 065 OAuth app lookup + secrets guard | 4–7, 16 | 063, 064 |
-| 1 | 066 Connect lifecycle handlers | 8–13, 15, 17 | 065 |
-| 1 | 067 Member removal + daily sweep | 14 | 066 |
-| 1 | 068 Tool framework (agents + MCP) | 9, 18–20, 24, 25 | 063, 066 |
-| 1 | 069 Write approvals | 21–23 | 068 |
-| 1 | 070 Audit, health, usage, quotas, backoff | 26–29 | 064, 068 |
-| 1 | 071 Google pilot tools | — | 068, 069 |
-| 1 | 072 Screens | 30–34 | 066, 069, 070 |
-| 2 | 073 Migrate Google Calendar | 35 | 071 |
-| 2 | 074 Slack personal | 36 | 061, 069, 070, 072 |
-| 2 | 075 GitHub personal | 37 | 061, 069, 070, 072 |
-| 2 | 076 Attachment picker | 39, 40 | 071, 072 |
-| 2 | 077 Remove old paths + setup docs | 38 | 073–076 |
+Two interns, two tracks. A task depends only on tasks of its own track and on the contract in 063, which both interns write together on day 1 (`063-connectors-provider-definition/resources/contract.md`).
 
-Phase 3 tasks (one per connector, Gmail when decided) are created after 062's ranking is accepted.
+- **Track A — connections** (getting and keeping a person's token): 061, 063, 064, 065, 066, 067, 072, 073, 076, 077
+- **Track B — tools** (using that token safely): 062, 068, 069, 070, 071, 078, 074, 075, 079
+
+| Phase | Track | Task | FRs | Depends on |
+|---|---|---|---|---|
+| 0 | A | 061 Research: Google, Dropbox | — | — |
+| 0 | B | 062 Research: new connectors, Gmail CASA, Phase 3 ranking | — | — |
+| 1 | A + B | 063 Contract (both), provider definition, registry, Google provider file (A) | 1–3 | — |
+| 1 | A | 064 Data model | §8 | 063 |
+| 1 | A | 065 OAuth app lookup + secrets guard | 4–7, 16 | 063, 064 |
+| 1 | A | 066 Connect lifecycle handlers + real `resolveConnection` | 8–13, 15, 17 | 065 |
+| 1 | A | 067 Member removal + daily sweep | 14 | 066 |
+| 1 | A | 072 Screens: My connections, admin overview, company apps | 30–32, 34 | 066 |
+| 1 | B | 068 Tool framework (agents + MCP), against a stub `resolveConnection` | 9, 18–20, 24, 25 | 063 contract |
+| 1 | B | 069 Write approvals | 21–23 | 068 |
+| 1 | B | 070 Audit, health, usage, quotas, backoff | 26–29 | 063 contract, 068 |
+| 1 | B | 071 Google pilot tools | — | 068, 069 |
+| 1 | B | 078 Screens: Inbox approval cards, quota settings | 23, 29, 33, 34 | 069, 070 |
+| 2 | A | 073 Migrate Google Calendar rows | 35 | 064, 066 |
+| 2 | A | 076 Attachment picker | 39, 40 | 066, 072 |
+| 2 | A | 077 Remove old Calendar + CloudStorage paths; Google and Dropbox setup pages | — | 073, 076 |
+| 2 | B | 074 Slack personal (incl. its research) | 36 | 069, 070, 078 |
+| 2 | B | 075 GitHub personal (incl. its research) | 37 | 069, 070, 078 |
+| 2 | B | 079 Remove old Slack bot + GitHub sync paths | 38 | 074, 075 |
+
+**Shared checks, owned by this task:** a joint end-to-end test after Phase 1 (a member connects Google through track A, an agent run and MCP read and propose a write through track B) and again after Phase 2 (Calendar, Slack, GitHub and the picker on the module). Phase 3 tasks (one per connector, Gmail when decided) are created after 062's ranking is accepted.
 
 ## 12. Out of scope
 

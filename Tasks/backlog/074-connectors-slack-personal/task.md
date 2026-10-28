@@ -3,7 +3,7 @@ id: 074
 title: Connectors — Slack as a personal OAuth provider; retire the workspace bot
 status: backlog
 priority: medium
-depends_on: [061, 069, 070, 072]
+depends_on: [069, 070, 078]
 created: 2026-10-28
 ---
 
@@ -15,7 +15,8 @@ Sub task of 056 (`Tasks/backlog/056-personal-app-connectors/task.md`, the PRD). 
 Slack is used with each person's own Slack user token, and the workspace bot is gone.
 
 ## Scope
-- Slack provider definition (user token)
+- Research first: Slack user-token OAuth scopes for channel read and message post, HTTPS redirect constraint, revoke, rate limits; a Slack row in `056-personal-app-connectors/resources/research-matrix.md`
+- Slack provider definition (user token) in the contract's format
 - `slack.channel.read` and `slack.message.post` redefined on the person's token and the channels they can see (FR-36)
 - Retire bot token, signing secret and channel allow-list; revoke their secrets; tell admins
 - Tunnel note for local development (HTTPS redirect)
@@ -30,5 +31,6 @@ Slack is used with each person's own Slack user token, and the workspace bot is 
 - [ ] Tested against a fake Slack server
 
 ## Constraints & notes
-- Depends on: 061, 069, 070, 072
+- Track: B — tools (using that token safely)
+- Depends on: 069, 070, 078
 - Replaces `slackConnection.js`, `slackApi.js`, `slackRead.js`, `slackPost.js`.
