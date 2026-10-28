@@ -5525,6 +5525,17 @@ const schema = {
         // Owner-triggered restarts, newest last, kept to the hourly limit.
         restartsAt: { type: [Date], required: false },
     },
+    // One row per workspace (_id: companyId) plus "public" for avatars and shared assets: bytes kept
+    // by common-storage/storageUsage.js on every put and delete, set from a full listing every night.
+    storageUsage: {
+        _id: { type: String, required: true },
+        bytes: { type: Number, required: false },
+        objects: { type: Number, required: false },
+        updatedAt: { type: Date, required: false },
+        reconciledAt: { type: Date, required: false },
+        drift: { type: Number, required: false },
+        removalPending: { type: Boolean, required: false },
+    },
     globalSettings: {
         name: {
             type: String,

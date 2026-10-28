@@ -17,6 +17,7 @@ const credentialExpiryNotices = require("./Modules/ApiTokens/expiryNotices");
 const projectDailyLook = require("./Modules/Agents/manager/dailyLook");
 const projectTriage = require("./Modules/Agents/managerTriage");
 const appConnections = require("./Modules/Integrations/appConnections/scheduler");
+const storageReconcile = require("./common-storage/storageReconcile");
 
 // UTC unless the operator pins another zone: the only choice that survives a DST
 // switch, a container reboot or a base-image swap without shifting schedules.
@@ -43,6 +44,8 @@ job('auditRetention', '0 2 * * *', () => auditRecorder.runAuditRetentionForAllCo
 job('auditChainMirror', '* * * * *', () => require('./Modules/Audit/chain').flushMirrors());
 job('projectAutoClose', '0 3 * * *', () => projectClose.runAutoCloseForAllCompanies());
 job('ssoDomainRecheck', '30 3 * * *', () => ssoDomainRecheck.runSsoDomainRecheckForAllCompanies());
+// A random minute after 03:30, so the instances sharing a bucket do not all list it at once.
+job('storageUsage', `${30 + Math.floor(Math.random() * 30)} 3 * * *`, () => storageReconcile.reconcileAll());
 job('taskIndex', '0 * * * *', () => taskIndexRef.createUnIndexTask());
 job('scheduledReports', '0 * * * *', () => scheduledReports.runScheduledReportsForAllCompanies());
 job('credentialExpiryNotices', '15 * * * *', () => credentialExpiryNotices.runForAllCompanies());

@@ -1,6 +1,3 @@
-const awsRef = require('../../../Config/aws.js');
-const { S3Client, GetObjectCommand ,CreateBucketCommand , PutObjectCommand ,DeleteObjectCommand,ListObjectsV2Command, CopyObjectCommand, DeleteBucketCommand } = require('@aws-sdk/client-s3');
-const { getSignedUrl } = require("@aws-sdk/s3-request-presigner");
 const fs = require("fs");
 const logger = require("../../../Config/loggerConfig.js");
 const sharp = require('sharp');
@@ -9,23 +6,23 @@ const thumbnailArray = require("../../../thumbnail.json");
 const { SCHEMA_TYPE } = require('../../../Config/schemaType.js');
 const { MongoDbCrudOpration } = require('../../../utils/mongo-handler/mongoQueries.js');
 const { default: mongoose } = require('mongoose');
-const {myCache, requestHandler} = require('../../../Config/config');
+const { myCache } = require('../../../Config/config');
 const { updateCompanyFun, getCompanyDataFun } = require('../../Company/controller/updateCompany.js');
 const { isProfileUpload, refuseUnverifiedBucket } = require('../bucketAccess');
 const { logUploadFailures } = require('../uploadFailures');
 const { isRowTrackshotKey } = require('../../../common-storage/taskFileKeys');
-/**
- * S3 client configuration for create bucket
- */
-let s3Client = new S3Client({
-    region: awsRef.region,
-    credentials: {
-        accessKeyId: awsRef.wasabiAccessKey,
-        secretAccessKey: awsRef.wasabiSecretAccessKey,
-    },
-    endpoint: awsRef.wasabiEndPoint,
-    requestHandler
-});
+const storage = require('../../../common-storage/s3Store');
+const { currentLayout, PUBLIC_OWNER } = require('../../../common-storage/s3Layout');
+
+const ownerOf = (companyId, isUserProfile) => (isUserProfile ? PUBLIC_OWNER : companyId);
+
+const bucketOf = (owner) => {
+    try {
+        return currentLayout().bucketOf(owner);
+    } catch (error) {
+        return '';
+    }
+};
 
 /**
  * Normalize an @aws-sdk/client-s3 error into a structured log line + a
@@ -58,43 +55,20 @@ const timestamped = (filePath, separator) => {
 };
 
 // Used function in default data create demo saas
-exports.deleteBucketInWasabi = (companyId) => {
-    return new Promise(async (resolve, reject) => {
-        try {
-            const command = new DeleteBucketCommand ({ Bucket: companyId });
-            const response = await s3Client.send(command);
-            logger.info(`Bucket is deleted successfully for company ${companyId}`);
-            resolve(response);
-        } catch (error) {
-            reject(error);
-        }
-    })
+exports.deleteBucketInWasabi = async (companyId) => {
+    const response = await storage.removeArea(companyId);
+    logger.info(`Bucket is deleted successfully for company ${companyId}`);
+    return response;
 }
 
 /**
  * Create a new Bucket using companyId
  * @param {Objcet} CompanyId
  */
-exports.createNewBucketInWasabi = (companyId) => {
-    return new Promise(async (resolve, reject) => {
-        try {
-            const s3ClientInstance = new S3Client({
-                region: awsRef.region,
-                credentials: {
-                    accessKeyId: awsRef.wasabiAccessKey,
-                    secretAccessKey: awsRef.wasabiSecretAccessKey,
-                },
-                endpoint: awsRef.wasabiEndPoint,
-                requestHandler
-            });
-            const command = new CreateBucketCommand({ Bucket: companyId });
-            const response = await s3ClientInstance.send(command);
-            logger.info(`Bucket is created successfully for company ${companyId}`);
-            resolve(response);
-        } catch (error) {
-            reject(error);
-        }
-    })
+exports.createNewBucketInWasabi = async (companyId) => {
+    const response = await storage.createArea(companyId);
+    logger.info(`Bucket is created successfully for company ${companyId}`);
+    return response;
 }
 
 
@@ -117,30 +91,13 @@ exports.updateLocalWasabiFiles = (companyId, path, file) => {
             reject(`Error reading file: ${err.message || err}`);
             return;
         }
-        const bucketName = companyId;
         const fileName = updatedFilePath;
-        
-        const params = {
-            Bucket: bucketName,
-            Key: fileName,
-            Body: fileContent,
-            ContentType: exports.getContentType(fileName)
-        };
         try {
-            const s3ClientInstance = new S3Client({
-                region: awsRef.region,
-                credentials: {
-                    accessKeyId: awsRef.wasabiAccessKey,
-                    secretAccessKey: awsRef.wasabiSecretAccessKey,
-                },
-                endpoint: awsRef.wasabiEndPoint,
-                requestHandler
-            });
-            s3ClientInstance.send(new PutObjectCommand(params))
+            storage.put(companyId, fileName, fileContent, { contentType: exports.getContentType(fileName) })
             .then(() => {
                 resolve(updatedFilePath);
             }).catch((error)=>{
-                reject(formatS3UploadError(error, { bucket: bucketName, key: fileName, op: 'PutObject' }))
+                reject(formatS3UploadError(error, { bucket: bucketOf(companyId), key: fileName, op: 'PutObject' }))
             })
         } catch (error) {
             reject(`File upload error: ${error}`)
@@ -251,19 +208,13 @@ exports.uploadThumbnailFileFromBase64 = (base64,path,name,width,height,companyId
         .withMetadata()
         .toBuffer()
         .then(resizedBuffer => {
-            const bucketName = isUserProfile ? process.env.USERPROFILEBUCKET : companyId;
-            const params = {
-                Bucket: bucketName,
-                Key: fileName,
-                Body: resizedBuffer,
-                ContentType: exports.getContentType(fileName)
-            };
+            const owner = ownerOf(companyId, isUserProfile);
             try {
-                s3Client.send(new PutObjectCommand(params))
+                storage.put(owner, fileName, resizedBuffer, { contentType: exports.getContentType(fileName), replace: isUserProfile })
                 .then(() => {
                     resolve(fileName)
                 }).catch((error)=>{
-                    reject(formatS3UploadError(error, { bucket: bucketName, key: fileName, op: 'PutObject(thumbnail)' }))
+                    reject(formatS3UploadError(error, { bucket: bucketOf(owner), key: fileName, op: 'PutObject(thumbnail)' }))
                 })
             } catch (error) {
                 reject(`File upload error: ${error}`)
@@ -299,15 +250,9 @@ exports.uploadMainFileForbase64Thumbnail = (companyId, path, base64String, repla
         let filePathArray = [];
         const fileContent = buffer;
         const fileName = updatedFilePath;
-        const bucketName = isUserProfile ? process.env.USERPROFILEBUCKET : companyId;
-        const params = {
-            Bucket: bucketName,
-            Key: fileName,
-            Body: fileContent,
-            ContentType: exports.getContentType(fileName)
-        };
+        const owner = ownerOf(companyId, isUserProfile);
         try {
-            s3Client.send(new PutObjectCommand(params))
+            storage.put(owner, fileName, fileContent, { contentType: exports.getContentType(fileName) })
             .then(() => {
                 filePathArray.push(updatedFilePath);
                 if (thumInd === -1) {
@@ -346,7 +291,7 @@ exports.uploadMainFileForbase64Thumbnail = (companyId, path, base64String, repla
                     });
                 }
             }).catch((error)=>{
-                reject(formatS3UploadError(error, { bucket: bucketName, key: fileName, op: 'PutObject(base64)' }))
+                reject(formatS3UploadError(error, { bucket: bucketOf(owner), key: fileName, op: 'PutObject(base64)' }))
             })
         } catch (error) {
             reject(`File upload error: ${error}`)
@@ -483,22 +428,19 @@ exports.getPresignedUrl  = async (req,res) => {
             return;
         }
 
-        const command = new GetObjectCommand({
-            Bucket: bucketId,
-            Key: req.body.path,
-        });
         if (req.body.isCache === true) {
-            const cacheKey = `image:${command.input.Bucket}:${command.input.Key}`;
+            const target = currentLayout().locate(bucketId, req.body.path);
+            const cacheKey = `image:${target.Bucket}:${target.Key}`;
             const value = myCache.get(cacheKey);
-            
+
             if (value) {
                 res.set('Cache-Control', 'private, max-age=43200');
                 res.send({
-                    status: true, 
+                    status: true,
                     statusText: value,
                 });
             } else {
-                const url = await getSignedUrl(s3Client, command, { expiresIn: 86400 });
+                const url = await storage.signedGetUrl(bucketId, req.body.path, 86400);
                 myCache.set( cacheKey, url, 1200 );
                 res.set('Cache-Control', 'private, max-age=43200')
                 res.send({
@@ -507,7 +449,7 @@ exports.getPresignedUrl  = async (req,res) => {
                 });
             }
         } else {
-            const url = await getSignedUrl(s3Client, command, { expiresIn: 86400 });
+            const url = await storage.signedGetUrl(bucketId, req.body.path, 86400);
             res.send({
                 status: true,
                 statusText: url,
@@ -549,11 +491,7 @@ exports.getUserProfilePresignedUrl  = async (req,res) => {
         return;
     } else {
         try {
-            const command = new GetObjectCommand({
-                Bucket: process.env.USERPROFILEBUCKET,
-                Key: req.params.path,
-            });
-            const url = await getSignedUrl(s3Client, command, { expiresIn: 86400 });
+            const url = await storage.signedGetUrl(PUBLIC_OWNER, req.params.path, 86400);
             myCache.set( cacheKey, url, 1200 );
             res.set('Cache-Control', 'private, max-age=86400')
             res.send({
@@ -582,12 +520,7 @@ exports.getUserProfilePresignedUrlCallBackFunction = async (params) => {
     }
 
     try {
-        const command = new GetObjectCommand({
-            Bucket: process.env.USERPROFILEBUCKET,
-            Key: params.path,
-        });
-
-        const url = await getSignedUrl(s3Client, command, { expiresIn: 86400 });
+        const url = await storage.signedGetUrl(PUBLIC_OWNER, params.path, 86400);
 
         // store in cache for 20 minutes (1200s)
         myCache.set(cacheKey, url, 1200);
@@ -637,18 +570,11 @@ exports.uploadThumbnailFile = (file,x,y,path,companyId,isUserProfile = false) =>
                     reject(`Error reading thumbnail: ${err2.message || err2}`);
                     return;
                 }
-                const bucketName = isUserProfile ? awsRef.userProfileBucket : companyId;
+                const owner = ownerOf(companyId, isUserProfile);
                 const fileExtension = path.split('.')[1];
                 const fileName = `${path.split('.')[0]}-${x}x${y}.${fileExtension}`
-            
-                const params = {
-                    Bucket: bucketName,
-                    Key: fileName,
-                    Body: fileContent,
-                    ContentType: exports.getContentType(fileName) 
-                };
                 try {
-                    s3Client.send(new PutObjectCommand(params))
+                    storage.put(owner, fileName, fileContent, { contentType: exports.getContentType(fileName), replace: isUserProfile })
                     .then(() => {
                         resolve(fileName)
                         fs.unlink(outputFile, (err) => {
@@ -657,7 +583,7 @@ exports.uploadThumbnailFile = (file,x,y,path,companyId,isUserProfile = false) =>
                             }
                         });
                     }).catch((error)=>{
-                        reject(formatS3UploadError(error, { bucket: bucketName, key: fileName, op: 'PutObject(thumbnail-file)' }))
+                        reject(formatS3UploadError(error, { bucket: bucketOf(owner), key: fileName, op: 'PutObject(thumbnail-file)' }))
                         fs.unlink(outputFile, (err) => {
                             if (err) {
                                 logger.error(`Error deleting file: ${err}`);
@@ -706,17 +632,10 @@ exports.uploadFileWasabiPromise = (companyId, path, file, replaceFile, fileObjec
                     reject(`Error reading file: ${err.message || err}`);
                     return;
                 }
-                const bucketName = isUserProfile ? awsRef.userProfileBucket : companyId;
+                const owner = ownerOf(companyId, isUserProfile);
                 const fileName = updatedFilePath;
-              
-                const params = {
-                    Bucket: bucketName,
-                    Key: fileName,
-                    Body: fileContent,
-                    ContentType: exports.getContentType(fileName)
-                };
                 try {
-                    s3Client.send(new PutObjectCommand(params))
+                    storage.put(owner, fileName, fileContent, { contentType: exports.getContentType(fileName), replace: isUserProfile })
                     .then(() => {
                         filePathArray.push(updatedFilePath);
                         thumbnailArray[thumInd].size.forEach((thu)=>{
@@ -752,7 +671,7 @@ exports.uploadFileWasabiPromise = (companyId, path, file, replaceFile, fileObjec
                             logger.error("Promise.allSettled error:", error);
                         });
                     }).catch((error)=>{
-                        reject(formatS3UploadError(error, { bucket: bucketName, key: fileName, op: 'PutObject(file+thumbnail)' }))
+                        reject(formatS3UploadError(error, { bucket: bucketOf(owner), key: fileName, op: 'PutObject(file+thumbnail)' }))
                         fs.unlink(file, (err) => {
                             if (err) {
                                 logger.error(`Error deleting file: ${err}`);
@@ -776,17 +695,11 @@ exports.uploadFileWasabiPromise = (companyId, path, file, replaceFile, fileObjec
                     reject(`Error reading file: ${err.message || err}`);
                     return;
                 }
-                const bucketName = isUserProfile ? awsRef.userProfileBucket : companyId;
+                const owner = ownerOf(companyId, isUserProfile);
                 const fileName = updatedFilePath;
-                const params = {
-                    Bucket: bucketName,
-                    Key: fileName,
-                    Body: fileContent,
-                    ContentType: exports.getContentType(fileName)
-                };
                 try {
-                    s3Client.send(new PutObjectCommand(params))
-                    .then((response) => {
+                    storage.put(owner, fileName, fileContent, { contentType: exports.getContentType(fileName), replace: isUserProfile })
+                    .then(() => {
                         resolve(updatedFilePath);
                             fs.unlink(file, (err) => {
                                 if (err) {
@@ -794,7 +707,7 @@ exports.uploadFileWasabiPromise = (companyId, path, file, replaceFile, fileObjec
                                 }
                             });
                     }).catch((error)=>{
-                        reject(formatS3UploadError(error, { bucket: bucketName, key: fileName, op: 'PutObject(file)' }))
+                        reject(formatS3UploadError(error, { bucket: bucketOf(owner), key: fileName, op: 'PutObject(file)' }))
                         fs.unlink(file, (err) => {
                             if (err) {
                                 logger.error(`Error deleting file: ${err}`);
@@ -873,13 +786,8 @@ exports.deleteFileWasabi = async (req, res) => {
         return;
     }
 
-    const command = new DeleteObjectCommand({
-        Bucket: bucketId,
-        Key: req.body.path,
-    });
-
     try {
-        await s3Client.send(command);
+        await storage.remove(bucketId, req.body.path);
         res.send({
            status: true, 
            statusText: `File deleted successfully`,
@@ -894,20 +802,8 @@ exports.deleteFileWasabi = async (req, res) => {
 
 exports.getBucketSizeCompanyWise = async(companyId) => {
     try {
-        const bucketName = JSON.parse(JSON.stringify(companyId));
-        const params = {
-            Bucket: bucketName,
-            ContentType: exports.getContentType('')
-        };
-        const listObjectsCommand = new ListObjectsV2Command(params);
-        await s3Client.send(listObjectsCommand)
-        .then(async(data) => {
-            let totalSize = 0;
-
-            data.Contents.forEach((obj) => {
-                totalSize += obj.Size;
-            });
-
+        await storage.measure(JSON.parse(JSON.stringify(companyId)))
+        .then(async({ bytes: totalSize }) => {
             let mongoObj = {
                 type: SCHEMA_TYPE.COMPANIES,
                 data: [
@@ -942,13 +838,8 @@ exports.getBucketSize = async () => {
 }
 
 exports.copyWasabiImage = async(companyId,path,destinationKey) => {
-    const copyParams = {
-        Bucket: companyId,
-        CopySource: `${companyId}/${path}`,
-        Key: destinationKey,
-    };
     try {
-        await s3Client.send(new CopyObjectCommand(copyParams));
+        await storage.copy(companyId, path, destinationKey);
     } catch (err) {
         logger.error(`Error copying image: ${err}`)
     }
@@ -974,13 +865,7 @@ exports.getContentType = (key) => {
 exports.uploadPublicAssetsToWasabi = async (path, file) => {
     const fileContent = await fs.promises.readFile(file);
     const fileName = `public_assets/${path}`;
-    await s3Client.send(new PutObjectCommand({
-        Bucket: process.env.USERPROFILEBUCKET,
-        Key: fileName,
-        Body: fileContent,
-        ContentType: exports.getContentType(fileName),
-        ACL: "public-read",
-    }));
+    await storage.put(PUBLIC_OWNER, fileName, fileContent, { contentType: exports.getContentType(fileName), acl: "public-read", replace: true });
     return fileName;
 };
 
@@ -1025,13 +910,7 @@ exports.cleanUpTrackShotCompanyWise = async(companyId) => {
                         continue;
                     }
                     try {
-
-                        const command = new DeleteObjectCommand({
-                            Bucket: companyId,
-                            Key: shot.image,
-                        });
-
-                        await s3Client.send(command)
+                        await storage.remove(companyId, shot.image);
                         updatedShots.push({
                             ...shot,
                             deleted: true,

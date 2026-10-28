@@ -16,8 +16,32 @@ describe('the settings catalog', () => {
     });
 
     it('marks what is read at module load as needing a restart', () => {
-        for (const key of ['STORAGE_TYPE', 'WASABI_ACCESS_KEY', 'TRUST_PROXY', 'GLOBAL_RATE_LIMIT_PER_MIN', 'HELMET_ENABLED', 'CRON_TZ']) expect(byKey.get(key).restart).toBe(true);
+        for (const key of ['STORAGE_TYPE', 'TRUST_PROXY', 'GLOBAL_RATE_LIMIT_PER_MIN', 'HELMET_ENABLED', 'CRON_TZ']) expect(byKey.get(key).restart).toBe(true);
         for (const key of ['NODEMAILER_HOST', 'AI_API_KEY', 'GOOGLE_CLIENT_ID']) expect(byKey.get(key).restart).toBeUndefined();
+    });
+
+    it('applies every storage value but the driver on save, so a rotated key needs no restart', () => {
+        const storage = CATALOG.filter((f) => f.group === 'storage' && f.key !== 'STORAGE_TYPE');
+        expect(storage.map((f) => f.key)).toEqual(expect.arrayContaining(['S3_ENDPOINT', 'S3_REGION', 'S3_BUCKET', 'S3_PREFIX', 'S3_ACCESS_KEY', 'S3_SECRET_KEY', 'S3_FORCE_PATH_STYLE', 'S3_PUBLIC_BASE_URL', 'WASABI_ACCESS_KEY']));
+        expect(storage.filter((f) => f.restart).map((f) => f.key)).toEqual([]);
+        expect(byKey.get('S3_SECRET_KEY').secret).toBe(true);
+        expect(byKey.get('STORAGE_TYPE').options).toEqual(expect.arrayContaining(['server', 's3', 'wasabi']));
+    });
+
+    it('shows a Wasabi-named field only while it holds a value', () => {
+        const row = (rows, key) => rows.find((r) => r.key === key);
+        const unset = describeSettings({});
+        expect(row(unset, 'WASABI_ACCESS_KEY').hidden).toBe(true);
+        expect(row(unset, 'WASABIENDPOINT').hidden).toBe(true);
+        expect(row(unset, 'S3_ACCESS_KEY').hidden).toBe(false);
+        expect(row(describeSettings({ saved: { WASABI_ACCESS_KEY: 'AK' } }), 'WASABI_ACCESS_KEY').hidden).toBe(false);
+        expect(row(describeSettings({ env: { WASABIENDPOINT: 'https://s3.wasabisys.com' }, locked: ['WASABIENDPOINT'] }), 'WASABIENDPOINT').hidden).toBe(false);
+    });
+
+    it('refuses a key prefix that could climb out of its folder', () => {
+        expect(validateSettings({ S3_PREFIX: 'ins_01jd3k/' }).valid).toBe(true);
+        expect(validateSettings({ S3_PREFIX: 'a/../b/' }).errors).toEqual({ S3_PREFIX: 'prefix' });
+        expect(validateSettings({ S3_PREFIX: 'a//b' }).errors).toEqual({ S3_PREFIX: 'prefix' });
     });
 });
 

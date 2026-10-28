@@ -110,7 +110,7 @@ const testResult = ref(null);
 const restartState = ref("idle");
 let baseline = {};
 
-const visible = computed(() => rows.value.filter((r) => r.group === group.value));
+const visible = computed(() => rows.value.filter((r) => r.group === group.value && !r.hidden));
 const testable = computed(() => TESTABLE.includes(group.value));
 const hosted = computed(() => isManagedHosting());
 const allManaged = (list) => list.length > 0 && list.every((r) => r.managed);

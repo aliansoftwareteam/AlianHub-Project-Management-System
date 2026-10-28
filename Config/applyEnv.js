@@ -2,6 +2,7 @@ const fs = require('fs');
 const path = require('path');
 const config = require('./config.js');
 const awsRef = require('./aws.js');
+const { touchesStorage } = require('../common-storage/s3Config');
 
 const FIREBASE_KEYS = new Set(['APIKEY', 'AUTODOMAIN', 'PROJECTID', 'STORAGEBUCKET', 'MESSAGINGSENDERID', 'APPID', 'MEASUREMENTID']);
 const AWS_KEYS = {
@@ -38,6 +39,7 @@ function applyEnvMap(map, { override = true } = {}) {
         if (AWS_KEYS[key]) awsRef[AWS_KEYS[key]] = value;
         if (!envWins) applied.push(key);
     }
+    if (touchesStorage(applied)) require('../common-storage/s3Client').reloadStorageClient();
     return applied;
 }
 

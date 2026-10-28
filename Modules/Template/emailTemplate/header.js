@@ -1,5 +1,6 @@
-const { USERPROFILEBUCKET } = require('../../../Config/config');
-const awsRef = require('../../../Config/aws.js');
+const { currentLayout } = require('../../../common-storage/s3Layout');
+
+const publicAsset = (name) => currentLayout().publicUrl(`public_assets/${name}`);
 const { textHtml } = require('../emailText');
 exports.headerHTML = ({ title = "", description = [] }) => {
     return(
@@ -39,7 +40,7 @@ function headerDescriptions(description) {
         return (
             `
             ${index!=0?`<span style="padding:0px 5px;"> /</span>`:`<span/>`}
-            ${item.showFolder? `<img src="https://s3.${awsRef.region}.wasabisys.com/${USERPROFILEBUCKET}/public_assets/email_folder_icon.png" alt="folder-icon" style="padding:0px 5px;">`:`<span/>`}
+            ${item.showFolder? `<img src="${publicAsset('email_folder_icon.png')}" alt="folder-icon" style="padding:0px 5px;">`:`<span/>`}
             <a href="#" target="_blank" style="font-size:16px;line-height:30px;color:#818181;text-size-adjust:100%;-ms-text-size-adjust:100%;-moz-text-size-adjust:100%;-webkit-text-size-adjust:100%;text-decoration:none;text-decoration: none; margin: 0;">
             ${textHtml(item.title)}
             </a>
