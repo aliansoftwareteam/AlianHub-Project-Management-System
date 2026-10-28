@@ -17,5 +17,7 @@
 
 - 2026-10-23: Owner answered the five open questions: MCP writes approved in the Inbox; quotas 500 reads / 50 write proposals per person and 200 reads per agent a day, admin-set under an instance ceiling; no Gmail in the Google pilot, Gmail via company Internal apps, hosted-instance CASA decided later from quotes; the Drive/Dropbox picker joins the module (checked: its client secret is stored unsealed and disconnect does not revoke); connectors easiest first, Shopify last. PRD v1.1 adds FR-39 and FR-40 and restores the connector list.
 
+- 2026-10-28: Split into sub tasks 061–077 (Phase 0 research, Phase 1 module, Phase 2 migration), each with its FRs and dependencies; table in `task.md` §11. Phase 3 connector tasks wait for 062's ranking.
+
 ## Last step
-PRD v1.1 done. Next: owner corrections, then Phase 0 research.
+Split into 061–077. Next: owner corrections, then 061, 062 and 064 can start in parallel.
