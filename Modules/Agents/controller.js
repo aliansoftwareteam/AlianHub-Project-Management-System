@@ -27,6 +27,9 @@ const routingPolicy = require('../AICore/routingPolicy');
 const modelPin = require('../AICore/modelPin');
 const taskClass = require('../AICore/taskClass');
 const revisions = require('./revisions');
+const agentApproval = require('./agentApproval');
+const audience = require('./agentAudience');
+const aiRights = require('../../Config/aiRights');
 const workspaceGuide = require('./workspaceGuide');
 const skillRecord = require('./skillRecord');
 const { buildTrace } = require('./runTrace');
@@ -74,7 +77,7 @@ const idempotencyKeyOf = (req) => {
     return raw;
 };
 
-const { humanActor, callerOf, canManageAgents, canControlRun, canActAsAgent, visibleProjectIdsFor, agentProjectsFor, readScopeOf, canSeeRun, canSeeProposal, decidesProposals, REFUSAL } = access;
+const { humanActor, callerOf, canManageAgents, agentRightsOf, canEditAgent, canControlRun, canActAsAgent, visibleProjectIdsFor, agentProjectsFor, readScopeOf, canSeeRun, canSeeProposal, decidesProposals, REFUSAL } = access;
 
 /* A run that is someone else's private work is not there for an owner or admin; a member's standing
  * on a run is decided by the checks each route already makes. */
@@ -114,6 +117,40 @@ const refusePin = (res, set) => {
 const refuseSkills = async (res, companyId, set) => {
     const errors = set.skills ? await skillRecord.checkAgentSkills(companyId, set.skills) : [];
     return errors.length ? fail(res, 'The agent names skills that cannot run.', 400, { data: { errors } }) : null;
+};
+
+/* What only an owner or admin may give an agent: a skill above the caller's risk cap. A skill already on the agent stays.
+ * And a share that names nobody real. */
+const refuseAgentFields = async (res, companyId, caller, rights, set, before = {}) => {
+    const had = new Set((before.skills || []).map((skill) => String((skill && skill.key) || skill)));
+    const added = (set.skills || []).filter((skill) => !had.has(String(skill.key)));
+    if (!caller.privileged && added.length) {
+        const over = await skillRecord.skillsAboveRisk(companyId, added, rights.skillRisk);
+        if (over.length) {
+            const names = over.map((skill) => `"${skill.name}"`).join(', ');
+            return fail(res, `Your role does not let an agent use ${names}. Ask an Owner or an Admin.`, 400, { code: 'skill_risk', data: { skills: over } });
+        }
+    }
+    if (set.visibility !== undefined || set.sharedWith !== undefined) {
+        const problems = await audience.unknownShares(companyId, { ...before, ...set });
+        if (problems.length) return fail(res, problems[0], 400);
+    }
+    return null;
+};
+
+const fieldsOf = (body) => ({ ...agentPatchFields(body), ...audience.audienceFields(body) });
+
+/* The fields a save actually changes; a form sends every field back. */
+const changedFields = (before, set) => Object.fromEntries(Object.entries(set).filter(([key, value]) => JSON.stringify(value) !== JSON.stringify(before[key])));
+
+const AUDIENCE_KEYS = Object.freeze(['visibility', 'sharedWith']);
+
+/* Narrowing who may use an agent takes effect at once; every other change to an approved agent waits. */
+const splitEdit = (before, set) => {
+    const reach = Object.fromEntries(Object.entries(set).filter(([key]) => AUDIENCE_KEYS.includes(key)));
+    const rest = Object.fromEntries(Object.entries(set).filter(([key]) => !AUDIENCE_KEYS.includes(key)));
+    if (!Object.keys(reach).length || audience.widens(before, reach)) return { now: {}, later: set };
+    return { now: reach, later: rest };
 };
 
 const roleNameOf = (key) => {
@@ -159,12 +196,17 @@ exports.listAgents = async (req, res) => {
     try {
         const companyId = companyOf(req);
         if (!companyId) return fail(res, 'companyId is required.');
-        const [rows, visible] = await Promise.all([
+        const caller = await callerOf(req, companyId);
+        const [rows, visible, rights, person] = await Promise.all([
             MongoDbCrudOpration(companyId, { type: SCHEMA_TYPE.AGENTS, data: [{ deletedStatusKey: { $ne: 1 } }, {}, { sort: { createdAt: 1 } }] }, 'find'),
-            callerOf(req, companyId).then((caller) => visibleProjectIdsFor(companyId, caller)),
+            visibleProjectIdsFor(companyId, caller),
+            agentRightsOf(companyId, caller),
+            audience.personOf(companyId, caller.actor.userId),
         ]);
-        const agents = await skillRecord.enrichAgentSkills(companyId, rows || []);
-        return res.send({ status: true, statusText: 'Agents fetched.', data: agents.map((agent) => ({ ...agent, ...agentProjectsFor(agent, visible), roleName: roleNameOf(agent.role) })) });
+        const seen = (rows || []).filter((agent) => audience.maySee(agent, person, { seesAll: rights.seesAll }));
+        const agents = await skillRecord.enrichAgentSkills(companyId, seen);
+        const people = await peopleOf(companyId, agents);
+        return res.send({ status: true, statusText: 'Agents fetched.', data: agents.map((agent) => ({ ...agent, ...agentProjectsFor(agent, visible), roleName: roleNameOf(agent.role), ...people(agent) })) });
     } catch (e) { logger.error(`listAgents: ${e.message}`); return fail(res, e.message, 500); }
 };
 
@@ -181,24 +223,35 @@ exports.runnableAgents = async (req, res) => {
     } catch (e) { logger.error(`runnableAgents: ${e.message}`); return fail(res, e.message, 500); }
 };
 
-/* POST /api/v2/agents */
+/* POST /api/v2/agents — an owner or admin's agent works at once; anyone else's waits for one of them to approve it */
 exports.createAgent = async (req, res) => {
     try {
         const companyId = companyOf(req);
         if (!companyId) return fail(res, 'companyId is required.');
         const caller = await callerOf(req, companyId);
-        if (refuseUnlessManager(res, caller, 'Agents cannot create agents.')) return undefined;
+        if (!caller.human) return fail(res, 'Agents cannot create agents.', 403);
+        const rights = await agentRightsOf(companyId, caller);
+        if (!rights.build) return fail(res, REFUSAL.BUILD, 403);
         const { actor } = caller;
-        const set = agentPatchFields(req.body || {});
+        const set = fieldsOf(req.body || {});
         if (!set.name) return fail(res, 'name is required.');
         if (refusePin(res, set)) return undefined;
         if (await refuseSkills(res, companyId, set)) return undefined;
+        if (await refuseAgentFields(res, companyId, caller, rights, set)) return undefined;
+        const asks = !caller.privileged;
         const saved = await MongoDbCrudOpration(companyId, {
             type: SCHEMA_TYPE.AGENTS,
-            data: { autonomy: 1, spendCapUsd: 30, rateLimitPerDay: DEFAULT_RATE_LIMIT_PER_DAY, paused: false, account: 'workspace', deletedStatusKey: 0, projectIds: [], ...set, ownerId: actor.userId },
+            data: {
+                autonomy: 1, spendCapUsd: 30, rateLimitPerDay: DEFAULT_RATE_LIMIT_PER_DAY, paused: false, account: 'workspace', deletedStatusKey: 0, projectIds: [],
+                visibility: audience.VISIBILITY.PRIVATE, ...set, ownerId: actor.userId, ...(asks ? { approval: agentApproval.requested(actor) } : {}),
+            },
         }, 'save');
         await revisions.recordCreate(companyId, saved, { actor });
-        return res.send({ status: true, statusText: 'Agent created.', data: saved });
+        if (asks) {
+            await agentApproval.audit(companyId, actor, { entityType: 'agent', entityId: saved._id, name: saved.name, ip: req.ip || '' });
+            await agentApproval.notifyRequested(companyId, agentApproval.KIND.AGENT, saved, { actor });
+        }
+        return res.send({ status: true, statusText: asks ? 'Agent saved. It waits for an Owner or an Admin to approve it.' : 'Agent created.', data: saved });
     } catch (e) { logger.error(`createAgent: ${e.message}`); return fail(res, e.message, e.status || 500); }
 };
 
@@ -221,20 +274,68 @@ exports.updateAgent = async (req, res) => {
         const companyId = companyOf(req);
         if (!companyId || !OBJECT_ID.test(req.params.id)) return fail(res, 'companyId and a valid agent id are required.');
         const caller = await callerOf(req, companyId);
-        if (refuseUnlessManager(res, caller, 'Agents cannot edit agents.')) return undefined;
+        if (!caller.human) return fail(res, 'Agents cannot edit agents.', 403);
+        const rights = await agentRightsOf(companyId, caller);
+        if (!rights.build) return fail(res, REFUSAL.BUILD, 403);
         const { actor } = caller;
-        const set = agentPatchFields(req.body || {});
-        if (!Object.keys(set).length) return fail(res, 'Nothing to update.');
+        const fields = fieldsOf(req.body || {});
+        if (!Object.keys(fields).length) return fail(res, 'Nothing to update.');
         const before = await runs.getAgent(companyId, req.params.id);
         if (!before) return fail(res, 'Agent not found.', 404);
-        if (refuseBuiltInEdit(res, before, set)) return undefined;
-        if (refusePin(res, set)) return undefined;
-        if (await refuseSkills(res, companyId, set)) return undefined;
-        const updated = await MongoDbCrudOpration(companyId, { type: SCHEMA_TYPE.AGENTS, data: [{ _id: oid(req.params.id) }, { $set: set }, { returnDocument: 'after' }] }, 'findOneAndUpdate');
-        if (!updated) return fail(res, 'Agent not found.', 404);
-        const { revision } = await revisions.recordSave(companyId, before, updated, { actor, ip: req.ip || '' });
-        return res.send({ status: true, statusText: 'Agent updated.', data: updated, revision: revision ? Number(revision.n) : null });
+        if (!canEditAgent(caller, rights, before)) return fail(res, REFUSAL.OWN_AGENT, 403);
+        if (refuseBuiltInEdit(res, before, fields)) return undefined;
+        if (refusePin(res, fields)) return undefined;
+        if (await refuseSkills(res, companyId, fields)) return undefined;
+        if (await refuseAgentFields(res, companyId, caller, rights, fields, before)) return undefined;
+        const ip = req.ip || '';
+        const saveLive = async (set, extra = {}) => {
+            const updated = await MongoDbCrudOpration(companyId, { type: SCHEMA_TYPE.AGENTS, data: [{ _id: oid(req.params.id) }, { $set: { ...set, ...extra } }, { returnDocument: 'after' }] }, 'findOneAndUpdate');
+            if (!updated) return { updated: null };
+            const { revision } = await revisions.recordSave(companyId, before, updated, { actor, ip });
+            return { updated, revision };
+        };
+        if (caller.privileged) {
+            const { updated, revision } = await saveLive(fields);
+            if (!updated) return fail(res, 'Agent not found.', 404);
+            return res.send({ status: true, statusText: 'Agent updated.', data: updated, revision: revision ? Number(revision.n) : null });
+        }
+        if (!agentApproval.isApproved(before)) {
+            const resent = before.approval.state === agentApproval.STATE.DECLINED;
+            const { updated, revision } = await saveLive(fields, resent ? { approval: agentApproval.requested(actor) } : {});
+            if (!updated) return fail(res, 'Agent not found.', 404);
+            if (resent) {
+                await agentApproval.audit(companyId, actor, { entityType: 'agent', entityId: updated._id, name: updated.name, ip });
+                await agentApproval.notifyRequested(companyId, agentApproval.KIND.AGENT, updated, { actor });
+            }
+            const statusText = resent ? 'Agent sent again. It waits for an Owner or an Admin to approve it.' : 'Agent updated. It still waits for an Owner or an Admin to approve it.';
+            return res.send({ status: true, statusText, data: updated, revision: revision ? Number(revision.n) : null });
+        }
+        const { now, later } = splitEdit(before, changedFields(before, fields));
+        let updated = before;
+        if (Object.keys(now).length) {
+            ({ updated } = await saveLive(now));
+            if (!updated) return fail(res, 'Agent not found.', 404);
+        }
+        const waiting = Object.keys(later).length ? await revisions.createDraft(companyId, updated, { fields: later, actor, requestedApproval: true }) : null;
+        if (waiting) {
+            await agentApproval.audit(companyId, actor, { entityType: 'agent', entityId: updated._id, name: updated.name, n: waiting.n, ip });
+            await agentApproval.notifyRequested(companyId, agentApproval.KIND.EDIT, updated, { actor, n: waiting.n });
+        }
+        const statusText = waiting ? 'Your change waits for an Owner or an Admin to approve it. The agent keeps working as it was.' : 'Agent updated.';
+        return res.send({ status: true, statusText, data: updated, pendingRevision: waiting ? Number(waiting.n) : null });
     } catch (e) { logger.error(`updateAgent: ${e.message}`); return fail(res, e.message, e.status || 500); }
+};
+
+/* The kill switch and delete: an owner or admin for any agent, a person whose role builds agents for their own. */
+const ownAgentOrRefuse = async (req, res, companyId, agentsMessage) => {
+    const caller = await callerOf(req, companyId);
+    if (!caller.human) { fail(res, agentsMessage, 403); return null; }
+    const rights = await agentRightsOf(companyId, caller);
+    if (!rights.build) { fail(res, REFUSAL.BUILD, 403); return null; }
+    const agent = await runs.getAgent(companyId, req.params.id);
+    if (!agent) { fail(res, 'Agent not found.', 404); return null; }
+    if (!canEditAgent(caller, rights, agent)) { fail(res, REFUSAL.OWN_AGENT, 403); return null; }
+    return { caller, agent };
 };
 
 /* POST /api/v2/agents/:id/pause  |  /resume — the kill switch */
@@ -242,7 +343,7 @@ exports.setPaused = (paused) => async (req, res) => {
     try {
         const companyId = companyOf(req);
         if (!companyId || !OBJECT_ID.test(req.params.id)) return fail(res, 'companyId and a valid agent id are required.');
-        if (refuseUnlessManager(res, await callerOf(req, companyId), 'Agents cannot pause or resume agents.')) return undefined;
+        if (!(await ownAgentOrRefuse(req, res, companyId, 'Agents cannot pause or resume agents.'))) return undefined;
         const set = paused ? { paused: true, pausedReason: String((req.body && req.body.reason) || 'manual').slice(0, 120), pausedAt: new Date() } : { paused: false, pausedReason: null, pausedAt: null };
         const updated = await MongoDbCrudOpration(companyId, { type: SCHEMA_TYPE.AGENTS, data: [{ _id: oid(req.params.id) }, { $set: set }, { returnDocument: 'after' }] }, 'findOneAndUpdate');
         if (!updated) return fail(res, 'Agent not found.', 404);
@@ -264,15 +365,35 @@ const revisionRow = (r, names = {}) => {
         source: o.source || null, rollbackOf: o.rollbackOf || null, note: o.note || null,
         createdBy: o.createdBy || null, createdByName: names[String(o.createdBy)] || null, createdAt: o.createdAt,
         promotedBy: o.promotedBy || null, promotedByName: names[String(o.promotedBy)] || null, promotedAt: o.promotedAt || null, supersededAt: o.supersededAt || null,
+        requestedApproval: Boolean(o.requestedApproval),
+        declinedBy: o.declinedBy || null, declinedByName: names[String(o.declinedBy)] || null, declinedAt: o.declinedAt || null, declineReason: o.declineReason || null,
     };
 };
 
-const userNames = async (rows) => {
-    const ids = [...new Set(rows.flatMap((r) => [r.createdBy, r.promotedBy]).filter(Boolean).map(String))].map(oid).filter(Boolean);
+const namesOf = async (personIds) => {
+    const ids = [...new Set(personIds.filter(Boolean).map(String))].map(oid).filter(Boolean);
     if (!ids.length) return {};
     const { dbCollections } = require('../../Config/collections');
     const users = await MongoDbCrudOpration(dbCollections.GLOBAL, { type: SCHEMA_TYPE.USERS, data: [{ _id: { $in: ids } }, { Employee_Name: 1, Employee_FName: 1, Employee_LName: 1 }] }, 'find').catch(() => []);
     return Object.fromEntries((users || []).map((u) => [String(u._id), u.Employee_Name || [u.Employee_FName, u.Employee_LName].filter(Boolean).join(' ') || null]));
+};
+
+const userNames = (rows) => namesOf(rows.flatMap((r) => [r.createdBy, r.promotedBy, r.declinedBy]));
+
+/* Who made each agent, who answered its approval, and the edit of it that waits for an owner or admin. */
+const peopleOf = async (companyId, agents) => {
+    const edits = await revisions.requestedEditsOf(companyId, agents.map((agent) => agent._id));
+    const approvalOf = (agent) => agent.approval || {};
+    const names = await namesOf(agents.flatMap((agent) => [agent.ownerId, approvalOf(agent).decidedBy, (edits.get(String(agent._id)) || {}).createdBy]));
+    return (agent) => {
+        const approval = approvalOf(agent);
+        const edit = edits.get(String(agent._id));
+        return {
+            ownerName: names[String(agent.ownerId)] || null,
+            ...(approval.decidedBy ? { decidedByName: names[String(approval.decidedBy)] || null } : {}),
+            pendingEdit: edit ? { n: Number(edit.n), createdBy: edit.createdBy || null, createdByName: names[String(edit.createdBy)] || null, createdAt: edit.createdAt || null } : null,
+        };
+    };
 };
 
 /* Revisions are owner/admin ground, like the agent settings page. */
@@ -328,6 +449,13 @@ exports.createRevision = async (req, res) => {
     } catch (e) { logger.error(`createRevision: ${e.message}`); return fail(res, e.message, e.status || 500); }
 };
 
+/* An owner or admin's answer to an edit someone asked for: recorded, and told to the person who asked. */
+const answerEdit = async (ctx, revision, { approved, reason, ip }) => {
+    const { companyId, actor, agent } = ctx;
+    await agentApproval.audit(companyId, actor, { decision: approved ? 'approved' : 'declined', entityType: 'agent', entityId: agent._id, name: agent.name, n: revision.n, reason, ip });
+    await agentApproval.notifyDecided(companyId, agentApproval.KIND.EDIT, agent, { actor, to: revision.createdBy, approved, reason, n: revision.n });
+};
+
 /* POST /api/v2/agents/:id/revisions/:n/promote */
 exports.promoteRevision = async (req, res) => {
     try {
@@ -337,8 +465,44 @@ exports.promoteRevision = async (req, res) => {
         if (!n) return fail(res, 'Revision not found.', 404);
         const out = await revisions.promote(ctx.companyId, ctx.agent, n, { actor: ctx.actor, ip: req.ip || '' });
         if (out.error) return fail(res, out.error, out.status || 400, out.errors ? { data: { errors: out.errors } } : undefined);
+        if (!out.unchanged && out.revision.requestedApproval) await answerEdit(ctx, out.revision, { approved: true, ip: req.ip || '' });
         return res.send({ status: true, statusText: out.unchanged ? `Revision ${n} is already live.` : `Revision ${n} is live.`, data: { revision: revisionRow(out.revision), from: out.from, agent: out.agent || null } });
     } catch (e) { logger.error(`promoteRevision: ${e.message}`); return fail(res, e.message, 500); }
+};
+
+/* POST /api/v2/agents/:id/revisions/:n/decline  body: { reason } — the live revision stays */
+exports.declineRevision = async (req, res) => {
+    try {
+        const ctx = await revisionAccess(req, res);
+        if (!ctx) return undefined;
+        const n = revisionN(req.params.n);
+        if (!n) return fail(res, 'Revision not found.', 404);
+        const reason = agentApproval.reasonOf((req.body || {}).reason);
+        if (!reason) return fail(res, agentApproval.REFUSAL.REASON, 400);
+        const out = await revisions.decline(ctx.companyId, ctx.agent, n, { actor: ctx.actor, reason });
+        if (out.error) return fail(res, out.error, out.status || 400);
+        if (out.revision.requestedApproval) await answerEdit(ctx, out.revision, { approved: false, reason, ip: req.ip || '' });
+        return res.send({ status: true, statusText: `Revision ${n} declined. The live version keeps running.`, data: { revision: revisionRow(out.revision) } });
+    } catch (e) { logger.error(`declineRevision: ${e.message}`); return fail(res, e.message, 500); }
+};
+
+/* POST /api/v2/agents/:id/approve  |  /decline  body: { reason } — an owner or admin answers a request to put an agent to work */
+exports.decideAgent = (approve) => async (req, res) => {
+    try {
+        const companyId = companyOf(req);
+        if (!companyId || !OBJECT_ID.test(req.params.id)) return fail(res, 'companyId and a valid agent id are required.');
+        const caller = await callerOf(req, companyId);
+        if (refuseUnlessManager(res, caller, 'Agents cannot approve agents.')) return undefined;
+        const reason = approve ? '' : agentApproval.reasonOf((req.body || {}).reason);
+        if (!approve && !reason) return fail(res, agentApproval.REFUSAL.REASON, 400);
+        if (!(await runs.getAgent(companyId, req.params.id))) return fail(res, 'Agent not found.', 404);
+        const updated = await agentApproval.decide(companyId, req.params.id, { approve, actor: caller.actor, reason });
+        if (!updated) return fail(res, agentApproval.REFUSAL.DECIDED, 409);
+        await agentApproval.audit(companyId, caller.actor, { decision: approve ? 'approved' : 'declined', entityType: 'agent', entityId: updated._id, name: updated.name, reason, ip: req.ip || '' });
+        await agentApproval.notifyDecided(companyId, agentApproval.KIND.AGENT, updated, { actor: caller.actor, to: updated.approval.requestedBy, approved: approve, reason });
+        runs.emitAgent(companyId, { agentId: String(updated._id), agent: updated });
+        return res.send({ status: true, statusText: approve ? 'Agent approved. It can start work now.' : 'Agent declined.', data: updated });
+    } catch (e) { logger.error(`decideAgent: ${e.message}`); return fail(res, e.message, e.status || 500); }
 };
 
 /* POST /api/v2/agents/:id/revisions/:n/rollback — copies :n forward and makes the copy live */
@@ -360,11 +524,9 @@ exports.deleteAgent = async (req, res) => {
     try {
         const companyId = companyOf(req);
         if (!companyId || !OBJECT_ID.test(req.params.id)) return fail(res, 'companyId and a valid agent id are required.');
-        const caller = await callerOf(req, companyId);
-        if (refuseUnlessManager(res, caller, 'Agents cannot delete agents.')) return undefined;
-        const { actor } = caller;
-        const agent = await runs.getAgent(companyId, req.params.id);
-        if (!agent) return fail(res, 'Agent not found.', 404);
+        const owned = await ownAgentOrRefuse(req, res, companyId, 'Agents cannot delete agents.');
+        if (!owned) return undefined;
+        const { caller: { actor }, agent } = owned;
         const active = await runs.list(companyId, { status: 'open', agentId: req.params.id });
         const running = (active || []).filter((r) => [runs.STATUS.RUNNING, runs.STATUS.QUEUED].includes(r.status));
         if (running.length) return fail(res, `This agent has ${running.length} run(s) in progress — stop them first.`, 409);
@@ -520,7 +682,9 @@ exports.startRun = async (req, res) => {
             if (!triggers.isWorkTask(task) || !tokenAllowsProject(req.apiToken, task.ProjectID)) return fail(res, 'Task not found.', 404);
             if (!(await triggers.mayRunOn(companyId, actor.userId, task))) return fail(res, 'Task not found.', 404);
             if (agent.projectIds && agent.projectIds.length && !agent.projectIds.includes(String(task.ProjectID))) return fail(res, 'This agent is not scoped to that project.', 403);
+            if (!audience.mayUse(agent, await audience.personOf(companyId, actor.userId))) return fail(res, audience.REFUSAL.USE, 403);
         }
+        if (!(await aiRights.mayUse(companyId, actor.userId, aiRights.AI_RIGHT.AGENT_USE))) return fail(res, aiRights.REFUSAL[aiRights.AI_RIGHT.AGENT_USE], 403);
         if (!task) {
             // Every executable skill works on a task. Without one the run used to be created,
             // never executed and never finished — "running" forever in every counter.
@@ -811,7 +975,10 @@ exports.teamBoard = async (req, res) => {
         const companyId = companyOf(req);
         if (!companyId || !req.uid) return fail(res, 'Unauthorized.', 401);
         const hoursPerWeek = Number(req.query && req.query.hoursPerWeek) > 0 ? Number(req.query.hoursPerWeek) : 40;
-        const data = await team.board(companyId, { hoursPerWeek, viewerId: req.uid });
+        const caller = await callerOf(req, companyId);
+        const [rights, person] = await Promise.all([agentRightsOf(companyId, caller), audience.personOf(companyId, req.uid)]);
+        const seesAgent = (agent) => audience.maySee(agent, person, { seesAll: rights.seesAll });
+        const data = await team.board(companyId, { hoursPerWeek, viewerId: req.uid, seesAgent });
         return res.send({ status: true, statusText: 'Team board fetched.', data: { ...data, standup: team.standup(data) } });
     } catch (e) { logger.error(`teamBoard: ${e.message}`); return fail(res, e.message, 500); }
 };

@@ -32,6 +32,7 @@ jest.mock('../Modules/notification/prepare-notification-data/controllerV2', () =
 jest.mock('../Config/permissionGuard', () => ({
     getRoleType: jest.fn(async (companyId, uid) => mockRoles[uid]),
     isPrivileged: (roleType) => roleType === 1 || roleType === 2,
+    evaluatePermission: jest.fn(async () => true), isWritable: (p) => p === true || p === 1 || p === 2, isReadable: (p) => p !== null && p !== undefined && p !== 0,
 }));
 jest.mock('../Modules/Agents/engine/safeFetch', () => {
     const actual = jest.requireActual('../Modules/Agents/engine/safeFetch');

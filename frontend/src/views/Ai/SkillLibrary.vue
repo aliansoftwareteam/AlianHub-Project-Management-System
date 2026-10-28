@@ -9,7 +9,7 @@
                     <input v-model="showRetired" type="checkbox" class="ah-check" @change="load" />
                     {{ $t('Ai.skill_show_retired') }}
                 </label>
-                <button v-if="canManage" type="button" class="ah-btn ah-btn--primary ah-btn--sm" @click="startCreate">{{ $t('Ai.skill_new') }}</button>
+                <button v-if="canWriteSkills" type="button" class="ah-btn ah-btn--primary ah-btn--sm" @click="startCreate">{{ $t('Ai.skill_new') }}</button>
             </div>
             <div class="ai-page__body ah-scroll">
                 <p class="ai-lead">{{ $t('Ai.skills_library_lead') }}</p>
@@ -30,7 +30,10 @@
                                     </span>
                                     <span class="ah-chip ah-chip--sm" :class="riskChip(skill.risk)">{{ $t('Ai.risk') }}: {{ skill.risk }}</span>
                                     <span v-if="skill.retiredAt" class="ah-chip ah-chip--sm ah-chip--danger">{{ $t('Ai.skill_retired') }}</span>
+                                    <span v-else-if="approvalOf(skill) === 'pending'" class="ah-chip ah-chip--sm ah-chip--warn" data-test="skill-pending">{{ $t('AgentAccess.state_pending') }}</span>
+                                    <span v-else-if="approvalOf(skill) === 'declined'" class="ah-chip ah-chip--sm ah-chip--danger" data-test="skill-declined">{{ $t('AgentAccess.state_declined') }}</span>
                                     <span v-else-if="skill.enabled === false" class="ah-chip ah-chip--sm">{{ $t('Ai.off') }}</span>
+                                    <span v-if="skill.pendingChange" class="ah-chip ah-chip--sm ah-chip--warn" data-test="skill-change-waiting">{{ $t('AgentAccess.change_waiting') }}</span>
                                     <span v-if="skill.unavailable" class="ah-chip ah-chip--sm ah-chip--warn">{{ $t('Ai.skill_unavailable') }}</span>
                                 </div>
                                 <p class="ai-agent__scope">{{ skillAbout(t, skill) || $t('Ai.skill_no_description') }}</p>
@@ -44,10 +47,16 @@
                             <span v-for="action in skill.emits" :key="action" class="ah-chip ah-chip--sm" :title="action">{{ actionLabel(t, action, actions) }}</span>
                         </div>
 
+                        <div v-if="canManage && waitsOn(skill)" class="sk-lib__decide" data-test="skill-decide">
+                            <input v-model.trim="reasons[skill.key]" type="text" class="ah-input" maxlength="500" :placeholder="$t('AgentAccess.decline_reason_hint')" :aria-label="$t('AgentAccess.decline_reason')" />
+                            <button type="button" class="ah-btn ah-btn--primary ah-btn--sm" :disabled="busy" @click="answer(skill, true)">{{ $t('AgentAccess.approve') }}</button>
+                            <button type="button" class="ah-btn ah-btn--secondary ah-btn--sm" :disabled="busy || !reasons[skill.key]" @click="answer(skill, false)">{{ $t('AgentAccess.decline') }}</button>
+                        </div>
+
                         <div class="ai-agent__foot">
-                            <button type="button" class="ah-btn ah-btn--secondary ah-btn--sm" @click="startDryRun(skill)">{{ $t('Ai.skill_dry_run') }}</button>
-                            <button v-if="canManage && skill.source === 'data'" type="button" class="ah-btn ah-btn--secondary ah-btn--sm" @click="startEdit(skill)">{{ $t('Ai.skill_edit') }}</button>
-                            <button v-if="canManage && skill.source === 'data' && !skill.retiredAt" type="button" class="ah-btn ah-btn--ghost ah-btn--sm" @click="retiring = skill" >{{ $t('Ai.skill_retire') }}</button>
+                            <button v-if="canWriteSkills" type="button" class="ah-btn ah-btn--secondary ah-btn--sm" @click="startDryRun(skill)">{{ $t('Ai.skill_dry_run') }}</button>
+                            <button v-if="mayChange(skill)" type="button" class="ah-btn ah-btn--secondary ah-btn--sm" @click="startEdit(skill)">{{ $t('Ai.skill_edit') }}</button>
+                            <button v-if="mayChange(skill) && !skill.retiredAt" type="button" class="ah-btn ah-btn--ghost ah-btn--sm" @click="retiring = skill" >{{ $t('Ai.skill_retire') }}</button>
                             <span v-if="skill.version" class="ai-agent__trigger">v{{ skill.version }}</span>
                         </div>
 
@@ -121,8 +130,9 @@
 </template>
 
 <script setup>
-import { computed, inject, onMounted, ref } from "vue";
+import { computed, inject, onMounted, reactive, ref } from "vue";
 import { useI18n } from "vue-i18n";
+import { useToast } from "vue-toast-notification";
 import EmptyState from "@/components/atom/EmptyState/EmptyState.vue";
 import AiSidebar from "./AiSidebar.vue";
 import SkillEditor from "./SkillEditor.vue";
@@ -140,8 +150,29 @@ defineOptions({ name: "SkillLibraryPage" });
 
 const { t } = useI18n();
 const companyId = inject("$companyId");
-const { registryManifest, skillManifest, loadRegistry, loadSkills, loadCatalogues, loadSkill, retireSkill, dryRunSkill } = useAgents();
-const { canManage } = useAgentAccess();
+const { registryManifest, skillManifest, loadRegistry, loadSkills, loadCatalogues, loadSkill, retireSkill, dryRunSkill, answerSkill } = useAgents();
+const { canManage, canWriteSkills, userId } = useAgentAccess();
+const $toast = useToast();
+const reasons = reactive({});
+
+const approvalOf = (skill) => (skill.approval && skill.approval.state) || "approved";
+const waitsOn = (skill) => approvalOf(skill) === "pending" || Boolean(skill.pendingChange);
+/* An owner or admin changes any data skill; a person whose role writes skills changes the ones they wrote. */
+const mayChange = (skill) => skill.source === "data" && (canManage.value || (canWriteSkills.value && String(skill.createdBy || "") === String(userId.value || "")));
+
+const answer = async (skill, approve) => {
+    busy.value = true;
+    try {
+        await answerSkill(skill.key, approve, reasons[skill.key] || "");
+        reasons[skill.key] = "";
+        $toast.success(t(approve ? "AgentAccess.approved_toast" : "AgentAccess.declined_toast", { name: skill.name }), { position: "top-right" });
+        await loadSkills({ includeRetired: showRetired.value });
+    } catch (error) {
+        $toast.error(error.message, { position: "top-right" });
+    } finally {
+        busy.value = false;
+    }
+};
 
 const mcp = ref({ tools: [] });
 const loading = ref(true);
@@ -239,6 +270,8 @@ onMounted(load);
 .sk-lib__note { margin: 6px 0 10px; }
 .sk-lib__scroll { overflow-x: auto; }
 .sk-lib__confirm { display: flex; align-items: center; gap: 8px; margin-top: 10px; padding-top: 10px; border-top: 1px solid var(--hairline); }
+.sk-lib__decide { display: flex; align-items: center; gap: 8px; margin-top: 10px; flex-wrap: wrap; }
+.sk-lib__decide .ah-input { flex: 1; min-width: 160px; }
 .ai-table { width: 100%; border-collapse: collapse; margin-top: 10px; font: var(--text-small); }
 .ai-table th { text-align: left; font: var(--text-label); letter-spacing: .06em; text-transform: uppercase; color: var(--ink-2); padding: 6px var(--cell-pad-x, 10px); border-bottom: 1px solid var(--hairline); }
 .ai-table td { padding: var(--table-pad-y, 9px) var(--cell-pad-x, 10px); font-size: var(--row-font, 12.5px); border-bottom: 1px solid var(--hairline); vertical-align: top; color: var(--ink); }

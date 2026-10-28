@@ -9,6 +9,9 @@ const { commentThreadAccess } = require('../Comments/helpers/threadAccess');
 const { parseAgentMentionIds, mentionsAsNames } = require('../Comments/helpers/parseMentions');
 const registry = require('./registry');
 const runs = require('./runs');
+const { APPROVED_CLAUSE } = require('./agentApproval');
+const audience = require('./agentAudience');
+const aiRights = require('../../Config/aiRights');
 const writerLimits = require('../../event/writerLimits');
 
 // Where people start agents from the task itself: choosing one in the assignee
@@ -50,10 +53,12 @@ const inScope = (agent, task) => {
 const runnableAgents = async (companyId, uid, task) => {
     if (!(await mayRunOn(companyId, uid, task))) return [];
     if (!(await aiSwitch.allowed(companyId))) return [];
-    const rows = await MongoDbCrudOpration(companyId, {
-        type: SCHEMA_TYPE.AGENTS, data: [{ deletedStatusKey: { $ne: 1 }, paused: { $ne: true } }, {}, { sort: { name: 1 } }],
-    }, 'find');
-    return (rows || []).filter((agent) => inScope(agent, task));
+    if (!(await aiRights.mayUse(companyId, uid, aiRights.AI_RIGHT.AGENT_USE).catch(() => false))) return [];
+    const [rows, person] = await Promise.all([
+        MongoDbCrudOpration(companyId, { type: SCHEMA_TYPE.AGENTS, data: [{ deletedStatusKey: { $ne: 1 }, paused: { $ne: true }, ...APPROVED_CLAUSE }, {}, { sort: { name: 1 } }] }, 'find'),
+        audience.personOf(companyId, uid),
+    ]);
+    return (rows || []).filter((agent) => inScope(agent, task) && audience.mayUse(agent, person));
 };
 
 const listed = (agent) => ({ _id: String(agent._id), name: agent.name, description: agent.description || '', autonomy: Number(agent.autonomy || 0), ...(agent.builtIn ? { builtIn: agent.builtIn } : {}) });

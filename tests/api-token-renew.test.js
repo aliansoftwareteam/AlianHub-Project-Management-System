@@ -104,6 +104,7 @@ beforeEach(() => {
         globalDb().seed(SCHEMA_TYPE.USERS, { _id: id, AssignCompany: COMPANY, Employee_Name: name });
         db().seed(SCHEMA_TYPE.COMPANY_USERS, { userId: id, roleType, status: 2, isDelete: false });
     });
+    require('./fixtures/aiRules').seedAiRules(db());
     boot();
 });
 

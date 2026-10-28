@@ -65,3 +65,4 @@ Auto-maintained registry of all tasks. Reflects YAML frontmatter from each `task
 | 057 | Projects settings — Open, Archived and Closed tabs; every undo returns the exact previous state | active | high | — | active/057-project-lifecycle-tabs |
 | 058 | Tracker timesheet — every screenshot card shows its image box and a loading state from the first paint | active | medium | — | active/058-tracker-screenshot-loading-placeholder |
 | 059 | Agent settings page — tabs, a searchable project picker and one sticky Save bar | active | high | — | active/059-agent-settings-tabs |
+| 060 | AI access by role — per-role AI rights in Security & Permissions, owner/admin approval for agents and skills | active | high | — | active/060-ai-access-by-role |

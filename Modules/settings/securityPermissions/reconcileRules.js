@@ -10,6 +10,13 @@ const { removeCache } = require('../../../utils/commonFunctions');
 // MAINTENANCE: when a permission key is added to the catalogue in utils/data.js, add it here too.
 const SENTINEL_KEYS = [
     'task_total_estimate',
+    'ai_assistant',
+    'ai_agent_use',
+    'ai_agents',
+    'ai_skills',
+    'ai_skill_risk',
+    'ai_connectors',
+    'ai_external_clients',
 ];
 
 function findMissingSentinels(rules) {

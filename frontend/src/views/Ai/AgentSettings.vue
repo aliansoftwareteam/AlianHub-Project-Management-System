@@ -11,7 +11,7 @@
                     <span>{{ agent.name || $t('Ai.agent') }}</span>
                 </div>
                 <div class="ah-toolbar__spacer"></div>
-                <button v-if="canManage" type="button" class="ah-btn ah-btn--secondary ah-btn--sm" data-test="stop-agent" :disabled="busy" @click="stop">{{ $t('Ai.stop_agent') }}</button>
+                <button v-if="editable" type="button" class="ah-btn ah-btn--secondary ah-btn--sm" data-test="stop-agent" :disabled="busy" @click="stop">{{ $t('Ai.stop_agent') }}</button>
             </div>
 
             <div v-if="!loadingAgent" class="ai-tabbar">
@@ -40,7 +40,8 @@
             <div class="ai-page__body ah-scroll">
                 <div v-if="loadingAgent" class="ah-empty">{{ $t('Ai.loading') }}</div>
                 <div v-else class="ai-settings">
-                    <p v-if="!canManage" class="ah-chip ah-chip--warn" data-test="read-only">{{ $t('Ai.settings_read_only') }}</p>
+                    <p v-if="!editable" class="ah-chip ah-chip--warn" data-test="read-only">{{ $t('Ai.settings_read_only') }}</p>
+                    <AgentApprovalPanel :agent="agent" :can-manage="canManage" :is-mine="isMine(agent)" @changed="load" />
 
                     <div v-show="activeTab === 'skills'" id="agent-panel-skills" role="tabpanel" aria-labelledby="agent-tab-skills" class="ai-panel">
                         <section class="ah-card ai-agent">
@@ -62,7 +63,7 @@
                                 </button>
                                 <div v-show="i < usedSkillCount || showLibrary || skill.enabled" class="ai-skill">
                                     <div class="ai-skill__head">
-                                        <input :id="`sk-${skill.key}`" v-model="skill.enabled" type="checkbox" class="ah-check" :disabled="!canManage" />
+                                        <input :id="`sk-${skill.key}`" v-model="skill.enabled" type="checkbox" class="ah-check" :disabled="!editable" />
                                         <label :for="`sk-${skill.key}`" class="ai-skill__name" :title="skill.key">{{ skillLabel(t, skill) }}</label>
                                         <span v-if="skill.source === 'data'" class="ah-chip ah-chip--brand ah-chip--sm">{{ $t('Ai.skill_source_yours') }}</span>
                                         <span v-if="skill.model" class="ah-chip ah-chip--mono ah-chip--sm">{{ skill.model }}</span>
@@ -100,7 +101,7 @@
                                 <div class="ah-label">{{ $t('Ai.role') }}</div>
                                 <span class="ah-small">{{ $t('Ai.role_lead') }}</span>
                                 <label class="ah-field__label" for="agent-role">{{ $t('Ai.role') }}</label>
-                                <select id="agent-role" v-model="form.role" class="ah-input" :disabled="!canManage" data-test="role-pick">
+                                <select id="agent-role" v-model="form.role" class="ah-input" :disabled="!editable" data-test="role-pick">
                                     <option value="">{{ $t('Ai.role_none') }}</option>
                                     <option v-for="role in roles" :key="role.id" :value="role.id">{{ $t('Ai.role_option', { name: role.name, department: role.department }) }}</option>
                                 </select>
@@ -123,20 +124,24 @@
                                     />
                                     <span class="ah-small ai-scope__count" data-test="scope-count">{{ $t('Ai.scope_chosen_count', { n: form.projectIds.length, total: projects.length }) }}</span>
                                     <button type="button" class="ah-btn ah-btn--sm" :class="chosenOnly ? 'ah-btn--secondary is-on' : 'ah-btn--ghost'" :aria-pressed="chosenOnly" data-test="scope-chosen-only" @click="chosenOnly = !chosenOnly">{{ $t('Ai.scope_chosen_only') }}</button>
-                                    <template v-if="canManage">
+                                    <template v-if="editable">
                                         <button type="button" class="ah-btn ah-btn--ghost ah-btn--sm" :disabled="!shownProjects.length" data-test="scope-choose-shown" @click="chooseShown">{{ $t('Ai.scope_choose_shown') }}</button>
                                         <button type="button" class="ah-btn ah-btn--ghost ah-btn--sm" :disabled="!form.projectIds.length" data-test="scope-clear" @click="form.projectIds = []">{{ $t('Ai.scope_clear') }}</button>
                                     </template>
                                 </div>
                                 <div v-if="shownProjects.length" class="ai-scope__grid" data-test="scope-grid">
                                     <label v-for="p in shownProjects" :key="p._id" class="ai-scope__item" :class="{ 'is-on': form.projectIds.includes(String(p._id)) }" :title="p.ProjectName">
-                                        <input v-model="form.projectIds" type="checkbox" :value="String(p._id)" class="ah-check" :disabled="!canManage" />
+                                        <input v-model="form.projectIds" type="checkbox" :value="String(p._id)" class="ah-check" :disabled="!editable" />
                                         <span class="ai-scope__name">{{ p.ProjectName }}</span>
                                     </label>
                                 </div>
                                 <p v-else class="ai-ladder__rule" data-test="scope-empty">{{ chosenOnly && !projectQuery.trim() ? $t('Ai.scope_none_chosen') : $t('Ai.scope_no_match') }}</p>
                             </template>
                             <p v-else class="ai-ladder__rule">{{ $t('Ai.scope_no_projects') }}</p>
+                        </section>
+
+                        <section class="ah-card ai-agent" data-test="audience">
+                            <AgentAudience v-model:visibility="form.visibility" v-model:sharedWith="form.sharedWith" :disabled="!editable" :hint="editable && !canManage ? $t('AgentAccess.widen_waits') : ''" />
                         </section>
                     </div>
 
@@ -145,7 +150,7 @@
                             <div class="ah-label">{{ $t('Ai.autonomy') }}</div>
                             <div class="ai-radios ai-radios--grid">
                                 <label v-for="level in AUTONOMY_LEVELS" :key="level" class="ai-radio" :class="{ 'is-on': form.autonomy === level }" :title="autonomyTip(t, level)">
-                                    <input v-model.number="form.autonomy" type="radio" :value="level" class="ah-check" :disabled="!canManage" />
+                                    <input v-model.number="form.autonomy" type="radio" :value="level" class="ah-check" :disabled="!editable" />
                                     <span class="ai-radio__level"><strong>{{ autonomyName(t, level) }}</strong><span class="ah-small">{{ autonomyAbout(t, level) }}</span></span>
                                 </label>
                             </div>
@@ -182,17 +187,17 @@
                             <div class="ai-fields">
                                 <div class="ah-field">
                                     <label class="ah-field__label" for="rate">{{ $t('Ai.rate_limit') }}</label>
-                                    <input id="rate" v-model.number="form.rateLimitPerDay" type="number" min="0" max="500" class="ah-input" :disabled="!canManage" />
+                                    <input id="rate" v-model.number="form.rateLimitPerDay" type="number" min="0" max="500" class="ah-input" :disabled="!editable" />
                                     <span class="ah-field__hint" data-test="rate-hint">{{ $t('Ai.rate_limit_hint') }}</span>
                                 </div>
                                 <div class="ah-field">
                                     <label class="ah-field__label" for="cap">{{ $t('Ai.spend_cap') }}</label>
-                                    <input id="cap" v-model.number="form.spendCapUsd" type="number" min="0" step="1" class="ah-input" :disabled="!canManage" />
+                                    <input id="cap" v-model.number="form.spendCapUsd" type="number" min="0" step="1" class="ah-input" :disabled="!editable" />
                                     <span class="ah-field__hint">{{ $t('Ai.cap_hint') }}</span>
                                 </div>
                                 <div class="ah-field">
                                     <label class="ah-field__label" for="model-pin">{{ $t('Ai.model_pin') }}</label>
-                                    <select id="model-pin" v-model="form.model" class="ah-input" :disabled="!canManage" data-test="model-pin">
+                                    <select id="model-pin" v-model="form.model" class="ah-input" :disabled="!editable" data-test="model-pin">
                                         <option value="">{{ $t('Ai.model_pin_none') }}</option>
                                         <option v-for="m in pinnableModels" :key="m.model" :value="m.model">{{ m.model }} · {{ m.provider }}</option>
                                     </select>
@@ -212,12 +217,12 @@
                         />
                     </div>
 
-                    <div v-if="canManage && SETTINGS_TABS.includes(activeTab)" class="ai-savebar" data-test="savebar">
+                    <div v-if="editable && SETTINGS_TABS.includes(activeTab)" class="ai-savebar" data-test="savebar">
                         <span v-if="error" class="ah-field__error ai-savebar__note">{{ error }}</span>
                         <span v-else-if="dirty" class="ai-savebar__note ai-savebar__note--dirty" data-test="unsaved">{{ $t('Ai.unsaved_changes') }}</span>
                         <span v-else class="ai-savebar__note">{{ $t('Ai.all_saved') }}</span>
                         <router-link class="ah-btn ah-btn--secondary ah-btn--sm" :to="{ name: 'AiHub', params: { cid: companyId } }">{{ $t('Ai.cancel') }}</router-link>
-                        <button type="button" class="ah-btn ah-btn--primary ah-btn--sm" data-test="save" :disabled="busy" @click="save">{{ busy ? $t('Ai.saving') : $t('Ai.save') }}</button>
+                        <button type="button" class="ah-btn ah-btn--primary ah-btn--sm" data-test="save" :disabled="busy" @click="save">{{ busy ? $t('Ai.saving') : (canManage ? $t('Ai.save') : $t('AgentAccess.save_for_approval')) }}</button>
                     </div>
 
                     <div v-show="activeTab === 'runs'" id="agent-panel-runs" role="tabpanel" aria-labelledby="agent-tab-runs" class="ai-panel">
@@ -245,7 +250,7 @@
                         <AgentRevisionHistory :key="revisionsKey" :agent-id="String(route.params.id)" :highlight="highlightRevision" @changed="load" />
                     </div>
 
-                    <div v-if="canManage" v-show="activeTab === 'delete'" id="agent-panel-delete" role="tabpanel" aria-labelledby="agent-tab-delete" class="ai-panel">
+                    <div v-if="editable" v-show="activeTab === 'delete'" id="agent-panel-delete" role="tabpanel" aria-labelledby="agent-tab-delete" class="ai-panel">
                         <section class="ah-card ai-agent ai-danger" data-test="danger">
                             <div class="ah-label">{{ $t('Ai.delete_agent') }}</div>
                             <p class="ai-lead ai-panel__lead">{{ openRunCount ? t('Ai.delete_blocked_open_runs', { n: openRunCount }, openRunCount) : $t('Ai.delete_body') }}</p>
@@ -279,6 +284,8 @@ import AiSidebar from "./AiSidebar.vue";
 import AgentRunDetail from "./AgentRunDetail.vue";
 import AgentRevisionHistory from "./AgentRevisionHistory.vue";
 import AgentSchedules from "./AgentSchedules.vue";
+import AgentAudience from "./AgentAudience.vue";
+import AgentApprovalPanel from "./AgentApprovalPanel.vue";
 import { useAgents, refusalCount } from "./useAgents";
 import { splitPreview } from "./policyPreview";
 import { changedFields, formFromAgent, skillsPayload } from "./agentSavePatch";
@@ -296,7 +303,7 @@ const router = useRouter();
 const { getters } = useStore();
 const companyId = inject("$companyId");
 const { agents, spend, registryManifest, skillManifest, loadAgents, loadSpend, loadRegistry, loadSkills, saveAgent, setPaused, deleteAgent, activeRuns, loadActiveRuns } = useAgents();
-const { canManage } = useAgentAccess();
+const { canManage, mayEdit, isMine } = useAgentAccess();
 
 const loadingAgent = ref(true);
 const busy = ref(false);
@@ -312,6 +319,7 @@ const projects = computed(() => (getters["projectData/projects"]?.data || []).fi
 const pinnableModels = ref([]);
 const roles = ref([]);
 const openRunCount = computed(() => (activeRuns.value[String(route.params.id)] || []).length);
+const editable = computed(() => mayEdit(agent.value));
 
 const AUTONOMY_LEVELS = computed(() => (registryManifest.value.autonomy || []).map((a) => a.level).slice(0, 4));
 const nameOfAction = (key) => actionLabel(t, key, registryManifest.value.actions);
@@ -321,9 +329,9 @@ const expandedRun = ref("");
 const revisionsKey = ref(0);
 const highlightRevision = computed(() => { const n = Number(route.query.rev); return Number.isInteger(n) && n > 0 ? n : null; });
 
-const TAB_FIELDS = { skills: ["skills"], projects: ["projectIds", "role"], autonomy: ["autonomy"], limits: ["rateLimitPerDay", "spendCapUsd", "model"] };
+const TAB_FIELDS = { skills: ["skills"], projects: ["projectIds", "role", "visibility", "sharedWith"], autonomy: ["autonomy"], limits: ["rateLimitPerDay", "spendCapUsd", "model"] };
 const SETTINGS_TABS = Object.keys(TAB_FIELDS);
-const tabs = computed(() => [...SETTINGS_TABS, "runs", ...(canManage.value ? ["history", "delete"] : [])]);
+const tabs = computed(() => [...SETTINGS_TABS, "runs", ...(canManage.value ? ["history"] : []), ...(editable.value ? ["delete"] : [])]);
 // A run's detail links here with ?rev=N to show that revision.
 const tab = ref(String(route.query.tab || (route.query.rev ? "history" : "skills")));
 const activeTab = computed(() => (tabs.value.includes(tab.value) ? tab.value : "skills"));
@@ -461,9 +469,11 @@ const save = async () => {
     busy.value = true;
     error.value = "";
     try {
-        await saveAgent({ _id: agent.value._id, ...patch });
+        const out = await saveAgent({ _id: agent.value._id, ...patch }, { full: true });
         saved.value = current;
-        $toast.success(t("Ai.saved"), { position: "top-right" });
+        if (out && out.pendingRevision) $toast.info(t("AgentAccess.change_sent"), { position: "top-right" });
+        else $toast.success(t("Ai.saved"), { position: "top-right" });
+        await load();
         revisionsKey.value += 1;
     } catch (e) {
         error.value = e.message;

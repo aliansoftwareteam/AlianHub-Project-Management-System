@@ -16,7 +16,7 @@ jest.mock('../Config/config', () => {
 jest.mock('../Config/loggerConfig', () => ({ info: jest.fn(), error: jest.fn(), warn: jest.fn(), debug: jest.fn() }));
 jest.mock('../Modules/Audit/recorder', () => ({ recordAudit: jest.fn() }));
 jest.mock('../event/socketEventEmitter', () => ({ emit: jest.fn() }));
-jest.mock('../Config/permissionGuard', () => ({ ROLE_OWNER: 1, ROLE_ADMIN: 2, getRoleType: jest.fn(async () => 1), isPrivileged: (r) => r === 1 || r === 2 }));
+jest.mock('../Config/permissionGuard', () => ({ ROLE_OWNER: 1, ROLE_ADMIN: 2, getRoleType: jest.fn(async () => 1), isPrivileged: (r) => r === 1 || r === 2, evaluatePermission: jest.fn(async () => null), isWritable: (p) => p === true || p === 1 || p === 2, isReadable: (p) => p !== null && p !== undefined && p !== 0 }));
 
 const { myCache } = require('../Config/config');
 const { getRoleType } = require('../Config/permissionGuard');

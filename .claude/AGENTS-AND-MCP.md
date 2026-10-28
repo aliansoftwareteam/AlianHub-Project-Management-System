@@ -167,6 +167,8 @@ These are the rules in `Tasks/active/047-ai-run/task.md`, as the code keeps them
 10. **Nothing is auto-approved by default.** Project policy defaults: `done: approval`, `connected: single_task` (`DEFAULTS` in `projectPolicy.js`). A standing approval exists only where a person made it, and can be ended.
 11. **Budgets refuse before the model is called.** Where AlianHub pays for the model, `Modules/Agents/spendGuard.js` stops a run before any tokens are used.
 12. **No web fetch after a connector read.** A run that read a connector fetches nothing from the web afterwards (`taint.js`, `Modules/Agents/connectors/`).
+13. **AI rights come from the role.** Building agents, writing skills, seeing every agent, working with agents, Ask AI, app connectors and connecting your own AI are rows of Security & Permissions (`Config/aiRights.js`, task 060). Owners and admins hold all of them. Check the row in the handler with `aiRights.mayUse()` or `access.agentRightsOf()`, not with `canManageAgents`, unless the thing is an AI setting that stays owner/admin only.
+14. **Only an approved agent runs.** An agent or skill made by anyone but an owner or admin is pending until one of them approves it (`Modules/Agents/agentApproval.js`). `runs.canStart()` refuses a pending or declined agent, and every list that offers agents filters with `APPROVED_CLAUSE`. A new road that starts an agent goes through `canStart()`; a new list that offers one adds the clause and `agentAudience.mayUse()`.
 
 ---
 

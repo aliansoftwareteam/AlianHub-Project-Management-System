@@ -11,10 +11,10 @@ const logger = require('../../Config/loggerConfig');
 // the exact configuration that produced it. Promote and rollback move the
 // `live` pointer; rollback copies the target forward so history stays append-only.
 
-const STATE = Object.freeze({ DRAFT: 'draft', CANDIDATE: 'candidate', LIVE: 'live', SUPERSEDED: 'superseded' });
+const STATE = Object.freeze({ DRAFT: 'draft', CANDIDATE: 'candidate', LIVE: 'live', SUPERSEDED: 'superseded', DECLINED: 'declined' });
 const PROMOTABLE = [STATE.DRAFT, STATE.CANDIDATE];
 const SOURCE = Object.freeze({ SAVE: 'save', CREATE: 'create', DRAFT: 'draft', PROMOTE: 'promote', ROLLBACK: 'rollback', MIGRATION: 'migration', BOOTSTRAP: 'bootstrap' });
-const RUN_FIELDS = Object.freeze(['name', 'description', 'skills', 'allowedActions', 'projectIds', 'autonomy', 'spendCapUsd', 'account', 'model', 'schedule', 'rateLimitPerDay', 'trigger', 'confidenceFloor', 'role']);
+const RUN_FIELDS = Object.freeze(['name', 'description', 'skills', 'allowedActions', 'projectIds', 'autonomy', 'spendCapUsd', 'account', 'model', 'schedule', 'rateLimitPerDay', 'trigger', 'confidenceFloor', 'role', 'visibility', 'sharedWith']);
 const SYNTHETIC_ZERO = Object.freeze({ n: 0, state: STATE.LIVE, synthetic: true, snapshot: null, serves: [], skillRefs: [] });
 const NOTE_MAX = 500;
 const T = SCHEMA_TYPE.AGENT_REVISIONS;
@@ -89,9 +89,10 @@ const nextN = async (companyId, agentId) => {
 };
 
 /* Inserts n+1 and lets the unique index arbitrate a race: the loser retries with the next number. */
-const createRevision = async (companyId, agentId, { snapshot, state, createdBy, source, note, rollbackOf }) => {
+const createRevision = async (companyId, agentId, { snapshot, state, createdBy, source, note, rollbackOf, requestedApproval }) => {
     const base = {
         agentId: String(agentId), state: state || STATE.DRAFT, snapshot: clone(snapshot),
+        ...(requestedApproval ? { requestedApproval: true } : {}),
         serves: skillKeysOf(snapshot), skillRefs: skillRefsOf(snapshot),
         source: source || SOURCE.SAVE, createdBy: createdBy ? String(createdBy) : null,
         ...(note ? { note: String(note).slice(0, NOTE_MAX) } : {}),
@@ -215,13 +216,42 @@ const recordSave = async (companyId, before, after, { actor, ip } = {}) => {
     return { revision, changed: true, from: from ? Number(from.n) : null };
 };
 
-/* A draft or candidate: reachable only here, never through the plain save. */
-const createDraft = async (companyId, agent, { fields, state, note, actor } = {}) => {
+/* A draft or candidate: reachable only here, never through the plain save. `requestedApproval` marks a candidate
+ * that waits for an owner or admin; a newer request from the same person replaces their older one. */
+const createDraft = async (companyId, agent, { fields, state, note, actor, requestedApproval = false } = {}) => {
     const a = plain(agent);
-    const target = state === STATE.CANDIDATE ? STATE.CANDIDATE : STATE.DRAFT;
+    const target = state === STATE.CANDIDATE || requestedApproval ? STATE.CANDIDATE : STATE.DRAFT;
     const live = await liveFor(companyId, a);
     const snapshot = { ...clone((live && live.snapshot) || snapshotOf(a)), ...snapshotOf(fields || {}) };
-    return createRevision(companyId, a._id, { snapshot, state: target, createdBy: actor && actor.userId, source: SOURCE.DRAFT, note });
+    if (requestedApproval && actor && actor.userId) {
+        await MongoDbCrudOpration(companyId, {
+            type: T, data: [{ agentId: String(a._id), state: STATE.CANDIDATE, requestedApproval: true, createdBy: String(actor.userId) }, { $set: { state: STATE.SUPERSEDED, supersededAt: new Date() } }],
+        }, 'updateMany');
+    }
+    return createRevision(companyId, a._id, { snapshot, state: target, createdBy: actor && actor.userId, source: SOURCE.DRAFT, note, requestedApproval });
+};
+
+/* The edits that wait for an owner or admin, by agent id. */
+const requestedEditsOf = async (companyId, agentIds) => {
+    const ids = [...new Set((agentIds || []).map(String))];
+    if (!ids.length) return new Map();
+    const rows = await MongoDbCrudOpration(companyId, { type: T, data: [{ agentId: { $in: ids }, state: STATE.CANDIDATE, requestedApproval: true }, {}, { sort: { n: 1 } }] }, 'find');
+    return new Map((rows || []).map((row) => [String(row.agentId), plain(row)]));
+};
+
+/* An owner or admin turns a requested edit down; the live revision stays as it was. */
+const decline = async (companyId, agent, n, { actor, reason } = {}) => {
+    const a = plain(agent);
+    const target = await getRevision(companyId, a._id, n);
+    if (!target) return { error: 'Revision not found.', status: 404 };
+    if (!PROMOTABLE.includes(target.state)) return { error: `Revision ${target.n} is ${target.state}.`, status: 409 };
+    const declined = await MongoDbCrudOpration(companyId, {
+        type: T,
+        data: [{ _id: target._id, state: target.state }, { $set: { state: STATE.DECLINED, declinedBy: String(actor.userId), declinedAt: new Date(), declineReason: String(reason || '').slice(0, NOTE_MAX) } }, { returnDocument: 'after' }],
+    }, 'findOneAndUpdate');
+    if (!declined) return { error: `Revision ${target.n} has already been answered.`, status: 409 };
+    emitAgent(companyId, { agentId: String(a._id), revision: Number(target.n), declined: true });
+    return { revision: plain(declined) };
 };
 
 const applyToAgent = async (companyId, agentId, snapshot) => {
@@ -279,5 +309,5 @@ module.exports = {
     STATE, SOURCE, RUN_FIELDS, SYNTHETIC_ZERO, PROMOTABLE,
     snapshotOf, sameSnapshot, skillKeysOf, skillRefOf, skillRefsOf, loadSkillHashes,
     listFor, getRevision, findLive, liveFor, pinFor, skillSourceOf, forRun, applyRevision,
-    createRevision, recordCreate, recordSave, createDraft, promote, rollback,
+    createRevision, recordCreate, recordSave, createDraft, requestedEditsOf, decline, promote, rollback,
 };

@@ -4,12 +4,12 @@ const mockDb = require('./fixtures/fakeMongo').create();
 jest.mock('../utils/mongo-handler/mongoQueries', () => ({ MongoDbCrudOpration: (...a) => mockDb.crud(...a) }));
 jest.mock('../event/socketEventEmitter', () => ({ emit: jest.fn() }));
 jest.mock('../Config/loggerConfig', () => ({ info: jest.fn(), error: jest.fn(), warn: jest.fn() }));
-jest.mock('../Config/permissionGuard', () => ({ ROLE_OWNER: 1, ROLE_ADMIN: 2, getRoleType: jest.fn(async () => 1), isPrivileged: (r) => r === 1 || r === 2 }));
+jest.mock('../Config/permissionGuard', () => ({ ROLE_OWNER: 1, ROLE_ADMIN: 2, getRoleType: jest.fn(async () => 1), isPrivileged: (r) => r === 1 || r === 2, evaluatePermission: jest.fn(async () => null), isWritable: (p) => p === true || p === 1 || p === 2, isReadable: (p) => p !== null && p !== undefined && p !== 0 }));
 jest.mock('../Modules/Agents/actor', () => ({ resolveActor: jest.fn(async (req) => ({ kind: req.agent ? 'agent' : 'human', userId: req.uid || null })), isAgent: (a) => a && a.kind === 'agent' }));
 
 const { SCHEMA_TYPE } = require('../Config/schemaType');
 const { dbCollections } = require('../Config/collections');
-const { getRoleType } = require('../Config/permissionGuard');
+const { getRoleType, evaluatePermission } = require('../Config/permissionGuard');
 const { validateSkill } = require('../Modules/Agents/skills/validateSkill');
 const skillRecord = require('../Modules/Agents/skillRecord');
 const codeSkills = require('../Modules/Agents/skills');
@@ -139,10 +139,13 @@ describe('the record: create, update, retire', () => {
 });
 
 describe('GET /api/v2/agents/skills and the write endpoints', () => {
-    it('serves the manifest to any member of the company', async () => {
+    it('serves the library to a member whose role sees skills, and refuses one whose role does not', async () => {
         mockDb.seed(SCHEMA_TYPE.AGENT_SKILLS, skillDoc());
         getRoleType.mockResolvedValue(3);
+        expect((await call(ctrl.listSkills, req())).code).toBe(403);
+        evaluatePermission.mockImplementation(async (c, uid, path) => (path === 'artificial_intelligence.ai_skills' ? false : null));
         const r = await call(ctrl.listSkills, req());
+        evaluatePermission.mockImplementation(async () => null);
         expect(r.body.status).toBe(true);
         expect(r.body.data.map((s) => s.key)).toContain('brief.parse');
         r.body.data.forEach((s) => expect(Object.keys(s)).toEqual(expect.arrayContaining(['key', 'name', 'source', 'inputs', 'emits', 'risk', 'enabled'])));

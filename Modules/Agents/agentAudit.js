@@ -37,6 +37,8 @@ const BUDGET_CHANGED = 'agent.budget_changed';
 const ROLE_PLAYBOOK_CHANGED = 'agent.role_playbook_changed';
 const STANDING_APPROVAL_MADE = 'agent.standing_approval_made';
 const STANDING_APPROVAL_ENDED = 'agent.standing_approval_ended';
+const APPROVAL_REQUESTED = 'agent.approval_requested';
+const APPROVAL_DECIDED = 'agent.approval_decided';
 
 const clip = (v, n = 2000) => {
     try { const s = JSON.stringify(v); return s.length > n ? JSON.parse(s.slice(0, n - 1) + '"') : v; } catch (e) { return String(v).slice(0, n); }
@@ -225,6 +227,17 @@ const recordRunReverted = async (companyId, actor, { runId, agentId, agentName, 
     });
 };
 
+/* A request for an owner or admin to approve an agent, an edit of one or a skill, and the answer to it. */
+const recordApproval = async (companyId, actor, { decision, entityType, entityId, name, n, reason, ip }) => {
+    const a = attribution(actor);
+    return writeQuietly(companyId, {
+        actorId: a.actorId, actorName: a.label, ip,
+        action: decision ? APPROVAL_DECIDED : APPROVAL_REQUESTED,
+        entityType, entityId: String(entityId), entityName: name || '',
+        meta: { ...baseMeta(actor), ...(decision ? { decision } : {}), ...(n ? { revision: Number(n) } : {}), ...(reason ? { reason } : {}) },
+    });
+};
+
 /* One row per pointer move: which revision was live before, which is live now,
  * and what moved it (a settings save, a promote, a rollback). */
 const recordRevisionChange = async (companyId, actor, { kind, agentId, agentName, from, to, ip }) => {
@@ -333,8 +346,8 @@ const findById = async (companyId, auditId) => {
 };
 
 module.exports = {
-    ACTION_DONE, ACTION_REFUSED, ACTION_UNDONE, PROPOSAL_DECIDED, AGENT_CREATED, AGENT_DELETED, RUN_REVERTED, REVISION_PROMOTED, REVISION_ROLLED_BACK, PROJECT_POLICY_CHANGED, WORKSPACE_POLICY_CHANGED, BUDGET_CHANGED, STANDING_APPROVAL_MADE, STANDING_APPROVAL_ENDED, STATE, AUDIT_UNAVAILABLE, AUDIT_UNMARKED,
+    ACTION_DONE, ACTION_REFUSED, ACTION_UNDONE, PROPOSAL_DECIDED, AGENT_CREATED, AGENT_DELETED, RUN_REVERTED, REVISION_PROMOTED, REVISION_ROLLED_BACK, PROJECT_POLICY_CHANGED, WORKSPACE_POLICY_CHANGED, BUDGET_CHANGED, STANDING_APPROVAL_MADE, STANDING_APPROVAL_ENDED, APPROVAL_REQUESTED, APPROVAL_DECIDED, STATE, AUDIT_UNAVAILABLE, AUDIT_UNMARKED,
     AuditUnavailableError, AuditUnmarkedError,
-    openAction, applyAction, failAction, recordAction, recordRefusal, recordUndo, recordProposalDecision, recordAgentCreated, recordAgentDeleted, recordRunReverted, recordRevisionChange, recordProjectPolicyChange, recordWorkspacePolicyChange, recordBudgetChange, recordRolePlaybookChange, recordStandingApproval, markUndone, findById, findByIdempotencyKey,
+    openAction, applyAction, failAction, recordAction, recordRefusal, recordUndo, recordProposalDecision, recordAgentCreated, recordAgentDeleted, recordRunReverted, recordRevisionChange, recordApproval, recordProjectPolicyChange, recordWorkspacePolicyChange, recordBudgetChange, recordRolePlaybookChange, recordStandingApproval, markUndone, findById, findByIdempotencyKey,
     undoneBefore, canRecordChange,
 };

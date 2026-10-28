@@ -7,6 +7,7 @@ const { requestAddress } = require('../../utils/requestAddress');
 const { buildCorsAllowList } = require('../../utils/cors');
 const flag = require('../Agents/connectors/flag');
 const google = require('../Agents/connectors/googleConnection');
+const aiRights = require('../../Config/aiRights');
 
 const OBJECT_ID = /^[a-f0-9]{24}$/i;
 
@@ -68,6 +69,13 @@ const forConnector = (run) => (who, req, res) => {
     return connector ? run(who, connector, req, res) : undefined;
 };
 
+/* Connecting an account for AI is a row of Security & Permissions; seeing and ending one's own connection is not. */
+const connectsApps = (run) => async (who, req, res) => {
+    if (await aiRights.mayUse(who.companyId, who.userId, aiRights.AI_RIGHT.CONNECTORS)) return run(who, req, res);
+    refuse(res, 403, aiRights.REFUSAL[aiRights.AI_RIGHT.CONNECTORS]);
+    return undefined;
+};
+
 /* Where the browser returns after consent: the origin the request came from when the server already allows it,
  * and the configured web address otherwise. */
 const originOf = (req) => {
@@ -96,14 +104,14 @@ exports.mine = handle('list my Google connections', 'Connections fetched.', asyn
     return { connections };
 });
 
-exports.connect = handle('start a Google connection', 'Continue with Google.', forConnector((who, connector, req) => google.start({
+exports.connect = handle('start a Google connection', 'Continue with Google.', connectsApps(forConnector((who, connector, req) => google.start({
     companyId: who.companyId, userId: who.userId, sessionId: req.sessionId, connector, origin: originOf(req),
-})));
+}))));
 
-exports.complete = handle('complete a Google connection', 'Connected.', forConnector((who, connector, req) => {
+exports.complete = handle('complete a Google connection', 'Connected.', connectsApps(forConnector((who, connector, req) => {
     const body = req.body || {};
     return google.complete({ companyId: who.companyId, userId: who.userId, sessionId: req.sessionId, connector, state: body.state, code: body.code, actor: who.actor });
-}));
+})));
 
 exports.disconnect = handle('end a Google connection', 'Disconnected.', forConnector((who, connector) => google.disconnect({
     companyId: who.companyId, userId: who.userId, connector, actor: who.actor, by: google.BY.SELF,

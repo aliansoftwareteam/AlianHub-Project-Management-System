@@ -40,22 +40,23 @@ const serve = ({ policy = policyOf(), tokens = [], renew } = {}) => {
     apiRequestWithoutCompnay.mockResolvedValue({ data: { status: true, data: { protocolVersion: '', tools: [], never: [] } } });
 };
 
-const store = () => createStore({
+// A member whose role connects their own AI, as a new workspace sets it; `connectsOwnAi: false` takes that away.
+const store = ({ connectsOwnAi = true } = {}) => createStore({
     modules: {
-        settings: { namespaced: true, getters: { companyUserDetail: () => ({ roleType: 3 }) } },
+        settings: { namespaced: true, getters: { companyUserDetail: () => ({ roleType: 3 }), rules: () => ({ artificial_intelligence: { ai_external_clients: { roles: connectsOwnAi ? [{ key: 3, permission: true }] : [] } } }) } },
         projectData: { namespaced: true, getters: { projects: () => ({ data: [] }) } }
     }
 });
 
-const open = async (setup, { query } = {}) => {
+const open = async (setup, { query, connectsOwnAi } = {}) => {
     serve(setup);
-    const wrapper = mount(AiAccounts, { global: { plugins: [store()], mocks: { $t: t }, provide: query ? { [routeLocationKey]: { query } } : {} } });
+    const wrapper = mount(AiAccounts, { global: { plugins: [store({ connectsOwnAi })], mocks: { $t: t }, provide: query ? { [routeLocationKey]: { query } } : {} } });
     await flushPromises();
     return wrapper;
 };
 
-const openTokens = async (setup) => {
-    const wrapper = await open(setup);
+const openTokens = async (setup, options) => {
+    const wrapper = await open(setup, options);
     await wrapper.findAll('.ah-tab').find((tab) => tab.text() === t('Accounts.tab_link')).trigger('click');
     return wrapper;
 };
@@ -82,6 +83,12 @@ beforeEach(() => {
 });
 
 describe('the default lifetime in the token form', () => {
+    it('is not offered to a member whose role does not connect their own AI', async () => {
+        const wrapper = await openTokens(undefined, { connectsOwnAi: false });
+        expect(wrapper.findAll('button').some((b) => b.text() === t('Accounts.new_token'))).toBe(false);
+        expect(wrapper.find('[data-test="mint-not-allowed"]').text()).toBe(t('AgentAccess.own_ai_not_allowed'));
+    });
+
     it('is 30 days unless the server says otherwise, and never past the maximum', () => {
         expect(DEFAULT_TOKEN_POLICY.defaultExpiryDays).toBe(30);
         expect(defaultExpiryFor({})).toBe(30);

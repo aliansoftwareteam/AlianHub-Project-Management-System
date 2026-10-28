@@ -28,6 +28,8 @@ const mint = (body) => call(ctrl.createMcpToken, { body: { name: 'Laptop', ...bo
 
 beforeEach(() => {
     Object.keys(mockDb.store).forEach((type) => { mockDb.store[type].length = 0; });
+    mockDb.seed('company_users', { userId: USER_ID, roleType: 3, status: 2, isDelete: false });
+    require('./fixtures/aiRules').seedAiRules(mockDb);
     delete process.env.API_TOKEN_STRICT;
     process.env.MCP_TOOLS_MANAGE = 'on';
     process.env.MCP_TOOLS_DATA = 'off';
@@ -35,6 +37,21 @@ beforeEach(() => {
 afterAll(() => { process.env.MCP_TOOLS_MANAGE = 'off'; process.env.MCP_TOOLS_DATA = 'off'; });
 
 describe('creating an agent token', () => {
+    it('is refused to a member whose role does not connect their own AI', async () => {
+        const { myCache } = require('../Config/config');
+        const forget = () => myCache.del(`rules:${COMPANY}`);
+        forget();
+        mockDb.store.rules.find((row) => row.key === 'ai_external_clients').roles = [];
+        try {
+            const res = await mint({});
+            expect(res.statusCode).toBe(403);
+            expect(res.body.statusText).toMatch(/connecting your own AI/);
+            expect(tokens()).toHaveLength(0);
+        } finally {
+            forget();
+        }
+    });
+
     it('stores no grant unless it is asked for, so the token lists none of the write tools', async () => {
         const res = await mint({});
         expect(res.body.status).toBe(true);

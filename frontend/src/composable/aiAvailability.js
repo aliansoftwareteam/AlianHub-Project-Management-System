@@ -29,6 +29,8 @@ const initial = () => ({
     embeddings: false,
     canManageWorkspace: false,
     canConfigureInstance: false,
+    // The person's "Ask AI and writing help" row (composable/aiRights.js); null until the rules are read.
+    assistantAllowed: null,
 });
 
 /* One copy for the whole app: the shell loads it per workspace and every AI entry point reads it. */
@@ -52,7 +54,7 @@ export function aiAccessFor(context = {}) {
     const server = serverAccess();
     if (server !== AI_ACCESS.USABLE) return server;
     if (aiAvailability.planAllowsAi === null) return AI_ACCESS.UNKNOWN;
-    if (!aiAvailability.planAllowsAi || context.permitted === false) return AI_ACCESS.NOT_PERMITTED;
+    if (!aiAvailability.planAllowsAi || context.permitted === false || aiAvailability.assistantAllowed === false) return AI_ACCESS.NOT_PERMITTED;
     if ("project" in context && !hasAiApp(context.project)) return AI_ACCESS.NOT_PERMITTED;
     return AI_ACCESS.USABLE;
 }
@@ -76,6 +78,10 @@ export function applyAiAvailability(data = {}) {
 
 export function resetAiAvailability() {
     Object.assign(aiAvailability, initial());
+}
+
+export function trackAiAssistant(allowed) {
+    applyAiAvailability({ assistantAllowed: allowed === null || allowed === undefined ? null : Boolean(allowed) });
 }
 
 export function trackAiPlan(planFeature) {

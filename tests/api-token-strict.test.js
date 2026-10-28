@@ -115,7 +115,8 @@ beforeEach(() => {
     strict(false);
     mockDb.seed('companies', { _id: COMPANY });
     mockDb.seed('users', { _id: USER_ID, AssignCompany: COMPANY });
-    mockDb.seed('company_users', { userId: USER_ID, status: 2, isDelete: false });
+    mockDb.seed('company_users', { userId: USER_ID, roleType: 3, status: 2, isDelete: false });
+    require('./fixtures/aiRules').seedAiRules(mockDb);
     boot();
 });
 
