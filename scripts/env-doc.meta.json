@@ -1325,6 +1325,18 @@
     "description": "ISO date from which desktop tracker builds that sign in without a PKCE verifier are refused. Unset (the default) keeps those builds working; an unparseable value reads as unset.",
     "managed": "fixed"
   },
+  "TRACKER_MIN_VERSION": {
+    "group": "general",
+    "description": "Oldest desktop tracker version this server accepts, sent in the tracker handshake; an older tracker asks its user to update before it connects. Raise it only once the matching tracker release is on the stable channel.",
+    "default": "6.0.0",
+    "managed": "fixed"
+  },
+  "TRACKER_UPDATE_URL": {
+    "group": "general",
+    "description": "Address of the desktop tracker update feed, holding a stable and a beta folder with the latest.yml files the tracker build writes. Settings > Time tracking offers the newest stable download from it. Set to off on an instance without internet access; the downloads uploaded under Admin > Tracker are offered instead.",
+    "default": "https://downloads.alianhub.com/tracker",
+    "managed": "fixed"
+  },
   "TRACKSHOT_RETENTION_DAYS": {
     "group": "storage",
     "description": "Days to keep time-tracker screenshots before deletion.",

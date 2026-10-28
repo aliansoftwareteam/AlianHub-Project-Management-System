@@ -211,6 +211,7 @@ module.exports.TASK_TYPE_TEMPLATE = '/api/v1/templates/taskType';
 module.exports.TASK_STATUS_TEMPLATE = '/api/v1/templates/taskStatus';
 module.exports.TOURS='/api/v1/tours'
 module.exports.GET_TACKER="/api/v1/tracker";
+module.exports.TRACKER_DESKTOP_APP = '/api/v2/tracker/desktop-app';
 module.exports.TASK_TYPE_SETTING_TEMPLATE = '/api/v1/setting/taskType';
 module.exports.TASK_STATUS_SETTING_TEMPLATE = '/api/v1/setting/taskStatus';
 module.exports.PROJECT_STATUS_SETTING_TEMPLATE = '/api/v1/setting/projectStatus';

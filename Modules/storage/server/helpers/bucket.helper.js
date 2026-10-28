@@ -8,6 +8,7 @@ const { SCHEMA_TYPE } = require('../../../../Config/schemaType');
 const thumbnailArray = require('../../../../thumbnail.json');
 const { guardFile, guardBuffer } = require('../../../../utils/imageGuard.js');
 const { logUploadFailures } = require('../../uploadFailures');
+const { isScreenshotStorageKey } = require('../../../../common-storage/taskFileKeys');
 
 exports.iconsThumbnailGenerator = (fpath,companyId,file,bufferString,fileNameWithRan,thumbnailKey) => {
     return new Promise((resolve, reject) => {
@@ -134,7 +135,7 @@ exports.createBucketHelper = (bucketObject,files = '',fromCreateCompnay = false)
  * @param {string} directoryPath 
  * @returns 
  */
-exports.getDirectorySize = (directoryPath) => {
+exports.getDirectorySize = (directoryPath, counts = () => true) => {
     let totalSize = 0;
 
     function calculateFSize(dirPath) {
@@ -146,7 +147,7 @@ exports.getDirectorySize = (directoryPath) => {
 
             if (stats.isDirectory()) {
                 calculateFSize(filePath);
-            } else {
+            } else if (counts(path.relative(directoryPath, filePath))) {
                 totalSize += stats.size;
             }
         });
@@ -325,7 +326,8 @@ exports.getBucketSizeCompanyWiseStorage = (bucketId,unit,isUpdate=false) => {
                                 },
                                 {
                                     $set: {
-                                        bucketSize: `${dataSize / (1024 * 1024)}`
+                                        bucketSize: `${dataSize / (1024 * 1024)}`,
+                                        trackshotSize: this.getDirectorySize(bucketDir, isScreenshotStorageKey) / (1024 * 1024)
                                     }
                                 }
                             ]

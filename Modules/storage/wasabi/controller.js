@@ -10,7 +10,7 @@ const { myCache } = require('../../../Config/config');
 const { updateCompanyFun, getCompanyDataFun } = require('../../Company/controller/updateCompany.js');
 const { isProfileUpload, refuseUnverifiedBucket } = require('../bucketAccess');
 const { logUploadFailures } = require('../uploadFailures');
-const { isRowTrackshotKey } = require('../../../common-storage/taskFileKeys');
+const { isRowTrackshotKey, isScreenshotStorageKey } = require('../../../common-storage/taskFileKeys');
 const storage = require('../../../common-storage/s3Store');
 const { currentLayout, PUBLIC_OWNER } = require('../../../common-storage/s3Layout');
 
@@ -800,10 +800,20 @@ exports.deleteFileWasabi = async (req, res) => {
     }
 };
 
+const bucketSizes = async (owner) => {
+    let totalSize = 0;
+    let screenshotSize = 0;
+    for await (const object of storage.list(owner)) {
+        totalSize += object.size;
+        if (isScreenshotStorageKey(object.key)) screenshotSize += object.size;
+    }
+    return { totalSize, screenshotSize };
+};
+
 exports.getBucketSizeCompanyWise = async(companyId) => {
     try {
-        await storage.measure(JSON.parse(JSON.stringify(companyId)))
-        .then(async({ bytes: totalSize }) => {
+        await bucketSizes(JSON.parse(JSON.stringify(companyId)))
+        .then(async({ totalSize, screenshotSize }) => {
             let mongoObj = {
                 type: SCHEMA_TYPE.COMPANIES,
                 data: [
@@ -812,7 +822,8 @@ exports.getBucketSizeCompanyWise = async(companyId) => {
                     },
                     {
                         $set: {
-                            bucketSize: `${totalSize / (1024 * 1024)}`
+                            bucketSize: `${totalSize / (1024 * 1024)}`,
+                            trackshotSize: screenshotSize / (1024 * 1024)
                         }
                     }
                 ]

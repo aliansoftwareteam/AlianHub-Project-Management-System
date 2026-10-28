@@ -14,38 +14,45 @@
                     <p>{{ $t('TimeTracker.smooth') }}</p>
                 </div>
             </div>
-            <p v-if="loaded && !dataobj.length" class="tt-empty">{{ $t('TimeTracker.no_builds') }}</p>
-            <div v-if="dataobj.length" class="d-flex justify-content-center download-links-wappermain">
-                <div class="download-links-wapper cursor-pointer" v-for="(item , index) in dataobj" :key="index" @click="selectedData = item" :class="{'active':(item == selectedData),'border-primary':(item == selectedData)}" >
-                    <div class="download-links-img">
-                        <img :src="item.image">
+            <DesktopAppCard :info="desktopApp" :loading="desktopLoading">
+                <template #fallback>
+                    <p v-if="loaded && !dataobj.length" class="tt-empty">{{ $t('TimeTracker.no_builds') }}</p>
+                    <div v-if="dataobj.length" class="d-flex justify-content-center download-links-wappermain">
+                        <div class="download-links-wapper cursor-pointer" v-for="(item , index) in dataobj" :key="index" @click="selectedData = item" :class="{'active':(item == selectedData),'border-primary':(item == selectedData)}" >
+                            <div class="download-links-img">
+                                <img :src="item.image">
+                            </div>
+                            <div>
+                                <span class="d-block time-tracking-black ostype">{{item.type}}</span>
+                                <span class="time-tracking-gray osversion">{{ item.version }}</span>
+                            </div>
+                        </div>
                     </div>
-                    <div>
-                        <span class="d-block time-tracking-black ostype">{{item.type}}</span>
-                        <span class="time-tracking-gray osversion">{{ item.version }}</span>
+                    <div v-if="dataobj.length" class="d-flex justify-content-center download-lable-wapper">
+                        <div class="d-flex  download-links-lable cursor-pointer" @click="$refs.anchor.click()">
+                            <div class="d-flex download-content-wapper">
+                            <div class="d-flex align-items-center download__icon-wrapper"> 
+                                <img :src="Download_icon" alt="icon">
+                            </div>
+                            <div class="text-center download-links-msg">
+                                <span class="d-inline-block">{{selectedData?.title }}</span>
+                                <p v-if="selectedData?.description" class="d-inline-block">{{ selectedData.description }}</p>
+                            </div>
+                            </div>  
+                        </div>
+                        <a :href="selectedData?.downloadUrl" ref="anchor" download hidden >{{ $t('TimeTracker.click') }}</a>
                     </div>
-                </div>
-            </div>
-            <div v-if="dataobj.length" class="d-flex justify-content-center download-lable-wapper">
-                <div class="d-flex  download-links-lable cursor-pointer" @click="$refs.anchor.click()">
-                    <div class="d-flex download-content-wapper">
-                    <div class="d-flex align-items-center download__icon-wrapper"> 
-                        <img :src="Download_icon" alt="icon">
-                    </div>
-                    <div class="text-center download-links-msg">
-                        <span class="d-inline-block">{{selectedData?.title }}</span>
-                        <p v-if="selectedData?.description" class="d-inline-block">{{ selectedData.description }}</p>
-                    </div>
-                    </div>  
-                </div>
-                <a :href="selectedData?.downloadUrl" ref="anchor" download hidden >{{ $t('TimeTracker.click') }}</a>
-            </div>
+                </template>
+            </DesktopAppCard>
         </div>
     </div>
 </template>
 
 <script setup>
 import { onMounted, ref, computed ,inject} from "vue";
+import DesktopAppCard from "./DesktopAppCard.vue";
+import { apiRequest } from "@/services";
+import * as env from "@/config/env";
 
 const Windows = require("@/assets/images/svg/Windows.svg");
 const Mac = require("@/assets/images/svg/Mac.svg");
@@ -65,8 +72,14 @@ const arrobj = computed(() => getters['settings/TimeTracker']);
 const companyId = inject("$companyId");
 const dataobj = ref([]);
 const loaded = ref(false);
+const desktopApp = ref(null);
+const desktopLoading = ref(true);
 					
 onMounted(() => {
+    apiRequest("get", env.TRACKER_DESKTOP_APP)
+        .then((res) => { desktopApp.value = res && res.data && res.data.status ? res.data.data : null; })
+        .catch((error) => console.error("ERROR in loading the desktop tracker card: ", error))
+        .finally(() => { desktopLoading.value = false; });
     if(arrobj.value && !arrobj.value.length) {
             dispatch('settings/setTimeTrackerDownload', companyId.value).then((res)=>{                        
             dataobj.value = (res || []).map((element) =>{return {...element , image:imageObj.value[element.type]}})

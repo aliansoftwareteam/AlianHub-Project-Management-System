@@ -22,6 +22,8 @@ import * as env from "@/config/env";
 defineOptions({ name: "TrackerLoginPage" });
 
 const HANDOFF_WAIT_MS = 2500;
+// A tracker names the link it listens on; one from before AlianHub Tracker 6 names none and listens on myapp.
+const RETURN_SCHEMES = ["alianhub-tracker", "myapp"];
 
 const userId = inject("$userId");
 const companyId = inject("$companyId");
@@ -67,7 +69,8 @@ const redirect = async () => {
         const response = await apiRequestWithoutCompnay("post", env.TRACKER_CODE, codeChallenge ? { codeChallenge } : {});
         const code = response?.data?.data?.code;
         if (!code) throw new Error("No tracker sign-in code");
-        window.location.href = `myapp://authorize?client_id=${encodeURIComponent(userId.value)}&code=${encodeURIComponent(code)}`;
+        const scheme = RETURN_SCHEMES.includes(route?.query?.scheme) ? route.query.scheme : "myapp";
+        window.location.href = `${scheme}://authorize?client_id=${encodeURIComponent(userId.value)}&code=${encodeURIComponent(code)}`;
         waitForHandoff();
     } catch {
         failed.value = true;
