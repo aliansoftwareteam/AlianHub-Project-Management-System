@@ -14,6 +14,10 @@ describe('environment variables', () => {
         expect(built.drift.undescribed).toEqual([]);
     });
 
+    it('are all classified for a hosted instance (who sets each one under HOSTING_MODE=managed)', () => {
+        expect(built.drift.unclassified).toEqual([]);
+    });
+
     it('scan something (the regexes still match the source)', () => {
         expect(Object.keys(scanBackend()).length).toBeGreaterThan(50);
         expect(Object.keys(scanFrontend()).length).toBeGreaterThan(5);
@@ -21,7 +25,7 @@ describe('environment variables', () => {
 
     it('generate their docs from the current tree', () => {
         expect(built.problems).toEqual([]);
-        expect(Object.values(built.files)).toHaveLength(3);
+        expect(Object.values(built.files)).toHaveLength(4);
         expect(Object.values(built.files).every((content) => typeof content === 'string' && content.length > 100)).toBe(true);
     });
 

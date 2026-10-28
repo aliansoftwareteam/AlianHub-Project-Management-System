@@ -116,3 +116,34 @@ describe('what drift costs', () => {
         expect(driftReport(none, true)).toEqual({ problems: [], warnings: [] });
     });
 });
+
+describe('who sets each variable on a hosted instance', () => {
+    const { MANAGED_CLASSES, renderMatrix } = require('../scripts/env-doc');
+
+    it('accepts the five columns and refuses anything else', () => {
+        expect(MANAGED_CLASSES).toEqual(['bootstrap', 'platform', 'customer', 'fixed', 'dev']);
+        for (const managed of MANAGED_CLASSES) expect(metaShapeProblems({ A_VAR: { group: 'server', description: 'A.', managed } })).toEqual([]);
+        expect(metaShapeProblems({ A_VAR: { group: 'server', description: 'A.', managed: 'ours' } })).toEqual(['"managed" must be one of bootstrap, platform, customer, fixed, dev: A_VAR']);
+    });
+
+    it('fails a pull request that reads a variable without saying who sets it, strict or not', () => {
+        const drift = { undescribed: [], unread: [], stale: [], unclassified: ['NEW_VAR'] };
+        const problem = 'not classified for hosting ("managed") in scripts/env-doc.meta.json: NEW_VAR';
+        expect(driftReport(drift).problems).toEqual([problem]);
+        expect(driftReport(drift, true).problems).toEqual([problem]);
+    });
+
+    it('renders one section per column, in column order, with secrets marked and pipes escaped', () => {
+        const described = {
+            WEBURL: { group: 'server', description: 'Public URL.', managed: 'bootstrap' },
+            AI_API_KEY: { group: 'ai', description: 'Key | provider.', managed: 'customer', secret: true },
+            LOG_DIR: { group: 'logging', description: 'Logs.', managed: 'fixed', default: 'log' },
+        };
+        const reads = { WEBURL: { files: [] }, AI_API_KEY: { files: [] }, LOG_DIR: { files: [] } };
+        const text = renderMatrix(described, reads);
+        const headings = text.split('\n').filter((line) => line.startsWith('## '));
+        expect(headings).toEqual(['## Bootstrap', '## Customer', '## Fixed']);
+        expect(text).toContain('| `AI_API_KEY` (secret) | ai |  | Key \\| provider. |');
+        expect(text).toContain('| `LOG_DIR` | logging | `log` | Logs. |');
+    });
+});

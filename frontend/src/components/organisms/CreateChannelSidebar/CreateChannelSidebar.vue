@@ -67,7 +67,7 @@
                             <div v-if="showWarning" class="show_warning">
                                 <div class="mb-15px msg-color">{{warningMessage}}</div>
                                 <div class="upgrade-btn-txt d-flex justify-content-center">
-                                    <span @click="$router.push({name: 'Upgrade', params: {cid: companyId}})">
+                                    <span @click="openUpgrade($router, companyId)">
                                         {{$t('Upgrades.upgrade_your_plan')}}
                                     </span>
                                 </div>
@@ -130,6 +130,7 @@ import { useToast } from "vue-toast-notification";
 import { apiRequest, apiRequestWithoutCompnay } from '../../../services';
 import {storageQueryBuilder} from '@/utils/storageQueryBuild.js';
 import { useI18n } from "vue-i18n";
+import { openUpgrade } from "@/composable/upgradeLink";
 const { t } = useI18n();
 
 library.add(far);

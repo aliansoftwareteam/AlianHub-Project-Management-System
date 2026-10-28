@@ -20,6 +20,8 @@ const { csvCell: formulaSafeCell } = require('../../utils/csv');
 const llmProvider = require('../AICore/llmProvider');
 const { ssoOnInstance } = require('../SSO/discover');
 const { tenantOf, TenantError } = require('../../Config/tenant');
+const hostingMode = require('../../Config/hostingMode');
+const { ownerOnHostedInstance } = require('./guard');
 
 const PUBLIC_CONFIG_KEY = 'instance:public-config';
 const LATEST_RELEASE_KEY = 'instance:latest-release';
@@ -27,11 +29,17 @@ const BUILD_LOG_LIMIT = 200;
 const ok = (res, statusText, data) => res.send({ status: true, statusText, data });
 const fail = (res, code, statusText, data) => res.status(code).send({ status: false, statusText, ...(data ? { data } : {}) });
 
-exports.access = (req, res) => ok(res, 'Instance admin.', { allowed: true, via: req.instanceAdmin });
+exports.access = (req, res) => ok(res, 'Instance admin.', { allowed: true, via: req.instanceAdmin, managed: hostingMode.isManaged() });
 
 exports.getSettings = (req, res) => ok(res, 'Instance settings.', { groups: GROUPS, settings: settings.describe(), loaded: settings.isLoaded() });
 
+/* A locked key used to be dropped silently, so the page reported a save that never applied. */
 exports.putSettings = async (req, res) => {
+    const refused = settings.refusedKeys(req.body || {});
+    if (Object.keys(refused).length) {
+        const managed = Object.values(refused).includes('managed');
+        return fail(res, 400, managed ? 'Some settings are managed by AlianHub Cloud.' : 'Some settings are set in the environment and cannot be changed here.', { errors: refused });
+    }
     const { values, errors, valid } = validateSettings(req.body || {});
     if (!valid) return fail(res, 400, 'Some settings are not valid.', { errors });
     try {
@@ -109,6 +117,24 @@ function mailHealth() {
     return { configured, provider: process.env.RESEND_API_KEY ? 'resend' : process.env.NODEMAILER_HOST ? 'smtp' : null };
 }
 
+/* What a hosted customer may see: green or red per part, never a host name, path, bucket or
+ * error text from our side of the stack. */
+function customerHealth(full) {
+    const jobs = Object.fromEntries(Object.entries(full.cron.jobs || {}).map(([name, job]) => [name, { lastRunAt: job.lastRunAt, ok: job.ok }]));
+    return {
+        managed: true,
+        status: full.status,
+        version: full.version,
+        maintenance: full.maintenance,
+        db: { ok: Boolean(full.db.ok) },
+        storage: { ok: Boolean(full.storage.ok) },
+        mail: { configured: full.mail.configured, ...(full.mail.ok !== undefined ? { ok: full.mail.ok } : {}) },
+        agenda: { pending: full.agenda.pending, failed: full.agenda.failed },
+        cron: { enabled: full.cron.enabled, tz: full.cron.tz, jobs },
+        portalUrl: hostingMode.portalUrl(),
+    };
+}
+
 exports.health = async (req, res) => {
     const probeMail = String(req.query.probe || '') === 'mail';
     const migrations = require('../../migrations');
@@ -125,7 +151,7 @@ exports.health = async (req, res) => {
         httpsWebUrl: /^https:\/\//i.test(process.env.WEBURL || ''),
         migrationsClean: migrationStatus.pending.length === 0 && !state.migrationError,
     };
-    return ok(res, 'Instance health.', {
+    const full = {
         status: db.ok ? 'ok' : 'degraded',
         version: buildInfo.get().version,
         nodeVersion: process.version,
@@ -138,7 +164,8 @@ exports.health = async (req, res) => {
         migrations: { applied: migrationStatus.applied.length, pending: migrationStatus.pending.map((m) => m.id), failed: migrationStatus.failed, error: state.migrationError },
         lastBackup: backupList[0] || null,
         readiness,
-    });
+    };
+    return ok(res, 'Instance health.', ownerOnHostedInstance(req) ? customerHealth(full) : full);
 };
 
 exports.setMaintenance = (req, res) => {
@@ -307,7 +334,8 @@ exports.stats = async (req, res) => {
             MongoDbCrudOpration(SCHEMA_TYPE.GOLBAL, { type: SCHEMA_TYPE.USERS, data: [{}] }, 'countDocuments'),
         ]);
         const { version, release, commit, channel, build, builtAt } = buildInfo.summary();
-        return ok(res, 'Instance stats.', { version, release, commit, channel, build, builtAt, nodeVersion: process.version, uptimeSeconds: Math.round(process.uptime()), companies: companies || 0, users: users || 0 });
+        const host = ownerOnHostedInstance(req) ? {} : { nodeVersion: process.version, uptimeSeconds: Math.round(process.uptime()) };
+        return ok(res, 'Instance stats.', { version, release, commit, channel, build, builtAt, ...host, companies: companies || 0, users: users || 0 });
     } catch (error) {
         return fail(res, 500, error.message);
     }

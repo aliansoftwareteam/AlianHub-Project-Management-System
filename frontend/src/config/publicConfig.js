@@ -23,6 +23,7 @@ export const publicConfig = reactive({
     firebase: {},
     demoMode: false,
     mcpOAuth: false,
+    hosting: { mode: "self", portalUrl: "" },
 });
 
 export function applyPublicConfig(data = {}) {
@@ -30,5 +31,7 @@ export function applyPublicConfig(data = {}) {
     env.setRuntimeConfig(publicConfig);
     return publicConfig;
 }
+
+export const isManagedHosting = () => publicConfig.hosting?.mode === "managed";
 
 export const enabledProviders = () => ["google", "github", "gitlab"].filter((p) => publicConfig.auth[p]?.enabled);

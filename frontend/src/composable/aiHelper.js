@@ -4,6 +4,7 @@ import Swal from '@/utils/lazySwal';
 import { apiRequest } from "@/services";
 import * as env from '@/config/env';
 import { useRouter } from "vue-router";
+import { openUpgrade } from "@/composable/upgradeLink";
 import Store from '@/store/index'
 import { i18n } from "@/locales/main";
 const t = i18n.global.t;
@@ -30,7 +31,7 @@ export function useAiApiFunction() {
                         showCloseButton:true    
                     }).then((result) => {
                         if (result.isConfirmed) {
-                            router.push({name: 'Upgrade', params: {cid: apiObj.companyId}})
+                            openUpgrade(router, apiObj.companyId)
                         }
                     })
                     return;

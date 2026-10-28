@@ -5518,6 +5518,12 @@ const schema = {
         apiTokenStrictSince: { type: Date, required: false },
         // When the maximum API token lifetime first applied; tokens made earlier with a longer expiry count from here.
         apiTokenMaxLifetimeSince: { type: Date, required: false },
+        // HOSTING_MODE=managed: what the platform pushed (PUT /api/v2/platform/config), replaced whole on each push.
+        platformValues: { type: Object, required: false },
+        platformUpdatedAt: { type: Date, required: false },
+        platformUpdatedBy: { type: String, required: false },
+        // Owner-triggered restarts, newest last, kept to the hourly limit.
+        restartsAt: { type: [Date], required: false },
     },
     globalSettings: {
         name: {

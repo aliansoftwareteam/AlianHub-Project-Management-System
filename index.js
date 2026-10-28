@@ -9,6 +9,7 @@ const bodyParser = require("body-parser");
 const config =  require('./Config/config.js');
 const { loadDotEnv, applyEnvMap } = require('./Config/applyEnv.js');
 loadDotEnv();
+require('./Config/hostingMode').refuseBadBoot();
 const { makeDefaultBrandSettings } = require("./Modules/Admin/common/controller.js");
 const { installCors } = require('./utils/cors.js');
 const { trustProxySetting } = require('./Config/trustProxy.js');
@@ -40,6 +41,7 @@ app.get("/", (req, res) => {
     res.sendFile(path.join(__dirname, './frontend/dist/index.html'));
 });
 app.use(require('./Modules/Instance/maintenance.js').maintenanceGuard);
+app.use(require('./Config/billingRoutes').closeBillingWhenHosted);
 
 // ADD DEFAULT BRAND SETTINGS
 makeDefaultBrandSettings()
@@ -261,5 +263,6 @@ async function applySavedSettings() {
         console.log("Server ready on " + config.PORT);
     });
     require('./Modules/Agents/engine/timeouts').applyServerTimeouts(server);
+    require('./Modules/Instance/restart').attach(server);
     initSocket(server);
 })();

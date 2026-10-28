@@ -54,7 +54,7 @@ const OUTSIDE_EVERY_PROJECT = {
         'POST /api/v2/instance/instruction-patterns', 'POST /api/v2/instance/knowledge/:companyId/erase/document', 'POST /api/v2/instance/knowledge/:companyId/erase/person',
         'POST /api/v2/instance/knowledge/:companyId/exclusions/:exclusionId/remove', 'POST /api/v2/instance/knowledge/:companyId/reembed',
         'POST /api/v2/instance/knowledge/:companyId/reindex', 'POST /api/v2/instance/knowledge/:companyId/reindex/cancel', 'POST /api/v2/instance/knowledge/:companyId/retry-files',
-        'POST /api/v2/instance/maintenance', 'POST /api/v2/instance/migrations/run', 'POST /api/v2/instance/orphan-databases/:name/drop', 'POST /api/v2/instance/settings/test',
+        'POST /api/v2/instance/maintenance', 'POST /api/v2/instance/migrations/run', 'POST /api/v2/instance/orphan-databases/:name/drop', 'POST /api/v2/instance/restart', 'POST /api/v2/instance/settings/test',
         'PUT /api/v2/instance/egress/:companyId', 'PUT /api/v2/instance/enforcement/:companyId/mode', 'PUT /api/v2/instance/enforcement/default', 'PUT /api/v2/instance/settings',
         'POST /api/v1/projectSetting/migrateSprintsFun', 'POST /api/v1/setPresetCompany', 'POST /api/v1/settings/oauth', 'POST /api/v1/tracker/create', 'PUT /api/v1/tracker/update',
         'POST /api/v1/updateAiModel', 'POST /api/v1/updateEmailTemplate', 'POST /api/v1/versionUpdateNotify',

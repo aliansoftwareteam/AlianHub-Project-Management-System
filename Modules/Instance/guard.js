@@ -31,4 +31,15 @@ function requireInstanceAdmin(req, res, next) {
     });
 }
 
-module.exports = { requireInstanceAdmin, isInstanceOwner };
+const MANAGED_DENIED = 'AlianHub Cloud manages this for you.';
+
+const ownerOnHostedInstance = (req) => require('../../Config/hostingMode').isManaged() && req.instanceAdmin === 'owner';
+
+/* On a hosted instance maintenance, upgrades, logs, backups and database drops are ours: the
+ * owner is refused while the platform key still passes. */
+function managedDeny(req, res, next) {
+    if (ownerOnHostedInstance(req)) return refuse(res, 403, MANAGED_DENIED);
+    return next();
+}
+
+module.exports = { requireInstanceAdmin, isInstanceOwner, managedDeny, ownerOnHostedInstance, MANAGED_DENIED };
