@@ -43,7 +43,7 @@ const TAKES_A_FILE = {
     'POST /api/v4/timetracker/capture': [['timelog.capture'], 'the bucket, the path and the person\'s own running timer, by the reader before it stores, and again after'],
     'POST /api/v1/wasabi/uploadFile': [[], 'the bucket and the path, by the reader before it stores, and again after'],
     'POST /api/v1/storage/uploadFile': [[], 'the bucket and the path, by the reader before it stores, and again after'],
-    'POST /api/v2/company/create': [['workspace.create'], 'nothing: a file part is passed over'],
+    'POST /api/v2/company/create': [['workspace.create', 'requireWorkspaceRoom'], 'nothing: a file part is passed over'],
     'POST /api/v1/ai/project/upload-brief': [['ai.spend', 'briefAsked'], 'the company the fields name, after; the file is removed on a refusal'],
     'POST /api/v1/ai/transcribe': [['ai.spend'], 'the workspace\'s AI switch, after; the audio is held in memory and never stored'],
     'POST /api/v2/pages/:id/images': [['page.image'], 'the right to edit the doc, by the handler before it reads the file'],
