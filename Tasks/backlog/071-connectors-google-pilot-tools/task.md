@@ -12,24 +12,24 @@ created: 2026-10-28
 Sub task of 056 (`Tasks/backlog/056-personal-app-connectors/task.md`, the PRD). FR numbers refer to that PRD; its decisions and section 10 (security, privacy, testability, feature flag) apply here.
 
 ## Goal
-Prove the module end to end: a member connects Google, ticks products, and both an agent run and MCP read and propose writes.
+Give the pilot provider its tools, so an agent run and MCP can read and propose writes on a person's Google account.
 
 ## Scope
-- Calendar read tools and event create/update as write proposals
-- Meet read tools and meeting create as a write proposal (scopes per 061)
+- Calendar read tools and event create/update as write proposals, in `providers/google/tools.js`
+- Meet read tools and meeting create as a write proposal (scopes per the contract and 061's matrix rows)
 - Drive `drive.file` tools on picked files
 - Fake Google server for tests
-- Instance and company setup page for Google
 
 ## Out of scope
 - Gmail (decision 15)
+- The Google provider definition and setup page (track A: 063, 077)
 - Calendar row migration (073)
 - Attachment picker (076)
 
 ## Acceptance criteria
-- [ ] Phase 1 "done when" of the PRD holds for Google
+- [ ] Every tool works from an agent run and from MCP against the fake Google server; no real credential needed
 - [ ] A missing product scope tells the person which product to tick
-- [ ] All tools tested against the fake Google server; no real credential needed
 
 ## Constraints & notes
+- Track: B — tools (using that token safely)
 - Depends on: 068, 069

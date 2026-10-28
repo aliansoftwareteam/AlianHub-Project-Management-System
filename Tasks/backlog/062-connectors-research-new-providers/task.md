@@ -31,5 +31,6 @@ Give the owner the facts to order Phase 3 (easiest first) and to decide on Gmail
 - [ ] Owner accepts the matrix and the order (recorded in 056 progress)
 
 ## Constraints & notes
+- Track: B — tools (using that token safely)
 - Depends on: nothing; can start now
 - After the owner accepts the ranking, create one task per connector (one provider definition plus its tools each), and one for Gmail once its production path is decided.

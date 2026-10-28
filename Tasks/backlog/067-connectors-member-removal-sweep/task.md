@@ -28,5 +28,6 @@ No connection outlives its person's membership.
 - [ ] Running the sweep twice changes nothing the second time
 
 ## Constraints & notes
+- Track: A — connections (getting and keeping a person's token)
 - Depends on: 066
 - Extend `Modules/Agents/connectors/memberDeparted.js`.

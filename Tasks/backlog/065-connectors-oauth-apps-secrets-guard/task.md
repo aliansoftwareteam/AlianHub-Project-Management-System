@@ -32,4 +32,5 @@ Resolve which OAuth app serves a workspace and refuse to run without a usable se
 - [ ] Without the secrets store the module stays off with a clear reason
 
 ## Constraints & notes
+- Track: A — connections (getting and keeping a person's token)
 - Depends on: 063, 064

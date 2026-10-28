@@ -3,7 +3,7 @@ id: 064
 title: Connectors — data model: evolve connector_connections, add connector_apps and connector_usage
 status: backlog
 priority: high
-depends_on: []
+depends_on: [063]
 created: 2026-10-28
 ---
 
@@ -29,4 +29,5 @@ Store connections keyed by connection id with health, app source and handles, so
 - [ ] Schemas declared; no hard-coded collection names
 
 ## Constraints & notes
-- Depends on: nothing; can start now
+- Track: A — connections (getting and keeping a person's token)
+- Depends on: 063

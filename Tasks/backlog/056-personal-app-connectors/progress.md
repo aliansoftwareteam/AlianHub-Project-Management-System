@@ -19,5 +19,7 @@
 
 - 2026-10-28: Split into sub tasks 061–077 (Phase 0 research, Phase 1 module, Phase 2 migration), each with its FRs and dependencies; table in `task.md` §11. Phase 3 connector tasks wait for 062's ranking.
 
+- 2026-10-28: Re-cut for two interns working independently. Track A (connections): 061, 063–067, 072, 073, 076, 077. Track B (tools): 062, 068–071, 078, 074, 075, 079. The only shared step is the contract in 063 (definition shape, schema, `resolveConnection`), written together on day 1. 072 and 077 split (new 078, 079); Slack and GitHub research moved from 061 into 074 and 075; 073 no longer waits on 071; Google setup page moved from 071 to 077. Joint end-to-end tests after Phase 1 and Phase 2 stay with this task.
+
 ## Last step
-Split into 061–077. Next: owner corrections, then 061, 062 and 064 can start in parallel.
+Two-track split done. Next: owner corrections, then the contract day for 063; 061 (A) and 062 (B) can start alongside.

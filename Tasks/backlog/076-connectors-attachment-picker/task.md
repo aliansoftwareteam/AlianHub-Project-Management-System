@@ -3,7 +3,7 @@ id: 076
 title: Connectors — Drive/Dropbox attachment picker on the module
 status: backlog
 priority: medium
-depends_on: [071, 072]
+depends_on: [066, 072]
 created: 2026-10-28
 ---
 
@@ -29,5 +29,6 @@ The attachment picker uses each person's module connection with the instance or 
 - [ ] Stored client secrets deleted; migration safe to run twice
 
 ## Constraints & notes
-- Depends on: 071, 072
+- Track: A — connections (getting and keeping a person's token)
+- Depends on: 066, 072
 - `Modules/CloudStorage` today stores the client secret unsealed (`sanitizeAppConfig`, `saveSettings`) and never revokes.

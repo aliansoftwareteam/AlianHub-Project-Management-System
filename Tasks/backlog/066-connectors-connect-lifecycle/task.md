@@ -20,6 +20,7 @@ One connect lifecycle for every provider, built on the existing four-step flow, 
 - Reconnect: same account replaces tokens, different account revokes the earlier grant (FR-11)
 - `DELETE .../connections/:id`: revoke unless shared, retire secrets, close row (FR-12)
 - Membership checked at every use (FR-13); tokens only by handle (FR-15); refresh on use, `invalid_grant` → `broken` (FR-17)
+- The real `resolveConnection` exactly as the contract (063) defines it; track B's stub is swapped for it on merge
 - `GET /api/v2/connectors` for the member; `agentsRefused`, audit, socket emit, cache clear
 
 ## Out of scope
@@ -34,5 +35,6 @@ One connect lifecycle for every provider, built on the existing four-step flow, 
 - [ ] No token in any response, log, socket event or audit row (asserted)
 
 ## Constraints & notes
+- Track: A — connections (getting and keeping a person's token)
 - Depends on: 065
 - Generalise `Modules/Agents/connectors/googleConnection.js` and `Modules/Connectors/googleController.js` rather than writing new flow code.

@@ -3,7 +3,7 @@ id: 073
 title: Connectors — migrate Google Calendar connections onto the Google provider
 status: backlog
 priority: medium
-depends_on: [071]
+depends_on: [064, 066]
 created: 2026-10-28
 ---
 
@@ -19,11 +19,12 @@ Existing Calendar connections keep working as Google connections with Calendar t
 - Existing grants keep working; no reconnect asked
 
 ## Out of scope
-- Anything not listed above; see the 056 PRD for the neighbouring sub tasks
+- Calendar tools (071, track B); checked together in the joint end-to-end test of 056
 
 ## Acceptance criteria
 - [ ] Migration is safe to run twice
-- [ ] A migrated connection calls Calendar tools without reconnecting
+- [ ] A migrated row resolves through `resolveConnection` and refreshes its token without reconnecting
 
 ## Constraints & notes
-- Depends on: 071
+- Track: A — connections (getting and keeping a person's token)
+- Depends on: 064, 066

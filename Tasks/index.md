@@ -61,25 +61,27 @@ Auto-maintained registry of all tasks. Reflects YAML frontmatter from each `task
 | 053 | Industry demos — the dispatcher, the Company view and workflow runs | done | high | 052 | done/053-industry-demo-agentic-layers |
 | 054 | Industry demos for every blueprint, named by industry | done | high | 053 | done/054-industry-demos-every-blueprint |
 | 055 | Create Project modal — Member, Skills, Source and Due date pickers open above the modal | active | high | — | active/055-create-project-field-popovers |
-| 056 | Personal app connectors for AI and agents — one reusable module, then connectors one by one | backlog | high | 061–077 | backlog/056-personal-app-connectors |
+| 056 | Personal app connectors for AI and agents — one reusable module, then connectors one by one | backlog | high | 061–079 | backlog/056-personal-app-connectors |
 | 057 | Projects settings — Open, Archived and Closed tabs; every undo returns the exact previous state | active | high | — | active/057-project-lifecycle-tabs |
 | 058 | Tracker timesheet — every screenshot card shows its image box and a loading state from the first paint | active | medium | — | active/058-tracker-screenshot-loading-placeholder |
 | 059 | Agent settings page — tabs, a searchable project picker and one sticky Save bar | active | high | — | active/059-agent-settings-tabs |
 | 060 | AI access by role — per-role AI rights in Security & Permissions, owner/admin approval for agents and skills | active | high | — | active/060-ai-access-by-role |
-| 061 | Connectors research — confirm Google, Slack, GitHub and Dropbox before the build | backlog | high | — | backlog/061-connectors-research-pilot-providers |
+| 061 | Connectors research — confirm Google and Dropbox before the build | backlog | high | — | backlog/061-connectors-research-pilot-providers |
 | 062 | Connectors research — matrix and ranking for the new connectors and Gmail | backlog | medium | — | backlog/062-connectors-research-new-providers |
-| 063 | Connectors — provider definition format, registry and the Google provider file | backlog | high | 061 | backlog/063-connectors-provider-definition |
-| 064 | Connectors — data model: evolve connector_connections, add connector_apps and connector_usage | backlog | high | — | backlog/064-connectors-data-model |
+| 063 | Connectors — the two-track contract, provider definition format, registry and the Google provider file | backlog | high | — | backlog/063-connectors-provider-definition |
+| 064 | Connectors — data model: evolve connector_connections, add connector_apps and connector_usage | backlog | high | 063 | backlog/064-connectors-data-model |
 | 065 | Connectors — OAuth app lookup (instance default, company override) and the secrets-store guard | backlog | high | 063, 064 | backlog/065-connectors-oauth-apps-secrets-guard |
 | 066 | Connectors — generic connect, products, reconnect and disconnect handlers | backlog | high | 065 | backlog/066-connectors-connect-lifecycle |
 | 067 | Connectors — end a member's connections on removal, deactivation or SCIM, plus a daily sweep | backlog | high | 066 | backlog/067-connectors-member-removal-sweep |
-| 068 | Connectors — tool framework: one definition registered for agents and MCP | backlog | high | 063, 066 | backlog/068-connectors-tool-framework |
+| 068 | Connectors — tool framework: one definition registered for agents and MCP | backlog | high | 063 | backlog/068-connectors-tool-framework |
 | 069 | Connectors — every outside write is a proposal only the connection owner approves | backlog | high | 068 | backlog/069-connectors-write-approvals |
-| 070 | Connectors — audit, health, usage counts, quotas and provider backoff | backlog | high | 064, 068 | backlog/070-connectors-tracking-quotas |
+| 070 | Connectors — audit, health, usage counts, quotas and provider backoff | backlog | high | 063, 068 | backlog/070-connectors-tracking-quotas |
 | 071 | Connectors — Google pilot tools: Calendar, Meet and Drive (no Gmail) | backlog | high | 068, 069 | backlog/071-connectors-google-pilot-tools |
-| 072 | Connectors — My connections, admin overview, company apps, quotas and approval cards | backlog | high | 066, 069, 070 | backlog/072-connectors-screens |
-| 073 | Connectors — migrate Google Calendar connections onto the Google provider | backlog | medium | 071 | backlog/073-connectors-migrate-google-calendar |
-| 074 | Connectors — Slack as a personal OAuth provider; retire the workspace bot | backlog | medium | 061, 069, 070, 072 | backlog/074-connectors-slack-personal |
-| 075 | Connectors — GitHub as a personal, on-demand provider; retire the task 049 sync | backlog | medium | 061, 069, 070, 072 | backlog/075-connectors-github-personal |
-| 076 | Connectors — Drive/Dropbox attachment picker on the module | backlog | medium | 071, 072 | backlog/076-connectors-attachment-picker |
-| 077 | Connectors — remove the old connection paths and finish the setup docs | backlog | medium | 073, 074, 075, 076 | backlog/077-connectors-remove-old-paths |
+| 072 | Connectors — My connections, admin overview and company apps screens | backlog | high | 066 | backlog/072-connectors-connection-screens |
+| 073 | Connectors — migrate Google Calendar connections onto the Google provider | backlog | medium | 064, 066 | backlog/073-connectors-migrate-google-calendar |
+| 074 | Connectors — Slack as a personal OAuth provider; retire the workspace bot | backlog | medium | 069, 070, 078 | backlog/074-connectors-slack-personal |
+| 075 | Connectors — GitHub as a personal, on-demand provider; retire the task 049 sync | backlog | medium | 069, 070, 078 | backlog/075-connectors-github-personal |
+| 076 | Connectors — Drive/Dropbox attachment picker on the module | backlog | medium | 066, 072 | backlog/076-connectors-attachment-picker |
+| 077 | Connectors — remove the old Google Calendar and CloudStorage paths; Google and Dropbox setup pages | backlog | medium | 073, 076 | backlog/077-connectors-remove-calendar-picker-paths |
+| 078 | Connectors — Inbox approval cards and quota settings screens | backlog | high | 069, 070 | backlog/078-connectors-approval-quota-screens |
+| 079 | Connectors — remove the old Slack bot and GitHub sync paths | backlog | medium | 074, 075 | backlog/079-connectors-remove-slack-github-paths |
