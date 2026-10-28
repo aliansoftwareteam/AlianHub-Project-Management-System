@@ -25,3 +25,7 @@ Spaces presigned backups, Resend, DOCR mirror); Q26 can swap the file-storage ad
 
 ### 2026-10-27
 - Task created from the AlianHub Cloud programme plan (060).
+
+### 2026-10-28
+- 074 (local Docker host) builds the first slice of this task: step runner, provision and change
+  workflows, entitlement signing, with local host/DNS/storage adapters; M2 adds the cloud adapters.
