@@ -15,6 +15,7 @@ exports.init = (app) => {
     const admin = '/api/v2/instance';
     app.use(admin, (req, res, next) => (req.path === '/public-config' ? next() : requireInstanceAdmin(req, res, next)));
     app.get(`${admin}/access`, ctrl.access);
+    app.get(`${admin}/support-access`, require('../Platform/controller').supportAccess);
     app.get(`${admin}/settings`, ctrl.getSettings);
     app.put(`${admin}/settings`, ctrl.putSettings);
     app.post(`${admin}/settings/test`, ctrl.testSettings);

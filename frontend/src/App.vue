@@ -12,6 +12,7 @@
                 <!-- Mounted at the root so an incoming call rings wherever the user is,
                      not only when the conversation that called them is on screen. -->
                 <CallOverlay />
+                <HostedBanners />
                 <div class="ah-app">
                     <GlobalRail v-if="!$route.meta.hideHeader" @change="changeCompany($event)" />
                     <main class="ah-app__main" id="ah-main">
@@ -64,6 +65,7 @@ import { computed, defineAsyncComponent, defineComponent, onMounted, provide, re
 // COMPONENTS
 import TourCom from "@/components/organisms/Tour/TourComponet.vue"
 import MaintenanceBanner from "@/views/Settings/Instance/MaintenanceBanner.vue"
+import HostedBanners from "@/components/organisms/HostedBanners/HostedBanners.vue"
 import MaintenanceCard from "@/views/Settings/Instance/MaintenanceCard.vue"
 import { maintenanceOn } from "@/composable/maintenanceState"
 import GlobalRail from '@/components/organisms/Shell/GlobalRail.vue'

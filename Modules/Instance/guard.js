@@ -13,7 +13,24 @@ async function isInstanceOwner(uid) {
     return Boolean(user && user.isProductOwner);
 }
 
+/* Hosted, the platform reuses these routes with its own key, behind the same locks as /api/v2/platform. */
+function viaPlatformKey(req, res, next) {
+    const platformGuard = require('../Platform/guard');
+    const { logCall } = require('../Platform/platformAudit');
+    const startedAt = Date.now();
+    return platformGuard.checkPlatformCall(req).then((refused) => {
+        if (refused) return refuse(res, refused.status, refused.statusText);
+        req.instanceAdmin = 'platform';
+        res.on('finish', () => logCall({
+            action: 'platform.instance', requestId: req.platform.requestId, ok: res.statusCode < 400,
+            summary: `${req.method} ${req.originalUrl.split('?')[0]} ${res.statusCode}`, durationMs: Date.now() - startedAt,
+        }));
+        return next();
+    }).catch((error) => refuse(res, 500, error.message));
+}
+
 function requireInstanceAdmin(req, res, next) {
+    if (require('../Platform/guard').carriesPlatformKey(req)) return viaPlatformKey(req, res, next);
     const configuredKey = process.env.INSTANCE_ADMIN_KEY || '';
     if (configuredKey && String(req.headers.adminkey || '') === configuredKey) {
         req.instanceAdmin = 'key';

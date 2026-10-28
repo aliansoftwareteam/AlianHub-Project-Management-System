@@ -47,7 +47,7 @@ const OUTSIDE_EVERY_PROJECT = {
         'POST /api/v2/auth/reset-password', 'POST /api/v2/auth/token-verify-forgotpassword', 'POST /api/v2/auth/tracker-code', 'POST /api/v2/createUser',
         'POST /api/v2/generateToken', 'POST /api/v2/github-signup', 'POST /api/v2/gitlab-signup', 'POST /api/v2/google-signup', 'POST /api/v2/logout',
         'POST /api/v2/sendForgotPasswordEmail', 'POST /api/v2/sendVerificationEmail', 'POST /api/v2/test', 'POST /api/v2/verifyEmail', 'PUT /api/v2/session/update',
-        'POST /api/v2/setup/complete', 'POST /api/v1/email-in/:token', 'POST /api/v1/slack/command/:companyId', 'POST /form/:token', 'POST /share/:token', 'POST /share/:token/intake',
+        'POST /api/v2/setup/complete', 'POST /api/v2/auth/platform-login', 'POST /api/v2/auth/activation/verify', 'POST /api/v2/auth/activate', 'POST /api/v1/email-in/:token', 'POST /api/v1/slack/command/:companyId', 'POST /form/:token', 'POST /share/:token', 'POST /share/:token/intake',
     ],
     'is answered by the instance owner\'s guard or key, which takes no token': [
         'POST /api/v2/instance/audit/:companyId/redact-person', 'POST /api/v2/instance/backups', 'POST /api/v2/instance/backups/:name/restore',
@@ -58,6 +58,11 @@ const OUTSIDE_EVERY_PROJECT = {
         'PUT /api/v2/instance/egress/:companyId', 'PUT /api/v2/instance/enforcement/:companyId/mode', 'PUT /api/v2/instance/enforcement/default', 'PUT /api/v2/instance/settings',
         'POST /api/v1/projectSetting/migrateSprintsFun', 'POST /api/v1/setPresetCompany', 'POST /api/v1/settings/oauth', 'POST /api/v1/tracker/create', 'PUT /api/v1/tracker/update',
         'POST /api/v1/updateAiModel', 'POST /api/v1/updateEmailTemplate', 'POST /api/v1/versionUpdateNotify',
+    ],
+    'is answered by the platform key of a hosted instance, and does not exist self-hosted': [
+        'POST /api/v2/platform/provision', 'PUT /api/v2/platform/config', 'PUT /api/v2/platform/entitlements', 'POST /api/v2/platform/lifecycle',
+        'POST /api/v2/platform/owner/activation-link', 'POST /api/v2/platform/owner/login-link', 'POST /api/v2/platform/owner/transfer',
+        'POST /api/v2/platform/rotate-key', 'POST /api/v2/platform/support-session',
     ],
     'is judged where it is handled, which takes a signed-in person or refuses a token': [
         'POST /api/v2/agents/proposals/:id/approve', 'POST /api/v2/agents/proposals/:id/decline', 'POST /api/v2/agents/proposals/:id/undo',

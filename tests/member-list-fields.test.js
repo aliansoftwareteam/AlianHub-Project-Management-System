@@ -92,6 +92,13 @@ beforeEach(() => {
 });
 
 describe('GET /api/v1/members', () => {
+    it('leaves out the AlianHub Support seat, except for that account itself', async () => {
+        const SUPPORT = '6f0000000000000000000099';
+        seat(SUPPORT, 2, { isSupportUser: true });
+        expect(rowIn(await list(OWNER), SUPPORT)).toBeUndefined();
+        expect(rowIn(await list(SUPPORT), SUPPORT)).toMatchObject({ userId: SUPPORT, roleType: 2 });
+    });
+
     it('gives a member the fields the app shows of a colleague', async () => {
         const row = rowIn(await list(MEMBER), COLLEAGUE);
 

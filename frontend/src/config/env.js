@@ -143,6 +143,10 @@ module.exports.TWO_FA_VERIFY = '/api/v2/auth/2fa/verify';
 module.exports.TWO_FA_DISABLE = '/api/v2/auth/2fa/disable';
 module.exports.TWO_FA_VALIDATE = '/api/v2/auth/2fa/validate';
 module.exports.MAGIC_LINK = '/api/v2/auth/magic-link';
+// Hosted only (Modules/Platform): the platform's one-time links.
+module.exports.PLATFORM_LOGIN = '/api/v2/auth/platform-login';
+module.exports.ACTIVATION_VERIFY = '/api/v2/auth/activation/verify';
+module.exports.ACTIVATE = '/api/v2/auth/activate';
 module.exports.SSO_DISCOVER = '/api/v2/sso/discover';
 
 // Webhooks / integrations (Modules/Webhooks)
@@ -434,6 +438,7 @@ module.exports.ADMIN_GUIDE_URL = 'https://github.com/aliansoftwareteam/AlianHub-
 // Instance console (Modules/Instance); public-config is the only public one
 module.exports.INSTANCE_PUBLIC_CONFIG = '/api/v2/instance/public-config';
 module.exports.INSTANCE_ACCESS = '/api/v2/instance/access';
+module.exports.INSTANCE_SUPPORT_ACCESS = '/api/v2/instance/support-access';
 module.exports.INSTANCE_SETTINGS = '/api/v2/instance/settings';
 module.exports.INSTANCE_SETTINGS_TEST = '/api/v2/instance/settings/test';
 module.exports.INSTANCE_HEALTH = '/api/v2/instance/health';

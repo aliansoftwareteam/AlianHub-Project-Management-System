@@ -70,6 +70,8 @@ exports.sessionRefusalFor = async (uid) => {
     const user = await mongoC.MongoDbCrudOpration(dbCollections.GLOBAL, { type: dbCollections.USERS, data: [{ _id: uid }] }, "findOne");
     if (!(user && user._id)) return { status: false, isLogout: true, message: 'user not found.' };
     if (!user.isEmailVerified) return unverifiedEmailAnswer(user);
+    // Whatever way in was tried (password, provider, link), the AlianHub Support account gets a session only during a support session.
+    if (user.isSupportUser && !require('../../Platform/supportSession').isSupportSessionLive(user._id)) return { status: false, isLogout: true, message: 'The support session has ended.' };
     return null;
 };
 
@@ -145,6 +147,12 @@ exports.insertAuthFun = async (reqData, cb) => {
                 status: false,
                 message: "Email is require"
             });
+            return;
+        }
+        // Only an explicit null from a server-side caller makes an account that has no password yet.
+        if (reqData.passwordless === true && reqData.password === null) {
+            const saved = await mongoC.MongoDbCrudOpration(dbCollections.GLOBAL, { type: dbCollections.USER_AUTH, data: { email: reqData.email } }, "save");
+            cb({ status: true, data: { email: reqData.email, _id: saved._id } });
             return;
         }
         if (!(reqData && reqData.password)) {
@@ -229,6 +237,7 @@ const storeInCurrentFormat = async (account, input) => {
 };
 
 const mailSetPasswordLink = async (email, isLoginType) => {
+    if (await require("../helpers/accountMail").refusesPasswordMail(email)) return;
     const token = generateToken(600);
     const stored = await mongoC.MongoDbCrudOpration(dbCollections.GLOBAL, {
         type: dbCollections.USER_AUTH,

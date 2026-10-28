@@ -229,7 +229,7 @@ function publicConfig() {
         },
         demoMode: env('DEMO_MODE') === 'true',
         mcpOAuth: require('../Modules/OAuthServer/config').isOn(process.env),
-        hosting: { mode: hostingMode.mode(), portalUrl: hostingMode.portalUrl() },
+        hosting: { mode: hostingMode.mode(), portalUrl: hostingMode.portalUrl(), ...(hostingMode.isManaged() ? { lifecycle: require('../Modules/Platform/lifecycle').lifecycle() } : {}) },
     };
 }
 

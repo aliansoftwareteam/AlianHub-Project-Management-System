@@ -323,7 +323,10 @@ const checkToken = async (isValid, req, res, next) => {
     req.aud = isValid.aud;
     const session = await resolveAccessSession(isValid);
     if (session.sid) req.sessionId = session.sid;
-    if (session.ok) return next();
+    if (session.ok) {
+        require('./lastSeen').noteSeen(isValid.uid);
+        return next();
+    }
     if (session.reason === 'legacy' || session.reason === 'rotated') return refuseForRefresh(res);
     if (session.reason === 'invalid') {
         res.clearCookie('accessToken', clearOptions(req));

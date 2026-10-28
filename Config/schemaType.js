@@ -145,6 +145,8 @@ const SCHEMA_TYPE = {
     SCHEMA_VERSIONS: "schema_versions",
     INSTANCE_SETTINGS: "instance_settings",
     STORAGE_USAGE: "storage_usage",
+    PLATFORM_STATE: "platform_state",
+    PLATFORM_AUDIT: "platform_audit",
     AGENT_SESSIONS: "agent_sessions",
     AGENT_SESSION_ENDPOINTS: "agent_session_endpoints",
     ASK_THREADS: "ask_threads",

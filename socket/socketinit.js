@@ -100,6 +100,7 @@ exports.initSocket = (server) => {
         },
     });
     const userNamespace = io.of(/^\/userid_\w+$/);
+    require('./controller/instanceSocket').attach(userNamespace);
     userNamespace.use(async (socket, next) => {
         const token = handshakeToken(socket.handshake);
         if (!token) {
