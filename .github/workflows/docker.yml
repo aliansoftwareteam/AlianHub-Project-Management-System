@@ -29,6 +29,18 @@ name: Docker
 #   Note: ubuntu-24.04-arm is a GitHub-hosted Arm64 runner (free for
 #   public repositories; requires a runner-enabled plan for private ones).
 #
+# For hosting (task 065 T4), after the per-arch builds:
+#   • scan           — Trivy fails the run, before any tag is applied, on a
+#                      CRITICAL CVE that has a fix. Repo variable
+#                      TRIVY_ENFORCE=false turns it into a report.
+#   • sign           — cosign keyless signature (GitHub OIDC) on the
+#                      manifest list digest. IMAGE_SIGNING=false skips it.
+#   • mirror         — copies the same digest, with its signatures, to
+#                      registry.digitalocean.com/<DOCR_REGISTRY|alianhub>/alianhub.
+#                      Skipped until the DOCR_TOKEN secret exists.
+#   • release-index  — adds the digest to the release notes and attaches
+#                      index.json (scripts/release-index.js).
+#
 # See also: BRANCHING.md § Release workflow
 # ─────────────────────────────────────────────────────────────────────
 
@@ -146,12 +158,42 @@ jobs:
           if-no-files-found: error
           retention-days: 1
 
+  # ── Refuse to tag an image with a fixable critical CVE ──
+  #    Runs on the untagged amd64 digest, so a failure leaves nothing
+  #    pullable by version or `latest`.
+  scan:
+    name: Scan for critical CVEs
+    runs-on: ubuntu-latest
+    needs: [build]
+    if: github.event_name != 'pull_request'
+
+    steps:
+      - name: Download the amd64 digest
+        uses: actions/download-artifact@v4
+        with:
+          name: digests-linux-amd64
+          path: ${{ runner.temp }}/digests
+
+      - name: Trivy
+        env:
+          TRIVY_USERNAME: ${{ github.actor }}
+          TRIVY_PASSWORD: ${{ secrets.GITHUB_TOKEN }}
+          EXIT_CODE: ${{ vars.TRIVY_ENFORCE == 'false' && '0' || '1' }}
+        run: |
+          ref="${REGISTRY_GHCR}/${IMAGE_NAME}@sha256:$(ls "${{ runner.temp }}/digests")"
+          echo "Scanning $ref"
+          docker run --rm -e TRIVY_USERNAME -e TRIVY_PASSWORD aquasec/trivy:0.69.0 image \
+            --severity CRITICAL --ignore-unfixed --exit-code "$EXIT_CODE" --no-progress "$ref"
+
   # ── Stitch the per-arch digests into one manifest list + apply tags ──
   merge:
     name: Merge manifest & push tags
     runs-on: ubuntu-latest
-    needs: [build]
+    needs: [build, scan]
     if: github.event_name != 'pull_request'
+    outputs:
+      digest: ${{ steps.digest.outputs.digest }}
+      version: ${{ steps.meta.outputs.version }}
 
     steps:
       - name: Download digests
@@ -204,3 +246,152 @@ jobs:
       - name: Inspect the published image
         run: |
           docker buildx imagetools inspect ${{ env.REGISTRY_GHCR }}/${{ env.IMAGE_NAME }}:${{ steps.meta.outputs.version }}
+
+      # Hosts pull by this digest, never by tag, so a re-pushed tag cannot change what runs.
+      - name: Read the manifest list digest
+        id: digest
+        env:
+          REF: ${{ env.REGISTRY_GHCR }}/${{ env.IMAGE_NAME }}:${{ steps.meta.outputs.version }}
+        run: |
+          digest=$(docker buildx imagetools inspect "$REF" --format '{{json .Manifest}}' | jq -r .digest)
+          [[ $digest =~ ^sha256:[a-f0-9]{64}$ ]] || { echo "::error::no digest for $REF"; exit 1; }
+          echo "digest=$digest" >> "$GITHUB_OUTPUT"
+          printf '### Image\n\n`%s@%s`\n' "${REF%:*}" "$digest" >> "$GITHUB_STEP_SUMMARY"
+
+  # ── Keyless signature; host agents verify it before `up` (task 069) ──
+  sign:
+    name: Sign with cosign
+    runs-on: ubuntu-latest
+    needs: [merge]
+    if: vars.IMAGE_SIGNING != 'false'
+    permissions:
+      contents: read
+      packages: write
+      id-token: write
+
+    steps:
+      - name: Install cosign
+        uses: sigstore/cosign-installer@v3
+
+      - name: Log in to GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY_GHCR }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Sign the manifest list
+        env:
+          IMAGE: ${{ env.REGISTRY_GHCR }}/${{ env.IMAGE_NAME }}@${{ needs.merge.outputs.digest }}
+        run: cosign sign --yes "$IMAGE"
+
+  # ── Same digest on DigitalOcean, so hosts can pull during a GitHub outage ──
+  mirror:
+    name: Mirror to DigitalOcean Container Registry
+    runs-on: ubuntu-latest
+    needs: [merge, sign]
+    if: always() && needs.merge.result == 'success' && startsWith(github.ref, 'refs/tags/v')
+    env:
+      DOCR_TOKEN: ${{ secrets.DOCR_TOKEN }}
+      SOURCE: ghcr.io/aliansoftwareteam/alianhub@${{ needs.merge.outputs.digest }}
+      TARGET: registry.digitalocean.com/${{ vars.DOCR_REGISTRY || 'alianhub' }}/alianhub
+      VERSION: ${{ needs.merge.outputs.version }}
+    outputs:
+      repository: ${{ steps.copy.outputs.repository }}
+
+    steps:
+      - name: Skip until the registry is set up
+        if: env.DOCR_TOKEN == ''
+        run: echo "::notice::DOCR_TOKEN is not set, so the DigitalOcean mirror is skipped (task 070 sets it up)."
+
+      - name: Install cosign
+        if: env.DOCR_TOKEN != ''
+        uses: sigstore/cosign-installer@v3
+
+      - name: Log in to DigitalOcean Container Registry
+        if: env.DOCR_TOKEN != ''
+        uses: docker/login-action@v3
+        with:
+          registry: registry.digitalocean.com
+          username: ${{ secrets.DOCR_TOKEN }}
+          password: ${{ secrets.DOCR_TOKEN }}
+
+      # cosign copy keeps the digest and brings the signatures along, so a
+      # host can verify the mirror's copy without reaching GHCR.
+      - name: Copy the image and its signatures
+        id: copy
+        if: env.DOCR_TOKEN != ''
+        run: |
+          cosign copy --force "$SOURCE" "$TARGET:$VERSION"
+          copied=$(docker buildx imagetools inspect "$TARGET:$VERSION" --format '{{json .Manifest}}' | jq -r .digest)
+          [[ $copied == "${SOURCE#*@}" ]] || { echo "::error::the mirror holds $copied, not ${SOURCE#*@}"; exit 1; }
+          echo "repository=$TARGET" >> "$GITHUB_OUTPUT"
+
+  # ── Digest in the release notes + index.json for the control plane ──
+  release-index:
+    name: Publish the digest and index.json
+    runs-on: ubuntu-latest
+    needs: [merge, sign, mirror]
+    if: always() && needs.merge.result == 'success' && startsWith(github.ref, 'refs/tags/v')
+    permissions:
+      contents: write
+    env:
+      GH_TOKEN: ${{ github.token }}
+      GH_REPO: ${{ github.repository }}
+      TAG: ${{ github.ref_name }}
+      VERSION: ${{ needs.merge.outputs.version }}
+      DIGEST: ${{ needs.merge.outputs.digest }}
+      REPOSITORY: ghcr.io/aliansoftwareteam/alianhub
+      MIRROR: ${{ needs.mirror.outputs.repository }}
+      SIGNED: ${{ needs.sign.result == 'success' }}
+      PRERELEASE: ${{ github.event.release.prerelease == true }}
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      # The newest earlier release that carries an index; it already lists every release before it.
+      - name: Fetch the previous index
+        run: |
+          mkdir -p "$RUNNER_TEMP/previous"
+          for tag in $(gh release list --exclude-drafts --limit 30 --json tagName --jq '.[].tagName'); do
+            [[ $tag == "$TAG" ]] && continue
+            if gh release download "$tag" --pattern index.json --dir "$RUNNER_TEMP/previous" 2>/dev/null; then
+              echo "previous index from $tag"
+              break
+            fi
+          done
+
+      - name: Build index.json
+        run: |
+          args=(--version "$VERSION" --tag "$TAG" --digest "$DIGEST" --repository "$REPOSITORY"
+                --published-at "$(gh release view "$TAG" --json publishedAt --jq .publishedAt)"
+                --previous "$RUNNER_TEMP/previous/index.json" --out "$RUNNER_TEMP/index.json")
+          if [[ -n $MIRROR ]]; then args+=(--mirror "$MIRROR"); fi
+          if [[ $SIGNED == true ]]; then args+=(--signed); fi
+          if [[ $PRERELEASE == true ]]; then args+=(--prerelease); fi
+          node scripts/release-index.js "${args[@]}"
+
+      - name: Attach index.json to the release
+        run: gh release upload "$TAG" "$RUNNER_TEMP/index.json" --clobber
+
+      - name: Add the digest to the release notes
+        run: |
+          notes="$RUNNER_TEMP/notes.md"
+          gh release view "$TAG" --json body --jq .body > "$notes"
+          if grep -q "$DIGEST" "$notes"; then exit 0; fi
+          {
+            printf '\n\n### Container image\n\n```\n%s:%s\n%s@%s\n```\n' "$REPOSITORY" "$VERSION" "$REPOSITORY" "$DIGEST"
+            if [[ -n $MIRROR ]]; then printf '\nMirror: `%s@%s`\n' "$MIRROR" "$DIGEST"; fi
+            if [[ $SIGNED == true ]]; then
+              printf '\nSigned with cosign (keyless):\n\n```\ncosign verify %s@%s \\\n  --certificate-oidc-issuer https://token.actions.githubusercontent.com \\\n  --certificate-identity-regexp %s\n```\n' \
+                "$REPOSITORY" "$DIGEST" "'^https://github.com/${GITHUB_REPOSITORY}/.github/workflows/docker.yml@refs/tags/v'"
+            fi
+          } >> "$notes"
+          gh release edit "$TAG" --notes-file "$notes"

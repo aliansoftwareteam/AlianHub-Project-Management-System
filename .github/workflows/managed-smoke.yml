@@ -1,0 +1,50 @@
+name: Managed smoke
+
+# Two tenant stacks from deploy/managed behind a local Traefik, proven isolated
+# (task 065 T6, deploy/managed/smoke/run.sh). It runs on demand, and on the
+# release pull request once the repository variable MANAGED_SMOKE is "true": it
+# needs the platform API (062) and S3 prefix storage (063) to be merged first.
+
+on:
+  workflow_dispatch:
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: managed-smoke-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  managed-smoke:
+    if: github.event_name == 'workflow_dispatch' || (startsWith(github.head_ref, 'release-please--') && vars.MANAGED_SMOKE == 'true')
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0   # the build number is derived from the history since the last release tag
+          persist-credentials: false
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Stamp the build version
+        run: node scripts/build-info.js --write
+
+      - name: Run the smoke test
+        env:
+          SMOKE_WORK: ${{ runner.temp }}/managed-smoke
+        run: deploy/managed/smoke/run.sh
+
+      - name: Keep the logs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: managed-smoke-logs
+          path: ${{ runner.temp }}/managed-smoke/logs
+          if-no-files-found: ignore
+          retention-days: 7
