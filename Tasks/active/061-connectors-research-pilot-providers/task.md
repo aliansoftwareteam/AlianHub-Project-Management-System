@@ -1,7 +1,7 @@
 ---
 id: 061
 title: Connectors research — confirm Google and Dropbox before the build
-status: backlog
+status: active
 priority: high
 depends_on: []
 created: 2026-10-28
@@ -25,9 +25,9 @@ Confirm, against current provider documentation, every Google and Dropbox fact t
 - The new connectors and Gmail CASA quotes (task 062)
 
 ## Acceptance criteria
-- [ ] Google and Dropbox have filled matrix rows: auth type, per-person support, least scopes, review needed, token life, limits, callback constraints, verdict
-- [ ] Every fact names the documentation page it came from and the date checked
-- [ ] Anything that contradicts the PRD is listed for the owner
+- [x] Google and Dropbox have filled matrix rows: auth type, per-person support, least scopes, review needed, token life, limits, callback constraints, verdict
+- [x] Every fact names the documentation page it came from and the date checked
+- [x] Anything that contradicts the PRD is listed for the owner
 
 ## Constraints & notes
 - Track: A — connections (getting and keeping a person's token)
