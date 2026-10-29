@@ -7,7 +7,9 @@ name: Docker
 # Triggers:
 #   • release.published   — when release-please cuts a tagged release,
 #                            push `vX.Y.Z`, `X.Y.Z`, `X.Y`, `X`, `latest`
-#   • workflow_dispatch   — manual trigger from the Actions UI
+#   • workflow_dispatch   — manual trigger from the Actions UI; a run on a
+#                            branch other than main pushes only
+#                            `<branch>-<short sha>` (e.g. chore-pre-staging-92e0486)
 #
 # Pushing to Docker Hub:
 #   To also push to hub.docker.com, add two repo secrets:
@@ -226,6 +228,7 @@ jobs:
             type=sha,prefix=main-,enable=${{ github.ref == 'refs/heads/main' }}
             # `latest` only for stable release tags (not pre-releases)
             type=raw,value=latest,enable=${{ github.event_name == 'release' && !github.event.release.prerelease }}
+            type=ref,event=branch,suffix=-{{sha}},enable=${{ github.event_name == 'workflow_dispatch' && github.ref != 'refs/heads/main' }}
 
       - name: Log in to GitHub Container Registry
         uses: docker/login-action@v3
