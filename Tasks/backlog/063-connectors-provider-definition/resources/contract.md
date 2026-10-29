@@ -1,6 +1,6 @@
 # Connectors — the two-track contract
 
-Task 063. Track A (connections) and track B (tools) both build against this file. **Draft until both sign section 8.** After that, a change needs both interns to agree, recorded in 063's `progress.md`.
+Task 063. Track A (connections) and track B (tools) both build against this file. Signed by both on 2026-10-29 (section 8). A change now needs both interns to agree, recorded in 063's `progress.md`.
 
 ## 1. Who owns which file
 
@@ -134,5 +134,5 @@ Indexes: unique (`companyId`, `userId`, `provider`, `account.id`); partial uniqu
 
 | Track | Name | Date |
 |---|---|---|
-| A — connections | Hetvi | |
-| B — tools | | |
+| A — connections | Hetvi | 2026-10-29 |
+| B — tools | Prinsa | 2026-10-29 |

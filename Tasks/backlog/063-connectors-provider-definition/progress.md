@@ -1,7 +1,7 @@
 # Progress: Connectors — the two-track contract, provider definition format, registry and the Google provider file
 
 ## Checklist
-- [ ] Contract day with B → `resources/contract.md` (draft written; needs B's review and both signatures)
+- [x] Contract day with B → `resources/contract.md` (signed by Hetvi and Prinsa, 2026-10-29)
 - [x] Definition shape and validation
 - [x] Registry + flag/app gate
 - [x] Google provider file
@@ -11,7 +11,7 @@
 Wrote the contract draft, `Modules/Connectors/validate.js`, `registry.js`, `providers/google/index.js`, the `resolveConnection.js` stub, a fake provider fixture and `tests/connector-registry.test.js`.
 
 ## Blockers
-- The contract is a draft until track B reviews it and both sign; 068 must not start before.
+None.
 
 ## Log
 
@@ -24,3 +24,4 @@ Wrote the contract draft, `Modules/Connectors/validate.js`, `registry.js`, `prov
 - The registry takes the workspace's company apps as a list (`companyApps`) instead of reading `connector_apps`, so it stays free of the database until 065.
 - `Modules/Agents/connectors/flag.js` now exports `named`, so the registry and the old flag read `CONNECTORS` the same way.
 - The Google file reuses `googleApi.accountOf` for the account id (`sub`) and label.
+- Contract signed by Hetvi (A) and Prinsa (B). The two open points in section 7 are still to be settled.
