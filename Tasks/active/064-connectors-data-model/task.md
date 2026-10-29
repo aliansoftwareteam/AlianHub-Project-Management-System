@@ -1,7 +1,7 @@
 ---
 id: 064
 title: Connectors — data model: evolve connector_connections, add connector_apps and connector_usage
-status: backlog
+status: active
 priority: high
 depends_on: [063]
 created: 2026-10-28
@@ -24,9 +24,9 @@ Store connections keyed by connection id with health, app source and handles, so
 - Data migrations of existing rows (073–076)
 
 ## Acceptance criteria
-- [ ] A second live connection for the same person and provider is refused by the index
-- [ ] A disconnected row does not block a new connection
-- [ ] Schemas declared; no hard-coded collection names
+- [x] A second live connection for the same person and provider is refused by the index
+- [x] A disconnected row does not block a new connection
+- [x] Schemas declared; no hard-coded collection names
 
 ## Constraints & notes
 - Track: A — connections (getting and keeping a person's token)

@@ -2148,8 +2148,13 @@ const schema = {
     },
     // One row per workspace and connector, or per person and connector when the connection is a person's own
     // (Modules/Agents/connectors). Tokens live in `secrets` by handle, never here.
+    // Rows from before the connector module (task 056) have `connector` and `secretHandles`; module rows have
+    // `provider`, `handles` and the rest of 063's contract section 6. 073 and 079 migrate the old rows.
     connectorConnections: {
-        connector: { type: String, required: true },
+        connector: { type: String, required: false },
+        companyId: { type: String, required: false },
+        provider: { type: String, required: false },
+        products: { type: [String], default: undefined, required: false },
         // The person a personal connection belongs to; absent on a workspace connection.
         userId: { type: String, required: false },
         // { bot_token: 'sec_…', signing_secret: 'sec_…' } or { refresh_token: 'sec_…', access_token: 'sec_…' }
@@ -2162,13 +2167,20 @@ const schema = {
         // [{ id, name, read, post }] the channels an owner or admin chose and what agents may do in each; a row
         // without the two ticks is from before reading existed and means post only
         allowedChannels: { type: Array, default: [], required: false },
-        // connected | broken, and for a person's connection also pending | revoked
+        // connected | broken, and for a person's connection also pending | reauth_required | revoked
         status: { type: String, default: 'connected', required: false },
         brokenReason: { type: String, required: false },
+        lastError: { type: String, required: false },
         brokenAt: { type: Date, required: false },
-        // What the provider granted, and { email, sub } of the account the person connected
+        // What the provider granted, and the account the person connected: { id, label } on module rows,
+        // { email, sub } on older ones
         scopes: { type: [String], default: undefined, required: false },
         account: { type: Object, required: false },
+        // { source: 'instance' | 'company', appId }: appId is the connector_apps id, null for the instance app
+        app: { type: Object, required: false },
+        // { access: 'sec_…', refresh: 'sec_…' } secrets store handles of a module row
+        handles: { type: Object, required: false },
+        backoffUntil: { type: Date, required: false },
         accessExpiresAt: { type: Date, required: false },
         connectedAt: { type: Date, required: false },
         lastUsedAt: { type: Date, required: false },
@@ -2183,6 +2195,29 @@ const schema = {
         createdBy: { type: String, required: false },
         updatedBy: { type: String, required: false },
         deletedStatusKey: { type: Number, default: 0, required: false },
+    },
+    // A workspace's own OAuth app for one provider; it wins over the instance's CONNECTOR_<ID>_* app (FR-5).
+    connectorApps: {
+        companyId: { type: String, required: true },
+        provider: { type: String, required: true },
+        clientId: { type: String, required: true },
+        secretHandle: { type: String, required: true },
+        // Browser-safe values a provider also needs, such as Google Picker's { apiKey, appId }
+        extra: { type: Object, required: false },
+        setBy: { type: String, required: true },
+        createdAt: { type: Date, required: true },
+        updatedAt: { type: Date, required: true },
+    },
+    // One document per connection, caller and day, incremented in place (FR-28, FR-29).
+    connectorUsage: {
+        companyId: { type: String, required: true },
+        connectionId: { type: String, required: true },
+        userId: { type: String, required: true },
+        // { type: 'agent' | 'mcp', id }
+        actor: { type: Object, required: true },
+        day: { type: String, required: true },
+        reads: { type: Number, default: 0, required: false },
+        writeProposals: { type: Number, default: 0, required: false },
     },
     // Instance-wide, in the global database: patterns the owner added to the instruction guard on top of
     // the built-in list (Modules/AICore/instructionPatterns.js).

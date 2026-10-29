@@ -408,6 +408,21 @@ const egressAllowlistsSchema = new Schema(schema.egressAllowlists, {strict: true
 const connectorConnectionsSchema = new Schema(schema.connectorConnections, {strict: true, timestamps: true});
 connectorConnectionsSchema.index({ connector: 1, deletedStatusKey: 1 });
 connectorConnectionsSchema.index({ userId: 1, connector: 1, deletedStatusKey: 1 });
+// Live module rows only: a disconnected row (deletedStatusKey 1) and an older row without `provider` never block
+// a new connection, and a pending row has no account id yet.
+connectorConnectionsSchema.index(
+    { companyId: 1, userId: 1, provider: 1, 'account.id': 1 },
+    { unique: true, name: 'one_live_per_account', partialFilterExpression: { provider: { $type: 'string' }, 'account.id': { $type: 'string' }, deletedStatusKey: { $eq: 0 } } },
+);
+connectorConnectionsSchema.index(
+    { companyId: 1, userId: 1, provider: 1 },
+    { unique: true, name: 'one_live_per_provider', partialFilterExpression: { provider: { $type: 'string' }, deletedStatusKey: { $eq: 0 } } },
+);
+const connectorAppsSchema = new Schema(schema.connectorApps, {strict: true, timestamps: false});
+connectorAppsSchema.index({ companyId: 1, provider: 1 }, { unique: true, name: 'one_per_provider' });
+const connectorUsageSchema = new Schema(schema.connectorUsage, {strict: true, timestamps: false});
+connectorUsageSchema.index({ connectionId: 1, 'actor.type': 1, 'actor.id': 1, day: 1 }, { unique: true, name: 'one_per_caller_day' });
+connectorUsageSchema.index({ companyId: 1, userId: 1, day: 1 });
 const instructionPatternsSchema = new Schema(schema.instructionPatterns, {strict: true, timestamps: false});
 const agentSessionsSchema = new Schema(schema.agentSessions, {strict: true, timestamps: false});
 agentSessionsSchema.index({ taskId: 1, createdAt: -1 });
@@ -631,6 +646,8 @@ module.exports = {
     auditChainKeySchema,
     egressAllowlistsSchema,
     connectorConnectionsSchema,
+    connectorAppsSchema,
+    connectorUsageSchema,
     instructionPatternsSchema,
     agentSessionsSchema,
     agentSessionEndpointsSchema,

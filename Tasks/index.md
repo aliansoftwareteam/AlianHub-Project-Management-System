@@ -69,7 +69,7 @@ Auto-maintained registry of all tasks. Reflects YAML frontmatter from each `task
 | 061 | Connectors research — confirm Google and Dropbox before the build | backlog | high | — | backlog/061-connectors-research-pilot-providers |
 | 062 | Connectors research — matrix and ranking for the new connectors and Gmail | backlog | medium | — | backlog/062-connectors-research-new-providers |
 | 063 | Connectors — the two-track contract, provider definition format, registry and the Google provider file | backlog | high | — | backlog/063-connectors-provider-definition |
-| 064 | Connectors — data model: evolve connector_connections, add connector_apps and connector_usage | backlog | high | 063 | backlog/064-connectors-data-model |
+| 064 | Connectors — data model: evolve connector_connections, add connector_apps and connector_usage | active | high | 063 | active/064-connectors-data-model |
 | 065 | Connectors — OAuth app lookup (instance default, company override) and the secrets-store guard | backlog | high | 063, 064 | backlog/065-connectors-oauth-apps-secrets-guard |
 | 066 | Connectors — generic connect, products, reconnect and disconnect handlers | backlog | high | 065 | backlog/066-connectors-connect-lifecycle |
 | 067 | Connectors — end a member's connections on removal, deactivation or SCIM, plus a daily sweep | backlog | high | 066 | backlog/067-connectors-member-removal-sweep |
