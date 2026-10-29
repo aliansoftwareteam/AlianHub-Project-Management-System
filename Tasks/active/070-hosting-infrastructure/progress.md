@@ -39,3 +39,14 @@ Q25 (prepay or limit request, 1–2 weeks lead time) is due at the start of M4, 
   - cloud-init on a Droplet;
   - Traefik reloading the pushed certificate;
   - a real Let's Encrypt order.
+
+### 2026-10-29
+- Wasabi: the owner's key passes `cloud:check` (storage and IAM in `ap-southeast-1`). The shared
+  backups bucket `alianhub-cloud-backups` was created (private, owner-only, tagged). Readable
+  bucket and IAM user names are in alianhub-cloud PR 1.
+- DNS: `alianhub.com` is served by QUIC.cloud (`jon.quicns.cloud`, `kevin.quicns.net`), not Route 53,
+  and its name servers cannot move. QUIC.cloud's API was tried live: it lists zones and records,
+  creates, updates in place and deletes them. `DNS_PROVIDER=quiccloud` is built (alianhub-cloud PR 2),
+  and `cloud:check` passes against the real zone (17 records). The certificate flow was only dry-run;
+  it needs `ACME_EMAIL` before a staging certificate is issued.
+

@@ -438,7 +438,9 @@ suspension) is already exercised by `cloudctl` and the back office.
 6. **One Wasabi bucket and one IAM user per installation** *(owner, 2026-10-28; replaces the
    prefix-per-instance plan)*. Created at provisioning, deleted with the instance; the default of
    1,000 buckets per Wasabi account needs a raise before ~800 instances.
-7. **DNS on AWS Route 53, no proxy in front** *(owner, 2026-10-28; replaces Cloudflare)*. The
+7. **DNS on QUIC.cloud through its API** *(owner, 2026-10-29; replaces the Route 53 plan of
+   2026-10-28, itself replacing Cloudflare)*: `alianhub.com`'s name servers stay QUIC.cloud's. Earlier
+   text: **DNS on AWS Route 53, no proxy in front**. The
    `alianhub.com` hosted zone gets one `A` record per tenant pointing at its host. TLS is one
    Let's Encrypt wildcard `*.alianhub.com` certificate issued by the control plane over a Route 53
    DNS-01 challenge and pushed to every host by the agent (hosts never hold AWS keys, and one

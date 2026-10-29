@@ -42,6 +42,16 @@ the image stays on GitHub's registry with a DigitalOcean registry mirror.** The 
 - Hosts can also be **registered by hand** (`cloudctl host add --manual`): the agent runs on any
   Docker machine, including the developer PC, so the cloud mode is testable without DigitalOcean.
 
+- **2026-10-29 update (owner): DNS stays on QUIC.cloud, not Route 53.** `alianhub.com`'s name
+  servers are QUIC.cloud's and cannot move, and customer addresses must stay `<sub>.alianhub.com`.
+  The control plane therefore writes each tenant's `A` record and the `_acme-challenge` TXT records
+  through QUIC.cloud's API (`https://api.quic.cloud/v2`; create, update in place and delete were
+  tried against the real zone). Route 53 remains a supported option.
+- **2026-10-29 update (owner): Wasabi names.** Each installation's bucket and IAM user are
+  `alianhub-cloud-<subdomain>-<6 characters of the instance id>`, tagged with instance, subdomain,
+  account, plan and env. Backups go in the shared `alianhub-cloud-backups` bucket (created in
+  `ap-southeast-1`) under one folder per installation, named like its bucket.
+
 ## Where we start
 
 - Nothing is provisioned. The owner chose DigitalOcean (Q5).
