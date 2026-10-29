@@ -24,4 +24,5 @@ None.
 - The registry takes the workspace's company apps as a list (`companyApps`) instead of reading `connector_apps`, so it stays free of the database until 065.
 - `Modules/Agents/connectors/flag.js` now exports `named`, so the registry and the old flag read `CONNECTORS` the same way.
 - The Google file reuses `googleApi.accountOf` for the account id (`sub`) and label.
-- Contract signed by Hetvi (A) and Prinsa (B). The two open points in section 7 are still to be settled.
+- Contract signed by Hetvi (A) and Prinsa (B).
+- Contract change after signing, agreed by Prinsa on 2026-10-29: section 5 adds `getAccessToken` throwing `broken`, `markBackoff` as B's one write to `connector_connections`, and the `ConnectorError` fields; section 2 lists every check the code makes and says screens show the provider name through i18n; section 6 sets `app.appId` to `null` for the instance app; section 7 turns the two open points into decisions: `connector_usage` is its own collection, and `google_calendar` is renamed to `google` in 073.
