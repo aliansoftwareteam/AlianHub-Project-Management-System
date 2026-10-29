@@ -85,9 +85,12 @@ RUN npm ci --omit=dev --no-audit --no-fund \
 FROM node:20.20.2-alpine3.23@sha256:fb4cd12c85ee03686f6af5362a0b0d56d50c58a04632e6c0fb8363f609372293 AS production
 
 # tini forwards SIGTERM/SIGINT so Node shuts down gracefully. Yarn is unused and
-# only adds packages to scan; npm stays for `npm run migrate` in the container.
+# only adds packages to scan; npm stays for `npm run migrate` in the container,
+# upgraded because the npm bundled with Node 20 ships a tar with a critical CVE.
 RUN apk add --no-cache tini \
- && rm -rf /opt/yarn-v* /usr/local/bin/yarn /usr/local/bin/yarnpkg
+ && rm -rf /opt/yarn-v* /usr/local/bin/yarn /usr/local/bin/yarnpkg \
+ && npm install -g npm@10.9.9 --no-audit --no-fund \
+ && npm cache clean --force
 
 WORKDIR /app
 
