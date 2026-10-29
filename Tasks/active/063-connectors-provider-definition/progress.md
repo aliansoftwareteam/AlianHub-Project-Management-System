@@ -8,7 +8,7 @@
 - [x] Tests
 
 ## Last step
-Wrote the contract draft, `Modules/Connectors/validate.js`, `registry.js`, `providers/google/index.js`, the `resolveConnection.js` stub, a fake provider fixture and `tests/connector-registry.test.js`.
+Wrote `Modules/Connectors/validate.js`, `registry.js`, `providers/google/index.js`, the `resolveConnection.js` stub, a fake provider fixture and `tests/connector-registry.test.js`; the contract is signed by both tracks and its open points are settled. Waits for the PR to merge.
 
 ## Blockers
 None.
