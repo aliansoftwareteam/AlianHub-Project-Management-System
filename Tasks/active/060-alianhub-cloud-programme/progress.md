@@ -51,3 +51,15 @@ M2 (infrastructure) needs the DigitalOcean, Cloudflare, Wasabi and Resend accoun
 - M3: new local repository `F:/Projects/alianhub-cloud` — foundation, portal (067) and back office
   (072) merged into `main`; lint, 320 tests and the build pass. Until M5 plans come from invite
   codes or staff-approved plan requests.
+- M2 (owner, evening): "complete the M2 overnight". The keys are placeholders until the owner adds
+  them. DNS moves to AWS Route 53 and files to a Wasabi bucket per installation (architecture §15
+  and §18 updated). 069, 070 and 071 moved to active and built in `alianhub-cloud`:
+  - provider adapters, host agent, cloud mode, placement, `cloudctl`;
+  - backup, restore and upgrade workflows, fleet loops;
+  - `deploy/managed/backup.sh` and `restore.sh` in this repository.
+  Cloud mode ran end to end on this PC with a host registered by hand. What is left is in each
+  task's progress.
+
+### 2026-10-29
+- `alianhub-cloud` (portal, back office, M2) is pushed to a new private repository,
+  `aliansoftwareteam/alianhub-cloud`, with `main` and the feature branches.

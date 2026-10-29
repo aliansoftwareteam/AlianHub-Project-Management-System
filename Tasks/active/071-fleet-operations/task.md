@@ -1,7 +1,7 @@
 ---
 id: 071
 title: Fleet operations — staged upgrades, nightly backups, restore, monitoring and on-call
-status: backlog
+status: active
 priority: high
 depends_on: [060, 065, 069, 070]
 created: 2026-10-27
@@ -18,6 +18,33 @@ AlianHub release reaches all customers in safe waves that stop and roll back on 
 database is backed up nightly to storage a compromised server cannot erase; a lost host or a
 customer's "we deleted everything" is a rehearsed, timed runbook; and the right person is woken up
 only for things a customer would notice.
+
+## Decisions on 2026-10-28 (owner)
+
+- **DNS is AWS Route 53**, not Cloudflare: the `alianhub.com` hosted zone gets one `A` record per
+  tenant (`<sub>` → host IP, TTL 60) through the Route 53 API. No proxy sits in front, so TLS is a
+  Let's Encrypt wildcard `*.alianhub.com` issued by the control plane over a Route 53 DNS-01 challenge
+  and pushed to every host by the agent (`edge.tls`); a DigitalOcean Cloud Firewall leaves only
+  80/443 open to the world.
+- **Files: one Wasabi bucket per installation**, with its own Wasabi IAM user, inline policy and
+  access key, created at provisioning and pushed to the instance; all four are removed on delete.
+  Backups go to a separate Wasabi backups bucket through presigned PUT URLs.
+- **DigitalOcean, Route 53 and Wasabi keys are placeholders** in the control plane's `.env` until the
+  owner adds them (the accounts are tied to payment). Every adapter has a fake; `CLOUD_DRY_RUN=true`
+  logs each provider call instead of making it; `npm run cloud:check` proves each key with read-only
+  calls; the agent path is proven end to end on a local host before any key exists.
+- Hosts can also be **registered by hand** (`cloudctl host add --manual`): the agent runs on any
+  Docker machine, including the developer PC, so the cloud mode is testable without DigitalOcean.
+
+- **2026-10-29 update (owner): DNS stays on QUIC.cloud, not Route 53.** `alianhub.com`'s name
+  servers are QUIC.cloud's and cannot move, and customer addresses must stay `<sub>.alianhub.com`.
+  The control plane therefore writes each tenant's `A` record and the `_acme-challenge` TXT records
+  through QUIC.cloud's API (`https://api.quic.cloud/v2`; create, update in place and delete were
+  tried against the real zone). Route 53 remains a supported option.
+- **2026-10-29 update (owner): Wasabi names.** Each installation's bucket and IAM user are
+  `alianhub-cloud-<subdomain>-<6 characters of the instance id>`, tagged with instance, subdomain,
+  account, plan and env. Backups go in the shared `alianhub-cloud-backups` bucket (created in
+  `ap-southeast-1`) under one folder per installation, named like its bucket.
 
 ## Where we start
 
@@ -52,6 +79,9 @@ only for things a customer would notice.
 - Security releases can skip soak times with a two-person approval in the back office.
 
 ### T2 — Nightly backups
+
+> 2026-10-28: the backups bucket is on Wasabi (owner's choice of S3), still written only through
+> presigned PUT URLs. Client-side encryption follows in M4; M2 relies on the bucket's privacy.
 
 - Database: the host's backup runner (part of the host agent's `stack.backup`) runs
   `mongodump --archive --gzip` against each tenant's Mongo container over its internal network,

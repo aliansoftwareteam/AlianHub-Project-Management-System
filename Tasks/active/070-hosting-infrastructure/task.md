@@ -1,7 +1,7 @@
 ---
 id: 070
 title: Hosting infrastructure on DigitalOcean — account, hosts, network, edge, TLS, registry, storage, mail
-status: backlog
+status: active
 priority: high
 depends_on: [060, 065]
 created: 2026-10-27
@@ -24,6 +24,33 @@ This answers the owner's question "which DigitalOcean API, and do we push our Do
 short: **DigitalOcean API v2 for servers only; tenants on a shared host need no DigitalOcean call;
 the image stays on GitHub's registry with a DigitalOcean registry mirror.** The evidence is in
 [digitalocean.md](../../active/060-alianhub-cloud-programme/resources/digitalocean.md).
+
+## Decisions on 2026-10-28 (owner)
+
+- **DNS is AWS Route 53**, not Cloudflare: the `alianhub.com` hosted zone gets one `A` record per
+  tenant (`<sub>` → host IP, TTL 60) through the Route 53 API. No proxy sits in front, so TLS is a
+  Let's Encrypt wildcard `*.alianhub.com` issued by the control plane over a Route 53 DNS-01 challenge
+  and pushed to every host by the agent (`edge.tls`); a DigitalOcean Cloud Firewall leaves only
+  80/443 open to the world.
+- **Files: one Wasabi bucket per installation**, with its own Wasabi IAM user, inline policy and
+  access key, created at provisioning and pushed to the instance; all four are removed on delete.
+  Backups go to a separate Wasabi backups bucket through presigned PUT URLs.
+- **DigitalOcean, Route 53 and Wasabi keys are placeholders** in the control plane's `.env` until the
+  owner adds them (the accounts are tied to payment). Every adapter has a fake; `CLOUD_DRY_RUN=true`
+  logs each provider call instead of making it; `npm run cloud:check` proves each key with read-only
+  calls; the agent path is proven end to end on a local host before any key exists.
+- Hosts can also be **registered by hand** (`cloudctl host add --manual`): the agent runs on any
+  Docker machine, including the developer PC, so the cloud mode is testable without DigitalOcean.
+
+- **2026-10-29 update (owner): DNS stays on QUIC.cloud, not Route 53.** `alianhub.com`'s name
+  servers are QUIC.cloud's and cannot move, and customer addresses must stay `<sub>.alianhub.com`.
+  The control plane therefore writes each tenant's `A` record and the `_acme-challenge` TXT records
+  through QUIC.cloud's API (`https://api.quic.cloud/v2`; create, update in place and delete were
+  tried against the real zone). Route 53 remains a supported option.
+- **2026-10-29 update (owner): Wasabi names.** Each installation's bucket and IAM user are
+  `alianhub-cloud-<subdomain>-<6 characters of the instance id>`, tagged with instance, subdomain,
+  account, plan and env. Backups go in the shared `alianhub-cloud-backups` bucket (created in
+  `ap-southeast-1`) under one folder per installation, named like its bucket.
 
 ## Where we start
 
@@ -129,6 +156,9 @@ Host classes *(placeholder until the M2 measurements)*:
 
 ### T5 — Edge and TLS
 
+> Superseded on 2026-10-28: Route 53 + a control-plane wildcard certificate (see Decisions). The
+> Cloudflare text below is kept for the record.
+
 - DNS stays on **Cloudflare**: one proxied `A` record per tenant (`acme` → host IP) created by the
   orchestrator (069) through the Cloudflare API with a zone-scoped token; TTL auto.
 - Zone plan: **Cloudflare Pro** before the beta (3,500 records; WAF rules; ~$25/month). If the
@@ -165,6 +195,9 @@ Host classes *(placeholder until the M2 measurements)*:
 - Order: start M2 on GHCR only; add the mirror in M4.
 
 ### T7 — Object storage
+
+> Superseded on 2026-10-28: one Wasabi bucket and IAM user per installation, backups in a Wasabi
+> backups bucket (see Decisions).
 
 - **Tenant files: Wasabi** (Q26), one bucket per region (`alianhub-cloud-tenants-<region>`), a
   prefix per instance and **one IAM user + policy per instance** limited to its prefix
