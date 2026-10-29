@@ -1,8 +1,8 @@
 # Connectors research matrix
 
-Phase 0 of task 056. The Google and Dropbox rows come from task 061. Each fact cites a source from the list at the end as `[S#]`. All sources were checked on **2026-10-28** and re-checked on **2026-10-29** in review. Secondary sources are marked.
+Phase 0 of task 056. Sections 1–4 cover Google and Dropbox (task 061); each fact there cites a source from section 4 as `[S#]`. Sections 5–8 cover the new connectors, their Phase 3 ranking and Gmail (task 062), with sources per provider in section 8 and `*` marking a fact no official page confirms. Slack and GitHub are researched in tasks 074 and 075. All sources were checked on **2026-10-28** and re-checked on **2026-10-29** in review. Secondary sources are marked.
 
-## 1. Matrix
+## 1. Pilot matrix: Google and Dropbox
 
 | | Google — Calendar | Google — Meet | Google — Drive (`drive.file`) | Dropbox (attachment picker) |
 |---|---|---|---|---|
@@ -63,3 +63,66 @@ Phase 0 of task 056. The Google and Dropbox rows come from task 061. Each fact c
 | S20 | [Drive API — Usage limits](https://developers.google.com/workspace/drive/api/guides/limits) |
 | S21 | [Dropbox — Error handling guide](https://developers.dropbox.com/error-handling-guide) |
 | S22 | [Google Cloud Help — OAuth app verification FAQ](https://support.google.com/cloud/answer/13463817) (checked 2026-10-29) |
+
+## 5. Phase 3 matrix: new connectors, ranked easiest first
+
+Researched 2026-10-28 from provider docs, re-checked 2026-10-29 in review.
+
+| Rank | Connector | Auth | Per-person | API reach and least scopes | App review | Token life | Limits | Callback constraints | Verdict |
+|---|---|---|---|---|---|---|---|---|---|
+| 1 | ClickUp | OAuth 2.0 code grant (personal `pk_` token as fallback) | Yes; user ticks the workspaces at consent | Read and write: tasks, lists, comments, time, docs. No scopes: token has the user's full access | None, no install cap | Access token does not expire; no refresh token | 100/min per token (Business Plus 1,000, Enterprise 10,000) | Redirect URLs registered per app; non-SSL may be dropped | **Build first.** Standard OAuth, no review, maps onto PM objects. Guard writes because there are no scopes |
+| 2 | Outlook (Microsoft Graph) | OAuth 2.0, multi-tenant Entra app, delegated scopes | Yes, including personal Outlook.com. Tenant admin consent needed where user consent is off or limited to verified publishers | Read and write mail and calendar. Least: `Mail.Read`, `Calendars.ReadWrite`, `offline_access`, `User.Read` | None. Publisher verification (free, needs a Microsoft partner account) so locked-down tenants can consent | Access 60–90 min; refresh 90 days sliding (24 h if registered as SPA) | 10,000 per 10 min per app per mailbox (~1,000/min), 4 concurrent | https only, http for localhost; no wildcards with personal accounts; max 100 URIs | **Build.** No review, high limits, strong demand. Start publisher verification in parallel |
+| 3 | Notion | OAuth 2.0 public connection | Yes; user picks the pages to share | Read and write pages, databases, comments. Least privilege via capabilities plus the page picker | The authorization URL appears only after the public connection is submitted for review; whether approval is also needed is not stated. Marketplace listing review 5–10 business days* | Refresh token rotates on each refresh; access lifetime not stated | 180/min per connection (600 on Business/Enterprise), plus a workspace-wide budget | Redirect URIs registered in portal; https rules not stated*. Notion MCP supports dynamic client registration for self-hosted | **Build.** Best least-privilege model. Submit for review early, since the authorization URL depends on it |
+| 4 | Figma | OAuth 2.0 (personal access token as fallback) | Yes; never more than the user can reach | Read files, comments, versions, components. Write only comments (variables on Enterprise). Least: `current_user:read`, `file_content:read`, `file_metadata:read`, `file_comments:read`, `file_comments:write` (`files:read` is deprecated) | Private apps: none (own team/org only). Public: review; no official timeline, reported weeks to a month* | Access 90 days; refresh reusable; one access token per app per user | Per user and seat. Dev/Full seats: Tier 1 10 / 15 / 20 per min on Starter / Pro / Org. View/Collab seats: Tier 1 a few calls per month*, Tier 2 5/min, Tier 3 10/min | Redirect URLs registered per app; https/localhost rules not stated* | **Middle.** Small build but read-mostly, seat-gated limits and long public review |
+| 5 | Supabase | OAuth 2.0 with PKCE, Management API | Yes; any Supabase user, optional org preselect | Projects, Database, Storage etc., read or write per area. Least: Projects:read, Organizations:read, Database:read. Database:write runs arbitrary SQL | None documented* | Access plus refresh; lifetimes not documented* | 120/min per user per endpoint; a few endpoints 10–30/min | Exact redirect match; `state` up to 4 kB; other rules not documented* | **Later.** Easy build, niche audience, all-or-nothing database write needs guardrails |
+| 6 | Canva | OAuth 2.0 with PKCE (`S256`) | Yes, user-level tokens. Private integrations only for Canva Enterprise teams | Read and write designs, assets, folders, comments. Least: `design:meta:read`, `design:content:read`, `design:content:write`, `profile:read` | Public integration needs Canva review (timeline undocumented); developer account needs MFA*; no preview APIs | Access token lasts "a short period" (4 h reported*); refresh single-use, rotates | List 100/min*, create and export 20/min per user*; app-wide 5,000 exports/day* (third-party pages disagree) | Canva's example redirect is `http://127.0.0.1`; that `localhost` is refused and the entry must be removed before review is unconfirmed* | **Later.** Small code, but gated by review and an app-wide export cap |
+| 7 | HubSpot | OAuth 2.0 | Partly: token is portal-level and reflects app scopes, not the user; installer must be a Super Admin | Read and write CRM objects. Least: `crm.objects.<object>.read`/`.write` per object needed | Unlisted apps capped at 25 installs (since 2025-09-22); above that, Marketplace listing and review (no official timeline; AI connectors have extra requirements) | Access 30 min; refresh token does not expire until uninstall* | 110 per 10 s per account (~660/min); search has its own stricter limit | https redirect required in production | **Later.** Good API, but not per-person, needs an admin and review past 25 installs |
+| 8 | Upwork | OAuth 2.0, GraphQL API, key by application | Yes, after the key is approved; tenant header picks the organization | Read and write jobs, proposals, contracts, messages; permissions chosen on the key | Manual key approval, up to ~2 weeks*; commercial use may be barred*; responses may not be cached over 24 h | Unclear, possibly 24 h access plus refresh* | 10/s per IP (~600/min, shared across tenants on one IP); 40,000/day* | One callback fixed per key | **Later, possibly drop.** Ask Upwork whether a multi-tenant SaaS is allowed before any build |
+| 9 | Shopify | OAuth 2.0 code grant | No: access is per store; owner or staff with the permissions installs | Read and write products, orders, inventory, customers. Least: `read_products`, `write_products`, `read_orders`, `read_inventory`; customer data needs Protected Customer Data approval* | App Store review: up to 14 business days*, reported 3–6 weeks; registration fee*; mandatory compliance webhooks*. Custom distribution is single-store only | Expiring offline: access 1 h, refresh 90 days, rotating (the old refresh token works up to 30 days or until the new one is used). Non-expiring offline tokens are already blocked for new public apps; existing public apps must switch by 2027-01-01. Online: 24 h, no refresh* | GraphQL cost buckets per second: 100 Standard, 200 Advanced, 1,000 Plus, 2,000 Enterprise | Exact redirect match; `shop` must match `*.myshopify.com` | **Last.** Store-level not per-person, heaviest review and compliance load |
+| – | Wispr Flow | No public API for user data. Developer API is speech-to-text only; remote MCP server for any MCP client after the user signs in | MCP is per user | MCP is read-only: meeting notes, scratchpad, calendar. No dictation history, no export | Not applicable | Unknown | Unknown | Unknown | **Drop.** No supported way to read a user's dictations. Revisit only if AlianHub gets a generic remote-MCP connector |
+
+## 6. Self-hosted callbacks for the Phase 3 connectors
+
+Section 2 covers who gets reviewed. In addition, every provider in section 5 fixes redirect URIs per registered app. A self-hosted instance therefore either registers its own app per provider (credentials in `.env`, the company override), or relies on a callback relay run by the Alian-hosted instance. This is an owner decision that affects every Phase 3 task.
+
+## 7. Gmail on the Alian-hosted instance
+
+Gmail read scopes (`gmail.readonly`, `gmail.modify`, `gmail.metadata`) are restricted. A public app using them needs:
+
+1. OAuth consent screen brand verification: verified domain, homepage, privacy policy, scope justification and a demo video.
+2. Restricted scope verification by Google (estimated 6 weeks [S22]).
+3. A CASA security assessment by an authorized lab at the assurance level Google assigns (AL1 or AL2; AL2 is the lab-tested level that replaced Tier 2), repeated every 12 months from the Letter of Assessment date.
+
+A company's own Internal Google app on its Workspace domain skips this, which is why the supported production path is the company override.
+
+Authorized labs, per the App Defense Alliance page as read on 2026-10-29: Bishop Fox, DEKRA, NetSentries Technologies and TAC Security clearly offer CASA. Leviathan Security sells CASA on its own site. NCC Group, Prescient Security and ValueMentor are listed, but their entries don't name CASA. Confirm CASA authorization with each lab before engaging it.
+
+### CASA prices
+
+These are published prices, read 2026-10-28. No lab has been contacted, and none of these is a written quote.
+
+| Lab | Option | Level | Price | Includes | Source |
+|---|---|---|---|---|---|
+| TAC Security | Basic | Not stated* | $540 per application | One assessment, two revalidation cycles, letter of validation in 1–3 weeks; whether it renews yearly at this price is unconfirmed* | [casa.tacsecurity.com](https://casa.tacsecurity.com/site/home) |
+| TAC Security | Premium | Not stated* | $720–$855 (pages differ)* | Unlimited revalidation | [tacsecurity.com CASA](https://tacsecurity.com/google-casa-cloud-application-security-assessment/) |
+| TAC Security | Enterprise | Not stated* | $3,600 | Unlimited revalidation | same |
+| Leviathan Security | No Rush | AL1 | $3,000 | Start within 30 days, one retest | [leviathansecurity.com CASA](https://leviathansecurity.com/programs/google-casa-cloud-application-security-assessment) |
+| Leviathan Security | Standard | AL1 | $4,500 | Start within 10 days, one retest | same |
+| Leviathan Security | Priority | AL1 | $6,000 | Start within 2 days, one retest | same |
+| Leviathan Security | – | AL2 | Quote only | Contact form | same |
+
+The TAC pages refused automated access on 2026-10-29, so their prices could not be re-checked. Published prices run from about $540 (TAC, level unstated) to $6,000 (Leviathan, AL1) a year. No AL2 price is published. Because Gmail's restricted scopes may be assigned AL2, the PRD's $500–$6,000 range is unproven until a lab quotes in writing. Developer time to fix what the scan finds comes on top. Premium firms quote far more (forum reports of $15,000–$40,000*).
+
+## 8. Sources for sections 5–7 (read 2026-10-28, re-checked 2026-10-29)
+
+- ClickUp: [authentication](https://developer.clickup.com/docs/authentication), [rate limits](https://developer.clickup.com/docs/rate-limits)
+- Outlook: [Graph permissions](https://learn.microsoft.com/en-us/graph/permissions-reference), [user consent](https://learn.microsoft.com/en-us/entra/identity/enterprise-apps/configure-user-consent), [publisher verification](https://learn.microsoft.com/en-us/entra/identity-platform/publisher-verification-overview), [refresh tokens](https://learn.microsoft.com/en-us/entra/identity-platform/refresh-tokens), [throttling](https://learn.microsoft.com/en-us/graph/throttling-limits), [redirect URIs](https://learn.microsoft.com/en-us/entra/identity-platform/reply-url)
+- Notion: [authorization](https://developers.notion.com/guides/get-started/authorization), [capabilities](https://developers.notion.com/reference/capabilities), [request limits](https://developers.notion.com/reference/request-limits), [public connections](https://developers.notion.com/guides/get-started/public-integrations)
+- Figma: [OAuth apps](https://developers.figma.com/docs/rest-api/oauth-apps/), [scopes](https://developers.figma.com/docs/rest-api/scopes/), [rate limits](https://developers.figma.com/docs/rest-api/rate-limits/), [platform updates](https://developers.figma.com/docs/updates-to-figmas-developer-platform)
+- Supabase: [OAuth integration](https://supabase.com/docs/guides/integrations/build-a-supabase-oauth-integration), [Management API](https://supabase.com/docs/reference/api/introduction)
+- Canva: [authentication](https://www.canva.dev/docs/apps/rest-apis/authentication.md), [scopes](https://www.canva.dev/docs/apps/rest-apis/scopes.md), [creating integrations](https://www.canva.dev/docs/connect/creating-integrations/)
+- HubSpot: [usage limits](https://developers.hubspot.com/docs/api/usage-details), [OAuth quickstart](https://developers.hubspot.com/docs/api/oauth-quickstart-guide), [install limits](https://developers.hubspot.com/changelog/new-marketplace-distribution-app-install-limits)
+- Upwork: [request an API key](https://support.upwork.com/hc/en-us/articles/115015857647-Request-an-API-Key), [request limits](https://support.upwork.com/hc/en-us/articles/115015933428-What-are-the-API-requests-limits)
+- Shopify: [auth code grant](https://shopify.dev/docs/apps/build/authentication-authorization/get-access-tokens/auth-code-grant/implement-auth-code-grants-manually), [offline tokens](https://shopify.dev/docs/apps/build/authentication-authorization/access-token-types/offline-access-tokens), [distribution](https://shopify.dev/docs/apps/launch/distribution), [rate limits](https://shopify.dev/docs/apps/build/apis/graphql-admin/rate-limits), [App Store review](https://shopify.dev/docs/apps/launch/app-store-review/review-process)
+- Wispr Flow: [developer API](https://api-docs.wisprflow.ai/quickstart), [remote MCP](https://docs.wisprflow.ai/articles/9551372685-connect-an-mcp-client-to-wispr-flow-remote-mcp-server)
+- Gmail and CASA: [restricted scope verification](https://developers.google.com/identity/protocols/oauth2/production-readiness/restricted-scope-verification), [CASA tiering](https://appdefensealliance.dev/casa/casa-tiering), [ADA authorized labs](https://www.appdefensealliance.org/certification/authorized-labs)
