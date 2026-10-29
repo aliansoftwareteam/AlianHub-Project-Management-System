@@ -21,10 +21,10 @@
 - [x] T18 — Account deletion and data rights
 
 ## Last step
-Built in the local repository `F:/Projects/alianhub-cloud` (`main`, no remote yet): foundation, sign-up and sign-in, then the portal on `feat/portal`, merged into `main` with the back office (072). Lint, 320 tests and the build pass.
+Built in `alianhub-cloud` (`main`; private on GitHub at aliansoftwareteam/alianhub-cloud since 2026-10-29): foundation, sign-up and sign-in, then the portal on `feat/portal`, merged into `main` with the back office (072). Lint, 320 tests and the build pass.
 
 ## Blockers
-T5 checkout waits for the payment gateway (068, M5). Not run: Playwright end to end, the container image, real Turnstile and Google widgets. The repository needs a GitHub home before anyone else can review it.
+T5 checkout waits for the payment gateway (068, M5). Not run: Playwright end to end, the container image, real Turnstile and Google widgets.
 
 ## Log
 
@@ -36,3 +36,7 @@ T5 checkout waits for the payment gateway (068, M5). Not run: Playwright end to 
 - Owner's order applied: no payment step until M5. A buyer either redeems an invite code (`grantPlan` provisions at once) or sends a plan request that staff approve in the back office; the requested address is held 14 days while pending.
 - Portal T3–T18 built on `feat/portal` (decisions 38–63 in the repo's `docs/decisions.md`); walked through sign-up → setup over SSE → dashboard in a browser in simulate mode, light and dark, desktop and phone width.
 - Node 20 left support in April 2026; move the repository to Node 22 or 24 before M4.
+
+### 2026-10-29
+- The repository is now private on GitHub, `aliansoftwareteam/alianhub-cloud`, with `main` and every
+  feature branch pushed.

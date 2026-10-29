@@ -59,3 +59,7 @@ M2 (infrastructure) needs the DigitalOcean, Cloudflare, Wasabi and Resend accoun
   - `deploy/managed/backup.sh` and `restore.sh` in this repository.
   Cloud mode ran end to end on this PC with a host registered by hand. What is left is in each
   task's progress.
+
+### 2026-10-29
+- `alianhub-cloud` (portal, back office, M2) is pushed to a new private repository,
+  `aliansoftwareteam/alianhub-cloud`, with `main` and the feature branches.
