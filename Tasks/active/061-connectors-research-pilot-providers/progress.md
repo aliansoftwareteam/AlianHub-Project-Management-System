@@ -20,3 +20,6 @@ Wrote `backlog/056-personal-app-connectors/resources/research-matrix.md`: Google
 - Assigned to track A in the two-track split; depends only on its own track and the 063 contract.
 - Moved to active. Every fact in the matrix cites its page, checked 2026-10-28; secondary sources are marked.
 - Main findings for the owner: Meet scopes are sensitive and recordings need restricted scopes; the Dropbox picker today is the Chooser, with no token to revoke; the company app form needs the Picker's API key and project number.
+
+### 2026-10-29
+- Review re-checked every source. Corrected: sensitive-scope verification takes up to 10 days, not 3–5 (new source S22); recordings name only `drive.readonly`; the yearly assessment applies when restricted data is stored or sent server-side; Dropbox scopes and `include_granted_scopes=user` cite the official S17; Dropbox access types; Gmail password-change case and Calendar daily billing threshold added. Still unconfirmed: Dropbox's 4 h access-token life (secondary only).
