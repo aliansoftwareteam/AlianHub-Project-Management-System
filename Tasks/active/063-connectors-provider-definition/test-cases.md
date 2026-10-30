@@ -1,6 +1,6 @@
 # 063 test cases: provider definition, registry, Google provider
 
-Run 2026-10-30 on `feat/connectors-provider-registry` after the review fixes (section H). 45 of 46 cases pass; B-01 is not run.
+Run 2026-10-30 on `feat/connectors-provider-registry` after the review fixes (section H). All 46 cases pass. B-01 ran later the same day on a local MongoDB 8.0.4.
 
 Two kinds of case:
 - **Auto**: covered by Jest. Run `node node_modules/jest/bin/jest.js --selectProjects unit --runTestsByPath tests/connector-registry.test.js --no-watchman`. Through `npx jest` on Windows the run can hang on watchman.
@@ -104,7 +104,7 @@ Command: `node -e "require('./Modules/Connectors/resolveConnection').resolveConn
 
 | ID | Case | Steps | Expected | Result |
 |---|---|---|---|---|
-| B-01 | Server starts with `CONNECTORS=google` | Set `CONNECTORS=google` in `.env`, `npm run nodemon`, read the log | No crash. `CONNECTORS names google, which this server does not have` is expected until 073 (contract, open point 2) | not run: the test machine could not reach MongoDB |
+| B-01 | Server starts with `CONNECTORS=google` | Set `CONNECTORS=google` in `.env`, `npm run nodemon`, read the log | No crash. `CONNECTORS names google, which this server does not have` is expected until 073 (contract, open point 2) | pass: booted with `CONNECTORS=google` on a local MongoDB, Mongo connected, no crash, no `provider google skipped` line. The one connector line is the expected `CONNECTORS names google, which this server does not have; known connectors: slack, google_calendar` |
 | B-02 | Contract file present | Open `resources/contract.md` | Signed by both tracks; covers definition shape, the three collections and `resolveConnection` | pass |
 
 ## H. Review fixes made during this testing

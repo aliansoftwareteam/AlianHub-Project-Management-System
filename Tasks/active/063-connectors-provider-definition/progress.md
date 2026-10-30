@@ -8,7 +8,7 @@
 - [x] Tests
 
 ## Last step
-Tested and reviewed the PR before merge: `test-cases.md` records 45 of 46 cases passing, and four review fixes with their tests. Merged the upstream branch to clear the conflicts #1732 and #1733 left. Waits for the PR to merge.
+Tested and reviewed the PR before merge: `test-cases.md` records all 46 cases passing, and four review fixes with their tests. Merged the upstream branch to clear the conflicts #1732 and #1733 left. Waits for the PR to merge.
 
 ## Blockers
 None.
@@ -33,3 +33,4 @@ None.
 - Review fixes, each with a test: the registry freezes the whole definition, not only its top level; `resolveConnection` throws `provider_off` for a provider `CONNECTORS` does not name, as contract section 5 says; Google `readAccount` throws when the token response has no `sub` instead of returning id `''`; `scopesFor` refuses products that are not a list.
 - `Config/config.js` falls back to the working folder when there is no main module, so the `node -e` checks in `test-cases.md` load the Google provider.
 - Left for the owner: refusing reserved OAuth keys (`redirect_uri`, `scope`, `state`) in `auth.extraParams` would change the contract and needs track B's agreement.
+- B-01 run on a local MongoDB 8.0.4: the server boots with `CONNECTORS=google`, the Google provider loads, and the only connector line is the `google` unknown-name log contract section 7 expects. All 46 cases in `test-cases.md` now pass.
