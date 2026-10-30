@@ -2149,10 +2149,10 @@ const schema = {
     // One row per workspace and connector, or per person and connector when the connection is a person's own
     // (Modules/Agents/connectors). Tokens live in `secrets` by handle, never here.
     // Rows from before the connector module (task 056) have `connector` and `secretHandles`; module rows have
-    // `provider`, `handles` and the rest of 063's contract section 6. 073 and 079 migrate the old rows.
+    // `provider`, `handles` and the rest of 063's contract section 6. Task 073 migrates the old rows.
     connectorConnections: {
         connector: { type: String, required: false },
-        companyId: { type: String, required: false },
+        companyId: { type: String, required() { return typeof this.provider === 'string'; } },
         provider: { type: String, required: false },
         products: { type: [String], default: undefined, required: false },
         // The person a personal connection belongs to; absent on a workspace connection.

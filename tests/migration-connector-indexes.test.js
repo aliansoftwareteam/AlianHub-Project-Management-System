@@ -1,13 +1,24 @@
 /* Migration 079 builds task 064's connector indexes in every workspace, so the live-only unique indexes hold on
    a workspace whose connector_connections existed before they were declared. */
 const mockBuilt = [];
+const mockDropped = [];
 const mockFailing = new Set();
+const mockExisting = new Map();
 
 jest.mock('../utils/mongo-handler/mongoQueries', () => ({
     MongoDbCrudOpration: async (companyId, query, method) => {
+        const id = String(companyId);
+        if (method === 'listIndexes') {
+            if (!mockExisting.has(id)) throw Object.assign(new Error('ns does not exist'), { code: 26 });
+            return mockExisting.get(id);
+        }
+        if (method === 'dropIndex') {
+            mockDropped.push({ companyId: id, type: query.type, name: query.data[0] });
+            return undefined;
+        }
         if (method !== 'createIndexes') throw new Error(`unexpected ${method} on ${query.type}`);
-        if (mockFailing.has(String(companyId))) throw new Error('index build failed');
-        mockBuilt.push({ companyId: String(companyId), type: query.type, data: query.data });
+        if (mockFailing.has(id)) throw new Error('index build failed');
+        mockBuilt.push({ companyId: id, type: query.type, data: query.data });
         return undefined;
     },
 }));
@@ -31,7 +42,9 @@ const contextFor = (companies, crud = MongoDbCrudOpration) => buildContext({ Mon
 
 beforeEach(() => {
     mockBuilt.length = 0;
+    mockDropped.length = 0;
     mockFailing.clear();
+    mockExisting.clear();
 });
 
 describe(ID, () => {
@@ -55,7 +68,29 @@ describe(ID, () => {
         const ctx = contextFor([C1, C2]);
         await migration.up(ctx);
         expect(mockBuilt).toEqual([C1, C2].flatMap((companyId) => TYPES.map((type) => ({ companyId, type, data: [] }))));
-        expect(ctx.companies).toEqual({ [C1]: { ok: true, indexes: migration.UNIQUE }, [C2]: { ok: true, indexes: migration.UNIQUE } });
+        expect(ctx.companies).toEqual({ [C1]: { ok: true, indexes: migration.UNIQUE, dropped: [] }, [C2]: { ok: true, indexes: migration.UNIQUE, dropped: [] } });
+        expect(mockDropped).toEqual([]);
+    });
+
+    test('drops the one-account-per-provider index of the first build and the account index without the companyId filter', async () => {
+        mockExisting.set(C1, [
+            { name: '_id_', key: { _id: 1 } },
+            { name: 'connector_1_deletedStatusKey_1', key: { connector: 1, deletedStatusKey: 1 } },
+            { name: 'one_live_per_provider', unique: true, partialFilterExpression: { provider: { $type: 'string' }, deletedStatusKey: { $eq: 0 } } },
+            { name: 'one_live_per_account', unique: true, partialFilterExpression: { provider: { $type: 'string' }, 'account.id': { $type: 'string' }, deletedStatusKey: { $eq: 0 } } },
+        ]);
+        await migration.up(contextFor([C1]));
+        expect(mockDropped).toEqual([
+            { companyId: C1, type: SCHEMA_TYPE.CONNECTOR_CONNECTIONS, name: 'one_live_per_provider' },
+            { companyId: C1, type: SCHEMA_TYPE.CONNECTOR_CONNECTIONS, name: 'one_live_per_account' },
+        ]);
+        expect(mockBuilt).toHaveLength(3);
+    });
+
+    test('leaves an account index that already filters on companyId', async () => {
+        mockExisting.set(C1, [{ name: 'one_live_per_account', unique: true, partialFilterExpression: { companyId: { $type: 'string' }, provider: { $type: 'string' } } }]);
+        await migration.up(contextFor([C1]));
+        expect(mockDropped).toEqual([]);
     });
 
     test('running it again is harmless', async () => {
@@ -75,6 +110,8 @@ describe(ID, () => {
 describe(`${ID} under migrate up --dry-run and migrate verify`, () => {
     class Collection {
         constructor(db, name) { this.dbName = db; this.collectionName = name; }
+
+        listIndexes() { return MongoDbCrudOpration(this.dbName, { type: this.collectionName, data: [] }, 'listIndexes'); }
 
         createIndexes(...data) { return MongoDbCrudOpration(this.dbName, { type: this.collectionName, data }, 'createIndexes'); }
     }

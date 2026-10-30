@@ -408,15 +408,12 @@ const egressAllowlistsSchema = new Schema(schema.egressAllowlists, {strict: true
 const connectorConnectionsSchema = new Schema(schema.connectorConnections, {strict: true, timestamps: true});
 connectorConnectionsSchema.index({ connector: 1, deletedStatusKey: 1 });
 connectorConnectionsSchema.index({ userId: 1, connector: 1, deletedStatusKey: 1 });
-// Live module rows only: a disconnected row (deletedStatusKey 1) and an older row without `provider` never block
-// a new connection, and a pending row has no account id yet.
+// A person may connect several accounts of one provider, each once. Live module rows only: a disconnected row,
+// an older row without `provider` and a pending row (no account id yet) never block a connect. A row missing
+// `companyId` stays out too, so it cannot be taken for another workspace's null.
 connectorConnectionsSchema.index(
     { companyId: 1, userId: 1, provider: 1, 'account.id': 1 },
-    { unique: true, name: 'one_live_per_account', partialFilterExpression: { provider: { $type: 'string' }, 'account.id': { $type: 'string' }, deletedStatusKey: { $eq: 0 } } },
-);
-connectorConnectionsSchema.index(
-    { companyId: 1, userId: 1, provider: 1 },
-    { unique: true, name: 'one_live_per_provider', partialFilterExpression: { provider: { $type: 'string' }, deletedStatusKey: { $eq: 0 } } },
+    { unique: true, name: 'one_live_per_account', partialFilterExpression: { companyId: { $type: 'string' }, provider: { $type: 'string' }, 'account.id': { $type: 'string' }, deletedStatusKey: { $eq: 0 } } },
 );
 const connectorAppsSchema = new Schema(schema.connectorApps, {strict: true, timestamps: false});
 connectorAppsSchema.index({ companyId: 1, provider: 1 }, { unique: true, name: 'one_per_provider' });

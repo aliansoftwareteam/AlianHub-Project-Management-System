@@ -1,3 +1,4 @@
+const mongoose = require('mongoose');
 const { SCHEMA_TYPE } = require('../Config/schemaType');
 const { dbCollections } = require('../Config/collections');
 const { checkType, tableType } = require('../utils/mongo-handler/mongoQueries');
@@ -23,25 +24,30 @@ const clash = ({ keys, options }, a, b) => matchesFilter(a, options.partialFilte
     && keys.every((key) => (valueAt(a, key) ?? null) === (valueAt(b, key) ?? null));
 
 const live = (extra = {}) => ({ companyId: 'c1', userId: 'u1', provider: 'google', account: { id: 'g-1', label: 'a@example.com' }, deletedStatusKey: 0, ...extra });
-const UNIQUE = ['one_live_per_provider', 'one_live_per_account'];
-const refused = (a, b) => UNIQUE.some((name) => clash(indexNamed(connectorConnectionsSchema, name), a, b));
+const UNIQUE = 'one_live_per_account';
+const refused = (a, b) => clash(indexNamed(connectorConnectionsSchema, UNIQUE), a, b);
 
 describe('connector_connections indexes', () => {
-    it.each(UNIQUE)('declares %s as unique and partial', (name) => {
-        const { options } = indexNamed(connectorConnectionsSchema, name);
-        expect(options.unique).toBe(true);
-        expect(options.partialFilterExpression).toMatchObject({ provider: { $type: 'string' }, deletedStatusKey: { $eq: 0 } });
+    it('has one unique index, partial on live module rows of a workspace', () => {
+        const unique = connectorConnectionsSchema.indexes().filter(([, options]) => options.unique).map(([, options]) => options.name);
+        expect(unique).toEqual([UNIQUE]);
+        expect(indexNamed(connectorConnectionsSchema, UNIQUE).options.partialFilterExpression).toEqual({
+            companyId: { $type: 'string' }, provider: { $type: 'string' }, 'account.id': { $type: 'string' }, deletedStatusKey: { $eq: 0 },
+        });
     });
 
-    it('keys one live connection on company, person and provider, and one account on its id', () => {
-        expect(indexNamed(connectorConnectionsSchema, 'one_live_per_provider').keys).toEqual(['companyId', 'userId', 'provider']);
-        expect(indexNamed(connectorConnectionsSchema, 'one_live_per_account').keys).toEqual(['companyId', 'userId', 'provider', 'account.id']);
+    it('keys a connection on company, person, provider and account', () => {
+        expect(indexNamed(connectorConnectionsSchema, UNIQUE).keys).toEqual(['companyId', 'userId', 'provider', 'account.id']);
     });
 
-    it('refuses a second live connection for the same person and provider', () => {
+    it('refuses the same account twice, and lets a person connect a second account of the same provider', () => {
         expect(refused(live(), live())).toBe(true);
-        expect(refused(live(), live({ account: { id: 'g-2' } }))).toBe(true);
-        expect(refused(live(), live({ account: undefined }))).toBe(true);
+        expect(refused(live(), live({ account: { id: 'g-2' } }))).toBe(false);
+    });
+
+    it('never lets a pending row, which has no account yet, block a connect', () => {
+        expect(refused(live({ status: 'pending', account: undefined }), live())).toBe(false);
+        expect(refused(live({ status: 'pending', account: undefined }), live({ status: 'pending', account: undefined }))).toBe(false);
     });
 
     it('lets a disconnected row stand beside a new connection', () => {
@@ -53,6 +59,10 @@ describe('connector_connections indexes', () => {
         expect(refused(live(), live({ userId: 'u2' }))).toBe(false);
         expect(refused(live(), live({ provider: 'dropbox' }))).toBe(false);
         expect(refused(live(), live({ companyId: 'c2' }))).toBe(false);
+    });
+
+    it('never takes a row without companyId for one from another workspace', () => {
+        expect(refused(live({ companyId: undefined }), live({ companyId: undefined }))).toBe(false);
     });
 
     it('never touches rows from before the module, which have no provider', () => {
@@ -69,6 +79,13 @@ describe('connector_connections indexes', () => {
     it('takes the module fields under the strict schema', () => {
         ['companyId', 'provider', 'products', 'lastError', 'app', 'handles', 'backoffUntil'].forEach((field) => expect(connectorConnectionsSchema.path(field)).toBeDefined());
         expect(connectorConnectionsSchema.path('connector').isRequired).toBeFalsy();
+    });
+
+    it('requires companyId on a module row, and not on a row from before the module', () => {
+        const Model = mongoose.model('ConnectorConnectionsCheck', connectorConnectionsSchema, 'connector_connections_check');
+        expect(new Model({ userId: 'u1', provider: 'google', deletedStatusKey: 0 }).validateSync()?.errors?.companyId).toBeDefined();
+        expect(new Model({ companyId: 'c1', userId: 'u1', provider: 'google', deletedStatusKey: 0 }).validateSync()).toBeUndefined();
+        expect(new Model({ connector: 'slack', deletedStatusKey: 0 }).validateSync()).toBeUndefined();
     });
 });
 
