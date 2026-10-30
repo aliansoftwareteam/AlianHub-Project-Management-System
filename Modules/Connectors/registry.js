@@ -12,6 +12,15 @@ const instanceApp = (id) => {
     return !!(String(process.env[`${prefix}ID`] || '').trim() && String(process.env[`${prefix}SECRET`] || '').trim());
 };
 
+// A definition is one object shared by every request, so a caller that pushes onto `products.calendar`
+// would change the scopes asked for everyone after it.
+const deepFreeze = (value) => {
+    if (!value || typeof value !== 'object' || Object.isFrozen(value)) return value;
+    Object.freeze(value);
+    Object.values(value).forEach(deepFreeze);
+    return value;
+};
+
 const readDefinitions = (dir) => {
     const found = new Map();
     if (!fs.existsSync(dir)) return found;
@@ -31,7 +40,7 @@ const readDefinitions = (dir) => {
                 logger.error(`${LOG} provider ${entry.name} skipped: ${problems.join('; ')}`);
                 return;
             }
-            found.set(definition.id, Object.freeze(definition));
+            found.set(definition.id, deepFreeze(definition));
         });
     return found;
 };
@@ -52,6 +61,7 @@ const createRegistry = ({ dir = PROVIDERS_DIR } = {}) => {
     const scopesFor = (id, products = []) => {
         const definition = get(id);
         if (!definition) throw new Error(`unknown connector provider ${id}`);
+        if (!Array.isArray(products)) throw new TypeError(`products for ${id} must be a list of product names`);
         const unknown = products.filter((product) => !Object.prototype.hasOwnProperty.call(definition.products, product));
         if (unknown.length) throw new Error(`${id} has no product ${unknown.join(', ')}`);
         const ticked = Object.keys(definition.products).filter((product) => products.includes(product));

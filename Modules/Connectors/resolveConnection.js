@@ -1,4 +1,5 @@
 const registry = require('./registry');
+const { named } = require('../Agents/connectors/flag');
 
 const CODE = Object.freeze({
     NOT_CONNECTED: 'not_connected',
@@ -21,7 +22,8 @@ class ConnectorError extends Error {
  * until then no connection exists, so every call is refused the way a person without one would be. */
 const resolveConnection = async ({ companyId, userId, provider } = {}) => {
     if (!companyId || !userId) throw new TypeError('resolveConnection needs companyId and userId');
-    if (!registry.get(provider)) throw new ConnectorError(CODE.PROVIDER_OFF, String(provider || ''));
+    // The app half of "offered" needs 065's company app lookup; until then CONNECTORS alone decides.
+    if (!registry.get(provider) || !named().includes(provider)) throw new ConnectorError(CODE.PROVIDER_OFF, String(provider || ''));
     throw new ConnectorError(CODE.NOT_CONNECTED, provider);
 };
 

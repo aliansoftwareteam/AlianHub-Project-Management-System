@@ -8,7 +8,7 @@
 - [x] Tests
 
 ## Last step
-Wrote `Modules/Connectors/validate.js`, `registry.js`, `providers/google/index.js`, the `resolveConnection.js` stub, a fake provider fixture and `tests/connector-registry.test.js`; the contract is signed by both tracks and its open points are settled. Waits for the PR to merge.
+Tested and reviewed the PR before merge: `test-cases.md` records 45 of 46 cases passing, and four review fixes with their tests. Merged the upstream branch to clear the conflicts #1732 and #1733 left. Waits for the PR to merge.
 
 ## Blockers
 None.
@@ -26,3 +26,10 @@ None.
 - The Google file reuses `googleApi.accountOf` for the account id (`sub`) and label.
 - Contract signed by Hetvi (A) and Prinsa (B).
 - Contract change after signing, agreed by Prinsa on 2026-10-29: section 5 adds `getAccessToken` throwing `broken`, `markBackoff` as B's one write to `connector_connections`, and the `ConnectorError` fields; section 2 lists every check the code makes and says screens show the provider name through i18n; section 6 sets `app.appId` to `null` for the instance app; section 7 turns the two open points into decisions: `connector_usage` is its own collection, and `google_calendar` is renamed to `google` in 073.
+
+### 2026-10-30
+- Merged upstream `feat/per-user-connectors` into the branch: #1732 and #1733 had left conflicts in `Tasks/index.md`, the 061 progress and the research matrix. Kept upstream's matrix and 061 progress.
+- Testing before merge, recorded in `test-cases.md`: 45 of 46 cases pass. B-01 (boot log with `CONNECTORS=google`) is not run, since the test machine could not reach MongoDB.
+- Review fixes, each with a test: the registry freezes the whole definition, not only its top level; `resolveConnection` throws `provider_off` for a provider `CONNECTORS` does not name, as contract section 5 says; Google `readAccount` throws when the token response has no `sub` instead of returning id `''`; `scopesFor` refuses products that are not a list.
+- `Config/config.js` falls back to the working folder when there is no main module, so the `node -e` checks in `test-cases.md` load the Google provider.
+- Left for the owner: refusing reserved OAuth keys (`redirect_uri`, `scope`, `state`) in `auth.extraParams` would change the contract and needs track B's agreement.

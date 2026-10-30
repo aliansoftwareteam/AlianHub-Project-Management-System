@@ -76,6 +76,17 @@ describe('scopes for ticked products', () => {
         expect(() => registry.scopesFor('ghost', [])).toThrow('unknown connector provider ghost');
         expect(() => registry.scopesFor('fake', ['mail'])).toThrow('fake has no product mail');
     });
+
+    it('refuse products that are not a list', () => {
+        expect(() => registry.scopesFor('fake', 'notes')).toThrow('products for fake must be a list of product names');
+    });
+
+    it('cannot be widened by changing the shared definition', () => {
+        const fake = registry.get('fake');
+        expect(() => { 'use strict'; fake.products.notes.push('admin'); }).toThrow(TypeError);
+        expect(() => { 'use strict'; fake.auth.baseScopes = []; }).toThrow(TypeError);
+        expect(registry.scopesFor('fake', ['notes'])).toEqual(['profile', 'notes.read', 'notes.write']);
+    });
 });
 
 describe('a provider definition', () => {
@@ -103,6 +114,12 @@ describe('a provider definition', () => {
         const claims = Buffer.from(JSON.stringify({ sub: '1234', email: 'a@example.com', email_verified: true })).toString('base64url');
         expect(google.readAccount({ tokenResponse: { id_token: `h.${claims}.s` } })).toEqual({ id: '1234', label: 'a@example.com' });
     });
+
+    it('refuses a Google token response without an account id', () => {
+        const noSub = Buffer.from(JSON.stringify({ email: 'a@example.com' })).toString('base64url');
+        expect(() => google.readAccount({ tokenResponse: {} })).toThrow('no id_token subject');
+        expect(() => google.readAccount({ tokenResponse: { id_token: `h.${noSub}.s` } })).toThrow('no id_token subject');
+    });
 });
 
 describe('resolveConnection, until 066', () => {
@@ -110,8 +127,12 @@ describe('resolveConnection, until 066', () => {
         await expect(resolveConnection({ companyId: 'c', userId: 'u', provider: 'ghost' })).rejects.toMatchObject({ code: CODE.PROVIDER_OFF });
     });
 
+    it('refuses a provider CONNECTORS does not name', async () => {
+        await withEnv({ CONNECTORS: 'slack' }, () => expect(resolveConnection({ companyId: 'c', userId: 'u', provider: 'google' })).rejects.toMatchObject({ code: CODE.PROVIDER_OFF, provider: 'google' }));
+    });
+
     it('says the person has not connected', async () => {
-        await expect(resolveConnection({ companyId: 'c', userId: 'u', provider: 'google' })).rejects.toMatchObject({ code: CODE.NOT_CONNECTED, provider: 'google' });
+        await withEnv({ CONNECTORS: 'google' }, () => expect(resolveConnection({ companyId: 'c', userId: 'u', provider: 'google' })).rejects.toMatchObject({ code: CODE.NOT_CONNECTED, provider: 'google' }));
     });
 
     it('needs a company and a person', async () => {

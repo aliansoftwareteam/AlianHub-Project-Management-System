@@ -22,6 +22,8 @@ module.exports = {
     },
     readAccount: ({ tokenResponse }) => {
         const { sub, email } = accountOf(tokenResponse && tokenResponse.id_token);
+        // Without `sub` every account would be stored as id '', and the unique index would treat them as one.
+        if (!sub) throw new Error('google token response has no id_token subject');
         return { id: sub, label: email };
     },
     egressHosts: ['accounts.google.com', 'oauth2.googleapis.com', 'www.googleapis.com', 'meet.googleapis.com'],
