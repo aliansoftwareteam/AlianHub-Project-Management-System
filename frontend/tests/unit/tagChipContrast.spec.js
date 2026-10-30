@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 import { mount } from '@vue/test-utils';
-import { contrastOn, inkOf, worstContrast } from '../wcagContrast';
+import { inkOf, worstContrast } from '../wcagContrast';
 
 vi.mock('@/services', () => ({ apiRequest: vi.fn(() => Promise.resolve({ status: 200, data: {} })) }));
 vi.mock('@/utils/TaskOperations', () => ({ default: { updateTags: vi.fn(() => Promise.resolve()) } }));
@@ -45,18 +45,22 @@ describe('tag chips painted from a tag colour', () => {
         expectLightInk(chip);
     });
 
-    it("keeps the tag picker's chips and tag names readable on its white menu", () => {
+    it("keeps the tag picker's chips and tag names readable on its menu in both themes", () => {
         const wrapper = mount(CreateTagPopup, {
             props: { task: { _id: 't1', sprintId: 's1', TaskName: 'Tag the release notes', tagsArray: [navy.uid] }, project: { _id: 'p1', isGlobalPermission: true, tagsArray: [navy, lemon] } },
             global: { stubs }
         });
         const chip = wrapper.get('.chipDiv-wrapper .tagListContent');
         expect(chip.get('.tagname').text()).toBe('Navy');
-        expect(chip.classes()).not.toContain('ah-status-ink');
+        expect(chip.classes()).toContain('ah-status-ink');
         expectLightInk(chip);
+        expect(worstContrast(chip.element.style.getPropertyValue('--status-ink-dark'), chip.element.style.background, 'dark')).toBeGreaterThanOrEqual(4.5);
 
         const option = wrapper.get('.taglist-options .tag_name');
         expect(option.text()).toBe('Lemon');
-        expect(contrastOn(option.element.style.color, '#ffffff', '#ffffff')).toBeGreaterThanOrEqual(4.5);
+        expect(option.classes()).toContain('ah-status-ink');
+        const onMenu = (ink, theme) => worstContrast(ink, 'rgba(0, 0, 0, 0)', theme);
+        expect(onMenu(inkOf(option.element.style), 'light')).toBeGreaterThanOrEqual(4.5);
+        expect(onMenu(option.element.style.getPropertyValue('--status-ink-dark'), 'dark')).toBeGreaterThanOrEqual(4.5);
     });
 });
