@@ -95,4 +95,27 @@ const callProvider = async (url, { form = {}, token, timeoutMs, maxBytes } = {})
     return { status: res.status, headers: res.headers || {}, body: res.body };
 };
 
-module.exports = { audit: inWorkspace('audit'), postJson: inWorkspace('postJson'), readDeclared, callProvider };
+/* A connector tool's request to its provider's API. Only a host the provider's definition names is reached, so a
+ * tool cannot carry what it holds anywhere else; like callProvider it names a workspace and follows no redirect. */
+const callApi = async (url, { method = 'get', query = {}, json, token, hosts = [], timeoutMs, maxBytes } = {}) => {
+    if (!(egressContext.get() || {}).companyId) {
+        throw Object.assign(new Error('a connector call names no workspace, so it was refused'), { code: 'no_workspace' });
+    }
+    const target = new URL(String(url));
+    if (target.protocol !== 'https:' || !hosts.includes(target.hostname)) {
+        throw Object.assign(new Error(`${target.hostname || 'that address'} is not a host of this connector, so it was not contacted`), { code: 'host_not_declared', deterministic: true });
+    }
+    Object.entries(query).forEach(([name, value]) => target.searchParams.set(name, String(value)));
+    const res = await fetcher.safeFetch(target.href, {
+        method,
+        data: json === undefined ? undefined : JSON.stringify(json),
+        timeoutMs,
+        maxBytes,
+        maxRedirects: 0,
+        headers: { 'User-Agent': UA, Accept: 'application/json', ...(json === undefined ? {} : { 'Content-Type': 'application/json' }), ...(token ? { Authorization: `Bearer ${token}` } : {}) },
+        sensitiveHeaders: ['Authorization'],
+    });
+    return { status: res.status, headers: res.headers || {}, body: res.body };
+};
+
+module.exports = { audit: inWorkspace('audit'), postJson: inWorkspace('postJson'), readDeclared, callProvider, callApi };

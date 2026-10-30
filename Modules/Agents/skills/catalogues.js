@@ -103,6 +103,26 @@ const externalReadParams = (formats, extra = {}) => Object.freeze({
  * the companyId-first tool layer (skills/readers.js); `params` is the whole
  * surface a skill can tune. The result is what the template reads as
  * {{gather.<as>.<field>}}. */
+/* A connector read tool's flat input becomes its reader's params, bounded the way its schema bounds them. */
+const readerParamOf = (schema) => {
+    if (schema.type === 'boolean') return Object.freeze({ type: 'boolean', default: schema.default === true });
+    if (schema.type === 'string') return Object.freeze({ type: 'string', ...(typeof schema.default === 'string' ? { default: schema.default } : {}) });
+    return Object.freeze({ type: 'number', min: schema.minimum, max: schema.maximum, default: Number.isFinite(schema.default) ? schema.default : schema.minimum });
+};
+
+const connectorReaders = () => Object.fromEntries(require('../../Connectors/tools').reads().map((tool) => [tool.key, Object.freeze({
+    label: String(tool.input.description).slice(0, 120),
+    description: `${tool.input.description} Reads only the connection of the person the agent acts for: at most ${tool.caps.maxChars} characters. What it reads marks the run, which makes no web fetch after it.`,
+    connector: tool.provider,
+    action: tool.key,
+    params: Object.freeze({
+        ...Object.fromEntries(Object.entries(tool.input.properties || {}).map(([name, schema]) => [name, readerParamOf(schema)])),
+        // Kept so a connectionId naming someone else's connection reaches the runner and is refused, not silently dropped.
+        connectionId: Object.freeze({ type: 'string' }),
+    }),
+    fields: Object.freeze(['text', 'chars', 'truncated']),
+})]));
+
 const READER_CATALOGUE = Object.freeze({
     task: Object.freeze({
         label: 'The task',
@@ -192,6 +212,7 @@ const READER_CATALOGUE = Object.freeze({
         }),
         fields: Object.freeze(['channel', 'channelId', 'count', 'text', 'chars', 'truncated']),
     }),
+    ...connectorReaders(),
 });
 
 /* A connector's reader exists only while its read is a registry action, which is only while the connector is on. */

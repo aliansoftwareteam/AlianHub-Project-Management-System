@@ -9,7 +9,9 @@ const MANAGE_SCOPES = Object.freeze(['tasks:manage', 'docs:manage']);
 /* Reading chat is given the same way and no other: it is not part of reading tasks, of a default approval, of a
  * personal token's read or of a manage scope. */
 const CHAT_SCOPE = 'chat:read';
-const OPT_IN_SCOPES = Object.freeze([...MANAGE_SCOPES, CHAT_SCOPE]);
+/* Reaching the person's accounts at other apps is given the same way: it is part of no other scope. */
+const CONNECTOR_SCOPES = Object.freeze(['connectors:read', 'connectors:write']);
+const OPT_IN_SCOPES = Object.freeze([...MANAGE_SCOPES, CHAT_SCOPE, ...CONNECTOR_SCOPES]);
 const SCOPES = Object.freeze(['tasks:read', 'tasks:write', 'projects:read', 'docs:read', 'time:read', 'time:write', ...OPT_IN_SCOPES]);
 const isManageScope = (scope) => MANAGE_SCOPES.includes(scope);
 const isOptInScope = (scope) => OPT_IN_SCOPES.includes(scope);
@@ -19,7 +21,12 @@ const PLAIN_SCOPES = Object.freeze(SCOPES.filter((scope) => !isOptInScope(scope)
 // An opt-in scope unlocks nothing while its tools are off, so it is neither listed nor taken at authorization then.
 const manageOffered = () => require('../Mcp/manageFlag').enabled();
 const chatOffered = () => require('../Mcp/dataFlag').enabled();
-const isOffered = (scope) => (isManageScope(scope) ? manageOffered() : scope !== CHAT_SCOPE || chatOffered());
+const connectorsOffered = () => require('../Connectors/tools').anyOn();
+const isOffered = (scope) => {
+    if (isManageScope(scope)) return manageOffered();
+    if (CONNECTOR_SCOPES.includes(scope)) return connectorsOffered();
+    return scope !== CHAT_SCOPE || chatOffered();
+};
 const offeredScopes = () => SCOPES.filter(isOffered);
 
 /* The scopes a client named for itself, or null when it named none and may ask for any. A pre-registered
@@ -142,6 +149,6 @@ const endpoints = (env = process.env) => {
 };
 
 module.exports = {
-    SCOPES, READ_SCOPES, MANAGE_SCOPES, CHAT_SCOPE, OPT_IN_SCOPES, PLAIN_SCOPES, isManageScope, isOptInScope, offeredScopes, namedScopes, mayAskFor, CODE_TTL_MS, CODE_REUSE_WINDOW_MS, DEFAULTS, MODE,
+    SCOPES, READ_SCOPES, MANAGE_SCOPES, CHAT_SCOPE, CONNECTOR_SCOPES, OPT_IN_SCOPES, PLAIN_SCOPES, isManageScope, isOptInScope, offeredScopes, namedScopes, mayAskFor, CODE_TTL_MS, CODE_REUSE_WINDOW_MS, DEFAULTS, MODE,
     mode, isOn, dcrOn, lifetimes, rateLimitPerMinute, metadataCacheMs, issuer, issuerProblem, unsetIssuerProblem, assertIssuer, resource, canonicalResource, endpoints,
 };
