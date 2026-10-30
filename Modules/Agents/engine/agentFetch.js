@@ -95,8 +95,8 @@ const callProvider = async (url, { form = {}, token, timeoutMs, maxBytes } = {})
     return { status: res.status, headers: res.headers || {}, body: res.body };
 };
 
-/* A connector tool's request to its provider's API. Only a host the provider's definition names is reached, so a
- * tool cannot carry what it holds anywhere else; like callProvider it names a workspace and follows no redirect. */
+/* Only a host the provider's definition names is reached, and no redirect is followed, so a tool cannot carry the
+ * token anywhere else. */
 const callApi = async (url, { method = 'get', query = {}, json, token, hosts = [], timeoutMs, maxBytes } = {}) => {
     if (!(egressContext.get() || {}).companyId) {
         throw Object.assign(new Error('a connector call names no workspace, so it was refused'), { code: 'no_workspace' });

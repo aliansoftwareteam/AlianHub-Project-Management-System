@@ -99,15 +99,12 @@ const externalReadParams = (formats, extra = {}) => Object.freeze({
     ...extra,
 });
 
-/* Context a skill may read before the model is asked. Each reader is a call into
- * the companyId-first tool layer (skills/readers.js); `params` is the whole
- * surface a skill can tune. The result is what the template reads as
- * {{gather.<as>.<field>}}. */
-/* A connector read tool's flat input becomes its reader's params, bounded the way its schema bounds them. */
+const CONNECTION_ID_MAX = 64;
+
 const readerParamOf = (schema) => {
     if (schema.type === 'boolean') return Object.freeze({ type: 'boolean', default: schema.default === true });
-    if (schema.type === 'string') return Object.freeze({ type: 'string', ...(typeof schema.default === 'string' ? { default: schema.default } : {}) });
-    return Object.freeze({ type: 'number', min: schema.minimum, max: schema.maximum, default: Number.isFinite(schema.default) ? schema.default : schema.minimum });
+    if (schema.type === 'string') return Object.freeze({ type: 'string', maxLength: schema.maxLength, ...(typeof schema.default === 'string' ? { default: schema.default } : {}) });
+    return Object.freeze({ type: schema.type, min: schema.minimum, max: schema.maximum, default: Number.isFinite(schema.default) ? schema.default : schema.minimum });
 };
 
 const connectorReaders = () => Object.fromEntries(require('../../Connectors/tools').reads().map((tool) => [tool.key, Object.freeze({
@@ -118,10 +115,15 @@ const connectorReaders = () => Object.fromEntries(require('../../Connectors/tool
     params: Object.freeze({
         ...Object.fromEntries(Object.entries(tool.input.properties || {}).map(([name, schema]) => [name, readerParamOf(schema)])),
         // Kept so a connectionId naming someone else's connection reaches the runner and is refused, not silently dropped.
-        connectionId: Object.freeze({ type: 'string' }),
+        connectionId: Object.freeze({ type: 'string', maxLength: CONNECTION_ID_MAX }),
     }),
     fields: Object.freeze(['text', 'chars', 'truncated']),
 })]));
+
+/* Context a skill may read before the model is asked. Each reader is a call into
+ * the companyId-first tool layer (skills/readers.js); `params` is the whole
+ * surface a skill can tune. The result is what the template reads as
+ * {{gather.<as>.<field>}}. */
 
 const READER_CATALOGUE = Object.freeze({
     task: Object.freeze({

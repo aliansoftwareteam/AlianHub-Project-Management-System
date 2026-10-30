@@ -51,7 +51,7 @@ const paramsFor = (reader, given = {}) => {
     const out = {};
     Object.entries(spec).forEach(([name, rule]) => {
         const raw = given[name];
-        if (rule.type === 'number') {
+        if (rule.type === 'number' || rule.type === 'integer') {
             const n = Number(raw);
             out[name] = Number.isFinite(n) ? Math.min(rule.max, Math.max(rule.min, Math.round(n))) : rule.default;
         } else if (rule.type === 'boolean') {

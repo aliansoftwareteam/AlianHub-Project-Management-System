@@ -1,8 +1,6 @@
 const { RISK, SCOPE, read } = require('../registryKit');
 const connectorTools = require('../../Connectors/tools');
 
-/* Each read tool a connector provider defines is one action, on while CONNECTORS names its provider. Its writes
- * join with the approval flow (task 069). */
 const PERMISSION = Object.freeze({ key: 'artificial_intelligence.ai_connectors', write: false });
 
 const actionOf = (tool) => ({

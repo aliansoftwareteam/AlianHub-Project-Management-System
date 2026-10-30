@@ -1,5 +1,6 @@
 const fs = require('fs');
 const path = require('path');
+const { createRegistry } = require('./registry');
 
 const DIR = path.join(__dirname, 'providers');
 const KEY = /^[a-z][a-z0-9_]*\.[a-z][a-z0-9_]*\.[a-z][a-z0-9_]*$/;
@@ -12,7 +13,7 @@ const isObject = (value) => value !== null && typeof value === 'object' && !Arra
 const positive = (value) => Number.isInteger(value) && value > 0;
 
 /* A tool's input is the schema MCP publishes and a data skill's reader params are built from, so it stays flat:
- * named scalars only, numbers bounded, nothing extra accepted. Its description is the text both show. */
+ * named scalars only, numbers and strings bounded, nothing extra accepted. Its description is the text both show. */
 const inputProblems = (input) => {
     if (!isObject(input) || input.type !== 'object') return ['input is not an object schema'];
     const found = [];
@@ -23,6 +24,7 @@ const inputProblems = (input) => {
     Object.entries(properties).forEach(([name, schema]) => {
         if (!isObject(schema) || !PROPERTY_TYPES.includes(schema.type)) found.push(`input.${name} is not a ${PROPERTY_TYPES.join(', ')}`);
         else if (['integer', 'number'].includes(schema.type) && !(Number.isFinite(schema.minimum) && Number.isFinite(schema.maximum))) found.push(`input.${name} has no minimum and maximum`);
+        else if (schema.type === 'string' && !positive(schema.maxLength)) found.push(`input.${name} has no maxLength`);
     });
     (Array.isArray(input.required) ? input.required : []).filter((name) => !properties[name]).forEach((name) => found.push(`input requires ${name}, which it does not describe`));
     return found;
@@ -53,21 +55,20 @@ const problemsOf = (definition, tools) => {
     return found;
 };
 
-const readFolder = (dir, id) => {
-    const toolsFile = path.join(dir, id, 'tools.js');
+const readFolder = (dir, definition) => {
+    const toolsFile = path.join(dir, definition.id, 'tools.js');
     if (!fs.existsSync(toolsFile)) return [];
-    const definition = require(path.join(dir, id, 'index.js'));
     const tools = require(toolsFile);
     const found = problemsOf(definition, tools);
     // A broken tools file stops the server at boot rather than ship a tool that skips a check.
-    if (found.length) throw new Error(`connector tools of ${id} are invalid: ${found.join('; ')}`);
-    return tools.map((tool) => Object.freeze({ ...tool, provider: id, definition }));
+    if (found.length) throw new Error(`connector tools of ${definition.id} are invalid: ${found.join('; ')}`);
+    return tools.map((tool) => Object.freeze({ ...tool, provider: definition.id, definition }));
 };
 
-const load = (dir) => {
-    const ids = fs.existsSync(dir) ? fs.readdirSync(dir, { withFileTypes: true }).filter((entry) => entry.isDirectory()).map((entry) => entry.name).sort() : [];
-    return Object.freeze(ids.flatMap((id) => readFolder(dir, id)));
-};
+// Only a provider the registry accepted has tools: one it skipped has no checked definition to hold them to.
+const load = (dir) => Object.freeze(createRegistry({ dir }).list()
+    .sort((a, b) => a.id.localeCompare(b.id))
+    .flatMap((definition) => readFolder(dir, definition)));
 
 /* A provider's tools exist for agents and MCP only while CONNECTORS names it, and only where a run that read
  * from outside is routed to approval. Whether this workspace has an app for it is asked at call time. */

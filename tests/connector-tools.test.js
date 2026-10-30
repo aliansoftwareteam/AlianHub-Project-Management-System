@@ -75,8 +75,44 @@ describe('a tool definition', () => {
         expect(problems({ caps: { maxItems: 0, maxChars: 10 } }).join()).toMatch(/caps/);
         expect(problems({ input: { ...good.input, properties: { connectionId: { type: 'string' } } } }).join()).toMatch(/reserved/);
         expect(problems({ input: { ...good.input, properties: { limit: { type: 'integer' } } } }).join()).toMatch(/no minimum and maximum/);
+        expect(problems({ input: { ...good.input, properties: { folder: { type: 'string' } } } }).join()).toMatch(/folder has no maxLength/);
         expect(problems({ input: { ...good.input, additionalProperties: true } }).join()).toMatch(/additionalProperties/);
         expect(connectorTools.problemsOf(fake, [good, good]).join()).toMatch(/used twice/);
+    });
+
+    it('loads no tools for a provider the registry skipped', () => {
+        const fs = require('fs');
+        const path = require('path');
+        const dir = fs.mkdtempSync(path.join(require('os').tmpdir(), 'connectors-'));
+        fs.mkdirSync(path.join(dir, 'bad'));
+        fs.writeFileSync(path.join(dir, 'bad', 'index.js'), "module.exports = { id: 'bad', name: 'Bad' };");
+        fs.writeFileSync(path.join(dir, 'bad', 'tools.js'), "module.exports = [{ key: 'bad.notes.list' }];");
+        try {
+            expect(connectorTools.make(dir).all()).toEqual([]);
+        } finally {
+            fs.rmSync(dir, { recursive: true, force: true });
+        }
+    });
+});
+
+describe('a skill reader built from a tool', () => {
+    const { READER_CATALOGUE } = require('../Modules/Agents/skills/catalogues');
+
+    it('keeps an integer an integer and bounds connectionId', () => {
+        expect(READER_CATALOGUE[KEY].params.limit).toMatchObject({ type: 'integer', min: 1, max: 20, default: 5 });
+        expect(READER_CATALOGUE[KEY].params.connectionId).toMatchObject({ type: 'string', maxLength: 64 });
+    });
+
+    it('is checked against those bounds when a skill is saved', () => {
+        const { validateSkill } = require('../Modules/Agents/skills/validateSkill');
+        const prompt = { partials: ['json_only'], instructions: 'Summarise the notes.', template: '{{gather.notes.text}}', output: '{"summary":"..."}' };
+        const step = (params) => validateSkill({ key: 'team.notes', name: 'Notes', inputs: [], gather: [{ reader: KEY, as: 'notes', params }], prompt, emit: [{ action: 'task.comment', params: { body: '{{answer.summary}}' } }] });
+        const fields = (checked) => checked.errors.map((e) => `${e.field} ${e.code}`);
+        expect(fields(step({ limit: 2.5 }))).toContain('gather[0].params.limit invalid_params');
+        expect(fields(step({ connectionId: 'x'.repeat(65) }))).toContain('gather[0].params.connectionId invalid_params');
+        const kept = step({ limit: 3, connectionId: 'conn-prisha' });
+        expect(fields(kept)).toEqual([]);
+        expect(kept.value.gather[0].params).toMatchObject({ limit: 3, connectionId: 'conn-prisha' });
     });
 });
 
@@ -124,6 +160,34 @@ describe('from an agent run', () => {
         await expect(agentRead()).rejects.toMatchObject({ code: 'run_call_cap' });
         expect(safeFetch).not.toHaveBeenCalled();
     });
+
+    it('counts a read that failed, so an agent cannot retry past the cap', async () => {
+        safeFetch.mockRejectedValue(new Error('provider down'));
+        for (let i = 0; i < 3; i += 1) await expect(agentRead()).rejects.toThrow('provider down');
+        expect(runRow().connectorReads.map((r) => r.state)).toEqual(['failed', 'failed', 'failed']);
+        await expect(agentRead()).rejects.toMatchObject({ code: 'run_call_cap' });
+        expect(safeFetch).toHaveBeenCalledTimes(3);
+    });
+
+    it('lets only as many racing reads through as the run has calls left', async () => {
+        const outcomes = await Promise.allSettled([1, 2, 3, 4].map(() => agentRead()));
+        expect(outcomes.filter((o) => o.status === 'fulfilled')).toHaveLength(3);
+        expect(outcomes.filter((o) => o.status === 'rejected').map((o) => o.reason.code)).toEqual(['run_call_cap']);
+        expect(safeFetch).toHaveBeenCalledTimes(3);
+    });
+
+    it('sends a GET whatever method the read tool asks for', async () => {
+        const tool = connectorTools.get(KEY);
+        jest.spyOn(connectorTools, 'get').mockReturnValue({ ...tool, run: async ({ connection }) => (await connection.request('https://api.fake.test/notes', { method: 'post', json: { title: 'x' } })).body });
+        try {
+            await agentRead();
+        } finally {
+            connectorTools.get.mockRestore();
+        }
+        const [, options] = safeFetch.mock.calls[0];
+        expect(options.method).toBe('get');
+        expect(options.data).toBeUndefined();
+    });
 });
 
 describe('from MCP', () => {
@@ -152,12 +216,12 @@ describe('only the caller\'s own connection', () => {
 
     it('tells a person with no connection to connect the provider', async () => {
         resolveConnection.mockRejectedValue(connectorError('not_connected'));
-        expect(await mcpTools.call(mcp(['connectors:read']), KEY, {})).toEqual({ code: 'not_connected', error: 'Connect Fake Notes on My connections first, then ask again.' });
+        expect(await mcpTools.call(mcp(['connectors:read']), KEY, {})).toEqual({ code: 'not_connected', error: 'Connect Fake on My connections first, then ask again.' });
     });
 
     it('names the product to tick when the connection lacks the tool\'s scope', async () => {
         connected(['files.read']);
-        expect(await mcpTools.call(mcp(['connectors:read']), KEY, {})).toEqual({ code: 'scope_missing', error: 'Tick notes on your Fake Notes connection in My connections, then ask again.' });
+        expect(await mcpTools.call(mcp(['connectors:read']), KEY, {})).toEqual({ code: 'scope_missing', error: 'Tick notes on your Fake connection in My connections, then ask again.' });
         expect(safeFetch).not.toHaveBeenCalled();
     });
 
