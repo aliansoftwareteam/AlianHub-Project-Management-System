@@ -6,12 +6,14 @@
 - [x] connector_apps
 - [x] connector_usage
 - [x] Tests
+- [x] Migration 079 builds the indexes in every workspace
+- [ ] Manual cases in `test-cases.md` run against a real MongoDB
 
 ## Last step
-Added the module fields to `connectorConnections`, the `connectorApps` and `connectorUsage` schemas with their indexes, their names in `Config/schemaType.js`, `Config/collections.js` and `mongoQueries.js`, and `tests/connector-data-model.test.js`.
+Tested and reviewed the PR before merge: every Jest case in `test-cases.md` passes, and migration 079 now builds the indexes. The manual MongoDB cases are blocked on the test machine.
 
 ## Blockers
-None. Needs no 063 code: it only adds schemas, so it branches from `feat/per-user-connectors` on its own.
+The manual cases in `test-cases.md` need a MongoDB the test machine can reach. Needs no 063 code: it only adds schemas, so it branches from `feat/per-user-connectors` on its own.
 
 ## Log
 
@@ -25,3 +27,8 @@ None. Needs no 063 code: it only adds schemas, so it branches from `feat/per-use
 - `connector_usage` is its own collection (063 contract, section 7), unique per connection, caller and day.
 - `connector_apps` is unique per company and provider and holds the secret only as a secrets store handle.
 - The tests check the declared indexes against Mongo's partial-index rule rather than a live database.
+
+### 2026-10-30
+- Testing before merge, recorded in `test-cases.md`: every Jest case passes. The manual cases are blocked, since the test machine could not reach MongoDB (Atlas SRV lookup refused from Node, no local `mongod`).
+- Review fix: `migrations/079-connector-indexes.js` runs `createIndexes` on `connector_connections`, `connector_apps` and `connector_usage` in every workspace, as 077 does for agents. Without it Mongoose builds the unique indexes only in the background on first use, so a workspace that already has `connector_connections` could take two live rows for one person and provider first. `createIndexes`, not `syncIndexes`, so the indexes the Google and Slack code read by stay.
+- Left as they are, with the reasons in `test-cases.md` section G: `one_live_per_account` adds nothing `one_live_per_provider` does not refuse but is in the signed contract; schema checks on `connector_usage.day` and `actor` would not run on the `$inc` upsert, so 070's writer has to build those values.
