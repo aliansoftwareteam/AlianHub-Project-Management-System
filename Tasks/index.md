@@ -73,7 +73,7 @@ Auto-maintained registry of all tasks. Reflects YAML frontmatter from each `task
 | 065 | Connectors — OAuth app lookup (instance default, company override) and the secrets-store guard | backlog | high | 063, 064 | backlog/065-connectors-oauth-apps-secrets-guard |
 | 066 | Connectors — generic connect, products, reconnect and disconnect handlers | backlog | high | 065 | backlog/066-connectors-connect-lifecycle |
 | 067 | Connectors — end a member's connections on removal, deactivation or SCIM, plus a daily sweep | backlog | high | 066 | backlog/067-connectors-member-removal-sweep |
-| 068 | Connectors — tool framework: one definition registered for agents and MCP | backlog | high | 063 | backlog/068-connectors-tool-framework |
+| 068 | Connectors — tool framework: one definition registered for agents and MCP | active | high | 063 | active/068-connectors-tool-framework |
 | 069 | Connectors — every outside write is a proposal only the connection owner approves | backlog | high | 068 | backlog/069-connectors-write-approvals |
 | 070 | Connectors — audit, health, usage counts, quotas and provider backoff | backlog | high | 063, 068 | backlog/070-connectors-tracking-quotas |
 | 071 | Connectors — Google pilot tools: Calendar, Meet and Drive (no Gmail) | backlog | high | 068, 069 | backlog/071-connectors-google-pilot-tools |

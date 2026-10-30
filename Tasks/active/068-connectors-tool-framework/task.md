@@ -1,7 +1,7 @@
 ---
 id: 068
 title: Connectors — tool framework: one definition registered for agents and MCP
-status: backlog
+status: active
 priority: high
 depends_on: [063]
 created: 2026-10-28

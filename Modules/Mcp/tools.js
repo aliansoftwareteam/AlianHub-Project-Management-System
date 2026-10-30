@@ -29,6 +29,7 @@ const manageFlag = require('./manageFlag');
 const manageTools = require('./manageTools');
 const workTools = require('./workTools');
 const workFlag = require('./workFlag');
+const connectorTools = require('./connectorTools');
 const argsSchema = require('./argsSchema');
 const { taskRow, planRow } = require('./taskRows');
 const { searchFilters } = require('./searchFilters');
@@ -287,9 +288,9 @@ const SEARCH_BY_LIST = 'Finds tasks the person can open, by text, status, projec
 const SEARCH_FOR_PLANNING = 'Finds tasks the person can open, by text, status, project, list, assignee or due date. Each task shows its assignees, dates, estimate, subtask count and the tasks above it. Changes nothing.';
 const SEARCH_FOR_PLANNING_BY_LIST = 'Finds tasks the person can open, by text, status, project, list, assignee, due date, tag, priority or a custom field\'s value. Each task shows its assignees, dates, estimate, subtask count and the tasks above it. Changes nothing.';
 
-const offered = () => [...TOOLS, ...FLAGGED_TOOLS.filter((t) => registry.has(t.action)), ...dataTools.offered(), ...screenTools.offered(), ...intentTools.offered(), ...contextTools.offered(), ...manageTools.offered(), ...workTools.offered(), ...sessionTools.offered()];
+const offered = () => [...TOOLS, ...FLAGGED_TOOLS.filter((t) => registry.has(t.action)), ...dataTools.offered(), ...screenTools.offered(), ...intentTools.offered(), ...contextTools.offered(), ...manageTools.offered(), ...workTools.offered(), ...connectorTools.offered(), ...sessionTools.offered()];
 
-const registered = () => [...TOOLS, ...FLAGGED_TOOLS, ...dataTools.TOOLS, ...screenTools.TOOLS, ...intentTools.TOOLS, ...contextTools.TOOLS, ...manageTools.TOOLS, ...Object.values(manageTools.VARIANTS), ...workTools.TOOLS, ...sessionTools.TOOLS];
+const registered = () => [...TOOLS, ...FLAGGED_TOOLS, ...dataTools.TOOLS, ...screenTools.TOOLS, ...intentTools.TOOLS, ...contextTools.TOOLS, ...manageTools.TOOLS, ...Object.values(manageTools.VARIANTS), ...workTools.TOOLS, ...connectorTools.TOOLS, ...sessionTools.TOOLS];
 
 /* A tool that needs a grant, or a scope a person gives only by name, is one only a caller holding it lists or runs. */
 const holdsOptIn = (ctx, tool) => !tool.optIn || scopes.grantedScopes(ctx && ctx.token).includes(tool.optIn);
