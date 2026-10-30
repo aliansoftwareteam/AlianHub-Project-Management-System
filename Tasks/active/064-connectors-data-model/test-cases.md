@@ -1,6 +1,6 @@
 # 064 test cases: connector data model
 
-Run 2026-10-30 on `feat/task-064-connectors-data-model` after the review fix (section G). Every **Auto** case passes. The **Manual** cases need a MongoDB the test machine could not reach (Atlas SRV lookup refused, no local `mongod`), so they are `blocked` and wait for a run against a real database before merge.
+Run 2026-10-30 on `feat/task-064-connectors-data-model` after the review fix (section G). Every **Auto** case passes. The **Manual** MongoDB cases were run on a local MongoDB 8.0.4 in a throwaway database (`tc_064_test`, dropped after), with the indexes built by `createIndexes` from the schemas, as migration 079 does: all pass. X-02 and X-03 need Google and Slack apps and are not run.
 
 Two kinds of case:
 - **Auto**: covered by Jest. Run `node node_modules/jest/bin/jest.js --selectProjects unit --runTestsByPath tests/connector-data-model.test.js tests/migration-connector-indexes.test.js --no-watchman`. The data model test checks the declared indexes against Mongo's partial-index rule, not a live database. Through `npx jest` on Windows the run can hang on watchman.
@@ -24,23 +24,23 @@ Write the result in the **Result** column: `pass`, `fail` (with what happened), 
 | N-01 | Auto | `SCHEMA_TYPE` has the new names | Jest | `CONNECTOR_APPS` = `connector_apps`, `CONNECTOR_USAGE` = `connector_usage` | pass |
 | N-02 | Auto | `checkType` and `tableType` know both | Jest | Each returns the right schema and collection name | pass |
 | N-03 | Auto + Manual | No hard-coded collection name | `git grep -n "'connector_apps'\|'connector_usage'" -- Modules utils` | No match outside `Config/` | pass |
-| N-04 | Manual | Old rows still valid | Insert `{ connector: 'slack', deletedStatusKey: 0 }` (no `provider`, no `companyId`) | Insert succeeds | blocked |
-| N-05 | Manual | Strict schema drops unknown fields | Through the app's Mongo helper, save a row with `foo: 1` | `foo` is not stored | blocked |
+| N-04 | Manual | Old rows still valid | Insert `{ connector: 'slack', deletedStatusKey: 0 }` (no `provider`, no `companyId`) | Insert succeeds | pass |
+| N-05 | Manual | Strict schema drops unknown fields | Through the app's Mongo helper, save a row with `foo: 1` | `foo` is not stored | pass |
 
 ## B. Unique indexes on `connector_connections`
 
 | ID | Kind | Case | Steps | Expected | Result |
 |---|---|---|---|---|---|
-| I-01 | Manual | Both indexes exist | `db.connector_connections.getIndexes()` | `one_live_per_account` and `one_live_per_provider`, both `unique: true` with a `partialFilterExpression` | blocked |
-| I-02 | Auto + Manual | Second live connection for same person and provider is refused | Insert `{ companyId:'tc-co', userId:'tc-u1', provider:'google', account:{id:'a1'}, deletedStatusKey:0 }`, then the same with `account.id:'a2'` | Second insert fails `E11000` on `one_live_per_provider` | Auto pass; Manual blocked |
-| I-03 | Auto + Manual | Same account twice is refused | Insert the I-02 first row twice | Second fails `E11000` | Auto pass; Manual blocked |
-| I-04 | Auto + Manual | Disconnected row does not block | Set the I-02 row to `deletedStatusKey: 1`, then insert a new live row for `tc-u1` + `google` | Insert succeeds | Auto pass; Manual blocked |
-| I-05 | Auto + Manual | Same account reconnects after disconnect | After I-04, the new row uses `account.id:'a1'` again | Insert succeeds | Auto pass; Manual blocked |
-| I-06 | Auto + Manual | Different person, same provider | Live row for `tc-u2` + `google` | Insert succeeds | Auto pass; Manual blocked |
-| I-07 | Auto + Manual | Same person, different provider | Live row for `tc-u1` + `dropbox` | Insert succeeds | Auto pass; Manual blocked |
-| I-08 | Auto + Manual | Different company, same person id | Live row `companyId:'tc-co2'`, `tc-u1` + `google` | Insert succeeds | Auto pass; Manual blocked |
-| I-09 | Auto + Manual | Pending row (no account id yet) still holds the provider | Insert `{ companyId:'tc-co', userId:'tc-u3', provider:'google', status:'pending', deletedStatusKey:0 }`, then a second live `tc-u3` + `google` row | Second fails `E11000` on `one_live_per_provider` | Auto pass; Manual blocked |
-| I-10 | Auto + Manual | Old rows without `provider` never collide | Insert two `{ userId:'tc-u4', connector:'google_calendar', deletedStatusKey:0 }` | Both succeed | Auto pass; Manual blocked |
+| I-01 | Manual | Both indexes exist | `db.connector_connections.getIndexes()` | `one_live_per_account` and `one_live_per_provider`, both `unique: true` with a `partialFilterExpression` | pass |
+| I-02 | Auto + Manual | Second live connection for same person and provider is refused | Insert `{ companyId:'tc-co', userId:'tc-u1', provider:'google', account:{id:'a1'}, deletedStatusKey:0 }`, then the same with `account.id:'a2'` | Second insert fails `E11000` on `one_live_per_provider` | pass |
+| I-03 | Auto + Manual | Same account twice is refused | Insert the I-02 first row twice | Second fails `E11000` | pass |
+| I-04 | Auto + Manual | Disconnected row does not block | Set the I-02 row to `deletedStatusKey: 1`, then insert a new live row for `tc-u1` + `google` | Insert succeeds | pass |
+| I-05 | Auto + Manual | Same account reconnects after disconnect | After I-04, the new row uses `account.id:'a1'` again | Insert succeeds | pass |
+| I-06 | Auto + Manual | Different person, same provider | Live row for `tc-u2` + `google` | Insert succeeds | pass |
+| I-07 | Auto + Manual | Same person, different provider | Live row for `tc-u1` + `dropbox` | Insert succeeds | pass |
+| I-08 | Auto + Manual | Different company, same person id | Live row `companyId:'tc-co2'`, `tc-u1` + `google` | Insert succeeds | pass |
+| I-09 | Auto + Manual | Pending row (no account id yet) still holds the provider | Insert `{ companyId:'tc-co', userId:'tc-u3', provider:'google', status:'pending', deletedStatusKey:0 }`, then a second live `tc-u3` + `google` row | Second fails `E11000` on `one_live_per_provider` | pass |
+| I-10 | Auto + Manual | Old rows without `provider` never collide | Insert two `{ userId:'tc-u4', connector:'google_calendar', deletedStatusKey:0 }` | Both succeed | pass |
 | I-11 | Auto | The indexes the Google and Slack code read by stay | Jest | `connector,deletedStatusKey` and `userId,connector,deletedStatusKey` still declared | pass |
 | I-12 | Manual | Disconnect writes `deletedStatusKey: 1` | Read `disconnect` in `Modules/Agents/connectors/googleConnection.js` | `$set` has `deletedStatusKey: 1`, so a disconnected row leaves the live-only indexes | pass |
 
@@ -48,9 +48,9 @@ Write the result in the **Result** column: `pass`, `fail` (with what happened), 
 
 | ID | Kind | Case | Steps | Expected | Result |
 |---|---|---|---|---|---|
-| A-01 | Manual | Index exists | `db.connector_apps.getIndexes()` | `one_per_provider` on `companyId` + `provider`, unique | blocked |
-| A-02 | Auto + Manual | One app per company and provider | Insert two `{ companyId:'tc-co', provider:'google', ... }` | Second fails `E11000` | Auto pass; Manual blocked |
-| A-03 | Manual | Another company may have its own | Same with `companyId:'tc-co2'` | Succeeds | blocked |
+| A-01 | Manual | Index exists | `db.connector_apps.getIndexes()` | `one_per_provider` on `companyId` + `provider`, unique | pass |
+| A-02 | Auto + Manual | One app per company and provider | Insert two `{ companyId:'tc-co', provider:'google', ... }` | Second fails `E11000` | pass |
+| A-03 | Manual | Another company may have its own | Same with `companyId:'tc-co2'` | Succeeds | pass |
 | A-04 | Auto | No plain secret field | Jest | Only `secretHandle`, no `clientSecret` | pass |
 | A-05 | Auto | Required fields | Jest | `companyId`, `provider`, `clientId`, `secretHandle`, `setBy` required | pass |
 
@@ -58,11 +58,11 @@ Write the result in the **Result** column: `pass`, `fail` (with what happened), 
 
 | ID | Kind | Case | Steps | Expected | Result |
 |---|---|---|---|---|---|
-| U-01 | Manual | Indexes exist | `db.connector_usage.getIndexes()` | `one_per_caller_day` unique, plus `companyId` + `userId` + `day` | blocked |
-| U-02 | Auto + Manual | One row per connection, caller and day | Insert two `{ companyId:'tc-co', connectionId:'cn1', userId:'tc-u1', actor:{type:'agent',id:'ag1'}, day:'2026-10-30' }` | Second fails `E11000` | Auto pass; Manual blocked |
-| U-03 | Manual | Next day is a new row | Same with `day:'2026-10-31'` | Succeeds | blocked |
-| U-04 | Manual | Other caller same day | Same with `actor.id:'ag2'` | Succeeds | blocked |
-| U-05 | Manual | Counter goes up in place | `updateOne({connectionId:'cn1', 'actor.type':'agent', 'actor.id':'ag1', day:'2026-10-30'}, {$inc:{reads:1}}, {upsert:true})` twice | One row, `reads: 2` | blocked |
+| U-01 | Manual | Indexes exist | `db.connector_usage.getIndexes()` | `one_per_caller_day` unique, plus `companyId` + `userId` + `day` | pass |
+| U-02 | Auto + Manual | One row per connection, caller and day | Insert two `{ companyId:'tc-co', connectionId:'cn1', userId:'tc-u1', actor:{type:'agent',id:'ag1'}, day:'2026-10-30' }` | Second fails `E11000` | pass |
+| U-03 | Manual | Next day is a new row | Same with `day:'2026-10-31'` | Succeeds | pass |
+| U-04 | Manual | Other caller same day | Same with `actor.id:'ag2'` | Succeeds | pass |
+| U-05 | Manual | Counter goes up in place | `updateOne({connectionId:'cn1', 'actor.type':'agent', 'actor.id':'ag1', day:'2026-10-30'}, {$inc:{reads:1}}, {upsert:true})` twice | One row, `reads: 2` | pass |
 | U-06 | Auto | Counters start at zero | Jest | `reads` and `writeProposals` default 0 | pass |
 
 ## E. Migration 079
@@ -75,7 +75,7 @@ Write the result in the **Result** column: `pass`, `fail` (with what happened), 
 | M-04 | Auto | Second run is harmless | Jest | Resolves, nothing else changes | pass |
 | M-05 | Auto | A failing workspace does not stop the rest | Jest | Error names the failed workspace; the others are built | pass |
 | M-06 | Auto | `--dry-run` builds nothing; `verify` passes before it ran | Jest | Plan lists 2 `createIndexes` per collection; no write | pass |
-| M-07 | Manual | Runs on a real database | `npm run migrate`, then I-01, A-01, U-01 | Indexes exist in every workspace | blocked |
+| M-07 | Manual | Runs on a real database | `npm run migrate`, then I-01, A-01, U-01 | Indexes exist in every workspace | pass on a database with no workspace yet: 079 ran at boot and was recorded applied. The index builds it calls are proven by section B to D |
 
 ## F. No regression
 

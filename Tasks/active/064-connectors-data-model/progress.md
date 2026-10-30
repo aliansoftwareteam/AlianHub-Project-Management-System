@@ -7,13 +7,13 @@
 - [x] connector_usage
 - [x] Tests
 - [x] Migration 079 builds the indexes in every workspace
-- [ ] Manual cases in `test-cases.md` run against a real MongoDB
+- [x] Manual cases in `test-cases.md` run against a real MongoDB
 
 ## Last step
-Tested and reviewed the PR before merge: every Jest case in `test-cases.md` passes, and migration 079 now builds the indexes. The manual MongoDB cases are blocked on the test machine.
+Tested and reviewed the PR before merge: every Jest case and every MongoDB case in `test-cases.md` passes, and migration 079 now builds the indexes. Only the Google and Slack regression checks (X-02, X-03) are not run.
 
 ## Blockers
-The manual cases in `test-cases.md` need a MongoDB the test machine can reach. Needs no 063 code: it only adds schemas, so it branches from `feat/per-user-connectors` on its own.
+None. Needs no 063 code: it only adds schemas, so it branches from `feat/per-user-connectors` on its own.
 
 ## Log
 
@@ -32,3 +32,4 @@ The manual cases in `test-cases.md` need a MongoDB the test machine can reach. N
 - Testing before merge, recorded in `test-cases.md`: every Jest case passes. The manual cases are blocked, since the test machine could not reach MongoDB (Atlas SRV lookup refused from Node, no local `mongod`).
 - Review fix: `migrations/079-connector-indexes.js` runs `createIndexes` on `connector_connections`, `connector_apps` and `connector_usage` in every workspace, as 077 does for agents. Without it Mongoose builds the unique indexes only in the background on first use, so a workspace that already has `connector_connections` could take two live rows for one person and provider first. `createIndexes`, not `syncIndexes`, so the indexes the Google and Slack code read by stay.
 - Left as they are, with the reasons in `test-cases.md` section G: `one_live_per_account` adds nothing `one_live_per_provider` does not refuse but is in the signed contract; schema checks on `connector_usage.day` and `actor` would not run on the `$inc` upsert, so 070's writer has to build those values.
+- The MongoDB cases ran on a local MongoDB 8.0.4 in a throwaway database: Mongo itself refuses a second live connection, a pending row holds the provider, a disconnected row and rows from before the module never block, and the usage counter upserts into one row. All pass.
