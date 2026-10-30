@@ -122,7 +122,7 @@ describe('the platform source', () => {
 describe('what the owner sees on a hosted instance', () => {
     it('hides the value of every managed row, set or not, secret or not', async () => {
         const { settings, row } = await boot({ env: { WEBURL: 'https://acme.alianhub.com' }, stored: { values: {}, platformValues: { NODEMAILER_HOST: 'smtp.internal' } } });
-        for (const key of ['WEBURL', 'NODEMAILER_HOST', 'NODEMAILER_PORT', 'RESEND_API_KEY', 'TURN_URLS']) {
+        for (const key of ['WEBURL', 'NODEMAILER_HOST', 'NODEMAILER_PORT', 'RESEND_API_KEY', 'HELMET_ENABLED']) {
             expect(row(key)).toMatchObject({ managed: true, locked: true, value: null, default: null });
         }
         expect(row('NODEMAILER_HOST').source).toBe('platform');
@@ -135,6 +135,7 @@ describe('what the owner sees on a hosted instance', () => {
         expect(row('APP_NAME')).toMatchObject({ managed: false, locked: false, value: 'Acme Projects', source: 'saved' });
         expect(row('AI_MODEL')).toMatchObject({ managed: false, locked: false, value: 'gpt-4.1' });
         expect(row('STUN_URLS')).toMatchObject({ managed: false });
+        expect(row('TURN_URLS')).toMatchObject({ managed: false });
     });
 
     it('does not apply an owner value saved for a platform-owned key', async () => {
