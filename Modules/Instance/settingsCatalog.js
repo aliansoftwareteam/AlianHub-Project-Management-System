@@ -23,11 +23,20 @@ const onOff = (value) => (require('../Mcp/defaultOn').isOn(value) ? 'true' : 'fa
 
 const field = (key, group, type, extra = {}) => ({ key, group, type, secret: type === 'secret', default: '', ...extra });
 
+const timeZoneError = (value) => {
+    try {
+        new Intl.DateTimeFormat('en-US', { timeZone: value });
+        return null;
+    } catch {
+        return 'timezone';
+    }
+};
+
 const CATALOG = [
     field('APP_NAME', 'general', 'text', { default: 'AlianHub', label: 'Product name', owner: 'customer' }),
     field('WEBURL', 'general', 'text', { label: 'Public web URL', help: 'The address people open in the browser; used in emails and OAuth callbacks.' }),
     field('APIURL', 'general', 'text', { label: 'Public API URL', help: 'Usually the web URL with a trailing slash.' }),
-    field('CRON_TZ', 'general', 'text', { default: 'UTC', label: 'Scheduler time zone', restart: true, owner: 'customer' }),
+    field('CRON_TZ', 'general', 'timezone', { default: 'UTC', label: 'Scheduler time zone', restart: true, owner: 'customer', validate: timeZoneError }),
 
     field('NODEMAILER_HOST', 'mail', 'text', { label: 'SMTP host' }),
     field('NODEMAILER_PORT', 'mail', 'number', { default: '587', label: 'SMTP port', help: '587 (STARTTLS) or 465 (TLS).' }),
@@ -131,10 +140,10 @@ const CATALOG = [
     field('TWO_FACTOR_ISSUER', 'auth', 'text', { default: 'AlianHub', label: 'Name in authenticator apps' }),
 
     field('STUN_URLS', 'calling', 'text', { default: 'stun:stun.l.google.com:19302', label: 'STUN servers' }),
-    field('TURN_URLS', 'calling', 'text', { label: 'TURN servers', help: 'Comma-separated, e.g. turn:turn.example.com:3478', owner: 'platform' }),
-    field('TURN_STATIC_AUTH_SECRET', 'calling', 'secret', { label: 'TURN static auth secret', owner: 'platform' }),
-    field('TURN_USERNAME', 'calling', 'text', { label: 'TURN username (fallback)', owner: 'platform' }),
-    field('TURN_PASSWORD', 'calling', 'secret', { label: 'TURN password (fallback)', owner: 'platform' }),
+    field('TURN_URLS', 'calling', 'text', { label: 'TURN servers', help: 'Comma-separated, e.g. turn:turn.example.com:3478' }),
+    field('TURN_STATIC_AUTH_SECRET', 'calling', 'secret', { label: 'TURN static auth secret' }),
+    field('TURN_USERNAME', 'calling', 'text', { label: 'TURN username (fallback)' }),
+    field('TURN_PASSWORD', 'calling', 'secret', { label: 'TURN password (fallback)' }),
 
     field('TRUST_PROXY', 'security', 'text', { default: 'loopback', label: 'Trusted proxies', help: '"loopback", a hop count such as "1", or "true" behind any proxy.', restart: true }),
     field('GLOBAL_RATE_LIMIT_PER_MIN', 'security', 'number', { default: '1000', label: 'API requests per minute per IP', help: '0 turns the limit off.', restart: true }),

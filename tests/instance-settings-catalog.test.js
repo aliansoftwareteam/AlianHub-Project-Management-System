@@ -6,7 +6,7 @@ describe('the settings catalog', () => {
         expect(new Set(keys).size).toBe(keys.length);
         for (const f of CATALOG) {
             expect(GROUPS).toContain(f.group);
-            expect(['text', 'secret', 'number', 'boolean', 'select', 'list']).toContain(f.type);
+            expect(['text', 'secret', 'number', 'boolean', 'select', 'list', 'timezone']).toContain(f.type);
             expect(f.secret).toBe(f.type === 'secret');
             if (f.type === 'select') expect(f.options.length).toBeGreaterThan(1);
         }
@@ -42,6 +42,13 @@ describe('the settings catalog', () => {
         expect(validateSettings({ S3_PREFIX: 'ins_01jd3k/' }).valid).toBe(true);
         expect(validateSettings({ S3_PREFIX: 'a/../b/' }).errors).toEqual({ S3_PREFIX: 'prefix' });
         expect(validateSettings({ S3_PREFIX: 'a//b' }).errors).toEqual({ S3_PREFIX: 'prefix' });
+    });
+
+    it('takes only a time zone the runtime knows for the scheduler', () => {
+        expect(byKey.get('CRON_TZ').type).toBe('timezone');
+        expect(validateSettings({ CRON_TZ: 'Asia/Kolkata' }).values).toEqual({ CRON_TZ: 'Asia/Kolkata' });
+        expect(validateSettings({ CRON_TZ: 'UTC' }).valid).toBe(true);
+        expect(validateSettings({ CRON_TZ: 'Mars/Olympus' }).errors).toEqual({ CRON_TZ: 'timezone' });
     });
 });
 

@@ -16,7 +16,7 @@ describe('who owns each setting on a hosted instance', () => {
 
     it.each([
         ['WEBURL', 'platform'], ['APIURL', 'platform'], ['APP_NAME', 'customer'], ['CRON_TZ', 'customer'],
-        ['TURN_URLS', 'platform'], ['TURN_STATIC_AUTH_SECRET', 'platform'], ['TURN_USERNAME', 'platform'], ['TURN_PASSWORD', 'platform'], ['STUN_URLS', 'customer'],
+        ['TURN_URLS', 'customer'], ['TURN_STATIC_AUTH_SECRET', 'customer'], ['TURN_USERNAME', 'customer'], ['TURN_PASSWORD', 'customer'], ['STUN_URLS', 'customer'],
         ['TRUST_PROXY', 'platform'], ['GLOBAL_RATE_LIMIT_PER_MIN', 'platform'], ['HELMET_ENABLED', 'platform'], ['WEBHOOK_ALLOWED_PRIVATE_HOSTS', 'platform'],
         ['PERMISSION_ENFORCEMENT_MODE', 'customer'], ['AUDIT_RETENTION_DAYS', 'customer'],
     ])('gives %s to the %s', (key, owner) => {
