@@ -5,11 +5,11 @@
         <template v-else>
             <div class="in-actions">
                 <div class="ah-tabs">
-                    <button v-for="g in groups" :key="g" type="button" class="ah-tab" :class="{ 'is-active': group === g }" @click="group = g">{{ $t(`Instance.group_${g}`) }}</button>
+                    <button v-for="g in shownGroups" :key="g" type="button" class="ah-tab" :class="{ 'is-active': group === g }" @click="group = g">{{ $t(`Instance.group_${g}`) }}</button>
                 </div>
                 <div class="ah-toolbar__spacer"></div>
-                <button v-if="testable && !groupManaged" type="button" class="ah-btn ah-btn--secondary ah-btn--sm" :disabled="busy" data-test="instance-settings-test" @click="test">{{ group === 'ai' ? $t('Instance.test_connection') : $t('Instance.test') }}</button>
-                <button v-if="!groupManaged" type="button" class="ah-btn ah-btn--primary ah-btn--sm" :disabled="busy || !dirty" @click="save">{{ busy ? $t('Instance.saving') : $t('Instance.save') }}</button>
+                <button v-if="testable" type="button" class="ah-btn ah-btn--secondary ah-btn--sm" :disabled="busy" data-test="instance-settings-test" @click="test">{{ group === 'ai' ? $t('Instance.test_connection') : $t('Instance.test') }}</button>
+                <button type="button" class="ah-btn ah-btn--primary ah-btn--sm" :disabled="busy || !dirty" @click="save">{{ busy ? $t('Instance.saving') : $t('Instance.save') }}</button>
             </div>
 
             <div v-if="restartKeys.length && hosted" class="in-banner in-banner--warn in-restart" data-test="instance-restart-banner">
@@ -26,47 +26,41 @@
                     <li v-for="model in testResult.models" :key="model"><code class="ah-mono">{{ model }}</code></li>
                 </ul>
             </div>
-            <p class="ah-small">{{ hosted ? $t('Instance.managed_settings_lead') : $t('Instance.settings_lead') }} <a :href="guide('configure')" target="_blank" rel="noopener">{{ $t('Instance.guide') }}</a></p>
+            <p class="ah-small">{{ hosted ? $t('Instance.hosted_settings_lead') : $t('Instance.settings_lead') }} <a :href="guide('configure')" target="_blank" rel="noopener">{{ $t('Instance.guide') }}</a></p>
 
-            <section v-if="groupManaged" class="ah-card in-card" data-test="instance-managed-card">
-                <div class="in-card__head"><ShellIcon name="lock" :size="15" /><span class="in-card__title">{{ managedGroupNames }}</span></div>
-                <p>{{ $t('Instance.managed_card_body') }}</p>
-                <a v-if="managedGroups.includes('mail')" href="#" data-test="instance-own-smtp" @click.prevent="openUpgrade(router, cid)">{{ $t('Instance.managed_own_smtp') }}</a>
-            </section>
-
-            <section v-else class="ah-card in-card">
-                <div v-for="row in visible" :key="row.key" class="in-field">
-                    <div>
-                        <label class="in-field__label" :for="`f-${row.key}`">
-                            {{ label(row) }}
-                            <span v-if="row.managed" class="ah-chip ah-chip--mono" :title="$t('Instance.managed_help')">{{ $t('Instance.managed_lock') }}</span>
-                            <span v-else-if="row.locked" class="ah-chip ah-chip--mono" :title="$t('Instance.locked_help')">{{ $t('Instance.locked') }}</span>
-                            <span v-if="row.restart" class="ah-chip ah-chip--warn">{{ $t('Instance.restart') }}</span>
-                        </label>
-                        <div class="in-field__help">{{ help(row) }} <code class="ah-mono">{{ row.key }}</code></div>
-                    </div>
-                    <div v-if="row.managed" class="in-field__control" :data-test="`instance-managed-${row.key}`">
-                        <span v-if="row.key === 'WEBURL' && publicConfig.webUrl" class="ah-mono">{{ publicConfig.webUrl }}</span>
-                        <span class="ah-small in-managed"><ShellIcon name="lock" :size="12" />{{ $t('Instance.managed_by_cloud') }}</span>
-                    </div>
-                    <div v-else class="in-field__control">
-                        <select v-if="row.type === 'select'" :id="`f-${row.key}`" v-model="draft[row.key]" class="ah-input" :disabled="row.locked">
-                            <option v-for="o in row.options" :key="o" :value="o">{{ optionLabel(row, o) }}</option>
-                        </select>
-                        <label v-else-if="row.type === 'boolean'" class="in-toggle">
-                            <input :id="`f-${row.key}`" v-model="draft[row.key]" type="checkbox" class="ah-check" true-value="true" false-value="false" :disabled="row.locked" />
-                            <span>{{ draft[row.key] === 'true' ? $t('Instance.on') : $t('Instance.off') }}</span>
-                        </label>
-                        <template v-else-if="row.secret">
-                            <input :id="`f-${row.key}`" v-model="draft[row.key]" type="password" autocomplete="new-password" class="ah-input" :disabled="row.locked" :placeholder="row.value.set ? $t('Instance.secret_set') : $t('Instance.secret_unset')" />
-                            <label v-if="row.value.set && !row.locked" class="ah-small in-clear"><input v-model="clear[row.key]" type="checkbox" class="ah-check" /> {{ $t('Instance.clear_secret') }}</label>
-                        </template>
-                        <textarea v-else-if="row.type === 'list'" :id="`f-${row.key}`" v-model="draft[row.key]" rows="4" class="ah-input in-list" :class="{ 'ah-input--error': errors[row.key] }" :disabled="row.locked" :placeholder="$t('Instance.allowlist_placeholder')" :data-test="`instance-setting-${row.key}`"></textarea>
-                        <input v-else :id="`f-${row.key}`" v-model="draft[row.key]" :type="row.type === 'number' ? 'number' : 'text'" class="ah-input" :class="{ 'ah-input--error': errors[row.key] }" :disabled="row.locked" :placeholder="row.default || ''" />
-                        <span v-if="errors[row.key]" class="ah-field__error">{{ $t(`Instance.err_${errors[row.key]}`) }}</span>
-                        <span v-else-if="row.source === 'default' && !row.secret" class="ah-small">{{ $t('Instance.using_default') }}</span>
+            <section v-for="section in sections" :key="section.id" class="ah-card in-card" :data-test="`instance-section-${section.id}`">
+                <div v-if="sectionText(section, '')" class="in-section__head">
+                    <h3 class="in-card__title">{{ sectionText(section, '') }}</h3>
+                    <p v-if="sectionText(section, '_note')" class="ah-small in-section__note">
+                        {{ sectionText(section, '_note') }}
+                        <a v-if="section.href && sectionText(section, '_link')" :href="section.href" target="_blank" rel="noopener">{{ sectionText(section, '_link') }}</a>
+                    </p>
+                    <div v-if="section.paste" class="in-paste" :data-test="`instance-paste-${section.id}`">
+                        <span class="ah-small">{{ sectionText(section, '_paste') }}</span>
+                        <code class="ah-mono">{{ origin }}</code>
+                        <button type="button" class="ah-btn ah-btn--ghost ah-btn--sm" @click="copy(origin)">{{ $t('Instance.copy') }}</button>
                     </div>
                 </div>
+
+                <InstanceSettingField v-for="row in section.rows" :key="row.key" v-model="draft[row.key]" v-model:clear="clear[row.key]" :row="row" :error="errors[row.key] || ''" :hosted="hosted" />
+
+                <fieldset v-if="section.choice" class="in-choice">
+                    <legend class="in-field__label">{{ $t(`Instance.choice_${section.choice}`) }}</legend>
+                    <label v-for="option in CHOICES[section.choice].options" :key="option" class="in-choice__option">
+                        <input v-model="ui[section.choice]" type="radio" class="ah-check" :value="option" :name="section.choice" :data-test="`instance-choice-${option}`" />
+                        <span>
+                            <span class="in-choice__name">{{ $t(`Instance.choice_${section.choice}_${option}`) }}</span>
+                            <span class="ah-small in-choice__help">{{ $t(`Instance.choice_${section.choice}_${option}_help`) }}</span>
+                        </span>
+                    </label>
+                </fieldset>
+
+                <InstanceSettingField v-for="row in section.choiceRows" :key="row.key" v-model="draft[row.key]" v-model:clear="clear[row.key]" :row="row" :error="errors[row.key] || ''" :hosted="hosted" />
+
+                <details v-if="section.advancedRows.length" class="in-advanced">
+                    <summary class="ah-small">{{ sectionText(section, '_advanced') || $t('Instance.advanced') }}</summary>
+                    <InstanceSettingField v-for="row in section.advancedRows" :key="row.key" v-model="draft[row.key]" v-model:clear="clear[row.key]" :row="row" :error="errors[row.key] || ''" :hosted="hosted" />
+                </details>
             </section>
 
             <InstanceAgents v-if="group === 'ai'" />
@@ -76,23 +70,23 @@
 
 <script setup>
 import { computed, inject, onMounted, reactive, ref, watch } from "vue";
-import { useRoute, useRouter } from "vue-router";
+import { useRoute } from "vue-router";
 import { useI18n } from "vue-i18n";
 import { useToast } from "vue-toast-notification";
 import ShellIcon from "@/components/organisms/Shell/ShellIcon.vue";
 import { apiRequestWithoutCompnay } from "@/services";
 import { isManagedHosting, publicConfig } from "@/config/publicConfig";
-import { openUpgrade } from "@/composable/upgradeLink";
 import { restartAndWait } from "./restartInstance";
 import { useInstanceApi } from "./useInstanceApi";
 import InstanceAgents from "./InstanceAgents.vue";
+import InstanceSettingField from "./InstanceSettingField.vue";
+import { CHOICES, layout } from "./settingsLayout";
 
 defineOptions({ name: "InstanceSettings" });
 
 const { t, te } = useI18n();
 const $toast = useToast();
 const route = useRoute();
-const router = useRouter();
 const cid = inject("$companyId");
 const { get, post, put, message, guide, env } = useInstanceApi();
 
@@ -103,24 +97,32 @@ const group = ref(String(route.query.group || "general"));
 const draft = reactive({});
 const clear = reactive({});
 const errors = reactive({});
+const ui = reactive({});
 const busy = ref(false);
 const error = ref("");
 const restartKeys = ref([]);
 const testResult = ref(null);
 const restartState = ref("idle");
 let baseline = {};
+let uiBaseline = {};
 
-const visible = computed(() => rows.value.filter((r) => r.group === group.value && !r.hidden));
-const testable = computed(() => TESTABLE.includes(group.value));
 const hosted = computed(() => isManagedHosting());
-const allManaged = (list) => list.length > 0 && list.every((r) => r.managed);
-const groupManaged = computed(() => allManaged(visible.value));
-const managedGroups = computed(() => groups.value.filter((g) => allManaged(rows.value.filter((r) => r.group === g))));
-const managedGroupNames = computed(() => managedGroups.value.map((g) => t(`Instance.group_${g}`)).join(" · "));
-const dirty = computed(() => Object.keys(draft).some((k) => draft[k] !== baseline[k]) || Object.values(clear).some(Boolean));
-const label = (row) => (te(`Instance.f_${row.key}`) ? t(`Instance.f_${row.key}`) : row.label);
-const help = (row) => (te(`Instance.h_${row.key}`) ? t(`Instance.h_${row.key}`) : row.help);
-const optionLabel = (row, option) => (te(`Instance.o_${row.key}_${option}`) ? t(`Instance.o_${row.key}_${option}`) : option);
+/* A hosted owner sees only what they can change: what AlianHub Cloud or the environment sets is left out. */
+const shown = (row) => !row.hidden && !(hosted.value && row.locked);
+const shownGroups = computed(() => groups.value.filter((g) => rows.value.some((r) => r.group === g && shown(r))));
+const visible = computed(() => rows.value.filter((r) => r.group === group.value && shown(r)));
+const sections = computed(() => layout(group.value, visible.value, draft, ui));
+const testable = computed(() => TESTABLE.includes(group.value));
+const origin = computed(() => (publicConfig.webUrl || window.location.origin).replace(/\/+$/, ""));
+const dirty = computed(() => Object.keys(draft).some((k) => draft[k] !== baseline[k])
+    || Object.values(clear).some(Boolean)
+    || Object.keys(ui).some((k) => ui[k] !== uiBaseline[k]));
+
+const sectionText = (section, suffix) => {
+    const base = `Instance.sec_${group.value}_${section.id}${suffix}`;
+    if (section.variant && te(`${base}_${section.variant}`)) return t(`${base}_${section.variant}`);
+    return te(base) ? t(base) : "";
+};
 
 function seed(list) {
     rows.value = list;
@@ -128,7 +130,9 @@ function seed(list) {
     Object.keys(clear).forEach((k) => delete clear[k]);
     Object.keys(errors).forEach((k) => delete errors[k]);
     for (const row of list) draft[row.key] = row.secret ? "" : (row.value ?? "");
+    for (const [name, choice] of Object.entries(CHOICES)) ui[name] = choice.initial(list);
     baseline = { ...draft };
+    uiBaseline = { ...ui };
 }
 
 async function load() {
@@ -137,17 +141,23 @@ async function load() {
         const data = await get(env.INSTANCE_SETTINGS);
         groups.value = data.groups;
         seed(data.settings);
+        if (!shownGroups.value.includes(group.value)) group.value = shownGroups.value[0] || group.value;
     } catch (e) {
         error.value = message(e);
     }
 }
 
-/* Only what changed travels: a secret left blank stays as it is on the server. */
+/* Only what changed travels: a secret left blank stays as it is on the server. The fields of a
+ * choice the owner moved away from are cleared, so the server never falls back to them. */
 function patch() {
     const body = {};
+    const dropped = new Set(Object.entries(CHOICES).flatMap(([name, choice]) =>
+        Object.entries(choice.keys).filter(([option]) => option !== ui[name]).flatMap(([, keys]) => keys)));
     for (const row of rows.value) {
         if (row.locked) continue;
-        if (row.secret) {
+        if (dropped.has(row.key)) {
+            if (row.secret ? row.value?.set : row.value) body[row.key] = "";
+        } else if (row.secret) {
             if (clear[row.key]) body[row.key] = "";
             else if (draft[row.key]) body[row.key] = draft[row.key];
         } else if (draft[row.key] !== baseline[row.key]) body[row.key] = draft[row.key];
@@ -188,6 +198,15 @@ async function test() {
     }
 }
 
+async function copy(text) {
+    try {
+        await navigator.clipboard.writeText(text);
+        $toast.success(t("Instance.copied"));
+    } catch {
+        $toast.error(t("Instance.copy_failed"));
+    }
+}
+
 async function restartNow() {
     restartState.value = "restarting";
     try {
@@ -204,13 +223,22 @@ onMounted(load);
 </script>
 
 <style scoped>
-.in-toggle { display: inline-flex; align-items: center; gap: 8px; font: var(--text-small); color: var(--ink); cursor: pointer; }
-.in-clear { display: inline-flex; align-items: center; gap: 6px; cursor: pointer; }
-.in-list { height: auto; min-height: 88px; resize: vertical; font-family: var(--font-mono, monospace); }
 .in-models { margin: 0 0 12px; }
 .in-models__list { display: flex; flex-wrap: wrap; gap: 6px; margin: 6px 0 0; padding: 0; list-style: none; }
 .in-models__list code { overflow-wrap: anywhere; }
-.in-managed { display: inline-flex; align-items: center; gap: 6px; }
 .in-restart { align-items: center; }
 .in-restart > span:not(.ah-spin) { flex: 1; }
+.in-section__head { display: flex; flex-direction: column; gap: 6px; padding-bottom: 4px; }
+.in-section__head .in-card__title { margin: 0; font-size: 14px; }
+.in-section__note { margin: 0; max-width: 760px; color: var(--ink-2); }
+.in-paste { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+.in-paste code { padding: 2px 6px; border-radius: 6px; background: var(--hairline); color: var(--ink); overflow-wrap: anywhere; }
+.in-choice { border: 0; margin: 0; padding: 10px 0; display: flex; flex-direction: column; gap: 8px; border-bottom: 1px solid var(--hairline); }
+.in-choice legend { padding: 0; margin-bottom: 8px; }
+.in-choice__option { display: flex; gap: 8px; align-items: flex-start; cursor: pointer; max-width: 760px; }
+.in-choice__option > span { display: flex; flex-direction: column; gap: 2px; }
+.in-choice__name { font: 600 12.5px/1.3 var(--font-ui); color: var(--ink); }
+.in-choice__help { color: var(--ink-2); }
+.in-advanced { padding-top: 8px; }
+.in-advanced summary { cursor: pointer; color: var(--ink-2); padding: 4px 0; }
 </style>
