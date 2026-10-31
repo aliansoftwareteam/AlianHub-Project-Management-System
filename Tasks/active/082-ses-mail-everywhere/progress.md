@@ -10,11 +10,11 @@
 - [x] Cloud: docs, tests, lint and build
 - [ ] Owner puts a working SES key in the `.env` files
 - [ ] Real sends from the cloud portal and the app to harmit.mendapara@aliansoftware.net only
-- [ ] PRs: app into `chore/pre-staging`, cloud into `main`
+- [x] PRs: app #1745 into `chore/pre-staging`, cloud #14 into `main`
 
 ## Last step
 
-Code for both repos built and tested with mocked SES; waiting for a working SES key for the real sends.
+PRs open (AlianHub #1745, alianhub-cloud #14); waiting for a working SES key for the real sends.
 
 ## Blockers
 
@@ -33,3 +33,4 @@ Code for both repos built and tested with mocked SES; waiting for a working SES 
 - App checks: new `tests/mail-provider.test.js` 19/19; the 86 test files that load the touched modules pass except `process-guards` (known Windows path failure on a clean base); frontend instance-settings specs 88/88; `i18n:check`, `style:check`, `env:doc:check` pass.
 - Cloud (`feat/ses-mail`, commits `d5ba5df`, `2250e1d`): SES v2 provider in `server/lib/mail.js`, all-or-none `AWS_SES_*` and `INSTANCE_AWS_SES_*`, production accepts SES in place of Resend, `mailSettings()` pushes `AWS_SES_*`, decision 104. Lint clean; mail, config and adapter tests 75/75.
 - Release order: an instance accepts the pushed `AWS_SES_*` keys only from an AlianHub image that has this task's settings fields, so `INSTANCE_AWS_SES_*` are set in the cloud only after that image is the release.
+- Opened AlianHub #1745 (into `chore/pre-staging`) and alianhub-cloud #14 (into `main`, rebased on `130293e` after #6, #7, #8 and #13 merged; server 362/362, portal 50/50, ops 33/33, agent 25/25, lint and build clean).
