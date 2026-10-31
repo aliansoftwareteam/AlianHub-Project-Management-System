@@ -71,7 +71,7 @@ Auto-maintained registry of all tasks. Reflects YAML frontmatter from each `task
 | 063 | Connectors — the two-track contract, provider definition format, registry and the Google provider file | active | high | — | active/063-connectors-provider-definition |
 | 064 | Connectors — data model: evolve connector_connections, add connector_apps and connector_usage | active | high | 063 | active/064-connectors-data-model |
 | 065 | Connectors — OAuth app lookup (instance default, company override) and the secrets-store guard | active | high | 063, 064 | active/065-connectors-oauth-apps-secrets-guard |
-| 066 | Connectors — generic connect, products, reconnect and disconnect handlers | backlog | high | 065 | backlog/066-connectors-connect-lifecycle |
+| 066 | Connectors — generic connect, products, reconnect and disconnect handlers | active | high | 065 | active/066-connectors-connect-lifecycle |
 | 067 | Connectors — end a member's connections on removal, deactivation or SCIM, plus a daily sweep | backlog | high | 066 | backlog/067-connectors-member-removal-sweep |
 | 068 | Connectors — tool framework: one definition registered for agents and MCP | active | high | 063 | active/068-connectors-tool-framework |
 | 069 | Connectors — every outside write is a proposal only the connection owner approves | active | high | 068 | active/069-connectors-write-approvals |

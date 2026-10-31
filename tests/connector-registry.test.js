@@ -122,17 +122,16 @@ describe('a provider definition', () => {
     });
 });
 
-describe('resolveConnection, until 066', () => {
+/* The real lookup (066) reads the database for the connection and the seat; those paths are covered in
+ * connector-lifecycle.test.js with the store and roles mocked. Here only the answers that need neither: a
+ * provider that cannot be offered is refused before any lookup. */
+describe('resolveConnection (066): provider_off before any lookup', () => {
     it('refuses a provider that does not exist', async () => {
         await expect(resolveConnection({ companyId: 'c', userId: 'u', provider: 'ghost' })).rejects.toMatchObject({ code: CODE.PROVIDER_OFF });
     });
 
     it('refuses a provider CONNECTORS does not name', async () => {
         await withEnv({ CONNECTORS: 'slack' }, () => expect(resolveConnection({ companyId: 'c', userId: 'u', provider: 'google' })).rejects.toMatchObject({ code: CODE.PROVIDER_OFF, provider: 'google' }));
-    });
-
-    it('says the person has not connected', async () => {
-        await withEnv({ CONNECTORS: 'google' }, () => expect(resolveConnection({ companyId: 'c', userId: 'u', provider: 'google' })).rejects.toMatchObject({ code: CODE.NOT_CONNECTED, provider: 'google' }));
     });
 
     it('needs a company and a person', async () => {

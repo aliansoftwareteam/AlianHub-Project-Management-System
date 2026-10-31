@@ -2748,6 +2748,7 @@
     "AuditEvents.connector_call": "An agent read from a connected service",
     "AuditEvents.connector_channels_set": "Chose the Slack channels agents may use",
     "AuditEvents.connector_connect": "Connected a service",
+    "AuditEvents.connector_products_changed": "Changed what a connected service may do",
     "AuditEvents.connector_revoke": "Disconnected a service",
     "AuditEvents.custom_field_deleted": "Deleted a custom field",
     "AuditEvents.dispatcher_pack_applied": "Turned on a team pack",

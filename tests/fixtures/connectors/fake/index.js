@@ -4,6 +4,7 @@ module.exports = {
     auth: {
         authorizeUrl: 'https://auth.fake.test/authorize',
         tokenUrl: 'https://api.fake.test/token',
+        revokeUrl: 'https://api.fake.test/revoke',
         pkce: 'S256',
         baseScopes: ['profile'],
     },

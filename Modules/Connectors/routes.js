@@ -2,6 +2,9 @@ const rateLimit = require('express-rate-limit');
 const flag = require('../Agents/connectors/flag');
 const ctrl = require('./controller');
 const google = require('./googleController');
+const providers = require('./connectorsController');
+const registry = require('./registry');
+const { agentsRefused } = require('../Agents/guard');
 const { CALLBACK_PATH } = require('../Agents/connectors/googleConnection');
 
 // Saving a token, refreshing the channel list, and connecting or ending a Google connection each call the provider.
@@ -38,8 +41,24 @@ const appRoutes = (app) => {
     app.delete('/api/v2/connectors/apps/:provider', providerLimiter, ctrl.removeApp);
 };
 
+/* The one lifecycle for every registry provider (066). `connections` and `apps` are literal segments, so a
+ * provider id in `/:provider/connect` never collides with them or with the legacy google /:connector routes. */
+const genericRoutes = (app) => {
+    // Outside the /api/v2/connectors prefix on purpose: a provider's redirect carries no session.
+    app.get('/api/v1/connector-oauth/:provider/callback', callbackLimiter, providers.callback);
+    // A person's own connections and the providers offered to the workspace: any member with a seat, never a guest or an API token. No route returns a token.
+    app.get('/api/v2/connectors', providers.list);
+    app.get('/api/v2/connectors/members', providers.members);
+    // A person connects their own account; an agent or automation never may, so the write routes refuse one.
+    app.post('/api/v2/connectors/:provider/connect', agentsRefused('connector.connect'), providerLimiter, providers.connect);
+    app.post('/api/v2/connectors/:provider/complete', agentsRefused('connector.connect'), providerLimiter, providers.complete);
+    app.put('/api/v2/connectors/connections/:id/products', agentsRefused('connector.products_changed'), providerLimiter, providers.setProducts);
+    app.delete('/api/v2/connectors/connections/:id', agentsRefused('connector.revoke'), providerLimiter, providers.disconnect);
+};
+
 exports.init = (app) => {
     if (flag.requested().includes('slack')) slackRoutes(app);
     if (flag.requestedGoogle().length) googleRoutes(app);
     if (flag.requested().length) appRoutes(app);
+    if (registry.list().some((definition) => flag.named().includes(definition.id))) genericRoutes(app);
 };
