@@ -20,6 +20,7 @@ export const SECTIONS = {
     mail: [
         { id: "smtp", keys: ["NODEMAILER_HOST", "NODEMAILER_PORT", "NODEMAILER_EMAIL", "NODEMAILER_USER", "NODEMAILER_EMAIL_PASSWORD"] },
         { id: "resend", keys: ["RESEND_API_KEY", "RESEND_FROM_EMAIL"], link: "https://resend.com/api-keys" },
+        { id: "ses", keys: ["AWS_SES_REGION", "AWS_SES_KEY", "AWS_SES_SECRET", "AWS_SES_FROM_DEFAULT"], link: "https://console.aws.amazon.com/ses/home" },
     ],
     storage: [
         { id: "driver", keys: ["STORAGE_TYPE"] },

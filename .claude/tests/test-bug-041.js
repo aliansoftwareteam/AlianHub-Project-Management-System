@@ -7,10 +7,8 @@
  *
  * Post-fix:
  *   1. `aws-sdk` removed from package.json.
- *   2. `Config/aws.js` builds the SES client from `@aws-sdk/client-ses`
- *      and exposes a v2-shaped `.sendEmail(params, cb)` shim so the one
- *      consumer (`Modules/servicewithAWS.js`) doesn't have to rewrite
- *      its callback contract.
+ *   2. SES mail goes through `@aws-sdk/client-ses` in `Modules/mailProvider.js`
+ *      (task 083 replaced the old `Config/aws.js` shim and `servicewithAWS.js`).
  *   3. No live `require('aws-sdk')` remains anywhere in source.
  */
 
@@ -46,7 +44,7 @@ function liveLinesContaining(src, needle) {
     });
 }
 
-['Config/aws.js', 'Modules/servicewithAWS.js'].forEach(file => {
+['Config/aws.js', 'Modules/mailProvider.js'].forEach(file => {
     const src = readSrc(file);
     const live = liveLinesContaining(src, "require('aws-sdk')");
     assert(live.length === 0, `${file} has no live require('aws-sdk') (found ${live.length})`);
@@ -54,48 +52,9 @@ function liveLinesContaining(src, needle) {
     assert(liveSub.length === 0, `${file} has no live require('aws-sdk/...') (found ${liveSub.length})`);
 });
 
-// 4. The v3 shim is wired correctly: Config/aws.js exports `ses` with
-//    a sendEmail callback shim and a raw SESClient.
-const cfgAws = readSrc('Config/aws.js');
-assert(/SESClient/.test(cfgAws), 'Config/aws.js imports SESClient from @aws-sdk/client-ses');
-assert(/SendEmailCommand/.test(cfgAws), 'Config/aws.js imports SendEmailCommand');
-assert(/sendEmail\s*\(\s*params\s*,\s*callback\s*\)/.test(cfgAws), 'Config/aws.js exposes a v2-shaped sendEmail(params, callback) shim');
+// 4. SES mail uses the v3 client.
+const provider = readSrc('Modules/mailProvider.js');
+assert(/require\("@aws-sdk\/client-ses"\)/.test(provider), 'Modules/mailProvider.js requires @aws-sdk/client-ses');
+assert(/SendRawEmailCommand/.test(provider), 'Modules/mailProvider.js sends through SendRawEmailCommand');
 
-// 5. servicewithAWS.js no longer constructs its own v2 client.
-const svcSrc = readSrc('Modules/servicewithAWS.js');
-const liveAWSConfig = liveLinesContaining(svcSrc, 'AWS.config.update');
-assert(liveAWSConfig.length === 0, 'servicewithAWS.js no longer calls AWS.config.update (was v2-only)');
-const liveAWSNew = liveLinesContaining(svcSrc, 'new AWS.SES');
-assert(liveAWSNew.length === 0, 'servicewithAWS.js no longer instantiates `new AWS.SES` (was v2-only)');
-
-// 6. Smoke-load the shim and verify it accepts a v2-shaped call.
-//    We don't actually send mail; we just confirm the shim invokes the
-//    callback once. Use a fake SESClient that fails fast.
-const { SESClient } = require('@aws-sdk/client-ses');
-const stubClient = new SESClient({ region: 'us-east-1' });
-const original = stubClient.send;
-stubClient.send = () => Promise.reject(new Error('stub failure'));
-
-// Reconstruct the shim shape from Config/aws.js — we can't easily load
-// the module because it pulls in env config; this asserts the SHAPE is
-// preserved.
-const sesShim = {
-    sendEmail(params, callback) {
-        stubClient.send().then(d => callback(null, d)).catch(e => callback(e));
-    }
-};
-
-(function asyncSmoke() {
-    let called = false;
-    sesShim.sendEmail({ Destination: { ToAddresses: ['t@example.com'] } }, (err, data) => {
-        called = true;
-        assert(!!err && /stub failure/.test(err.message), 'sendEmail shim invokes callback with v2-shaped (err, data)');
-    });
-    setImmediate(() => {
-        if (!called) {
-            console.error('FAIL: sendEmail shim never invoked callback');
-            process.exit(1);
-        }
-        console.log('\nAll BUG-041 assertions passed.');
-    });
-})();
+console.log('\nAll BUG-041 assertions passed.');

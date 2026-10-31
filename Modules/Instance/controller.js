@@ -18,6 +18,7 @@ const backups = require('./backups');
 const socketEmitter = require('../../event/socketEventEmitter');
 const { csvCell: formulaSafeCell } = require('../../utils/csv');
 const llmProvider = require('../AICore/llmProvider');
+const { mailProvider } = require('../mailProvider');
 const { ssoOnInstance } = require('../SSO/discover');
 const { tenantOf, TenantError } = require('../../Config/tenant');
 const hostingMode = require('../../Config/hostingMode');
@@ -113,8 +114,8 @@ async function storageHealth() {
 }
 
 function mailHealth() {
-    const configured = Boolean(process.env.RESEND_API_KEY || process.env.NODEMAILER_HOST);
-    return { configured, provider: process.env.RESEND_API_KEY ? 'resend' : process.env.NODEMAILER_HOST ? 'smtp' : null };
+    const provider = mailProvider();
+    return { configured: Boolean(provider), provider };
 }
 
 /* What a hosted customer may see: green or red per part, never a host name, path, bucket or

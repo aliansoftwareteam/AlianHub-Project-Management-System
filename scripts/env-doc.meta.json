@@ -378,25 +378,25 @@
   },
   "AWS_SES_FROM_DEFAULT": {
     "group": "mail",
-    "description": "Default From address when mail is sent through AWS SES.",
-    "managed": "fixed"
+    "description": "From address for mail sent through Amazon SES, on a domain verified in SES. The sender name is APP_NAME.",
+    "managed": "platform"
   },
   "AWS_SES_KEY": {
     "group": "mail",
-    "description": "AWS access key for SES mail delivery.",
+    "description": "Access key ID of an IAM user allowed to send through Amazon SES. With AWS_SES_SECRET and AWS_SES_REGION set, SES sends all mail, ahead of Resend and SMTP.",
     "secret": true,
-    "managed": "fixed"
+    "managed": "platform"
   },
   "AWS_SES_REGION": {
     "group": "mail",
-    "description": "AWS region of the SES account.",
-    "managed": "fixed"
+    "description": "AWS region of the Amazon SES account, e.g. us-east-1.",
+    "managed": "platform"
   },
   "AWS_SES_SECRET": {
     "group": "mail",
-    "description": "AWS secret key for SES mail delivery.",
+    "description": "Secret access key for AWS_SES_KEY.",
     "secret": true,
-    "managed": "fixed"
+    "managed": "platform"
   },
   "BACKUP_DIR": {
     "group": "general",

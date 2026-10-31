@@ -84,3 +84,4 @@ Auto-maintained registry of all tasks. Reflects YAML frontmatter from each `task
 | 080 | AlianHub Cloud back office — simpler Catalog editor with a customer-view preview | done | high | — | done/080-cloud-catalog-editor-preview |
 | 081 | Cloud plans choose their server — shared or dedicated, units and droplet size | active | high | 069, 070, 072 | active/081-cloud-plan-server-type |
 | 082 | Cloud orchestrator hardening — no droplet left billing, safer deletes and hosts, approvals that stay visible | backlog | high | 069, 070, 072 | backlog/082-cloud-orchestrator-hardening |
+| 083 | Amazon SES mail for AlianHub Cloud, hosted instances and every AlianHub install | active | high | — | active/083-ses-mail-everywhere |
