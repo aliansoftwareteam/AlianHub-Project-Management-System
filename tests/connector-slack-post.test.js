@@ -487,6 +487,7 @@ describe('with the flag off', () => {
             'PUT /api/v2/connectors/admin/quotas',
             'GET /api/v2/connectors/slack', 'PUT /api/v2/connectors/slack/secrets', 'DELETE /api/v2/connectors/slack/secrets/:key',
             'POST /api/v2/connectors/slack/channels/refresh', 'PUT /api/v2/connectors/slack/channels',
+            'GET /api/v2/connectors/apps', 'PUT /api/v2/connectors/apps/:provider', 'DELETE /api/v2/connectors/apps/:provider',
         ]);
     });
 

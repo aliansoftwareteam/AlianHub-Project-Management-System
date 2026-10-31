@@ -30,9 +30,18 @@ const googleRoutes = (app) => {
     app.delete('/api/v2/connectors/google/:connector/members/:userId', providerLimiter, google.disconnectMember);
 };
 
+const appRoutes = (app) => {
+    // Owners and admins only, never an API token; the handlers check the seat themselves. No route returns a client secret.
+    // Under /apps, not /:provider/app, so the provider segment never collides with a provider's own /:connector routes.
+    app.get('/api/v2/connectors/apps', ctrl.getApps);
+    app.put('/api/v2/connectors/apps/:provider', providerLimiter, ctrl.setApp);
+    app.delete('/api/v2/connectors/apps/:provider', providerLimiter, ctrl.removeApp);
+};
+
 exports.init = (app) => {
     // Owners and admins only, never an API token; the handler checks the seat itself.
     if (flag.named().length) app.put('/api/v2/connectors/admin/quotas', ctrl.setQuotas);
     if (flag.requested().includes('slack')) slackRoutes(app);
     if (flag.requestedGoogle().length) googleRoutes(app);
+    if (flag.requested().length) appRoutes(app);
 };
