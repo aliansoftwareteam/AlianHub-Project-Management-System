@@ -1,5 +1,5 @@
 ---
-id: 082
+id: 083
 title: Amazon SES mail for AlianHub Cloud, hosted instances and every AlianHub install
 status: active
 priority: high
@@ -7,7 +7,7 @@ depends_on: []
 created: 2026-10-31
 ---
 
-# 082 — Amazon SES mail everywhere (PRD)
+# 083 — Amazon SES mail everywhere (PRD)
 
 Two repositories:
 

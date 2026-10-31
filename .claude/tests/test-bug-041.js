@@ -8,7 +8,7 @@
  * Post-fix:
  *   1. `aws-sdk` removed from package.json.
  *   2. SES mail goes through `@aws-sdk/client-ses` in `Modules/mailProvider.js`
- *      (task 082 replaced the old `Config/aws.js` shim and `servicewithAWS.js`).
+ *      (task 083 replaced the old `Config/aws.js` shim and `servicewithAWS.js`).
  *   3. No live `require('aws-sdk')` remains anywhere in source.
  */
 
