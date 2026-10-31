@@ -1,7 +1,7 @@
 ---
 id: 064
 title: Connectors — data model: evolve connector_connections, add connector_apps and connector_usage
-status: backlog
+status: active
 priority: high
 depends_on: [063]
 created: 2026-10-28
@@ -16,7 +16,7 @@ Store connections keyed by connection id with health, app source and handles, so
 
 ## Scope
 - `connector_connections` fields of PRD section 8, declared in the strict schema
-- Unique index (`companyId`, `userId`, `provider`, `account.id`) and partial unique index (`companyId`, `userId`, `provider`) for live rows
+- Partial unique index (`companyId`, `userId`, `provider`, `account.id`) for live rows: a person may connect several accounts of one provider, each once (decided on the PR #1738 review)
 - `connector_apps` and `connector_usage` collections (or row counters if 061 shows that is enough)
 - SCHEMA_TYPE entries; every query company-scoped
 
@@ -24,9 +24,10 @@ Store connections keyed by connection id with health, app source and handles, so
 - Data migrations of existing rows (073–076)
 
 ## Acceptance criteria
-- [ ] A second live connection for the same person and provider is refused by the index
-- [ ] A disconnected row does not block a new connection
-- [ ] Schemas declared; no hard-coded collection names
+- [x] The same account connected twice by one person is refused by the index; a second account of the same provider is allowed
+- [x] A disconnected row does not block a new connection
+- [x] Schemas declared; no hard-coded collection names
+- [x] A module row (one with `provider`) cannot be saved without `companyId`
 
 ## Constraints & notes
 - Track: A — connections (getting and keeping a person's token)

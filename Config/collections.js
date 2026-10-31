@@ -137,6 +137,8 @@ const dbCollections = {
     AUDIT_CHAIN_KEY: "audit_chain_key",
     EGRESS_ALLOWLISTS: "egress_allowlists",
     CONNECTOR_CONNECTIONS: "connector_connections",
+    CONNECTOR_APPS: "connector_apps",
+    CONNECTOR_USAGE: "connector_usage",
     INSTRUCTION_PATTERNS: "instruction_patterns",
     SECRETS: "secrets",
     OAUTH_CLIENTS: "oauth_clients",
