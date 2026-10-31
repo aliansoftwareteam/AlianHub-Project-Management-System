@@ -85,3 +85,4 @@ Auto-maintained registry of all tasks. Reflects YAML frontmatter from each `task
 | 081 | Cloud plans choose their server — shared or dedicated, units and droplet size | active | high | 069, 070, 072 | active/081-cloud-plan-server-type |
 | 082 | Cloud orchestrator hardening — no droplet left billing, safer deletes and hosts, approvals that stay visible | backlog | high | 069, 070, 072 | backlog/082-cloud-orchestrator-hardening |
 | 083 | Amazon SES mail for AlianHub Cloud, hosted instances and every AlianHub install | active | high | — | active/083-ses-mail-everywhere |
+| 084 | Razorpay billing for AlianHub Cloud — pay to start, auto-debit, dunning, GST invoices and the ledger | active | high | 067, 068, 069, 072 | active/084-cloud-razorpay-billing |
