@@ -80,4 +80,5 @@ Auto-maintained registry of all tasks. Reflects YAML frontmatter from each `task
 | 072 | Cloud back office — the staff console at ops.alianhub.com | active | high | 060, 067, 068, 069 | active/072-cloud-back-office |
 | 073 | Cloud launch readiness — legal, emails, support, security review, beta and go/no-go | backlog | high | 060, 067, 068, 069, 070, 071, 072 | backlog/073-cloud-launch-readiness |
 | 074 | Local Docker host — real AlianHub Cloud instances on a developer PC | active | high | 062, 063, 064, 065, 067, 072 | active/074-local-docker-host |
+| 080 | AlianHub Cloud back office — simpler Catalog editor with a customer-view preview | done | high | — | done/080-cloud-catalog-editor-preview |
 | 081 | Cloud plans choose their server — shared or dedicated, units and droplet size | active | high | 069, 070, 072 | active/081-cloud-plan-server-type |
