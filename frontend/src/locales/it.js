@@ -9073,6 +9073,8 @@ export default {
         "connector_broken": "A connected service stopped working",
         "connector_channels_set": "Chose the Slack channels agents may use",
         "connector_call": "An agent read from a connected service",
+        "connector_app_set": "Set the workspace's own app for a connected service",
+        "connector_app_removed": "Removed the workspace's own app for a connected service",
         "agent_session_delegated": "Handed a task to an outside agent",
         "agent_session_endpoint_saved": "Saved where an outside agent is reached",
         "agent_session_completed": "An outside agent finished its work",
