@@ -14,11 +14,11 @@
 
 ## Last step
 
-PRs open (AlianHub #1745, alianhub-cloud #14); waiting for a working SES key for the real sends.
+PRs open (AlianHub #1745, alianhub-cloud #14); the new SES key is in the cloud `.env` but AWS quarantines its IAM user, so no real mail yet.
 
 ## Blockers
 
-- The SES key sent on 2026-10-31 is rejected by AWS (`InvalidClientTokenId`). A fresh key is needed for the real sends (§3.3), not for building.
+- The IAM user `alianhub-ses` carries `AWSCompromisedKeyQuarantineV3`, an explicit deny AWS attaches when a key leaks, so the new key (`AKIA36HK4FUPJMIO…`) is refused even for `ses:GetSendQuota`. The old key leaked through the public AlianHub repo: commit `5c285b9a0` (2025-12-22) added `environment/prod-.env` and `environment/test-.env`, and both are in the history of `main` and `staging`. The owner rotates every secret in those files, then detaches the quarantine policy; only then can the real sends (§3.3) run.
 
 ## Log
 
@@ -35,3 +35,4 @@ PRs open (AlianHub #1745, alianhub-cloud #14); waiting for a working SES key for
 - Release order: an instance accepts the pushed `AWS_SES_*` keys only from an AlianHub image that has this task's settings fields, so `INSTANCE_AWS_SES_*` are set in the cloud only after that image is the release.
 - Opened AlianHub #1745 (into `chore/pre-staging`) and alianhub-cloud #14 (into `main`, rebased on `130293e` after #6, #7, #8 and #13 merged; server 362/362, portal 50/50, ops 33/33, agent 25/25, lint and build clean).
 - Renumbered from 082 to 083: the orchestrator hardening task took 082 first (AlianHub #1744, merged into `chore/pre-staging`). Commit messages written before the rename still say 082.
+- The owner sent a new key for `alianhub-ses`; it is in `F:/Projects/alianhub-cloud/.env` (`AWS_SES_KEY`, `AWS_SES_SECRET`, `AWS_SES_REGION`; not the instance keys, see the release order). The cloud SES branch loads it. AWS refuses it under `AWSCompromisedKeyQuarantineV3`; cause and fix under Blockers.
