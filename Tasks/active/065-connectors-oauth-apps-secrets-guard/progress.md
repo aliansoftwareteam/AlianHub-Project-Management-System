@@ -6,7 +6,7 @@
 - [x] reauth marking — `apps.js` `markReauth`, run on set/replace/remove
 - [x] Secrets guard — secret stored by handle, never returned; set/replace refuses when the store is off (FR-16, via `secrets.requireOn`); flag already logs the off reason at startup
 - [x] Audit — `connector.app_set` on set/replace, `connector.app_removed` on remove
-- [x] Tests — `tests/connectors-apps.test.js` (12), plus route-list updates in two existing suites
+- [x] Tests — `tests/connectors-apps.test.js` (15), plus route-list updates in two existing suites
 
 ## Last step
 Core built on branch `feat/task-065-connectors-oauth-apps-secrets-guard` (off upstream `feat/per-user-connectors`). All 327 connector tests green. Not pushed yet.
@@ -26,3 +26,4 @@ None (063, 064 are in).
 ### 2026-10-31
 - Built the app model: `apps.js` (resolveApp, setApp/removeApp, companyProviders, describeApps, markReauth, audit); company-app routes and handlers; secret kept in the secrets store by handle, never on the row or in a response.
 - Added `tests/connectors-apps.test.js`; updated the route-list assertions in the Google and Slack suites for the three new `/api/v2/connectors` app routes. 327 connector tests pass.
+- Hardened `setApp`: retire the just-created secret if the row write fails, report a racing duplicate as a 409 conflict, and clear `extra` on a replace that omits it. Three more tests; 330 connector tests pass.
