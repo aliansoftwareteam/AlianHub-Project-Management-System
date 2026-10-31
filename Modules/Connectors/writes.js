@@ -14,6 +14,8 @@ const GATE = tools.WRITE_GATE;
 const CARD_TEXT_MAX = 20000;
 const CARD_LINE_MAX = 300;
 const ATTACHMENTS_MAX = 20;
+const ROWS_MAX = 20;
+const CARD_KEY = /^Connectors\.card\.[A-Za-z0-9_]+$/;
 const ERROR_MAX = 300;
 const FILED = 'filed';
 const REFUSAL = Object.freeze({
@@ -37,7 +39,17 @@ const partTooLong = (card) => {
     if (card.title.length > CARD_LINE_MAX) return 'title';
     if (card.text.length > CARD_TEXT_MAX) return 'text';
     if (card.attachments.length > ATTACHMENTS_MAX || card.attachments.some((name) => name.length > CARD_LINE_MAX)) return 'attachments';
+    const rows = card.rows || [];
+    if (rows.length > ROWS_MAX || rows.some((row) => String(row.value || '').length > CARD_TEXT_MAX)) return 'details';
     return '';
+};
+
+/* A label is an i18n key the Inbox translates; a value is the person's own data and is shown as it goes out. */
+const rowOf = (row) => {
+    if (!CARD_KEY.test(String(row && row.label)) || (row.valueLabel !== undefined && !CARD_KEY.test(String(row.valueLabel)))) {
+        throw new Error(`a card row needs Connectors.card.* keys: ${JSON.stringify(row)}`);
+    }
+    return { label: row.label, ...(row.valueLabel === undefined ? { value: runner.plain(row.value) } : { valueLabel: row.valueLabel }) };
 };
 
 const cardOf = (tool, args) => {
@@ -47,9 +59,11 @@ const cardOf = (tool, args) => {
         tool: tool.key,
         label: tool.label,
         target: line(shown.target),
+        ...(shown.targetLabel ? { targetLabel: rowOf({ label: shown.targetLabel }).label } : {}),
         title: line(shown.title),
         text: runner.plain(shown.text),
         attachments: (Array.isArray(shown.attachments) ? shown.attachments : []).map(line).filter(Boolean),
+        ...(Array.isArray(shown.rows) && shown.rows.length ? { rows: shown.rows.map(rowOf) } : {}),
     };
     const part = partTooLong(card);
     if (part) throw refuse(`The ${part} of this write is too long to show whole on its approval card, so it was not filed. Shorten it and ask again.`, 'card_too_long', 400);

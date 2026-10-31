@@ -1,6 +1,7 @@
 const TOKEN = 'google-test-token';
 
-const answer = (status, body = {}) => ({ status, headers: {}, body: typeof body === 'string' ? body : JSON.stringify(body) });
+const answer = (status, body = {}, headers = {}) => ({ status, headers, body: typeof body === 'string' ? body : JSON.stringify(body) });
+const googleError = (status, reason, message) => answer(status, { error: { code: status, message, errors: [{ domain: 'global', reason, message }] } });
 
 /* Stands in for Google behind safeFetch, so a tool's real URL, query and body are what is checked. Drive holds only
  * the files the person picked, because that is all drive.file ever shows. */
@@ -18,6 +19,7 @@ const create = () => {
             { id: 'img1', name: 'photo.png', mimeType: 'image/png', size: '900', modifiedTime: '2026-10-04T09:00:00Z' },
         ],
         calls: [],
+        next: null,
     };
 
     const listEvents = (query) => {
@@ -95,10 +97,11 @@ const create = () => {
         const body = options.data ? JSON.parse(options.data) : undefined;
         state.calls.push({ url, method, body });
         if ((options.headers || {}).Authorization !== `Bearer ${TOKEN}`) return answer(401, { error: { code: 401, message: 'Invalid Credentials' } });
+        if (state.next) { const planned = state.next; state.next = null; return planned; }
         return route(url, method, body);
     };
 
     return { state, fetch, TOKEN };
 };
 
-module.exports = { create, TOKEN };
+module.exports = { create, answer, googleError, TOKEN };

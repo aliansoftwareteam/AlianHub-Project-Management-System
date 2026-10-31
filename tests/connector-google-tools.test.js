@@ -12,7 +12,8 @@ jest.mock('../Modules/AICore/persistence', () => {
     return { deleteThread, saverFor: jest.fn(() => ({ deleteThread })), storeFor: jest.fn(() => { throw new Error('no store in this suite'); }), ready: jest.fn(async () => {}) };
 });
 jest.mock('../Modules/Mcp/oauthAuth', () => ({ ...jest.requireActual('../Modules/Mcp/oauthAuth'), standingOfGrant: jest.fn(async () => ['connectors:write']) }));
-jest.mock('../Modules/Connectors/resolveConnection', () => ({ resolveConnection: jest.fn() }));
+jest.mock('../Modules/Audit/recorder', () => ({ recordAudit: jest.fn(), recordAuditFromReq: jest.fn() }));
+jest.mock('../Modules/Connectors/resolveConnection', () => ({ resolveConnection: jest.fn(), markBackoff: jest.fn(), recordHealth: jest.fn(async () => {}) }));
 jest.mock('../Modules/Agents/engine/safeFetch', () => ({
     ...jest.requireActual('../Modules/Agents/engine/safeFetch'),
     safeFetch: jest.fn(),
@@ -20,7 +21,9 @@ jest.mock('../Modules/Agents/engine/safeFetch', () => ({
 
 const { SCHEMA_TYPE } = require('../Config/schemaType');
 const { safeFetch } = require('../Modules/Agents/engine/safeFetch');
-const { resolveConnection } = require('../Modules/Connectors/resolveConnection');
+const { resolveConnection, markBackoff } = require('../Modules/Connectors/resolveConnection');
+const { recordAudit } = require('../Modules/Audit/recorder');
+const logger = require('../Config/loggerConfig');
 const { standingOfGrant } = require('../Modules/Mcp/oauthAuth');
 const connectorTools = require('../Modules/Connectors/tools');
 const google = require('../Modules/Connectors/providers/google');
@@ -69,6 +72,7 @@ beforeEach(() => {
     connected();
     standingOfGrant.mockResolvedValue(['connectors:write']);
     safeFetch.mockImplementation(fake.fetch);
+    markBackoff.mockImplementation(async ({ connectionId, until }) => mockDb.seed(SCHEMA_TYPE.CONNECTOR_CONNECTIONS, { _id: connectionId, backoffUntil: until }));
     mockDb.seed(SCHEMA_TYPE.AGENT_RUNS, { _id: RUN, status: 'running', connectorReads: [] });
     mockDb.seed(SCHEMA_TYPE.AGENTS, { _id: AGENT_ID, name: 'Digest', allowedActions: [], autonomy: 3 });
 });
@@ -92,9 +96,13 @@ describe('the Google tool definitions', () => {
         expect(googleTools().filter((tool) => tool.product === 'drive' && tool.kind === 'write')).toEqual([]);
     });
 
-    it('have a label in en.js', () => {
+    it('have a label in en.js, and so does every row of their cards', () => {
         const en = require('fs').readFileSync(require('path').join(__dirname, '..', 'frontend', 'src', 'locales', 'en.js'), 'utf8');
         googleTools().forEach((tool) => expect(en).toContain(`${tool.label.replace('Connectors.tool.', '')}: "`));
+        const source = require('fs').readFileSync(require('path').join(__dirname, '..', 'Modules', 'Connectors', 'providers', 'google', 'tools.js'), 'utf8');
+        const keys = [...new Set(source.match(/Connectors\.card\.[A-Za-z]+/g))];
+        expect(keys.length).toBeGreaterThan(10);
+        keys.forEach((key) => expect(en).toContain(`${key.replace('Connectors.card.', '')}: "`));
     });
 
     it('still refuse a key that is not provider, optional product, object and verb', () => {
@@ -243,9 +251,14 @@ describe('Calendar writes', () => {
     it('sends what the card shows, and emails nobody unless asked', async () => {
         const { proposalId } = await mcpWrite('google.calendar.events.create', NEW_EVENT);
         const { card } = proposalRow(proposalId).changes[0];
-        expect(card).toMatchObject({ target: 'Primary calendar', title: 'Team lunch' });
-        expect(card.text).toContain('Attendees: sam@example.com, jo@example.com');
-        expect(card.text).toContain('Google emails the attendees: no');
+        expect(card).toMatchObject({ target: '', targetLabel: 'Connectors.card.primaryCalendar', title: 'Team lunch' });
+        expect(card.rows).toEqual([
+            { label: 'Connectors.card.start', value: NEW_EVENT.start },
+            { label: 'Connectors.card.end', value: NEW_EVENT.end },
+            { label: 'Connectors.card.where', value: 'Cafe' },
+            { label: 'Connectors.card.attendees', value: 'sam@example.com, jo@example.com' },
+            { label: 'Connectors.card.notifyAttendees', valueLabel: 'Connectors.card.no' },
+        ]);
         await approve(proposalId);
         expect(lastCall().url.searchParams.get('sendUpdates')).toBe('none');
         expect(lastCall().body).toEqual({
@@ -257,7 +270,7 @@ describe('Calendar writes', () => {
 
     it('says so on the card when Google will email the attendees', async () => {
         const { proposalId } = await mcpWrite('google.calendar.events.create', { ...NEW_EVENT, notifyAttendees: true });
-        expect(proposalRow(proposalId).changes[0].card.text).toContain('Google emails the attendees: yes');
+        expect(proposalRow(proposalId).changes[0].card.rows).toContainEqual({ label: 'Connectors.card.notifyAttendees', valueLabel: 'Connectors.card.yes' });
         await approve(proposalId);
         expect(lastCall().url.searchParams.get('sendUpdates')).toBe('all');
     });
@@ -271,11 +284,17 @@ describe('Calendar writes', () => {
     it('an update sends only what it names and warns that attendees replace the list', async () => {
         const { proposalId } = await mcpWrite('google.calendar.events.update', { eventId: 'ev1', attendees: 'jo@example.com' });
         const { card } = proposalRow(proposalId).changes[0];
-        expect(card.title).toBe('Change event ev1');
-        expect(card.text).toContain('Attendees (replaces the whole list): jo@example.com');
+        expect(card.title).toBe('ev1');
+        expect(card.rows).toContainEqual({ label: 'Connectors.card.eventId', value: 'ev1' });
+        expect(card.rows).toContainEqual({ label: 'Connectors.card.attendeesReplaced', value: 'jo@example.com' });
         await approve(proposalId);
         expect(lastCall().method).toBe('patch');
         expect(lastCall().body).toEqual({ attendees: [{ email: 'jo@example.com' }] });
+    });
+
+    it('shows on the card that an update clears the attendees', async () => {
+        const { proposalId } = await mcpWrite('google.calendar.events.update', { eventId: 'ev1', attendees: ' , ' });
+        expect(proposalRow(proposalId).changes[0].card.rows).toContainEqual({ label: 'Connectors.card.attendeesReplaced', valueLabel: 'Connectors.card.nobody' });
     });
 
     it('an update that changes nothing is not filed', async () => {
@@ -295,19 +314,81 @@ describe('Calendar writes', () => {
 describe('Meet writes', () => {
     it('shows who can join on the card', async () => {
         const { proposalId } = await mcpWrite('google.meet.spaces.create', { accessType: 'OPEN' });
-        expect(proposalRow(proposalId).changes[0].card).toMatchObject({ target: 'Google Meet', title: 'New meeting', text: 'Anyone with the link can join' });
+        expect(proposalRow(proposalId).changes[0].card).toMatchObject({ target: 'Google Meet', rows: [{ label: 'Connectors.card.access', valueLabel: 'Connectors.card.accessOpen' }] });
         await approve(proposalId);
         expect(lastCall().body).toEqual({ config: { accessType: 'OPEN' } });
     });
 
-    it('leaves access to the account\'s default when not asked, and says so', async () => {
+    it('leaves access to the organisation\'s default when not asked, and says so', async () => {
         const { proposalId } = await mcpWrite('google.meet.spaces.create');
-        expect(proposalRow(proposalId).changes[0].card.text).toBe('Who can join follows the default of your Google account');
+        expect(proposalRow(proposalId).changes[0].card.rows).toEqual([{ label: 'Connectors.card.access', valueLabel: 'Connectors.card.accessDefault' }]);
         await approve(proposalId);
         expect(lastCall().body).toEqual({});
     });
 
     it('refuses an access type Google does not have', async () => {
         await expect(mcpWrite('google.meet.spaces.create', { accessType: 'ALL' })).rejects.toThrow(/accessType must be one of/);
+    });
+});
+
+describe('what a card may hold', () => {
+    const writes = require('../Modules/Connectors/writes');
+    const tool = (shown) => ({ provider: 'google', key: 'k', label: 'l', card: () => shown });
+
+    it('refuses a row whose label is not an i18n key', () => {
+        expect(() => writes.cardOf(tool({ rows: [{ label: 'Starts', value: 'x' }] }), {})).toThrow(/Connectors\.card/);
+        expect(() => writes.cardOf(tool({ rows: [{ label: 'Connectors.card.start', valueLabel: 'Yes' }] }), {})).toThrow(/Connectors\.card/);
+    });
+
+    it('refuses a value too long to show whole', () => {
+        expect(() => writes.cardOf(tool({ rows: [{ label: 'Connectors.card.where', value: 'x'.repeat(20001) }] }), {})).toThrow(/details of this write is too long/);
+    });
+});
+
+describe('what stays out of sight', () => {
+    const everywhere = () => JSON.stringify([recordAudit.mock.calls, logger.info.mock.calls, logger.warn.mock.calls, logger.error.mock.calls, logger.debug.mock.calls]);
+
+    it('no token or event content reaches an audit row or a log, and the token reaches only Google', async () => {
+        await mcpRead('google.calendar.events.get', { eventId: 'ev1' });
+        await mcpRead('google.drive.files.read', { fileId: 'doc1' });
+        const { proposalId } = await mcpWrite('google.calendar.events.create', NEW_EVENT);
+        await approve(proposalId);
+        await mcpRead('google.calendar.events.get', { eventId: 'gone' });
+
+        expect(recordAudit.mock.calls.filter(([, row]) => row.action === 'connector.call').length).toBeGreaterThanOrEqual(4);
+        ['Board meeting', 'The Q4 plan text', 'Team lunch', 'sam@example.com', fakeGoogle.TOKEN].forEach((secret) => expect(everywhere()).not.toContain(secret));
+        expect(JSON.stringify(proposalRow(proposalId))).not.toContain(fakeGoogle.TOKEN);
+        safeFetch.mock.calls.forEach(([url]) => expect(google.egressHosts).toContain(new URL(url).hostname));
+    });
+});
+
+describe('when Google says slow down', () => {
+    it('a 429 holds the connection, and the next call never reaches Google', async () => {
+        fake.state.next = fakeGoogle.answer(429, { error: { code: 429, message: 'Too Many Requests' } }, { 'retry-after': '30' });
+        expect(await mcpRead('google.meet.spaces.get', { space: 'sp1' })).toMatchObject({ code: 'provider_busy' });
+        expect(markBackoff).toHaveBeenCalledWith(expect.objectContaining({ connectionId: MINE }));
+        const calls = fake.state.calls.length;
+        expect(await mcpRead('google.drive.files.list')).toMatchObject({ code: 'provider_busy' });
+        expect(fake.state.calls).toHaveLength(calls);
+    });
+
+    it('a 403 for its rate limit holds it too', async () => {
+        fake.state.next = fakeGoogle.googleError(403, 'rateLimitExceeded', 'Rate Limit Exceeded');
+        expect(await mcpRead('google.calendar.events.list')).toMatchObject({ code: 'provider_busy' });
+        expect(markBackoff).toHaveBeenCalled();
+    });
+
+    it('a 403 for anything else is a plain refusal and holds nothing', async () => {
+        fake.state.next = fakeGoogle.googleError(403, 'insufficientPermissions', 'Request had insufficient authentication scopes.');
+        expect(await mcpRead('google.calendar.events.list')).toEqual({ code: 'provider_refused', error: 'Google answered 403, so this did not go through.' });
+        expect(markBackoff).not.toHaveBeenCalled();
+    });
+
+    it('an approved write that Google holds back is not delivered', async () => {
+        const { proposalId } = await mcpWrite('google.meet.spaces.create');
+        fake.state.next = fakeGoogle.answer(429, {}, { 'retry-after': '30' });
+        const out = await approve(proposalId);
+        expect(out.applied).toEqual([expect.objectContaining({ ok: false })]);
+        expect(fake.state.spaces).toHaveLength(1);
     });
 });

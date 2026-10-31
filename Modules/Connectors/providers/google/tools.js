@@ -10,11 +10,7 @@ const EDITABLE = Object.freeze(['summary', 'description', 'location', 'start', '
 const GOOGLE_DOCS = 'application/vnd.google-apps.';
 const EXPORT_AS = Object.freeze({ [`${GOOGLE_DOCS}document`]: 'text/plain', [`${GOOGLE_DOCS}spreadsheet`]: 'text/csv', [`${GOOGLE_DOCS}presentation`]: 'text/plain' });
 const TEXT_TYPE = /^text\/|json|xml|csv/;
-const ACCESS = Object.freeze({
-    OPEN: 'Anyone with the link can join',
-    TRUSTED: 'People in your organisation and people invited can join',
-    RESTRICTED: 'Only people invited can join',
-});
+const ACCESS_ROW = Object.freeze({ OPEN: 'Connectors.card.accessOpen', TRUSTED: 'Connectors.card.accessTrusted', RESTRICTED: 'Connectors.card.accessRestricted' });
 
 const limit = { type: 'integer', minimum: 1, maximum: 50, default: DEFAULT_ITEMS };
 const calendarId = { type: 'string', maxLength: 200, description: 'Leave out for the person\'s primary calendar.' };
@@ -64,16 +60,20 @@ const eventDetail = (event) => lines([
     ['Description', event.description],
 ]);
 
-const eventCardText = (input, attendeesLabel) => lines([
-    ['Starts', input.start],
-    ['Ends', input.end],
-    ['Where', input.location],
-    [attendeesLabel, input.attendees === undefined ? undefined : emails(input.attendees).join(', ') || 'nobody'],
-    ['Google emails the attendees', input.notifyAttendees ? 'yes' : 'no'],
-    ['Description', input.description],
-]);
+const eventCard = (input, attendeesLabel) => ({
+    target: input.calendarId || '',
+    targetLabel: input.calendarId ? undefined : 'Connectors.card.primaryCalendar',
+    text: input.description,
+    rows: [
+        { label: 'Connectors.card.eventId', value: input.eventId },
+        { label: 'Connectors.card.start', value: input.start },
+        { label: 'Connectors.card.end', value: input.end },
+        { label: 'Connectors.card.where', value: input.location },
+        input.attendees === undefined ? null : { label: attendeesLabel, ...(emails(input.attendees).length ? { value: emails(input.attendees).join(', ') } : { valueLabel: 'Connectors.card.nobody' }) },
+        { label: 'Connectors.card.notifyAttendees', valueLabel: input.notifyAttendees ? 'Connectors.card.yes' : 'Connectors.card.no' },
+    ].filter((row) => row && (row.value || row.valueLabel)),
+});
 
-const calendarOf = (input) => input.calendarId || 'Primary calendar';
 const notifyOf = (input) => ({ sendUpdates: input.notifyAttendees ? 'all' : 'none' });
 
 const spaceId = (space) => encodeURIComponent(String(space).replace(/^spaces\//, ''));
@@ -145,7 +145,7 @@ module.exports = [{
         additionalProperties: false,
     },
     caps: { maxItems: 1, maxChars: 500 },
-    card: (input) => ({ target: calendarOf(input), title: input.summary, text: eventCardText(input, 'Attendees') }),
+    card: (input) => ({ ...eventCard(input, 'Connectors.card.attendees'), title: input.summary }),
     run: async ({ input, connection }) => {
         const event = json(await connection.request(eventsUrl(input), { method: 'post', query: notifyOf(input), json: eventBody(input) }));
         return `Created event ${event.id}: ${event.htmlLink}`;
@@ -168,11 +168,7 @@ module.exports = [{
         if (!EDITABLE.some((field) => input[field] !== undefined)) {
             throw Object.assign(new Error('This update names nothing to change, so it was not filed.'), { code: 'bad_input', status: 400, deterministic: true });
         }
-        return {
-            target: calendarOf(input),
-            title: input.summary === undefined ? `Change event ${input.eventId}` : `Change event ${input.eventId} to "${input.summary}"`,
-            text: eventCardText(input, 'Attendees (replaces the whole list)'),
-        };
+        return { ...eventCard(input, 'Connectors.card.attendeesReplaced'), title: input.summary === undefined ? input.eventId : input.summary };
     },
     run: async ({ input, connection }) => {
         const event = json(await connection.request(eventUrl(input), { method: 'patch', query: notifyOf(input), json: eventBody(input) }));
@@ -211,11 +207,11 @@ module.exports = [{
     input: {
         type: 'object',
         description: 'Creates a new Google Meet meeting space with its own link.',
-        properties: { accessType: { type: 'string', maxLength: 10, enum: Object.keys(ACCESS), description: 'Leave out for the default of the person\'s Google account.' } },
+        properties: { accessType: { type: 'string', maxLength: 10, enum: Object.keys(ACCESS_ROW), description: 'Who joins without knocking: OPEN anyone with the link, TRUSTED the organisation and people invited, RESTRICTED only people invited. Leave out for the default of the person\'s organisation.' } },
         additionalProperties: false,
     },
     caps: { maxItems: 1, maxChars: 500 },
-    card: (input) => ({ target: 'Google Meet', title: 'New meeting', text: ACCESS[input.accessType] || 'Who can join follows the default of your Google account' }),
+    card: (input) => ({ target: 'Google Meet', rows: [{ label: 'Connectors.card.access', valueLabel: ACCESS_ROW[input.accessType] || 'Connectors.card.accessDefault' }] }),
     run: async ({ input, connection }) => {
         const space = json(await connection.request(MEET_SPACES, { method: 'post', json: input.accessType ? { config: { accessType: input.accessType } } : {} }));
         return `Created meeting ${space.meetingCode}: ${space.meetingUri}`;
@@ -272,7 +268,7 @@ module.exports = [{
     scope: `${SCOPE}drive.file`,
     input: {
         type: 'object',
-        description: 'The text of one Google Drive file the person picked: a Google Doc, Sheet or Slides file, or a text file.',
+        description: 'The text of one Google Drive file the person picked: a Google Doc, Slides file or text file, or the first tab only of a Google Sheet.',
         properties: { fileId },
         required: ['fileId'],
         additionalProperties: false,

@@ -20,7 +20,11 @@ None for this task. A real Google call waits on track A's 066 (`resolveConnectio
 - Decided: tool keys follow the contract's `google.calendar.events.list`. The 068 key check allowed only three parts, so it now also accepts a product part.
 - Decided: a read now fails on a provider status outside 2xx, as a write already did, so the model never gets an error page as the person's data. The runner holds this, so 074 and 075 get it too.
 - Decided: `notifyAttendees` defaults to no, and the card says whether Google emails the attendees.
-- Noted for 078: card text ("Starts", "Attendees") is English from the server; only the tool label goes through `$t`.
+- Decided: Meet has one read tool, `spaces.get`. Google has no call to list spaces, and meeting records are left out because 061 keeps the pilot to meeting spaces.
+- Checked the requests against Google's official reference pages for Calendar events list, insert and patch, Meet spaces get and create, and Drive files list and export, and their scopes. They match. Not yet run against a real account. Two fixes came out of it: Meet access means joining without knocking, so the wording changed; and a Sheet exports its first tab only, so `files.read` says so.
+- Known limits, to see on a real account: a Drive file over the runner's 512 KB response cap fails the read rather than being cut; a PATCH that turns a timed event into an all-day one may be refused by Google, since it would keep the old `dateTime`.
+- Card wording goes through i18n: a card may hold `targetLabel` and `rows` of `{ label, value | valueLabel }`, with `Connectors.card.*` keys, and `text` holds only what the person's event says. 078 renders them with `$t`.
+- Left for Hetvi: the Google definition asks for `calendar.app.created`, which no tool here uses. PRD section 10 asks for least scopes, and the definition is track A's file, so keeping or dropping it is track A's call.
 
 ### 2026-10-28
 - Task created from the split of 056; acceptance criteria drawn from the 056 PRD.

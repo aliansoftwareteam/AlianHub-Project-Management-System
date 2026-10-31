@@ -13913,6 +13913,24 @@ export default {
             "googleDriveFilesList": "List picked Google Drive files",
             "googleDriveFilesGet": "Read Google Drive file details",
             "googleDriveFilesRead": "Read a Google Drive file"
+        },
+        "card": {
+            "primaryCalendar": "Your primary calendar",
+            "eventId": "Event",
+            "start": "Starts",
+            "end": "Ends",
+            "where": "Where",
+            "attendees": "Attendees",
+            "attendeesReplaced": "Attendees (replaces the whole list)",
+            "nobody": "Nobody",
+            "notifyAttendees": "Google emails the attendees",
+            "yes": "Yes",
+            "no": "No",
+            "access": "Who joins without knocking",
+            "accessOpen": "Anyone with the link",
+            "accessTrusted": "Your organisation and people invited",
+            "accessRestricted": "Only people invited",
+            "accessDefault": "Your organisation's default"
         }
     },
     "WhoCanSee": {
