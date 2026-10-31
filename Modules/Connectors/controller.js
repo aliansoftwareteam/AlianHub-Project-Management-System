@@ -5,6 +5,7 @@ const logger = require('../../Config/loggerConfig');
 const { requestAddress } = require('../../utils/requestAddress');
 const flag = require('../Agents/connectors/flag');
 const slack = require('../Agents/connectors/slackConnection');
+const quotas = require('./quotas');
 const apps = require('./apps');
 
 const refuse = (res, code, statusText, extra = {}) => res.status(code).send({ status: false, statusText, ...extra });
@@ -66,6 +67,19 @@ exports.saveSlackSecrets = handle('save the Slack connector secrets', 'Slack con
 exports.removeSlackSecret = handle('remove a Slack connector secret', 'Removed.', (companyId, req) => slack.removeSecret(companyId, req.params.key, actorOf(req)));
 
 exports.refreshSlackChannels = handle('refresh the Slack channel list', 'Channel list refreshed.', (companyId, req) => slack.refreshChannels(companyId, actorOf(req)));
+
+exports.setQuotas = async (req, res) => {
+    try {
+        const companyId = tenantOf(req);
+        if (req.apiToken) return refuse(res, 403, 'An API token cannot manage connectors.');
+        if (!isPrivileged(await getRoleType(companyId, req.uid))) return refuse(res, 403, 'Only an owner or admin can manage connectors.');
+        return res.send({ status: true, statusText: 'Limits saved.', data: await quotas.set(companyId, req.body || {}, actorOf(req)) });
+    } catch (error) {
+        if (error instanceof TenantError) return refuse(res, error.statusCode, error.message);
+        if (error && error.expose) return refuse(res, error.status, error.message);
+        return failed(res, error, 'set the connector limits');
+    }
+};
 
 exports.setSlackChannels = handle('set the Slack channel allow-list', 'Allowed channels saved.', (companyId, req) => {
     const body = req.body || {};

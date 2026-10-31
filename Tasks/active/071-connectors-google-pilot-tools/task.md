@@ -1,7 +1,7 @@
 ---
 id: 071
 title: Connectors — Google pilot tools: Calendar, Meet and Drive (no Gmail)
-status: backlog
+status: active
 priority: high
 depends_on: [068, 069]
 created: 2026-10-28
@@ -27,8 +27,8 @@ Give the pilot provider its tools, so an agent run and MCP can read and propose 
 - Attachment picker (076)
 
 ## Acceptance criteria
-- [ ] Every tool works from an agent run and from MCP against the fake Google server; no real credential needed
-- [ ] A missing product scope tells the person which product to tick
+- [x] Every tool works from an agent run and from MCP against the fake Google server; no real credential needed
+- [x] A missing product scope tells the person which product to tick
 
 ## Constraints & notes
 - Track: B — tools (using that token safely)

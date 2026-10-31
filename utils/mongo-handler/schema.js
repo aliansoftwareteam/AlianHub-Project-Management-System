@@ -2223,6 +2223,19 @@ const schema = {
         reads: { type: Number, default: 0, required: false },
         writeProposals: { type: Number, default: 0, required: false },
     },
+    // An owner or admin's daily limit for the workspace, a member or an agent; a field left out falls to the wider
+    // limit, then to the default in Modules/Connectors/quotas.js (FR-29).
+    connectorQuotas: {
+        companyId: { type: String, required: true },
+        // workspace | member | agent
+        scope: { type: String, required: true },
+        targetId: { type: String, default: '', required: false },
+        reads: { type: Number, required: false },
+        writeProposals: { type: Number, required: false },
+        agentReads: { type: Number, required: false },
+        setBy: { type: String, required: true },
+        updatedAt: { type: Date, required: true },
+    },
     // Instance-wide, in the global database: patterns the owner added to the instruction guard on top of
     // the built-in list (Modules/AICore/instructionPatterns.js).
     instructionPatterns: {
