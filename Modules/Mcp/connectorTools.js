@@ -5,6 +5,9 @@ const runner = require('../Connectors/toolRunner');
 const READ_SCOPE = 'connectors:read';
 const WRITE_SCOPE = 'connectors:write';
 const CONNECTION_ID = Object.freeze({ type: 'string', maxLength: 64, description: 'Leave out: your own connection is used. Kept for when a person can connect more than one account.' });
+// These reach an app outside the workspace, which annotationsFor's default says no action does.
+const READ_HINTS = Object.freeze({ readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: true });
+const WRITE_HINTS = Object.freeze({ readOnlyHint: false, destructiveHint: true, idempotentHint: false, openWorldHint: true });
 
 /* A refusal is the answer, so the client can tell the person what to do; anything else fails the call. */
 const answered = (run) => async (...args) => {
@@ -16,6 +19,8 @@ const answered = (run) => async (...args) => {
     }
 };
 
+const clientOf = (ctx) => (ctx.oauth ? `oauth:${ctx.oauth.clientId}` : `mcp:${String((ctx.token && ctx.token._id) || '')}`);
+
 const withConnectionId = (tool) => ({ ...tool.input, properties: { ...tool.input.properties, connectionId: CONNECTION_ID } });
 
 const readOf = (tool) => Object.freeze({
@@ -25,10 +30,11 @@ const readOf = (tool) => Object.freeze({
     input: withConnectionId(tool),
     strict: true,
     optIn: READ_SCOPE,
+    annotations: READ_HINTS,
     visibility: 'none',
     visibilityReason: 'reads the caller\'s own account at another app, never anything in this workspace',
     readParams: () => ({}),
-    run: answered((ctx, args) => runner.read({ companyId: ctx.companyId, userId: ctx.userId, via: runner.VIA.MCP, key: tool.key, input: args })),
+    run: answered((ctx, args) => runner.read({ companyId: ctx.companyId, userId: ctx.userId, via: runner.VIA.MCP, callerId: clientOf(ctx), key: tool.key, input: args })),
 });
 
 /* No write is made or approved inside the AI client: the call is filed as a proposal that waits in the person's Inbox. */
@@ -39,6 +45,7 @@ const writeOf = (tool) => Object.freeze({
     input: withConnectionId(tool),
     strict: true,
     optIn: WRITE_SCOPE,
+    annotations: WRITE_HINTS,
     alwaysProposed: true,
     pendingMessage: `Nothing was sent to ${tool.definition.name}. It waits in your AlianHub Inbox as the proposal named here; only you can approve it there, and it is sent once, exactly as you approve it.`,
     filing: answered((file) => file()),

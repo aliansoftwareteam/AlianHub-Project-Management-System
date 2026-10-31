@@ -1,0 +1,39 @@
+# Progress: Connectors — Google pilot tools: Calendar, Meet and Drive (no Gmail)
+
+## Checklist
+- [x] Fake Google server (`tests/fixtures/fakeGoogleApi.js`; `fakeGoogle.js` stays the OAuth fake)
+- [x] Calendar tools
+- [x] Meet tools
+- [x] Drive tools
+- [ ] After 066: run each tool against a real Google connection
+
+## Last step
+All nine tools in `providers/google/tools.js`, tested from an agent run and MCP against the fake server. Not yet run against a real Google account: that needs 065 and 066.
+
+## Blockers
+None for this task. A real Google call waits on track A's 066 (`resolveConnection` is still the stub), and picked Drive files on 076.
+
+## Log
+
+### 2026-10-31
+- Built on the 070 branch, because the runner this task uses changes there.
+- Decided: Drive is read only, because the task names no Drive write and `drive.file` reads are all the pilot needs.
+- Decided: tool keys follow the contract's `google.calendar.events.list`. The 068 key check allowed only three parts, so it now also accepts a product part.
+- Decided: a read now fails on a provider status outside 2xx, as a write already did, so the model never gets an error page as the person's data. The runner holds this, so 074 and 075 get it too.
+- Decided: `notifyAttendees` defaults to no, and the card says whether Google emails the attendees.
+- Decided: Meet has one read tool, `spaces.get`. Google has no call to list spaces, and meeting records are left out because 061 keeps the pilot to meeting spaces.
+- Checked the requests against Google's official reference pages for Calendar events list, insert and patch, Meet spaces get and create, and Drive files list and export, and their scopes. They match. Not yet run against a real account. Two fixes came out of it: Meet access means joining without knocking, so the wording changed; and a Sheet exports its first tab only, so `files.read` says so.
+- Known limits, to see on a real account: a Drive file over the runner's 512 KB response cap fails the read rather than being cut; a PATCH that turns a timed event into an all-day one may be refused by Google, since it would keep the old `dateTime`.
+- Card wording goes through i18n: a card may hold `targetLabel` and `rows` of `{ label, value | valueLabel }`, with `Connectors.card.*` keys, and `text` holds only what the person's event says. 078 renders them with `$t`.
+- `/security-review` run on the connector work (068 to 071). One real finding, confidence 7 of 10: an update with a blank title, description or location cleared that field at Google while its card showed nothing. Fixed: the card now has a "Cleared" row, with tests. Also refused `.` and `..` as calendar, event and file ids, since a URL would resolve them into another Google endpoint; no exploit was found, it is hardening.
+- For 078, from that review: `card.rows`, `valueLabel` and `targetLabel` have no screen yet, so 078 must render them whole. 066 should not reach users before 078, because the owner approves from this card.
+- For 078 to look at: owners and admins can read a member's pending MCP connector proposals, event text and attendees included, and project members can read agent-filed ones. It holds no token, but it is a person's own account, so it needs a decision.
+- Independent audit against the task, the PRD and the contract. Fixed from it: `files.read` took Word, Excel and PowerPoint files as text, because `xml` matched their type; HTML files and event markup reached the model; a Drive name search promised a match anywhere, while Google matches the start of a word; Google's `quotaExceeded` and `dailyLimitExceeded` were not treated as a slow-down; a skill could be saved without an id a read needs; MCP annotations told clients these tools stay inside the workspace; `CONNECTORS` docs did not name `google`.
+- Known limit: a skill's reader params are fixed when it is written, not filled from the task, so an id-taking read works from a run only with a fixed id. That is how every reader works today.
+- Real Google, with a dummy token and no database: all nine tools' URLs answered 401, while made-up paths on the same hosts answered 404, so the routes exist. No real account was used, so answers and scopes are still unproven.
+- Handoffs for 078 are in its `progress.md`.
+- Left for Hetvi: the Google definition asks for `calendar.app.created`, which no tool here uses. PRD section 10 asks for least scopes, and the definition is track A's file, so keeping or dropping it is track A's call.
+
+### 2026-10-28
+- Task created from the split of 056; acceptance criteria drawn from the 056 PRD.
+- Assigned to track B in the two-track split; depends only on its own track and the 063 contract.

@@ -113,7 +113,7 @@ const connectorReaders = () => Object.fromEntries(require('../../Connectors/tool
     connector: tool.provider,
     action: tool.key,
     params: Object.freeze({
-        ...Object.fromEntries(Object.entries(tool.input.properties || {}).map(([name, schema]) => [name, readerParamOf(schema)])),
+        ...Object.fromEntries(Object.entries(tool.input.properties || {}).map(([name, schema]) => [name, Object.freeze({ ...readerParamOf(schema), ...((tool.input.required || []).includes(name) ? { required: true } : {}) })])),
         // Kept so a connectionId naming someone else's connection reaches the runner and is refused, not silently dropped.
         connectionId: Object.freeze({ type: 'string', maxLength: CONNECTION_ID_MAX }),
     }),
