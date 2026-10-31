@@ -209,6 +209,11 @@ describe('Drive reads', () => {
         expect(lastCall().url.searchParams.get('q')).toBe("trashed = false and name contains 'x\\' or trashed = true or name contains \\''");
     });
 
+    it('refuses a file id that would step out of its URL path', async () => {
+        await expect(mcpRead('google.drive.files.read', { fileId: '..' })).rejects.toThrow(/fileId is not in the form/);
+        expect(safeFetch).not.toHaveBeenCalled();
+    });
+
     it('a file the person did not pick is refused by Google', async () => {
         expect(await mcpRead('google.drive.files.read', { fileId: 'not-picked' })).toMatchObject({ code: 'provider_refused' });
     });
@@ -295,6 +300,29 @@ describe('Calendar writes', () => {
     it('shows on the card that an update clears the attendees', async () => {
         const { proposalId } = await mcpWrite('google.calendar.events.update', { eventId: 'ev1', attendees: ' , ' });
         expect(proposalRow(proposalId).changes[0].card.rows).toContainEqual({ label: 'Connectors.card.attendeesReplaced', valueLabel: 'Connectors.card.nobody' });
+    });
+
+    it.each([
+        ['summary', 'Connectors.card.title'],
+        ['description', 'Connectors.card.description'],
+        ['location', 'Connectors.card.where'],
+    ])('shows on the card that a blank %s clears it at Google', async (field, label) => {
+        for (const blank of ['', '   ']) {
+            // eslint-disable-next-line no-await-in-loop
+            const { proposalId } = await mcpWrite('google.calendar.events.update', { eventId: 'ev1', [field]: blank });
+            const { card } = proposalRow(proposalId).changes[0];
+            expect(card.title).toBe('ev1');
+            expect(card.rows).toContainEqual({ label, valueLabel: 'Connectors.card.cleared' });
+            // eslint-disable-next-line no-await-in-loop
+            await approve(proposalId);
+            expect(lastCall().body).toEqual({ [field]: blank });
+        }
+    });
+
+    it.each([['calendarId', { eventId: 'ev1', calendarId: '..' }], ['eventId', { eventId: '..' }], ['eventId', { eventId: '.' }]])('refuses a %s that would step out of its URL path', async (field, input) => {
+        await expect(mcpRead('google.calendar.events.get', input)).rejects.toThrow(new RegExp(`${field} is not in the form`));
+        await expect(mcpWrite('google.calendar.events.update', { ...input, summary: 'x' })).rejects.toThrow(new RegExp(`${field} is not in the form`));
+        expect(safeFetch).not.toHaveBeenCalled();
     });
 
     it('an update that changes nothing is not filed', async () => {

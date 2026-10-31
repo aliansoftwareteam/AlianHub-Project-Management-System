@@ -14204,6 +14204,9 @@ export default {
         },
         card: {
             primaryCalendar: "Your primary calendar",
+            title: "Title",
+            description: "Description",
+            cleared: "Cleared",
             eventId: "Event",
             start: "Starts",
             end: "Ends",

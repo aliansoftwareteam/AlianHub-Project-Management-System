@@ -13,9 +13,11 @@ const TEXT_TYPE = /^text\/|json|xml|csv/;
 const ACCESS_ROW = Object.freeze({ OPEN: 'Connectors.card.accessOpen', TRUSTED: 'Connectors.card.accessTrusted', RESTRICTED: 'Connectors.card.accessRestricted' });
 
 const limit = { type: 'integer', minimum: 1, maximum: 50, default: DEFAULT_ITEMS };
-const calendarId = { type: 'string', maxLength: 200, description: 'Leave out for the person\'s primary calendar.' };
-const eventId = { type: 'string', minLength: 1, maxLength: 200 };
-const fileId = { type: 'string', minLength: 1, maxLength: 200 };
+// encodeURIComponent leaves dots alone, and a URL resolves a '..' segment into another Google endpoint.
+const NOT_A_PATH_STEP = '^(?!\\.{1,2}$).+$';
+const calendarId = { type: 'string', maxLength: 200, pattern: NOT_A_PATH_STEP, description: 'Leave out for the person\'s primary calendar.' };
+const eventId = { type: 'string', minLength: 1, maxLength: 200, pattern: NOT_A_PATH_STEP };
+const fileId = { type: 'string', minLength: 1, maxLength: 200, pattern: NOT_A_PATH_STEP };
 const when = { type: 'string', maxLength: 40, pattern: `^(\\d{4}-\\d{2}-\\d{2}|${STAMP})$`, description: 'YYYY-MM-DD for an all-day event (its end is the day after it finishes), or an ISO time with its offset.' };
 const stamp = { type: 'string', maxLength: 40, pattern: `^${STAMP}$`, description: 'An ISO time with its offset.' };
 const eventFields = {
@@ -60,6 +62,9 @@ const eventDetail = (event) => lines([
     ['Description', event.description],
 ]);
 
+// A blank field is sent and clears that field at Google, so the card has to say so.
+const clearedRow = (label, value) => (value !== undefined && !String(value).trim() ? { label, valueLabel: 'Connectors.card.cleared' } : null);
+
 const eventCard = (input, attendeesLabel) => ({
     target: input.calendarId || '',
     targetLabel: input.calendarId ? undefined : 'Connectors.card.primaryCalendar',
@@ -68,7 +73,9 @@ const eventCard = (input, attendeesLabel) => ({
         { label: 'Connectors.card.eventId', value: input.eventId },
         { label: 'Connectors.card.start', value: input.start },
         { label: 'Connectors.card.end', value: input.end },
-        { label: 'Connectors.card.where', value: input.location },
+        clearedRow('Connectors.card.title', input.summary),
+        clearedRow('Connectors.card.description', input.description),
+        clearedRow('Connectors.card.where', input.location) || { label: 'Connectors.card.where', value: input.location },
         input.attendees === undefined ? null : { label: attendeesLabel, ...(emails(input.attendees).length ? { value: emails(input.attendees).join(', ') } : { valueLabel: 'Connectors.card.nobody' }) },
         { label: 'Connectors.card.notifyAttendees', valueLabel: input.notifyAttendees ? 'Connectors.card.yes' : 'Connectors.card.no' },
     ].filter((row) => row && (row.value || row.valueLabel)),
@@ -168,7 +175,7 @@ module.exports = [{
         if (!EDITABLE.some((field) => input[field] !== undefined)) {
             throw Object.assign(new Error('This update names nothing to change, so it was not filed.'), { code: 'bad_input', status: 400, deterministic: true });
         }
-        return { ...eventCard(input, 'Connectors.card.attendeesReplaced'), title: input.summary === undefined ? input.eventId : input.summary };
+        return { ...eventCard(input, 'Connectors.card.attendeesReplaced'), title: String(input.summary || '').trim() || input.eventId };
     },
     run: async ({ input, connection }) => {
         const event = json(await connection.request(eventUrl(input), { method: 'patch', query: notifyOf(input), json: eventBody(input) }));
