@@ -771,6 +771,9 @@ describe('the flag', () => {
         'POST /api/v2/connectors/google/:connector/connect', 'POST /api/v2/connectors/google/:connector/complete',
         'DELETE /api/v2/connectors/google/:connector', 'DELETE /api/v2/connectors/google/:connector/members/:userId',
     ];
+    const APP_ROUTES = [
+        'GET /api/v2/connectors/apps', 'PUT /api/v2/connectors/:provider/app', 'DELETE /api/v2/connectors/:provider/app',
+    ];
     const routesOf = () => {
         const seen = [];
         const app = Object.fromEntries(['get', 'post', 'put', 'delete'].map((verb) => [verb, (path) => seen.push(`${verb.toUpperCase()} ${path}`)]));
@@ -787,7 +790,7 @@ describe('the flag', () => {
     ];
 
     it('registers the Google routes only while the flag names the connector', () => {
-        expect(routesOf()).toEqual(GOOGLE_ROUTES);
+        expect(routesOf()).toEqual([...GOOGLE_ROUTES, ...APP_ROUTES]);
         process.env.CONNECTORS = 'slack';
         expect(routesOf().filter((r) => r.includes('google'))).toEqual([]);
         process.env.CONNECTORS = `slack, ${G}`;
@@ -832,7 +835,7 @@ describe('the flag', () => {
         expect(logger.error.mock.calls[0][0]).toContain(named);
         expect(logger.error.mock.calls[0][0]).not.toContain(CLIENT_SECRET);
         expect(logger.info).not.toHaveBeenCalled();
-        expect(routesOf()).toEqual(GOOGLE_ROUTES);
+        expect(routesOf()).toEqual([...GOOGLE_ROUTES, ...APP_ROUTES]);
 
         expect((await call(ctrl.mine, ADMIN)).body.data.connections).toEqual([{ connector: G, on: false, problems: codes }]);
         expect((await call(ctrl.mine, MEMBER)).body.data.connections).toEqual([{ connector: G, on: false, problems: [] }]);
