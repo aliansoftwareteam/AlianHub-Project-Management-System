@@ -96,15 +96,17 @@ const claimRunRead = async (companyId, runId, entry, maxChars) => {
     return { settle, maxChars: Math.min(maxChars, left) };
 };
 
-/* The tool is handed a request function, never the token, which goes only to the provider's own hosts. A read tool can only GET. */
-const requesterFor = (call) => async (url, { query } = {}) => callProvider(call, url, { method: 'get', query });
-
-/* safeFetch hands back any status, so a provider's refusal becomes an error here: it must not be kept as a delivery. */
-const writeRequesterFor = (call) => async (url, { method = 'post', query, json } = {}) => {
-    const res = await callProvider(call, url, { method, query, json });
+/* safeFetch hands back any status, so a provider's refusal becomes an error here: a write must not be kept as a
+ * delivery, and a read must not hand the model an error page as if it were the person's data. */
+const accepted = (call, res) => {
     if (res.status < 200 || res.status >= 300) throw refusal('provider_refused', `${call.tool.definition.name} answered ${res.status}, so this did not go through.`);
     return res;
 };
+
+/* The tool is handed a request function, never the token, which goes only to the provider's own hosts. A read tool can only GET. */
+const requesterFor = (call) => async (url, { query } = {}) => accepted(call, await callProvider(call, url, { method: 'get', query }));
+
+const writeRequesterFor = (call) => async (url, { method = 'post', query, json } = {}) => accepted(call, await callProvider(call, url, { method, query, json }));
 
 const ownConnection = async (tool, companyId, userId, asked) => {
     const connection = await connectionOf(tool, companyId, userId);

@@ -1,7 +1,7 @@
 ---
 id: 071
 title: Connectors — Google pilot tools: Calendar, Meet and Drive (no Gmail)
-status: backlog
+status: active
 priority: high
 depends_on: [068, 069]
 created: 2026-10-28

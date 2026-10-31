@@ -13902,6 +13902,19 @@ export default {
         "rating_value": "{n} out of {max}",
         "job_done_failed": "Done: {filled} filled, {skipped} skipped, {failed} couldn't be filled."
     },
+    "Connectors": {
+        "tool": {
+            "googleCalendarEventsList": "List Google Calendar events",
+            "googleCalendarEventsGet": "Read a Google Calendar event",
+            "googleCalendarEventsCreate": "Create a Google Calendar event",
+            "googleCalendarEventsUpdate": "Update a Google Calendar event",
+            "googleMeetSpacesGet": "Read a Google Meet meeting",
+            "googleMeetSpacesCreate": "Create a Google Meet meeting",
+            "googleDriveFilesList": "List picked Google Drive files",
+            "googleDriveFilesGet": "Read Google Drive file details",
+            "googleDriveFilesRead": "Read a Google Drive file"
+        }
+    },
     "WhoCanSee": {
         "title": "Who can see this",
         "menu_project": "Who can see this project",
