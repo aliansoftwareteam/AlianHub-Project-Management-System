@@ -10,7 +10,7 @@ const logger = require('../../Config/loggerConfig');
 
 const SOURCE_MCP = 'mcp';
 const NOT_PERMITTED = 'not_permitted';
-const WHY = Object.freeze({ SEAT: 'seat', OWNER_ADMIN: 'owner_admin', OWN_RIGHTS: 'own_rights', FIRST_APPROVER: 'first_approver' });
+const WHY = Object.freeze({ SEAT: 'seat', OWNER_ADMIN: 'owner_admin', OWN_RIGHTS: 'own_rights', FIRST_APPROVER: 'first_approver', CONNECTION_OWNER: 'connection_owner' });
 const KEEPS_WAITING = 'It stays waiting for someone who can.';
 const REFUSAL = Object.freeze({
     OWNER_ADMIN: 'This proposal needs an Owner or Admin.',
@@ -45,6 +45,8 @@ const changeRefusal = async (companyId, userId, proposal, change) => {
 /* null when the person may approve `changes` of the proposal; otherwise the refusal the approve route answers. */
 const approveRefusal = async (companyId, { userId, privileged }, proposal, changes = proposal.changes) => {
     const list = Array.isArray(changes) ? changes : [];
+    const notOwner = require('../Connectors/writes').approverRefusal(userId, proposal, list);
+    if (notOwner) return held(notOwner, WHY.CONNECTION_OWNER);
     if (needsOwnerOrAdmin(proposal, list) && !privileged) return held(REFUSAL.OWNER_ADMIN, WHY.OWNER_ADMIN);
     for (const change of list) {
         // eslint-disable-next-line no-await-in-loop
@@ -59,8 +61,8 @@ const OPEN = Object.freeze({ locked: false, lockedWhy: '', mayDecline: true });
 const UNREAD = Object.freeze({ locked: true, lockedWhy: WHY.OWN_RIGHTS, mayDecline: false });
 
 /* Whether a change of the proposal is one only the person it was asked for approves, which no role answers for. */
-const asksWhoeverApproves = (proposal) => proposal.source === SOURCE_MCP
-    && (Array.isArray(proposal.changes) ? proposal.changes : []).some((change) => require('../Mcp/approval').approvedByRequesterAlone(change));
+const asksWhoeverApproves = (proposal) => require('../Connectors/writes').gatedByOwner(proposal) || (proposal.source === SOURCE_MCP
+    && (Array.isArray(proposal.changes) ? proposal.changes : []).some((change) => require('../Mcp/approval').approvedByRequesterAlone(change)));
 
 /* A plan can hold a part it cannot make for anyone (./planLocks.js), which is read for an owner or an admin too. */
 const holdsPlan = (proposal) => (Array.isArray(proposal.changes) ? proposal.changes : []).some((change) => change && require('./planChoice').isPlan(change.action));

@@ -233,6 +233,7 @@ async function propose(state, config) {
         what,
         why: [result.summary, dropped].filter(Boolean).join('\n\n'),
         changes: toPropose,
+        connectionOwner: deps.actor && deps.actor.userId ? String(deps.actor.userId) : '',
         cost: { tokens: result.usage && result.usage.totalTokens, model: result.model, usd: spend && spend.usd },
         ...(taint.isTainted(run) ? { taint: taint.forProposal(run) } : {}),
     });

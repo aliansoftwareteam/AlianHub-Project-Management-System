@@ -44,6 +44,8 @@ const toolProblems = (definition, tool) => {
     found.push(...inputProblems(tool.input).map((problem) => `${key}: ${problem}`));
     if (!isObject(tool.caps) || !positive(tool.caps.maxItems) || !positive(tool.caps.maxChars)) found.push(`${key}: caps needs maxItems and maxChars above 0`);
     if (typeof tool.run !== 'function') found.push(`${key}: run is not a function`);
+    // The approval card is the only place a person sees what a write sends, so a write without one never loads.
+    if (tool.kind === KIND.WRITE && typeof tool.card !== 'function') found.push(`${key}: a write has no card`);
     return found;
 };
 
@@ -79,7 +81,11 @@ const make = (dir) => {
     const all = () => { loaded = loaded || load(dir); return loaded; };
     const get = (key) => all().find((tool) => tool.key === String(key)) || null;
     const reads = () => all().filter((tool) => tool.kind === KIND.READ);
-    return { all, get, reads, isOn: (tool) => providerOn(tool.provider), anyOn: () => all().some((tool) => providerOn(tool.provider)) };
+    const writes = () => all().filter((tool) => tool.kind === KIND.WRITE);
+    const isWrite = (key) => { const tool = get(key); return Boolean(tool) && tool.kind === KIND.WRITE; };
+    return { all, get, reads, writes, isWrite, isOn: (tool) => providerOn(tool.provider), anyOn: () => all().some((tool) => providerOn(tool.provider)) };
 };
 
-module.exports = { KIND, problemsOf, make, ...make(DIR) };
+const WRITE_GATE = 'connection_owner';
+
+module.exports = { KIND, WRITE_GATE, problemsOf, make, ...make(DIR) };
