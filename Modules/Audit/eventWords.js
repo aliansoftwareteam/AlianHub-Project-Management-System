@@ -66,6 +66,8 @@ const EVENTS = Object.freeze({
     'connector.broken': 'A connected service stopped working',
     'connector.channels_set': 'Chose the Slack channels agents may use',
     'connector.call': 'An agent read from a connected service',
+    'connector.app_set': "Set the workspace's own app for a connected service",
+    'connector.app_removed': "Removed the workspace's own app for a connected service",
     'agent_session.delegated': 'Handed a task to an outside agent',
     'agent_session.endpoint_saved': 'Saved where an outside agent is reached',
     'agent_session.completed': 'An outside agent finished its work',

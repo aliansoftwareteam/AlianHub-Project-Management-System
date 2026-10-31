@@ -2742,6 +2742,8 @@
     "AuditEvents.billing_invoice_update": "Changed an invoice",
     "AuditEvents.billing_milestone_create": "Added a billing milestone",
     "AuditEvents.billing_milestone_update": "Changed a billing milestone",
+    "AuditEvents.connector_app_removed": "Removed the workspace's own app for a connected service",
+    "AuditEvents.connector_app_set": "Set the workspace's own app for a connected service",
     "AuditEvents.connector_broken": "A connected service stopped working",
     "AuditEvents.connector_call": "An agent read from a connected service",
     "AuditEvents.connector_channels_set": "Chose the Slack channels agents may use",
