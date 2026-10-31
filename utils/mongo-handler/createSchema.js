@@ -420,6 +420,9 @@ connectorAppsSchema.index({ companyId: 1, provider: 1 }, { unique: true, name: '
 const connectorUsageSchema = new Schema(schema.connectorUsage, {strict: true, timestamps: false});
 connectorUsageSchema.index({ connectionId: 1, 'actor.type': 1, 'actor.id': 1, day: 1 }, { unique: true, name: 'one_per_caller_day' });
 connectorUsageSchema.index({ companyId: 1, userId: 1, day: 1 });
+connectorUsageSchema.index({ 'actor.type': 1, 'actor.id': 1, day: 1 });
+const connectorQuotasSchema = new Schema(schema.connectorQuotas, {strict: true, timestamps: false});
+connectorQuotasSchema.index({ scope: 1, targetId: 1 }, { unique: true, name: 'one_per_target' });
 const instructionPatternsSchema = new Schema(schema.instructionPatterns, {strict: true, timestamps: false});
 const agentSessionsSchema = new Schema(schema.agentSessions, {strict: true, timestamps: false});
 agentSessionsSchema.index({ taskId: 1, createdAt: -1 });
@@ -645,6 +648,7 @@ module.exports = {
     connectorConnectionsSchema,
     connectorAppsSchema,
     connectorUsageSchema,
+    connectorQuotasSchema,
     instructionPatternsSchema,
     agentSessionsSchema,
     agentSessionEndpointsSchema,

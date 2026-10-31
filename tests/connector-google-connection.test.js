@@ -787,7 +787,7 @@ describe('the flag', () => {
     ];
 
     it('registers the Google routes only while the flag names the connector', () => {
-        expect(routesOf()).toEqual(GOOGLE_ROUTES);
+        expect(routesOf()).toEqual(['PUT /api/v2/connectors/admin/quotas', ...GOOGLE_ROUTES]);
         process.env.CONNECTORS = 'slack';
         expect(routesOf().filter((r) => r.includes('google'))).toEqual([]);
         process.env.CONNECTORS = `slack, ${G}`;
@@ -832,7 +832,7 @@ describe('the flag', () => {
         expect(logger.error.mock.calls[0][0]).toContain(named);
         expect(logger.error.mock.calls[0][0]).not.toContain(CLIENT_SECRET);
         expect(logger.info).not.toHaveBeenCalled();
-        expect(routesOf()).toEqual(GOOGLE_ROUTES);
+        expect(routesOf()).toEqual(['PUT /api/v2/connectors/admin/quotas', ...GOOGLE_ROUTES]);
 
         expect((await call(ctrl.mine, ADMIN)).body.data.connections).toEqual([{ connector: G, on: false, problems: codes }]);
         expect((await call(ctrl.mine, MEMBER)).body.data.connections).toEqual([{ connector: G, on: false, problems: [] }]);

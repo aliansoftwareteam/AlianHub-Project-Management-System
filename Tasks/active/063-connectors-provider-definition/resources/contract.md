@@ -93,6 +93,7 @@ resolveConnection({ companyId, userId, provider })
 
 getAccessToken()                       // → Promise<string>; refreshes on use; throws ConnectorError `broken`
 markBackoff({ companyId, connectionId, until })   // → Promise<void>; B calls it on a rate-limit signal
+recordHealth({ companyId, connectionId, lastUsedAt, lastError })   // → Promise<void>; B calls it after a provider call; a field left out is not changed, `lastError: ''` clears it
 ```
 
 `ConnectorError` is exported by `resolveConnection.js` with the codes as `CODE`. Each error carries:
@@ -114,8 +115,9 @@ markBackoff({ companyId, connectionId, until })   // → Promise<void>; B calls 
 - Only the person's own connection is ever returned (FR-19).
 - The access token stays inside the caller of `getAccessToken()`: never returned by a route, logged, emitted or audited (FR-15).
 - `connectionId` is the only id B stores (audit, proposals, usage).
-- B never writes `connector_connections` directly; `markBackoff` is the one write B makes to it.
-- Until 066 lands, `resolveConnection` is a stub with this signature that throws `provider_off` or `not_connected`, so B can build and test against it. `getAccessToken` and `markBackoff` arrive with 066.
+- B never writes `connector_connections` directly: `markBackoff` and `recordHealth` are its only writes to it. B may read a row's `backoffUntil`.
+- `connector.connect`, `connector.products_changed`, `connector.broken` and `connector.revoke` are audited by A, where those events happen; `connector.call` is audited by B.
+- Until 066 lands, `resolveConnection` is a stub with this signature that throws `provider_off` or `not_connected`, so B can build and test against it. `getAccessToken`, `markBackoff` and `recordHealth` arrive with 066.
 
 ## 6. Data fields (built in 064, track A)
 

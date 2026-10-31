@@ -37,3 +37,4 @@ None.
 
 ### 2026-10-31
 - Contract change proposed by track B for 069, not yet agreed by Hetvi, so `contract.md` is unchanged: section 3 adds `card: (input) => ({ target, title, text, attachments })`, required on a `kind: 'write'` tool, and `caps` plus `connection.request` in what `run` receives. Track A reads nothing from `tools.js`, so nothing on its side changes.
+- Contract change for 070, agreed with Hetvi as Prinsa reported on 2026-10-31: section 5 adds `recordHealth` beside `markBackoff`, lets B read `backoffUntil`, and has A audit `connector.connect`, `products_changed`, `broken` and `revoke`, since those events happen in A's flow. 066 builds `recordHealth`.

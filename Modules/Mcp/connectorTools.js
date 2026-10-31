@@ -16,6 +16,8 @@ const answered = (run) => async (...args) => {
     }
 };
 
+const clientOf = (ctx) => (ctx.oauth ? `oauth:${ctx.oauth.clientId}` : `mcp:${String((ctx.token && ctx.token._id) || '')}`);
+
 const withConnectionId = (tool) => ({ ...tool.input, properties: { ...tool.input.properties, connectionId: CONNECTION_ID } });
 
 const readOf = (tool) => Object.freeze({
@@ -28,7 +30,7 @@ const readOf = (tool) => Object.freeze({
     visibility: 'none',
     visibilityReason: 'reads the caller\'s own account at another app, never anything in this workspace',
     readParams: () => ({}),
-    run: answered((ctx, args) => runner.read({ companyId: ctx.companyId, userId: ctx.userId, via: runner.VIA.MCP, key: tool.key, input: args })),
+    run: answered((ctx, args) => runner.read({ companyId: ctx.companyId, userId: ctx.userId, via: runner.VIA.MCP, callerId: clientOf(ctx), key: tool.key, input: args })),
 });
 
 /* No write is made or approved inside the AI client: the call is filed as a proposal that waits in the person's Inbox. */

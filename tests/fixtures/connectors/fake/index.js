@@ -13,4 +13,5 @@ module.exports = {
     },
     readAccount: ({ tokenResponse }) => ({ id: String(tokenResponse.account_id), label: String(tokenResponse.email || '') }),
     egressHosts: ['auth.fake.test', 'api.fake.test'],
+    rateLimit: { statuses: [403, 429] },
 };

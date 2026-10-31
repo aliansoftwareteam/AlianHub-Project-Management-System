@@ -344,6 +344,21 @@
     "description": "Extra origins allowed by CORS, comma-separated (WEBURL and APIURL are always allowed).",
     "default": "http://localhost:8080"
   },
+  "CONNECTOR_QUOTA_MAX_AGENT_READS": {
+    "group": "ai",
+    "description": "The most reads from connected apps an owner or admin can allow one agent per day (default limit 200). A lower value here also lowers the limits already set.",
+    "default": "2000"
+  },
+  "CONNECTOR_QUOTA_MAX_READS": {
+    "group": "ai",
+    "description": "The most reads from connected apps an owner or admin can allow one person per day, across their connections (default limit 500). A lower value here also lowers the limits already set.",
+    "default": "5000"
+  },
+  "CONNECTOR_QUOTA_MAX_WRITE_PROPOSALS": {
+    "group": "ai",
+    "description": "The most proposed writes to connected apps an owner or admin can allow one person per day (default limit 50). A lower value here also lowers the limits already set.",
+    "default": "500"
+  },
   "CRON_ENABLED": {
     "group": "general",
     "description": "Run the scheduled jobs in this process (default true; set false on extra replicas).",

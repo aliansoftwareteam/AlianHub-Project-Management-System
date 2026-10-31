@@ -484,6 +484,7 @@ describe('with the flag off', () => {
 
     it('registers the routes while the flag names slack', () => {
         expect(routesOf()).toEqual([
+            'PUT /api/v2/connectors/admin/quotas',
             'GET /api/v2/connectors/slack', 'PUT /api/v2/connectors/slack/secrets', 'DELETE /api/v2/connectors/slack/secrets/:key',
             'POST /api/v2/connectors/slack/channels/refresh', 'PUT /api/v2/connectors/slack/channels',
         ]);

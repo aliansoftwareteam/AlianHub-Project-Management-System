@@ -4,6 +4,8 @@ const { SCHEMA_TYPE } = require('../../Config/schemaType');
 const { MongoDbCrudOpration } = require('../../utils/mongo-handler/mongoQueries');
 const tools = require('./tools');
 const runner = require('./toolRunner');
+const quotas = require('./quotas');
+const callAudit = require('./callAudit');
 
 /* A write to a connected app is filed as a proposal that only the connection's owner approves, and is sent once,
  * with exactly the params that owner saw on its card (FR-21 to FR-23 of task 056). */
@@ -13,6 +15,7 @@ const CARD_TEXT_MAX = 20000;
 const CARD_LINE_MAX = 300;
 const ATTACHMENTS_MAX = 20;
 const ERROR_MAX = 300;
+const FILED = 'filed';
 const REFUSAL = Object.freeze({
     NOT_OWNER: 'Only the person whose connection this is can approve it. It stays waiting for them.',
     NO_OWNER: 'A write to a connected app needs the person whose connection it uses.',
@@ -69,6 +72,37 @@ const prepareChanges = async (companyId, ownerId, changes) => {
     return out;
 };
 
+/* Filing is what the daily limit counts and what the audit shows: an edit of a waiting proposal goes through prepareChanges alone. */
+const fileChanges = async (companyId, ownerId, changes, { via, id, runId = null }) => {
+    const list = Array.isArray(changes) ? changes : [];
+    if (!hasWrite(list)) return list;
+    const audited = (state, reason = '', connectionOf = () => '') => list.filter((c) => c && isWrite(c.action)).forEach((c) => callAudit.record(companyId, {
+        userId: ownerId, via, callerId: id, runId, key: c.action, tool: tools.get(c.action), phase: callAudit.PHASE.PROPOSE, input: c.params, connectionId: connectionOf(c), state, reason,
+    }));
+    let prepared;
+    try {
+        prepared = await prepareChanges(companyId, ownerId, list);
+    } catch (error) {
+        audited(runner.STATE.REFUSED, String(error.code || 'error'));
+        throw error;
+    }
+    const connectionsByAction = new Map(prepared.filter((c) => c && isWrite(c.action)).map((c) => [c.action, c.params.connectionId]));
+    const connectionOf = (c) => connectionsByAction.get(c.action) || '';
+    const claimed = [];
+    try {
+        for (const change of prepared.filter((c) => c && isWrite(c.action))) {
+            // eslint-disable-next-line no-await-in-loop
+            claimed.push(await quotas.claimWriteProposal(companyId, { connectionId: change.params.connectionId, userId: ownerId, actor: { type: via, id } }));
+        }
+    } catch (error) {
+        await Promise.all(claimed.map((claim) => claim.release()));
+        audited(runner.STATE.REFUSED, String(error.code || 'error'), connectionOf);
+        throw error;
+    }
+    audited(FILED, '', connectionOf);
+    return prepared;
+};
+
 const gatedByOwner = (proposal, changes = proposal && proposal.changes) => Boolean(proposal)
     && (proposal.gate === GATE || hasWrite(changes));
 
@@ -96,9 +130,13 @@ const send = async ({ companyId, actor, action, params, proposal }) => {
     if (!proposal.connectionOwner || String(proposal.connectionOwner) !== userId) throw refuse(REFUSAL.NOT_OWNER, 'not_owner');
     const asApproved = { ...params };
     delete asApproved.__proposal;
-    if (!(await claimAttempt(companyId, proposal.id, attemptOf(action, asApproved)))) throw refuse(REFUSAL.SENT_ONCE, 'sent_once', 409);
     const tool = tools.get(action);
-    const out = await runner.write({ companyId, userId, key: action, params: asApproved });
+    const out = await runner.write({
+        companyId, userId, key: action, params: asApproved,
+        beforeSend: async () => {
+            if (!(await claimAttempt(companyId, proposal.id, attemptOf(action, asApproved)))) throw refuse(REFUSAL.SENT_ONCE, 'sent_once', 409);
+        },
+    });
     return { result: out, undo: null, entityType: 'connector_write', entityId: action, entityName: tool ? tool.definition.name : action };
 };
 
@@ -114,4 +152,4 @@ const deliveryOf = (changes, applied) => (Array.isArray(changes) ? changes : [])
         at: new Date(),
     }));
 
-module.exports = { GATE, REFUSAL, isWrite, hasWrite, cardOf, prepareChanges, gatedByOwner, approverRefusal, send, executorFor, deliveryOf };
+module.exports = { GATE, REFUSAL, isWrite, hasWrite, cardOf, prepareChanges, fileChanges, gatedByOwner, approverRefusal, send, executorFor, deliveryOf };

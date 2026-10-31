@@ -1,7 +1,7 @@
 ---
 id: 070
 title: Connectors — audit, health, usage counts, quotas and provider backoff
-status: backlog
+status: active
 priority: high
 depends_on: [063, 068]
 created: 2026-10-28
