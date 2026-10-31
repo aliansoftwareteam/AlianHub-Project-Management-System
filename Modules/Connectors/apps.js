@@ -14,9 +14,12 @@ const CODE = Object.freeze({
     INVALID: 'invalid_app',
     UNKNOWN_PROVIDER: 'unknown_provider',
     NOT_FOUND: 'app_not_found',
+    CONFLICT: 'app_conflict',
     SECRET_UNREADABLE: 'app_secret_unreadable',
 });
-const STATUS_BY_CODE = { invalid_app: 400, unknown_provider: 404, app_not_found: 404, app_secret_unreadable: 503 };
+const STATUS_BY_CODE = { invalid_app: 400, unknown_provider: 404, app_not_found: 404, app_conflict: 409, app_secret_unreadable: 503 };
+
+const isDuplicateKey = (error) => !!error && (error.code === 11000 || /E11000|duplicate key/i.test(String(error.message || '')));
 
 class AppError extends Error {
     constructor(code, message) {
@@ -111,13 +114,24 @@ const setApp = async ({ companyId, provider, clientId, clientSecret, extra, acto
 
     let secretHandle;
     if (existing) {
-        await secrets.rotate({ companyId: id, handle: existing.secretHandle, value: clientSecret, actor });
         secretHandle = existing.secretHandle;
-        await appsDb(id, [{ _id: existing._id }, { $set: { clientId: text(clientId), extra: cleanExtra, setBy: actorIdOf(actor), updatedAt: now } }], 'updateOne');
+        await secrets.rotate({ companyId: id, handle: secretHandle, value: clientSecret, actor });
+        // An omitted `extra` on replace clears the old one, so the row only ever holds what was last sent.
+        const set = { clientId: text(clientId), setBy: actorIdOf(actor), updatedAt: now };
+        const change = cleanExtra ? { $set: { ...set, extra: cleanExtra } } : { $set: set, $unset: { extra: '' } };
+        await appsDb(id, [{ _id: existing._id }, change], 'updateOne');
     } else {
         const meta = await secrets.create({ companyId: id, name, kind: SECRET_KIND, value: clientSecret, actor });
         secretHandle = meta.handle;
-        await appsDb(id, { companyId: id, provider: String(provider), clientId: text(clientId), secretHandle, extra: cleanExtra, setBy: actorIdOf(actor), createdAt: now, updatedAt: now }, 'save');
+        // The unique index closes the window between the read above and this write; a racing create would
+        // leave this secret behind, so it is retired before the conflict is reported.
+        try {
+            await appsDb(id, { companyId: id, provider: String(provider), clientId: text(clientId), secretHandle, ...(cleanExtra ? { extra: cleanExtra } : {}), setBy: actorIdOf(actor), createdAt: now, updatedAt: now }, 'save');
+        } catch (error) {
+            await secrets.retire({ companyId: id, handle: secretHandle, actor }).catch(() => {});
+            if (isDuplicateKey(error)) throw new AppError(CODE.CONFLICT, `An app for ${provider} was just set; try again.`);
+            throw error;
+        }
     }
 
     await markReauth(id, provider);

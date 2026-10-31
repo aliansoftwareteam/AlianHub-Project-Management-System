@@ -14,6 +14,7 @@ jest.mock('../utils/mongo-handler/mongoQueries', () => {
     const MongoDbCrudOpration = jest.fn(async (companyId, { type, data }, method) => {
         const coll = collOf(type);
         if (method === 'save') {
+            if (MongoDbCrudOpration.__failSave) { const e = MongoDbCrudOpration.__failSave; MongoDbCrudOpration.__failSave = null; throw e; }
             const saved = { _id: `id_${seq++}`, ...data };
             coll.push(saved);
             return saved;
@@ -23,7 +24,10 @@ jest.mock('../utils/mongo-handler/mongoQueries', () => {
         if (method === 'find') return coll.filter((d) => matches(d, filter));
         if (method === 'updateOne') {
             const doc = coll.find((d) => matches(d, filter));
-            if (doc) Object.assign(doc, change.$set || {});
+            if (doc) {
+                Object.assign(doc, change.$set || {});
+                Object.keys(change.$unset || {}).forEach((k) => delete doc[k]);
+            }
             return { modifiedCount: doc ? 1 : 0 };
         }
         if (method === 'updateMany') {
@@ -40,7 +44,8 @@ jest.mock('../utils/mongo-handler/mongoQueries', () => {
     });
     MongoDbCrudOpration.__apps = apps;
     MongoDbCrudOpration.__connections = connections;
-    MongoDbCrudOpration.__reset = () => { apps.length = 0; connections.length = 0; seq = 1; };
+    MongoDbCrudOpration.__failSave = null;
+    MongoDbCrudOpration.__reset = () => { apps.length = 0; connections.length = 0; seq = 1; MongoDbCrudOpration.__failSave = null; };
     return { MongoDbCrudOpration };
 });
 
@@ -124,6 +129,29 @@ describe('setApp', () => {
         await expect(apps.setApp({ companyId: COMPANY, provider: 'google', clientId: '', clientSecret: 'x', actor: ACTOR }))
             .rejects.toMatchObject({ name: 'AppError', code: 'invalid_app' });
         expect(secrets.create).not.toHaveBeenCalled();
+    });
+
+    it('clears a previously set extra when a replace omits it', async () => {
+        await apps.setApp({ companyId: COMPANY, provider: 'google', clientId: 'cid', clientSecret: 'one', extra: { apiKey: 'k' }, actor: ACTOR });
+        expect(MongoDbCrudOpration.__apps[0].extra).toEqual({ apiKey: 'k' });
+        await apps.setApp({ companyId: COMPANY, provider: 'google', clientId: 'cid', clientSecret: 'two', actor: ACTOR });
+        expect(MongoDbCrudOpration.__apps[0]).not.toHaveProperty('extra');
+    });
+
+    it('retires the just-created secret when the row write fails', async () => {
+        MongoDbCrudOpration.__failSave = new Error('db exploded');
+        await expect(apps.setApp({ companyId: COMPANY, provider: 'google', clientId: 'cid', clientSecret: 'shh', actor: ACTOR }))
+            .rejects.toThrow('db exploded');
+        expect(secrets.create).toHaveBeenCalledTimes(1);
+        expect(secrets.retire).toHaveBeenCalledWith(expect.objectContaining({ handle: 'sec_1' }));
+        expect(MongoDbCrudOpration.__apps).toHaveLength(0);
+    });
+
+    it('reports a racing duplicate as a conflict and leaves no orphan secret', async () => {
+        MongoDbCrudOpration.__failSave = Object.assign(new Error('E11000 duplicate key'), { code: 11000 });
+        await expect(apps.setApp({ companyId: COMPANY, provider: 'google', clientId: 'cid', clientSecret: 'shh', actor: ACTOR }))
+            .rejects.toMatchObject({ name: 'AppError', code: 'app_conflict', statusCode: 409 });
+        expect(secrets.retire).toHaveBeenCalledWith(expect.objectContaining({ handle: 'sec_1' }));
     });
 });
 
