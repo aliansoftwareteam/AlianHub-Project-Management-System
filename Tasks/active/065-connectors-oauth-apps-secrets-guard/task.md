@@ -26,11 +26,13 @@ Resolve which OAuth app serves a workspace and refuse to run without a usable se
 - The company apps screen (072)
 
 ## Acceptance criteria
-- [ ] Company app wins for its workspace only; other workspaces keep the instance default
-- [ ] Replacing a company app marks its connections `reauth_required`
-- [ ] No response, log or audit row contains a client secret (asserted)
-- [ ] Without the secrets store the module stays off with a clear reason
+- [x] Company app wins for its workspace only; other workspaces keep the instance default
+- [x] Replacing a company app marks its connections `reauth_required`
+- [x] No response, log or audit row contains a client secret (asserted)
+- [x] Without the secrets store the module stays off with a clear reason
 
 ## Constraints & notes
 - Track: A — connections (getting and keeping a person's token)
 - Depends on: 063, 064
+- Changing or removing a company app moves its `connected` connections to `reauth_required`; a `broken` connection stays `broken` (it already signals that the person must reconnect, so it is left alone).
+- The company app handlers live under `/api/v2/connectors/apps/:provider` (not `/:provider/app`), so the provider segment never collides with a provider's own `/:connector` routes.

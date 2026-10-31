@@ -144,8 +144,10 @@ const removeApp = async ({ companyId, provider, actor } = {}) => {
     const id = String(companyId);
     const existing = await row(id, provider);
     if (!existing) throw new AppError(CODE.NOT_FOUND, `No ${provider} app is set for this workspace.`);
-    await secrets.retire({ companyId: id, handle: existing.secretHandle, actor });
+    // Drop the row first: a failed retire leaves no app behind, where a failed delete after a retire would
+    // leave the row pointing at a retired handle and resolveApp answering app_secret_unreadable until re-removed.
     await appsDb(id, [{ _id: existing._id }], 'deleteOne');
+    await secrets.retire({ companyId: id, handle: existing.secretHandle, actor });
     await markReauth(id, provider);
     recordAudit(id, { actorId: actorIdOf(actor), actorName: String((actor && actor.name) || ''), ...(actor && actor.ip ? { ip: String(actor.ip) } : {}), action: 'connector.app_removed', entityType: 'connector_app', entityId: String(provider), entityName: `${provider} OAuth app`, meta: { provider: String(provider) } });
     return { provider: String(provider), op: 'remove' };

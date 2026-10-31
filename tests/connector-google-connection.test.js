@@ -38,6 +38,19 @@ const google = require('../Modules/Agents/connectors/googleConnection');
 const ctrl = require('../Modules/Connectors/googleController');
 const routes = require('../Modules/Connectors/routes');
 const { AUTH_URL, TOKEN_URL, REVOKE_URL } = require('./fixtures/fakeGoogle');
+const http = require('http');
+const express = require('express');
+const appCtrl = require('../Modules/Connectors/controller');
+
+const sendJson = (method, url) => new Promise((resolve, reject) => {
+    const req = http.request(url, { method }, (res) => {
+        let data = '';
+        res.on('data', (chunk) => { data += chunk; });
+        res.on('end', () => resolve({ status: res.statusCode, body: JSON.parse(data || '{}') }));
+    });
+    req.on('error', reject);
+    req.end();
+});
 
 const C = '6f0000000000000000000c01';
 const OTHER_COMPANY = '6f0000000000000000000c02';
@@ -772,7 +785,7 @@ describe('the flag', () => {
         'DELETE /api/v2/connectors/google/:connector', 'DELETE /api/v2/connectors/google/:connector/members/:userId',
     ];
     const APP_ROUTES = [
-        'GET /api/v2/connectors/apps', 'PUT /api/v2/connectors/:provider/app', 'DELETE /api/v2/connectors/:provider/app',
+        'GET /api/v2/connectors/apps', 'PUT /api/v2/connectors/apps/:provider', 'DELETE /api/v2/connectors/apps/:provider',
     ];
     const routesOf = () => {
         const seen = [];
@@ -796,6 +809,28 @@ describe('the flag', () => {
         process.env.CONNECTORS = `slack, ${G}`;
         expect(routesOf().filter((r) => r.includes('google'))).toEqual(GOOGLE_ROUTES);
         expect(routesOf().filter((r) => r.includes('slack'))).toHaveLength(5);
+    });
+
+    it('routes a real DELETE for the app to removeApp, while the google /:connector route still disconnects', async () => {
+        const previous = process.env.CONNECTORS;
+        process.env.CONNECTORS = G;
+        const removeApp = jest.spyOn(appCtrl, 'removeApp').mockImplementation((req, res) => res.status(200).json({ handler: 'removeApp', provider: req.params.provider }));
+        const disconnect = jest.spyOn(ctrl, 'disconnect').mockImplementation((req, res) => res.status(200).json({ handler: 'disconnect', connector: req.params.connector }));
+        const app = express();
+        routes.init(app);
+        const server = http.createServer(app);
+        await new Promise((resolve) => server.listen(0, '127.0.0.1', resolve));
+        const base = `http://127.0.0.1:${server.address().port}/api/v2/connectors`;
+        try {
+            expect((await sendJson('DELETE', `${base}/apps/${G}`)).body).toEqual({ handler: 'removeApp', provider: G });
+            expect(disconnect).not.toHaveBeenCalled();
+            expect((await sendJson('DELETE', `${base}/google/${G}`)).body).toEqual({ handler: 'disconnect', connector: G });
+        } finally {
+            await new Promise((resolve) => server.close(resolve));
+            removeApp.mockRestore();
+            disconnect.mockRestore();
+            process.env.CONNECTORS = previous;
+        }
     });
 
     it.each([undefined, 'off', 'slack'])('CONNECTORS=%s: no route, every handler refuses, no token is handed out and Google is never called', async (value) => {

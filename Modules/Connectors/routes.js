@@ -32,9 +32,10 @@ const googleRoutes = (app) => {
 
 const appRoutes = (app) => {
     // Owners and admins only, never an API token; the handlers check the seat themselves. No route returns a client secret.
+    // Under /apps, not /:provider/app, so the provider segment never collides with a provider's own /:connector routes.
     app.get('/api/v2/connectors/apps', ctrl.getApps);
-    app.put('/api/v2/connectors/:provider/app', providerLimiter, ctrl.setApp);
-    app.delete('/api/v2/connectors/:provider/app', providerLimiter, ctrl.removeApp);
+    app.put('/api/v2/connectors/apps/:provider', providerLimiter, ctrl.setApp);
+    app.delete('/api/v2/connectors/apps/:provider', providerLimiter, ctrl.removeApp);
 };
 
 exports.init = (app) => {
