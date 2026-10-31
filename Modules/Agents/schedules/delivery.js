@@ -1,5 +1,4 @@
 const mongoose = require('mongoose');
-const config = require('../../../Config/config');
 const { SCHEMA_TYPE } = require('../../../Config/schemaType');
 const { dbCollections } = require('../../../Config/collections');
 const { MongoDbCrudOpration } = require('../../../utils/mongo-handler/mongoQueries');
@@ -34,7 +33,7 @@ const mayWrite = (agent, action) => Array.isArray(agent.allowedActions)
     && registry.has(action)
     && registry.mayActDirectly(agent.autonomy, action);
 
-const mailConfigured = () => Boolean(config.NODEMAILER_HOST && config.NODEMAILER_EMAIL);
+const { mailConfigured } = require('../../mailProvider');
 
 const toInbox = async (companyId, { run, agent, report, ownerId }) => {
     const { updateUnReadCommentsCountFun } = require('../../notification-count/controller');

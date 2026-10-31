@@ -1,46 +1,20 @@
-const nodemailer = require("nodemailer");
-const config =  require('../Config/config.js');
 const logger = require("../Config/loggerConfig.js");
-
-// TLS certificate validation is ON by default. Only disable it (e.g. a
-// self-signed SMTP cert in a controlled environment) via an explicit env
-// opt-in — never silently, since disabling it exposes SMTP traffic to MITM.
-const allowSelfSigned = String(process.env.NODEMAILER_ALLOW_SELF_SIGNED || "").toLowerCase() === "true";
+const { mailProvider, mailTransport, fromHeader } = require("./mailProvider");
 
 // options.accountMail: password reset, activation, verification and sign-in links, which the daily cap never holds back.
 const heldForTomorrow = (kind, message, options) => require("./Entitlements/mailCap").holdForTomorrow(kind, message, options || {});
 const QUEUED = Object.freeze({ status: true, queued: true });
 
+const sender = () => fromHeader(mailProvider());
 
-/**
- * Send mail via email
- * @param {*} subject
- * @param {*} html
- * @param {*} toMail
- * @param {*} isHtml
- * @param {*} cb
- */
 exports.SendEmail = async (subject, html, toMail, isHtml, cb, options) => {
     try {
         if (await heldForTomorrow("to", { subject, html, to: toMail, isHtml }, options)) return cb({ ...QUEUED });
 
-        let transporter = nodemailer.createTransport({
-            host: config.NODEMAILER_HOST,
-            port: config.NODEMAILER_PORT,
-            secure: config.NODEMAILER_PORT == 465, // true for 465, false for other ports
-            auth: {
-                user: config.NODEMAILER_USER || config.NODEMAILER_EMAIL,
-                pass: config.NODEMAILER_EMAIL_PASSWORD,
-            },
-            tls: {
-                rejectUnauthorized: !allowSelfSigned
-            }
-        });
-
-        await transporter.sendMail({
-            from: ""+'<'+config.NODEMAILER_EMAIL+'>', // sender address
-            to: toMail, // list of receivers
-            subject: subject, // Subject line
+        await mailTransport().sendMail({
+            from: sender(),
+            to: toMail,
+            subject: subject,
             [isHtml ? "html" : "text"]: html
         },(err, res)=>{
             if (err) {
@@ -63,36 +37,15 @@ exports.SendEmail = async (subject, html, toMail, isHtml, cb, options) => {
     }
 };
 
-
-/**
- * Send notification via email
- * @param {*} subject
- * @param {*} html
- * @param {*} toMail
- * @param {*} isHtml
- * @param {*} cb
- */
 exports.SendNotificationEmail = async (subject, html, toMail, isHtml, cb, options) => {
     try {
         if (await heldForTomorrow("bcc", { subject, html, to: toMail, isHtml }, options)) return cb({ ...QUEUED });
         const toArr = toMail.toString().toLowerCase()
-        let transporter = nodemailer.createTransport({
-            host: config.NODEMAILER_HOST,
-            port: config.NODEMAILER_PORT,
-            secure: config.NODEMAILER_PORT == 465, // true for 465, false for other ports
-            auth: {
-                user: config.NODEMAILER_USER || config.NODEMAILER_EMAIL,
-                pass: config.NODEMAILER_EMAIL_PASSWORD,
-            },
-            tls: {
-                rejectUnauthorized: !allowSelfSigned
-            }
-        });
 
-        await transporter.sendMail({
-            from: ""+'<'+config.NODEMAILER_EMAIL+'>', // sender address
-            bcc: toArr, // list of receivers
-            subject: subject, // Subject line
+        await mailTransport().sendMail({
+            from: sender(),
+            bcc: toArr,
+            subject: subject,
             [isHtml ? "html" : "text"]: html
         },(err, res)=>{
             if (err) {
@@ -116,33 +69,12 @@ exports.SendNotificationEmail = async (subject, html, toMail, isHtml, cb, option
     }
 };
 
-
-/**
- * Send Attachment via email
- * @param {*} subject
- * @param {*} html
- * @param {*} toMail
- * @param {*} attachMents
- * @param {*} cb
- */
 exports.sendAttachMail = async (subject, html, toMail,attachMents, cb, options) => {
     if (await heldForTomorrow("attach", { subject, html, to: toMail, attachments: attachMents }, options)) return cb({ ...QUEUED });
-    let transporter = nodemailer.createTransport({
-        host: config.NODEMAILER_HOST,
-        port: config.NODEMAILER_PORT,
-        secure: config.NODEMAILER_PORT == 465, // true for 465, false for other ports
-        auth: {
-            user: config.NODEMAILER_USER || config.NODEMAILER_EMAIL,
-            pass: config.NODEMAILER_EMAIL_PASSWORD,
-        },
-        tls: {
-            rejectUnauthorized: !allowSelfSigned
-        }
-    });
-    transporter.sendMail({
-        from: ""+'<'+config.NODEMAILER_EMAIL+'>', // sender address
-        to: toMail, // list of receivers
-        subject: subject, // Subject line
+    mailTransport().sendMail({
+        from: sender(),
+        to: toMail,
+        subject: subject,
         html : html,
         attachments: attachMents
     }, (err, res) => {

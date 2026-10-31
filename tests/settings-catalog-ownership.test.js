@@ -96,7 +96,7 @@ describe('the mail test on a hosted instance', () => {
         const { probeMail } = require('../Modules/Instance/probes');
         const result = await probeMail({ NODEMAILER_HOST: 'smtp.example.com', NODEMAILER_PORT: String(port) });
         expect(result.status).toBe(false);
-        expect(result.statusText).toBe("Our hosting provider blocks this port. Use an API key (Resend) or your provider's alternate port, such as 2525.");
+        expect(result.statusText).toBe("Our hosting provider blocks this port. Use Amazon SES or Resend, or your provider's alternate port, such as 2525.");
         expect(result.data).toEqual({ code: 'smtp_port_blocked', port });
     });
 

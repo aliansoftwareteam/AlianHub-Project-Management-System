@@ -2,6 +2,8 @@ const fs = require('fs');
 const path = require('path');
 const axios = require('axios');
 const nodemailer = require('nodemailer');
+const { SESClient, GetSendQuotaCommand, GetIdentityVerificationAttributesCommand } = require('@aws-sdk/client-ses');
+const { SES_KEYS, mailProvider } = require('../mailProvider');
 const { resolveS3Config, prefixProblem } = require('../../common-storage/s3Config');
 const { withTimeout } = require('./health');
 const compatibleClient = require('../AICore/llmProvider/compatibleClient');
@@ -11,8 +13,17 @@ const PROBE_TIMEOUT_MS = 10000;
 /* DigitalOcean drops these on every Droplet, so on a hosted instance a timeout there is the
  * provider's block, not a slow server. */
 const BLOCKED_SMTP_PORTS = [25, 465, 587];
-const SMTP_PORT_BLOCKED = "Our hosting provider blocks this port. Use an API key (Resend) or your provider's alternate port, such as 2525.";
+const SMTP_PORT_BLOCKED = "Our hosting provider blocks this port. Use Amazon SES or Resend, or your provider's alternate port, such as 2525.";
 const STORAGE_ROOT = path.join(__dirname, '..', '..', 'storage');
+const MAIL_KEYS = [...SES_KEYS, 'AWS_SES_FROM_DEFAULT', 'RESEND_API_KEY', 'NODEMAILER_HOST'];
+/* A new SES account may send 200 mails a day, only to verified addresses, until AWS grants production access. */
+const SES_SANDBOX_DAILY = 200;
+const SES_KEY_PROBLEMS = {
+    InvalidClientTokenId: 'AWS does not recognise this access key ID: it was deleted, deactivated or mistyped.',
+    UnrecognizedClientException: 'AWS does not recognise this access key ID: it was deleted, deactivated or mistyped.',
+    SignatureDoesNotMatch: 'The secret access key does not match this access key ID.',
+};
+const isAccessDenied = (error) => ['AccessDenied', 'AccessDeniedException'].includes(error?.name);
 
 const ok = (statusText, data) => ({ status: true, statusText, data });
 const fail = (error) => ({ status: false, statusText: error?.message || String(error) });
@@ -23,18 +34,52 @@ const pick = (values, key) => (values && values[key] !== undefined && values[key
 
 const isTimeout = (error) => error?.code === 'ETIMEDOUT' || /timed? ?out/i.test(error?.message || '');
 
+/* Read-only calls, so Test never sends a mail. A key allowed only to send answers AccessDenied, which
+ * still proves AWS accepted it; the sandbox and sender checks are then skipped. */
+async function probeSes(env) {
+    const from = env.AWS_SES_FROM_DEFAULT;
+    if (!from) return fail(new Error('Set the Amazon SES from address.'));
+    const client = new SESClient({
+        region: env.AWS_SES_REGION,
+        credentials: { accessKeyId: env.AWS_SES_KEY, secretAccessKey: env.AWS_SES_SECRET },
+        maxAttempts: 1,
+    });
+    let quota = null;
+    try {
+        quota = await withTimeout(client.send(new GetSendQuotaCommand({})), PROBE_TIMEOUT_MS, 'Amazon SES');
+    } catch (error) {
+        if (!isAccessDenied(error)) return fail(SES_KEY_PROBLEMS[error?.name] ? new Error(SES_KEY_PROBLEMS[error.name]) : error);
+        return ok('Amazon SES key accepted. It may not read the sending quota, so the sandbox and sender checks were skipped.', { provider: 'ses', sandbox: null });
+    }
+    const domain = String(from).split('@').pop();
+    try {
+        const { VerificationAttributes = {} } = await withTimeout(client.send(new GetIdentityVerificationAttributesCommand({ Identities: [from, domain] })), PROBE_TIMEOUT_MS, 'Amazon SES');
+        const verified = [from, domain].some((identity) => VerificationAttributes[identity]?.VerificationStatus === 'Success');
+        if (!verified) return fail(new Error(`${from} is not verified in Amazon SES: verify the address or its domain ${domain} in the SES console.`));
+    } catch (error) {
+        if (!isAccessDenied(error)) return fail(error);
+    }
+    const sandbox = Number(quota.Max24HourSend) <= SES_SANDBOX_DAILY;
+    return ok(
+        sandbox ? 'Amazon SES key accepted. The account is in the SES sandbox: it sends only to verified addresses until AWS grants production access.' : 'Amazon SES key accepted.',
+        { provider: 'ses', sandbox, max24HourSend: quota.Max24HourSend },
+    );
+}
+
 async function probeMail(values = {}) {
     let port = null;
     try {
-        const resendKey = pick(values, 'RESEND_API_KEY');
-        if (resendKey) {
+        const env = Object.fromEntries(MAIL_KEYS.map((key) => [key, pick(values, key)]));
+        const provider = mailProvider(env);
+        if (provider === 'ses') return await probeSes(env);
+        if (provider === 'resend') {
             await withTimeout(axios.get('https://api.resend.com/domains', {
-                headers: { Authorization: `Bearer ${resendKey}` }, timeout: PROBE_TIMEOUT_MS,
+                headers: { Authorization: `Bearer ${env.RESEND_API_KEY}` }, timeout: PROBE_TIMEOUT_MS,
             }), PROBE_TIMEOUT_MS, 'Resend');
             return ok('Resend API key accepted.', { provider: 'resend' });
         }
-        const host = pick(values, 'NODEMAILER_HOST');
-        if (!host) return fail(new Error('No mail provider configured: set SMTP (NODEMAILER_*) or RESEND_API_KEY.'));
+        const host = env.NODEMAILER_HOST;
+        if (!host) return fail(new Error('No mail provider configured: set Amazon SES (AWS_SES_*), RESEND_API_KEY or SMTP (NODEMAILER_*).'));
         port = Number(pick(values, 'NODEMAILER_PORT')) || 587;
         const transporter = nodemailer.createTransport({
             host, port, secure: port === 465,

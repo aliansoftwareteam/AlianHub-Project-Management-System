@@ -45,6 +45,10 @@ const CATALOG = [
     field('NODEMAILER_EMAIL_PASSWORD', 'mail', 'secret', { label: 'SMTP password' }),
     field('RESEND_API_KEY', 'mail', 'secret', { label: 'Resend API key', help: 'When set, Resend is used instead of SMTP.' }),
     field('RESEND_FROM_EMAIL', 'mail', 'text', { label: 'Resend from address' }),
+    field('AWS_SES_REGION', 'mail', 'text', { label: 'Amazon SES region', help: 'The AWS region your SES account sends from, e.g. us-east-1.' }),
+    field('AWS_SES_KEY', 'mail', 'secret', { label: 'Amazon SES access key ID' }),
+    field('AWS_SES_SECRET', 'mail', 'secret', { label: 'Amazon SES secret access key' }),
+    field('AWS_SES_FROM_DEFAULT', 'mail', 'text', { label: 'Amazon SES from address', help: 'An address on a domain verified in SES, e.g. noreply@example.com.' }),
 
     field('STORAGE_TYPE', 'storage', 'select', { default: 'server', options: ['server', 's3', 'wasabi'], label: 'Storage driver', restart: true }),
     field('S3_ENDPOINT', 'storage', 'text', { label: 'Storage address', help: 'e.g. https://blr1.digitaloceanspaces.com or https://s3.ap-southeast-1.wasabisys.com. Empty uses Amazon S3.' }),
