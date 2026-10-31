@@ -5,6 +5,9 @@ const runner = require('../Connectors/toolRunner');
 const READ_SCOPE = 'connectors:read';
 const WRITE_SCOPE = 'connectors:write';
 const CONNECTION_ID = Object.freeze({ type: 'string', maxLength: 64, description: 'Leave out: your own connection is used. Kept for when a person can connect more than one account.' });
+// These reach an app outside the workspace, which annotationsFor's default says no action does.
+const READ_HINTS = Object.freeze({ readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: true });
+const WRITE_HINTS = Object.freeze({ readOnlyHint: false, destructiveHint: true, idempotentHint: false, openWorldHint: true });
 
 /* A refusal is the answer, so the client can tell the person what to do; anything else fails the call. */
 const answered = (run) => async (...args) => {
@@ -27,6 +30,7 @@ const readOf = (tool) => Object.freeze({
     input: withConnectionId(tool),
     strict: true,
     optIn: READ_SCOPE,
+    annotations: READ_HINTS,
     visibility: 'none',
     visibilityReason: 'reads the caller\'s own account at another app, never anything in this workspace',
     readParams: () => ({}),
@@ -41,6 +45,7 @@ const writeOf = (tool) => Object.freeze({
     input: withConnectionId(tool),
     strict: true,
     optIn: WRITE_SCOPE,
+    annotations: WRITE_HINTS,
     alwaysProposed: true,
     pendingMessage: `Nothing was sent to ${tool.definition.name}. It waits in your AlianHub Inbox as the proposal named here; only you can approve it there, and it is sent once, exactly as you approve it.`,
     filing: answered((file) => file()),

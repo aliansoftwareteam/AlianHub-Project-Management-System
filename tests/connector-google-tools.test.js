@@ -111,6 +111,17 @@ describe('the Google tool definitions', () => {
         expect(connectorTools.problemsOf(google, [{ ...good, key: 'google.a.b.c.d' }]).join()).toMatch(/is not <provider>/);
     });
 
+    it('tell an MCP client they reach outside the workspace', () => {
+        const saved = process.env.MCP_TOOLS_V2;
+        process.env.MCP_TOOLS_V2 = 'on';
+        const listed = mcpTools.manifest(mcpCaller(['connectors:read', 'connectors:write'])).filter((tool) => tool.name.startsWith('google.'));
+        if (saved === undefined) delete process.env.MCP_TOOLS_V2; else process.env.MCP_TOOLS_V2 = saved;
+        expect(listed).toHaveLength(9);
+        listed.forEach((tool) => expect(tool.annotations.openWorldHint).toBe(true));
+        expect(listed.find((tool) => tool.name === 'google.drive.files.read').annotations).toMatchObject({ readOnlyHint: true, destructiveHint: false });
+        expect(listed.find((tool) => tool.name === 'google.meet.spaces.create').annotations).toMatchObject({ readOnlyHint: false, destructiveHint: true });
+    });
+
     it('are offered only while CONNECTORS names google', () => {
         expect(mcpTools.names()).toContain('google.calendar.events.list');
         process.env.CONNECTORS = 'slack';
@@ -175,6 +186,13 @@ describe('Calendar reads', () => {
         expect(lastCall().url.pathname).toBe('/calendar/v3/calendars/..%2F..%2Fevil/events/ev1');
     });
 
+    it('gives the model an event description without its markup', async () => {
+        fake.state.events[0].description = '<b>Budget</b> <a href="https://x.test">plan</a>';
+        const { text } = await mcpRead('google.calendar.events.get', { eventId: 'ev1' });
+        expect(text).toContain('Description: Budget plan');
+        expect(text).not.toContain('<');
+    });
+
     it('turns Google\'s not found into a refusal, not an answer', async () => {
         expect(await mcpRead('google.calendar.events.get', { eventId: 'gone' })).toEqual({ code: 'provider_refused', error: 'Google answered 404, so this did not go through.' });
     });
@@ -212,6 +230,17 @@ describe('Drive reads', () => {
     it('refuses a file id that would step out of its URL path', async () => {
         await expect(mcpRead('google.drive.files.read', { fileId: '..' })).rejects.toThrow(/fileId is not in the form/);
         expect(safeFetch).not.toHaveBeenCalled();
+    });
+
+    it.each(['img1', 'word1', 'page1'])('never downloads %s, which is not text', async (fileId) => {
+        const out = await mcpRead('google.drive.files.read', { fileId });
+        expect(out.text).toMatch(/cannot be read as text/);
+        expect(fake.state.calls).toHaveLength(1);
+    });
+
+    it('finds a file by the start of a word in its name', async () => {
+        expect((await mcpRead('google.drive.files.list', { name: 'plan' })).text).toContain('Q4 plan');
+        expect((await mcpRead('google.drive.files.list', { name: 'lan' })).text).toBe('No picked files found.');
     });
 
     it('a file the person did not pick is refused by Google', async () => {
@@ -340,7 +369,7 @@ describe('Calendar writes', () => {
 });
 
 describe('Meet writes', () => {
-    it('shows who can join on the card', async () => {
+    it('shows who joins without knocking on the card', async () => {
         const { proposalId } = await mcpWrite('google.meet.spaces.create', { accessType: 'OPEN' });
         expect(proposalRow(proposalId).changes[0].card).toMatchObject({ target: 'Google Meet', rows: [{ label: 'Connectors.card.access', valueLabel: 'Connectors.card.accessOpen' }] });
         await approve(proposalId);
@@ -402,6 +431,15 @@ describe('when Google says slow down', () => {
 
     it('a 403 for its rate limit holds it too', async () => {
         fake.state.next = fakeGoogle.googleError(403, 'rateLimitExceeded', 'Rate Limit Exceeded');
+        expect(await mcpRead('google.calendar.events.list')).toMatchObject({ code: 'provider_busy' });
+        expect(markBackoff).toHaveBeenCalled();
+    });
+
+    it.each([
+        ['quotaExceeded', 'Calendar usage limits exceeded.'],
+        ['dailyLimitExceeded', 'Daily Limit Exceeded'],
+    ])('a 403 for %s holds it too', async (reason, message) => {
+        fake.state.next = fakeGoogle.googleError(403, reason, message);
         expect(await mcpRead('google.calendar.events.list')).toMatchObject({ code: 'provider_busy' });
         expect(markBackoff).toHaveBeenCalled();
     });

@@ -17,6 +17,8 @@ const create = () => {
             { id: 'sheet1', name: 'Budget', mimeType: 'application/vnd.google-apps.spreadsheet', modifiedTime: '2026-10-02T09:00:00Z', webViewLink: 'https://docs.google.com/spreadsheets/d/sheet1', exported: { 'text/csv': 'item,cost\nchairs,10' } },
             { id: 'txt1', name: 'notes.txt', mimeType: 'text/plain', size: '12', modifiedTime: '2026-10-03T09:00:00Z', content: 'Plain notes' },
             { id: 'img1', name: 'photo.png', mimeType: 'image/png', size: '900', modifiedTime: '2026-10-04T09:00:00Z' },
+            { id: 'word1', name: 'contract.docx', mimeType: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document', size: '900', modifiedTime: '2026-10-05T09:00:00Z', content: 'PK\u0003\u0004 binary' },
+            { id: 'page1', name: 'page.html', mimeType: 'text/html', size: '40', modifiedTime: '2026-10-06T09:00:00Z', content: '<script>x</script>' },
         ],
         calls: [],
         next: null,
@@ -59,8 +61,9 @@ const create = () => {
 
     const listFiles = (query) => {
         const named = /name contains '((?:[^'\\]|\\.)*)'/.exec(query.get('q') || '');
-        const name = named ? named[1].replace(/\\(.)/g, '$1') : '';
-        const files = state.files.filter((file) => file.name.includes(name)).slice(0, Number(query.get('pageSize')) || undefined);
+        const name = (named ? named[1].replace(/\\(.)/g, '$1') : '').toLowerCase();
+        // Google's name contains matches the start of a word, never its middle.
+        const files = state.files.filter((file) => file.name.toLowerCase().split(/\s+/).some((word) => word.startsWith(name))).slice(0, Number(query.get('pageSize')) || undefined);
         return answer(200, { files });
     };
 

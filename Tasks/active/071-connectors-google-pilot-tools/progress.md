@@ -5,6 +5,7 @@
 - [x] Calendar tools
 - [x] Meet tools
 - [x] Drive tools
+- [ ] After 066: run each tool against a real Google connection
 
 ## Last step
 All nine tools in `providers/google/tools.js`, tested from an agent run and MCP against the fake server. Not yet run against a real Google account: that needs 065 and 066.
@@ -27,6 +28,10 @@ None for this task. A real Google call waits on track A's 066 (`resolveConnectio
 - `/security-review` run on the connector work (068 to 071). One real finding, confidence 7 of 10: an update with a blank title, description or location cleared that field at Google while its card showed nothing. Fixed: the card now has a "Cleared" row, with tests. Also refused `.` and `..` as calendar, event and file ids, since a URL would resolve them into another Google endpoint; no exploit was found, it is hardening.
 - For 078, from that review: `card.rows`, `valueLabel` and `targetLabel` have no screen yet, so 078 must render them whole. 066 should not reach users before 078, because the owner approves from this card.
 - For 078 to look at: owners and admins can read a member's pending MCP connector proposals, event text and attendees included, and project members can read agent-filed ones. It holds no token, but it is a person's own account, so it needs a decision.
+- Independent audit against the task, the PRD and the contract. Fixed from it: `files.read` took Word, Excel and PowerPoint files as text, because `xml` matched their type; HTML files and event markup reached the model; a Drive name search promised a match anywhere, while Google matches the start of a word; Google's `quotaExceeded` and `dailyLimitExceeded` were not treated as a slow-down; a skill could be saved without an id a read needs; MCP annotations told clients these tools stay inside the workspace; `CONNECTORS` docs did not name `google`.
+- Known limit: a skill's reader params are fixed when it is written, not filled from the task, so an id-taking read works from a run only with a fixed id. That is how every reader works today.
+- Real Google, with a dummy token and no database: all nine tools' URLs answered 401, while made-up paths on the same hosts answered 404, so the routes exist. No real account was used, so answers and scopes are still unproven.
+- Handoffs for 078 are in its `progress.md`.
 - Left for Hetvi: the Google definition asks for `calendar.app.created`, which no tool here uses. PRD section 10 asks for least scopes, and the definition is track A's file, so keeping or dropping it is track A's call.
 
 ### 2026-10-28

@@ -9,7 +9,7 @@ const DEFAULT_ITEMS = 10;
 const EDITABLE = Object.freeze(['summary', 'description', 'location', 'start', 'end', 'attendees']);
 const GOOGLE_DOCS = 'application/vnd.google-apps.';
 const EXPORT_AS = Object.freeze({ [`${GOOGLE_DOCS}document`]: 'text/plain', [`${GOOGLE_DOCS}spreadsheet`]: 'text/csv', [`${GOOGLE_DOCS}presentation`]: 'text/plain' });
-const TEXT_TYPE = /^text\/|json|xml|csv/;
+const TEXT_TYPE = /^text\/(plain|csv|markdown|tab-separated-values)$|^application\/json$/;
 const ACCESS_ROW = Object.freeze({ OPEN: 'Connectors.card.accessOpen', TRUSTED: 'Connectors.card.accessTrusted', RESTRICTED: 'Connectors.card.accessRestricted' });
 
 const limit = { type: 'integer', minimum: 1, maximum: 50, default: DEFAULT_ITEMS };
@@ -50,6 +50,9 @@ const eventBody = (input) => present({
     attendees: input.attendees === undefined ? undefined : emails(input.attendees).map((email) => ({ email })),
 });
 
+// Google Calendar keeps a description as HTML, and a read gives the model text only.
+const withoutMarkup = (text) => (text ? String(text).replace(/<[^>]*>/g, ' ').replace(/[ \t]+/g, ' ').trim() : text);
+
 const eventDetail = (event) => lines([
     ['Title', event.summary || '(no title)'],
     ['When', span(event)],
@@ -59,7 +62,7 @@ const eventDetail = (event) => lines([
     ['Meet link', event.hangoutLink],
     ['Link', event.htmlLink],
     ['Id', event.id],
-    ['Description', event.description],
+    ['Description', withoutMarkup(event.description)],
 ]);
 
 // A blank field is sent and clears that field at Google, so the card has to say so.
@@ -189,7 +192,7 @@ module.exports = [{
     scope: `${SCOPE}meetings.space.readonly`,
     input: {
         type: 'object',
-        description: 'One Google Meet meeting space: its link, who can join and whether a call is live in it.',
+        description: 'One Google Meet meeting space: its link, who joins without knocking and whether a call is live in it.',
         properties: { space: { type: 'string', maxLength: 140, pattern: '^(spaces/)?[A-Za-z0-9_-]+$', description: 'The space name or the meeting code.' } },
         required: ['space'],
         additionalProperties: false,
@@ -232,7 +235,7 @@ module.exports = [{
     input: {
         type: 'object',
         description: 'The Google Drive files the person picked for AlianHub; no other file of theirs can be seen.',
-        properties: { name: { type: 'string', maxLength: 200, description: 'Only files whose name contains this.' }, limit },
+        properties: { name: { type: 'string', maxLength: 200, description: 'Only files with a word in their name that starts with this; Google does not match the middle of a word.' }, limit },
         additionalProperties: false,
     },
     caps: { maxItems: 50, maxChars: 8000 },
@@ -275,7 +278,7 @@ module.exports = [{
     scope: `${SCOPE}drive.file`,
     input: {
         type: 'object',
-        description: 'The text of one Google Drive file the person picked: a Google Doc, Slides file or text file, or the first tab only of a Google Sheet.',
+        description: 'The text of one Google Drive file the person picked: a Google Doc, Slides file or text file, or the first tab only of a Google Sheet. A file over about 500 KB, or of any other type, cannot be read.',
         properties: { fileId },
         required: ['fileId'],
         additionalProperties: false,

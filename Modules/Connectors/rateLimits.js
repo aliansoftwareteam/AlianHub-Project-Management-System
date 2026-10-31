@@ -5,7 +5,7 @@ const backoff = require('../Integrations/appConnections/backoff');
 const connections = require('./resolveConnection');
 
 const FIRST_FAILURE = 1;
-const RATE_WORDS = /rate.?limit/i;
+const RATE_WORDS = /rate.?limit|usage.?limit|daily.?limit|quota.?exceeded/i;
 
 /* Providers answer 403 for missing rights too, so a listed status other than 429 counts only when it says it is a rate limit. */
 const isRateLimited = (definition, res) => {
