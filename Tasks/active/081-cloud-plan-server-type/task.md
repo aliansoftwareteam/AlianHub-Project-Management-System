@@ -1,5 +1,5 @@
 ---
-id: 080
+id: 081
 title: Cloud plans choose their server — shared or dedicated, units and droplet size
 status: active
 priority: high
