@@ -21,6 +21,7 @@ const planLocks = require('./planLocks');
 const planShown = require('./planShown');
 const planFollowUp = require('./planFollowUp');
 const proposalText = require('./proposalText');
+const connectorWrites = require('../Connectors/writes');
 
 // AI Inbox proposals (9b). A proposal says what, why and exactly which registry
 // actions it would run. Approving applies them through perform() — so they are
@@ -160,10 +161,15 @@ const mcpActor = async (p) => (p.oauthGrantId
     ? { ...(await externalClientActor({ userId: p.requestedBy, clientId: p.oauthClientId, clientName: p.agentName, grantId: p.oauthGrantId })), source: SOURCE_MCP }
     : { kind: 'agent', userId: p.requestedBy, agentId: null, agentName: p.agentName, runId: null, viaAccount: 'personal', tokenId: p.tokenId || null, source: SOURCE_MCP });
 
-const create = async (companyId, { agent, runId, taskId, taskIds, projectId, what, why, changes, gate, priority, cost, taint: marker, source, requestedBy, tokenId, tokenProjectIds, allowedActions, oauthClientId, oauthGrantId, finding }) => {
+/* The person whose connection a connector write uses: who filed it over MCP, or whom the run works for. */
+const connectionOwnerOf = (source, requestedBy, connectionOwner) => String((source === SOURCE_MCP ? requestedBy : connectionOwner) || '');
+
+const create = async (companyId, { agent, runId, taskId, taskIds, projectId, what, why, changes, gate, priority, cost, taint: marker, source, requestedBy, tokenId, tokenProjectIds, allowedActions, oauthClientId, oauthGrantId, finding, connectionOwner }) => {
     const check = validateChanges(changes);
     if (!check.valid) throw Object.assign(new Error(check.reason), { status: 400 });
-    const prepared = slackPost.hasSlackChange(changes) ? await slackPost.prepareChanges(companyId, changes) : changes;
+    const owner = connectorWrites.hasWrite(changes) ? connectionOwnerOf(source, requestedBy, connectionOwner) : '';
+    const slackReady = slackPost.hasSlackChange(changes) ? await slackPost.prepareChanges(companyId, changes) : changes;
+    const prepared = await connectorWrites.prepareChanges(companyId, owner, slackReady);
     const scopedProjectId = projectId || await projectOfTask(companyId, taskId);
     const saved = await MongoDbCrudOpration(companyId, {
         type: SCHEMA_TYPE.AGENT_PROPOSALS,
@@ -171,8 +177,9 @@ const create = async (companyId, { agent, runId, taskId, taskIds, projectId, wha
             agentId: String(agent._id), agentName: proposalText.nameOf(agent.name), runId: runId || null, taskId: taskId || null, projectId: scopedProjectId || null,
             ...(Array.isArray(taskIds) && taskIds.length ? { taskIds: taskIds.map(String) } : {}),
             what: proposalText.titleOf(what, prepared), why: proposalText.reasonOf(why),
-            changes: prepared.map((c) => ({ action: c.action, params: planFiling.storedParams(c.action, c.params || {}), label: proposalText.labelOf(c), reversible: Boolean(registry.get(c.action) && registry.get(c.action).undoable), rating: c.rating || null, ...(c.remember ? { remember: c.remember } : {}) })),
+            changes: prepared.map((c) => ({ action: c.action, params: planFiling.storedParams(c.action, c.params || {}), label: proposalText.labelOf(c), reversible: Boolean(registry.get(c.action) && registry.get(c.action).undoable), rating: c.rating || null, ...(c.remember ? { remember: c.remember } : {}), ...(c.card ? { card: c.card } : {}) })),
             status: STATUS.PENDING, gate: gateOf(changes, gate), priority: priority || 'normal', cost: cost || null, auditIds: [],
+            ...(owner ? { connectionOwner: owner } : {}),
             ...(marker && marker.reason ? { taint: { sources: Array.isArray(marker.sources) ? marker.sources : [], reason: String(marker.reason).slice(0, 2000) } } : {}),
             ...mcpFields({ source, requestedBy, tokenId, tokenProjectIds, allowedActions, oauthClientId, oauthGrantId }),
             ...systemFields({ source, allowedActions, finding, requestedBy }),
@@ -308,6 +315,18 @@ const setStatus = async (companyId, id, set, { onlyIf } = {}) => {
     return updated;
 };
 
+const reshowEdited = async (companyId, id, p, changes) => {
+    let ready;
+    try { ready = await connectorWrites.prepareChanges(companyId, p.connectionOwner, changes); } catch (e) { return { error: e.message, status: e.status || 400 }; }
+    const stored = ready.map((c) => ({
+        action: c.action, params: planFiling.storedParams(c.action, c.params || {}), label: proposalText.labelOf(c),
+        reversible: Boolean(registry.get(c.action) && registry.get(c.action).undoable), rating: c.rating || actions.rating(c.action), ...(c.card ? { card: c.card } : {}),
+    }));
+    const updated = await setStatus(companyId, id, { changes: stored, editedAt: new Date() }, { onlyIf: STATUS.PENDING });
+    if (!updated) return alreadyDecided(companyId, id);
+    return { proposal: updated, applied: [], reshown: true };
+};
+
 const alreadyDecided = async (companyId, id) => {
     const now = await get(companyId, id);
     const state = now && now.status === STATUS.APPLYING ? 'being applied' : `already ${(now && now.status) || 'decided'}`;
@@ -320,6 +339,8 @@ const approve = async (companyId, id, { decider, isPrivileged, changes: edited, 
     const p = await get(companyId, id);
     if (!p) return { error: 'Proposal not found.', status: 404 };
     if (p.status !== STATUS.PENDING) return alreadyDecided(companyId, id);
+    const notOwner = connectorWrites.approverRefusal(decider.userId, p, [...(p.changes || []), ...(Array.isArray(edited) ? edited : [])]);
+    if (notOwner) return { error: notOwner, status: 403, reason: 'not_permitted' };
     const planChoice = require('./planChoice');
     const chosen = planChoice.given(parts);
     const editing = Array.isArray(edited) && edited.length > 0;
@@ -345,6 +366,8 @@ const approve = async (companyId, id, { decider, isPrivileged, changes: edited, 
         if (slackPost.hasSlackChange(changes)) {
             try { changes = await slackPost.prepareChanges(companyId, changes); } catch (e) { return { error: e.message, status: e.status || 400 }; }
         }
+        // An edited connector write is checked and shown to its owner again, never sent on the click that edited it.
+        if (connectorWrites.hasWrite(changes)) return reshowEdited(companyId, id, p, changes);
         status = STATUS.EDITED;
     }
     const person = { userId: decider.userId, privileged: Boolean(isPrivileged) };
@@ -381,7 +404,7 @@ const approve = async (companyId, id, { decider, isPrivileged, changes: edited, 
     for (const c of changes) {
         try {
             // eslint-disable-next-line no-await-in-loop
-            const out = await underTokenOf(p, () => actions.perform({ companyId, actor: agentActor, action: c.action, params: { ...c.params, __proposal: true }, reason: `approved proposal ${id} by ${decider.userId}`, ip, allowedActions: agent.allowedActions, depth, approved: true, approvedBy: decider.userId, proposal: { source: p.source || '', edited: editing }, ...(marker ? { taint: marker } : {}) }));
+            const out = await underTokenOf(p, () => actions.perform({ companyId, actor: agentActor, action: c.action, params: { ...c.params, __proposal: true }, reason: `approved proposal ${id} by ${decider.userId}`, ip, allowedActions: agent.allowedActions, depth, approved: true, approvedBy: decider.userId, proposal: { source: p.source || '', edited: editing, id: String(id), connectionOwner: p.connectionOwner || '' }, ...(marker ? { taint: marker } : {}) }));
             if (out.auditId) auditIds.push(out.auditId, ...partAudits(out.result));
             applied.push({ action: c.action, ok: true, result: out.result });
         } catch (e) {
@@ -389,7 +412,7 @@ const approve = async (companyId, id, { decider, isPrivileged, changes: edited, 
         }
     }
     const undoUntil = new Date(Date.now() + UNDO_WINDOW_MS);
-    const delivery = slackPost.deliveryOf(changes, applied);
+    const delivery = [...slackPost.deliveryOf(changes, applied), ...connectorWrites.deliveryOf(changes, applied)];
     const notMade = planFollowUp.notMadeBy(changes, applied);
     const updated = await setStatus(companyId, id, { status, changes, undoUntil, auditIds, ...(delivery.length ? { delivery } : {}), ...(notMade.length ? { notMade } : {}) });
     await audit.recordProposalDecision(companyId, { ...decider, ...runTrace }, { proposalId: id, decision: status, agentName: p.agentName, runId: p.runId, changes: applied, ip });

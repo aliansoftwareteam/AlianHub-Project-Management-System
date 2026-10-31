@@ -34,3 +34,6 @@ None.
 - `Config/config.js` falls back to the working folder when there is no main module, so the `node -e` checks in `test-cases.md` load the Google provider.
 - Left for the owner: refusing reserved OAuth keys (`redirect_uri`, `scope`, `state`) in `auth.extraParams` would change the contract and needs track B's agreement.
 - B-01 run on a local MongoDB 8.0.4: the server boots with `CONNECTORS=google`, the Google provider loads, and the only connector line is the `google` unknown-name log contract section 7 expects. All 46 cases in `test-cases.md` now pass.
+
+### 2026-10-31
+- Contract change proposed by track B for 069, not yet agreed by Hetvi, so `contract.md` is unchanged: section 3 adds `card: (input) => ({ target, title, text, attachments })`, required on a `kind: 'write'` tool, and `caps` plus `connection.request` in what `run` receives. Track A reads nothing from `tools.js`, so nothing on its side changes.

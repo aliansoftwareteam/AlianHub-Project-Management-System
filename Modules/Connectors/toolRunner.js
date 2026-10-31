@@ -16,19 +16,19 @@ const refusal = (code, message) => Object.assign(new Error(`${code}: ${message}`
 
 const MESSAGES = Object.freeze({
     not_connected: (name) => `Connect ${name} on My connections first, then ask again.`,
-    not_member: () => 'This read is not available to you.',
+    not_member: () => 'This is not available to you.',
     broken: (name) => `${name} is no longer accepting your connection. Reconnect ${name} on My connections, then ask again.`,
     provider_off: (name) => `${name} is not switched on here.`,
 });
 
-const connectionOf = async (tool, companyId, userId) => {
-    try {
-        return await connections.resolveConnection({ companyId: String(companyId), userId: String(userId), provider: tool.provider });
-    } catch (e) {
-        if (!e || e.name !== 'ConnectorError' || !MESSAGES[e.code]) throw e;
-        throw refusal(e.code, MESSAGES[e.code](tool.definition.name));
-    }
+const spoken = (tool) => (e) => {
+    if (!e || e.name !== 'ConnectorError' || !MESSAGES[e.code]) throw e;
+    throw refusal(e.code, MESSAGES[e.code](tool.definition.name));
 };
+
+const connectionOf = (tool, companyId, userId) => connections.resolveConnection({ companyId: String(companyId), userId: String(userId), provider: tool.provider }).catch(spoken(tool));
+
+const tokenOf = (tool, connection) => connection.getAccessToken().catch(spoken(tool));
 
 /* What the provider sent is data for the model, never markup or control characters. */
 // eslint-disable-next-line no-control-regex
@@ -62,8 +62,48 @@ const claimRunRead = async (companyId, runId, entry, maxChars) => {
 /* The tool is handed a request function, never the token: the token is fetched here, sent only to the
  * provider's own hosts, and lives in one header of one call. A read tool can only GET. */
 const requesterFor = (tool, connection) => async (url, { query } = {}) => {
-    const token = await connection.getAccessToken();
+    const token = await tokenOf(tool, connection);
     return agentFetch.callApi(url, { method: 'get', query, token, hosts: tool.definition.egressHosts, timeoutMs: TIMEOUT_MS, maxBytes: MAX_BYTES });
+};
+
+/* safeFetch hands back any status, so a provider's refusal becomes an error here: it must not be kept as a delivery. */
+const writeRequesterFor = (tool, connection) => async (url, { method = 'post', query, json } = {}) => {
+    const token = await tokenOf(tool, connection);
+    const res = await agentFetch.callApi(url, { method, query, json, token, hosts: tool.definition.egressHosts, timeoutMs: TIMEOUT_MS, maxBytes: MAX_BYTES });
+    if (res.status < 200 || res.status >= 300) throw refusal('provider_refused', `${tool.definition.name} answered ${res.status}, so this did not go through.`);
+    return res;
+};
+
+const ownConnection = async (tool, companyId, userId, asked) => {
+    const connection = await connectionOf(tool, companyId, userId);
+    if (asked !== undefined && String(asked) !== String(connection.connectionId)) {
+        throw refusal('not_connected', `That connection is not yours. Leave connectionId out to use your own ${tool.definition.name} connection.`);
+    }
+    if (!(connection.scopes || []).includes(tool.scope)) {
+        throw refusal('scope_missing', `Tick ${tool.product} on your ${tool.definition.name} connection in My connections, then ask again.`);
+    }
+    return connection;
+};
+
+/* The stored params keep the connection's id, so a later send through any other is refused. */
+const admitWrite = async ({ companyId, userId, key, input = {} }) => {
+    const tool = tools.get(key);
+    if (!tool || tool.kind !== tools.KIND.WRITE || !tools.isOn(tool)) throw refusal('tool_off', `${key} is not available here.`);
+    if (!userId) throw refusal('no_person', 'This write names no person, so no connection can be used.');
+    const { connectionId: asked, ...args } = input || {};
+    const problem = argsSchema.problemIn(tool.input, args);
+    if (problem) throw refusal('bad_input', `${key}: ${problem}`);
+    const connection = await ownConnection(tool, companyId, userId, asked);
+    return { tool, args, connection, params: { ...args, connectionId: String(connection.connectionId) } };
+};
+
+const write = async ({ companyId, userId, key, params = {} }) => {
+    const { tool, args, connection } = await admitWrite({ companyId, userId, key, input: params });
+    const raw = await egressContext.run(
+        { companyId: String(companyId), actor: String(userId) },
+        () => tool.run({ input: args, connection: { connectionId: connection.connectionId, request: writeRequesterFor(tool, connection) }, caps: { ...tool.caps } }),
+    );
+    return { text: plain(raw).slice(0, tool.caps.maxChars), connectionId: String(connection.connectionId) };
 };
 
 const read = async ({ companyId, userId, via, runId = null, key, input = {} }) => {
@@ -75,13 +115,7 @@ const read = async ({ companyId, userId, via, runId = null, key, input = {} }) =
     if (problem) throw refusal('bad_input', `${key}: ${problem}`);
     if (via === VIA.AGENT && !runId) throw refusal('run_required', 'A connected app can be read only while an agent is running.');
 
-    const connection = await connectionOf(tool, companyId, userId);
-    if (asked !== undefined && String(asked) !== String(connection.connectionId)) {
-        throw refusal('not_connected', `That connection is not yours. Leave connectionId out to use your own ${tool.definition.name} connection.`);
-    }
-    if (!(connection.scopes || []).includes(tool.scope)) {
-        throw refusal('scope_missing', `Tick ${tool.product} on your ${tool.definition.name} connection in My connections, then ask again.`);
-    }
+    const connection = await ownConnection(tool, companyId, userId, asked);
 
     const claim = via === VIA.AGENT
         ? await claimRunRead(companyId, runId, { action: key, connector: tool.provider, connectionId: String(connection.connectionId) }, tool.caps.maxChars)
@@ -110,4 +144,4 @@ const read = async ({ companyId, userId, via, runId = null, key, input = {} }) =
     return { text, chars: text.length, truncated: whole.length > text.length, taint: [source] };
 };
 
-module.exports = { VIA, STATE, read, plain };
+module.exports = { VIA, STATE, read, admitWrite, write, plain };

@@ -270,8 +270,12 @@ const EMIT_REQUIRED = Object.freeze({
 const CONNECTOR_EMIT_REQUIRED = Object.freeze({
     'slack.message.post': Object.freeze(['channelId', 'text']),
 });
-const emitActions = () => [...EMIT_ACTIONS, ...Object.keys(CONNECTOR_EMIT_REQUIRED).filter((key) => registry.has(key))];
-const emitRequired = (action) => EMIT_REQUIRED[action] || (registry.has(action) && CONNECTOR_EMIT_REQUIRED[action]) || [];
+const connectorEmitRequired = () => ({
+    ...CONNECTOR_EMIT_REQUIRED,
+    ...Object.fromEntries(require('../../Connectors/tools').writes().map((tool) => [tool.key, Object.freeze([...(tool.input.required || [])])])),
+});
+const emitActions = () => [...EMIT_ACTIONS, ...Object.keys(connectorEmitRequired()).filter((key) => registry.has(key))];
+const emitRequired = (action) => EMIT_REQUIRED[action] || (registry.has(action) && connectorEmitRequired()[action]) || [];
 
 /* The task fields a template may read directly ({{TaskName}} or {{task.TaskName}}).
  * The view handed to the renderer holds these and nothing else of the task. */

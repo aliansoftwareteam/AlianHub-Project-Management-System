@@ -1532,6 +1532,10 @@ const schema = {
         auditIds: { type: Array, default: [], required: false },
         // [{ action, ok, channelId, channelName, ts, error, at }] — what the provider answered for each connector change
         delivery: { type: Array, required: false },
+        // The one person who may approve a connector write (Connectors/writes.js).
+        connectionOwner: { type: String, required: false },
+        // Each write of an approval claimed before it is sent, so it is sent once.
+        sendAttempts: { type: Array, required: false },
         cost: { type: Object, required: false },
         // a canned Inbox key (too_many_changes | wrong_tone | needs_person | not_now) or free text, ≤ 200 chars
         declineReason: { type: String, required: false },

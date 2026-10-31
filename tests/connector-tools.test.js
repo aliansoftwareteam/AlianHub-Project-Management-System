@@ -9,7 +9,7 @@ jest.mock('../Modules/Connectors/tools', () => {
     const real = jest.requireActual('../Modules/Connectors/tools');
     return { ...real, ...real.make(require('path').join(__dirname, 'fixtures', 'connectors')) };
 });
-jest.mock('../Modules/Connectors/resolveConnection', () => ({ resolveConnection: jest.fn() }), { virtual: true });
+jest.mock('../Modules/Connectors/resolveConnection', () => ({ resolveConnection: jest.fn() }));
 jest.mock('../Modules/Agents/engine/safeFetch', () => ({
     ...jest.requireActual('../Modules/Agents/engine/safeFetch'),
     safeFetch: jest.fn(),
@@ -217,6 +217,12 @@ describe('only the caller\'s own connection', () => {
     it('tells a person with no connection to connect the provider', async () => {
         resolveConnection.mockRejectedValue(connectorError('not_connected'));
         expect(await mcpTools.call(mcp(['connectors:read']), KEY, {})).toEqual({ code: 'not_connected', error: 'Connect Fake on My connections first, then ask again.' });
+    });
+
+    it('tells a person whose token cannot be refreshed to reconnect', async () => {
+        resolveConnection.mockResolvedValue({ connectionId: MINE, scopes: ['notes.read'], getAccessToken: async () => { throw connectorError('broken'); } });
+        expect(await mcpTools.call(mcp(['connectors:read']), KEY, {})).toEqual({ code: 'broken', error: 'Fake is no longer accepting your connection. Reconnect Fake on My connections, then ask again.' });
+        expect(safeFetch).not.toHaveBeenCalled();
     });
 
     it('names the product to tick when the connection lacks the tool\'s scope', async () => {

@@ -1,7 +1,7 @@
 ---
 id: 069
 title: Connectors — every outside write is a proposal only the connection owner approves
-status: backlog
+status: active
 priority: high
 depends_on: [068]
 created: 2026-10-28
@@ -25,10 +25,10 @@ Nothing is sent to an outside service before the connection's owner sees exactly
 - Approval card screens (078)
 
 ## Acceptance criteria
-- [ ] A write from an agent run and from MCP each becomes a proposal
-- [ ] An admin's approval is refused
-- [ ] What is sent equals what was approved (asserted against a fake provider)
-- [ ] A second attempt on the same approval is refused
+- [x] A write from an agent run and from MCP each becomes a proposal
+- [x] An admin's approval is refused
+- [x] What is sent equals what was approved (asserted against a fake provider)
+- [x] A second attempt on the same approval is refused
 
 ## Constraints & notes
 - Track: B — tools (using that token safely)

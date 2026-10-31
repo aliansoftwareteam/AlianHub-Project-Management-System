@@ -14,6 +14,8 @@ const { ACTION: PROJECT_COPY } = require('../Agents/projectDuplicate');
 const dashboards = require('../Agents/dashboardRequests');
 const planWork = require('../Agents/planWork');
 const timesheetWeek = require('../Agents/timesheetWeek');
+const connectorWrites = require('../Connectors/writes');
+const { WRITE_SCOPE: CONNECTOR_WRITE_SCOPE } = require('./connectorTools');
 
 // An approved MCP proposal runs as the token's person, not as the approver, so
 // approval re-asks everything the original call was asked and adds the
@@ -73,6 +75,9 @@ const tokenFiler = async (companyId, p, changes) => {
     if (!token) return refused('The token that filed this proposal has been revoked, deleted or has expired.');
     if (String(token.userId || '') !== String(p.requestedBy || '')) return refused('The token that filed this proposal belongs to someone else now.');
     if (!hasScope(token, 'write')) return refused('The token that filed this proposal no longer has the write scope.');
+    if (connectorWrites.hasWrite(changes) && !require('./scopes').grantedScopes(token).includes(CONNECTOR_WRITE_SCOPE)) {
+        return refused(`The token that filed this proposal no longer has the ${CONNECTOR_WRITE_SCOPE} scope.`);
+    }
     const lacking = changes.flatMap(actionsOf).map((action) => manageTools.grantOfAction(action)).filter(Boolean).some((grant) => !manageFlag.holdsGrant(token, grant));
     if (lacking) return refused('The token that filed this proposal does not hold the grant this change needs.');
     return { tokenLists: [p.tokenProjectIds, token.projectIds].filter((l) => Array.isArray(l) && l.length).map((l) => l.map(String)) };
@@ -83,7 +88,8 @@ const tokenFiler = async (companyId, p, changes) => {
 const grantFiler = async (companyId, p, changes) => {
     const held = await require('./oauthAuth').standingOfGrant({ companyId, grantId: p.oauthGrantId, clientId: p.oauthClientId, userId: p.requestedBy });
     if (!held) return refused('The connection that filed this proposal has been revoked, has expired, or its app is no longer approved in this workspace.');
-    const covered = changes.flatMap(actionsOf).every((action) => { const grant = manageTools.grantOfAction(action) || workTools.filedUnder(action); return Boolean(grant) && held.includes(grant); });
+    const grantOf = (action) => manageTools.grantOfAction(action) || workTools.filedUnder(action) || (connectorWrites.isWrite(action) ? CONNECTOR_WRITE_SCOPE : '');
+    const covered = changes.flatMap(actionsOf).every((action) => { const grant = grantOf(action); return Boolean(grant) && held.includes(grant); });
     if (!covered) return refused('The connection that filed this proposal no longer holds the grant this change needs.');
     return { tokenLists: [] };
 };
@@ -101,8 +107,12 @@ const approverRefusal = async (companyId, userId, proposal, change) => {
     const params = change.params || {};
     const notTheirs = approvedByRequesterAlone(change) ? REQUESTER_ALONE[change.action](userId, proposal.requestedBy) : '';
     if (notTheirs) return { error: notTheirs, lacks: LACKS.STANDING };
+    const notOwner = connectorWrites.approverRefusal(userId, proposal, [change]);
+    if (notOwner) return { error: notOwner, lacks: LACKS.STANDING };
     const own = await holderMayInEach(companyId, { kind: 'human', userId: String(userId) }, change.action, params);
     if (!own.allowed) return { error: `The approver may not make this change: ${own.reason}`, lacks: LACKS.RIGHT };
+    // A connector write reaches the owner's own account at another app, nothing in this workspace.
+    if (connectorWrites.isWrite(change.action)) return null;
     if (!(await reachable(companyId, { userId: String(userId), projectIds: [] }, targetOf(params, change.action)))) {
         return { error: 'The approver cannot open what this change touches.', lacks: LACKS.SIGHT };
     }
@@ -125,6 +135,7 @@ const refusalFor = async (companyId, p, { decider, isPrivileged, edited, changes
         // eslint-disable-next-line no-await-in-loop
         const notApprovers = await approverRefusal(companyId, decider.userId, p, c);
         if (notApprovers) return refused(notApprovers.error);
+        if (connectorWrites.isWrite(c.action)) continue;
         const target = targetOf(c.params, c.action);
         // eslint-disable-next-line no-await-in-loop
         if (!(await reachable(companyId, { userId: p.requestedBy, projectIds: [] }, target))) return refused('The person behind the token (the requester) can no longer open what this change touches.');
