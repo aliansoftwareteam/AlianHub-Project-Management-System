@@ -1,7 +1,7 @@
 ---
 id: 062
 title: Connectors research — matrix and ranking for the new connectors and Gmail
-status: backlog
+status: active
 priority: medium
 depends_on: []
 created: 2026-10-28
@@ -25,8 +25,8 @@ Give the owner the facts to order Phase 3 (easiest first) and to decide on Gmail
 - Building any connector
 
 ## Acceptance criteria
-- [ ] Every listed connector has a matrix row with a verdict and reason
-- [ ] A ranked Phase 3 order with Shopify last
+- [x] Every listed connector has a matrix row with a verdict and reason
+- [x] A ranked Phase 3 order with Shopify last
 - [ ] Gmail CASA quotes from at least two labs, with dates
 - [ ] Owner accepts the matrix and the order (recorded in 056 progress)
 

@@ -64,4 +64,4 @@ const logBootState = () => {
     });
 };
 
-module.exports = { ENV_KEY, KNOWN, GOOGLE, PROBLEM, requested, requestedGoogle, status, slackOn, googleClient, logBootState };
+module.exports = { ENV_KEY, KNOWN, GOOGLE, PROBLEM, named, requested, requestedGoogle, status, slackOn, googleClient, logBootState };

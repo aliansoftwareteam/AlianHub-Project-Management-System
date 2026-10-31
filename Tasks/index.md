@@ -66,14 +66,14 @@ Auto-maintained registry of all tasks. Reflects YAML frontmatter from each `task
 | 058 | Tracker timesheet — every screenshot card shows its image box and a loading state from the first paint | active | medium | — | active/058-tracker-screenshot-loading-placeholder |
 | 059 | Agent settings page — tabs, a searchable project picker and one sticky Save bar | active | high | — | active/059-agent-settings-tabs |
 | 060 | AI access by role — per-role AI rights in Security & Permissions, owner/admin approval for agents and skills | active | high | — | active/060-ai-access-by-role |
-| 061 | Connectors research — confirm Google and Dropbox before the build | backlog | high | — | backlog/061-connectors-research-pilot-providers |
-| 062 | Connectors research — matrix and ranking for the new connectors and Gmail | backlog | medium | — | backlog/062-connectors-research-new-providers |
-| 063 | Connectors — the two-track contract, provider definition format, registry and the Google provider file | backlog | high | — | backlog/063-connectors-provider-definition |
+| 061 | Connectors research — confirm Google and Dropbox before the build | active | high | — | active/061-connectors-research-pilot-providers |
+| 062 | Connectors research — matrix and ranking for the new connectors and Gmail | active | medium | — | active/062-connectors-research-new-providers |
+| 063 | Connectors — the two-track contract, provider definition format, registry and the Google provider file | active | high | — | active/063-connectors-provider-definition |
 | 064 | Connectors — data model: evolve connector_connections, add connector_apps and connector_usage | active | high | 063 | active/064-connectors-data-model |
 | 065 | Connectors — OAuth app lookup (instance default, company override) and the secrets-store guard | backlog | high | 063, 064 | backlog/065-connectors-oauth-apps-secrets-guard |
 | 066 | Connectors — generic connect, products, reconnect and disconnect handlers | backlog | high | 065 | backlog/066-connectors-connect-lifecycle |
 | 067 | Connectors — end a member's connections on removal, deactivation or SCIM, plus a daily sweep | backlog | high | 066 | backlog/067-connectors-member-removal-sweep |
-| 068 | Connectors — tool framework: one definition registered for agents and MCP | backlog | high | 063 | backlog/068-connectors-tool-framework |
+| 068 | Connectors — tool framework: one definition registered for agents and MCP | active | high | 063 | active/068-connectors-tool-framework |
 | 069 | Connectors — every outside write is a proposal only the connection owner approves | backlog | high | 068 | backlog/069-connectors-write-approvals |
 | 070 | Connectors — audit, health, usage counts, quotas and provider backoff | backlog | high | 063, 068 | backlog/070-connectors-tracking-quotas |
 | 071 | Connectors — Google pilot tools: Calendar, Meet and Drive (no Gmail) | backlog | high | 068, 069 | backlog/071-connectors-google-pilot-tools |

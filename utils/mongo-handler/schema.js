@@ -1299,7 +1299,7 @@ const schema = {
         tainted: { type: Boolean, required: false },
         // [{ kind: fetch | email | form | webhook | file | passage | client | instruction | connector, ref, at }] — where it came from, never the content
         taintSources: { type: Array, default: undefined, required: false },
-        // [{ action, connector, channelId, state: applied | failed | refused, messages, chars, truncated, reason, error, at }] — one per
+        // [{ action, connector, channelId, connectionId, slot, state: pending | applied | failed | refused, messages, chars, truncated, reason, error, at }] — one per
         // connector read the run tried; the per-run caps are counted from it, and it never holds what was read
         connectorReads: { type: Array, default: undefined, required: false },
         // 'report' for a scheduled report run (no task); absent on a task run

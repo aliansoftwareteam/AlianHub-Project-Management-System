@@ -1,7 +1,7 @@
 ---
 id: 063
 title: Connectors — the two-track contract, provider definition format, registry and the Google provider file
-status: backlog
+status: active
 priority: high
 depends_on: []
 created: 2026-10-28
@@ -28,10 +28,10 @@ Fix the contract both tracks build against, then make a provider one definition 
 - Tool registration (068)
 
 ## Acceptance criteria
-- [ ] `resources/contract.md` exists, agreed by both interns, before track B starts 068
-- [ ] A test adds a fake provider by one file and it appears in the registry with no other change
-- [ ] A provider missing from `CONNECTORS` or with no app is not offered
-- [ ] Scope union per ticked products is tested
+- [x] `resources/contract.md` exists, agreed by both interns, before track B starts 068
+- [x] A test adds a fake provider by one file and it appears in the registry with no other change
+- [x] A provider missing from `CONNECTORS` or with no app is not offered
+- [x] Scope union per ticked products is tested
 
 ## Constraints & notes
 - Track: A — connections (getting and keeping a person's token) (contract written with B)

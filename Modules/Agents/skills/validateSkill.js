@@ -94,6 +94,14 @@ const checkParam = (rule, value, field, inputs, errors) => {
         if (typeof value === 'number' && Number.isFinite(value) && value >= rule.min && value <= rule.max) return value;
         errors.push(error(field, 'invalid_params', `must be a number between ${rule.min} and ${rule.max}`)); return null;
     }
+    if (rule.type === 'integer') {
+        if (Number.isInteger(value) && value >= rule.min && value <= rule.max) return value;
+        errors.push(error(field, 'invalid_params', `must be a whole number between ${rule.min} and ${rule.max}`)); return null;
+    }
+    if (rule.type === 'string') {
+        if (typeof value === 'string' && value.length <= rule.maxLength) return value;
+        errors.push(error(field, 'invalid_params', `must be text of at most ${rule.maxLength} characters`)); return null;
+    }
     if (rule.type === 'boolean') {
         if (typeof value === 'boolean') return value;
         errors.push(error(field, 'invalid_params', 'must be true or false')); return null;

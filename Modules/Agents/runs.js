@@ -179,6 +179,11 @@ const patch = async (companyId, runId, set, extra = {}, { onlyIf } = {}) => {
 
 const appendAction = (companyId, runId, entry) => patch(companyId, runId, {}, { $push: { actions: { ...entry, at: new Date() } } });
 
+const settleConnectorRead = (companyId, runId, slot, fields) => MongoDbCrudOpration(companyId, {
+    type: SCHEMA_TYPE.AGENT_RUNS,
+    data: [{ _id: oid(runId) }, { $set: Object.fromEntries(Object.entries(fields).map(([name, value]) => [`connectorReads.$[read].${name}`, value])) }, { arrayFilters: [{ 'read.slot': slot }] }],
+}, 'updateOne');
+
 /* No socket event, unlike patch: a step lands after every node and nothing renders it live. */
 const recordStep = (companyId, runId, step) => MongoDbCrudOpration(companyId, {
     type: SCHEMA_TYPE.AGENT_RUNS, data: [{ _id: oid(runId) }, { $push: { steps: step } }],
@@ -425,4 +430,4 @@ const skillSlugOf = (agent, explicit) => {
     return first.key || first.slug || first.name || 'qa-review';
 };
 
-module.exports = { STATUS, OPEN, TERMINAL, RETENTION_SECONDS, LOOP_DEPTH_EXCEEDED, originDepth, terminalUpdate, canStart, runsToday, skillSlugOf, idempotencyKeyFor, start, create, get, patch, appendAction, recordStep, finish, isRunning, reapStale, stop, recordSpend, list, summary, countsByStatus, pauseAll, stopIn, pausedIn, getAgent, emitAgent, changesFor, executeSkill, monthKey };
+module.exports = { STATUS, OPEN, TERMINAL, RETENTION_SECONDS, LOOP_DEPTH_EXCEEDED, originDepth, terminalUpdate, canStart, runsToday, skillSlugOf, idempotencyKeyFor, start, create, get, patch, appendAction, settleConnectorRead, recordStep, finish, isRunning, reapStale, stop, recordSpend, list, summary, countsByStatus, pauseAll, stopIn, pausedIn, getAgent, emitAgent, changesFor, executeSkill, monthKey };
