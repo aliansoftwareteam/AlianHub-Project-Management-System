@@ -189,11 +189,57 @@ describe('a write to a connected app', () => {
         });
     });
 
-    it('shows no fields to an owner of a tool with none to retype, and they can still approve', async () => {
+    it('offers no Edit on a lone write whose tool lets nothing be changed, and can still be approved', () => {
         mountQueue([row('p1', { changes: [write({ card: card({ fields: undefined }) })] })]);
-        await rowOf('p1').find('[data-test="queue-edit"]').trigger('click');
-        expect(cardOf('p1').find('[data-test="connector-card-form"]').exists()).toBe(false);
-        expect(cardOf('p1').find('[data-test="connector-card-title"]').exists()).toBe(true);
+        expect(rowOf('p1').find('[data-test="queue-edit"]').exists()).toBe(false);
+        expect(rowOf('p1').find('[data-test="queue-approve"]').exists()).toBe(true);
+    });
+
+    it('offers Edit beside another change, which can still be dropped', () => {
+        mountQueue([row('p1', { changes: [write({ card: card({ fields: undefined }) }), change('Comment')] })]);
+        expect(rowOf('p1').find('[data-test="queue-edit"]').exists()).toBe(true);
+    });
+
+    describe('with a toggle and a choice', () => {
+        const NOTIFY = { param: 'notifyAttendees', label: 'Connectors.card.notifyAttendees', toggle: true };
+        const ACCESS = { param: 'accessType', label: 'Connectors.card.access', blank: 'Connectors.card.accessDefault', options: [{ value: 'OPEN', label: 'Connectors.card.accessOpen' }] };
+        const open = async (params) => {
+            mountQueue([row('p1', { changes: [write({ params: { connectionId: 'c1', ...params }, card: card({ fields: [NOTIFY, ACCESS] }) })] })]);
+            await rowOf('p1').find('[data-test="queue-edit"]').trigger('click');
+        };
+        const paramsSent = async () => {
+            sendProposalDecision.mockImplementation(() => done({ reshown: true, proposal: { changes: [] } }));
+            await saveEdit('p1');
+            return sendProposalDecision.mock.calls[0][2].changes[0].params;
+        };
+
+        it('keeps the read card beside the form, so what does not change stays in sight', async () => {
+            await open({});
+            expect(cardOf('p1').find('[data-test="connector-card-form"]').exists()).toBe(true);
+            expect(cardOf('p1').find('[data-test="connector-card-target"]').exists()).toBe(true);
+        });
+
+        it('turns the emails off when they were on', async () => {
+            await open({ notifyAttendees: true });
+            await cardOf('p1').find('[data-test="connector-field-notifyAttendees"]').setValue(false);
+            expect((await paramsSent()).notifyAttendees).toBe(false);
+        });
+
+        it('sets a choice, and its default leaves the input out', async () => {
+            await open({});
+            const access = cardOf('p1').find('[data-test="connector-field-accessType"]');
+            await access.setValue('OPEN');
+            expect(rowOf('p1').find('[data-test="queue-approve"]').text()).toBe(en.Connectors.approval.check_again);
+            await access.setValue('');
+            expect(rowOf('p1').find('[data-test="queue-approve"]').text()).toBe(en.Inbox.approve);
+        });
+    });
+
+    it('tells the page when a send did not go through', async () => {
+        sendProposalDecision.mockImplementation(() => done({ applied: [{ ok: false, error: 'Google answered 403' }] }));
+        mountQueue([row('p1', { changes: [write()] })]);
+        await saveEdit('p1');
+        expect(decided()[0].failure).toContain('Google answered 403');
     });
 });
 

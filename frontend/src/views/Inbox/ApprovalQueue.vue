@@ -166,7 +166,7 @@
                         @click="approve(p)"
                     >{{ checksAgain(p) ? t('Connectors.approval.check_again') : t('Inbox.approve') }}</button>
                     <button
-                        v-if="p.editable"
+                        v-if="p.editable && !nothingToEdit(p.changes)"
                         type="button"
                         class="ah-btn ah-btn--secondary ah-btn--sm"
                         :disabled="busy || reviewing"
@@ -238,7 +238,7 @@ import { proposalTitle } from '@/views/Ai/plainLabels';
 import { agentActionLabel, changeLabel } from '@/views/Ai/agentActionLabels';
 import { findingFix, findingReasons } from '@/views/Projects/ProjectDetail/findingText';
 import { plainReason } from '@/views/Ai/auditWords';
-import { changesEdited, decideEach, decideOne, hasOutsideWrite, withShownRevision } from './approvalQueue';
+import { changesEdited, decideEach, decideOne, hasOutsideWrite, nothingToEdit, withShownRevision } from './approvalQueue';
 import { fullText } from '@/utils/clockText';
 
 defineOptions({ name: 'ApprovalQueue' });
@@ -345,7 +345,8 @@ const settle = (p, verb, result) => {
     forgetPicks(p);
     picked.value = picked.value.filter((id) => id !== p.proposalId);
     const more = Boolean(result.later?.waiting || result.later?.retry);
-    emit('decided', { id: p.proposalId, verb, undo: Boolean(result.undo), ...(result.madeProjects?.length ? { madeProjects: result.madeProjects } : {}), ...(result.opens ? { opens: result.opens } : {}), ...(more ? { more } : {}) });
+    const failure = failuresLine(result.unapplied || []);
+    emit('decided', { id: p.proposalId, verb, undo: Boolean(result.undo), ...(failure ? { failure } : {}),...(result.madeProjects?.length ? { madeProjects: result.madeProjects } : {}), ...(result.opens ? { opens: result.opens } : {}), ...(more ? { more } : {}) });
 };
 
 const approve = async (p) => {

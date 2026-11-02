@@ -184,6 +184,15 @@ describe('the limits for connected apps', () => {
         expect(puts()[0][2]).toEqual({ scope: 'member', targetId: GONE, reads: null });
     });
 
+    it('does not call an agent deleted when the agent list failed to load', async () => {
+        overview = overviewOf({ agents: [{ targetId: AGENT, limits: { agentReads: 7 } }] });
+        apiRequest.mockImplementation((method, url) => (url === BASE ? Promise.resolve({ data: { status: true, data: overview } }) : Promise.reject(new Error('down'))));
+        const wrapper = await mountQuotas();
+        const row = wrapper.find('[data-test="quota-override"]');
+        expect(row.text()).toContain(en.Connectors.quota.agent_unread);
+        expect(row.text()).not.toContain(en.Connectors.quota.unknown_agent);
+    });
+
     it('shows the server\'s refusal', async () => {
         const wrapper = await mountQuotas();
         apiRequest.mockImplementationOnce(() => Promise.reject(Object.assign(new Error('x'), { response: { data: { statusText: 'That member is not in this workspace.' } } })));

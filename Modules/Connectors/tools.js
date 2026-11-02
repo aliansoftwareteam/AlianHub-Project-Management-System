@@ -32,15 +32,22 @@ const inputProblems = (input) => {
     return found;
 };
 
-/* What its owner may retype on the approval card: free text only, since the send is checked against the input schema. */
+const controlFits = (field, schema) => {
+    if (field.toggle) return schema.type === 'boolean';
+    if (field.options) return Array.isArray(schema.enum) && field.options.every((option) => schema.enum.includes(option.value));
+    return schema.type === 'string' && !schema.enum;
+};
+
+/* What its owner may change on the approval card, each with the control its input takes. An id is left out on purpose:
+ * it says what the write acts on, and a mistyped one would act on something else. */
 const editableProblems = (tool) => {
     if (tool.editable === undefined) return [];
     if (!Array.isArray(tool.editable)) return ['editable is not a list'];
     const properties = (tool.input && tool.input.properties) || {};
     return tool.editable.flatMap((field) => {
         const schema = properties[field && field.param];
-        if (!schema || schema.type !== 'string' || schema.enum) return [`editable names ${field && field.param}, which is not a free text input`];
-        const labels = [field.label, ...(field.hint === undefined ? [] : [field.hint])];
+        if (!schema || !controlFits(field, schema)) return [`editable names ${field && field.param}, which its control cannot set`];
+        const labels = [field.label, field.hint, field.blank, ...(field.options || []).map((option) => option.label)].filter((label) => label !== undefined);
         return labels.every((label) => CARD_LABEL.test(String(label || ''))) ? [] : [`editable ${field.param} has no Connectors.card.* label`];
     });
 };

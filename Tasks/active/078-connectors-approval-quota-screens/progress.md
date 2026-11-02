@@ -37,19 +37,23 @@ None for the code. 066 landed on `upstream/feat/per-user-connectors` after this 
   - A former member's limit could not be taken away, unreadable number input silently cleared a limit, and a limit above a lowered ceiling read as in force.
   - "Check and show again" showed even after the write itself was dropped.
   - `editedAt` was dropped by the strict schema. `CONNECTORS=google` alone hid the quota screen: the catalogue now says `connectorLimits`. The promise about sending showed on cards no longer waiting. Edit refusals started with `bad_input:`.
+- Second round of fixes:
+  - The owner can now turn Google's emails off and change who joins a Meet: `editable` takes a toggle and a choice, as well as text. Ids stay out, since a mistyped one would act on something else.
+  - No Edit on a lone write with nothing to change. The read card stays in sight above the form.
+  - The revision check and the claim are one step now, so an edit racing an approval never sends the old text.
+  - An edit writes its own audit row (`card_edited`).
+  - The AI Inbox list marks a failed send "Not sent". The Inbox says what failed even when that was its last row.
+  - A failed agent list no longer reads as "Deleted agent".
 - Left as they are:
   - A proposal mixing a write with other changes loses its undo window as a whole; the audit log still undoes the rest.
-  - A failed send stays `approved`, as 069 chose: the card says "Not sent", the list does not.
-  - The proposal's headline is not rewritten by an edit, and the edit form hides the rows it cannot change.
-  - An edit writes no audit row of its own; the sent params are in the send's row.
-  - If the agent list fails to load, agent limits read "Deleted agent".
+  - A failed send stays `approved`, as 069 chose.
+  - The proposal's headline is not rewritten by an edit.
   - `slack.message.post` has the same undo fault. 079 removes that path, so it is not fixed here.
 - For track A, read against 066 and not fixed here:
   - A reconnect to a different Google account keeps the same connection id, so a waiting write goes to the new account. The card names no account.
   - Disconnect then reconnect gives a new id, so a waiting write is refused: the owner asks again. The send attempt still ends `approved` with "Not sent".
   - `resolveConnection.js` does not export `recordHealth`, so `health.js` records nothing after a provider call (070's open check).
   - A token failure such as `refresh_failed` reaches the card in developer wording.
-- Left as is: the `revision` check and the claim are not one atomic step, so an edit landing in the same milliseconds could still lose to an approval.
 - First final run, before the last small fixes: real server checks 57/57; integration 104/104 (connector, inbox, agents, MCP tools); unit 3768/3768 (connector, inbox, proposal, undo, intent, MCP); frontend specs 328/328 for the screens touched, not the whole frontend suite; convention failures still the same 26.
 
 ### 2026-10-31

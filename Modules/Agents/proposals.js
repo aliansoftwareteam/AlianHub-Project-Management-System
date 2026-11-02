@@ -306,8 +306,11 @@ const fileLeft = async (companyId, p, id, { decider, left }) => {
     return { waiting, retry };
 };
 
-const setStatus = async (companyId, id, set, { onlyIf } = {}) => {
-    const filter = onlyIf ? { _id: oid(id), status: onlyIf } : { _id: oid(id) };
+/* A proposal's first card has no revision stored; each edit after it does. */
+const onSameCard = (p) => (connectorWrites.hasWrite(p.changes) ? { revision: p.revision ? p.revision : { $exists: false } } : {});
+
+const setStatus = async (companyId, id, set, { onlyIf, matching = {} } = {}) => {
+    const filter = onlyIf ? { _id: oid(id), status: onlyIf, ...matching } : { _id: oid(id) };
     const updated = await MongoDbCrudOpration(companyId, {
         type: SCHEMA_TYPE.AGENT_PROPOSALS, data: [filter, { $set: set }, { returnDocument: 'after' }],
     }, 'findOneAndUpdate');
@@ -315,20 +318,22 @@ const setStatus = async (companyId, id, set, { onlyIf } = {}) => {
     return updated;
 };
 
-const reshowEdited = async (companyId, id, p, changes) => {
+const reshowEdited = async (companyId, id, p, changes, { decider, ip }) => {
     let ready;
     try { ready = await connectorWrites.prepareChanges(companyId, p.connectionOwner, changes); } catch (e) { return { error: connectorWrites.spoken(e.message), status: e.status || 400 }; }
     const stored = ready.map((c) => ({
         action: c.action, params: planFiling.storedParams(c.action, c.params || {}), label: proposalText.labelOf(c),
         reversible: Boolean(registry.get(c.action) && registry.get(c.action).undoable), rating: c.rating || actions.rating(c.action), ...(c.card ? { card: c.card } : {}),
     }));
-    const updated = await setStatus(companyId, id, { changes: stored, editedAt: new Date(), revision: (p.revision || 0) + 1 }, { onlyIf: STATUS.PENDING });
+    const updated = await setStatus(companyId, id, { changes: stored, editedAt: new Date(), revision: (p.revision || 0) + 1 }, { onlyIf: STATUS.PENDING, matching: onSameCard(p) });
     if (!updated) return alreadyDecided(companyId, id);
+    await audit.recordProposalDecision(companyId, decider, { proposalId: id, decision: 'card_edited', agentName: p.agentName, runId: p.runId, changes: stored.map((c) => ({ action: c.action, label: c.label })), ip });
     return { proposal: updated, applied: [], reshown: true };
 };
 
 const alreadyDecided = async (companyId, id) => {
     const now = await get(companyId, id);
+    if (now && now.status === STATUS.PENDING) return { error: connectorWrites.REFUSAL.CARD_CHANGED, status: 409 };
     const state = now && now.status === STATUS.APPLYING ? 'being applied' : `already ${(now && now.status) || 'decided'}`;
     return { error: `Proposal is ${state}.`, status: 409 };
 };
@@ -369,7 +374,7 @@ const approve = async (companyId, id, { decider, isPrivileged, changes: edited, 
             try { changes = await slackPost.prepareChanges(companyId, changes); } catch (e) { return { error: e.message, status: e.status || 400 }; }
         }
         // An edited connector write is checked and shown to its owner again, never sent on the click that edited it.
-        if (connectorWrites.hasWrite(changes)) return reshowEdited(companyId, id, p, changes);
+        if (connectorWrites.hasWrite(changes)) return reshowEdited(companyId, id, p, changes, { decider, ip });
         status = STATUS.EDITED;
     }
     const person = { userId: decider.userId, privileged: Boolean(isPrivileged) };
@@ -391,7 +396,7 @@ const approve = async (companyId, id, { decider, isPrivileged, changes: edited, 
     if (run && run.status === runs.STATUS.STOPPED) return { error: 'Run was stopped.', status: 409 };
     const depth = runs.originDepth(run);
 
-    const claimed = await setStatus(companyId, id, { status: STATUS.APPLYING, decidedBy: decider.userId, decidedAt: new Date() }, { onlyIf: STATUS.PENDING });
+    const claimed = await setStatus(companyId, id, { status: STATUS.APPLYING, decidedBy: decider.userId, decidedAt: new Date() }, { onlyIf: STATUS.PENDING, matching: onSameCard(p) });
     if (!claimed) return alreadyDecided(companyId, id);
 
     const runTrace = run && run.traceId ? { traceId: run.traceId } : {};

@@ -65,6 +65,7 @@ describe('a write to a connected app on the AI Inbox card', () => {
             changes: [write('One'), write('Two')],
             delivery: [{ action: KEY, ok: true, answer: 'Saved as note 1' }, { action: KEY, ok: false, error: 'the provider said no' }],
         }), { tab: DONE_TAB });
+        expect(wrapper.find('[data-test="proposal-not-sent"]').exists()).toBe(true);
         const results = wrapper.findAll('[data-test="connector-card-result"]');
         expect(results.map((r) => r.classes().includes('ah-field__error'))).toEqual([false, true]);
         expect(results[0].text()).toContain('Saved as note 1');

@@ -8962,6 +8962,7 @@ export default {
         "proposal_approved": "Approved an agent's proposal",
         "proposal_declined": "Declined an agent's proposal",
         "proposal_undone": "Undid an approved proposal",
+        "proposal_card_edited": "Edited a write to a connected app before approving it",
         "proposal_failed": "An agent's proposal could not be applied"
     },
     "AuditReasons": {
@@ -13956,6 +13957,7 @@ export default {
             "edit_note": "Your edit is checked and shown again before anything is sent.",
             "check_again": "Check and show again",
             "review_in_inbox": "Review in Inbox",
+            "not_sent": "Not sent",
             "reshown": "Your edit was checked. Read the new card, then approve it to send.",
             "locked": "Their connection",
             "locked_note": "This goes out on another person's connected account, so only that person can approve it.",
@@ -13988,7 +13990,8 @@ export default {
             "override_line": "{what}: {n}",
             "change": "Change",
             "unknown_member": "Former member",
-            "unknown_agent": "Deleted agent"
+            "unknown_agent": "Deleted agent",
+            "agent_unread": "An agent"
         }
     },
     "WhoCanSee": {

@@ -91,6 +91,7 @@ const EVENT_EDITS = Object.freeze([
     { param: 'location', label: 'Connectors.card.where' },
     { param: 'attendees', label: 'Connectors.card.attendees' },
     { param: 'description', label: 'Connectors.card.description', long: true },
+    { param: 'notifyAttendees', label: 'Connectors.card.notifyAttendees', toggle: true },
 ]);
 
 const notifyOf = (input) => ({ sendUpdates: input.notifyAttendees ? 'all' : 'none' });
@@ -234,6 +235,10 @@ module.exports = [{
     },
     caps: { maxItems: 1, maxChars: 500 },
     card: (input) => ({ target: 'Google Meet', rows: [{ label: 'Connectors.card.access', valueLabel: ACCESS_ROW[input.accessType] || 'Connectors.card.accessDefault' }] }),
+    editable: [{
+        param: 'accessType', label: 'Connectors.card.access', blank: 'Connectors.card.accessDefault',
+        options: Object.entries(ACCESS_ROW).map(([value, label]) => ({ value, label })),
+    }],
     run: async ({ input, connection }) => {
         const space = json(await connection.request(MEET_SPACES, { method: 'post', json: input.accessType ? { config: { accessType: input.accessType } } : {} }));
         return `Created meeting ${space.meetingCode}: ${space.meetingUri}`;

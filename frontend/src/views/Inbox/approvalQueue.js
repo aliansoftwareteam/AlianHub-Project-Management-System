@@ -36,6 +36,9 @@ export const deliveryOfChange = (delivery, changes, change) => {
 /* A change with a card leaves for a connected app. It is approved only where its card is read. */
 export const hasOutsideWrite = (changes) => (changes || []).some((change) => change?.card);
 
+/* A lone write whose tool lets nothing be changed leaves Edit with nothing to do, not even a change to drop. */
+export const nothingToEdit = (changes) => (changes || []).length === 1 && Boolean(changes[0]?.card) && !(changes[0].card.fields || []).length;
+
 /* The card a person read is named in the approval, so one edited elsewhere since is refused rather than sent. */
 export const withShownRevision = (proposal, body = {}) => (hasOutsideWrite(proposal.changes) ? { ...body, revision: proposal.revision || 0 } : body);
 

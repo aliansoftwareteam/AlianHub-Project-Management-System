@@ -85,6 +85,7 @@ const { getters } = useStore();
 
 const overview = ref(null);
 const agents = ref([]);
+const agentsFailed = ref(false);
 const loadError = ref('');
 const saveError = ref('');
 const saved = ref(false);
@@ -139,7 +140,9 @@ watch([scope, targetId], () => { saved.value = false; });
 
 const nameOf = (name, id) => {
     const found = (name === MEMBER ? members.value : agents.value).find((option) => option.id === id);
-    return found ? found.name : t(`Connectors.quota.unknown_${name}`);
+    if (found) return found.name;
+    // A list that failed to load says nothing about whether the agent still exists.
+    return t(name === AGENT && agentsFailed.value ? 'Connectors.quota.agent_unread' : `Connectors.quota.unknown_${name}`);
 };
 const lineOf = (limits) => Object.entries(limits).filter(([, n]) => present(n)).map(([field, n]) => t('Connectors.quota.override_line', { what: t(`Connectors.quota.${field}`), n: Math.min(n, overview.value.ceilings[field]) })).join(' · ');
 const overrides = computed(() => (overview.value ? [MEMBER, AGENT].flatMap((name) => rowsOf(name).map((row) => ({
@@ -184,6 +187,7 @@ const save = async () => {
 const load = async () => {
     try {
         const [limits, listed] = await Promise.all([apiRequest('get', BASE), apiRequest('get', env.AGENTS).catch(() => null)]);
+        agentsFailed.value = !listed?.data?.status;
         agents.value = (listed?.data?.data || []).map((agent) => ({ id: String(agent._id), name: agent.name }));
         overview.value = answered(limits);
     } catch (e) {

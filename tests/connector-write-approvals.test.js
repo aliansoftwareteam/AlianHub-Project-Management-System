@@ -97,7 +97,9 @@ describe('a write tool definition', () => {
     });
 
     it.each([
-        ['an input it does not take', [{ param: 'cc', label: 'Connectors.card.title' }], /not a free text input/],
+        ['an input it does not take', [{ param: 'cc', label: 'Connectors.card.title' }], /its control cannot set/],
+        ['a toggle on a text input', [{ param: 'title', label: 'Connectors.card.title', toggle: true }], /its control cannot set/],
+        ['a choice on an input with no list', [{ param: 'title', label: 'Connectors.card.title', options: [{ value: 'a', label: 'Connectors.card.yes' }] }], /its control cannot set/],
         ['a label outside Connectors.card', [{ param: 'title', label: 'Title' }], /no Connectors\.card\.\* label/],
     ])('does not load with an editable field naming %s', (_what, editable, why) => {
         const fake = require('./fixtures/connectors/fake');
@@ -257,6 +259,31 @@ describe('what is approved is what is sent, once', () => {
         expect(safeFetch).not.toHaveBeenCalled();
         expect((await approveAs(p._id, PRISHA, { revision: 1 })).error).toBeUndefined();
         expect(sentBody().body).toBe('Edited in another tab.');
+    });
+
+    it('never sends the old text when an edit and an approval race', async () => {
+        const p = await fromAgentRun();
+        const body = 'Edited at the same moment.';
+        const [edit, approval] = await Promise.all([
+            approveAs(p._id, PRISHA, { changes: [{ action: KEY, params: { ...NOTE, body } }] }),
+            approveAs(p._id, PRISHA),
+        ]);
+        if (edit.reshown) {
+            expect(approval.error).toBeDefined();
+            expect(safeFetch).not.toHaveBeenCalled();
+            expect(proposalRow(p._id)).toMatchObject({ status: 'pending', revision: 1 });
+        } else {
+            expect(edit.error).toBeDefined();
+            expect(sentBody().body).toBe(NOTE.body);
+        }
+    });
+
+    it('audits an edit, naming no text', async () => {
+        const p = await fromAgentRun();
+        await approveAs(p._id, PRISHA, { changes: [{ action: KEY, params: { ...NOTE, body: 'Private words.' } }] });
+        const rows = Object.values(mockDb.store).flat().filter((row) => row && row.meta && row.meta.decision === 'card_edited');
+        expect(rows).toHaveLength(1);
+        expect(JSON.stringify(rows[0])).not.toContain('Private words.');
     });
 
     it('offers no undo once sent, and stays approved when one is asked for', async () => {

@@ -89,6 +89,7 @@
                             <span v-if="p.taint" class="ah-chip ah-chip--warn ah-chip--mono" data-test="proposal-tainted">{{ $t('Audit.tainted') }}</span>
                             <SimulatedChip v-if="p.simulated" />
                             <span v-if="p.status !== 'pending'" class="ah-chip ah-chip--mono">{{ $t(`Ai.status_${p.status}`) }}</span>
+                            <span v-if="(p.delivery || []).some((sent) => sent.ok === false)" class="ah-chip ah-chip--warn" data-test="proposal-not-sent">{{ $t('Connectors.approval.not_sent') }}</span>
                             <span v-if="waitingDaysOf(p)" class="ah-chip ah-chip--warn" data-test="proposal-waiting">{{ t('Ai.waiting_days', { n: waitingDaysOf(p) }, waitingDaysOf(p)) }}</span>
                             <span class="ai-item__time ah-mono">{{ shortTime(p.createdAt) }}</span>
                         </div>
@@ -205,7 +206,7 @@
 
                     <div v-if="selected.status === 'pending' && canDecide && !declining" class="ai-actions">
                         <button type="button" class="ah-btn ah-btn--primary" :disabled="busy || !editable.length" @click="onApprove">{{ checksAgain ? $t('Connectors.approval.check_again') : $t('Ai.approve') }}</button>
-                        <button v-if="!selected.batch && selected.source !== SOURCE_MCP" type="button" class="ah-btn ah-btn--secondary" :disabled="busy" data-test="edit-then-approve" @click="toggleEditing">
+                        <button v-if="!selected.batch && selected.source !== SOURCE_MCP && !nothingToEdit(selected.changes)" type="button" class="ah-btn ah-btn--secondary" :disabled="busy" data-test="edit-then-approve" @click="toggleEditing">
                             {{ editing ? $t('Ai.done_editing') : $t('Ai.edit_then_approve') }}
                         </button>
                         <button type="button" class="ah-btn ah-btn--ghost" :disabled="busy" data-test="decline" @click="openDecline">{{ $t('Ai.decline') }}</button>
@@ -259,7 +260,7 @@ import AiSidebar from "./AiSidebar.vue";
 import WorkflowApprovalRow from "./WorkflowApprovalRow.vue";
 import SlackPostPreview from "./SlackPostPreview.vue";
 import ConnectorWriteCard from "@/views/Inbox/ConnectorWriteCard.vue";
-import { changesEdited, deliveryOfChange, hasOutsideWrite, withShownRevision } from "@/views/Inbox/approvalQueue";
+import { changesEdited, deliveryOfChange, hasOutsideWrite, nothingToEdit, withShownRevision } from "@/views/Inbox/approvalQueue";
 import WorkflowApprovalDetail from "./WorkflowApprovalDetail.vue";
 import AgentReportDetail from "./AgentReportDetail.vue";
 import { useAgentReports } from "./useAgentReports";
