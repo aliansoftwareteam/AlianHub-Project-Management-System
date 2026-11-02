@@ -1,7 +1,8 @@
 const fs = require('fs');
 const path = require('path');
 
-const WORKFLOW = fs.readFileSync(path.resolve(__dirname, '../../.github/workflows/ci.yml'), 'utf8');
+const read = (file) => fs.readFileSync(file, 'utf8').replace(/\r\n/g, '\n');
+const WORKFLOW = read(path.resolve(__dirname, '../../.github/workflows/ci.yml'));
 
 const jobs = Object.fromEntries(
     WORKFLOW.slice(WORKFLOW.indexOf('\njobs:\n'))
@@ -14,7 +15,7 @@ const jobsRunning = (command) => Object.entries(jobs).filter(([, block]) => bloc
 const shardJobs = () => jobsRunning('npm run e2e -- --shard=');
 
 const WORKFLOWS = path.resolve(__dirname, '../../.github/workflows');
-const stepsOf = (file) => fs.readFileSync(path.join(WORKFLOWS, file), 'utf8').split(/^ +- (?=[a-z-]+:)/m);
+const stepsOf = (file) => read(path.join(WORKFLOWS, file)).split(/^ +- (?=[a-z-]+:)/m);
 const pathsOf = (step) => {
     const found = /^( +)path: *(\|?)(.*)\n((?:\1 +.*\n?)*)/m.exec(step);
     if (!found) return [];
