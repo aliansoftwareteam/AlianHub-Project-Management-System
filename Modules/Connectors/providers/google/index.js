@@ -12,7 +12,7 @@ module.exports = {
         tokenUrl: 'https://oauth2.googleapis.com/token',
         revokeUrl: 'https://oauth2.googleapis.com/revoke',
         pkce: 'S256',
-        extraParams: { access_type: 'offline', include_granted_scopes: 'true' },
+        extraParams: { access_type: 'offline' },
         baseScopes: ['openid', 'email'],
     },
     products: {

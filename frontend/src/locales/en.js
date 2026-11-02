@@ -9246,6 +9246,7 @@ export default {
         oauth_client_revoked: "Removed an outside app",
         connector_connect: "Connected a service",
         connector_revoke: "Disconnected a service",
+        connector_products_changed: "Changed what a connected service may do",
         connector_broken: "A connected service stopped working",
         connector_channels_set: "Chose the Slack channels agents may use",
         connector_call: "An agent used a connected service",

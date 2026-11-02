@@ -63,6 +63,7 @@ const EVENTS = Object.freeze({
     'oauth.client_revoked': 'Removed an outside app',
     'connector.connect': 'Connected a service',
     'connector.revoke': 'Disconnected a service',
+    'connector.products_changed': 'Changed what a connected service may do',
     'connector.broken': 'A connected service stopped working',
     'connector.channels_set': 'Chose the Slack channels agents may use',
     'connector.call': 'An agent used a connected service',
