@@ -61,7 +61,7 @@ const agentRead = () => egressContext.run({ companyId: C }, () => runner.read({ 
 const callRows = () => recordAudit.mock.calls.map(([, row]) => row).filter((row) => row.action === 'connector.call');
 const usageRows = () => mockDb.store[SCHEMA_TYPE.CONNECTOR_USAGE] || [];
 const counted = (field) => usageRows().reduce((sum, row) => sum + (row[field] || 0), 0);
-const seedUsage = (over) => mockDb.seed(SCHEMA_TYPE.CONNECTOR_USAGE, { connectionId: 'other', userId: PRISHA, actor: { type: 'mcp', id: 'other' }, day: usage.dayOf(), reads: 0, writeProposals: 0, ...over });
+const seedUsage = (over) => mockDb.seed(SCHEMA_TYPE.CONNECTOR_USAGE, { companyId: C, connectionId: 'other', userId: PRISHA, actor: { type: 'mcp', id: 'other' }, day: usage.dayOf(), reads: 0, writeProposals: 0, ...over });
 const fileWrite = () => proposals.create(C, {
     agent: { _id: AGENT_ID, name: 'Digest' }, projectId: null, what: 'Save the minutes', why: 'The meeting ended',
     changes: [{ action: WRITE, params: { title: 'Minutes', body: 'Approved the budget.' } }], connectionOwner: PRISHA,
@@ -141,6 +141,21 @@ describe('usage', () => {
         await egressContext.run({ companyId: C }, () => runner.write({ companyId: C, userId: PRISHA, key: WRITE, params: { title: 'Minutes', body: 'Approved.' } }));
         expect(counted('writeProposals')).toBe(1);
         expect(callRows()[1].meta).toMatchObject({ phase: 'send', via: 'approved', state: 'applied' });
+    });
+
+    it('gives a write proposal\'s count back when the proposal cannot be saved', async () => {
+        const real = mockDb.crud.getMockImplementation();
+        mockDb.crud.mockImplementation((companyId, op, method) => (op.type === SCHEMA_TYPE.AGENT_PROPOSALS && method === 'save'
+            ? Promise.reject(new Error('save failed'))
+            : real(companyId, op, method)));
+        try {
+            await expect(fileWrite()).rejects.toThrow('save failed');
+        } finally {
+            mockDb.crud.mockImplementation(real);
+        }
+        expect(counted('writeProposals')).toBe(0);
+        expect(callRows()).toHaveLength(1);
+        expect(callRows()[0].meta).toMatchObject({ action: WRITE, phase: 'propose', state: 'failed', reason: 'error', connectionId: MINE });
     });
 });
 
@@ -382,6 +397,24 @@ describe('health', () => {
         resolveConnection.mockRejectedValue(connectorError('not_connected'));
         await expect(mcpRead()).rejects.toBeTruthy();
         expect(recordHealth).not.toHaveBeenCalled();
+    });
+
+    it('notes nothing when a known connection is refused before the provider', async () => {
+        safeFetch.mockResolvedValueOnce({ status: 429, headers: { 'retry-after': '120' }, body: '{}' });
+        await expect(mcpRead()).rejects.toMatchObject({ code: 'provider_busy' });
+        recordHealth.mockClear();
+        await expect(mcpRead()).rejects.toMatchObject({ code: 'provider_busy' });
+        expect(recordHealth).not.toHaveBeenCalled();
+    });
+
+    it.each(['refresh_failed', 'token_unavailable'])('keeps %s as the last error without calling the connection used', async (code) => {
+        resolveConnection.mockResolvedValue({ connectionId: MINE, scopes: ['notes.read'], getAccessToken: async () => { throw Object.assign(new Error(`no token (${code})`), { code }); } });
+        await expect(mcpRead()).rejects.toMatchObject({ code });
+        expect(recordHealth).toHaveBeenCalledTimes(1);
+        expect(recordHealth).toHaveBeenCalledWith({ companyId: C, connectionId: MINE, lastError: code });
+        expect(safeFetch).not.toHaveBeenCalled();
+        expect(callRows()[0].meta).toMatchObject({ state: 'refused', reason: code });
+        expect(counted('reads')).toBe(0);
     });
 
     it('tells the person of a broken connection once a day, however many calls hit it', async () => {

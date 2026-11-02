@@ -93,10 +93,11 @@ const prepareChanges = async (companyId, ownerId, changes) => {
     return out;
 };
 
-/* Filing is what the daily limit counts and what the audit shows: an edit of a waiting proposal goes through prepareChanges alone. */
-const fileChanges = async (companyId, ownerId, changes, { via, id, runId = null }) => {
+/* Filing is what the daily limit counts and what the audit shows: an edit of a waiting proposal goes through prepareChanges alone.
+ * `save` stores the proposal inside the claim, so a row that was never stored gives its count back. */
+const fileChanges = async (companyId, ownerId, changes, { via, id, runId = null }, save) => {
     const list = Array.isArray(changes) ? changes : [];
-    if (!hasWrite(list)) return list;
+    if (!hasWrite(list)) return save(list);
     const audited = (state, reason = '', connectionOf = () => '') => list.filter((c) => c && isWrite(c.action)).forEach((c) => callAudit.record(companyId, {
         userId: ownerId, via, callerId: id, runId, key: c.action, tool: tools.get(c.action), phase: callAudit.PHASE.PROPOSE, input: c.params, connectionId: connectionOf(c), state, reason,
     }));
@@ -120,8 +121,16 @@ const fileChanges = async (companyId, ownerId, changes, { via, id, runId = null 
         audited(runner.STATE.REFUSED, String(error.code || 'error'), connectionOf);
         throw error;
     }
+    let saved;
+    try {
+        saved = await save(prepared);
+    } catch (error) {
+        await Promise.all(claimed.map((claim) => claim.release()));
+        audited(runner.STATE.FAILED, String(error.code || 'error'), connectionOf);
+        throw error;
+    }
     audited(FILED, '', connectionOf);
-    return prepared;
+    return saved;
 };
 
 const gatedByOwner = (proposal, changes = proposal && proposal.changes) => Boolean(proposal)

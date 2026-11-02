@@ -15,6 +15,7 @@ const VIA = Object.freeze({ AGENT: 'agent', MCP: 'mcp', APPROVED: 'approved' });
 const STATE = Object.freeze({ PENDING: 'pending', APPLIED: 'applied', FAILED: 'failed', REFUSED: 'refused' });
 const TIMEOUT_MS = 10000;
 const MAX_BYTES = 512 * 1024;
+const TOKEN_FAILURES = Object.freeze(['refresh_failed', 'token_unavailable']);
 
 const refusal = (code, message) => Object.assign(new Error(`${code}: ${message}`), { code, deterministic: true });
 
@@ -47,6 +48,7 @@ const tracked = async (entry, work) => {
         const reason = String((error && error.code) || 'error');
         callAudit.record(companyId, { ...entry, ...trace, state: trace.called ? STATE.FAILED : STATE.REFUSED, reason });
         if (trace.called) await health.noteFailure(companyId, trace.connectionId, reason);
+        else if (TOKEN_FAILURES.includes(reason)) await health.noteTokenFailure(companyId, trace.connectionId, reason);
         throw error;
     }
 };
@@ -181,6 +183,7 @@ const readAdmitted = async ({ companyId, userId, via, runId, callerId, key, inpu
         );
     } catch (error) {
         if (claim) await claim.settle({ state: STATE.FAILED, chars: 0 });
+        if (!trace.called) await quota.release();
         throw error;
     }
     const whole = plain(raw);

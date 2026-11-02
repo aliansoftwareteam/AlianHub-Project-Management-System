@@ -14,10 +14,8 @@ const NOTICE_SCOPE = 'connectors';
 let uniqueSeq = 0;
 const uniqueId = () => `${Date.now().toString(36)}${(uniqueSeq += 1).toString(36)}${Math.random().toString(36).slice(2, 7)}`;
 
-/* recordHealth arrives with task 066; until then no connection exists, so no call reaches this point outside tests.
- * Bookkeeping that fails must never fail the call it records. */
+/* Bookkeeping that fails must never fail the call it records. */
 const record = async (companyId, connectionId, fields) => {
-    if (!connections.recordHealth) return;
     try {
         await connections.recordHealth({ companyId: String(companyId), connectionId: String(connectionId), ...fields });
     } catch (e) {
@@ -29,6 +27,9 @@ const noteUse = (companyId, connectionId) => record(companyId, connectionId, { l
 
 /* Only the code is kept: a provider's message can echo the request it answers. */
 const noteFailure = (companyId, connectionId, code) => record(companyId, connectionId, { lastUsedAt: new Date(), lastError: String(code || 'error') });
+
+/* No token means the provider was not reached, so the connection was not used. */
+const noteTokenFailure = (companyId, connectionId, code) => record(companyId, connectionId, { lastError: String(code) });
 
 const toldToday = async (companyId, userId, provider) => Boolean(await MongoDbCrudOpration(companyId, {
     type: SCHEMA_TYPE.NOTIFICATIONS,
@@ -60,4 +61,4 @@ const tellBroken = async (companyId, userId, provider, name) => {
     }
 };
 
-module.exports = { noteUse, noteFailure, tellBroken };
+module.exports = { noteUse, noteFailure, noteTokenFailure, tellBroken };

@@ -27,10 +27,10 @@ Every connector call is attributable, counted and limited.
 - Quota settings screen (078)
 
 ## Acceptance criteria
-- [ ] One audit row per call; usage counts match calls
-- [ ] A call over quota is refused with the limit and reset time
-- [ ] An admin cannot set a quota above the instance ceiling
-- [ ] A `Retry-After` from the provider delays the next call
+- [x] One audit row per call; usage counts match calls
+- [x] A call over quota is refused with the limit and reset time
+- [x] An admin cannot set a quota above the instance ceiling
+- [x] A `Retry-After` from the provider delays the next call
 
 ## Constraints & notes
 - Track: B — tools (using that token safely)
