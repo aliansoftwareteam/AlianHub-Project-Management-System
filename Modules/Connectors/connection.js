@@ -29,6 +29,7 @@ const MAX_STATE_LENGTH = 2000;
 const MAX_CODE_LENGTH = 2048;
 const EXPIRY_SKEW_MS = 60 * 1000;
 const OBJECT_ID = /^[a-f0-9]{24}$/i;
+const ERROR_CODE = /^[a-z0-9_]{1,60}$/;
 const STATUS = Object.freeze({ PENDING: 'pending', CONNECTED: 'connected', BROKEN: 'broken', REAUTH: 'reauth_required', REVOKED: 'revoked' });
 const BY = Object.freeze({ SELF: 'self', ADMIN: 'admin', MEMBER_REMOVED: 'member_removed' });
 const SECRET_LABEL = Object.freeze({ refresh: 'refresh token', access: 'access token' });
@@ -156,9 +157,10 @@ const beginConsent = async ({ companyId, userId, sessionId, provider, products, 
     const definition = definitionOf(provider);
     const jti = crypto.randomBytes(32).toString('hex');
     const verifier = crypto.randomBytes(48).toString('base64url');
-    const oauth = { stateHash: hash(jti), verifier, sessionId: String(sessionId), origin: String(origin || '') };
+    const oauth = { stateHash: hash(jti), verifier, sessionId: String(sessionId), origin: String(origin || ''), products: [...products] };
     const existing = await find(companyId, userId, provider);
-    const set = { oauth, provider: String(provider), products: [...products], app: { source: app.source, appId: app.appId } };
+    // The products the person ticked ride on the attempt; a live connection keeps its own until `complete` applies them.
+    const set = { oauth, provider: String(provider), app: { source: app.source, appId: app.appId } };
     if (existing) await update(companyId, existing, { $set: set });
     else {
         await MongoDbCrudOpration(companyId, {
@@ -188,9 +190,10 @@ const start = async ({ companyId, userId, sessionId, provider, products, origin 
     return beginConsent({ companyId, userId, sessionId, provider, products: products || Object.keys(definitionOf(provider).products), origin, app, scopes });
 };
 
-/* Adding a product re-consents for the union of the connection's products (incremental consent, FR-10); only the
- * scopes the provider grants are stored, so a product stays off until its consent comes back. */
-const setProducts = async ({ companyId, userId, sessionId, provider, connectionId, products, origin, actor }) => {
+/* Re-consents for the products the person ticked (incremental consent, FR-10). The live connection keeps its
+ * current products, and is unchanged and unaudited, until the new consent completes; only the scopes the provider
+ * grants are stored, so a product stays off until its consent comes back. */
+const setProducts = async ({ companyId, userId, sessionId, provider, connectionId, products, origin }) => {
     if (!sessionId) throw new ConnectionError(403, 'Sign in again before changing products.', 'no_session');
     if (!(await isOffered(companyId, provider))) throw new ConnectionError(404, 'This connector is not available.', 'provider_off');
     const row = await find(companyId, userId, provider);
@@ -202,10 +205,7 @@ const setProducts = async ({ companyId, userId, sessionId, provider, connectionI
         throw new ConnectionError(400, 'Those products are not offered by this connector.', 'bad_products');
     }
     const app = await apps.resolveApp({ companyId, provider });
-    const result = await beginConsent({ companyId, userId, sessionId, provider, products, origin, app, scopes });
-    audit(companyId, actor || { id: userId }, 'connector.products_changed', provider, { userId: String(userId), connectionId: String(connectionId), products: [...products] });
-    announce(companyId, userId, provider, 'products_changed');
-    return result;
+    return beginConsent({ companyId, userId, sessionId, provider, products, origin, app, scopes });
 };
 
 const readState = (state) => {
@@ -218,6 +218,10 @@ const readState = (state) => {
         return null;
     }
 };
+
+/* Whether a callback state is one this lifecycle signed (its audience). Lets the legacy google callback answer
+ * its own states while both share one redirect URI (routes.js, until 073). */
+const ownsState = (state) => !!readState(state);
 
 const pendingFilter = (claims) => ({ ...live(claims.userId, claims.provider), 'oauth.stateHash': hash(claims.jti) });
 
@@ -237,7 +241,8 @@ const returnFor = async ({ provider, state, code, error }) => {
     const given = typeof code === 'string' && code && code.length <= MAX_CODE_LENGTH ? code : '';
     if (error || !given) {
         await consume(claims);
-        const reason = error || 'no_code';
+        // The provider's error is reflected to the page, so clamp it to a code's shape as the token call does.
+        const reason = error ? (ERROR_CODE.test(String(error)) ? String(error) : 'provider_error') : 'no_code';
         return { ...target, query: { connector: provider, result: 'error', reason } };
     }
     return { ...target, query: { connector: provider, state, code: given } };
@@ -324,12 +329,19 @@ const complete = async ({ companyId, userId, sessionId, provider, state, code, a
         handles[key] = await keep({ companyId, userId, provider, handle: row.handles && row.handles[key], key, value, actor: who });
     }
     const scopes = api.scopesOf(answer.scope);
+    const was = row.products || [];
+    const products = Array.isArray(pending.products) ? pending.products : was;
     const saved = await update(companyId, row, { $set: {
         status: STATUS.CONNECTED, handles, scopes, account, app: row.app || { source: app.source, appId: app.appId }, accessExpiresAt: lifetimeOf(answer.expires_in),
-        connectedAt: new Date(), lastError: '', brokenAt: null, updatedBy: String(userId),
+        products: [...products], connectedAt: new Date(), lastError: '', brokenAt: null, updatedBy: String(userId),
     } });
     audit(companyId, who, 'connector.connect', provider, { userId: String(userId), products: [...(saved.products || [])], scopes });
     announce(companyId, userId, provider, 'connected');
+    // A re-consent that changed the products of an already-connected account is also a product change (FR-10).
+    if (holdsToken(row) && (was.length !== products.length || products.some((product) => !was.includes(product)))) {
+        audit(companyId, who, 'connector.products_changed', provider, { userId: String(userId), connectionId: String(row._id), products: [...products] });
+        announce(companyId, userId, provider, 'products_changed');
+    }
     return view(provider, saved);
 };
 
@@ -463,7 +475,7 @@ const endForMember = async (companyId, userId) => {
 
 module.exports = {
     STATUS, BY, STATE_TTL_SECONDS, SECRET_KIND, ConnectionError,
-    isOffered, fallbackOrigin, redirectUri, callbackPath, byId,
+    isOffered, fallbackOrigin, redirectUri, callbackPath, byId, ownsState,
     describe, list, membersWithConnections, start, setProducts, returnFor, complete, disconnect,
     findUsable, accessTokenFor, markBackoff, endForMember,
 };

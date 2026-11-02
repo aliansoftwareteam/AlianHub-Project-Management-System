@@ -98,6 +98,11 @@ const connectAs = async (uid, who = {}) => {
     expect(out.code).toBe(200);
     return out;
 };
+const connectWith = async (uid, products, who = {}) => {
+    const out = await completeAs(uid, await consentAs(uid, who, { body: { products } }));
+    expect(out.code).toBe(200);
+    return out;
+};
 const disconnectId = (uid, id, request = {}) => call(ctrl.disconnect, uid, { params: { id }, ...request });
 const tokenFor = (uid, companyId = C) => resolveConnection({ companyId, userId: uid, provider: P });
 const expire = (uid) => { rowOf(uid).accessExpiresAt = new Date(Date.now() - 1000); };
@@ -150,8 +155,10 @@ describe('connecting through the generic lifecycle', () => {
         expect(mockProvider.calls).toHaveLength(0);
 
         const [row] = rows(T);
-        expect(row).toMatchObject({ provider: P, userId: MEMBER, status: 'pending', handles: {}, products: ['notes'], app: { source: 'instance', appId: null } });
+        expect(row).toMatchObject({ provider: P, userId: MEMBER, status: 'pending', handles: {}, app: { source: 'instance', appId: null } });
+        expect(row.products).toBeUndefined();
         expect(row.oauth.sessionId).toBe(SESSION[MEMBER]);
+        expect(row.oauth.products).toEqual(['notes']);
         expect(crypto.createHash('sha256').update(row.oauth.verifier).digest('base64url')).toBe(asked.code_challenge);
     });
 
@@ -222,6 +229,38 @@ describe('connecting through the generic lifecycle', () => {
         const unknown = await call(ctrl.callback, undefined, { params: { provider: 'ghost' }, query: { state: 'a.b.c', code: 'a-code' } });
         expect(landed(unknown.location).query).toMatchObject({ result: 'error' });
         expect(mockProvider.calls).toHaveLength(0);
+    });
+});
+
+describe('the generic google callback coexists with the legacy one (until 073)', () => {
+    // A state the generic lifecycle did not sign: the legacy google connector uses a different audience.
+    const legacyState = () => require('jsonwebtoken').sign(
+        { companyId: C, userId: MEMBER, provider: 'google', jti: 'legacy' },
+        `${process.env.JWT_SECRET}::connector-oauth-state`,
+        { algorithm: 'HS256', audience: 'alianhub:connector-oauth:google', expiresIn: 600 },
+    );
+    const hitGoogleCallback = async (next) => {
+        const r = res();
+        await ctrl.callback(verified({ headers: { origin: WEB }, params: { provider: 'google' }, query: { state: legacyState(), code: 'a-code' } }), r, next);
+        return r;
+    };
+
+    it('hands a legacy state to the next handler while the legacy google connector is also named', async () => {
+        process.env.CONNECTORS = `${P} google_calendar`;
+        const next = jest.fn();
+        const r = await hitGoogleCallback(next);
+        expect(next).toHaveBeenCalledTimes(1);
+        expect(r.location).toBe('');
+        expect(r.body).toBeNull();
+    });
+
+    it('answers it here when no legacy google connector is named, so nothing falls through to a 404', async () => {
+        process.env.CONNECTORS = P;
+        const next = jest.fn();
+        const r = await hitGoogleCallback(next);
+        expect(next).not.toHaveBeenCalled();
+        expect(r.code).toBe(302);
+        expect(landed(r.location).query).toMatchObject({ connector: 'google', result: 'error' });
     });
 });
 
@@ -334,13 +373,21 @@ describe('listing and products', () => {
         expect(JSON.stringify(theirs.body)).not.toContain('maya@example.test');
     });
 
-    it('ticking a new product re-consents for only the union of scopes', async () => {
-        await connectAs(MEMBER, { scope: 'profile notes.read notes.write' });
+    it('ticking a new product re-consents for the union of scopes, applied with an audit only on completion', async () => {
+        await connectWith(MEMBER, ['notes'], { scope: 'profile notes.read notes.write' });
+        expect(rowOf(MEMBER).products).toEqual(['notes']);
         const id = String(rowOf(MEMBER)._id);
         const out = await call(ctrl.setProducts, MEMBER, { params: { id }, body: { products: ['notes', 'files'] } });
         expect(out.code).toBe(200);
-        const asked = Object.fromEntries(new URL(out.body.data.url).searchParams);
-        expect(asked.scope).toBe('profile notes.read notes.write files.read');
+        expect(Object.fromEntries(new URL(out.body.data.url).searchParams).scope).toBe('profile notes.read notes.write files.read');
+        // The live connection and its audit wait until the person finishes the new consent.
+        expect(rowOf(MEMBER).products).toEqual(['notes']);
+        expect(rowOf(MEMBER).oauth.products).toEqual(['notes', 'files']);
+        await settle();
+        expect(audits('connector.products_changed')).toHaveLength(0);
+
+        const granted = mockProvider.consent(out.body.data.url, { scope: 'profile notes.read notes.write files.read' });
+        expect((await completeAs(MEMBER, granted)).code).toBe(200);
         expect(rowOf(MEMBER).products).toEqual(['notes', 'files']);
         await settle();
         expect(audits('connector.products_changed')).toEqual([expect.objectContaining({ actorId: MEMBER, entityId: P, meta: expect.objectContaining({ products: ['notes', 'files'] }) })]);
@@ -351,10 +398,11 @@ describe('mutations push a socket update and clear the cached list', () => {
     it('on connect, products and disconnect — with no token in the event', async () => {
         const { removeCache } = require('../utils/commonFunctions');
         const emitted = (change) => socketEmitter.emit.mock.calls.some(([name, payload]) => name === 'update' && payload.module === 'connector' && payload.data.change === change && payload.data.userId === MEMBER);
-        await connectAs(MEMBER);
+        await connectWith(MEMBER, ['notes']);
         expect(emitted('connected')).toBe(true);
         expect(removeCache).toHaveBeenCalledWith(`connectors:${C}:${MEMBER}`);
-        await call(ctrl.setProducts, MEMBER, { params: { id: String(rowOf(MEMBER)._id) }, body: { products: ['notes', 'files'] } });
+        const changing = await call(ctrl.setProducts, MEMBER, { params: { id: String(rowOf(MEMBER)._id) }, body: { products: ['notes', 'files'] } });
+        await completeAs(MEMBER, mockProvider.consent(changing.body.data.url, {}));
         expect(emitted('products_changed')).toBe(true);
         await disconnectId(MEMBER, String(rowOf(MEMBER)._id));
         expect(emitted('disconnected')).toBe(true);
@@ -448,7 +496,7 @@ describe('the routes register only when a provider is offered', () => {
         const seen = [];
         const app = Object.fromEntries(['get', 'post', 'put', 'delete'].map((verb) => [verb, (p) => seen.push(`${verb.toUpperCase()} ${p}`)]));
         routes.init(app);
-        return seen.filter((r) => !r.includes('/slack') && !r.includes('/google') && !r.includes('/apps'));
+        return seen.filter((r) => !r.includes('/slack') && !r.includes('/google') && !r.includes('/apps') && !r.includes('/admin'));
     };
 
     it('registers the generic routes while CONNECTORS names a registry provider, and none otherwise', () => {
