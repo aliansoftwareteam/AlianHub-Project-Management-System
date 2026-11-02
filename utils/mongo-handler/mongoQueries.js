@@ -142,6 +142,7 @@ const {
     connectorConnectionsSchema,
     connectorAppsSchema,
     connectorUsageSchema,
+    connectorQuotasSchema,
     instructionPatternsSchema,
     agentSessionsSchema,
     agentSessionEndpointsSchema,
@@ -440,6 +441,8 @@ exports.checkType = (type) => {
             return connectorAppsSchema
         case SCHEMA_TYPE.CONNECTOR_USAGE:
             return connectorUsageSchema
+        case SCHEMA_TYPE.CONNECTOR_QUOTAS:
+            return connectorQuotasSchema
         case SCHEMA_TYPE.INSTRUCTION_PATTERNS:
             return instructionPatternsSchema
         case SCHEMA_TYPE.AGENT_SESSIONS:
@@ -758,6 +761,8 @@ exports.tableType = (type) => {
                 return `${dbCollections.CONNECTOR_APPS}`
         case SCHEMA_TYPE.CONNECTOR_USAGE:
                 return `${dbCollections.CONNECTOR_USAGE}`
+        case SCHEMA_TYPE.CONNECTOR_QUOTAS:
+                return `${dbCollections.CONNECTOR_QUOTAS}`
         case SCHEMA_TYPE.INSTRUCTION_PATTERNS:
                 return `${dbCollections.INSTRUCTION_PATTERNS}`
         case SCHEMA_TYPE.AGENT_SESSIONS:

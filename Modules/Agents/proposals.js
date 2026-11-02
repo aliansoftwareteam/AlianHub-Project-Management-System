@@ -169,7 +169,7 @@ const create = async (companyId, { agent, runId, taskId, taskIds, projectId, wha
     if (!check.valid) throw Object.assign(new Error(check.reason), { status: 400 });
     const owner = connectorWrites.hasWrite(changes) ? connectionOwnerOf(source, requestedBy, connectionOwner) : '';
     const slackReady = slackPost.hasSlackChange(changes) ? await slackPost.prepareChanges(companyId, changes) : changes;
-    const prepared = await connectorWrites.prepareChanges(companyId, owner, slackReady);
+    const prepared = await connectorWrites.fileChanges(companyId, owner, slackReady, { via: source === SOURCE_MCP ? 'mcp' : 'agent', id: String(agent._id), runId });
     const scopedProjectId = projectId || await projectOfTask(companyId, taskId);
     const saved = await MongoDbCrudOpration(companyId, {
         type: SCHEMA_TYPE.AGENT_PROPOSALS,

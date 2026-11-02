@@ -183,7 +183,7 @@ These are the rules in `Tasks/active/047-ai-run/task.md`, as the code keeps them
 | `MCP_TOOLS_WORK` | `Modules/Mcp/workFlag.js` | Tags, relations, lists, doc comments, goals, setup, project create, automation, queue |
 | `MCP_TOOLS_V2` | `Modules/Mcp/v2Flag.js` | Names beside ids, paged lists, annotations, approval for a write that reaches the whole workspace (a goal's target) |
 | `AGENT_PERFORMANCE_READ` | `Modules/Agents/performanceFlag.js` | `performance.read` |
-| `CONNECTORS` | `Modules/Agents/connectors/flag.js` | Slack and Google Calendar connectors |
+| `CONNECTORS` | `Modules/Agents/connectors/flag.js` | Slack and Google Calendar connectors, and with `google` the Google tools for Calendar, Meet and Drive |
 | `AGENT_TAINT_ROUTING` | `Modules/Agents/taint.js` | Risky writes after outside content wait for a person |
 | `MCP_OAUTH` | `Modules/OAuthServer/config.js` | Sign-in for outside MCP clients |
 | `EXTERNAL_AGENT_SESSIONS` | `Modules/AgentSessions/config.js` | Hand a task to an approved outside agent |

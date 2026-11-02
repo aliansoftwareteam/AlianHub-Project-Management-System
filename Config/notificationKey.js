@@ -55,6 +55,7 @@ const Notification_key = {
   GOAL_REACHED:"goal_reached",
   DOC_SHARED:"doc_shared",
   CREDENTIAL_EXPIRING:"credential_expiring",
+  CONNECTOR_BROKEN:"connector_broken",
 }
 const TemplateType = {
  CREATE:'create',

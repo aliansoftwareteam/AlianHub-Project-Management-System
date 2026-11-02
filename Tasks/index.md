@@ -75,8 +75,8 @@ Auto-maintained registry of all tasks. Reflects YAML frontmatter from each `task
 | 067 | Connectors — end a member's connections on removal, deactivation or SCIM, plus a daily sweep | backlog | high | 066 | backlog/067-connectors-member-removal-sweep |
 | 068 | Connectors — tool framework: one definition registered for agents and MCP | active | high | 063 | active/068-connectors-tool-framework |
 | 069 | Connectors — every outside write is a proposal only the connection owner approves | active | high | 068 | active/069-connectors-write-approvals |
-| 070 | Connectors — audit, health, usage counts, quotas and provider backoff | backlog | high | 063, 068 | backlog/070-connectors-tracking-quotas |
-| 071 | Connectors — Google pilot tools: Calendar, Meet and Drive (no Gmail) | backlog | high | 068, 069 | backlog/071-connectors-google-pilot-tools |
+| 070 | Connectors — audit, health, usage counts, quotas and provider backoff | active | high | 063, 068 | active/070-connectors-tracking-quotas |
+| 071 | Connectors — Google pilot tools: Calendar, Meet and Drive (no Gmail) | active | high | 068, 069 | active/071-connectors-google-pilot-tools |
 | 072 | Connectors — My connections, admin overview and company apps screens | backlog | high | 066 | backlog/072-connectors-connection-screens |
 | 073 | Connectors — migrate Google Calendar connections onto the Google provider | backlog | medium | 064, 066 | backlog/073-connectors-migrate-google-calendar |
 | 074 | Connectors — Slack as a personal OAuth provider; retire the workspace bot | backlog | medium | 069, 070, 078 | backlog/074-connectors-slack-personal |

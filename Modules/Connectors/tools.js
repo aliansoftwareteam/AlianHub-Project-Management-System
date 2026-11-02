@@ -3,7 +3,8 @@ const path = require('path');
 const { createRegistry } = require('./registry');
 
 const DIR = path.join(__dirname, 'providers');
-const KEY = /^[a-z][a-z0-9_]*\.[a-z][a-z0-9_]*\.[a-z][a-z0-9_]*$/;
+// A provider with products names the product too: google.calendar.events.list (063 contract, section 3).
+const KEY = /^[a-z][a-z0-9_]*(\.[a-z][a-z0-9_]*){2,3}$/;
 const LABEL = /^Connectors\.tool\.[A-Za-z0-9_]+$/;
 const KIND = Object.freeze({ READ: 'read', WRITE: 'write' });
 const PROPERTY_TYPES = Object.freeze(['string', 'integer', 'number', 'boolean']);

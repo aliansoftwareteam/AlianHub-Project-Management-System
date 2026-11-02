@@ -327,7 +327,7 @@
   },
   "CONNECTORS": {
     "group": "integrations",
-    "description": "Agent connectors to switch on, as a list separated by commas: slack and google_calendar. Default off: no connector route, no connector action in the agent registry and no section on the Integrations screen. With slack named, an owner or admin connects the workspace's Slack app under Integrations > Slack (the bot token and the signing secret go straight into the secrets store under the kind connector and are never shown again) and chooses the channels agents may post to; an agent can then propose a Slack message (slack.message.post), and nothing is sent until an owner or admin approves the exact channel and text in the AI Inbox. Needs SECRETS_STORE with a usable SECRETS_KEY and AGENT_TAINT_ROUTING on: without them the connector stays off, the server says why in one startup log line and the Integrations screen shows the same reason. While AGENT_EGRESS_ALLOWLIST is on and the workspace has a host list, slack.com must be on it. With google_calendar named, each member connects their own Google account on the Connections page: this slice ships the connection only (no calendar is read or written yet). Its access and refresh tokens go to the secrets store, the connection ends when the member disconnects, an owner or admin ends it, or the member is removed, and nobody else can use it. It needs the same two settings plus CONNECTOR_GOOGLE_CLIENT_ID and CONNECTOR_GOOGLE_CLIENT_SECRET, and APIURL, from which the redirect address <APIURL>/api/v1/connector-oauth/google/callback is built; that host list must then also hold oauth2.googleapis.com.",
+    "description": "Agent connectors to switch on, as a list separated by commas: slack, google_calendar and google. Default off: no connector route, no connector action in the agent registry and no section on the Integrations screen. With slack named, an owner or admin connects the workspace's Slack app under Integrations > Slack (the bot token and the signing secret go straight into the secrets store under the kind connector and are never shown again) and chooses the channels agents may post to; an agent can then propose a Slack message (slack.message.post), and nothing is sent until an owner or admin approves the exact channel and text in the AI Inbox. Needs SECRETS_STORE with a usable SECRETS_KEY and AGENT_TAINT_ROUTING on: without them the connector stays off, the server says why in one startup log line and the Integrations screen shows the same reason. While AGENT_EGRESS_ALLOWLIST is on and the workspace has a host list, slack.com must be on it. With google_calendar named, each member connects their own Google account on the Connections page: this slice ships the connection only (no calendar is read or written yet). Its access and refresh tokens go to the secrets store, the connection ends when the member disconnects, an owner or admin ends it, or the member is removed, and nobody else can use it. It needs the same two settings plus CONNECTOR_GOOGLE_CLIENT_ID and CONNECTOR_GOOGLE_CLIENT_SECRET, and APIURL, from which the redirect address <APIURL>/api/v1/connector-oauth/google/callback is built; that host list must then also hold oauth2.googleapis.com. With google named and AGENT_TAINT_ROUTING on, agents and MCP clients are offered the Google tools for Calendar, Meet and Drive: a read uses only the person's own connection, and a write waits until that person approves it. No Google connection can be made under that name yet, so every call answers that the person must connect first.",
     "default": "off"
   },
   "CONNECTOR_GOOGLE_CLIENT_ID": {
@@ -343,6 +343,21 @@
     "group": "security",
     "description": "Extra origins allowed by CORS, comma-separated (WEBURL and APIURL are always allowed).",
     "default": "http://localhost:8080"
+  },
+  "CONNECTOR_QUOTA_MAX_AGENT_READS": {
+    "group": "ai",
+    "description": "The most reads from connected apps an owner or admin can allow one agent per day (default limit 200). A lower value here also lowers the limits already set.",
+    "default": "2000"
+  },
+  "CONNECTOR_QUOTA_MAX_READS": {
+    "group": "ai",
+    "description": "The most reads from connected apps an owner or admin can allow one person per day, across their connections (default limit 500). A lower value here also lowers the limits already set.",
+    "default": "5000"
+  },
+  "CONNECTOR_QUOTA_MAX_WRITE_PROPOSALS": {
+    "group": "ai",
+    "description": "The most proposed writes to connected apps an owner or admin can allow one person per day (default limit 50). A lower value here also lowers the limits already set.",
+    "default": "500"
   },
   "CRON_ENABLED": {
     "group": "general",
