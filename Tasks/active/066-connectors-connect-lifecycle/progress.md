@@ -9,7 +9,7 @@
 - [x] Tests against a fake provider
 
 ## Last step
-Lifecycle built and green. Branch `feat/task-066-connectors-connect-lifecycle` off the merged 065 base; nothing committed or pushed yet.
+Committed, base-synced and pushed. Lifecycle built and green (16 suites / 515 tests). Branch `feat/task-066-connectors-connect-lifecycle` committed (`2087018df`), merged up to the current `feat/per-user-connectors` tip (`b8329f25f`, behind 0) and pushed to origin. Remaining: open the PR (base `feat/per-user-connectors`) and run `/security-review` on it.
 
 ## Blockers
 None. 065 is merged into `feat/per-user-connectors`.
@@ -34,3 +34,10 @@ None. 065 is merged into `feat/per-user-connectors`.
   - `connector.products_changed` audit in `setProducts` (plus words in `eventWords.js` + `en.js`, backfilled to all locales).
   - socket emit + cache clear on every mutation (connect, products, disconnect, broken) via an `announce` helper — module `connector`, key `connectors:<company>:<user>`, no token or account id in the payload; the client relay and the My-connections screen land with 072.
 - Lifecycle test now 18, + the audit-event-labels and egress-callers conventions and i18n:check all green.
+
+### 2026-11-02
+- Closed the last six coverage gaps caught on a final review (the "remaining branches have coverage" block of the lifecycle test): `markBackoff` records `backoffUntil`; an unreadable seat is refused as `not_member`; a `reauth_required` row resolves as `broken`; a transient refresh failure fails only that call and leaves the row `connected`; disconnect leaves a shared grant alone; the write routes carry the `agentsRefused` guard. Full connector + conventions green: 16 suites / 515 tests.
+- Committed as `2087018df` (37 files). `.claude/launch.json` kept out of the commit (dev-only config).
+- Base-synced: merged `upstream/feat/per-user-connectors` (the 8 commits the branch was behind, incl. the 071 Google-pilot merge) into the branch. Only the ten `<locale>.pending.json` files conflicted; resolved per Rule 3 by keeping both sides' keys (union, sorted), all code auto-merged. `i18n:check` green (every locale 13608/13608). Merge commit `b8329f25f`; branch now behind 0.
+- Pushed to origin (`hetvisitapara456-bot` fork). The full unit suite could not be run to completion on this machine (jest hangs at startup); the PR's CI is the test gate.
+- Remaining: open the PR (base `feat/per-user-connectors`) and run `/security-review`.
