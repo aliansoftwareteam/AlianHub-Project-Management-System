@@ -242,6 +242,12 @@ describe('PUT /api/v2/connectors/admin/quotas', () => {
         expect(out.body.statusText).toMatch(why);
     });
 
+    it('refuses to clear a limit nobody ever had on someone who is not here', async () => {
+        const { code } = await setQuota({ scope: 'member', targetId: '6f0000000000000000000a08', reads: null });
+        expect(code).toBe(400);
+        expect(mockDb.store[SCHEMA_TYPE.CONNECTOR_QUOTAS] || []).toHaveLength(0);
+    });
+
     it('takes away the limit of someone who has gone, and sets no new one for them', async () => {
         const GONE = '6f0000000000000000000a09';
         mockDb.seed(SCHEMA_TYPE.CONNECTOR_QUOTAS, { scope: 'member', targetId: GONE, reads: 9 });

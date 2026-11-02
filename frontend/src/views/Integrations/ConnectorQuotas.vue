@@ -63,7 +63,7 @@
 </template>
 
 <script setup>
-import { computed, onMounted, reactive, ref, watch } from 'vue';
+import { computed, reactive, ref, watch } from 'vue';
 import { useStore } from 'vuex';
 import { useI18n } from 'vue-i18n';
 import { apiRequest } from '@/services';
@@ -126,6 +126,7 @@ const heldBelowSaved = (field) => present(savedLimits.value[field]) && savedLimi
 // A number input reads as empty while it holds what is no number, and an empty field takes the limit away.
 const onType = (field, input) => {
     problems[field] = '';
+    saved.value = false;
     unreadable[field] = Boolean(input.validity && input.validity.badInput);
 };
 
@@ -171,8 +172,8 @@ const save = async () => {
         // A blank field takes the override away, so the wider limit or the default applies again.
         const limits = Object.fromEntries(asked.map((field) => [field, typed(field) ? Number(typed(field)) : null]));
         answered(await apiRequest('put', BASE, { scope: scope.value, ...(scope.value === WORKSPACE ? {} : { targetId: targetId.value }), ...limits }));
-        overview.value = answered(await apiRequest('get', BASE));
         saved.value = true;
+        overview.value = answered(await apiRequest('get', BASE));
     } catch (e) {
         saveError.value = problemOf(e);
     } finally {
@@ -181,7 +182,6 @@ const save = async () => {
 };
 
 const load = async () => {
-    if (!privileged.value) return;
     try {
         const [limits, listed] = await Promise.all([apiRequest('get', BASE), apiRequest('get', env.AGENTS).catch(() => null)]);
         agents.value = (listed?.data?.data || []).map((agent) => ({ id: String(agent._id), name: agent.name }));
@@ -191,7 +191,8 @@ const load = async () => {
     }
 };
 
-onMounted(load);
+// After a page reload the seat arrives once the screen is up, so the limits are read when it does.
+watch(privileged, (isPrivileged) => { if (isPrivileged && !overview.value) load(); }, { immediate: true });
 </script>
 
 <style scoped>

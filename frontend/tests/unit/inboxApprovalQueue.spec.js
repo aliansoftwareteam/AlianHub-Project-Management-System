@@ -110,6 +110,12 @@ describe('a write to a connected app', () => {
             expect(cardOf('p1').find('[data-test="connector-field-description"]').element.tagName).toBe('TEXTAREA');
         });
 
+        it('says what form a field takes when the tool gives a hint', async () => {
+            mountQueue([row('p1', { changes: [write({ card: card({ fields: [{ param: 'start', label: 'Connectors.card.start', hint: 'Connectors.card.timeHint' }] }) })] })]);
+            await rowOf('p1').find('[data-test="queue-edit"]').trigger('click');
+            expect(cardOf('p1').find('[data-test="connector-field-hint"]').text()).toBe(en.Connectors.card.timeHint);
+        });
+
         it('with nothing changed still approves as filed', async () => {
             await editing();
             expect(rowOf('p1').find('[data-test="queue-approve"]').text()).toBe(en.Inbox.approve);

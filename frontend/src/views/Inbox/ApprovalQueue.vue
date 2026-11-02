@@ -10,7 +10,7 @@
                         <li v-for="(change, i) in readChanges(p)" :key="i" class="aq__change">
                             <span class="aq__change-label">{{ changeText(change) }}</span>
                             <span v-if="!change.reversible" class="ah-chip ah-chip--warn">{{ t('Ai.not_reversible') }}</span>
-                            <ConnectorWriteCard v-if="change.card" class="aq__slack" :change="change" />
+                            <ConnectorWriteCard v-if="change.card" class="aq__wide" :change="change" />
                         </li>
                     </ul>
                     <p v-if="keptOf(p)" class="aq__lead" data-test="queue-review-parts">{{ t('Inbox.queue_parts_kept', { parts: keptOf(p) }) }}</p>
@@ -90,8 +90,8 @@
                             :aria-label="t('Inbox.queue_drop_named', { change: changeText(change) })"
                             @click="kept.splice(i, 1)"
                         >{{ t('Ai.drop') }}</button>
-                        <SlackPostPreview v-if="change.action === SLACK_POST" class="aq__slack" :change="change" />
-                        <ConnectorWriteCard v-if="change.card" class="aq__slack" :change="change" :editing="isEditing(p)" :disabled="busy" @update:params="change.params = $event" />
+                        <SlackPostPreview v-if="change.action === SLACK_POST" class="aq__wide" :change="change" />
+                        <ConnectorWriteCard v-if="change.card" class="aq__wide" :change="change" :editing="isEditing(p)" :disabled="busy" @update:params="change.params = $event" />
                     </li>
                 </ul>
 
@@ -481,7 +481,7 @@ const approveReviewed = async () => {
 .aq__change { display: flex; align-items: center; flex-wrap: wrap; gap: 6px; padding: 5px 8px; border-radius: var(--r-sm, 6px); background: var(--fill); color: var(--ink); min-width: 0; }
 .aq__change-label { flex: 1 1 12ch; min-width: 0; overflow-wrap: anywhere; }
 .aq__intent { flex: 1 1 16ch; }
-.aq__slack { flex: 1 1 100%; margin: 4px 0 0; }
+.aq__wide { flex: 1 1 100%; margin: 4px 0 0; }
 .aq__error { margin: 0; }
 .aq__actions { display: flex; align-items: center; flex-wrap: wrap; gap: 6px; }
 .aq__actions .ah-btn--sm { height: var(--control-h, 28px); padding: 0 var(--sp-4, 10px); font-size: var(--fs-sm, 11.5px); }

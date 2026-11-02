@@ -25,7 +25,6 @@ const keptByUndo = (data) => (Array.isArray(data?.results) ? data.results : []).
 
 const paramsOf = (changes) => JSON.stringify((changes || []).map((change) => change.params));
 
-/* Whether what the person holds differs from what was filed: a change dropped or a field retyped. */
 export const changesEdited = (held, filed) => paramsOf(held) !== paramsOf(filed);
 
 /* A proposal's results are kept per sent change, so a change's own is the nth of its action. */

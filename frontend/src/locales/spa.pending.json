@@ -3958,6 +3958,7 @@
     "Connectors.card.start": "Starts",
     "Connectors.card.target": "Goes to",
     "Connectors.card.text": "Text",
+    "Connectors.card.timeHint": "Like 2026-11-05T10:00:00+05:30, or 2026-11-05 for all day.",
     "Connectors.card.title": "Title",
     "Connectors.card.where": "Where",
     "Connectors.card.yes": "Yes",

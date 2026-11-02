@@ -25,6 +25,7 @@
                     :data-test="`connector-field-${field.param}`"
                     @input="retype(field, $event.target.value)"
                 />
+                <span v-if="field.hint" class="ah-small cwc__note" data-test="connector-field-hint">{{ t(field.hint) }}</span>
             </label>
             <p class="ah-small cwc__note">{{ t('Connectors.approval.edit_note') }}</p>
         </div>
@@ -42,7 +43,7 @@
                 <dt class="ah-small">{{ t('Connectors.card.text') }}</dt>
                 <dd class="cwc__text" data-test="connector-card-text">{{ card.text }}</dd>
             </template>
-            <template v-for="row in card.rows || []" :key="row.label">
+            <template v-for="(row, i) in card.rows || []" :key="i">
                 <dt class="ah-small">{{ t(row.label) }}</dt>
                 <dd data-test="connector-card-row">{{ row.valueLabel ? t(row.valueLabel) : row.value }}</dd>
             </template>
@@ -50,7 +51,7 @@
                 <dt class="ah-small">{{ t('Connectors.card.attachments') }}</dt>
                 <dd>
                     <ul class="cwc__files">
-                        <li v-for="name in card.attachments" :key="name" data-test="connector-card-attachment">{{ name }}</li>
+                        <li v-for="(name, i) in card.attachments" :key="i" data-test="connector-card-attachment">{{ name }}</li>
                     </ul>
                 </dd>
             </template>

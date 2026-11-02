@@ -4,14 +4,14 @@
 - [x] Approval cards
 - [x] Quota settings
 - [x] i18n backfill + checks
-- [ ] Run on the real app with a real connection, after 066
+- [ ] Run on the real app with a real connection, now that 066 has landed
 - [x] Decide who may read a card (see 2026-11-02)
 
 ## Last step
 Built on `feat/078-connectors-approval-quota-screens`, cut from `upstream/feat/per-user-connectors`, then tested on a real server and in the real UI. Committed locally, not pushed, no PR.
 
 ## Blockers
-None for the code. A real run waits on 066: until then `resolveConnection` refuses every call.
+None for the code. 066 landed on `upstream/feat/per-user-connectors` after this branch was cut, so a run with a real Google connection needs this branch merged with it and a Google OAuth client. The screens have no call to the generic connect route until 072, so that run has to connect through the API.
 
 ## Log
 
@@ -44,7 +44,13 @@ None for the code. A real run waits on 066: until then `resolveConnection` refus
   - An edit writes no audit row of its own; the sent params are in the send's row.
   - If the agent list fails to load, agent limits read "Deleted agent".
   - `slack.message.post` has the same undo fault. 079 removes that path, so it is not fixed here.
-- Final run: real server checks 57/57; integration 104/104 (connector, inbox, agents, MCP tools); unit 3768/3768 (connector, inbox, proposal, undo, intent, MCP); frontend specs 328/328 for the screens touched, not the whole frontend suite; convention failures still the same 26.
+- For track A, read against 066 and not fixed here:
+  - A reconnect to a different Google account keeps the same connection id, so a waiting write goes to the new account. The card names no account.
+  - Disconnect then reconnect gives a new id, so a waiting write is refused: the owner asks again. The send attempt still ends `approved` with "Not sent".
+  - `resolveConnection.js` does not export `recordHealth`, so `health.js` records nothing after a provider call (070's open check).
+  - A token failure such as `refresh_failed` reaches the card in developer wording.
+- Left as is: the `revision` check and the claim are not one atomic step, so an edit landing in the same milliseconds could still lose to an approval.
+- First final run, before the last small fixes: real server checks 57/57; integration 104/104 (connector, inbox, agents, MCP tools); unit 3768/3768 (connector, inbox, proposal, undo, intent, MCP); frontend specs 328/328 for the screens touched, not the whole frontend suite; convention failures still the same 26.
 
 ### 2026-10-31
 - From 071: render a card's `targetLabel` and `rows` of `{ label, value | valueLabel }` with `$t`, and never clamp `text` or a row, because the server refuses a card too long to show whole.

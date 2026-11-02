@@ -30,6 +30,9 @@ const REFUSAL = Object.freeze({
 
 const refuse = (message, code, status = 403) => Object.assign(new Error(message), { status, code, deterministic: true });
 
+/* The runner's messages open with a code and a tool key for the model that called it; a person reads what follows. */
+const spoken = (message) => String(message || '').replace(/^[a-z_]+: /, '').replace(/^[a-z0-9_]+(\.[a-z0-9_]+)+: /, '');
+
 const isWrite = (action) => tools.isWrite(action);
 const hasWrite = (changes) => (Array.isArray(changes) ? changes : []).some((c) => c && isWrite(c.action));
 
@@ -170,4 +173,4 @@ const deliveryOf = (changes, applied) => (Array.isArray(changes) ? changes : [])
         at: new Date(),
     }));
 
-module.exports = { GATE, REFUSAL, isWrite, hasWrite, cardOf, prepareChanges, fileChanges, gatedByOwner, approverRefusal, send, executorFor, deliveryOf };
+module.exports = { GATE, REFUSAL, spoken, isWrite, hasWrite, cardOf, prepareChanges, fileChanges, gatedByOwner, approverRefusal, send, executorFor, deliveryOf };

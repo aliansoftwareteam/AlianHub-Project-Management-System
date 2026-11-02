@@ -58,6 +58,33 @@ describe('the limits for connected apps', () => {
         expect(apiRequest).not.toHaveBeenCalled();
     });
 
+    it('reads the limits once the seat arrives, as it does after a page reload', async () => {
+        const store = createStore({
+            state: { roleType: undefined },
+            mutations: { seat(state, roleType) { state.roleType = roleType; } },
+            modules: {
+                settings: { namespaced: true, getters: { companyUserDetail: (_s, _g, root) => ({ roleType: root.roleType }), companyUsers: () => [] } },
+                users: { namespaced: true, getters: { users: () => [] } },
+            },
+        });
+        const wrapper = mount(ConnectorQuotas, { global: { plugins: [store], mocks: { $t: i18n.global.t } } });
+        await flushPromises();
+        expect(apiRequest).not.toHaveBeenCalled();
+        store.commit('seat', OWNER);
+        await flushPromises();
+        expect(wrapper.find('[data-test="quota-form"]').exists()).toBe(true);
+    });
+
+    it('stops saying saved once the person types again', async () => {
+        const wrapper = await mountQuotas();
+        await wrapper.find('[data-test="quota-reads"]').setValue('9');
+        await wrapper.find('[data-test="quota-form"]').trigger('submit');
+        await flushPromises();
+        expect(wrapper.find('[data-test="quota-saved"]').exists()).toBe(true);
+        await wrapper.find('[data-test="quota-reads"]').setValue('10');
+        expect(wrapper.find('[data-test="quota-saved"]').exists()).toBe(false);
+    });
+
     it('says what a blank field uses and what the server allows', async () => {
         const wrapper = await mountQuotas();
         expect(wrapper.text()).toContain(en.Connectors.quota.ceiling.replace('{n}', '600'));

@@ -86,8 +86,8 @@ const eventCard = (input, attendeesLabel) => ({
 
 const EVENT_EDITS = Object.freeze([
     { param: 'summary', label: 'Connectors.card.title' },
-    { param: 'start', label: 'Connectors.card.start' },
-    { param: 'end', label: 'Connectors.card.end' },
+    { param: 'start', label: 'Connectors.card.start', hint: 'Connectors.card.timeHint' },
+    { param: 'end', label: 'Connectors.card.end', hint: 'Connectors.card.timeHint' },
     { param: 'location', label: 'Connectors.card.where' },
     { param: 'attendees', label: 'Connectors.card.attendees' },
     { param: 'description', label: 'Connectors.card.description', long: true },

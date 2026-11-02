@@ -40,7 +40,8 @@ const editableProblems = (tool) => {
     return tool.editable.flatMap((field) => {
         const schema = properties[field && field.param];
         if (!schema || schema.type !== 'string' || schema.enum) return [`editable names ${field && field.param}, which is not a free text input`];
-        return CARD_LABEL.test(String(field.label || '')) ? [] : [`editable ${field.param} has no Connectors.card.* label`];
+        const labels = [field.label, ...(field.hint === undefined ? [] : [field.hint])];
+        return labels.every((label) => CARD_LABEL.test(String(label || ''))) ? [] : [`editable ${field.param} has no Connectors.card.* label`];
     });
 };
 

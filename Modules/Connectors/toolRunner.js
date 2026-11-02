@@ -111,7 +111,7 @@ const writeRequesterFor = (call) => async (url, { method = 'post', query, json }
 const ownConnection = async (tool, companyId, userId, asked) => {
     const connection = await connectionOf(tool, companyId, userId);
     if (asked !== undefined && String(asked) !== String(connection.connectionId)) {
-        throw refusal('not_connected', `That connection is not yours. Leave connectionId out to use your own ${tool.definition.name} connection.`);
+        throw refusal('not_connected', `This was filed on a connection that is not your current ${tool.definition.name} connection, so it was not sent. Ask for it again.`);
     }
     if (!(connection.scopes || []).includes(tool.scope)) {
         throw refusal('scope_missing', `Tick ${tool.product} on your ${tool.definition.name} connection in My connections, then ask again.`);

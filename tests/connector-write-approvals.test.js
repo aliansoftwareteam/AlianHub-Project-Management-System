@@ -268,6 +268,20 @@ describe('what is approved is what is sent, once', () => {
         expect(proposalRow(p._id).status).toBe('approved');
     });
 
+    it('tells the person why an edit failed without the runner\'s code or tool key', async () => {
+        const p = await fromAgentRun();
+        const out = await approveAs(p._id, PRISHA, { changes: [{ action: KEY, params: { ...NOTE, cc: 'x@acme.test' } }] });
+        expect(out.error).not.toMatch(/bad_input|fake\.notes\.create/);
+    });
+
+    it('tells the person why a send was refused without the runner\'s code', async () => {
+        const p = await fromAgentRun();
+        resolveConnection.mockRejectedValueOnce(Object.assign(new Error('not_connected: fake'), { code: 'not_connected', provider: 'fake' }));
+        const out = await approveAs(p._id, PRISHA);
+        expect(out.applied[0]).toMatchObject({ ok: false });
+        expect(out.applied[0].error).not.toMatch(/^not_connected/);
+    });
+
     it('refuses an edit the tool\'s schema does not accept', async () => {
         const p = await fromAgentRun();
         const out = await approveAs(p._id, PRISHA, { changes: [{ action: KEY, params: { ...NOTE, cc: 'everyone@acme.test' } }] });

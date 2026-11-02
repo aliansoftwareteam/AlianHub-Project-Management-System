@@ -137,7 +137,8 @@ const set = async (companyId, body, actor) => {
     const changes = changesFrom(scope, body);
     // A limit left behind by someone who has since gone can still be taken away.
     const onlyClearing = !Object.keys(changes.set).length && OBJECT_ID.test(targetId);
-    const problem = onlyClearing ? '' : await targetProblem(companyId, scope, targetId);
+    const leftBehind = onlyClearing && await MongoDbCrudOpration(companyId, { type: SCHEMA_TYPE.CONNECTOR_QUOTAS, data: [{ scope, targetId }] }, 'findOne');
+    const problem = leftBehind ? '' : await targetProblem(companyId, scope, targetId);
     if (problem) throw badInput(problem);
     await MongoDbCrudOpration(companyId, {
         type: SCHEMA_TYPE.CONNECTOR_QUOTAS,

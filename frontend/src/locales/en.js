@@ -14233,6 +14233,7 @@ export default {
             accessTrusted: "Your organisation and people invited",
             accessRestricted: "Only people invited",
             accessDefault: "Your organisation's default",
+            timeHint: "Like 2026-11-05T10:00:00+05:30, or 2026-11-05 for all day.",
             target: "Goes to",
             text: "Text",
             attachments: "Attachments",

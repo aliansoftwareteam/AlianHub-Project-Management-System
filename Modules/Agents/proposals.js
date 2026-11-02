@@ -317,8 +317,7 @@ const setStatus = async (companyId, id, set, { onlyIf } = {}) => {
 
 const reshowEdited = async (companyId, id, p, changes) => {
     let ready;
-    // The owner reads this beside the form, so it goes without the code the runner's messages start with.
-    try { ready = await connectorWrites.prepareChanges(companyId, p.connectionOwner, changes); } catch (e) { return { error: String(e.message).replace(/^[a-z_]+: /, ''), status: e.status || 400 }; }
+    try { ready = await connectorWrites.prepareChanges(companyId, p.connectionOwner, changes); } catch (e) { return { error: connectorWrites.spoken(e.message), status: e.status || 400 }; }
     const stored = ready.map((c) => ({
         action: c.action, params: planFiling.storedParams(c.action, c.params || {}), label: proposalText.labelOf(c),
         reversible: Boolean(registry.get(c.action) && registry.get(c.action).undoable), rating: c.rating || actions.rating(c.action), ...(c.card ? { card: c.card } : {}),
@@ -411,12 +410,12 @@ const approve = async (companyId, id, { decider, isPrivileged, changes: edited, 
             if (out.auditId) auditIds.push(out.auditId, ...partAudits(out.result));
             applied.push({ action: c.action, ok: true, result: out.result });
         } catch (e) {
-            applied.push({ action: c.action, ok: false, error: e.message, ...(Array.isArray(e.parts) ? { parts: e.parts } : {}) });
+            applied.push({ action: c.action, ok: false, error: connectorWrites.isWrite(c.action) ? connectorWrites.spoken(e.message) : e.message, ...(Array.isArray(e.parts) ? { parts: e.parts } : {}) });
         }
     }
     // A write that left for a connected app stays there, so no window is offered that could not take it back.
     const undoUntil = connectorWrites.hasWrite(changes) ? null : new Date(Date.now() + UNDO_WINDOW_MS);
-    const delivery =[...slackPost.deliveryOf(changes, applied), ...connectorWrites.deliveryOf(changes, applied)];
+    const delivery = [...slackPost.deliveryOf(changes, applied), ...connectorWrites.deliveryOf(changes, applied)];
     const notMade = planFollowUp.notMadeBy(changes, applied);
     const updated = await setStatus(companyId, id, { status, changes, undoUntil, auditIds, ...(delivery.length ? { delivery } : {}), ...(notMade.length ? { notMade } : {}) });
     await audit.recordProposalDecision(companyId, { ...decider, ...runTrace }, { proposalId: id, decision: status, agentName: p.agentName, runId: p.runId, changes: applied, ip });
