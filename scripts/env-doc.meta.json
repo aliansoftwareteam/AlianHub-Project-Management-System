@@ -359,6 +359,11 @@
     "description": "The most proposed writes to connected apps an owner or admin can allow one person per day (default limit 50). A lower value here also lowers the limits already set.",
     "default": "500"
   },
+  "CONNECTOR_SWEEP_HOURS": {
+    "group": "jobs",
+    "description": "Hours between runs of the daily sweep that ends the connections of members who no longer have a seat, the safety net for a removal whose own clean-up did not finish. Minimum 1. The sweep is idempotent, so a run that catches nothing changes nothing.",
+    "default": "24"
+  },
   "CRON_ENABLED": {
     "group": "general",
     "description": "Run the scheduled jobs in this process (default true; set false on extra replicas).",
