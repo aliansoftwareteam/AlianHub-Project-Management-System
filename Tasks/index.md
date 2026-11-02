@@ -85,6 +85,7 @@ Auto-maintained registry of all tasks. Reflects YAML frontmatter from each `task
 | 077 | Connectors — remove the old Google Calendar and CloudStorage paths; Google and Dropbox setup pages | backlog | medium | 073, 076 | backlog/077-connectors-remove-calendar-picker-paths |
 | 078 | Connectors — Inbox approval cards and quota settings screens | backlog | high | 069, 070 | backlog/078-connectors-approval-quota-screens |
 | 079 | Connectors — remove the old Slack bot and GitHub sync paths | backlog | medium | 074, 075 | backlog/079-connectors-remove-slack-github-paths |
+| 086 | Time reports — one header, deep filters and export on every tab, workload day panel | active | high | — | active/086-reports-consistent-filters-export |
 | 087 | Ask knows a project — grounded project, list, task and person answers, and a better @ picker | active | high | — | active/087-ask-project-context-mentions |
 | 088 | Documentation site — in-depth user, admin, developer and API docs to replace help.alianhub.com | active | high | — | active/088-documentation-site |
 | 089 | Quick UI/UX review — fix small UI issues with before/after screenshots | active | medium | — | active/089-quick-ui-review |

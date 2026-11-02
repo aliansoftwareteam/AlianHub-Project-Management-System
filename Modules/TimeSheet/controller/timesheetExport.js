@@ -5,6 +5,7 @@ const { buildTimesheetCsv } = require("../helpers/timesheetCsv");
 const logger = require("../../../Config/loggerConfig");
 const { sessionTenantOf, TenantError } = require('../../../Config/tenant');
 const { resolveSheetScope, scopedTimeMatch, SHEET_PERMISSION } = require('../helpers/timeScope');
+const { normalizeReportFilters, reportTimeClauses, narrowMatch } = require('../helpers/reportFilters');
 
 const toObjId = (id) => {
     try { return new mongoose.Types.ObjectId(String(id)); } catch (e) { return null; }
@@ -14,13 +15,14 @@ const toObjId = (id) => {
 exports.exportTimesheetCsv = async (req, res) => {
     try {
         const companyId = sessionTenantOf(req);
-        const { userArray = [], projectArray = [], start, end } = req.body || {};
+        const { userArray = [], projectArray = [], start, end, filters } = req.body || {};
         const scope = await resolveSheetScope(companyId, req.uid, SHEET_PERMISSION.user);
-        const match = scopedTimeMatch(scope, {
+        const scoped = scopedTimeMatch(scope, {
             userIds: Array.isArray(userArray) && userArray.length ? userArray : null,
             projectIds: Array.isArray(projectArray) && projectArray.length ? projectArray : null,
         });
-        if (start && end) match.LogStartTime = { $gte: Number(start), $lte: Number(end) };
+        if (start && end) scoped.LogStartTime = { $gte: Number(start), $lte: Number(end) };
+        const match = narrowMatch(scoped, (await reportTimeClauses(companyId, scope, normalizeReportFilters(filters))).clauses);
 
         const entries = await MongoDbCrudOpration(companyId, {
             type: SCHEMA_TYPE.TIMESHEET,

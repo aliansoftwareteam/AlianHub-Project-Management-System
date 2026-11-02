@@ -20,6 +20,7 @@ const { canReadTask } = require('../../Tasks/helpers/taskReadAccess');
 const { assigneeProblem } = require('../helpers/planMoveAccess');
 const { visibilityStage } = require('../../Tasks/helpers/taskQueryGuard');
 const { openTasksById, openProjectsById } = require('../../Tasks/helpers/openNames');
+const { normalizeReportFilters, reportTimeClauses, narrowMatch, estimateClausesOf } = require('../helpers/reportFilters');
 const oid = (id) => { try { return new mongoose.Types.ObjectId(String(id)); } catch (e) { return null; } };
 
 /* A scope that reads everyone already knows the tasks of the private lists its person is not on. */
@@ -134,7 +135,7 @@ const unitGrid = async ({ companyId, unit, userIds, inProjects, openToCaller, da
     return { users, unpointed };
 };
 
-// POST /api/v1/timesheet/workload-grid  body: { start, end, userIds?, projectIds?, hoursPerDay?, timeZone?, unit? }
+// POST /api/v1/timesheet/workload-grid  body: { start, end, userIds?, projectIds?, hoursPerDay?, timeZone?, unit?, filters? }
 // People × days against capacity (working time − approved PTO). unit 'hours' (the default) reads estimate chips and
 // logged minutes; 'points' and 'count' read open tasks against the person's capacity in that unit.
 exports.getWorkloadGrid = async (req, res) => {
@@ -171,9 +172,11 @@ exports.getWorkloadGrid = async (req, res) => {
         const startSec = Math.floor(DateTime.fromISO(b.start, { zone }).startOf('day').toSeconds());
         const endSec = Math.floor(DateTime.fromISO(b.end, { zone }).endOf('day').toSeconds());
 
-        const estMatch = { ...scopedEstimateMatch(scope), UserId: { $in: userIds }, Date: { $gte: rangeStart, $lte: rangeEnd } };
-        const logMatch = { ...scopedTimeMatch(scope, { userIds, projectIds: askedProjects.length ? askedProjects : null }), LogStartTime: { $gte: startSec, $lte: endSec } };
+        const { clauses: timeClauses, taskIds } = await reportTimeClauses(companyId, scope, normalizeReportFilters(b.filters));
+        let estMatch = { ...scopedEstimateMatch(scope), UserId: { $in: userIds }, Date: { $gte: rangeStart, $lte: rangeEnd } };
+        const logMatch = narrowMatch({ ...scopedTimeMatch(scope, { userIds, projectIds: askedProjects.length ? askedProjects : null }), LogStartTime: { $gte: startSec, $lte: endSec } }, timeClauses);
         if (inProjects) estMatch.ProjectId = inProjects;
+        estMatch = narrowMatch(estMatch, estimateClausesOf(taskIds));
 
         const [estimates, logs, ptoRows, names] = await Promise.all([
             MongoDbCrudOpration(companyId, { type: SCHEMA_TYPE.ESTIMATES_TIME, data: [estMatch, { UserId: 1, TaskId: 1, ProjectId: 1, Date: 1, EstimatedTime: 1 }] }, 'find')

@@ -9,18 +9,20 @@
     />
 </div>
 <AppState v-else-if="!allowed" kind="denied" />
-<div v-else class="ah-page tv-page ut2">
-    <div class="tv-head">
-        <h1 class="tv-title">{{ $t('Time.my_timesheet') }}</h1>
-        <span class="tv-range">
-            <button type="button" :aria-label="$t('Time.prev_week')" @click="shiftWeek(-1)">‹</button>
-            <span>{{ rangeLabel }}</span>
-            <button type="button" :aria-label="$t('Time.next_week')" @click="shiftWeek(1)">›</button>
-        </span>
-        <span class="ah-chip" :class="statusChip.cls" :title="statusChip.title">{{ statusChip.label }}</span>
-        <ReopenWeek :approval="approval.current" :personName="(getUser(targetUser) || {}).Employee_Name || ''" :range="rangeLabel" @reopened="onReopened" />
-        <TimesheetTabs active="mine" />
-        <div class="tv-actions">
+<div v-else class="ah-page rpt ut2">
+    <ReportToolbar
+        :title="$t('Time.my_timesheet')"
+        tab="mine"
+        :exporting="exporting || busy.export"
+        :canExport="displayRows.length > 0"
+        :exportExtra="[{ key: 'entries', label: $t('Reports.export_entries') }]"
+        @export="onExport"
+    >
+        <template v-if="weekMode" #meta>
+            <span class="ah-chip" :class="statusChip.cls" :title="statusChip.title" data-test="week-status">{{ statusChip.label }}</span>
+            <ReopenWeek :approval="approval.current" :personName="(getUser(targetUser) || {}).Employee_Name || ''" :range="rangeLabel" @reopened="onReopened" />
+        </template>
+        <template #actions>
             <span v-if="timer.running.value" class="ah-chip ah-chip--ok ut2-timer">
                 <span class="ah-dot ah-dot--ok"></span>
                 <span class="tv-mono">{{ formatClock(timer.elapsed.value, true) }}</span>
@@ -31,94 +33,96 @@
                 <span class="ah-dot ah-dot--ok"></span>
                 <span class="ut2-timer__task">{{ liveSession.taskName || $t('Time.task_not_open') }}</span>
             </span>
-            <select v-if="isEveryone" v-model="personId" class="tv-select" :title="$t('Time.me')">
-                <option value="">{{ $t('Time.me') }}</option>
-                <option v-for="u in otherUsers" :key="u._id" :value="u._id">{{ u.Employee_Name }}</option>
-            </select>
-            <select v-model="projectId" class="tv-select" :title="$t('Time.all_projects')">
-                <option value="">{{ $t('Time.all_projects') }}</option>
-                <option v-for="p in projectList" :key="p._id" :value="String(p._id)">{{ p.ProjectName }}</option>
-            </select>
             <button type="button" class="ah-btn ah-btn--secondary ah-btn--sm" @click="openLog()">{{ $t('Time.log_time') }}</button>
-            <button type="button" class="ah-btn ah-btn--secondary ah-btn--sm" :disabled="busy.export" @click="exportCsv">
-                {{ busy.export ? $t('Time.exporting') : $t('Time.export') }}
-            </button>
-            <button type="button" class="ah-btn ah-btn--primary ah-btn--sm" :disabled="!canSubmit || busy.submit" @click="submitWeek">
+            <button v-if="weekMode" type="button" class="ah-btn ah-btn--primary ah-btn--sm" :disabled="!canSubmit || busy.submit" data-test="submit-week" @click="submitWeek">
                 {{ busy.submit ? $t('Time.submitting') : (isRejected ? $t('Time.resubmit_week') : $t('Time.submit_week')) }}
             </button>
-        </div>
-    </div>
+        </template>
+    </ReportToolbar>
 
-    <p v-if="error" class="tv-error">{{ error }}</p>
-    <p v-else-if="notice" class="tv-ok">{{ notice }}</p>
+    <ReportFilterBar
+        :filters="filters"
+        :presets="PRESETS"
+        :fields="filterFields"
+        :options="filterOptions"
+        @apply="applyFilters"
+        @step="step"
+        @clear="clear"
+        @need-lists="options.loadListsFor(filters.projects)"
+    />
 
-    <div class="ut2-scroll ah-scroll">
-        <div class="tv-card ut2-grid" :style="{ '--days': days.length || 7 }" :class="{ 'is-loading': loading }">
-            <div class="ut2-row ut2-row--head">
-                <span class="ut2-task">{{ $t('Time.col_task') }}</span>
-                <span v-for="d in days" :key="d.date" :class="{ 'is-today': d.date === today, 'is-off': d.weekend || d.pto }" :title="d.pto ? $t('Time.pto') : ''">{{ dayLabel(d) }}</span>
-                <span>{{ $t('Time.col_total') }}</span>
-            </div>
-            <div v-if="!displayRows.length" class="ut2-empty">
-                <div v-if="loading" class="ah-small">{{ $t('Time.loading') }}</div>
-                <EmptyState
-                    v-else
-                    compact
-                    illustration="time"
-                    data-test="time-empty"
-                    :heading-level="2"
-                    :title="$t('Time.empty_week_title')"
-                    :message="$t('Time.empty_week')"
-                    :action-label="$t('Time.log_time')"
-                    :sentence="$t('EmptyState.say_time')"
-                    @action="openLog()"
-                />
-            </div>
-            <div v-for="row in displayRows" :key="row.taskId" class="ut2-row">
-                <div class="ut2-task">
-                    <span class="tv-sq" :style="{ background: row.projectColor || 'var(--brand)' }"></span>
-                    <span class="ut2-task__name" :title="row.projectName || ''">{{ row.taskName || $t('Time.task_not_open') }}</span>
-                    <button
-                        type="button"
-                        class="ut2-bill"
-                        :class="{ 'is-on': row.billable }"
-                        :title="$t('Time.toggle_billable')"
-                        :disabled="busy.billable === row.taskId || !row.entryIds.length"
-                        @click="toggleBillable(row)"
-                    >{{ row.billable ? $t('Time.billable') : $t('Time.non_billable') }}</button>
+    <div class="rpt__body">
+        <p v-if="error" class="tv-error">{{ error }}</p>
+        <p v-else-if="notice" class="tv-ok">{{ notice }}</p>
+
+        <div class="ut2-scroll ah-scroll">
+            <div class="tv-card ut2-grid" :style="{ '--days': columns.length || 7 }" :class="{ 'is-loading': loading, 'is-buckets': !dayMode }">
+                <div class="ut2-row ut2-row--head">
+                    <span class="ut2-task">{{ $t('Time.col_task') }}</span>
+                    <span v-for="c in columns" :key="c.key" :class="{ 'is-today': c.today, 'is-off': c.off }" :title="c.title">{{ c.label }}</span>
+                    <span>{{ $t('Time.col_total') }}</span>
                 </div>
-                <button
-                    v-for="d in days"
-                    :key="d.date"
-                    type="button"
-                    class="ut2-cell"
-                    :class="{ 'is-empty': !cellMinutes(row, d), 'is-off': d.weekend || d.pto, 'is-live': isLiveCell(row, d), 'is-today': d.date === today }"
-                    :disabled="!canEdit || d.date > today"
-                    @click="openLog(row, d)"
-                >{{ cellText(row, d) }}</button>
-                <span class="ut2-total">{{ formatMinutes(rowTotal(row)) }}</span>
-            </div>
-            <div class="ut2-row ut2-row--total">
-                <span class="ut2-task">{{ $t('Time.total_capacity', { h: hoursPerDay }) }}</span>
-                <span v-for="d in days" :key="d.date" :class="{ 'is-today': d.date === today, 'is-empty': !dayTotal(d), 'is-off': d.weekend || d.pto }">{{ dayTotal(d) ? formatMinutes(dayTotal(d)) : '—' }}</span>
-                <span>{{ formatMinutes(weekTotal) }}</span>
+                <div v-if="!displayRows.length" class="ut2-empty">
+                    <div v-if="loading" class="ah-small">{{ $t('Time.loading') }}</div>
+                    <EmptyState
+                        v-else
+                        compact
+                        illustration="time"
+                        data-test="time-empty"
+                        :heading-level="2"
+                        :title="narrowing ? $t('Reports.empty_filtered_title') : $t('Time.empty_week_title')"
+                        :message="narrowing ? $t('Reports.empty_filtered') : $t('Time.empty_week')"
+                        :action-label="narrowing ? $t('Reports.clear_filters_n', { n: narrowing }) : $t('Time.log_time')"
+                        :sentence="narrowing ? '' : $t('EmptyState.say_time')"
+                        @action="narrowing ? clear() : openLog()"
+                    />
+                </div>
+                <div v-for="row in displayRows" :key="row.taskId" class="ut2-row">
+                    <div class="ut2-task">
+                        <span class="tv-sq" :style="{ background: row.projectColor || 'var(--brand)' }"></span>
+                        <span class="ut2-task__name" :title="row.projectName || ''">{{ row.taskName || $t('Time.task_not_open') }}</span>
+                        <button
+                            type="button"
+                            class="ut2-bill"
+                            :class="{ 'is-on': row.billable }"
+                            :title="$t('Time.toggle_billable')"
+                            :disabled="busy.billable === row.taskId || !row.entryIds.length"
+                            @click="toggleBillable(row)"
+                        >{{ row.billable ? $t('Time.billable') : $t('Time.non_billable') }}</button>
+                    </div>
+                    <button
+                        v-for="c in columns"
+                        :key="c.key"
+                        type="button"
+                        class="ut2-cell"
+                        :class="{ 'is-empty': !cellMinutes(row, c), 'is-off': c.off, 'is-live': isLiveCell(row, c), 'is-today': c.today }"
+                        :disabled="!canEdit || !dayMode || c.key > today"
+                        @click="openLog(row, c.key)"
+                    >{{ cellText(row, c) }}</button>
+                    <span class="ut2-total">{{ formatMinutes(rowTotal(row)) }}</span>
+                </div>
+                <div class="ut2-row ut2-row--total">
+                    <span class="ut2-task">{{ $t('Time.total_capacity', { h: hoursPerDay }) }}</span>
+                    <span v-for="c in columns" :key="c.key" :class="{ 'is-today': c.today, 'is-empty': !columnTotal(c), 'is-off': c.off }">{{ columnTotal(c) ? formatMinutes(columnTotal(c)) : '—' }}</span>
+                    <span>{{ formatMinutes(weekTotal) }}</span>
+                </div>
             </div>
         </div>
-    </div>
 
-    <div class="tv-note">
-        <div class="tv-card">
-            <span class="ah-dot" :class="previous.dot"></span>
-            <span class="ut2-prev">{{ $t('Time.last_week') }} <strong>{{ previous.label }}</strong><span v-if="previous.detail">, {{ previous.detail }}</span><span v-if="previous.hours"> · {{ previous.hours }}</span></span>
-        </div>
-        <div v-if="reopening" class="tv-card" data-test="reopen-note">
-            <span class="ah-dot ah-dot--warn"></span>
-            <span>{{ $t('Time.reopened_by', { name: reopening.byName || $t('Time.someone'), date: dayClockText(reopening.at) }) }}</span>
-        </div>
-        <div v-if="underHint" class="tv-card">
-            <ShellIcon name="info" :size="13" class="tv-spark" />
-            <span class="ut2-hint">{{ underHint.text }}</span>
-            <button type="button" class="tv-link ut2-hint__cta" @click="openLog(null, underHint.day, underHint.minutes)">{{ $t('Time.add_hours', { h: formatHm(underHint.minutes) }) }}</button>
+        <div class="tv-note">
+            <div v-if="weekMode" class="tv-card">
+                <span class="ah-dot" :class="previous.dot"></span>
+                <span class="ut2-prev">{{ $t('Time.last_week') }} <strong>{{ previous.label }}</strong><span v-if="previous.detail">, {{ previous.detail }}</span><span v-if="previous.hours"> · {{ previous.hours }}</span></span>
+            </div>
+            <div v-if="weekMode && reopening" class="tv-card" data-test="reopen-note">
+                <span class="ah-dot ah-dot--warn"></span>
+                <span>{{ $t('Time.reopened_by', { name: reopening.byName || $t('Time.someone'), date: dayClockText(reopening.at) }) }}</span>
+            </div>
+            <div v-if="underHint" class="tv-card">
+                <ShellIcon name="info" :size="13" class="tv-spark" />
+                <span class="ut2-hint">{{ underHint.text }}</span>
+                <button type="button" class="tv-link ut2-hint__cta" @click="openLog(null, underHint.day, underHint.minutes)">{{ $t('Time.add_hours', { h: formatHm(underHint.minutes) }) }}</button>
+            </div>
         </div>
     </div>
 
@@ -146,7 +150,13 @@ import { useTimer, formatClock, formatMinutes, formatHm } from '@/composable/use
 import { timeLogFailureKey } from '@/composable/timeLogFailure';
 import UpgradePlan from '@/components/atom/UpgradYourPlanComponent/UpgradYourPlanComponent.vue';
 import AppState from '@/components/molecules/AppState/AppState.vue';
-import TimesheetTabs from '@/views/Timesheet/TimesheetTabs.vue';
+import ReportToolbar from '@/views/Timesheet/report/ReportToolbar.vue';
+import ReportFilterBar from '@/views/Timesheet/report/ReportFilterBar.vue';
+import { useReportFilters } from '@/views/Timesheet/report/useReportFilters';
+import { useReportOptions } from '@/views/Timesheet/report/useReportOptions';
+import { useReportExport } from '@/views/Timesheet/report/useReportExport';
+import { PRESETS, isOneIsoWeek, granularityOf, bucketsOf, addDays } from '@/views/Timesheet/report/reportRange';
+import { hoursOf } from '@/views/Timesheet/report/reportTable';
 import LogTimeSheet from '@/views/TimeLog/LogTimeSheet.vue';
 import ReopenWeek from './ReopenWeek.vue';
 import { isOwnApproval, lastReopenOf } from '@/views/Approvals/approvalAccess';
@@ -173,12 +183,31 @@ const isPrivileged = computed(() => isOwnerOrAdmin(companyUserDetail.value.roleT
 const permission = computed(() => checkPermission('sheet_settings.user_timesheet'));
 const allowed = computed(() => permission.value !== null && permission.value !== undefined);
 const isEveryone = computed(() => permission.value === true || permission.value === 2);
-const otherUsers = computed(() => (getters['users/users'] || []).filter((u) => u._id !== uid.value));
 
-const weekStart = ref(moment(route.query.week || undefined).startOf('isoWeek'));
-const personId = ref(String(route.query.userId || '') === uid.value ? '' : String(route.query.userId || ''));
-const projectId = ref('');
-const projectList = ref([]);
+const { filters, range, narrowing, serverFilters, apply, step, clear } = useReportFilters({ defaultPreset: 'this_week' });
+const options = useReportOptions(companyId);
+const { exporting, failed: exportFailed, exportReport } = useReportExport((field, value) => options.labelOf(field, value));
+
+/* A link from before task 086 names one week and one person. */
+if (route.query.week || route.query.userId) {
+    const legacyStart = moment(route.query.week || undefined).startOf('isoWeek').format('YYYY-MM-DD');
+    apply({
+        preset: 'custom', start: legacyStart, end: addDays(legacyStart, 6),
+        people: route.query.userId ? [String(route.query.userId)] : filters.value.people,
+    }, { drop: ['week', 'userId'] });
+}
+
+const filterFields = computed(() => [...(isEveryone.value ? ['people'] : []), 'projects', 'lists', 'status', 'billable', 'tags']);
+const filterOptions = computed(() => ({ people: options.people.value, projects: options.projects.value, lists: options.lists.value, status: options.statuses.value, tags: options.tags.value }));
+/* The sheet is one person's: picking someone replaces whoever was picked. */
+const applyFilters = (patch) => {
+    if (patch.people) patch = { ...patch, people: patch.people.slice(-1) };
+    apply(patch);
+};
+const personId = computed(() => {
+    const picked = isEveryone.value ? String(filters.value.people[0] || '') : '';
+    return picked === uid.value ? '' : picked;
+});
 const hoursPerDay = ref(8);
 const days = ref([]);
 const rows = ref([]);
@@ -193,9 +222,11 @@ const logOpen = ref(false);
 const logPrefill = ref({});
 
 const today = computed(() => moment().format('YYYY-MM-DD'));
-const startIso = computed(() => weekStart.value.format('YYYY-MM-DD'));
-const endIso = computed(() => weekStart.value.clone().add(6, 'days').format('YYYY-MM-DD'));
-const rangeLabel = computed(() => `${weekStart.value.format('MMM D')} – ${weekStart.value.clone().add(6, 'days').format('MMM D')}`);
+const startIso = computed(() => range.value.start);
+const endIso = computed(() => range.value.end);
+const rangeLabel = computed(() => `${moment(startIso.value).format('MMM D')} – ${moment(endIso.value).format('MMM D')}`);
+const weekMode = computed(() => isOneIsoWeek(range.value));
+const dayMode = computed(() => granularityOf(range.value) === 'day');
 const targetUser = computed(() => personId.value || uid.value);
 const isMe = computed(() => targetUser.value === uid.value);
 const canEdit = computed(() => isMe.value && !(approval.value.current && approval.value.current.status === 'approved'));
@@ -204,7 +235,16 @@ const liveSession = computed(() => (isMe.value ? timer.sessions.value.find((s) =
 const liveMinutes = computed(() => (timer.running.value ? Math.floor(timer.elapsed.value / 60) : 0));
 const liveTaskId = computed(() => (isMe.value ? (timer.active.value && timer.active.value.taskId) || (liveSession.value && liveSession.value.taskId) || '' : ''));
 
-const dayLabel = (d) => moment(d.date).format('ddd').toUpperCase();
+const dayLabel = (date) => (weekMode.value ? moment(date).format('ddd') : moment(date).format('dd D')).toUpperCase();
+const bucketLabel = (bucket, granularity) => (granularity === 'month' ? moment(bucket.start).format('MMM YYYY') : t('Reports.week_of', { date: moment(bucket.start).format('MMM D') })).toUpperCase();
+/* Day columns up to a month, then weeks, then months, each summing the days it holds. */
+const columns = computed(() => {
+    if (dayMode.value) {
+        return days.value.map((d) => ({ key: d.date, days: [d.date], label: dayLabel(d.date), today: d.date === today.value, off: Boolean(d.weekend || d.pto), title: d.pto ? t('Time.pto') : '' }));
+    }
+    const granularity = granularityOf(range.value);
+    return bucketsOf(range.value, granularity).map((b) => ({ key: b.key, days: b.days, label: bucketLabel(b, granularity), today: b.days.includes(today.value), off: false, title: `${b.start} – ${b.end}` }));
+});
 const displayRows = computed(() => {
     const list = rows.value.map((r) => ({ ...r }));
     const live = timer.active.value || liveSession.value;
@@ -216,16 +256,16 @@ const displayRows = computed(() => {
     }
     return list;
 });
-const isLiveCell = (row, d) => d.date === today.value && !!liveTaskId.value && row.taskId === liveTaskId.value;
-const liveExtra = (row, d) => (isLiveCell(row, d) && timer.running.value ? liveMinutes.value : 0);
-const cellMinutes = (row, d) => (row.byDay[d.date] || 0) + liveExtra(row, d);
+const isLiveCell = (row, c) => c.today && !!liveTaskId.value && row.taskId === liveTaskId.value;
+const liveExtra = (row, c) => (isLiveCell(row, c) && timer.running.value ? liveMinutes.value : 0);
+const cellMinutes = (row, c) => c.days.reduce((sum, date) => sum + (row.byDay[date] || 0), 0) + liveExtra(row, c);
 const cellText = (row, d) => {
     const m = cellMinutes(row, d);
     if (!m) return isLiveCell(row, d) ? '● 0:00' : '—';
     return `${isLiveCell(row, d) ? '● ' : ''}${formatMinutes(m)}`;
 };
 const rowTotal = (row) => row.total + (row.taskId === liveTaskId.value && timer.running.value ? liveMinutes.value : 0);
-const dayTotal = (d) => (totals.value.byDay[d.date] || 0) + (d.date === today.value && timer.running.value && liveTaskId.value ? liveMinutes.value : 0);
+const columnTotal = (c) => c.days.reduce((sum, date) => sum + (totals.value.byDay[date] || 0), 0) + (c.today && timer.running.value && liveTaskId.value ? liveMinutes.value : 0);
 const weekTotal = computed(() => totals.value.weekMinutes + (timer.running.value && liveTaskId.value ? liveMinutes.value : 0));
 
 const statusOf = (doc) => (doc && doc.status) || 'draft';
@@ -243,7 +283,7 @@ const onReopened = (doc) => {
     approval.value = { ...approval.value, current: doc };
     flash(t('Time.reopened_ok'));
 };
-const canSubmit = computed(() => (isMe.value || isPrivileged.value) && ['draft', 'rejected'].includes(statusOf(approval.value.current)));
+const canSubmit = computed(() => weekMode.value && (isMe.value || isPrivileged.value) && ['draft', 'rejected'].includes(statusOf(approval.value.current)));
 const previous = computed(() => {
     const doc = approval.value.previous;
     const status = statusOf(doc);
@@ -255,7 +295,7 @@ const previous = computed(() => {
     return { dot: 'ut2-dot--none', label: t('Time.not_submitted'), detail: '', hours: '' };
 });
 const underHint = computed(() => {
-    if (!isMe.value || !underCapacity.value.length) return null;
+    if (!weekMode.value || !isMe.value || !underCapacity.value.length) return null;
     const list = underCapacity.value;
     const gap = list.reduce((s, d) => s + d.gapMinutes, 0);
     const names = list.map((d) => moment(d.date).format('ddd'));
@@ -270,7 +310,10 @@ const load = async () => {
     loading.value = true;
     error.value = '';
     try {
-        const qs = new URLSearchParams({ start: startIso.value, end: endIso.value, userId: targetUser.value, projectId: projectId.value, hoursPerDay: String(hoursPerDay.value), timeZone: timeZone.value });
+        const qs = new URLSearchParams({
+            start: startIso.value, end: endIso.value, userId: targetUser.value, projectIds: filters.value.projects.join(','),
+            hoursPerDay: String(hoursPerDay.value), timeZone: timeZone.value, filters: JSON.stringify(serverFilters.value),
+        });
         const body = ((await apiRequest('get', `${env.TIMESHEET_WEEK}?${qs.toString()}`)) || {}).data || {};
         if (!body.status) throw new Error(body.statusText || 'load_failed');
         const d = body.data;
@@ -286,16 +329,6 @@ const load = async () => {
         loading.value = false;
     }
 };
-const loadProjects = async () => {
-    try {
-        const b = ((await apiRequest('get', env.PROJECT)) || {}).data;
-        const list = Array.isArray(b) ? b : (b && b.data) || [];
-        projectList.value = list.filter((p) => p && p.status !== 'close' && p.deletedStatusKey !== 1 && p.deletedStatusKey !== 2);
-    } catch (e) {
-        projectList.value = [];
-    }
-};
-const shiftWeek = (n) => { weekStart.value = weekStart.value.clone().add(n, 'weeks'); };
 const flash = (msg) => { notice.value = msg; setTimeout(() => { if (notice.value === msg) notice.value = ''; }, 4000); };
 
 const submitWeek = async () => {
@@ -324,8 +357,8 @@ const exportCsv = async () => {
         const s = new Date(`${startIso.value}T00:00:00`);
         const e = new Date(`${endIso.value}T23:59:59`);
         const res = await apiRequest('post', `${env.TIMESHEET}/export-csv`, {
-            userArray: [targetUser.value], projectArray: projectId.value ? [projectId.value] : [],
-            start: Math.floor(s.getTime() / 1000), end: Math.floor(e.getTime() / 1000),
+            userArray: [targetUser.value], projectArray: filters.value.projects,
+            start: Math.floor(s.getTime() / 1000), end: Math.floor(e.getTime() / 1000), filters: serverFilters.value,
         });
         const csv = typeof (res && res.data) === 'string' ? res.data : '';
         const url = URL.createObjectURL(new Blob([csv], { type: 'text/csv;charset=utf-8;' }));
@@ -341,6 +374,25 @@ const exportCsv = async () => {
     } finally {
         busy.value.export = false;
     }
+};
+const onExport = async (format) => {
+    if (format === 'entries') { await exportCsv(); return; }
+    const head = [
+        { key: 'task', label: t('Time.col_task'), value: (row) => row.taskName || t('Time.task_not_open') },
+        { key: 'project', label: t('Reports.col_project'), value: (row) => row.projectName || '' },
+        { key: 'billable', label: t('Time.billable'), value: (row) => (row.isTotal ? '' : row.billable ? t('Reports.yes') : t('Reports.no')) },
+        ...columns.value.map((c) => ({ key: c.key, label: c.label, value: (row) => (row.isTotal ? hoursOf(columnTotal(c)) : hoursOf(cellMinutes(row, c))) })),
+        { key: 'total', label: t('Reports.col_total_hours'), value: (row) => hoursOf(row.isTotal ? weekTotal.value : rowTotal(row)) },
+    ];
+    await exportReport(format, {
+        name: 'my-timesheet',
+        title: `${t('Time.my_timesheet')} · ${(getUser(targetUser.value) || {}).Employee_Name || ''}`,
+        filters: filters.value,
+        columns: head,
+        rows: displayRows.value,
+        total: { isTotal: true, taskName: t('Time.col_total'), projectName: '' },
+    });
+    if (exportFailed.value) error.value = t('Time.action_failed');
 };
 const toggleBillable = async (row) => {
     if (busy.value.billable) return;
@@ -385,11 +437,11 @@ const onLogged = (info) => {
     load();
 };
 
-watch([personId, projectId, weekStart], load);
+watch(() => [personId.value, startIso.value, endIso.value, filters.value.projects.join(','), JSON.stringify(serverFilters.value)], load);
 onMounted(() => {
     if (!allowed.value) return;
     load();
-    loadProjects();
+    options.ready();
     timer.reconcile();
 });
 </script>
@@ -402,6 +454,8 @@ onMounted(() => {
 .ut2-grid { min-width: calc(220px + var(--days) * 70px + 98px); font-size: 12.5px; overflow: hidden; transition: opacity var(--t-state) var(--ease); }
 .ut2-grid.is-loading { opacity: .6; }
 .ut2-row { display: grid; grid-template-columns: minmax(220px, 1fr) repeat(var(--days), 64px) 70px; gap: 6px; min-height: var(--row-h); padding: var(--cell-pad-y, 10px) var(--cell-pad-x, 14px); align-items: center; text-align: center; font: 500 var(--row-font, 12px)/1.2 var(--font-mono); border-bottom: 1px solid var(--hairline); }
+.ut2-grid.is-buckets { min-width: calc(220px + var(--days) * 90px + 98px); }
+.ut2-grid.is-buckets .ut2-row { grid-template-columns: minmax(220px, 1fr) repeat(var(--days), 84px) 70px; }
 .ut2-row:last-child { border-bottom: 0; }
 .ut2-row--head { min-height: 0; padding: 9px var(--cell-pad-x, 14px); font: var(--text-label); letter-spacing: .06em; color: var(--ink-2); }
 .ut2-row--head .is-today { color: var(--brand); }
