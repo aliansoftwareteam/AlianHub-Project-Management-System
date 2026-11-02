@@ -49,4 +49,6 @@ const resolveConnection = async ({ companyId, userId, provider } = {}) => {
 
 const markBackoff = ({ companyId, connectionId, until } = {}) => connection.markBackoff({ companyId, connectionId, until });
 
-module.exports = { CODE, ConnectorError, resolveConnection, markBackoff };
+const recordHealth = ({ companyId, connectionId, lastUsedAt, lastError } = {}) => connection.recordHealth({ companyId, connectionId, lastUsedAt, lastError });
+
+module.exports = { CODE, ConnectorError, resolveConnection, markBackoff, recordHealth };

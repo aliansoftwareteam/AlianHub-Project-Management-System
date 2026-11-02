@@ -38,7 +38,7 @@ const { SCHEMA_TYPE } = require('../Config/schemaType');
 const store = require('../Config/secrets');
 const ctrl = require('../Modules/Connectors/connectorsController');
 const routes = require('../Modules/Connectors/routes');
-const { resolveConnection, markBackoff, CODE } = require('../Modules/Connectors/resolveConnection');
+const { resolveConnection, markBackoff, recordHealth, CODE } = require('../Modules/Connectors/resolveConnection');
 const { AUTH_URL, TOKEN_URL, REVOKE_URL } = require('./fixtures/fakeProvider');
 
 const C = '6f0000000000000000000c01';
@@ -155,7 +155,7 @@ describe('connecting through the generic lifecycle', () => {
         expect(mockProvider.calls).toHaveLength(0);
 
         const [row] = rows(T);
-        expect(row).toMatchObject({ provider: P, userId: MEMBER, status: 'pending', handles: {}, app: { source: 'instance', appId: null } });
+        expect(row).toMatchObject({ companyId: C, provider: P, userId: MEMBER, status: 'pending', handles: {}, app: { source: 'instance', appId: null } });
         expect(row.products).toBeUndefined();
         expect(row.oauth.sessionId).toBe(SESSION[MEMBER]);
         expect(row.oauth.products).toEqual(['notes']);
@@ -440,6 +440,32 @@ describe('the remaining branches have coverage', () => {
         const until = new Date(Date.now() + 60000);
         await markBackoff({ companyId: C, connectionId: String(rowOf(MEMBER)._id), until });
         expect(new Date(rowOf(MEMBER).backoffUntil).getTime()).toBe(until.getTime());
+    });
+
+    it('recordHealth saves the fields it is given and leaves the rest', async () => {
+        await connectAs(MEMBER);
+        const connectionId = String(rowOf(MEMBER)._id);
+        const usedAt = new Date(Date.now() - 60000);
+        await recordHealth({ companyId: C, connectionId, lastUsedAt: usedAt, lastError: 'ECONNRESET' });
+        expect(rowOf(MEMBER)).toMatchObject({ lastError: 'ECONNRESET' });
+        expect(new Date(rowOf(MEMBER).lastUsedAt).getTime()).toBe(usedAt.getTime());
+
+        await recordHealth({ companyId: C, connectionId, lastError: '' });
+        expect(rowOf(MEMBER).lastError).toBe('');
+        expect(new Date(rowOf(MEMBER).lastUsedAt).getTime()).toBe(usedAt.getTime());
+
+        await recordHealth({ companyId: C, connectionId, lastError: 'ETIMEDOUT' });
+        const laterAt = new Date();
+        await recordHealth({ companyId: C, connectionId, lastUsedAt: laterAt });
+        expect(rowOf(MEMBER).lastError).toBe('ETIMEDOUT');
+        expect(new Date(rowOf(MEMBER).lastUsedAt).getTime()).toBe(laterAt.getTime());
+    });
+
+    it('recordHealth never overwrites the reason a connection is broken', async () => {
+        await connectAs(MEMBER);
+        Object.assign(rowOf(MEMBER), { status: 'broken', lastError: 'invalid_grant' });
+        await recordHealth({ companyId: C, connectionId: String(rowOf(MEMBER)._id), lastUsedAt: new Date(), lastError: '' });
+        expect(rowOf(MEMBER)).toMatchObject({ status: 'broken', lastError: 'invalid_grant' });
     });
 
     it('a seat that cannot be read is refused as not_member, not allowed through', async () => {

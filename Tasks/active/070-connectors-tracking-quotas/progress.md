@@ -2,18 +2,21 @@
 
 ## Checklist
 - [x] Audit rows
-- [x] Health + notifications (code done; the row is written once 066 brings `recordHealth`)
+- [x] Health + notifications
 - [x] Usage counters
 - [x] Quotas + admin route
-- [x] Backoff (code done; `backoffUntil` is written once 066 brings `markBackoff`)
+- [x] Backoff
 - [x] Tests
-- [ ] After 066: check `markBackoff` and `recordHealth` against the real functions and a real Google connection
+- [x] Check `markBackoff` and `recordHealth` against the real functions
+- [x] Check `recordHealth`, audit, usage and the broken notice on a real Google connection
+- [x] Check `markBackoff` (fake server only: Google gave no 429 in the real check, so it was never seen against Google)
+- [ ] After the PR merges: `npm run api:doc` in the docs PR, then move this task to `done/`
 
 ## Last step
-Code and tests are done on `feat/070-connectors-tracking-quotas`. The task stays active until the check after 066.
+Real Google check done, both review follow-ups fixed, committed locally on `fix/070-connector-health`. Not pushed, no PR.
 
 ## Blockers
-066 brings `markBackoff`, `recordHealth` and `getAccessToken`. Until then `resolveConnection` refuses every call, so no real call reaches the provider.
+None. Prinsa pushes and opens the PR.
 
 ## Log
 
@@ -40,3 +43,26 @@ Code and tests are done on `feat/070-connectors-tracking-quotas`. The task stays
 - Docs PR after merge: run `npm run api:doc` and `npm run env:doc` for the new route and the three settings.
 - 078 needs a read route for the current limits; the task names only the `PUT`, so none was added.
 - Tested: `tests/connector-tracking.test.js`, and `tests/integration/connector-usage.int.test.js` on a throwaway MongoDB 9.0, including 12 reads racing for 5 places.
+
+### 2026-11-02
+- 066 brought `getAccessToken` and `markBackoff` but not `recordHealth`. The guard in `health.js` and the mocks in the tests hid the gap, so nothing was saved after a call.
+- `recordHealth` added to `connection.js` and exported from `resolveConnection.js`. It leaves a broken row alone, because `lastError` there is the reason the person is shown and a call in flight can finish after a refresh marked the row broken.
+- Removed the guards in `health.js` and `rateLimits.js`.
+- `refresh_failed` and `token_unavailable` now reach `lastError`. They leave `lastUsedAt` alone and stay `refused` in the audit, since the provider was not reached.
+- Tested: `tests/integration/connector-health.int.test.js` on a throwaway MongoDB 9.0, including 50 calls finishing while the row is marked broken and one company naming another's connection. 14 deliberate breaks of the code were each caught by a test. The full unit and conventions run fails the same tests as the base commit, plus two baseline-format checks that fail only on this Windows checkout's CRLF line endings.
+- Left for others: a provider 401 does not mark a connection broken or tell the person until a refresh fails (track A), and token expiry and a `lastError` on a healthy row are not returned by any route yet (072).
+- Real Google check, with a real account in Testing mode, the local database and `google.calendar.events.list`. The tool was called through `toolRunner.read` from a script with `via: mcp`, not through an MCP client or an agent run.
+  - Read: `lastUsedAt` saved, `lastError` empty, `connector.call` `applied`, `reads: 1`, tainted.
+  - Calendar not ticked on Google's consent: only `openid` and email granted, read refused as `scope_missing`, no count.
+  - Access removed at Google: 401, `lastError: provider_refused`, audit `failed`, counted, still `connected` until a refresh fails.
+  - Access token expired by hand in the local row to force the refresh: `invalid_grant`, `broken`, `connector.broken` audit, one `connector_broken` notice over three calls, audit `refused`.
+- Bugs this found:
+  - Fixed: `beginConsent` saved a new row without `companyId`, which the schema requires, so every first connect answered 500. `feat/per-user-connectors` has the same line.
+  - Fixed: a read that failed on its token before reaching the provider kept its quota count, against the decision above. Covered by the unit test, not repeated against Google.
+  - Not fixed (track A): `complete` stores the asked products even when Google grants fewer, so the row said `calendar` with no Calendar scope.
+  - Not fixed (072): the Connections page drops the `code` for provider `google`. The check finished through a throwaway local page and the row's `oauth.origin` set by hand.
+- Review follow-ups:
+  - `usedByPerson` filters on `companyId` too, so the `{ companyId, userId, day }` index serves it.
+  - `fileChanges` takes a `save` callback and runs it inside the claim. A save that fails gives the count back and audits `failed`; `filed` is audited only once the row is stored.
+- Accepted on Prinsa's "finish what is left": fake-server cover is enough for `markBackoff`.
+- Connector and proposal suites pass (28 suites, 795 tests). `tests/conventions` fails in six suites this work does not touch: retired-flags, ai-core-boundary, style-check, plain-words, ci-e2e-shards, role-playbooks.

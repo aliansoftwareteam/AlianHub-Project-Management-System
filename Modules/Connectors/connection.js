@@ -165,7 +165,7 @@ const beginConsent = async ({ companyId, userId, sessionId, provider, products, 
     else {
         await MongoDbCrudOpration(companyId, {
             type: T,
-            data: { _id: new mongoose.Types.ObjectId(), userId: String(userId), status: STATUS.PENDING, handles: {}, createdBy: String(userId), deletedStatusKey: 0, ...set },
+            data: { _id: new mongoose.Types.ObjectId(), companyId: String(companyId), userId: String(userId), status: STATUS.PENDING, handles: {}, createdBy: String(userId), deletedStatusKey: 0, ...set },
         }, 'save');
     }
     const state = jwt.sign(
@@ -429,6 +429,18 @@ const markBackoff = async ({ companyId, connectionId, until }) => {
     await MongoDbCrudOpration(String(companyId), { type: T, data: [{ _id: connectionId }, { $set: { backoffUntil: until ? new Date(until) : null } }] }, 'updateOne');
 };
 
+/* A call already in flight can finish after a refresh marked the row broken, and `lastError` on a broken row is the
+ * reason the person is shown, so a broken row is left alone. */
+const recordHealth = async ({ companyId, connectionId, lastUsedAt, lastError }) => {
+    if (!companyId || !connectionId) return;
+    const fields = {
+        ...(lastUsedAt === undefined ? {} : { lastUsedAt: new Date(lastUsedAt) }),
+        ...(lastError === undefined ? {} : { lastError: String(lastError).slice(0, 60) }),
+    };
+    if (!Object.keys(fields).length) return;
+    await MongoDbCrudOpration(String(companyId), { type: T, data: [{ _id: connectionId, status: { $ne: STATUS.BROKEN } }, { $set: fields }] }, 'updateOne');
+};
+
 /* Every provider offered to this workspace, with the person's own connection on each (FR, GET /api/v2/connectors). */
 const list = async (companyId, userId) => {
     const offered = registry.offered(await companyAppsOf(companyId));
@@ -477,5 +489,5 @@ module.exports = {
     STATUS, BY, STATE_TTL_SECONDS, SECRET_KIND, ConnectionError,
     isOffered, fallbackOrigin, redirectUri, callbackPath, byId, ownsState,
     describe, list, membersWithConnections, start, setProducts, returnFor, complete, disconnect,
-    findUsable, accessTokenFor, markBackoff, endForMember,
+    findUsable, accessTokenFor, markBackoff, recordHealth, endForMember,
 };

@@ -20,13 +20,10 @@ const untilOf = (res, now = Date.now()) => {
     return new Date(backoff.nextAttempt({ retry: { after: headers['retry-after'], reset: headers['x-ratelimit-reset'] } }, FIRST_FAILURE, now));
 };
 
-/* markBackoff arrives with task 066; until then no connection exists, so no call reaches this point outside tests. */
 const hold = async (companyId, connectionId, res) => {
     const until = untilOf(res);
-    if (connections.markBackoff) {
-        await connections.markBackoff({ companyId: String(companyId), connectionId: String(connectionId), until })
-            .catch((e) => logger.error(`connector backoff of ${connectionId} was not saved: ${(e && e.name) || 'Error'}`));
-    }
+    await connections.markBackoff({ companyId: String(companyId), connectionId: String(connectionId), until })
+        .catch((e) => logger.error(`connector backoff of ${connectionId} was not saved: ${(e && e.name) || 'Error'}`));
     return until;
 };
 

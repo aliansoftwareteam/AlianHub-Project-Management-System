@@ -25,7 +25,7 @@ const sumOf = async (companyId, filter, field) => {
     return (rows || []).reduce((sum, row) => sum + (Number(row[field]) || 0), 0);
 };
 
-const usedByPerson = (companyId, userId, day, field) => sumOf(companyId, { userId: String(userId), day }, field);
+const usedByPerson = (companyId, userId, day, field) => sumOf(companyId, { companyId: String(companyId), userId: String(userId), day }, field);
 
 const usedByAgent = (companyId, agentId, day, field) => sumOf(companyId, { 'actor.type': 'agent', 'actor.id': String(agentId), day }, field);
 

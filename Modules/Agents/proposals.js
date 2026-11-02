@@ -169,22 +169,23 @@ const create = async (companyId, { agent, runId, taskId, taskIds, projectId, wha
     if (!check.valid) throw Object.assign(new Error(check.reason), { status: 400 });
     const owner = connectorWrites.hasWrite(changes) ? connectionOwnerOf(source, requestedBy, connectionOwner) : '';
     const slackReady = slackPost.hasSlackChange(changes) ? await slackPost.prepareChanges(companyId, changes) : changes;
-    const prepared = await connectorWrites.fileChanges(companyId, owner, slackReady, { via: source === SOURCE_MCP ? 'mcp' : 'agent', id: String(agent._id), runId });
-    const scopedProjectId = projectId || await projectOfTask(companyId, taskId);
-    const saved = await MongoDbCrudOpration(companyId, {
-        type: SCHEMA_TYPE.AGENT_PROPOSALS,
-        data: {
-            agentId: String(agent._id), agentName: proposalText.nameOf(agent.name), runId: runId || null, taskId: taskId || null, projectId: scopedProjectId || null,
-            ...(Array.isArray(taskIds) && taskIds.length ? { taskIds: taskIds.map(String) } : {}),
-            what: proposalText.titleOf(what, prepared), why: proposalText.reasonOf(why),
-            changes: prepared.map((c) => ({ action: c.action, params: planFiling.storedParams(c.action, c.params || {}), label: proposalText.labelOf(c), reversible: Boolean(registry.get(c.action) && registry.get(c.action).undoable), rating: c.rating || null, ...(c.remember ? { remember: c.remember } : {}), ...(c.card ? { card: c.card } : {}) })),
-            status: STATUS.PENDING, gate: gateOf(changes, gate), priority: priority || 'normal', cost: cost || null, auditIds: [],
-            ...(owner ? { connectionOwner: owner } : {}),
-            ...(marker && marker.reason ? { taint: { sources: Array.isArray(marker.sources) ? marker.sources : [], reason: String(marker.reason).slice(0, 2000) } } : {}),
-            ...mcpFields({ source, requestedBy, tokenId, tokenProjectIds, allowedActions, oauthClientId, oauthGrantId }),
-            ...systemFields({ source, allowedActions, finding, requestedBy }),
-        },
-    }, 'save');
+    const saved = await connectorWrites.fileChanges(companyId, owner, slackReady, { via: source === SOURCE_MCP ? 'mcp' : 'agent', id: String(agent._id), runId }, async (prepared) => {
+        const scopedProjectId = projectId || await projectOfTask(companyId, taskId);
+        return MongoDbCrudOpration(companyId, {
+            type: SCHEMA_TYPE.AGENT_PROPOSALS,
+            data: {
+                agentId: String(agent._id), agentName: proposalText.nameOf(agent.name), runId: runId || null, taskId: taskId || null, projectId: scopedProjectId || null,
+                ...(Array.isArray(taskIds) && taskIds.length ? { taskIds: taskIds.map(String) } : {}),
+                what: proposalText.titleOf(what, prepared), why: proposalText.reasonOf(why),
+                changes: prepared.map((c) => ({ action: c.action, params: planFiling.storedParams(c.action, c.params || {}), label: proposalText.labelOf(c), reversible: Boolean(registry.get(c.action) && registry.get(c.action).undoable), rating: c.rating || null, ...(c.remember ? { remember: c.remember } : {}), ...(c.card ? { card: c.card } : {}) })),
+                status: STATUS.PENDING, gate: gateOf(changes, gate), priority: priority || 'normal', cost: cost || null, auditIds: [],
+                ...(owner ? { connectionOwner: owner } : {}),
+                ...(marker && marker.reason ? { taint: { sources: Array.isArray(marker.sources) ? marker.sources : [], reason: String(marker.reason).slice(0, 2000) } } : {}),
+                ...mcpFields({ source, requestedBy, tokenId, tokenProjectIds, allowedActions, oauthClientId, oauthGrantId }),
+                ...systemFields({ source, allowedActions, finding, requestedBy }),
+            },
+        }, 'save');
+    });
     emit(companyId, saved);
     return saved;
 };
