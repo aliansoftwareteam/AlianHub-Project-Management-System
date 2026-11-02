@@ -147,3 +147,54 @@ describe('managed compose template', () => {
         }
     });
 });
+
+describe('custom domain routers (cloud task 085)', () => {
+    const labelsOf = (extra) => yaml.load(renderStack(meta(extra)).compose).services.app.labels;
+    const r = `traefik.http.routers.t_${ID}`;
+    const m = `traefik.http.middlewares.t_${ID}-to-custom`;
+
+    test('leaves the stack byte for byte as before without a custom domain', () => {
+        const values = stackValues(meta(), loadTiers()).values;
+        expect(renderStack(meta()).compose).toBe(render(loadTemplate(), values));
+        expect(renderStack(meta({ customHost: null })).compose).toBe(render(loadTemplate(), values));
+    });
+
+    test('routes the domain with its own certificate while the subdomain still serves', () => {
+        const labels = labelsOf({ customHost: 'pm.acme.com', certResolver: 'le' });
+        expect(labels[`${r}_c.rule`]).toBe('Host(`pm.acme.com`)');
+        expect(labels[`${r}_c.entrypoints`]).toBe('websecure');
+        expect(labels[`${r}_c.tls.certresolver`]).toBe('le');
+        expect(labels[`${r}_c.service`]).toBe(`t_${ID}`);
+        expect(labels[`${r}_c.middlewares`]).toBe('platform-deny@file,security-headers@file');
+        expect(labels[`${r}.middlewares`]).toBe('platform-deny@file,security-headers@file');
+        expect(labels[`${m}.redirectregex.regex`]).toBeUndefined();
+    });
+
+    test('redirects the subdomain to the domain once it is primary, except /health', () => {
+        const labels = labelsOf({ customHost: 'pm.acme.com', customHostPrimary: true });
+        expect(labels[`${r}.middlewares`]).toBe(`platform-deny@file,security-headers@file,t_${ID}-to-custom`);
+        // Compose turns each $$ into $ before Traefik reads the label.
+        expect(labels[`${m}.redirectregex.regex`]).toBe('^https?://[^/]+(.*)$$');
+        expect(labels[`${m}.redirectregex.replacement`]).toBe('https://pm.acme.com$${1}');
+        expect(labels[`${m}.redirectregex.permanent`]).toBe('true');
+        expect(labels[`${r}_h.rule`]).toBe('Host(`acme.alianhub.com`) && Path(`/health`)');
+        expect(labels[`${r}_h.middlewares`]).toBe('platform-deny@file,security-headers@file');
+        expect(labels[`${r}_c.tls.certresolver`]).toBeUndefined();
+    });
+
+    test('keeps CRLF templates CRLF', () => {
+        const template = loadTemplate().replace(/\r?\n/g, '\r\n');
+        const compose = renderStack(meta({ customHost: 'pm.acme.com', customHostPrimary: true }), { template }).compose;
+        expect(compose.split('\n').every((line, i, all) => i === all.length - 1 || line.endsWith('\r'))).toBe(true);
+        expect(yaml.load(compose).services.app.labels[`${r}.middlewares`]).toBe(`platform-deny@file,security-headers@file,t_${ID}-to-custom`);
+    });
+
+    test.each([
+        [{ customHost: 'Not A Host' }, 'customHost'],
+        [{ customHost: 'acme.alianhub.com' }, 'customHost'],
+        [{ customHost: 'pm.acme.com', certResolver: 'bad resolver' }, 'certResolver']
+    ])('refuses %o', (extra, field) => {
+        const { problems } = renderStack(meta(extra));
+        expect(problems.some((problem) => problem.startsWith(field))).toBe(true);
+    });
+});
