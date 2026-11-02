@@ -39,6 +39,8 @@ const store = require('../Config/secrets');
 const ctrl = require('../Modules/Connectors/connectorsController');
 const routes = require('../Modules/Connectors/routes');
 const { resolveConnection, markBackoff, CODE } = require('../Modules/Connectors/resolveConnection');
+const connection = require('../Modules/Connectors/connection');
+const { endMemberConnections } = require('../Modules/Agents/connectors/memberDeparted');
 const { AUTH_URL, TOKEN_URL, REVOKE_URL } = require('./fixtures/fakeProvider');
 
 const C = '6f0000000000000000000c01';
@@ -359,6 +361,69 @@ describe('disconnecting', () => {
         expect(mockProvider.endpoints()).toEqual(['revoke:revoke']);
         await settle();
         expect(audits('connector.revoke')).toEqual([expect.objectContaining({ actorId: ADMIN, meta: expect.objectContaining({ by: 'admin' }) })]);
+    });
+});
+
+describe('a departed member keeps no connection (removal hook + daily sweep, 067)', () => {
+    it('the removal hook revokes at the provider, clears the secrets and audits the revoke', async () => {
+        await connectAs(MEMBER);
+        mockProvider.calls.length = 0;
+        const ended = await endMemberConnections(C, MEMBER);
+        await settle();
+        expect(ended).toBe(1);
+        expect(mockProvider.calls.some((c) => c.url === REVOKE_URL && c.workspace === C)).toBe(true);
+        expect(sealed()).toHaveLength(0);
+        expect(rowOf(MEMBER)).toBeUndefined();
+        expect(rows(T)[0]).toMatchObject({ status: 'revoked', handles: {}, deletedStatusKey: 1, disconnectedBy: 'member_removed' });
+        expect(audits('connector.revoke')).toEqual([expect.objectContaining({ entityId: P, meta: expect.objectContaining({ by: 'member_removed' }) })]);
+    });
+
+    it('the daily sweep ends a still-open connection once its owner has no seat, and leaves seated members alone', async () => {
+        await connectAs(MEMBER);
+        await connectAs(COLLEAGUE);
+        // The member was removed but the end-one-member call never finished (the provider was down): the row is still open.
+        delete mockRoles[C][MEMBER];
+        mockProvider.calls.length = 0;
+        const ended = await connection.sweepCompany(C);
+        await settle();
+        expect(ended).toBe(1);
+        expect(rowOf(MEMBER)).toBeUndefined();
+        expect(rows(T).find((r) => r.userId === MEMBER)).toMatchObject({ status: 'revoked', deletedStatusKey: 1, disconnectedBy: 'member_removed' });
+        expect(sealed().filter((s) => s.userId === MEMBER)).toHaveLength(0);
+        expect(audits('connector.revoke')).toEqual([expect.objectContaining({ meta: expect.objectContaining({ userId: MEMBER }) })]);
+        expect(rowOf(COLLEAGUE)).toMatchObject({ status: 'connected' });
+    });
+
+    it('is idempotent: a second sweep ends nothing and writes nothing', async () => {
+        await connectAs(MEMBER);
+        delete mockRoles[C][MEMBER];
+        expect(await connection.sweepCompany(C)).toBe(1);
+        await settle();
+        const storeAfterFirst = JSON.stringify(mockDb.store);
+        const revokes = mockProvider.calls.filter((c) => c.url === REVOKE_URL).length;
+        expect(await connection.sweepCompany(C)).toBe(0);
+        await settle();
+        expect(JSON.stringify(mockDb.store)).toBe(storeAfterFirst);
+        expect(mockProvider.calls.filter((c) => c.url === REVOKE_URL).length).toBe(revokes);
+    });
+
+    it('revokes no one when the seat read fails, so a database blip ends nothing; the next pass retries', async () => {
+        await connectAs(MEMBER);
+        await connectAs(COLLEAGUE);
+        mockProvider.calls.length = 0;
+        mockRoleLookup.fails = true;
+        try {
+            expect(await connection.sweepCompany(C)).toBe(0);
+        } finally { mockRoleLookup.fails = false; }
+        await settle();
+        expect(mockProvider.calls.filter((c) => c.url === REVOKE_URL)).toHaveLength(0);
+        expect(rowOf(MEMBER)).toMatchObject({ status: 'connected' });
+        expect(rowOf(COLLEAGUE)).toMatchObject({ status: 'connected' });
+        // Once the read recovers and the member is gone, the next pass ends only them.
+        delete mockRoles[C][MEMBER];
+        expect(await connection.sweepCompany(C)).toBe(1);
+        expect(rowOf(MEMBER)).toBeUndefined();
+        expect(rowOf(COLLEAGUE)).toMatchObject({ status: 'connected' });
     });
 });
 

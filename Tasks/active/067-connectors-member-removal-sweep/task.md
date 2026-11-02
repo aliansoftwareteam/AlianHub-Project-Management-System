@@ -1,7 +1,7 @@
 ---
 id: 067
 title: Connectors — end a member's connections on removal, deactivation or SCIM, plus a daily sweep
-status: backlog
+status: active
 priority: high
 depends_on: [066]
 created: 2026-10-28
