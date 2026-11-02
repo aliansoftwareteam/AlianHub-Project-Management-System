@@ -102,7 +102,7 @@ describe('counts', () => {
             { _id: 'idle', statusType: 'default_active' },
         ], { now: NOW });
         expect(picks.map((p) => p.task._id)).toEqual(['late1', 'late2', 'soon']);
-        expect(picks[1].reasons).toEqual(['overdue', 'high priority', 'in progress']);
+        expect(picks[1].reasons).toEqual(['overdue', 'high priority', 'started']);
     });
 
     it('reads a history line as text with the task key', () => {
@@ -125,6 +125,7 @@ describe('project briefing', () => {
         mockDb.seed(SCHEMA_TYPE.HISTORY, { ProjectId: OPEN, TaskId: String(hidden._id), Message: '<b>Grace</b> changed pay', createdAt: day(-1) });
         const shown = mockDb.store[SCHEMA_TYPE.TASKS].find((t) => t.TaskKey === 'ENG-1');
         mockDb.seed(SCHEMA_TYPE.HISTORY, { ProjectId: OPEN, TaskId: String(shown._id), Message: '<b>Raj Iyer</b> has changed <b>Status</b> as <b>In Progress</b>.', createdAt: day(-1) });
+        mockDb.seed(SCHEMA_TYPE.HISTORY, { ProjectId: OPEN, TaskId: '', Message: '<b>Raj Iyer</b> has changed <b>Status</b> as <b>In Progress</b>.', createdAt: day(-1) });
         mockDb.seed(SCHEMA_TYPE.HISTORY, { ProjectId: OPEN, TaskId: String(shown._id), Message: 'Too old', createdAt: day(-40) });
 
         const out = await briefing.projectBriefing(C, ME, { project: PROJECTS[0], openIds: [OPEN, OTHER_PROJECT], now: NOW, timeZone: 'UTC' });
@@ -135,13 +136,14 @@ describe('project briefing', () => {
         expect(overview.detail).toContain('1 overdue');
         expect(overview.detail).toContain('1 blocked');
         expect(overview.detail).toContain('By status: Backlog 1, In Progress 1, Done 1.');
-        expect(overview.detail).toContain('- Raj Iyer: 1 open, 1 in progress, 1 overdue');
+        expect(overview.detail).toContain('- Raj Iyer: 1 open, 1 started, 1 overdue');
         expect(overview.detail).not.toMatch(/Pay rise|Salaries/);
         expect(activity.kind).toBe('activity');
         expect(activity.detail).toContain('Raj Iyer has changed Status as In Progress. [ENG-1]');
         expect(activity.detail).not.toMatch(/pay|Too old/);
+        expect(activity.detail.match(/has changed Status as In Progress/g)).toHaveLength(1);
         expect(tasks.map((t) => t.ref)).toEqual(['ENG-1', 'ENG-3', 'ENG-2']);
-        expect(tasks[0].detail).toContain('overdue, blocked, in progress · In Progress · Raj Iyer · due 2026-10-30');
+        expect(tasks[0].detail).toContain('overdue, blocked, started · In Progress · Raj Iyer · due 2026-10-30');
         expect(tasks[0].detail).toContain('blocked by SUP-3');
         expect(mockDb.calls.every((call) => call.companyId === C || call.companyId === 'global')).toBe(true);
     });
@@ -170,6 +172,7 @@ describe('list and person briefings', () => {
         const out = await briefing.listBriefing(C, ME, { listId: LIST, projects: PROJECTS, now: NOW });
         expect(out[0]).toMatchObject({ kind: 'list', id: LIST, title: 'Release board' });
         expect(out[0].detail).toContain('1 task: 0 done, 1 open');
+        expect(out[0].detail).toContain('list "Release board"');
         expect(await briefing.listBriefing(C, ME, { listId: PRIVATE_LIST, projects: PROJECTS, now: NOW })).toBeNull();
         expect(await briefing.listBriefing(C, ME, { listId: LIST, projects: [], now: NOW })).toBeNull();
     });

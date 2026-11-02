@@ -2107,7 +2107,7 @@
     "Ask.build_untitled": "untitled task",
     "Ask.chip_remove": "Remove {name}",
     "Ask.cite_unavailable": "Not available to open",
-    "Ask.composer_placeholder": "Ask, plan or build. Type / for a skill, {'@'} to add a task, doc or project.",
+    "Ask.composer_placeholder": "Ask, plan or build. Type / for a skill, {'@'} to add a project, list, task, doc or person.",
     "Ask.conversation_label": "Conversation",
     "Ask.copied": "Answer copied.",
     "Ask.copy": "Copy",

@@ -249,11 +249,11 @@ describe('@ adds context', () => {
         await box.trigger('keydown', { key: 'Enter' });
         await flushPromises();
         expect(wrapper.findAll('[data-test="ask-context-chip"]').map((c) => c.text())).toEqual([expect.stringContaining('Budget review')]);
-        expect(box.element.value).toBe('what changed in ');
+        expect(box.element.value).toBe('what changed in Budget review ');
 
         await box.trigger('keydown', { key: 'Enter' });
         await flushPromises();
-        expect(bodyOf(fetch.mock.calls[0])).toEqual({ question: 'what changed in', mode: 'ask', context: [{ kind: 'task', id: 't1' }] });
+        expect(bodyOf(fetch.mock.calls[0])).toEqual({ question: 'what changed in Budget review', mode: 'ask', context: [{ kind: 'task', id: 't1' }] });
         expect(wrapper.findAll('[data-test="ask-context-chip"]')).toHaveLength(0);
         expect(wrapper.find('[data-test="ask-turn-mentions"]').text()).toContain('Budget review');
     });

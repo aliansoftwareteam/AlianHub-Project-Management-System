@@ -5513,7 +5513,7 @@ export default {
         "thread_delete_failed": "Could not delete the thread.",
         "thread_load_failed": "Could not open that thread.",
         "kind_project": "Project",
-        "composer_placeholder": "Ask, plan or build. Type / for a skill, {'@'} to add a task, doc or project.",
+        "composer_placeholder": "Ask, plan or build. Type / for a skill, {'@'} to add a project, list, task, doc or person.",
         "chip_remove": "Remove {name}",
         "menu_skills": "Skills",
         "menu_context": "Add context",

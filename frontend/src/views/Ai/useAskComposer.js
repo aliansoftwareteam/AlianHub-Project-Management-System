@@ -76,6 +76,7 @@ export function useAskComposer({ question, box, skills, companyId = "", projectI
         if (Number.isInteger(caret) && typeof el.setSelectionRange === "function") el.setSelectionRange(caret, caret);
     });
 
+    /* The picked name takes the `@word`'s place so the question still reads as a sentence; the chip carries the id. */
     const pick = (item) => {
         if (!item) return;
         if (menu.kind === "skill") {
@@ -89,10 +90,10 @@ export function useAskComposer({ question, box, skills, companyId = "", projectI
         if (!chips.value.some((chip) => chip.kind === item.kind && chip.id === item.id)) chips.value = [...chips.value, { kind: item.kind, id: item.id, title: item.title }];
         rememberMention(unref(companyId), item);
         const text = String(unref(question) || "");
-        const caret = at ? at.start : text.length;
-        if (at) question.value = text.slice(0, at.start) + text.slice(at.end);
+        const named = at ? `${item.title} ` : "";
+        if (at) question.value = text.slice(0, at.start) + named + text.slice(at.end).replace(/^\s+/, "");
         close();
-        focusAt(caret);
+        focusAt(at ? at.start + named.length : text.length);
     };
 
     const move = (step) => {

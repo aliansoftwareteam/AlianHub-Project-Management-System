@@ -12,3 +12,13 @@
 - Frontend: the `@` picker opens on a bare `@`, calls the new route, groups rows under headings, puts recent picks (localStorage, per company) first, shows kind icons on chips and keeps the chips on the asked turn. "Why these sources" names the new kinds.
 - Tests: `tests/ai-ask-briefing.test.js` (26), `tests/ai-ask-mentions.test.js` (7), `frontend/tests/unit/askMentions.spec.js` (7), `askComposer.spec.js` updated (+1). All `tests/ai-ask*` pass; convention failures (plain-words, ci-e2e-shards, ai-core-boundary, style-check baseline form, role-playbooks) are identical on a clean base checkout.
 - i18n: 11 new `Ask.*` keys, backfilled; `menu_context_hint` dropped (no longer used). `i18n:check` and `style:check` pass.
+- Browser check (local :4420, demo DB, TechNova, model not configured): bare `@` suggestions, `@pla` search, `@omar` person search, Enter/Tab pick, chip on the asked turn. Briefings checked through the stream route against the DB by hand (Platform Engineering 12/2 done, IT Operations list 8/3, Omar 4 open). See `examples.md` and `screenshots/`.
+- Fixed after the real-data check: list names read as "undefined" (a Mongoose document spread); "in progress" counted Ready (an active-type status), now "started"; activity lines written twice (project and task rows) kept once; a doubled period after a description.
+- Picking a mention now puts its name where the `@word` was, so the question reads as a sentence ("How is Omar Haddad doing this week?"); before, the word was removed ("What is going on in and…").
+- The stale English copy of `Ask.composer_placeholder` in the other locales was updated to the new text.
+
+## Open
+
+- Answers not generated: no model key here. Needs one run with a key: ask "What is going on in this project?" on Platform Engineering and check the answer cites `[project:…]` and task refs and keeps the briefing's numbers.
+- `npm run api:doc` for `GET /api/v1/ai/ask/mentions` belongs in the follow-up docs PR (Rule 4).
+- The command palette's one-shot Ask (`POST /api/v1/ai/ask`) does not take `@` context or briefings yet.

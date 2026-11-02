@@ -132,7 +132,7 @@ const healthOf = (s) => {
 
 const countsLine = (s) => [
     `${plural(s.total, 'task')}: ${s.done} done, ${s.open} open (${s.pctDone}% done)`,
-    `${s.active} in progress`,
+    `${s.active} started (in an active status, not done)`,
     `${s.overdue} overdue`,
     `${s.dueSoon} due in the next ${SOON_DAYS} days`,
     `${s.blocked} blocked`,
@@ -145,7 +145,7 @@ const countsLine = (s) => [
 const peopleLines = (s, names) => [...s.people.entries()]
     .sort((a, b) => b[1].open - a[1].open)
     .slice(0, MAX_ROWS)
-    .map(([id, row]) => `- ${names.get(id) || 'A former member'}: ${row.open} open, ${row.active} in progress, ${row.overdue} overdue`);
+    .map(([id, row]) => `- ${names.get(id) || 'A former member'}: ${row.open} open, ${row.active} started, ${row.overdue} overdue`);
 
 const listLines = (s, lists, now, timeZone) => [...s.lists.entries()]
     .map(([id, row]) => ({ row, list: lists.get(id) }))
@@ -165,14 +165,14 @@ const listWords = (list, now, timeZone) => {
 /* The briefing as lines of text: the project (or list, or person) source's detail. */
 const briefingText = ({ heading, summary, names = new Map(), lists = new Map(), now = Date.now(), timeZone = 'UTC', extra = [] }) => {
     const lines = [
-        `${heading}. Today is ${localDate(new Date(now), timeZone)}. Overall: ${healthOf(summary)}.`,
+        `${heading.replace(/[.\s]+$/, '')}. Today is ${localDate(new Date(now), timeZone)}. Overall: ${healthOf(summary)}.`,
         `Counts (exact, every task the asker can open): ${countsLine(summary)}.`,
     ];
     if (summary.byStatus.length) lines.push(`By status: ${summary.byStatus.map((s) => `${s.name} ${s.count}`).join(', ')}.`);
     const people = peopleLines(summary, names);
     if (people.length) lines.push('Open work by person:', ...people);
     const listRows = listLines(summary, lists, now, timeZone);
-    if (listRows.length > 1 || (listRows.length === 1 && extra.length === 0)) lines.push('By list:', ...listRows);
+    if (listRows.length > 1) lines.push('By list:', ...listRows);
     lines.push(...extra);
     return lines.join('\n');
 };
@@ -182,7 +182,7 @@ const REASONS = [
     ['blocked', (t) => !isClosedTask(t) && isBlockedTask(t), null],
     ['high priority', (t) => isHigh(t), null],
     ['due soon', (t, now) => isDueSoon(t, now), (a, b) => dueOf(a) - dueOf(b)],
-    ['in progress', (t) => !isClosedTask(t) && inProgress(t), null],
+    ['started', (t) => !isClosedTask(t) && inProgress(t), null],
     ['recently done', (t, now) => isRecentlyDone(t, now), null],
 ];
 
@@ -253,7 +253,10 @@ const visibleLists = async (companyId, uid, projectIds, now) => {
         'name projectId private AssigneeUserId isScrum state startDate endDate');
     const privileged = isPrivileged(await getRoleType(companyId, uid).catch(() => null));
     const identities = privileged ? null : await sprintIdentities(companyId, uid);
-    return new Map(rows.filter((s) => !identities || canSeeSprint(s, identities)).map((s) => [String(s._id), { ...s, active: ACTIVE_LIST_STATES.includes(deriveState(s, new Date(now))) }]));
+    return new Map(rows.filter((s) => !identities || canSeeSprint(s, identities)).map((s) => [String(s._id), {
+        _id: s._id, name: s.name || '', projectId: s.projectId, isScrum: s.isScrum, state: s.state, startDate: s.startDate, endDate: s.endDate,
+        active: ACTIVE_LIST_STATES.includes(deriveState(s, new Date(now))),
+    }]));
 };
 
 /* The keys of the tasks a blocked task waits on, read inside the projects the asker can open. */
@@ -296,10 +299,15 @@ const activityOf = async (companyId, { projectId, tasks, timeZone, now }) => {
     const rows = await find(companyId, SCHEMA_TYPE.HISTORY,
         { ProjectId: { $in: idForms(projectId) }, createdAt: { $gte: new Date(now - ACTIVITY_DAYS * DAY) } },
         'Message TaskId createdAt', { sort: { createdAt: -1 }, limit: MAX_ACTIVITY * 3 });
-    // A row about a task the asker cannot open (a private list they are not on) stays out.
-    return rows.filter((row) => !row.TaskId || keys.has(String(row.TaskId)))
+    // A row about a task the asker cannot open (a private list they are not on) stays out. A change is often
+    // written twice, once for the project and once for its task: the task's line is kept.
+    const visible = rows.filter((row) => !row.TaskId || keys.has(String(row.TaskId)));
+    const texts = new Set(visible.filter((row) => row.TaskId).map((row) => `${localDate(row.createdAt, timeZone)}|${clip(row.Message, 220)}`));
+    const seen = new Set();
+    return visible
+        .filter((row) => row.TaskId || !texts.has(`${localDate(row.createdAt, timeZone)}|${clip(row.Message, 220)}`))
         .map((row) => activityLine(row, { keys, timeZone }))
-        .filter(Boolean)
+        .filter((line) => line && !seen.has(line) && seen.add(line))
         .slice(0, MAX_ACTIVITY);
 };
 
