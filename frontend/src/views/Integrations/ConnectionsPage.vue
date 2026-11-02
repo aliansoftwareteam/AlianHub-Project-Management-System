@@ -20,6 +20,7 @@
                 <p v-if="error" class="ah-field__error">{{ error }}</p>
 
                 <GoogleConnection v-if="hasGoogle && (view === 'all' || view === 'apps')" />
+                <ConnectorQuotas v-if="connectorLimits && (view === 'all' || view === 'apps')" />
 
                 <div class="conn__grid">
                     <article v-for="card in visible" :key="card.key" class="ah-card conn__card">
@@ -86,6 +87,7 @@ import * as env from "@/config/env";
 import ShellIcon from "@/components/organisms/Shell/ShellIcon.vue";
 import AiSidebar from "@/views/Ai/AiSidebar.vue";
 import GoogleConnection from "./GoogleConnection.vue";
+import ConnectorQuotas from "./ConnectorQuotas.vue";
 import { AI_RIGHT, useAiRights } from "@/composable/aiRights";
 
 // Connections (13e). Only what this workspace can actually connect to is listed:
@@ -102,6 +104,7 @@ const tabs = ["all", "apps", "mcp", "agents"];
 const view = ref("all");
 const catalog = ref([]);
 const connectors = ref([]);
+const connectorLimits = ref(false);
 const hasGoogle = computed(() => connectors.value.includes("google_calendar"));
 const connections = ref([]);
 const mcpManifest = ref({});
@@ -222,6 +225,7 @@ onMounted(async () => {
         ]);
         catalog.value = cat?.data?.status ? cat.data.data || [] : [];
         connectors.value = cat?.data?.status ? cat.data.connectors || [] : [];
+        connectorLimits.value = cat?.data?.status === true && cat.data.connectorLimits === true;
         connections.value = conns?.data?.status ? conns.data.data || [] : [];
         mcpManifest.value = manifest?.data?.status ? manifest.data.data || {} : {};
         await loadTokens();

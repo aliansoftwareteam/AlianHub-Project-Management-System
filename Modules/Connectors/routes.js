@@ -57,8 +57,11 @@ const genericRoutes = (app) => {
 };
 
 exports.init = (app) => {
-    // Owners and admins only, never an API token; the handler checks the seat itself.
-    if (flag.named().length) app.put('/api/v2/connectors/admin/quotas', ctrl.setQuotas);
+    // Owners and admins only, never an API token; the handlers check the seat themselves.
+    if (flag.named().length) {
+        app.get('/api/v2/connectors/admin/quotas', ctrl.getQuotas);
+        app.put('/api/v2/connectors/admin/quotas', ctrl.setQuotas);
+    }
     if (flag.requested().includes('slack')) slackRoutes(app);
     // Before the legacy google routes: the generic '/:provider/callback' and the legacy google callback share one
     // redirect URI, and the generic handler hands a legacy state back to the legacy handler (coexistence until 073).

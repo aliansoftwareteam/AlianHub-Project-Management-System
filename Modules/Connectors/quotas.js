@@ -112,14 +112,34 @@ const changesFrom = (scope, body) => {
     };
 };
 
+const savedLimits = (scope, row) => Object.fromEntries(FIELDS_OF[scope].map((field) => [field, isSet(row && row[field]) ? row[field] : null]));
+
+const hasOverride = (limits) => Object.values(limits).some(isSet);
+
+const overview = async (companyId) => {
+    const rows = await MongoDbCrudOpration(companyId, { type: SCHEMA_TYPE.CONNECTOR_QUOTAS, data: [{}] }, 'find') || [];
+    const overridesOf = (scope) => rows.filter((row) => row.scope === scope)
+        .map((row) => ({ targetId: row.targetId, limits: savedLimits(scope, row) }))
+        .filter((row) => hasOverride(row.limits));
+    return {
+        workspace: savedLimits(SCOPE.WORKSPACE, rows.find((row) => row.scope === SCOPE.WORKSPACE)),
+        members: overridesOf(SCOPE.MEMBER),
+        agents: overridesOf(SCOPE.AGENT),
+        defaults: DEFAULTS, ceilings: ceilings(),
+    };
+};
+
 /* `null` takes an override away, so the wider one or the default applies again. */
 const set = async (companyId, body, actor) => {
     const scope = String(body.scope || '');
     if (!FIELDS_OF[scope]) throw badInput(`scope must be one of ${Object.values(SCOPE).join(', ')}.`);
     const targetId = scope === SCOPE.WORKSPACE ? '' : String(body.targetId || '');
-    const problem = await targetProblem(companyId, scope, targetId);
-    if (problem) throw badInput(problem);
     const changes = changesFrom(scope, body);
+    // A limit left behind by someone who has since gone can still be taken away.
+    const onlyClearing = !Object.keys(changes.set).length && OBJECT_ID.test(targetId);
+    const leftBehind = onlyClearing && await MongoDbCrudOpration(companyId, { type: SCHEMA_TYPE.CONNECTOR_QUOTAS, data: [{ scope, targetId }] }, 'findOne');
+    const problem = leftBehind ? '' : await targetProblem(companyId, scope, targetId);
+    if (problem) throw badInput(problem);
     await MongoDbCrudOpration(companyId, {
         type: SCHEMA_TYPE.CONNECTOR_QUOTAS,
         data: [
@@ -135,9 +155,9 @@ const set = async (companyId, body, actor) => {
     const saved = await MongoDbCrudOpration(companyId, { type: SCHEMA_TYPE.CONNECTOR_QUOTAS, data: [{ scope, targetId }] }, 'findOne');
     return {
         scope, targetId,
-        limits: Object.fromEntries(FIELDS_OF[scope].map((field) => [field, isSet(saved && saved[field]) ? saved[field] : null])),
+        limits: savedLimits(scope, saved),
         defaults: DEFAULTS, ceilings: ceilings(),
     };
 };
 
-module.exports = { SCOPE, DEFAULTS, ceilings, limitsFor, claimRead, claimWriteProposal, set };
+module.exports = { SCOPE, DEFAULTS, ceilings, limitsFor, claimRead, claimWriteProposal, overview, set };

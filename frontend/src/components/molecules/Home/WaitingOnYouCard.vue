@@ -16,7 +16,7 @@
                 </div>
                 <div class="hwait__actions">
                     <button
-                        v-if="item.plan"
+                        v-if="item.plan && !item.outside"
                         type="button"
                         class="ah-btn ah-btn--primary ah-btn--sm"
                         data-test="waiting-review"
@@ -25,7 +25,7 @@
                         :aria-label="$t('Home.waiting_review_named', { what: item.what })"
                         @click="toggleReview(item)"
                     >{{ $t('Home.waiting_review_parts') }}</button>
-                    <button v-else type="button" class="ah-btn ah-btn--primary ah-btn--sm" data-test="waiting-approve" :disabled="busy" :aria-label="$t('Home.waiting_approve_named', { what: item.what })" @click="approve(item)">{{ $t('Inbox.approve') }}</button>
+                    <button v-else-if="!item.outside" type="button" class="ah-btn ah-btn--primary ah-btn--sm" data-test="waiting-approve" :disabled="busy" :aria-label="$t('Home.waiting_approve_named', { what: item.what })" @click="approve(item)">{{ $t('Inbox.approve') }}</button>
                     <button v-if="hasInbox" type="button" class="ah-btn ah-btn--secondary ah-btn--sm" data-test="waiting-open" :aria-label="$t(inQueueTab(item) ? 'Inbox.queue_open_named' : 'Home.waiting_open_named', { what: item.what })" @click="openItem(item)">{{ $t('Inbox.open') }}</button>
                 </div>
                 <div v-if="isReviewing(item)" :id="partsId(item)" class="hwait__parts" data-test="waiting-parts">
@@ -61,7 +61,7 @@ import SimulatedChip from "@/components/atom/SimulatedChip/SimulatedChip.vue";
 import IntentPreview from "@/components/molecules/IntentPreview/IntentPreview.vue";
 import { hasParts } from "@/components/molecules/IntentPreview/planPicks";
 import { usePlanChoices } from "@/components/molecules/IntentPreview/planChoices";
-import { laterLine, unappliedOf } from "@/views/Inbox/approvalQueue";
+import { hasOutsideWrite, laterLine, unappliedOf } from "@/views/Inbox/approvalQueue";
 import { changeLabel } from "@/views/Ai/agentActionLabels";
 import { aiOff } from "@/composable/aiAvailability";
 import { fetchPendingProposals, sendProposalDecision } from "@/composable/agentProposals";
@@ -102,7 +102,7 @@ const time = (value) => (value ? new Date(value).getTime() || 0 : 0);
 const mine = (p) => (typeof p.locked === "boolean" ? !p.locked : p.gate !== GATE_OWNER_ADMIN || canManage.value);
 const whyOf = (p) => (p.finding && findingReasons(t, p.finding).join(" · ")) || plainReason(t, te, p.why);
 const planOf = (p) => (!p.batch && hasParts(p.changes) ? p.changes : null);
-const fromProposal = (p) => ({ kind: "proposal", id: String(p._id), what: proposalTitle(t, p) || t("Home.waiting_untitled"), who: p.agentName || "", why: whyOf(p), at: time(p.createdAt), source: p, plan: planOf(p) });
+const fromProposal = (p) => ({ kind: "proposal", id: String(p._id), what: proposalTitle(t, p) || t("Home.waiting_untitled"), who: p.agentName || "", why: whyOf(p), at: time(p.createdAt), source: p, plan: planOf(p), outside: hasOutsideWrite(p.changes) });
 const fromApproval = (a) => ({ kind: "approval", id: String(a._id), what: a.title || t("Workflows.approval_untitled"), who: a.run?.name || a.ownerName || "", at: time(a.createdAt || a.deadlineAt), source: a });
 
 async function load() {

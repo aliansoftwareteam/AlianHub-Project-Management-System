@@ -10,6 +10,7 @@
                         <li v-for="(change, i) in readChanges(p)" :key="i" class="aq__change">
                             <span class="aq__change-label">{{ changeText(change) }}</span>
                             <span v-if="!change.reversible" class="ah-chip ah-chip--warn">{{ t('Ai.not_reversible') }}</span>
+                            <ConnectorWriteCard v-if="change.card" class="aq__wide" :change="change" />
                         </li>
                     </ul>
                     <p v-if="keptOf(p)" class="aq__lead" data-test="queue-review-parts">{{ t('Inbox.queue_parts_kept', { parts: keptOf(p) }) }}</p>
@@ -89,7 +90,8 @@
                             :aria-label="t('Inbox.queue_drop_named', { change: changeText(change) })"
                             @click="kept.splice(i, 1)"
                         >{{ t('Ai.drop') }}</button>
-                        <SlackPostPreview v-if="change.action === SLACK_POST" class="aq__slack" :change="change" />
+                        <SlackPostPreview v-if="change.action === SLACK_POST" class="aq__wide" :change="change" />
+                        <ConnectorWriteCard v-if="change.card" class="aq__wide" :change="change" :editing="isEditing(p)" :disabled="busy" @update:params="change.params = $event" />
                     </li>
                 </ul>
 
@@ -162,9 +164,9 @@
                         data-test="queue-approve"
                         :aria-label="t('Inbox.queue_approve_named', { what: titleOf(p) })"
                         @click="approve(p)"
-                    >{{ t('Inbox.approve') }}</button>
+                    >{{ checksAgain(p) ? t('Connectors.approval.check_again') : t('Inbox.approve') }}</button>
                     <button
-                        v-if="p.editable"
+                        v-if="p.editable && !nothingToEdit(p.changes)"
                         type="button"
                         class="ah-btn ah-btn--secondary ah-btn--sm"
                         :disabled="busy || reviewing"
@@ -230,12 +232,13 @@ import IntentPreview from '@/components/molecules/IntentPreview/IntentPreview.vu
 import { intentSummary, intentTitle } from '@/components/molecules/IntentPreview/intentLines';
 import { keptSummary, partsChoice } from '@/components/molecules/IntentPreview/planPicks';
 import SlackPostPreview from '@/views/Ai/SlackPostPreview.vue';
+import ConnectorWriteCard from './ConnectorWriteCard.vue';
 import { DECLINE_REASONS } from '@/views/Ai/episodeText';
 import { proposalTitle } from '@/views/Ai/plainLabels';
 import { agentActionLabel, changeLabel } from '@/views/Ai/agentActionLabels';
 import { findingFix, findingReasons } from '@/views/Projects/ProjectDetail/findingText';
 import { plainReason } from '@/views/Ai/auditWords';
-import { decideEach, decideOne } from './approvalQueue';
+import { changesEdited, decideEach, decideOne, hasOutsideWrite, nothingToEdit, withShownRevision } from './approvalQueue';
 import { fullText } from '@/utils/clockText';
 
 defineOptions({ name: 'ApprovalQueue' });
@@ -245,7 +248,7 @@ const props = defineProps({
     applied: { type: Array, default: () => [] },
     stamp: { type: Function, default: () => '' },
 });
-const emit = defineEmits(['decided', 'undone', 'open-task']);
+const emit = defineEmits(['decided', 'undone', 'open-task', 'reshown']);
 
 const SLACK_POST = 'slack.message.post';
 const SOURCE_MCP = 'mcp';
@@ -282,16 +285,16 @@ const titleOf = (p) => (p.finding && findingFix(t, p.finding)) || intentTitle(t,
 const whyOf = (p) => (p.finding && findingReasons(t, p.finding).join(' · ')) || plainReason(t, te, p.why);
 const changeText = (change) => intentSummary(t, change.preview) || changeLabel(t, change);
 const alwaysKindOf = (p) => agentActionLabel(t, p.changes?.[0]?.action, p.alwaysKind);
-// The preview is the server's reading of a change for this viewer, never part of the change sent back.
-const asFiled = (change) => Object.fromEntries(Object.entries(change).filter(([key]) => key !== 'preview'));
+// The preview and the card are the server's reading of a change, never part of the change sent back.
+const asFiled = (change) => Object.fromEntries(Object.entries(change).filter(([key]) => key !== 'preview' && key !== 'card'));
 const whoOf = (p) => {
     if (p.source === SOURCE_SYSTEM) return t('Inbox.queue_system_for', { project: p.finding?.projectName || p.agentName });
     const person = p.source === SOURCE_MCP && p.requestedBy ? getUser(p.requestedBy)?.Employee_Name : '';
     return person ? t('Inbox.queue_for', { agent: p.agentName, person }) : p.agentName;
 };
 
-const LOCKED_CHIPS = Object.freeze({ own_rights: 'Inbox.queue_locked_rights', first_approver: 'Inbox.queue_locked_retry', not_this_plan: 'Inbox.queue_locked_plan' });
-const LOCKED_NOTES = Object.freeze({ own_rights: 'Ai.rights_locked', first_approver: 'Inbox.queue_retry_locked', not_this_plan: 'Inbox.queue_plan_locked' });
+const LOCKED_CHIPS = Object.freeze({ own_rights: 'Inbox.queue_locked_rights', first_approver: 'Inbox.queue_locked_retry', not_this_plan: 'Inbox.queue_locked_plan', connection_owner: 'Connectors.approval.locked' });
+const LOCKED_NOTES = Object.freeze({ own_rights: 'Ai.rights_locked', first_approver: 'Inbox.queue_retry_locked', not_this_plan: 'Inbox.queue_plan_locked', connection_owner: 'Connectors.approval.locked_note' });
 // A row that is not the reader's to approve can still be theirs to decline: one their own agent asked for.
 const mayDecline = (p) => !p.locked || p.mayDecline === true;
 const selectable = computed(() => props.proposals.filter((p) => !p.locked));
@@ -316,7 +319,12 @@ const canPick = (p) => !p.locked && !p.batch && !isEditing(p);
 const leftOutAt = (p) => (i) => leftOut[pickKey(p, i)];
 const choiceOf = (p) => (p.batch || isEditing(p) ? null : partsChoice(p.changes, leftOutAt(p)));
 const keptOf = (p) => (choiceOf(p) ? keptSummary(t, p.changes, leftOutAt(p)) : '');
+const isEdited = (p) => isEditing(p) && changesEdited(kept.value, p.changes);
+// An edited write to a connected app comes back to its owner on a new card; this click sends nothing.
+const checksAgain = (p) => isEdited(p) && hasOutsideWrite(kept.value);
 const toggleEdit = (p) => {
+    // Closing the form must not leave the old card beside an Approve that would send the old text.
+    if (checksAgain(p)) { approve(p); return; }
     if (isEditing(p)) { editing.value = ''; return; }
     forgetPicks(p);
     editing.value = p.proposalId;
@@ -337,15 +345,22 @@ const settle = (p, verb, result) => {
     forgetPicks(p);
     picked.value = picked.value.filter((id) => id !== p.proposalId);
     const more = Boolean(result.later?.waiting || result.later?.retry);
-    emit('decided', { id: p.proposalId, verb, undo: Boolean(result.undo), ...(result.madeProjects?.length ? { madeProjects: result.madeProjects } : {}), ...(result.opens ? { opens: result.opens } : {}), ...(more ? { more } : {}) });
+    const failure = failuresLine(result.unapplied || []);
+    emit('decided', { id: p.proposalId, verb, undo: Boolean(result.undo), ...(failure ? { failure } : {}),...(result.madeProjects?.length ? { madeProjects: result.madeProjects } : {}), ...(result.opens ? { opens: result.opens } : {}), ...(more ? { more } : {}) });
 };
 
 const approve = async (p) => {
-    const edited = isEditing(p) && kept.value.length !== (p.changes || []).length;
     busy.value = true;
     summary.value = '';
-    const result = await send(p.proposalId, 'approve', edited ? { changes: kept.value.map(asFiled) } : choiceOf(p) || {});
+    const result = await send(p.proposalId, 'approve', withShownRevision(p, isEdited(p) ? { changes: kept.value.map(asFiled) } : choiceOf(p) || {}));
     busy.value = false;
+    if (result.reshown) {
+        delete errors[p.proposalId];
+        editing.value = '';
+        summary.value = t('Connectors.approval.reshown');
+        emit('reshown', { id: p.proposalId, changes: result.reshownChanges, revision: result.reshownRevision });
+        return;
+    }
     if (result.ok) { editing.value = ''; summary.value = outcomeLine([result]); }
     settle(p, 'approve', result);
 };
@@ -418,7 +433,7 @@ const approveReviewed = async () => {
     busy.value = true;
     summary.value = '';
     const byId = new Map(rows.map((p) => [p.proposalId, p]));
-    const results = await decideEach(rows.map((p) => p.proposalId), (id) => send(id, 'approve', choiceOf(byId.get(id)) || {}), (result) => settle(byId.get(result.id), 'approve', result));
+    const results = await decideEach(rows.map((p) => p.proposalId), (id) => send(id, 'approve', withShownRevision(byId.get(id), choiceOf(byId.get(id)) || {})), (result) => settle(byId.get(result.id), 'approve', result));
     busy.value = false;
     const approved = results.filter((r) => r.ok);
     const failed = results.length - approved.length;
@@ -467,7 +482,7 @@ const approveReviewed = async () => {
 .aq__change { display: flex; align-items: center; flex-wrap: wrap; gap: 6px; padding: 5px 8px; border-radius: var(--r-sm, 6px); background: var(--fill); color: var(--ink); min-width: 0; }
 .aq__change-label { flex: 1 1 12ch; min-width: 0; overflow-wrap: anywhere; }
 .aq__intent { flex: 1 1 16ch; }
-.aq__slack { flex: 1 1 100%; margin: 4px 0 0; }
+.aq__wide { flex: 1 1 100%; margin: 4px 0 0; }
 .aq__error { margin: 0; }
 .aq__actions { display: flex; align-items: center; flex-wrap: wrap; gap: 6px; }
 .aq__actions .ah-btn--sm { height: var(--control-h, 28px); padding: 0 var(--sp-4, 10px); font-size: var(--fs-sm, 11.5px); }

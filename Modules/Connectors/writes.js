@@ -24,9 +24,14 @@ const REFUSAL = Object.freeze({
     NOT_FROM_PROPOSAL: 'A write to a connected app is sent only from a proposal its owner approved.',
     SENT_ONCE: 'This approval was already used to send, so it is not sent again. Ask for a new one.',
     TOKEN_FILED: 'A write to a connected app is proposed only by an agent run or an MCP call, not through this route.',
+    CARD_CHANGED: 'This write was edited after this card was shown, so nothing was sent. Reload, read the new card, and approve that one.',
+    NOT_UNDOABLE: 'This was already sent to the connected app, so it cannot be undone from here. Change it in that app.',
 });
 
 const refuse = (message, code, status = 403) => Object.assign(new Error(message), { status, code, deterministic: true });
+
+/* The runner's messages open with a code and a tool key for the model that called it; a person reads what follows. */
+const spoken = (message) => String(message || '').replace(/^[a-z_]+: /, '').replace(/^[a-z0-9_]+(\.[a-z0-9_]+)+: /, '');
 
 const isWrite = (action) => tools.isWrite(action);
 const hasWrite = (changes) => (Array.isArray(changes) ? changes : []).some((c) => c && isWrite(c.action));
@@ -61,9 +66,11 @@ const cardOf = (tool, args) => {
         target: line(shown.target),
         ...(shown.targetLabel ? { targetLabel: rowOf({ label: shown.targetLabel }).label } : {}),
         title: line(shown.title),
+        ...(shown.headline ? { headline: line(shown.headline) } : {}),
         text: runner.plain(shown.text),
         attachments: (Array.isArray(shown.attachments) ? shown.attachments : []).map(line).filter(Boolean),
         ...(Array.isArray(shown.rows) && shown.rows.length ? { rows: shown.rows.map(rowOf) } : {}),
+        ...(tool.editable ? { fields: tool.editable.map((field) => JSON.parse(JSON.stringify(field))) } : {}),
     };
     const part = partTooLong(card);
     if (part) throw refuse(`The ${part} of this write is too long to show whole on its approval card, so it was not filed. Shorten it and ask again.`, 'card_too_long', 400);
@@ -81,7 +88,7 @@ const prepareChanges = async (companyId, ownerId, changes) => {
         // eslint-disable-next-line no-await-in-loop
         const { tool, args, params } = await runner.admitWrite({ companyId, userId: String(ownerId), key: change.action, input: change.params });
         const card = cardOf(tool, args);
-        out.push({ ...change, params, card, label: card.title || card.target });
+        out.push({ ...change, params, card, label: card.title || card.headline || card.target });
     }
     return out;
 };
@@ -166,4 +173,4 @@ const deliveryOf = (changes, applied) => (Array.isArray(changes) ? changes : [])
         at: new Date(),
     }));
 
-module.exports = { GATE, REFUSAL, isWrite, hasWrite, cardOf, prepareChanges, fileChanges, gatedByOwner, approverRefusal, send, executorFor, deliveryOf };
+module.exports = { GATE, REFUSAL, spoken, isWrite, hasWrite, cardOf, prepareChanges, fileChanges, gatedByOwner, approverRefusal, send, executorFor, deliveryOf };

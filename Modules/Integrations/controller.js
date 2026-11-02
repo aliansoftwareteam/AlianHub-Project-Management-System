@@ -75,8 +75,9 @@ const foldedRepo = async (companyId, uid, existing, config, projectId) => {
 
 exports.listCatalog = async (req, res) => {
     try {
-        const connectors = require('../Agents/connectors/flag').requested();
-        return res.send({ status: true, data: R.getCatalog(), ...(connectors.length ? { connectors } : {}) });
+        const flag = require('../Agents/connectors/flag');
+        const connectors = flag.requested();
+        return res.send({ status: true, data: R.getCatalog(), ...(connectors.length ? { connectors } : {}), ...(flag.named().length ? { connectorLimits: true } : {}) });
     }
     catch (e) { logger.error(`listCatalog: ${e.message}`); return res.send({ status: false, statusText: e.message }); }
 };

@@ -6,7 +6,7 @@ import { declineReasonText } from "./episodeText";
    keeps the two lists the same. */
 const AGENT_ROWS = Object.freeze(["agent.action", "agent.action_refused", "agent.action_undone"]);
 const PROPOSAL_DECIDED = "agent.proposal_decided";
-const DECISIONS = Object.freeze(["approved", "declined", "undone", "failed"]);
+const DECISIONS = Object.freeze(["approved", "declined", "undone", "failed", "card_edited"]);
 const PERSON = "member";
 
 const OBJECT_ID = /^[a-f0-9]{24}$/i;

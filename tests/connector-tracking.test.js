@@ -242,10 +242,61 @@ describe('PUT /api/v2/connectors/admin/quotas', () => {
         expect(out.body.statusText).toMatch(why);
     });
 
+    it('refuses to clear a limit nobody ever had on someone who is not here', async () => {
+        const { code } = await setQuota({ scope: 'member', targetId: '6f0000000000000000000a08', reads: null });
+        expect(code).toBe(400);
+        expect(mockDb.store[SCHEMA_TYPE.CONNECTOR_QUOTAS] || []).toHaveLength(0);
+    });
+
+    it('takes away the limit of someone who has gone, and sets no new one for them', async () => {
+        const GONE = '6f0000000000000000000a09';
+        mockDb.seed(SCHEMA_TYPE.CONNECTOR_QUOTAS, { scope: 'member', targetId: GONE, reads: 9 });
+        expect((await setQuota({ scope: 'member', targetId: GONE, reads: 5 })).code).toBe(400);
+        const { code, body } = await setQuota({ scope: 'member', targetId: GONE, reads: null });
+        expect(code).toBe(200);
+        expect(body.data.limits.reads).toBeNull();
+    });
+
     it('is for an owner or admin in person', async () => {
         expect((await setQuota({ scope: 'workspace', reads: 5 }, { role: 3 })).code).toBe(403);
         expect((await setQuota({ scope: 'workspace', reads: 5 }, { apiToken: { _id: 't' } })).code).toBe(403);
         expect(mockDb.store[SCHEMA_TYPE.CONNECTOR_QUOTAS] || []).toHaveLength(0);
+    });
+});
+
+describe('GET /api/v2/connectors/admin/quotas', () => {
+    const readQuotas = async ({ role = 1, apiToken } = {}) => {
+        getRoleType.mockResolvedValue(role);
+        const res = { status: jest.fn(() => res), send: jest.fn(() => res) };
+        await controller.getQuotas({ headers: { companyid: C }, aud: C, uid: ADMIN, apiToken, get: () => '', ip: '' }, res);
+        return { code: res.status.mock.calls.length ? res.status.mock.calls[0][0] : 200, body: res.send.mock.calls[0][0] };
+    };
+
+    it('answers the defaults and ceilings before anything is saved', async () => {
+        process.env.CONNECTOR_QUOTA_MAX_READS = '600';
+        const { code, body } = await readQuotas();
+        expect(code).toBe(200);
+        expect(body.data).toEqual({
+            workspace: { reads: null, writeProposals: null, agentReads: null }, members: [], agents: [],
+            defaults: quotas.DEFAULTS, ceilings: { reads: 600, writeProposals: 500, agentReads: 2000 },
+        });
+    });
+
+    it('lists what was saved, and not an override that was taken away', async () => {
+        await setQuota({ scope: 'workspace', writeProposals: 20 });
+        await setQuota({ scope: 'member', targetId: MEMBER, reads: 9 });
+        await setQuota({ scope: 'member', targetId: PRISHA, reads: 3 });
+        await setQuota({ scope: 'member', targetId: PRISHA, reads: null });
+        await setQuota({ scope: 'agent', targetId: AGENT_ID, agentReads: 7 });
+        const { data } = (await readQuotas()).body;
+        expect(data.workspace).toEqual({ reads: null, writeProposals: 20, agentReads: null });
+        expect(data.members).toEqual([{ targetId: MEMBER, limits: { reads: 9, writeProposals: null } }]);
+        expect(data.agents).toEqual([{ targetId: AGENT_ID, limits: { agentReads: 7 } }]);
+    });
+
+    it('is for an owner or admin in person', async () => {
+        expect((await readQuotas({ role: 3 })).code).toBe(403);
+        expect((await readQuotas({ apiToken: { _id: 't' } })).code).toBe(403);
     });
 });
 

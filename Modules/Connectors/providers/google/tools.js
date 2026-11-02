@@ -84,6 +84,16 @@ const eventCard = (input, attendeesLabel) => ({
     ].filter((row) => row && (row.value || row.valueLabel)),
 });
 
+const EVENT_EDITS = Object.freeze([
+    { param: 'summary', label: 'Connectors.card.title' },
+    { param: 'start', label: 'Connectors.card.start', hint: 'Connectors.card.timeHint' },
+    { param: 'end', label: 'Connectors.card.end', hint: 'Connectors.card.timeHint' },
+    { param: 'location', label: 'Connectors.card.where' },
+    { param: 'attendees', label: 'Connectors.card.attendees' },
+    { param: 'description', label: 'Connectors.card.description', long: true },
+    { param: 'notifyAttendees', label: 'Connectors.card.notifyAttendees', toggle: true },
+]);
+
 const notifyOf = (input) => ({ sendUpdates: input.notifyAttendees ? 'all' : 'none' });
 
 const spaceId = (space) => encodeURIComponent(String(space).replace(/^spaces\//, ''));
@@ -156,6 +166,7 @@ module.exports = [{
     },
     caps: { maxItems: 1, maxChars: 500 },
     card: (input) => ({ ...eventCard(input, 'Connectors.card.attendees'), title: input.summary }),
+    editable: EVENT_EDITS,
     run: async ({ input, connection }) => {
         const event = json(await connection.request(eventsUrl(input), { method: 'post', query: notifyOf(input), json: eventBody(input) }));
         return `Created event ${event.id}: ${event.htmlLink}`;
@@ -178,8 +189,10 @@ module.exports = [{
         if (!EDITABLE.some((field) => input[field] !== undefined)) {
             throw Object.assign(new Error('This update names nothing to change, so it was not filed.'), { code: 'bad_input', status: 400, deterministic: true });
         }
-        return { ...eventCard(input, 'Connectors.card.attendeesReplaced'), title: String(input.summary || '').trim() || input.eventId };
+        // The title row says what the event will be called, so an update that leaves the name alone has none.
+        return { ...eventCard(input, 'Connectors.card.attendeesReplaced'), title: String(input.summary || '').trim(), headline: input.eventId };
     },
+    editable: EVENT_EDITS,
     run: async ({ input, connection }) => {
         const event = json(await connection.request(eventUrl(input), { method: 'patch', query: notifyOf(input), json: eventBody(input) }));
         return `Updated event ${event.id}: ${event.htmlLink}`;
@@ -222,6 +235,10 @@ module.exports = [{
     },
     caps: { maxItems: 1, maxChars: 500 },
     card: (input) => ({ target: 'Google Meet', rows: [{ label: 'Connectors.card.access', valueLabel: ACCESS_ROW[input.accessType] || 'Connectors.card.accessDefault' }] }),
+    editable: [{
+        param: 'accessType', label: 'Connectors.card.access', blank: 'Connectors.card.accessDefault',
+        options: Object.entries(ACCESS_ROW).map(([value, label]) => ({ value, label })),
+    }],
     run: async ({ input, connection }) => {
         const space = json(await connection.request(MEET_SPACES, { method: 'post', json: input.accessType ? { config: { accessType: input.accessType } } : {} }));
         return `Created meeting ${space.meetingCode}: ${space.meetingUri}`;

@@ -100,7 +100,7 @@
                 />
 
                 <template v-else>
-                    <ApprovalQueue v-if="queue.length || applied.length" :proposals="queue" :applied="applied" :stamp="stamp" @decided="onQueueDecided" @undone="onQueueUndone" @open-task="openQueueTask" />
+                    <ApprovalQueue v-if="queue.length || applied.length" :proposals="queue" :applied="applied" :stamp="stamp" @decided="onQueueDecided" @undone="onQueueUndone" @reshown="onQueueReshown" @open-task="openQueueTask" />
                     <article
                         v-for="(it, i) in rows"
                         :key="rowKey(it)"
@@ -906,9 +906,11 @@ const undoApprovals = async (ids) => {
     else $toast.success(t('Inbox.queue_undone'), { position: 'top-right' });
     loadCounts();
 };
-const onQueueDecided = ({ id, verb, undo: canUndo, madeProjects, opens, more }) => {
+const onQueueDecided = ({ id, verb, undo: canUndo, madeProjects, opens, more, failure }) => {
     queue.value = queue.value.filter((p) => p.proposalId !== id);
     loadCounts();
+    // The queue's own line goes with it when this was its last row, so what did not go through is said here too.
+    if (failure && !queue.value.length) { $toast.error(failure, { position: 'top-right' }); return; }
     // What an approval left to be made later is back in the queue as rows of its own.
     if (more) load(false, { inPlace: true, quiet: true });
     showProjects(store, madeProjects);
@@ -920,6 +922,10 @@ const onQueueDecided = ({ id, verb, undo: canUndo, madeProjects, opens, more }) 
     Object.assign(undo.value, { approved, undoIds, opens: approved.length === 1 ? opens || '' : '' });
 };
 const openQueueTask = (task) => openTask({ companyId: companyId?.value, projectId: task.projectId, sprintId: task.sprintId, folderId: task.folderId || '', taskId: task.taskId });
+const onQueueReshown = ({ id, changes, revision }) => {
+    queue.value = queue.value.map((p) => (p.proposalId === id ? { ...p, changes, revision } : p));
+    load(false, { inPlace: true, quiet: true });
+};
 const onQueueUndone = ({ id }) => {
     applied.value = applied.value.filter((p) => p.proposalId !== id);
     $toast.success(t('Inbox.always_undone'), { position: 'top-right' });

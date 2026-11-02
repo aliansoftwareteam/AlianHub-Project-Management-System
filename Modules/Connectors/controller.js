@@ -68,18 +68,22 @@ exports.removeSlackSecret = handle('remove a Slack connector secret', 'Removed.'
 
 exports.refreshSlackChannels = handle('refresh the Slack channel list', 'Channel list refreshed.', (companyId, req) => slack.refreshChannels(companyId, actorOf(req)));
 
-exports.setQuotas = async (req, res) => {
+const handleQuotas = (what, statusText, run) => async (req, res) => {
     try {
         const companyId = tenantOf(req);
         if (req.apiToken) return refuse(res, 403, 'An API token cannot manage connectors.');
         if (!isPrivileged(await getRoleType(companyId, req.uid))) return refuse(res, 403, 'Only an owner or admin can manage connectors.');
-        return res.send({ status: true, statusText: 'Limits saved.', data: await quotas.set(companyId, req.body || {}, actorOf(req)) });
+        return res.send({ status: true, statusText, data: await run(companyId, req) });
     } catch (error) {
         if (error instanceof TenantError) return refuse(res, error.statusCode, error.message);
         if (error && error.expose) return refuse(res, error.status, error.message);
-        return failed(res, error, 'set the connector limits');
+        return failed(res, error, what);
     }
 };
+
+exports.getQuotas = handleQuotas('read the connector limits', 'Limits fetched.', (companyId) => quotas.overview(companyId));
+
+exports.setQuotas = handleQuotas('set the connector limits', 'Limits saved.', (companyId, req) => quotas.set(companyId, req.body || {}, actorOf(req)));
 
 exports.setSlackChannels = handle('set the Slack channel allow-list', 'Allowed channels saved.', (companyId, req) => {
     const body = req.body || {};

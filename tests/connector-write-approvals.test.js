@@ -95,6 +95,23 @@ describe('a write tool definition', () => {
         expect(connectorTools.problemsOf(fake, [{ ...noCard, kind: 'write' }]).join()).toMatch(/a write has no card/);
         expect(typeof card).toBe('function');
     });
+
+    it.each([
+        ['an input it does not take', [{ param: 'cc', label: 'Connectors.card.title' }], /its control cannot set/],
+        ['a toggle on a text input', [{ param: 'title', label: 'Connectors.card.title', toggle: true }], /its control cannot set/],
+        ['a choice on an input with no list', [{ param: 'title', label: 'Connectors.card.title', options: [{ value: 'a', label: 'Connectors.card.yes' }] }], /its control cannot set/],
+        ['a label outside Connectors.card', [{ param: 'title', label: 'Title' }], /no Connectors\.card\.\* label/],
+    ])('does not load with an editable field naming %s', (_what, editable, why) => {
+        const fake = require('./fixtures/connectors/fake');
+        expect(connectorTools.problemsOf(fake, [{ ...connectorTools.get(KEY), editable }]).join()).toMatch(why);
+    });
+
+    it('puts what its owner may retype on the card', () => {
+        const editable = [{ param: 'title', label: 'Connectors.card.title' }];
+        const card = writes.cardOf({ ...connectorTools.get(KEY), editable }, NOTE);
+        expect(card.fields).toEqual(editable);
+        expect(writes.cardOf(connectorTools.get(KEY), NOTE).fields).toBeUndefined();
+    });
 });
 
 describe('every write is a proposal', () => {
@@ -232,6 +249,64 @@ describe('what is approved is what is sent, once', () => {
         expect(safeFetch).not.toHaveBeenCalled();
         await approveAs(p._id, PRISHA);
         expect(sentBody()).toEqual(edited);
+    });
+
+    it('refuses an approval of a card that was edited since it was shown, and sends nothing', async () => {
+        const p = await fromAgentRun();
+        await approveAs(p._id, PRISHA, { changes: [{ action: KEY, params: { ...NOTE, body: 'Edited in another tab.' } }] });
+        expect(await approveAs(p._id, PRISHA, { revision: 0 })).toMatchObject({ status: 409, error: writes.REFUSAL.CARD_CHANGED });
+        expect(await approveAs(p._id, PRISHA, { revision: 0, changes: [{ action: KEY, params: { ...NOTE, body: 'Stale edit.' } }] })).toMatchObject({ status: 409 });
+        expect(safeFetch).not.toHaveBeenCalled();
+        expect((await approveAs(p._id, PRISHA, { revision: 1 })).error).toBeUndefined();
+        expect(sentBody().body).toBe('Edited in another tab.');
+    });
+
+    it('never sends the old text when an edit and an approval race', async () => {
+        const p = await fromAgentRun();
+        const body = 'Edited at the same moment.';
+        const [edit, approval] = await Promise.all([
+            approveAs(p._id, PRISHA, { changes: [{ action: KEY, params: { ...NOTE, body } }] }),
+            approveAs(p._id, PRISHA),
+        ]);
+        if (edit.reshown) {
+            expect(approval.error).toBeDefined();
+            expect(safeFetch).not.toHaveBeenCalled();
+            expect(proposalRow(p._id)).toMatchObject({ status: 'pending', revision: 1 });
+        } else {
+            expect(edit.error).toBeDefined();
+            expect(sentBody().body).toBe(NOTE.body);
+        }
+    });
+
+    it('audits an edit, naming no text', async () => {
+        const p = await fromAgentRun();
+        await approveAs(p._id, PRISHA, { changes: [{ action: KEY, params: { ...NOTE, body: 'Private words.' } }] });
+        const rows = Object.values(mockDb.store).flat().filter((row) => row && row.meta && row.meta.decision === 'card_edited');
+        expect(rows).toHaveLength(1);
+        expect(JSON.stringify(rows[0])).not.toContain('Private words.');
+    });
+
+    it('offers no undo once sent, and stays approved when one is asked for', async () => {
+        const p = await fromAgentRun();
+        const out = await approveAs(p._id, PRISHA);
+        expect(out.undoUntil).toBeNull();
+        expect(proposalRow(p._id).undoUntil).toBeNull();
+        expect(await proposals.undoApproval(C, p._id, { decider: decider(PRISHA), isPrivileged: true, ip: '' })).toMatchObject({ status: 409, error: writes.REFUSAL.NOT_UNDOABLE });
+        expect(proposalRow(p._id).status).toBe('approved');
+    });
+
+    it('tells the person why an edit failed without the runner\'s code or tool key', async () => {
+        const p = await fromAgentRun();
+        const out = await approveAs(p._id, PRISHA, { changes: [{ action: KEY, params: { ...NOTE, cc: 'x@acme.test' } }] });
+        expect(out.error).not.toMatch(/bad_input|fake\.notes\.create/);
+    });
+
+    it('tells the person why a send was refused without the runner\'s code', async () => {
+        const p = await fromAgentRun();
+        resolveConnection.mockRejectedValueOnce(Object.assign(new Error('not_connected: fake'), { code: 'not_connected', provider: 'fake' }));
+        const out = await approveAs(p._id, PRISHA);
+        expect(out.applied[0]).toMatchObject({ ok: false });
+        expect(out.applied[0].error).not.toMatch(/^not_connected/);
     });
 
     it('refuses an edit the tool\'s schema does not accept', async () => {

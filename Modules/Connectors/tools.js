@@ -6,6 +6,7 @@ const DIR = path.join(__dirname, 'providers');
 // A provider with products names the product too: google.calendar.events.list (063 contract, section 3).
 const KEY = /^[a-z][a-z0-9_]*(\.[a-z][a-z0-9_]*){2,3}$/;
 const LABEL = /^Connectors\.tool\.[A-Za-z0-9_]+$/;
+const CARD_LABEL = /^Connectors\.card\.[A-Za-z0-9_]+$/;
 const KIND = Object.freeze({ READ: 'read', WRITE: 'write' });
 const PROPERTY_TYPES = Object.freeze(['string', 'integer', 'number', 'boolean']);
 const MIN_DESCRIPTION = 20;
@@ -31,6 +32,26 @@ const inputProblems = (input) => {
     return found;
 };
 
+const controlFits = (field, schema) => {
+    if (field.toggle) return schema.type === 'boolean';
+    if (field.options) return Array.isArray(schema.enum) && field.options.every((option) => schema.enum.includes(option.value));
+    return schema.type === 'string' && !schema.enum;
+};
+
+/* What its owner may change on the approval card, each with the control its input takes. An id is left out on purpose:
+ * it says what the write acts on, and a mistyped one would act on something else. */
+const editableProblems = (tool) => {
+    if (tool.editable === undefined) return [];
+    if (!Array.isArray(tool.editable)) return ['editable is not a list'];
+    const properties = (tool.input && tool.input.properties) || {};
+    return tool.editable.flatMap((field) => {
+        const schema = properties[field && field.param];
+        if (!schema || !controlFits(field, schema)) return [`editable names ${field && field.param}, which its control cannot set`];
+        const labels = [field.label, field.hint, field.blank, ...(field.options || []).map((option) => option.label)].filter((label) => label !== undefined);
+        return labels.every((label) => CARD_LABEL.test(String(label || ''))) ? [] : [`editable ${field.param} has no Connectors.card.* label`];
+    });
+};
+
 const toolProblems = (definition, tool) => {
     if (!isObject(tool)) return ['a tool is not an object'];
     const key = String(tool.key || '');
@@ -47,6 +68,7 @@ const toolProblems = (definition, tool) => {
     if (typeof tool.run !== 'function') found.push(`${key}: run is not a function`);
     // The approval card is the only place a person sees what a write sends, so a write without one never loads.
     if (tool.kind === KIND.WRITE && typeof tool.card !== 'function') found.push(`${key}: a write has no card`);
+    found.push(...editableProblems(tool).map((problem) => `${key}: ${problem}`));
     return found;
 };
 

@@ -8962,6 +8962,7 @@ export default {
         "proposal_approved": "Approved an agent's proposal",
         "proposal_declined": "Declined an agent's proposal",
         "proposal_undone": "Undid an approved proposal",
+        "proposal_card_edited": "Edited a write to a connected app before approving it",
         "proposal_failed": "An agent's proposal could not be applied"
     },
     "AuditReasons": {
@@ -13945,7 +13946,53 @@ export default {
             "accessOpen": "Anyone with the link",
             "accessTrusted": "Your organisation and people invited",
             "accessRestricted": "Only people invited",
-            "accessDefault": "Your organisation's default"
+            "accessDefault": "Your organisation's default",
+            "timeHint": "Like 2026-11-05T10:00:00+05:30, or 2026-11-05 for all day.",
+            "target": "Goes to",
+            "text": "Text",
+            "attachments": "Attachments"
+        },
+        "approval": {
+            "outside": "Leaves AlianHub",
+            "note": "Nothing goes out until the person whose connection this is approves it. Exactly this is sent, once.",
+            "edit_note": "Your edit is checked and shown again before anything is sent.",
+            "check_again": "Check and show again",
+            "review_in_inbox": "Review in Inbox",
+            "not_sent": "Not sent",
+            "reshown": "Your edit was checked. Read the new card, then approve it to send.",
+            "locked": "Their connection",
+            "locked_note": "This goes out on another person's connected account, so only that person can approve it.",
+            "sent": "Sent. {answer}",
+            "failed": "Not sent: {error}"
+        },
+        "quota": {
+            "title": "Limits for connected apps",
+            "lead": "How much people and agents can use connected apps each day. Each day starts at midnight UTC.",
+            "loading": "Loading limits…",
+            "failed": "That did not work. Try again in a moment.",
+            "scope_label": "Set a limit for",
+            "scope_workspace": "The whole workspace",
+            "scope_member": "One member",
+            "scope_agent": "One agent",
+            "pick_member": "Choose a member",
+            "pick_agent": "Choose an agent",
+            "reads": "Reads per person",
+            "writeProposals": "Write proposals per person",
+            "agentReads": "Reads per agent",
+            "ceiling": "This server allows up to {n}.",
+            "blank_uses": "Leave blank to use {n}.",
+            "held_at": "Saved as {saved}, but this server holds it at {n}.",
+            "over_ceiling": "{what} cannot be above this server's limit of {n}.",
+            "not_whole": "{what} must be a whole number, 0 or more.",
+            "save": "Save limits",
+            "saving": "Saving…",
+            "saved": "Limits saved.",
+            "overrides_title": "Set for one member or agent",
+            "override_line": "{what}: {n}",
+            "change": "Change",
+            "unknown_member": "Former member",
+            "unknown_agent": "Deleted agent",
+            "agent_unread": "An agent"
         }
     },
     "WhoCanSee": {

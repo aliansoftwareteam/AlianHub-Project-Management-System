@@ -1,7 +1,7 @@
 ---
 id: 078
 title: Connectors — Inbox approval cards and quota settings screens
-status: backlog
+status: active
 priority: high
 depends_on: [069, 070]
 created: 2026-10-28
@@ -23,10 +23,10 @@ Members approve outside writes from cards that show exactly what goes out; admin
 - My connections, admin overview and company apps (072, track A)
 
 ## Acceptance criteria
-- [ ] Approval card shows recipient/target, title, full text and attachments
-- [ ] Only the connection owner sees the approve action
-- [ ] A quota above the ceiling is refused on screen with the reason
-- [ ] `i18n:check` and `style:check` pass
+- [x] Approval card shows recipient/target, title, full text and attachments
+- [x] Only the connection owner sees the approve action
+- [x] A quota above the ceiling is refused on screen with the reason
+- [x] `i18n:check` and `style:check` pass
 
 ## Constraints & notes
 - Track: B — tools (using that token safely)
