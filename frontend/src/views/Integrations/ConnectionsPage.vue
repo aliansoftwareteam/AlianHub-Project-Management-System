@@ -19,6 +19,12 @@
                 <p class="parity-lead">{{ $t('Parity.connections_lead') }}</p>
                 <p v-if="error" class="ah-field__error">{{ error }}</p>
 
+                <template v-if="view === 'all' || view === 'apps'">
+                    <MyConnections />
+                    <AdminConnections />
+                    <CompanyApps />
+                </template>
+
                 <GoogleConnection v-if="hasGoogle && (view === 'all' || view === 'apps')" />
                 <ConnectorQuotas v-if="connectorLimits && (view === 'all' || view === 'apps')" />
 
@@ -88,6 +94,9 @@ import ShellIcon from "@/components/organisms/Shell/ShellIcon.vue";
 import AiSidebar from "@/views/Ai/AiSidebar.vue";
 import GoogleConnection from "./GoogleConnection.vue";
 import ConnectorQuotas from "./ConnectorQuotas.vue";
+import MyConnections from "./MyConnections.vue";
+import AdminConnections from "./AdminConnections.vue";
+import CompanyApps from "./CompanyApps.vue";
 import { AI_RIGHT, useAiRights } from "@/composable/aiRights";
 
 // Connections (13e). Only what this workspace can actually connect to is listed:
