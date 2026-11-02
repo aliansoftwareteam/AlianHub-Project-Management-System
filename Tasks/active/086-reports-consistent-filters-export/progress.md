@@ -14,6 +14,8 @@
 - Browser check on :5410 against the demo DB (read-only): every tab renders, presets/stepper/URL round-trip, Approvals filtered empty state, CSV + PDF export return 200 and the CSV holds exactly the cards on screen. The demo DB has no time logs or plans, so the Workload panel was checked with a sample grid injected into the page (no DB writes) and real TechNova task ids; opening a task shows the task panel and closing it brings the list back.
 - Screenshots in `screenshots/` (before-*/after-*). No before-variance: the hidden browser pane timed out on that page.
 - i18n: keys added to `en.js` (Reports.*, Time.*), `npm run i18n:backfill` run (English copies, pending files updated), `npm run i18n:check` passes. `npm run style:check` passes; baseline unchanged.
+- Frontend vitest, full suite: 48 failures, the same tests that fail on a clean `chore/pre-staging` checkout; none new. Specs that pinned the old Project/Tracker header (legacyScreensOnTokens2, uiSweepThirdPass, darkModeBatchThree) now describe the shared toolbar/filter bar.
+- Local servers stopped; temporary `.claude/launch.json` entries reverted.
 
 ## Open / follow-ups
 - Custom-field filters (needs a task lookup per field).
