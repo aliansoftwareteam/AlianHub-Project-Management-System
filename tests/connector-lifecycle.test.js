@@ -406,6 +406,25 @@ describe('a departed member keeps no connection (removal hook + daily sweep, 067
         expect(JSON.stringify(mockDb.store)).toBe(storeAfterFirst);
         expect(mockProvider.calls.filter((c) => c.url === REVOKE_URL).length).toBe(revokes);
     });
+
+    it('revokes no one when the seat read fails, so a database blip ends nothing; the next pass retries', async () => {
+        await connectAs(MEMBER);
+        await connectAs(COLLEAGUE);
+        mockProvider.calls.length = 0;
+        mockRoleLookup.fails = true;
+        try {
+            expect(await connection.sweepCompany(C)).toBe(0);
+        } finally { mockRoleLookup.fails = false; }
+        await settle();
+        expect(mockProvider.calls.filter((c) => c.url === REVOKE_URL)).toHaveLength(0);
+        expect(rowOf(MEMBER)).toMatchObject({ status: 'connected' });
+        expect(rowOf(COLLEAGUE)).toMatchObject({ status: 'connected' });
+        // Once the read recovers and the member is gone, the next pass ends only them.
+        delete mockRoles[C][MEMBER];
+        expect(await connection.sweepCompany(C)).toBe(1);
+        expect(rowOf(MEMBER)).toBeUndefined();
+        expect(rowOf(COLLEAGUE)).toMatchObject({ status: 'connected' });
+    });
 });
 
 describe('listing and products', () => {

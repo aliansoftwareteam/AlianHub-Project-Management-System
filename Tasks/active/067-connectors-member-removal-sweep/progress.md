@@ -28,3 +28,9 @@ None. Rides on 066's `connection.endForMember`, which already exists.
   - *Provider-down case:* `disconnect` asks the provider once and clears local state regardless of the answer, so the sweep's role is to catch connections a **failed or interrupted** removal left open, not to retry provider revokes on already-closed rows.
 - Tests (in `tests/connector-lifecycle.test.js`): removal hook revokes + clears secrets + audits; sweep ends a seatless member's open connection while leaving a seated colleague; sweep is idempotent. `npx jest tests/connector-lifecycle.test.js` → 28/28.
 - Note: 5 files (`.claude/launch.json` + 4 `tests/conventions/*`) were already modified in the working tree before this task; left untouched and out of 067's commits.
+
+### 2026-11-02 — PR #1752 review fix
+- **Blocker (fixed): the sweep must not revoke on a failed seat read.** `sweepCompany` decided with `hasSeat`, which returns `false` on any `getRoleType` error (fail-closed). Right for `findUsable` (refuse one call), destructive in the sweep: one Mongo blip during the daily pass would make every connected member look seatless and revoke every grant + retire every secret, with no way back.
+- **Change:** added `seatOf(companyId, userId)` → `yes` / `no` / `unknown`; `hasSeat` now derives from it (`=== yes`), so `findUsable`'s fail-closed behaviour is unchanged. The sweep ends a member **only on a definite `no`**; an `unknown` (read failed) is skipped and left for the next pass to retry.
+- **Test:** added a case where the seat read throws — the sweep ends nothing and revokes no one; once the read recovers and the member is gone, the next pass ends only them. `connector-lifecycle` → 29/29.
+- Supersedes the earlier *"Departed = `!hasSeat`"* decision: departed is now a definite no-seat answer, never an unreadable one.

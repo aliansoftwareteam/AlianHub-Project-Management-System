@@ -97,16 +97,20 @@ const announce = (companyId, userId, provider, change) => {
     });
 };
 
-/* A removed member keeps a row in the member list, so "has a row" is not "has a seat"; a seat that cannot be
- * read is treated as none. */
-const hasSeat = async (companyId, userId) => {
+/* A removed member keeps a row in the member list, so "has a row" is not "has a seat". Three answers, not two: a
+ * seat, no seat, or a read that failed. The daily sweep must tell "no seat" from "could not tell", or a database
+ * blip would make every member look departed and revoke them all; `hasSeat` keeps the two-value, fail-closed form
+ * its callers want, where anything but a seat refuses one call. */
+const SEAT = Object.freeze({ YES: 'yes', NO: 'no', UNKNOWN: 'unknown' });
+const seatOf = async (companyId, userId) => {
     try {
         const role = await getRoleType(companyId, userId, { throwOnError: true });
-        return role !== null && role !== undefined && role !== ROLE_GUEST;
+        return role !== null && role !== undefined && role !== ROLE_GUEST ? SEAT.YES : SEAT.NO;
     } catch (e) {
-        return false;
+        return SEAT.UNKNOWN;
     }
 };
+const hasSeat = async (companyId, userId) => (await seatOf(companyId, userId)) === SEAT.YES;
 
 /* What the person sees of their own connection: the account it belongs to, never a token or its handle. */
 const view = (provider, row) => {
@@ -491,8 +495,9 @@ const sweepCompany = async (companyId) => {
         const open = ((await MongoDbCrudOpration(String(companyId), { type: T, data: [{ provider: { $in: offered }, deletedStatusKey: { $ne: 1 } }, 'userId'] }, 'find')) || []).map(plain);
         const userIds = [...new Set(open.map((row) => String(row.userId)))];
         for (const userId of userIds) {
+            // End only on a definite "no seat"; a read that failed is left for the next pass, never revoked on a blip.
             // eslint-disable-next-line no-await-in-loop
-            if (!(await hasSeat(String(companyId), userId))) ended += await endForMember(String(companyId), userId);
+            if ((await seatOf(String(companyId), userId)) === SEAT.NO) ended += await endForMember(String(companyId), userId);
         }
     } catch (error) {
         logger.error(`${LOG} the departed-member connection sweep failed for a company: ${(error && error.name) || 'Error'}`);
