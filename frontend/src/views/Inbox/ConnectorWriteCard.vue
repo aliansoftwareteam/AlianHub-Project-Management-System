@@ -59,7 +59,7 @@
         <p v-if="delivery" class="ah-small cwc__result" :class="{ 'ah-field__error': !delivery.ok }" data-test="connector-card-result">
             {{ delivery.ok ? t('Connectors.approval.sent', { answer: delivery.answer }) : t('Connectors.approval.failed', { error: delivery.error }) }}
         </p>
-        <p v-else class="ah-small cwc__note">{{ t('Connectors.approval.note') }}</p>
+        <p v-else-if="waiting" class="ah-small cwc__note">{{ t('Connectors.approval.note') }}</p>
     </div>
 </template>
 
@@ -74,6 +74,7 @@ const props = defineProps({
     editing: { type: Boolean, default: false },
     disabled: { type: Boolean, default: false },
     delivery: { type: Object, default: null },
+    waiting: { type: Boolean, default: true },
 });
 const emit = defineEmits(['update:params']);
 

@@ -503,7 +503,9 @@ const waitingMovesOf = async (companyId, uid, proposal) => {
  * them (../Mcp/names.js), and a text is the proposal's own. With `bareChanges`, a screen that shows a change
  * through its card alone gets the same card for one change that has none of its own. */
 const forBatches = async (companyId, uid, proposals, { bareChanges = false } = {}) => {
-    const batches = (Array.isArray(proposals) ? proposals : []).filter((proposal) => isBatch(proposal) || (bareChanges && isBareChange(proposal)));
+    // A write to a connected app is read from its own approval card, which a summary of the batch would stand in for.
+    const { hasWrite } = require('../Connectors/writes');
+    const batches = (Array.isArray(proposals) ? proposals : []).filter((proposal) => (isBatch(proposal) || (bareChanges && isBareChange(proposal))) && !hasWrite(proposal.changes));
     if (!batches.length) return new Map();
     const all = batches.flatMap(changesOf);
     const readable = await readableTaskIds(companyId, uid, taskIdsOf(all));

@@ -39,6 +39,7 @@ const toRow = (previews, batches = new Map(), viewer = null, mine = () => false)
     ...(proposal.finding ? { finding: proposal.finding } : {}),
     requestedBy: proposal.requestedBy ? String(proposal.requestedBy) : '',
     what: proposalText.titleOf(proposal.what, proposal.changes),
+    revision: proposal.revision || 0,
     why: proposalText.reasonOf(proposal.why),
     changes: (Array.isArray(proposal.changes) ? proposal.changes : []).map((change, at) => {
         const preview = (previews.get(String(proposal._id)) || [])[at];

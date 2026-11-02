@@ -35,9 +35,10 @@
                             :placeholder="String(fallbackOf(field))"
                             :aria-invalid="problems[field] ? 'true' : 'false'"
                             :data-test="`quota-${field}`"
-                            @input="problems[field] = ''"
+                            @input="onType(field, $event.target)"
                         />
                         <span class="ah-small cq__hint">{{ $t('Connectors.quota.blank_uses', { n: fallbackOf(field) }) }} {{ $t('Connectors.quota.ceiling', { n: overview.ceilings[field] }) }}</span>
+                        <span v-if="heldBelowSaved(field)" class="ah-small cq__held" :data-test="`quota-${field}-held`">{{ $t('Connectors.quota.held_at', { saved: savedLimits[field], n: overview.ceilings[field] }) }}</span>
                         <span v-if="problems[field]" class="ah-field__error" role="alert" :data-test="`quota-${field}-error`">{{ problems[field] }}</span>
                     </label>
                 </div>
@@ -92,10 +93,16 @@ const scope = ref(WORKSPACE);
 const targetId = ref('');
 const draft = reactive({ reads: '', writeProposals: '', agentReads: '' });
 const problems = reactive({ reads: '', writeProposals: '', agentReads: '' });
+const unreadable = reactive({ reads: false, writeProposals: false, agentReads: false });
 
 const privileged = computed(() => isOwnerOrAdmin(Number(getters['settings/companyUserDetail']?.roleType)));
 const members = computed(() => membersOnly(getters['users/users'], getters['settings/companyUsers']).map((user) => ({ id: String(user._id), name: user.Employee_Name })));
-const targets = computed(() => (scope.value === MEMBER ? members.value : agents.value));
+const targets = computed(() => {
+    const listed = scope.value === MEMBER ? members.value : agents.value;
+    // Someone who has gone is no longer listed, and their saved limit still has to open here to be taken away.
+    const gone = targetId.value && !listed.some((option) => option.id === targetId.value);
+    return gone ? [...listed, { id: targetId.value, name: t(`Connectors.quota.unknown_${scope.value}`) }] : listed;
+});
 const fields = computed(() => FIELDS_OF[scope.value]);
 
 const rowsOf = (name) => (name === MEMBER ? overview.value.members : overview.value.agents);
@@ -112,11 +119,18 @@ const typed = (field) => String(draft[field] ?? '').trim();
 const savedText = (field) => (present(savedLimits.value[field]) ? String(savedLimits.value[field]) : '');
 const changedFields = computed(() => {
     if (scope.value !== WORKSPACE && !targetId.value) return [];
-    return fields.value.filter((field) => typed(field) !== savedText(field));
+    return fields.value.filter((field) => unreadable[field] || typed(field) !== savedText(field));
 });
+const heldBelowSaved = (field) => present(savedLimits.value[field]) && savedLimits.value[field] > overview.value.ceilings[field];
+
+// A number input reads as empty while it holds what is no number, and an empty field takes the limit away.
+const onType = (field, input) => {
+    problems[field] = '';
+    unreadable[field] = Boolean(input.validity && input.validity.badInput);
+};
 
 const fillDraft = () => {
-    Object.keys(draft).forEach((field) => { draft[field] = savedText(field); problems[field] = ''; });
+    Object.keys(draft).forEach((field) => { draft[field] = savedText(field); problems[field] = ''; unreadable[field] = false; });
     saveError.value = '';
 };
 watch([scope, targetId, overview], fillDraft);
@@ -126,7 +140,7 @@ const nameOf = (name, id) => {
     const found = (name === MEMBER ? members.value : agents.value).find((option) => option.id === id);
     return found ? found.name : t(`Connectors.quota.unknown_${name}`);
 };
-const lineOf = (limits) => Object.entries(limits).filter(([, n]) => present(n)).map(([field, n]) => t('Connectors.quota.override_line', { what: t(`Connectors.quota.${field}`), n })).join(' · ');
+const lineOf = (limits) => Object.entries(limits).filter(([, n]) => present(n)).map(([field, n]) => t('Connectors.quota.override_line', { what: t(`Connectors.quota.${field}`), n: Math.min(n, overview.value.ceilings[field]) })).join(' · ');
 const overrides = computed(() => (overview.value ? [MEMBER, AGENT].flatMap((name) => rowsOf(name).map((row) => ({
     scope: name, targetId: row.targetId, name: nameOf(name, row.targetId), line: lineOf(row.limits),
 }))) : []));
@@ -142,7 +156,7 @@ const answered = (res) => {
 const refusalOf = (field) => {
     const n = Number(typed(field));
     const what = t(`Connectors.quota.${field}`);
-    if (!Number.isInteger(n) || n < 0) return t('Connectors.quota.not_whole', { what });
+    if (unreadable[field] || !Number.isInteger(n) || n < 0) return t('Connectors.quota.not_whole', { what });
     return n > overview.value.ceilings[field] ? t('Connectors.quota.over_ceiling', { what, n: overview.value.ceilings[field] }) : '';
 };
 
@@ -150,7 +164,7 @@ const save = async () => {
     const asked = changedFields.value;
     saved.value = false;
     saveError.value = '';
-    asked.forEach((field) => { problems[field] = typed(field) ? refusalOf(field) : ''; });
+    asked.forEach((field) => { problems[field] = typed(field) || unreadable[field] ? refusalOf(field) : ''; });
     if (asked.some((field) => problems[field])) return;
     busy.value = true;
     try {
@@ -188,6 +202,7 @@ onMounted(load);
 .cq__who, .cq__limits { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 10px 14px; align-items: start; }
 .cq__field { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
 .cq__hint { color: var(--ink-2); }
+.cq__held { color: var(--ink); }
 .cq__actions { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
 .cq__overrides { display: flex; flex-direction: column; gap: 4px; padding-top: 8px; border-top: 1px solid var(--hairline); }
 .cq__label { font: 600 12.5px/1.3 var(--font-ui); color: var(--ink); }

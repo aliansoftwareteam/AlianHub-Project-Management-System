@@ -80,7 +80,13 @@ describe('a write to a connected app', () => {
         mountQueue([row('p1', { gate: 'connection_owner', changes: [write()] })]);
         expect(rowOf('p1').find('[data-test="queue-approve"]').text()).toBe(en.Inbox.approve);
         await saveEdit('p1');
-        expect(sendProposalDecision).toHaveBeenCalledWith('p1', 'approve', {});
+        expect(sendProposalDecision).toHaveBeenCalledWith('p1', 'approve', { revision: 0 });
+    });
+
+    it('names the card it read, so a write edited elsewhere is refused rather than sent', async () => {
+        mountQueue([row('p1', { revision: 3, changes: [write()] })]);
+        await saveEdit('p1');
+        expect(sendProposalDecision).toHaveBeenCalledWith('p1', 'approve', { revision: 3 });
     });
 
     it('shows the card in a bulk review before approving', async () => {
@@ -108,7 +114,31 @@ describe('a write to a connected app', () => {
             await editing();
             expect(rowOf('p1').find('[data-test="queue-approve"]').text()).toBe(en.Inbox.approve);
             await saveEdit('p1');
-            expect(sendProposalDecision).toHaveBeenCalledWith('p1', 'approve', {});
+            expect(sendProposalDecision).toHaveBeenCalledWith('p1', 'approve', { revision: 0 });
+        });
+
+        it('checks the edit on Done, so the old card never sits beside an Approve that sends the old text', async () => {
+            sendProposalDecision.mockImplementation(reshown);
+            await editing();
+            await cardOf('p1').find('[data-test="connector-field-summary"]').setValue('Board review, moved');
+            await rowOf('p1').find('[data-test="queue-edit"]').trigger('click');
+            await flushPromises();
+            expect(sendProposalDecision.mock.calls[0][2].changes[0].params.summary).toBe('Board review, moved');
+            expect(wrapper.emitted('reshown')).toHaveLength(1);
+        });
+
+        it('closes on Done with nothing sent when nothing changed', async () => {
+            await editing();
+            await rowOf('p1').find('[data-test="queue-edit"]').trigger('click');
+            expect(sendProposalDecision).not.toHaveBeenCalled();
+            expect(cardOf('p1').find('[data-test="connector-card-form"]').exists()).toBe(false);
+        });
+
+        it('says Approve, not check again, once the write itself is dropped', async () => {
+            mountQueue([row('p1', { changes: [write(), change('Comment')] })]);
+            await rowOf('p1').find('[data-test="queue-edit"]').trigger('click');
+            await rowOf('p1').findAll('[data-test="queue-drop"]')[0].trigger('click');
+            expect(rowOf('p1').find('[data-test="queue-approve"]').text()).toBe(en.Inbox.approve);
         });
 
         it('sends the retyped params and never the card, says it will check first, and shows the new card without sending', async () => {

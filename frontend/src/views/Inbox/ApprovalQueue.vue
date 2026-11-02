@@ -238,7 +238,7 @@ import { proposalTitle } from '@/views/Ai/plainLabels';
 import { agentActionLabel, changeLabel } from '@/views/Ai/agentActionLabels';
 import { findingFix, findingReasons } from '@/views/Projects/ProjectDetail/findingText';
 import { plainReason } from '@/views/Ai/auditWords';
-import { changesEdited, decideEach, decideOne } from './approvalQueue';
+import { changesEdited, decideEach, decideOne, hasOutsideWrite, withShownRevision } from './approvalQueue';
 import { fullText } from '@/utils/clockText';
 
 defineOptions({ name: 'ApprovalQueue' });
@@ -319,15 +319,17 @@ const canPick = (p) => !p.locked && !p.batch && !isEditing(p);
 const leftOutAt = (p) => (i) => leftOut[pickKey(p, i)];
 const choiceOf = (p) => (p.batch || isEditing(p) ? null : partsChoice(p.changes, leftOutAt(p)));
 const keptOf = (p) => (choiceOf(p) ? keptSummary(t, p.changes, leftOutAt(p)) : '');
+const isEdited = (p) => isEditing(p) && changesEdited(kept.value, p.changes);
+// An edited write to a connected app comes back to its owner on a new card; this click sends nothing.
+const checksAgain = (p) => isEdited(p) && hasOutsideWrite(kept.value);
 const toggleEdit = (p) => {
+    // Closing the form must not leave the old card beside an Approve that would send the old text.
+    if (checksAgain(p)) { approve(p); return; }
     if (isEditing(p)) { editing.value = ''; return; }
     forgetPicks(p);
     editing.value = p.proposalId;
     kept.value = (p.changes || []).map((change) => ({ ...change }));
 };
-const isEdited = (p) => isEditing(p) && changesEdited(kept.value, p.changes);
-// An edited write to a connected app comes back to its owner on a new card; this click sends nothing.
-const checksAgain = (p) => isEdited(p) && (p.changes || []).some((change) => change.card);
 
 const send = (id, verb, body) => decideOne(sendProposalDecision, id, verb, body, t('Inbox.action_failed'));
 const failuresLine = (unapplied) => (unapplied.length ? t('Ai.applied_with_failures', { n: unapplied.length, error: unapplied[0].error || '' }) : '');
@@ -349,13 +351,13 @@ const settle = (p, verb, result) => {
 const approve = async (p) => {
     busy.value = true;
     summary.value = '';
-    const result = await send(p.proposalId, 'approve', isEdited(p) ? { changes: kept.value.map(asFiled) } : choiceOf(p) || {});
+    const result = await send(p.proposalId, 'approve', withShownRevision(p, isEdited(p) ? { changes: kept.value.map(asFiled) } : choiceOf(p) || {}));
     busy.value = false;
     if (result.reshown) {
         delete errors[p.proposalId];
         editing.value = '';
         summary.value = t('Connectors.approval.reshown');
-        emit('reshown', { id: p.proposalId, changes: result.reshownChanges });
+        emit('reshown', { id: p.proposalId, changes: result.reshownChanges, revision: result.reshownRevision });
         return;
     }
     if (result.ok) { editing.value = ''; summary.value = outcomeLine([result]); }
@@ -430,7 +432,7 @@ const approveReviewed = async () => {
     busy.value = true;
     summary.value = '';
     const byId = new Map(rows.map((p) => [p.proposalId, p]));
-    const results = await decideEach(rows.map((p) => p.proposalId), (id) => send(id, 'approve', choiceOf(byId.get(id)) || {}), (result) => settle(byId.get(result.id), 'approve', result));
+    const results = await decideEach(rows.map((p) => p.proposalId), (id) => send(id, 'approve', withShownRevision(byId.get(id), choiceOf(byId.get(id)) || {})), (result) => settle(byId.get(result.id), 'approve', result));
     busy.value = false;
     const approved = results.filter((r) => r.ok);
     const failed = results.length - approved.length;

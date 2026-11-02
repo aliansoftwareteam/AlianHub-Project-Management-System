@@ -317,12 +317,13 @@ const setStatus = async (companyId, id, set, { onlyIf } = {}) => {
 
 const reshowEdited = async (companyId, id, p, changes) => {
     let ready;
-    try { ready = await connectorWrites.prepareChanges(companyId, p.connectionOwner, changes); } catch (e) { return { error: e.message, status: e.status || 400 }; }
+    // The owner reads this beside the form, so it goes without the code the runner's messages start with.
+    try { ready = await connectorWrites.prepareChanges(companyId, p.connectionOwner, changes); } catch (e) { return { error: String(e.message).replace(/^[a-z_]+: /, ''), status: e.status || 400 }; }
     const stored = ready.map((c) => ({
         action: c.action, params: planFiling.storedParams(c.action, c.params || {}), label: proposalText.labelOf(c),
         reversible: Boolean(registry.get(c.action) && registry.get(c.action).undoable), rating: c.rating || actions.rating(c.action), ...(c.card ? { card: c.card } : {}),
     }));
-    const updated = await setStatus(companyId, id, { changes: stored, editedAt: new Date() }, { onlyIf: STATUS.PENDING });
+    const updated = await setStatus(companyId, id, { changes: stored, editedAt: new Date(), revision: (p.revision || 0) + 1 }, { onlyIf: STATUS.PENDING });
     if (!updated) return alreadyDecided(companyId, id);
     return { proposal: updated, applied: [], reshown: true };
 };
@@ -335,12 +336,14 @@ const alreadyDecided = async (companyId, id) => {
 
 /* Approve (optionally with edited changes, or with the parts of a plan to keep, ./planChoice.js). `decider` is the
  * human actor; the changes execute AS the agent, on the human's decision, inside the agent's allowedActions. */
-const approve = async (companyId, id, { decider, isPrivileged, changes: edited, parts, ip }) => {
+const approve = async (companyId, id, { decider, isPrivileged, changes: edited, parts, revision, ip }) => {
     const p = await get(companyId, id);
     if (!p) return { error: 'Proposal not found.', status: 404 };
     if (p.status !== STATUS.PENDING) return alreadyDecided(companyId, id);
     const notOwner = connectorWrites.approverRefusal(decider.userId, p, [...(p.changes || []), ...(Array.isArray(edited) ? edited : [])]);
     if (notOwner) return { error: notOwner, status: 403, reason: 'not_permitted' };
+    // What is approved is what was shown: another tab may have edited the write since this card was drawn.
+    if (revision !== undefined && connectorWrites.hasWrite(p.changes) && Number(revision) !== (p.revision || 0)) return { error: connectorWrites.REFUSAL.CARD_CHANGED, status: 409 };
     const planChoice = require('./planChoice');
     const chosen = planChoice.given(parts);
     const editing = Array.isArray(edited) && edited.length > 0;
@@ -411,8 +414,9 @@ const approve = async (companyId, id, { decider, isPrivileged, changes: edited, 
             applied.push({ action: c.action, ok: false, error: e.message, ...(Array.isArray(e.parts) ? { parts: e.parts } : {}) });
         }
     }
-    const undoUntil = new Date(Date.now() + UNDO_WINDOW_MS);
-    const delivery = [...slackPost.deliveryOf(changes, applied), ...connectorWrites.deliveryOf(changes, applied)];
+    // A write that left for a connected app stays there, so no window is offered that could not take it back.
+    const undoUntil = connectorWrites.hasWrite(changes) ? null : new Date(Date.now() + UNDO_WINDOW_MS);
+    const delivery =[...slackPost.deliveryOf(changes, applied), ...connectorWrites.deliveryOf(changes, applied)];
     const notMade = planFollowUp.notMadeBy(changes, applied);
     const updated = await setStatus(companyId, id, { status, changes, undoUntil, auditIds, ...(delivery.length ? { delivery } : {}), ...(notMade.length ? { notMade } : {}) });
     await audit.recordProposalDecision(companyId, { ...decider, ...runTrace }, { proposalId: id, decision: status, agentName: p.agentName, runId: p.runId, changes: applied, ip });
@@ -502,6 +506,7 @@ const undoApproval = async (companyId, id, { decider, isPrivileged, ip }) => {
     if (!p) return { error: 'Proposal not found.', status: 404 };
     if (!access.canUndoDecision({ actor: decider, human: true, privileged: Boolean(isPrivileged) }, p)) return { error: access.REFUSAL.UNDO_DECISION, status: 403, reason: 'not_permitted' };
     if (![STATUS.APPROVED, STATUS.EDITED].includes(p.status)) return { error: `Nothing to undo — proposal is ${p.status}.`, status: 409 };
+    if (connectorWrites.hasWrite(p.changes)) return { error: connectorWrites.REFUSAL.NOT_UNDOABLE, status: 409 };
     const undoUntil = p.undoUntil ? new Date(p.undoUntil).toISOString() : null;
     if (!undoUntil || new Date(undoUntil).getTime() < Date.now()) return { error: 'The undo window has closed. Use the audit log to undo individual actions.', status: 410, reason: undo.REASON.WINDOW_PASSED, undoUntil };
     const ctx = await undo.undoContext(companyId, decider);

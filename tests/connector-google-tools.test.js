@@ -317,8 +317,9 @@ describe('Calendar writes', () => {
 
     it('an update sends only what it names and warns that attendees replace the list', async () => {
         const { proposalId } = await mcpWrite('google.calendar.events.update', { eventId: 'ev1', attendees: 'jo@example.com' });
-        const { card } = proposalRow(proposalId).changes[0];
-        expect(card.title).toBe('ev1');
+        const { card, label } = proposalRow(proposalId).changes[0];
+        expect(card.title).toBe('');
+        expect(label).toBe('ev1');
         expect(card.rows).toContainEqual({ label: 'Connectors.card.eventId', value: 'ev1' });
         expect(card.rows).toContainEqual({ label: 'Connectors.card.attendeesReplaced', value: 'jo@example.com' });
         await approve(proposalId);
@@ -340,7 +341,7 @@ describe('Calendar writes', () => {
             // eslint-disable-next-line no-await-in-loop
             const { proposalId } = await mcpWrite('google.calendar.events.update', { eventId: 'ev1', [field]: blank });
             const { card } = proposalRow(proposalId).changes[0];
-            expect(card.title).toBe('ev1');
+            expect(card.title).toBe('');
             expect(card.rows).toContainEqual({ label, valueLabel: 'Connectors.card.cleared' });
             // eslint-disable-next-line no-await-in-loop
             await approve(proposalId);

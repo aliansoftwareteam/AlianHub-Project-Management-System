@@ -8,7 +8,7 @@
 - [x] Decide who may read a card (see 2026-11-02)
 
 ## Last step
-Built on `feat/078-connectors-approval-quota-screens`, cut from `upstream/feat/per-user-connectors`. Committed locally, not pushed, no PR.
+Built on `feat/078-connectors-approval-quota-screens`, cut from `upstream/feat/per-user-connectors`, then tested on a real server and in the real UI. Committed locally, not pushed, no PR.
 
 ## Blockers
 None for the code. A real run waits on 066: until then `resolveConnection` refuses every call.
@@ -26,6 +26,25 @@ None for the code. A real run waits on 066: until then `resolveConnection` refus
 - Decided by Prinsa, closing the question from 071: a card stays visible to whoever the proposal is shown to, so owners and admins read a member's pending write text and attendees and can decline with it in front of them. `GET /agents/proposals` already gave them the same data; the card only makes it visible.
 - Checked in a browser with the real components and a mocked API, at desktop and phone width, light and dark: over-ceiling refusal, save, edit, re-show, locked row. Not run against the real server or a real connection.
 - Unit: connector and inbox suites pass. Convention and `homeInboxDocsPolish` failures are the same 26 and 2 on a clean checkout of this branch's base, so none come from this task. Integration suites were not run.
+- Deeper testing: an independent review, the real server on a throwaway MongoDB, and the built app in a browser, with only `resolveConnection` and the outbound call stubbed. Defects found and fixed:
+  - An MCP-filed write showed a "1 change" summary and no card in both Inboxes, because `forBatches` stood in for it. Writes are now left out of batches. Only the browser pass caught this.
+  - Home and Approvals offered one-click Approve on a write with no card. Both now send the person to the Inbox.
+  - Undo was offered after a send and set the proposal to `undone` while the event stayed at Google. A proposal with a connector write now gets no undo window, and undo is refused.
+  - "Done editing" in the queue dropped the edit, so Approve sent the old text. Done now checks the edit and shows it again, on both screens.
+  - A card edited in another tab could be approved from the old one. `revision` moves on each edit, the screens send the one they read, and a mismatch is refused.
+  - The AI Inbox offered edits on MCP writes that the server always refuses. The button is gone.
+  - An update that left the name alone showed its event id as the title. `headline` now names the row and the title stays blank.
+  - A former member's limit could not be taken away, unreadable number input silently cleared a limit, and a limit above a lowered ceiling read as in force.
+  - "Check and show again" showed even after the write itself was dropped.
+  - `editedAt` was dropped by the strict schema. `CONNECTORS=google` alone hid the quota screen: the catalogue now says `connectorLimits`. The promise about sending showed on cards no longer waiting. Edit refusals started with `bad_input:`.
+- Left as they are:
+  - A proposal mixing a write with other changes loses its undo window as a whole; the audit log still undoes the rest.
+  - A failed send stays `approved`, as 069 chose: the card says "Not sent", the list does not.
+  - The proposal's headline is not rewritten by an edit, and the edit form hides the rows it cannot change.
+  - An edit writes no audit row of its own; the sent params are in the send's row.
+  - If the agent list fails to load, agent limits read "Deleted agent".
+  - `slack.message.post` has the same undo fault. 079 removes that path, so it is not fixed here.
+- Final run: real server checks 57/57; integration 104/104 (connector, inbox, agents, MCP tools); unit 3768/3768 (connector, inbox, proposal, undo, intent, MCP); frontend specs 328/328 for the screens touched, not the whole frontend suite; convention failures still the same 26.
 
 ### 2026-10-31
 - From 071: render a card's `targetLabel` and `rows` of `{ label, value | valueLabel }` with `$t`, and never clamp `text` or a row, because the server refuses a card too long to show whole.

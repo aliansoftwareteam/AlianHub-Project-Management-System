@@ -188,7 +188,8 @@ module.exports = [{
         if (!EDITABLE.some((field) => input[field] !== undefined)) {
             throw Object.assign(new Error('This update names nothing to change, so it was not filed.'), { code: 'bad_input', status: 400, deterministic: true });
         }
-        return { ...eventCard(input, 'Connectors.card.attendeesReplaced'), title: String(input.summary || '').trim() || input.eventId };
+        // The title row says what the event will be called, so an update that leaves the name alone has none.
+        return { ...eventCard(input, 'Connectors.card.attendeesReplaced'), title: String(input.summary || '').trim(), headline: input.eventId };
     },
     editable: EVENT_EDITS,
     run: async ({ input, connection }) => {

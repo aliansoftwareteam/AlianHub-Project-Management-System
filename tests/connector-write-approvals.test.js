@@ -249,6 +249,25 @@ describe('what is approved is what is sent, once', () => {
         expect(sentBody()).toEqual(edited);
     });
 
+    it('refuses an approval of a card that was edited since it was shown, and sends nothing', async () => {
+        const p = await fromAgentRun();
+        await approveAs(p._id, PRISHA, { changes: [{ action: KEY, params: { ...NOTE, body: 'Edited in another tab.' } }] });
+        expect(await approveAs(p._id, PRISHA, { revision: 0 })).toMatchObject({ status: 409, error: writes.REFUSAL.CARD_CHANGED });
+        expect(await approveAs(p._id, PRISHA, { revision: 0, changes: [{ action: KEY, params: { ...NOTE, body: 'Stale edit.' } }] })).toMatchObject({ status: 409 });
+        expect(safeFetch).not.toHaveBeenCalled();
+        expect((await approveAs(p._id, PRISHA, { revision: 1 })).error).toBeUndefined();
+        expect(sentBody().body).toBe('Edited in another tab.');
+    });
+
+    it('offers no undo once sent, and stays approved when one is asked for', async () => {
+        const p = await fromAgentRun();
+        const out = await approveAs(p._id, PRISHA);
+        expect(out.undoUntil).toBeNull();
+        expect(proposalRow(p._id).undoUntil).toBeNull();
+        expect(await proposals.undoApproval(C, p._id, { decider: decider(PRISHA), isPrivileged: true, ip: '' })).toMatchObject({ status: 409, error: writes.REFUSAL.NOT_UNDOABLE });
+        expect(proposalRow(p._id).status).toBe('approved');
+    });
+
     it('refuses an edit the tool\'s schema does not accept', async () => {
         const p = await fromAgentRun();
         const out = await approveAs(p._id, PRISHA, { changes: [{ action: KEY, params: { ...NOTE, cc: 'everyone@acme.test' } }] });

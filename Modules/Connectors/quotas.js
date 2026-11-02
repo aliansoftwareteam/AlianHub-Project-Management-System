@@ -134,9 +134,11 @@ const set = async (companyId, body, actor) => {
     const scope = String(body.scope || '');
     if (!FIELDS_OF[scope]) throw badInput(`scope must be one of ${Object.values(SCOPE).join(', ')}.`);
     const targetId = scope === SCOPE.WORKSPACE ? '' : String(body.targetId || '');
-    const problem = await targetProblem(companyId, scope, targetId);
-    if (problem) throw badInput(problem);
     const changes = changesFrom(scope, body);
+    // A limit left behind by someone who has since gone can still be taken away.
+    const onlyClearing = !Object.keys(changes.set).length && OBJECT_ID.test(targetId);
+    const problem = onlyClearing ? '' : await targetProblem(companyId, scope, targetId);
+    if (problem) throw badInput(problem);
     await MongoDbCrudOpration(companyId, {
         type: SCHEMA_TYPE.CONNECTOR_QUOTAS,
         data: [

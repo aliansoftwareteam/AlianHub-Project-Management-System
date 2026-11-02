@@ -34,13 +34,19 @@ export const deliveryOfChange = (delivery, changes, change) => {
     return (delivery || []).filter(sameAction)[(changes || []).filter(sameAction).indexOf(change)] || null;
 };
 
+/* A change with a card leaves for a connected app. It is approved only where its card is read. */
+export const hasOutsideWrite = (changes) => (changes || []).some((change) => change?.card);
+
+/* The card a person read is named in the approval, so one edited elsewhere since is refused rather than sent. */
+export const withShownRevision = (proposal, body = {}) => (hasOutsideWrite(proposal.changes) ? { ...body, revision: proposal.revision || 0 } : body);
+
 /* One decision through the agent API. A refusal is an answer, never a throw, so a caller working through several keeps going. */
 export const decideOne = async (send, id, verb, body, fallback) => {
     try {
         const res = await send(id, verb, body);
         if (!res?.data?.status) return { id, ok: false, error: refusalOf(res, fallback) };
         const data = res.data.data || {};
-        return { id, ok: true, undo: Boolean(data.undoUntil), unapplied: unappliedOf(data), left: keptByUndo(data), later: laterOf(data), standing: data.standing || null, reshown: data.reshown === true, reshownChanges: data.proposal?.changes || [], madeProjects: madeProjectIds(data), opens: openedProjectId(data), trashedProjects: trashedProjectIds(data) };
+        return { id, ok: true, undo: Boolean(data.undoUntil), unapplied: unappliedOf(data), left: keptByUndo(data), later: laterOf(data), standing: data.standing || null, reshown: data.reshown === true, reshownChanges: data.proposal?.changes || [], reshownRevision: data.proposal?.revision || 0, madeProjects: madeProjectIds(data), opens: openedProjectId(data), trashedProjects: trashedProjectIds(data) };
     } catch (error) {
         return { id, ok: false, error: refusalOf(error, fallback) };
     }

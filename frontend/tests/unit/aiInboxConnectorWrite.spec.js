@@ -13,6 +13,7 @@ vi.mock('@/components/organisms/Shell/ShellIcon.vue', () => ({ default: { name: 
 vi.mock('@/views/Ai/AiSidebar.vue', () => ({ default: { name: 'AiSidebar', render: () => null } }));
 
 import AiInbox from '@/views/Ai/AiInbox.vue';
+import ConnectorWriteCard from '@/views/Inbox/ConnectorWriteCard.vue';
 
 config.global.plugins[0].global.setLocaleMessage('en', en);
 
@@ -68,6 +69,33 @@ describe('a write to a connected app on the AI Inbox card', () => {
         expect(results.map((r) => r.classes().includes('ah-field__error'))).toEqual([false, true]);
         expect(results[0].text()).toContain('Saved as note 1');
         expect(results[1].text()).toContain('the provider said no');
+    });
+
+    it('offers no edit on a write an MCP client filed, which the server would refuse', async () => {
+        const wrapper = await openCard(proposal({ source: 'mcp' }));
+        expect(wrapper.find('[data-test="edit-then-approve"]').exists()).toBe(false);
+    });
+
+    it('promises nothing about sending on a card no longer waiting', () => {
+        const card = mount(ConnectorWriteCard, { props: { change: write(), waiting: false } });
+        expect(card.text()).not.toContain(en.Connectors.approval.note);
+    });
+
+    it('names the revision it read when approving', async () => {
+        const wrapper = await openCard(proposal({ revision: 2 }), { approved: { applied: [{ action: KEY, ok: true }] } });
+        await wrapper.find('.ai-actions .ah-btn--primary').trigger('click');
+        await flushPromises();
+        expect(approvals()[0][2]).toMatchObject({ revision: 2 });
+    });
+
+    it('checks the edit on Done instead of leaving the old card up', async () => {
+        const wrapper = await openCard(proposal(), { approved: { applied: [], reshown: true, proposal: { changes: [write('Moved')], revision: 1 } } });
+        await wrapper.find('[data-test="edit-then-approve"]').trigger('click');
+        await wrapper.find('[data-test="connector-field-title"]').setValue('Moved');
+        await wrapper.find('[data-test="edit-then-approve"]').trigger('click');
+        await flushPromises();
+        expect(approvals()).toHaveLength(1);
+        expect(wrapper.find('[data-test="connector-card-title"]').text()).toBe('Moved');
     });
 
     it('checks an edit and shows the new card, with nothing reported as sent', async () => {

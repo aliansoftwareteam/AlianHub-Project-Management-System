@@ -1534,6 +1534,8 @@ const schema = {
         delivery: { type: Array, required: false },
         // The one person who may approve a connector write (Connectors/writes.js).
         connectionOwner: { type: String, required: false },
+        editedAt: { type: Date, required: false },
+        revision: { type: Number, required: false },
         // Each write of an approval claimed before it is sent, so it is sent once.
         sendAttempts: { type: Array, required: false },
         cost: { type: Object, required: false },

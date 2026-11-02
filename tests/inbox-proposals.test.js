@@ -84,6 +84,17 @@ describe('a write to a connected app in the Inbox', () => {
         expect((await rowOf(OWNER)).changes[0].card).toEqual(card);
     });
 
+    it('filed over MCP keeps its card, with no batch summary standing in for it', async () => {
+        const action = 'google.calendar.events.create';
+        seedProposal('a write', {
+            source: 'mcp', requestedBy: MEMBER, gate: 'connection_owner', connectionOwner: MEMBER,
+            changes: [{ action, params: { summary: 'Minutes', connectionId: 'c1' }, label: 'Minutes', reversible: false, card }],
+        });
+        const row = await rowOf(MEMBER);
+        expect(row.batch).toBeUndefined();
+        expect(row.changes[0].card).toEqual(card);
+    });
+
     it('is locked for an owner, who still reads the card and may decline', async () => {
         seedWrite();
         expect(await rowOf(OWNER)).toMatchObject({ locked: true, lockedWhy: 'connection_owner', mayDecline: true });

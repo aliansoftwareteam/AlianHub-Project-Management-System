@@ -126,6 +126,37 @@ describe('the limits for connected apps', () => {
         expect(wrapper.find('[data-test="quota-agentReads"]').element.value).toBe('7');
     });
 
+    it('refuses what the browser cannot read as a number, rather than taking the limit away', async () => {
+        overview = overviewOf({ workspace: { reads: 100, writeProposals: null, agentReads: null } });
+        const wrapper = await mountQuotas();
+        const input = wrapper.find('[data-test="quota-reads"]');
+        Object.defineProperty(input.element, 'validity', { value: { badInput: true } });
+        await input.setValue('');
+        await wrapper.find('[data-test="quota-form"]').trigger('submit');
+        await flushPromises();
+        expect(wrapper.find('[data-test="quota-reads-error"]').exists()).toBe(true);
+        expect(puts()).toHaveLength(0);
+    });
+
+    it('says when a lowered ceiling holds a saved limit, and lists the limit in force', async () => {
+        overview = overviewOf({ workspace: { reads: 1000, writeProposals: null, agentReads: null }, members: [{ targetId: PRIYA, limits: { reads: 900, writeProposals: null } }] });
+        const wrapper = await mountQuotas();
+        expect(wrapper.find('[data-test="quota-reads-held"]').text()).toContain('1000');
+        expect(wrapper.find('[data-test="quota-override"]').text()).toContain('600');
+    });
+
+    it('opens the limit of someone who has gone, so it can be taken away', async () => {
+        const GONE = '6f0000000000000000000a09';
+        overview = overviewOf({ members: [{ targetId: GONE, limits: { reads: 9, writeProposals: null } }] });
+        const wrapper = await mountQuotas();
+        await wrapper.find('[data-test="quota-override-change"]').trigger('click');
+        expect(wrapper.find('[data-test="quota-target"]').element.value).toBe(GONE);
+        await wrapper.find('[data-test="quota-reads"]').setValue('');
+        await wrapper.find('[data-test="quota-form"]').trigger('submit');
+        await flushPromises();
+        expect(puts()[0][2]).toEqual({ scope: 'member', targetId: GONE, reads: null });
+    });
+
     it('shows the server\'s refusal', async () => {
         const wrapper = await mountQuotas();
         apiRequest.mockImplementationOnce(() => Promise.reject(Object.assign(new Error('x'), { response: { data: { statusText: 'That member is not in this workspace.' } } })));

@@ -242,6 +242,15 @@ describe('PUT /api/v2/connectors/admin/quotas', () => {
         expect(out.body.statusText).toMatch(why);
     });
 
+    it('takes away the limit of someone who has gone, and sets no new one for them', async () => {
+        const GONE = '6f0000000000000000000a09';
+        mockDb.seed(SCHEMA_TYPE.CONNECTOR_QUOTAS, { scope: 'member', targetId: GONE, reads: 9 });
+        expect((await setQuota({ scope: 'member', targetId: GONE, reads: 5 })).code).toBe(400);
+        const { code, body } = await setQuota({ scope: 'member', targetId: GONE, reads: null });
+        expect(code).toBe(200);
+        expect(body.data.limits.reads).toBeNull();
+    });
+
     it('is for an owner or admin in person', async () => {
         expect((await setQuota({ scope: 'workspace', reads: 5 }, { role: 3 })).code).toBe(403);
         expect((await setQuota({ scope: 'workspace', reads: 5 }, { apiToken: { _id: 't' } })).code).toBe(403);
