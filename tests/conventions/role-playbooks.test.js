@@ -30,8 +30,10 @@ const playbooks = (dir) => fs.readdirSync(dir, { withFileTypes: true }).flatMap(
     return entry.name.endsWith('.md') ? [full] : [];
 });
 
+const read = (file) => fs.readFileSync(file, 'utf8').replace(/\r\n/g, '\n');
+
 const parse = (file) => {
-    const text = fs.readFileSync(file, 'utf8');
+    const text = read(file);
     const match = text.match(/^---\n([\s\S]*?)\n---\n([\s\S]*)$/);
     if (!match) return { text, meta: null, body: text };
     const meta = {};
@@ -111,7 +113,7 @@ describe('role playbooks', () => {
         const parse = require('../../Modules/Agents/rolePlaybooks').parse;
         const bad = FILES.filter(({ meta }) => meta.fields !== undefined).flatMap(({ file, rel }) => {
             try {
-                parse(fs.readFileSync(file, 'utf8'), rel);
+                parse(read(file), rel);
                 return [];
             } catch (error) {
                 return [error.message];

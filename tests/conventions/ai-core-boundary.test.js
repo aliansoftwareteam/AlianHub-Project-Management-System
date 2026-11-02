@@ -2,8 +2,9 @@ const fs = require('fs');
 const path = require('path');
 
 const ROOT = path.join(__dirname, '..', '..');
+const rel = (f) => path.relative(ROOT, f).split(path.sep).join('/');
 const SCAN = ['Modules', 'Config', 'utils', 'middlewares', 'event', 'common-storage'];
-const CORE = path.join('Modules', 'AICore') + path.sep;
+const CORE = 'Modules/AICore/';
 
 /* Every model call goes through Modules/AICore/llmProvider so pricing, usage
  * accounting, the instruction guard and provider selection cannot be bypassed.
@@ -34,10 +35,10 @@ const glob = (dir, out = []) => {
 };
 
 describe('the retired AI-core paths are gone for good', () => {
-    const files = [...SCAN, 'tests', 'scripts'].flatMap((d) => glob(path.join(ROOT, d))).map((f) => path.relative(ROOT, f));
+    const files = [...SCAN, 'tests', 'scripts'].flatMap((d) => glob(path.join(ROOT, d))).map(rel);
 
     it('nothing requires or mocks them', () => {
-        const offenders = files.filter((rel) => rel !== path.relative(ROOT, __filename) && RETIRED_PATHS.test(fs.readFileSync(path.join(ROOT, rel), 'utf8')));
+        const offenders = files.filter((r) => r !== rel(__filename) && RETIRED_PATHS.test(fs.readFileSync(path.join(ROOT, r), 'utf8')));
         expect(offenders).toEqual([]);
     });
     it('the pattern matches a require and a jest.mock (the pattern works)', () => {
@@ -50,16 +51,16 @@ describe('the retired AI-core paths are gone for good', () => {
 });
 
 describe('vendor LLM SDKs and hosts are only reached from Modules/AICore', () => {
-    const files = SCAN.flatMap((d) => glob(path.join(ROOT, d))).map((f) => path.relative(ROOT, f));
-    const offenders = files.filter((rel) => {
-        if (rel.startsWith(CORE) || ALLOWED_OUTSIDE_CORE.includes(rel)) return false;
-        const text = fs.readFileSync(path.join(ROOT, rel), 'utf8');
+    const files = SCAN.flatMap((d) => glob(path.join(ROOT, d))).map(rel);
+    const offenders = files.filter((r) => {
+        if (r.startsWith(CORE) || ALLOWED_OUTSIDE_CORE.includes(r)) return false;
+        const text = fs.readFileSync(path.join(ROOT, r), 'utf8');
         return VENDOR_SDK.test(text) || VENDOR_HOST.test(text);
     });
 
     it('scans the modules (the scan works)', () => { expect(files.length).toBeGreaterThan(100); });
     it('the core itself talks to a vendor (the patterns work)', () => {
-        const core = files.filter((rel) => rel.startsWith(CORE)).map((rel) => fs.readFileSync(path.join(ROOT, rel), 'utf8'));
+        const core = files.filter((r) => r.startsWith(CORE)).map((r) => fs.readFileSync(path.join(ROOT, r), 'utf8'));
         expect(core.some((t) => VENDOR_SDK.test(t) || VENDOR_HOST.test(t))).toBe(true);
     });
     it('finds no direct vendor call outside the core', () => { expect(offenders).toEqual([]); });
