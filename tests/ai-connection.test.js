@@ -148,7 +148,8 @@ describe('GET /api/v2/api-tokens/ai-connection', () => {
     };
 
     it('answers for the signed-in person in the workspace the request names', async () => {
-        token({ lastUsedAt: NOW });
+        /* read() checks expiry against the real clock, not NOW. */
+        token({ lastUsedAt: new Date(), expiresAt: new Date(Date.now() + 30 * DAY) });
         expect((await read({})).body).toMatchObject({ status: true, data: { connected: true } });
         expect((await read({ uid: SAM })).body.data.connected).toBe(false);
     });
