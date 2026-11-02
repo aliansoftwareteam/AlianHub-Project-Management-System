@@ -85,3 +85,4 @@ Auto-maintained registry of all tasks. Reflects YAML frontmatter from each `task
 | 077 | Connectors — remove the old Google Calendar and CloudStorage paths; Google and Dropbox setup pages | backlog | medium | 073, 076 | backlog/077-connectors-remove-calendar-picker-paths |
 | 078 | Connectors — Inbox approval cards and quota settings screens | backlog | high | 069, 070 | backlog/078-connectors-approval-quota-screens |
 | 079 | Connectors — remove the old Slack bot and GitHub sync paths | backlog | medium | 074, 075 | backlog/079-connectors-remove-slack-github-paths |
+| 087 | Ask knows a project — grounded project, list, task and person answers, and a better @ picker | active | high | — | active/087-ask-project-context-mentions |
