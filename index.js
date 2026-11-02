@@ -35,10 +35,8 @@ app.use(bodyParser.raw({ limit: BODY_LIMIT }));
 app.use(require('./Config/requestLog').requestLog());
 
 require('./Config/appShellWorker').install(app, path.join(__dirname, './frontend/dist'));
+app.get(['/', '/index.html'], require('./Config/shellPage').shellPage(path.join(__dirname, './frontend/dist/index.html')));
 app.use(express.static(path.join(__dirname, './frontend/dist')));
-app.get("/", (req, res) => {
-    res.sendFile(path.join(__dirname, './frontend/dist/index.html'));
-});
 app.use(require('./Modules/Instance/maintenance.js').maintenanceGuard);
 
 // ADD DEFAULT BRAND SETTINGS
