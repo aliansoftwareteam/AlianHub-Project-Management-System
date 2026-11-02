@@ -18,6 +18,7 @@ const PATCH = /^\d{1,3}$/;
 const CPUS = /^\d+(?:\.\d+)?$/;
 const MEMORY = /^(\d+(?:\.\d+)?)([mg])$/;
 const CACHE_GB = /^\d+(?:\.\d+)?$/;
+const RESOLVER = /^[a-z0-9_-]{1,32}$/;
 const PLACEHOLDER = /\$\{([A-Z0-9_]+)\}/g;
 
 const loadTiers = (file = TIERS_FILE) => JSON.parse(fs.readFileSync(file, 'utf8'));
@@ -61,6 +62,10 @@ function stackValues(meta, tiers) {
     check(IMAGE.test(source.image || ''), 'image must be a repository reference without a tag or digest');
     check(DIGEST.test(source.imageDigest || ''), 'imageDigest must be sha256: followed by 64 hex characters');
     check(PATCH.test(mongoPatch), 'mongoPatch must be a number');
+    if (source.customHost !== undefined && source.customHost !== null) {
+        check(HOST.test(String(source.customHost)) && source.customHost !== hostname, 'customHost must be a lowercase DNS name other than hostname');
+        check(!source.certResolver || RESOLVER.test(source.certResolver), 'certResolver must be a Traefik resolver name');
+    }
     if (problems.length) return { problems };
 
     const limits = { ...tierLimits(tier), ...(source.limits || {}) };
@@ -89,8 +94,54 @@ function stackValues(meta, tiers) {
             MONGO_CPUS: limits.mongoCpus,
             MONGO_MEM: limits.mongoMemory,
             MONGO_CACHE_GB: limits.mongoCacheGb
-        }
+        },
+        customDomain: source.customHost ? {
+            host: String(source.customHost),
+            primary: source.customHostPrimary === true,
+            certResolver: source.certResolver || null
+        } : null
     };
+}
+
+/* A customer's own domain (cloud task 085) is a second router on the same service. While its
+ * certificate is being issued the subdomain keeps serving; once it is primary the subdomain
+ * redirects to it, except /health, which the control plane polls on the subdomain. Without a
+ * custom domain the output is the template's, byte for byte. */
+function withCustomDomain(compose, values, domain) {
+    if (!domain) return compose;
+    const id = `t_${values.INSTANCE_ID}`;
+    const routerKey = `traefik.http.routers.${id}.middlewares: `;
+    // A Windows checkout packs the template with CRLF.
+    const eol = compose.includes('\r\n') ? '\r\n' : '\n';
+    const lines = compose.split(eol);
+    const at = lines.findIndex((line) => line.trimStart().startsWith(routerKey));
+    if (at < 0) throw new Error('the template has no tenant router to add a custom domain to');
+    const indent = lines[at].slice(0, lines[at].indexOf(routerKey));
+    const middlewares = lines[at].slice(indent.length + routerKey.length);
+    const label = (key, value) => `${indent}traefik.http.${key}: ${value}`;
+    const added = [];
+    if (domain.primary) {
+        lines[at] = `${lines[at]},${id}-to-custom`;
+        added.push(
+            // Compose reads $$ as one literal $.
+            label(`middlewares.${id}-to-custom.redirectregex.regex`, '"^https?://[^/]+(.*)$$"'),
+            label(`middlewares.${id}-to-custom.redirectregex.replacement`, `"https://${domain.host}$\${1}"`),
+            label(`middlewares.${id}-to-custom.redirectregex.permanent`, '"true"'),
+            label(`routers.${id}_h.rule`, `Host(\`${values.TENANT_HOST}\`) && Path(\`/health\`)`),
+            label(`routers.${id}_h.entrypoints`, 'websecure'),
+            label(`routers.${id}_h.middlewares`, middlewares),
+            label(`routers.${id}_h.service`, id)
+        );
+    }
+    added.push(
+        label(`routers.${id}_c.rule`, `Host(\`${domain.host}\`)`),
+        label(`routers.${id}_c.entrypoints`, 'websecure'),
+        label(`routers.${id}_c.middlewares`, middlewares),
+        label(`routers.${id}_c.service`, id)
+    );
+    if (domain.certResolver) added.push(label(`routers.${id}_c.tls.certresolver`, domain.certResolver));
+    lines.splice(at + 1, 0, ...added);
+    return lines.join(eol);
 }
 
 function render(template, values) {
@@ -107,9 +158,10 @@ function render(template, values) {
 }
 
 function renderStack(meta, { tiers = loadTiers(), template = loadTemplate() } = {}) {
-    const { problems, values } = stackValues(meta, tiers);
+    const { problems, values, customDomain } = stackValues(meta, tiers);
     if (problems.length) return { problems };
-    return { problems, values, project: `t_${values.INSTANCE_ID}`, compose: render(template, values) };
+    const compose = withCustomDomain(render(template, values), values, customDomain);
+    return { problems, values, project: `t_${values.INSTANCE_ID}`, compose };
 }
 
 /* Written beside, then renamed over: the host agent may read compose.yml at any moment, and a
@@ -163,4 +215,4 @@ function main(argv) {
 
 if (require.main === module) process.exitCode = main(process.argv);
 
-module.exports = { TEMPLATE_FILE, TIERS_FILE, loadTiers, loadTemplate, memoryMb, stackValues, render, renderStack, writeReadOnly, main };
+module.exports = { TEMPLATE_FILE, TIERS_FILE, loadTiers, loadTemplate, memoryMb, stackValues, render, withCustomDomain, renderStack, writeReadOnly, main };
