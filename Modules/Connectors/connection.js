@@ -473,9 +473,36 @@ const endForMember = async (companyId, userId) => {
     return ended;
 };
 
+/* The idempotent daily sweep (067): ends the connections of anyone in this company who still holds one but no
+ * longer has a seat — the safety net for a removal whose end-one-member call never finished (the provider was
+ * down, the process died). It reuses endForMember, so a closed row is not open on the next pass and a second run
+ * ends nothing. A member who still has their seat is left alone. */
+const sweepCompany = async (companyId) => {
+    if (!OBJECT_ID.test(String(companyId || ''))) return 0;
+    let offered;
+    try {
+        offered = registry.offered(await companyAppsOf(companyId)).map((d) => d.id);
+    } catch (e) {
+        return 0;
+    }
+    if (!offered.length) return 0;
+    let ended = 0;
+    try {
+        const open = ((await MongoDbCrudOpration(String(companyId), { type: T, data: [{ provider: { $in: offered }, deletedStatusKey: { $ne: 1 } }, 'userId'] }, 'find')) || []).map(plain);
+        const userIds = [...new Set(open.map((row) => String(row.userId)))];
+        for (const userId of userIds) {
+            // eslint-disable-next-line no-await-in-loop
+            if (!(await hasSeat(String(companyId), userId))) ended += await endForMember(String(companyId), userId);
+        }
+    } catch (error) {
+        logger.error(`${LOG} the departed-member connection sweep failed for a company: ${(error && error.name) || 'Error'}`);
+    }
+    return ended;
+};
+
 module.exports = {
     STATUS, BY, STATE_TTL_SECONDS, SECRET_KIND, ConnectionError,
     isOffered, fallbackOrigin, redirectUri, callbackPath, byId, ownsState,
     describe, list, membersWithConnections, start, setProducts, returnFor, complete, disconnect,
-    findUsable, accessTokenFor, markBackoff, endForMember,
+    findUsable, accessTokenFor, markBackoff, endForMember, sweepCompany,
 };
