@@ -9,15 +9,16 @@ const sameFilters = (a, b) => JSON.stringify(a) === JSON.stringify(b);
 export function useReportFilters({ defaultPreset = 'this_week', presets = PRESETS } = {}) {
     const route = useRoute();
     const router = useRouter();
+    const queryNow = () => (route && route.query) || {};
     const options = { defaultPreset, presets };
-    const filters = ref(readFilters(route.query, options));
+    const filters = ref(readFilters(queryNow(), options));
 
     const commit = (next, drop = []) => {
         filters.value = next;
-        const base = { ...route.query };
+        const base = { ...queryNow() };
         drop.forEach((key) => { delete base[key]; });
         const query = writeFilters(next, base, options);
-        if (!sameFilters(query, route.query)) router.replace({ query }).catch(() => {});
+        if (router && !sameFilters(query, queryNow())) router.replace({ query }).catch(() => {});
     };
 
     /* `drop` removes query keys the tab has just read into the filters (an old link's week=, userId=). */
@@ -38,7 +39,7 @@ export function useReportFilters({ defaultPreset = 'this_week', presets = PRESET
 
     const clear = () => commit({ ...emptyFilters(filters.value.preset), start: filters.value.start, end: filters.value.end });
 
-    watch(() => route.query, (query) => {
+    watch(queryNow, (query) => {
         const next = readFilters(query, options);
         if (!sameFilters(next, filters.value)) filters.value = next;
     });

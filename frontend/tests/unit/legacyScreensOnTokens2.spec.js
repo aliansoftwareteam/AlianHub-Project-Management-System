@@ -83,10 +83,11 @@ describe('legacy timesheets', () => {
         for (const rel of TIMESHEET_VIEWS) expect(read(rel), rel).not.toMatch(/legacyTimesheetTheme/);
     });
 
-    test.each(['views/Timesheet/ProjectTimesheet/ProjectTimesheet.vue', 'views/Timesheet/TrackerTimeSheet/TrackerTimesheet.vue'])('%s opts into the theme and uses the themed filter menu', (rel) => {
+    test.each(['views/Timesheet/ProjectTimesheet/ProjectTimesheet.vue', 'views/Timesheet/TrackerTimeSheet/TrackerTimesheet.vue'])('%s opts into the theme and uses the shared report toolbar and filter bar', (rel) => {
         const template = templateOf(read(rel));
-        expect(template).toMatch(/class="ah-page timesheet_view /);
-        expect(template).toMatch(/<DropDown [^>]*\bthemed\b/);
+        expect(template).toMatch(/class="ah-page rpt timesheet_view /);
+        expect(template).toMatch(/<ReportToolbar\b/);
+        expect(template).toMatch(/<ReportFilterBar\b/);
     });
 
     test('the table head, foot, sticky column and today marker sit on opaque token surfaces', () => {
@@ -98,10 +99,11 @@ describe('legacy timesheets', () => {
         }
     });
 
-    test('arrows drawn for a white page are masks that take the text colour', () => {
+    test('the day arrows are the shared stepper, drawn with icons that take the text colour', () => {
         const tracker = templateOf(read('views/Timesheet/TrackerTimeSheet/TrackerTimesheet.vue'));
         expect(tracker).not.toMatch(/rectangle_(left|right)Arrow\.png"/);
-        expect(tracker.match(/class="ah-mask-icon"/g).length).toBeGreaterThanOrEqual(2);
+        expect(tracker).toMatch(/<ReportFilterBar[^>]*:presets="DAY_PRESETS"/);
+        expect(read('views/Timesheet/report/ReportDateChip.vue')).toMatch(/<ShellIcon name="chevronLeft"[\s\S]*<ShellIcon name="chevronRight"/);
     });
 });
 

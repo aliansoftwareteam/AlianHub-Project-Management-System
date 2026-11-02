@@ -10,6 +10,9 @@ const PRESETS = Object.freeze([
     'custom',
 ]);
 const DAY_PRESETS = Object.freeze(['today', 'yesterday', 'custom']);
+/* For a queue, where anything still open matters however old it is. */
+const ANY_TIME = 'all_time';
+const ANY_TIME_RANGE = Object.freeze({ start: '1970-01-01', end: '2999-12-31' });
 const DAY_MS = 86400000;
 const ISO_DAY = /^\d{4}-\d{2}-\d{2}$/;
 
@@ -52,6 +55,7 @@ const ordered = (start, end) => (toUtc(start) <= toUtc(end) ? { start, end } : {
 /* The range a preset stands for on the day `today`. `custom` keeps the given days, in order. */
 const rangeOf = (preset, today = localDay(), custom = {}) => {
     switch (preset) {
+    case ANY_TIME: return { ...ANY_TIME_RANGE };
     case 'today': return { start: today, end: today };
     case 'yesterday': { const d = addDays(today, -1); return { start: d, end: d }; }
     case 'this_week': { const s = weekStart(today); return { start: s, end: addDays(s, 6) }; }
@@ -84,6 +88,7 @@ const UNIT_OF = Object.freeze({
 
 /* The ‹ › stepper: a calendar preset moves by its own period, anything else by the range's length. The result is a custom range. */
 const shiftRange = (range, preset, step) => {
+    if (preset === ANY_TIME) return { ...ANY_TIME_RANGE };
     const unit = UNIT_OF[preset];
     if (unit === 'day') return { start: addDays(range.start, step), end: addDays(range.end, step) };
     if (unit === 'week') return { start: addDays(range.start, 7 * step), end: addDays(range.end, 7 * step) };
@@ -97,7 +102,7 @@ const shiftRange = (range, preset, step) => {
 };
 
 /* The preset whose range is exactly this one on `today`, so a stepped range that lands back on "this week" reads as such. */
-const presetFor = (range, today = localDay(), allowed = PRESETS) => allowed
+const presetFor = (range, today = localDay(), allowed = PRESETS) => (range.start === ANY_TIME_RANGE.start && range.end === ANY_TIME_RANGE.end && allowed.includes(ANY_TIME) ? ANY_TIME : null) || allowed
     .filter((preset) => preset !== 'custom')
     .find((preset) => { const r = rangeOf(preset, today); return r.start === range.start && r.end === range.end; }) || 'custom';
 
@@ -134,7 +139,7 @@ const bucketsOf = (range, granularity = granularityOf(range)) => {
 };
 
 module.exports = {
-    PRESETS, DAY_PRESETS,
+    PRESETS, DAY_PRESETS, ANY_TIME,
     isDay, localDay, addDays, weekStart, monthEnd, daysBetween,
     rangeOf, shiftRange, presetFor, isOneIsoWeek, granularityOf, daysOf, bucketsOf,
 };

@@ -10,6 +10,7 @@ const { scopeEstimatePipeline, withJoinScope, TimesheetQueryRefused } = require(
 const { buildEstimateWrite, authorizeTaskProject, EstimateWriteRefused } = require("./helpers/estimateWriteScope");
 const { previousPlanOf, recordPlanChange } = require("./helpers/planHistory");
 const { idForms } = require("../../utils/mongo-handler/objectIdKeys");
+const { normalizeReportFilters, reportTaskIds, estimateClausesOf } = require("../TimeSheet/helpers/reportFilters");
 const { evaluatePermission, isWritable } = require("../../Config/permissionGuard");
 const { visibleTask, TASK_NOT_FOUND } = require("../AI/taskAccess");
 const { actingUser } = require("../Sprints/helpers/actingUser");
@@ -221,6 +222,10 @@ exports.getEstimateByAggregate = async (req,res) => {
             if (!(error instanceof TimesheetQueryRefused)) throw error;
             return res.status(400).json({ status: false, statusText: "Bad Request", message: error.message });
         }
+
+        /* The Time reports' task filters (lists, status, tags) narrow the plans like the time they sit next to. */
+        const narrowing = estimateClausesOf(await reportTaskIds(companyId, scope, normalizeReportFilters(req.body && req.body.filters)));
+        if (narrowing.length) pipeline = [{ $match: { $and: narrowing } }, ...pipeline];
 
         const estimateData = await MongoDbCrudOpration(companyId, { type: SCHEMA_TYPE.ESTIMATES_TIME, data: [pipeline] }, 'aggregate');
 

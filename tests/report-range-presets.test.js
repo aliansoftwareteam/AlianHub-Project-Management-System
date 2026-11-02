@@ -87,3 +87,13 @@ describe('report date presets', () => {
         expect(R.isDay(20261104)).toBe(false);
     });
 });
+
+describe('the any-time preset of a queue', () => {
+    it('covers everything, does not step, and is recognised only where it is offered', () => {
+        const all = R.rangeOf(R.ANY_TIME, '2026-11-04');
+        expect(all).toEqual({ start: '1970-01-01', end: '2999-12-31' });
+        expect(R.shiftRange(all, R.ANY_TIME, 1)).toEqual(all);
+        expect(R.presetFor(all, '2026-11-04', [R.ANY_TIME, ...R.PRESETS])).toBe(R.ANY_TIME);
+        expect(R.presetFor(all, '2026-11-04')).toBe('custom');
+    });
+});

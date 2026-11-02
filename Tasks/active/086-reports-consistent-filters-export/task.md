@@ -31,7 +31,7 @@ Every Time report looks and behaves like the rest of AlianHub: one toolbar, one 
 1. **`reportRange.js`** (pure, CommonJS so jest tests it): date presets `today, yesterday, this_week, last_week, this_month, last_month, this_quarter, last_quarter, this_year, last_year, last_7, last_30, last_90, custom`; `rangeOf(preset, now, { start, end })` → `{ start, end }` as `YYYY-MM-DD`, ISO weeks (Monday start, as every Time screen already uses); `shiftRange` for the ‹ › stepper (moves by the preset's own period); `granularityOf(range)` (day/week/month buckets).
 2. **`reportQuery.js`** (pure): read/write the filter state ⇄ route query (`range`, `from`, `to`, `people`, `projects`, `lists`, `status`, `billable`, `tags`, plus tab-specific keys left untouched). Unknown or malformed values fall back to the tab's default.
 3. **`useReportFilters`** composable: reactive filters synced with `router.replace`, so the URL always says what the screen shows; tab links carry the shared keys across tabs.
-4. **`reportExport.js`**: `toCsvText(columns, rows)` (pure, tested; quotes, commas, newlines, formula-injection guard via the existing `escapeCSVValue` rules), CSV download, **Excel** through the already-installed `xlsx` (lazy `loadXlsx`), **PDF** through the browser's print dialog on a plain printable table (no PDF library exists in the web app).
+4. **`reportTable.js` + `useReportExport`**: build the on-screen table (`tableOf(columns, rows, total)`, pure and tested) and send it to the app's existing export routes (`Modules/Export`: `/api/v1/export/csv`, `/xlsx`, `/pdf` with pdfmake) through the shared `composable/exportDownload.js`, which gains the PDF format. Wide tables print landscape.
 5. **Components**
    - `ReportToolbar.vue` — `header.ah-toolbar` with `ah-toolbar__title`, the tab strip, a meta slot (status chip, count), spacer, actions slot and the Export menu.
    - `TimesheetTabs.vue` — restyled as the shared `ah-tabs`/`ah-tab` segmented control (router links, `aria-current`), carrying the shared filter query.
@@ -88,5 +88,11 @@ Every Time report looks and behaves like the rest of AlianHub: one toolbar, one 
 - **Status filters by name** across projects (each project has its own status keys), as Everything does.
 - **Tracker keeps a single day**: its timeline is per day; presets that span days do not apply there.
 - **Mine keeps Submit week-bound**: Submit/Resubmit show only when the range is exactly one ISO week; other ranges are read-only views.
-- **PDF = print dialog** of a plain table (no PDF library in the web app; adding one is a bigger decision).
-- **No new backend route**: the existing routes take an optional `filters` object; this keeps the API surface and the API doc unchanged except for request fields.
+- **Export goes through the existing `Modules/Export` routes** (CSV, Excel, PDF via pdfmake), which already take "the table on screen". No new export code on the server; the PDF prints landscape past eight columns.
+- **No new backend route**: `GET /timesheet/week`, `POST /timesheet/project`, `POST /timesheet/workload-grid`, `POST /timesheet/export-csv` and `POST /estimatedTime` take an optional `filters` object (lists, status names, tags, billable). Task-side filters resolve to task ids inside the session company and the caller's visible projects, and only ever go under `$and` beside the scope's own match.
+- **Teams filter dropped** from Project/Tracker: People covers it, and the shared bar has no team source yet (follow-up if wanted).
+- **Approvals default to "Any time"** and ignore a date range carried from another tab (a queue must not hide pending items); its card type (All/Time/Leave/AI) stays a segmented control and is kept in the URL (`types`).
+- **Workload defaults to "This week"** (was a fixed 12-day window). Ranges over a month fold into week columns, over six months into months; drag-and-drop and Balance only in day columns.
+- **Workload panel hides while a task is open** and comes back when the task is closed: the task panel is drawn inside the view, under a fixed side panel.
+- **Old links keep working**: Mine still reads `?week=&userId=` (Approvals' Detail now sends the new `range/from/to/people`).
+- **Variance** has no backend person/project filter; the bar narrows the groups and largest-delta rows client-side and recomputes the headline totals from what is left.

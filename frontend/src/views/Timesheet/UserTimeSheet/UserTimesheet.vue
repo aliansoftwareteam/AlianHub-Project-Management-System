@@ -65,16 +65,26 @@
                 <div v-if="!displayRows.length" class="ut2-empty">
                     <div v-if="loading" class="ah-small">{{ $t('Time.loading') }}</div>
                     <EmptyState
+                        v-else-if="narrowing"
+                        compact
+                        data-test="time-empty-filtered"
+                        :heading-level="2"
+                        :title="$t('Reports.empty_filtered_title')"
+                        :message="$t('Reports.empty_filtered')"
+                        :action-label="$t('Reports.clear_filters_n', { n: narrowing })"
+                        @action="clear()"
+                    />
+                    <EmptyState
                         v-else
                         compact
                         illustration="time"
                         data-test="time-empty"
                         :heading-level="2"
-                        :title="narrowing ? $t('Reports.empty_filtered_title') : $t('Time.empty_week_title')"
-                        :message="narrowing ? $t('Reports.empty_filtered') : $t('Time.empty_week')"
-                        :action-label="narrowing ? $t('Reports.clear_filters_n', { n: narrowing }) : $t('Time.log_time')"
-                        :sentence="narrowing ? '' : $t('EmptyState.say_time')"
-                        @action="narrowing ? clear() : openLog()"
+                        :title="$t('Time.empty_week_title')"
+                        :message="$t('Time.empty_week')"
+                        :action-label="$t('Time.log_time')"
+                        :sentence="$t('EmptyState.say_time')"
+                        @action="openLog()"
                     />
                 </div>
                 <div v-for="row in displayRows" :key="row.taskId" class="ut2-row">

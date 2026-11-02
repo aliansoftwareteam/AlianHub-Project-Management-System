@@ -1,22 +1,26 @@
 <template>
-    <div class="ah-page tv-page vr">
-        <div class="tv-head">
-            <h1 class="tv-title vr__title">{{ $t('Time.variance') }}</h1>
-            <span class="tv-range">
-                <button type="button" :aria-label="$t('Time.prev_month')" @click="shift(-1)">‹</button>
-                <span>{{ headline }}</span>
-                <button type="button" :aria-label="$t('Time.next_month')" @click="shift(1)">›</button>
-            </span>
-            <div class="tv-actions">
+    <div class="ah-page rpt vr">
+        <ReportToolbar :title="$t('Time.variance')" :exporting="exporting" :canExport="groups.length > 0" @export="onExport">
+            <template #meta><span class="rpt__range-text vr__headline">{{ headline }}</span></template>
+            <template #actions>
                 <span v-if="ownTimeOnly" class="ah-small">{{ $t('Time.variance_own_only') }}</span>
-                <select v-else v-model="groupBy" class="tv-select">
+                <select v-else v-model="groupBy" class="ah-input rpt__select" :aria-label="$t('Time.group_by')">
                     <option value="project">{{ $t('Time.by_project') }}</option>
                     <option value="person">{{ $t('Time.by_person') }}</option>
                 </select>
-                <button type="button" class="ah-btn ah-btn--secondary ah-btn--sm" :disabled="!groups.length" @click="exportReport">{{ $t('Time.export') }}</button>
-            </div>
-        </div>
+            </template>
+        </ReportToolbar>
+        <ReportFilterBar
+            :filters="filters"
+            :presets="PRESETS"
+            :fields="ownTimeOnly ? ['projects'] : ['projects', 'people']"
+            :options="{ projects: options.projects.value, people: options.people.value }"
+            @apply="apply"
+            @step="step"
+            @clear="clear"
+        />
 
+        <div class="rpt__body vr__body">
         <p v-if="error" class="tv-error">{{ error }}</p>
 
         <div class="tv-card tv-card--pad vr__bars">
@@ -73,22 +77,31 @@
             <span v-if="takeaway">{{ $t('Time.takeaway', { project: takeaway.projectName || $t('Time.unknown_project'), pct: `+${takeaway.variancePct}%`, task: takeaway.name, actual: formatHm(takeaway.actualMinutes), estimate: formatHm(takeaway.estimatedMinutes) }) }}</span>
             <span v-else>{{ $t('Time.takeaway_none') }}</span>
         </div>
+        </div>
     </div>
 </template>
 
 <script setup>
-import { ref, computed, onMounted, watch } from 'vue';
+import { ref, computed, inject, onMounted, watch } from 'vue';
 import { useI18n } from 'vue-i18n';
-import moment from 'moment';
 import { apiRequest } from '@/services';
 import * as env from '@/config/env';
-import { downloadExport } from '@/composable/exportDownload';
+import ReportToolbar from '@/views/Timesheet/report/ReportToolbar.vue';
+import ReportFilterBar from '@/views/Timesheet/report/ReportFilterBar.vue';
+import { useReportFilters } from '@/views/Timesheet/report/useReportFilters';
+import { useReportOptions } from '@/views/Timesheet/report/useReportOptions';
+import { useReportExport } from '@/views/Timesheet/report/useReportExport';
+import { PRESETS } from '@/views/Timesheet/report/reportRange';
+import { hoursOf } from '@/views/Timesheet/report/reportTable';
 import { formatHm } from '@/composable/useTimer';
 
 defineOptions({ name: 'VarianceReport' });
 
 const { t } = useI18n();
-const month = ref(moment().startOf('month'));
+const companyId = inject('$companyId');
+const { filters, range, apply, step, clear } = useReportFilters({ defaultPreset: 'this_month' });
+const options = useReportOptions(companyId);
+const { exporting, exportReport } = useReportExport((field, value) => options.labelOf(field, value));
 const groupBy = ref('project');
 const data = ref(null);
 const drill = ref(null);
@@ -105,17 +118,29 @@ const sorts = [
     { key: 'actual', label: 'Time.col_actual' },
     { key: 'name', label: 'Time.col_name' },
 ];
-const fromIso = computed(() => month.value.format('YYYY-MM-DD'));
-const toIso = computed(() => month.value.clone().endOf('month').format('YYYY-MM-DD'));
-const totals = computed(() => (data.value && data.value.totals) || { totalEstimated: 0, totalActual: 0, totalVariancePct: 0 });
-const headline = computed(() => t('Time.head_range', {
-    range: month.value.format('MMM').toUpperCase(),
+const fromIso = computed(() => range.value.start);
+const toIso = computed(() => range.value.end);
+const pctOf = (estimated, actual) => (estimated > 0 ? Math.round(((actual - estimated) / estimated) * 100) : 0);
+/* Projects and people narrow the groups on screen; the totals then add up what is left. */
+const narrowed = computed(() => filters.value.projects.length || filters.value.people.length);
+const keepGroup = (kind, g) => {
+    const picked = kind === 'project' ? filters.value.projects : filters.value.people;
+    return !picked.length || picked.includes(String(g.key));
+};
+const totals = computed(() => {
+    const raw = (data.value && data.value.totals) || { totalEstimated: 0, totalActual: 0, totalVariance: 0, totalVariancePct: 0 };
+    if (!narrowed.value) return raw;
+    const totalEstimated = groups.value.reduce((a, g) => a + g.estimatedMinutes, 0);
+    const totalActual = groups.value.reduce((a, g) => a + g.actualMinutes, 0);
+    return { totalEstimated, totalActual, totalVariance: totalActual - totalEstimated, totalVariancePct: pctOf(totalEstimated, totalActual) };
+});
+const headline = computed(() => t('Time.head_range_short', {
     est: Math.round(totals.value.totalEstimated / 60),
     act: Math.round(totals.value.totalActual / 60),
     pct: `${totals.value.totalVariancePct > 0 ? '+' : ''}${totals.value.totalVariancePct}%`,
 }));
 const ownTimeOnly = computed(() => Boolean(data.value && data.value.scope === 'self'));
-const groups = computed(() => (data.value ? (groupBy.value === 'project' ? data.value.byProject : data.value.byPerson) || [] : []));
+const groups = computed(() => (data.value ? ((groupBy.value === 'project' ? data.value.byProject : data.value.byPerson) || []).filter((g) => keepGroup(groupBy.value, g)) : []));
 const sortedGroups = computed(() => {
     const list = [...groups.value];
     const dir = sortDir.value;
@@ -133,7 +158,9 @@ const signedDelta = (r) => `${r.variance > 0 ? '+' : (r.variance < 0 ? '−' : '
 const drivers = computed(() => (data.value && data.value.drivers) || []);
 const takeaway = computed(() => (data.value && data.value.takeaway) || null);
 const projectNameOf = (id) => { const g = (data.value && data.value.byProject || []).find((p) => p.key === id); return g ? g.name : ''; };
-const taskRows = computed(() => (drill.value ? drillTasks.value : ((data.value && data.value.largest) || []).map((r) => ({ ...r, projectName: projectNameOf(r.projectId) }))));
+const taskRows = computed(() => (drill.value ? drillTasks.value : ((data.value && data.value.largest) || [])
+    .filter((r) => !filters.value.projects.length || filters.value.projects.includes(String(r.projectId)))
+    .map((r) => ({ ...r, projectName: projectNameOf(r.projectId) }))));
 const sortedTasks = computed(() => {
     const list = [...taskRows.value];
     const k = taskSortKey.value;
@@ -144,7 +171,6 @@ const sortedTasks = computed(() => {
 
 const setSort = (key) => { if (sortKey.value === key) sortDir.value = -sortDir.value; else { sortKey.value = key; sortDir.value = key === 'name' ? 1 : -1; } };
 const setTaskSort = (key) => { if (taskSortKey.value === key) taskSortDir.value = -taskSortDir.value; else { taskSortKey.value = key; taskSortDir.value = key === 'name' ? 1 : -1; } };
-const shift = (n) => { month.value = month.value.clone().add(n, 'months'); drill.value = null; };
 
 const load = async () => {
     loading.value = true;
@@ -171,26 +197,33 @@ const drillInto = async (g) => {
         drillTasks.value = [];
     }
 };
-const exportReport = () => {
-    downloadExport('csv', {
-        filename: `variance-${month.value.format('YYYY-MM')}`,
-        sheetName: 'Variance',
-        tableHead: [groupBy.value === 'project' ? 'Project' : 'Person', 'Estimated (min)', 'Actual (min)', 'Variance (min)', 'Variance %', 'Tasks'],
-        tableRows: sortedGroups.value.map((g) => [g.name, g.estimatedMinutes, g.actualMinutes, g.variance, g.variancePct, g.tasks]),
-        totalRow: ['Total', totals.value.totalEstimated, totals.value.totalActual, totals.value.totalVariance, totals.value.totalVariancePct, ''],
+const onExport = async (format) => {
+    await exportReport(format, {
+        name: 'variance',
+        title: `${t('Time.variance')} · ${groupBy.value === 'project' ? t('Time.by_project') : t('Time.by_person')}`,
+        filters: filters.value,
+        columns: [
+            { key: 'name', label: groupBy.value === 'project' ? t('Reports.col_project') : t('Reports.col_person'), value: (g) => g.name || '' },
+            { key: 'est', label: t('Reports.col_estimated_hours'), value: (g) => hoursOf(g.estimatedMinutes) },
+            { key: 'act', label: t('Reports.col_logged_hours'), value: (g) => hoursOf(g.actualMinutes) },
+            { key: 'var', label: t('Reports.col_variance_hours'), value: (g) => hoursOf(g.variance) },
+            { key: 'pct', label: t('Reports.col_variance_pct'), value: (g) => g.variancePct },
+            { key: 'tasks', label: t('Reports.col_tasks'), value: (g) => (g.isTotal ? '' : g.tasks) },
+        ],
+        rows: sortedGroups.value,
+        total: { isTotal: true, name: t('Time.col_total'), estimatedMinutes: totals.value.totalEstimated, actualMinutes: totals.value.totalActual, variance: totals.value.totalVariance, variancePct: totals.value.totalVariancePct },
     });
 };
 
-watch(month, load);
+watch(() => [fromIso.value, toIso.value], () => { drill.value = null; load(); });
 watch(groupBy, () => { drill.value = null; });
 watch(ownTimeOnly, (own) => { if (own) groupBy.value = 'project'; });
-onMounted(load);
+onMounted(() => { load(); options.ready(); });
 </script>
 
 <style src="../Timesheet/timeV2.css"></style>
 <style scoped>
-.vr { max-width: 980px; }
-.vr__title { font-size: 15px; }
+.vr__body { max-width: calc(980px + 2 * var(--page-pad-x, 22px)); width: 100%; box-sizing: border-box; }
 .vr__bars { display: flex; flex-direction: column; gap: 11px; }
 .vr__section { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
 .vr__sort { display: flex; gap: 4px; }

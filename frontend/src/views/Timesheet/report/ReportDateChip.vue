@@ -1,6 +1,6 @@
 <template>
     <div class="rpt__date">
-        <button type="button" class="rpt__step" :aria-label="$t('Reports.range_previous')" data-test="report-range-prev" @click="$emit('step', -1)">
+        <button v-if="steppable" type="button" class="rpt__step" :aria-label="$t('Reports.range_previous')" data-test="report-range-prev" @click="$emit('step', -1)">
             <ShellIcon name="chevronLeft" :size="13" aria-hidden="true" />
         </button>
         <div ref="anchor" class="evr__chip-anchor">
@@ -14,7 +14,7 @@
             >
                 <ShellIcon name="calendar" :size="13" aria-hidden="true" />
                 <span>{{ presetLabel }}</span>
-                <span class="rpt__range-text">{{ rangeText }}</span>
+                <span v-if="steppable" class="rpt__range-text">{{ rangeText }}</span>
                 <ShellIcon name="chevronDown" :size="12" aria-hidden="true" />
             </button>
             <div v-if="open" class="ah-pop evr__pop rpt__date-pop" role="dialog" :aria-label="$t('Reports.date_range')">
@@ -45,7 +45,7 @@
                 </form>
             </div>
         </div>
-        <button type="button" class="rpt__step" :aria-label="$t('Reports.range_next')" data-test="report-range-next" @click="$emit('step', 1)">
+        <button v-if="steppable" type="button" class="rpt__step" :aria-label="$t('Reports.range_next')" data-test="report-range-next" @click="$emit('step', 1)">
             <ShellIcon name="chevronRight" :size="13" aria-hidden="true" />
         </button>
     </div>
@@ -73,6 +73,7 @@ const draftEnd = ref('');
 
 const single = computed(() => !props.presets.some((preset) => !['today', 'yesterday', 'custom'].includes(preset)));
 const quickPresets = computed(() => props.presets.filter((preset) => preset !== 'custom'));
+const steppable = computed(() => props.filters.preset !== 'all_time');
 const presetLabel = computed(() => t(`Reports.preset_${props.filters.preset}`));
 const rangeText = computed(() => {
     const start = moment(props.filters.start);

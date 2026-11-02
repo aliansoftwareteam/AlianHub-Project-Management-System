@@ -1,5 +1,5 @@
 <template>
-    <aside ref="panel" class="rpt__panel wcp" role="dialog" aria-modal="false" :aria-labelledby="titleId" tabindex="-1" data-test="workload-panel" @keydown.esc.stop="$emit('close')">
+    <aside ref="panel" class="wcp" role="dialog" aria-modal="false" :aria-labelledby="titleId" tabindex="-1" data-test="workload-panel" @keydown.esc.stop="$emit('close')">
         <header class="wcp__head">
             <span class="ah-avatar" :style="{ background: color }">
                 <AvatarImage :src="person.avatar" :alt="person.name">{{ initial }}</AvatarImage>
@@ -76,7 +76,12 @@ onMounted(() => nextTick(() => panel.value && panel.value.focus()));
 </script>
 
 <style scoped>
-.wcp { outline: none; }
+.wcp {
+    position: fixed; top: 0; inset-inline-end: 0; bottom: 0; z-index: 45;
+    width: var(--panel-w, 420px); max-width: 100%;
+    display: flex; flex-direction: column; outline: none;
+    background: var(--surface); border-inline-start: 1px solid var(--hairline); box-shadow: var(--shadow-pop);
+}
 .wcp__head { display: flex; align-items: center; gap: 10px; padding: 14px 16px; border-bottom: 1px solid var(--hairline); }
 .wcp__head .ah-avatar { width: 30px; height: 30px; font-size: 11px; }
 .wcp__who { min-width: 0; flex: 1; }
@@ -102,6 +107,7 @@ onMounted(() => nextTick(() => panel.value && panel.value.focus()));
 .wcp__go { color: var(--ink-2); flex: none; }
 .wcp__empty { margin: 0 8px; }
 @media (max-width: 767px) {
+    .wcp { width: 100%; }
     .wcp__row { min-height: 44px; }
 }
 </style>

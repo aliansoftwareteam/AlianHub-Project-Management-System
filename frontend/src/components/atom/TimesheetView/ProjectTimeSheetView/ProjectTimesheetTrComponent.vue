@@ -397,12 +397,14 @@
     const toggleTaskDetail = (task,close=false) => {
         isTaskDetail.value = false;
         if(close == true) {
-            router.push({...route,query: {}})
+            const rest = { ...route.query };
+            delete rest.detailTab;
+            router.push({ ...route, query: rest })
             return;
         }
         taskDetailOpenObject.value ={};
         nextTick(()=>{
-            router.push({...route,query: {detailTab: "task-detail-tab"}})
+            router.push({ ...route, query: { ...route.query, detailTab: "task-detail-tab" } })
             taskDetailOpen(task);
         })
     }
