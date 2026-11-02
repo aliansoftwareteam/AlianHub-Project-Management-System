@@ -43,6 +43,11 @@ const sendShell = (req, res, indexFile, next) => {
     return res.type('html').send(html.replace(ORIGIN_TOKEN, originFor(req)));
 };
 
-const shellPage = (indexFile) => (req, res, next) => sendShell(req, res, indexFile, next);
+const SHELL_PATHS = new Set(['/', '/index.html']);
+
+/* Middleware rather than app.get, so the document stays a worker-handled shell path and not a server route. */
+const shellPage = (indexFile) => (req, res, next) => (
+    (req.method === 'GET' || req.method === 'HEAD') && SHELL_PATHS.has(req.path) ? sendShell(req, res, indexFile, next) : next()
+);
 
 module.exports = { originFor, sendShell, shellPage };

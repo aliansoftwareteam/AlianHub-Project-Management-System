@@ -24,7 +24,7 @@ const serve = async (html) => {
     const file = path.join(dir, 'index.html');
     fs.writeFileSync(file, html);
     const app = express();
-    app.get(['/', '/index.html'], shellPage(file));
+    app.use(shellPage(file));
     const server = await new Promise((resolve) => { const s = app.listen(0, '127.0.0.1', () => resolve(s)); });
     servers.push(server);
     return (route, host) => new Promise((resolve, reject) => {
@@ -60,6 +60,8 @@ describe('shell page', () => {
         expect(res.status).toBe(200);
         expect(res.headers['content-type']).toMatch(/text\/html/);
         expect(res.text).toBe('<meta property="og:image" content="http://demo.alianhub.com/og-image.png">');
+        expect((await get('/index.html', 'demo.alianhub.com')).text).toContain('http://demo.alianhub.com/og-image.png');
+        expect((await get('/other', 'demo.alianhub.com')).status).toBe(404);
     });
 
     it('takes the scheme from APIURL for its own host', () => {
@@ -75,7 +77,8 @@ describe('shell page', () => {
 
     it('is registered ahead of the static handler in index.js', () => {
         const source = fs.readFileSync(path.join(ROOT, 'index.js'), 'utf8');
-        expect(source.indexOf("require('./Config/shellPage').shellPage(")).toBeGreaterThan(-1);
-        expect(source.indexOf("require('./Config/shellPage').shellPage(")).toBeLessThan(source.indexOf('app.use(express.static('));
+        const shell = source.indexOf("app.use(require('./Config/shellPage').shellPage(");
+        expect(shell).toBeGreaterThan(-1);
+        expect(shell).toBeLessThan(source.indexOf('app.use(express.static('));
     });
 });
