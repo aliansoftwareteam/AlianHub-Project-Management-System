@@ -10,6 +10,7 @@
                         <li v-for="(change, i) in readChanges(p)" :key="i" class="aq__change">
                             <span class="aq__change-label">{{ changeText(change) }}</span>
                             <span v-if="!change.reversible" class="ah-chip ah-chip--warn">{{ t('Ai.not_reversible') }}</span>
+                            <ConnectorWriteCard v-if="change.card" class="aq__slack" :change="change" />
                         </li>
                     </ul>
                     <p v-if="keptOf(p)" class="aq__lead" data-test="queue-review-parts">{{ t('Inbox.queue_parts_kept', { parts: keptOf(p) }) }}</p>
@@ -90,6 +91,7 @@
                             @click="kept.splice(i, 1)"
                         >{{ t('Ai.drop') }}</button>
                         <SlackPostPreview v-if="change.action === SLACK_POST" class="aq__slack" :change="change" />
+                        <ConnectorWriteCard v-if="change.card" class="aq__slack" :change="change" :editing="isEditing(p)" :disabled="busy" @update:params="change.params = $event" />
                     </li>
                 </ul>
 
@@ -162,7 +164,7 @@
                         data-test="queue-approve"
                         :aria-label="t('Inbox.queue_approve_named', { what: titleOf(p) })"
                         @click="approve(p)"
-                    >{{ t('Inbox.approve') }}</button>
+                    >{{ checksAgain(p) ? t('Connectors.approval.check_again') : t('Inbox.approve') }}</button>
                     <button
                         v-if="p.editable"
                         type="button"
@@ -230,12 +232,13 @@ import IntentPreview from '@/components/molecules/IntentPreview/IntentPreview.vu
 import { intentSummary, intentTitle } from '@/components/molecules/IntentPreview/intentLines';
 import { keptSummary, partsChoice } from '@/components/molecules/IntentPreview/planPicks';
 import SlackPostPreview from '@/views/Ai/SlackPostPreview.vue';
+import ConnectorWriteCard from './ConnectorWriteCard.vue';
 import { DECLINE_REASONS } from '@/views/Ai/episodeText';
 import { proposalTitle } from '@/views/Ai/plainLabels';
 import { agentActionLabel, changeLabel } from '@/views/Ai/agentActionLabels';
 import { findingFix, findingReasons } from '@/views/Projects/ProjectDetail/findingText';
 import { plainReason } from '@/views/Ai/auditWords';
-import { decideEach, decideOne } from './approvalQueue';
+import { changesEdited, decideEach, decideOne } from './approvalQueue';
 import { fullText } from '@/utils/clockText';
 
 defineOptions({ name: 'ApprovalQueue' });
@@ -245,7 +248,7 @@ const props = defineProps({
     applied: { type: Array, default: () => [] },
     stamp: { type: Function, default: () => '' },
 });
-const emit = defineEmits(['decided', 'undone', 'open-task']);
+const emit = defineEmits(['decided', 'undone', 'open-task', 'reshown']);
 
 const SLACK_POST = 'slack.message.post';
 const SOURCE_MCP = 'mcp';
@@ -282,16 +285,16 @@ const titleOf = (p) => (p.finding && findingFix(t, p.finding)) || intentTitle(t,
 const whyOf = (p) => (p.finding && findingReasons(t, p.finding).join(' · ')) || plainReason(t, te, p.why);
 const changeText = (change) => intentSummary(t, change.preview) || changeLabel(t, change);
 const alwaysKindOf = (p) => agentActionLabel(t, p.changes?.[0]?.action, p.alwaysKind);
-// The preview is the server's reading of a change for this viewer, never part of the change sent back.
-const asFiled = (change) => Object.fromEntries(Object.entries(change).filter(([key]) => key !== 'preview'));
+// The preview and the card are the server's reading of a change, never part of the change sent back.
+const asFiled = (change) => Object.fromEntries(Object.entries(change).filter(([key]) => key !== 'preview' && key !== 'card'));
 const whoOf = (p) => {
     if (p.source === SOURCE_SYSTEM) return t('Inbox.queue_system_for', { project: p.finding?.projectName || p.agentName });
     const person = p.source === SOURCE_MCP && p.requestedBy ? getUser(p.requestedBy)?.Employee_Name : '';
     return person ? t('Inbox.queue_for', { agent: p.agentName, person }) : p.agentName;
 };
 
-const LOCKED_CHIPS = Object.freeze({ own_rights: 'Inbox.queue_locked_rights', first_approver: 'Inbox.queue_locked_retry', not_this_plan: 'Inbox.queue_locked_plan' });
-const LOCKED_NOTES = Object.freeze({ own_rights: 'Ai.rights_locked', first_approver: 'Inbox.queue_retry_locked', not_this_plan: 'Inbox.queue_plan_locked' });
+const LOCKED_CHIPS = Object.freeze({ own_rights: 'Inbox.queue_locked_rights', first_approver: 'Inbox.queue_locked_retry', not_this_plan: 'Inbox.queue_locked_plan', connection_owner: 'Connectors.approval.locked' });
+const LOCKED_NOTES = Object.freeze({ own_rights: 'Ai.rights_locked', first_approver: 'Inbox.queue_retry_locked', not_this_plan: 'Inbox.queue_plan_locked', connection_owner: 'Connectors.approval.locked_note' });
 // A row that is not the reader's to approve can still be theirs to decline: one their own agent asked for.
 const mayDecline = (p) => !p.locked || p.mayDecline === true;
 const selectable = computed(() => props.proposals.filter((p) => !p.locked));
@@ -322,6 +325,9 @@ const toggleEdit = (p) => {
     editing.value = p.proposalId;
     kept.value = (p.changes || []).map((change) => ({ ...change }));
 };
+const isEdited = (p) => isEditing(p) && changesEdited(kept.value, p.changes);
+// An edited write to a connected app comes back to its owner on a new card; this click sends nothing.
+const checksAgain = (p) => isEdited(p) && (p.changes || []).some((change) => change.card);
 
 const send = (id, verb, body) => decideOne(sendProposalDecision, id, verb, body, t('Inbox.action_failed'));
 const failuresLine = (unapplied) => (unapplied.length ? t('Ai.applied_with_failures', { n: unapplied.length, error: unapplied[0].error || '' }) : '');
@@ -341,11 +347,17 @@ const settle = (p, verb, result) => {
 };
 
 const approve = async (p) => {
-    const edited = isEditing(p) && kept.value.length !== (p.changes || []).length;
     busy.value = true;
     summary.value = '';
-    const result = await send(p.proposalId, 'approve', edited ? { changes: kept.value.map(asFiled) } : choiceOf(p) || {});
+    const result = await send(p.proposalId, 'approve', isEdited(p) ? { changes: kept.value.map(asFiled) } : choiceOf(p) || {});
     busy.value = false;
+    if (result.reshown) {
+        delete errors[p.proposalId];
+        editing.value = '';
+        summary.value = t('Connectors.approval.reshown');
+        emit('reshown', { id: p.proposalId, changes: result.reshownChanges });
+        return;
+    }
     if (result.ok) { editing.value = ''; summary.value = outcomeLine([result]); }
     settle(p, 'approve', result);
 };

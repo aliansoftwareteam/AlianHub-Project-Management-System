@@ -163,9 +163,10 @@
                             <button v-if="editing" type="button" class="ah-btn ah-btn--ghost ah-btn--sm" @click="editable.splice(i, 1)">{{ $t('Ai.drop') }}</button>
                         </div>
                         <SlackPostPreview v-if="change.action === SLACK_POST" :change="change" :delivery="slackDeliveryOf(change)" />
+                        <ConnectorWriteCard v-if="change.card" class="ai-write" :change="change" :editing="editing" :disabled="busy" :delivery="deliveryOfChange(selected.delivery, editable, change)" @update:params="change.params = $event" />
                     </template>
 
-                    <div v-if="selected.gate" class="auth__banner auth__banner--warn" style="margin-top:14px">
+                    <div v-if="selected.gate && selected.gate !== GATE_CONNECTION_OWNER" class="auth__banner auth__banner--warn" style="margin-top:14px">
                         <ShellIcon name="shield" :size="15" />
                         <span>{{ canDecide || lockedByRights ? $t('Ai.gate_note') : $t('Ai.gate_locked') }}</span>
                     </div>
@@ -173,6 +174,11 @@
                     <div v-if="lockedByRights" class="auth__banner auth__banner--warn ai-locked" data-test="rights-locked">
                         <ShellIcon name="shield" :size="15" />
                         <span>{{ $t('Ai.rights_locked') }}</span>
+                    </div>
+
+                    <div v-if="lockedForOwner" class="auth__banner auth__banner--warn ai-locked" data-test="owner-locked">
+                        <ShellIcon name="shield" :size="15" />
+                        <span>{{ $t('Connectors.approval.locked_note') }}</span>
                     </div>
 
                     <div v-if="lockedForRetry" class="auth__banner auth__banner--warn ai-locked" data-test="retry-locked">
@@ -198,7 +204,7 @@
                     <div v-if="error" class="ah-field__error" style="margin-top:12px">{{ error }}</div>
 
                     <div v-if="selected.status === 'pending' && canDecide && !declining" class="ai-actions">
-                        <button type="button" class="ah-btn ah-btn--primary" :disabled="busy || !editable.length" @click="onApprove">{{ $t('Ai.approve') }}</button>
+                        <button type="button" class="ah-btn ah-btn--primary" :disabled="busy || !editable.length" @click="onApprove">{{ checksAgain ? $t('Connectors.approval.check_again') : $t('Ai.approve') }}</button>
                         <button v-if="!selected.batch" type="button" class="ah-btn ah-btn--secondary" :disabled="busy" data-test="edit-then-approve" @click="editing = !editing">
                             {{ editing ? $t('Ai.done_editing') : $t('Ai.edit_then_approve') }}
                         </button>
@@ -252,6 +258,8 @@ import { madeProjectIds, openedProjectId, trashedProjectIds } from "@/composable
 import AiSidebar from "./AiSidebar.vue";
 import WorkflowApprovalRow from "./WorkflowApprovalRow.vue";
 import SlackPostPreview from "./SlackPostPreview.vue";
+import ConnectorWriteCard from "@/views/Inbox/ConnectorWriteCard.vue";
+import { changesEdited, deliveryOfChange } from "@/views/Inbox/approvalQueue";
 import WorkflowApprovalDetail from "./WorkflowApprovalDetail.vue";
 import AgentReportDetail from "./AgentReportDetail.vue";
 import { useAgentReports } from "./useAgentReports";
@@ -269,6 +277,7 @@ import { plainReason } from "./auditWords";
 defineOptions({ name: "AiInboxPage" });
 
 const GATE_OWNER_ADMIN = "owner_admin";
+const GATE_CONNECTION_OWNER = "connection_owner";
 const LOCKED_BY_RIGHTS = "own_rights";
 const LOCKED_FOR_RETRY = "first_approver";
 const LOCKED_FOR_PLAN = "not_this_plan";
@@ -329,6 +338,7 @@ const canDecide = computed(() => {
 });
 const canDecline = computed(() => canDecide.value || selected.value?.mayDecline === true);
 const lockedByRights = computed(() => selected.value?.status === "pending" && selected.value?.lockedWhy === LOCKED_BY_RIGHTS);
+const lockedForOwner = computed(() => selected.value?.status === "pending" && selected.value?.lockedWhy === GATE_CONNECTION_OWNER);
 const lockedForRetry = computed(() => selected.value?.status === "pending" && selected.value?.lockedWhy === LOCKED_FOR_RETRY);
 const lockedForPlan = computed(() => selected.value?.status === "pending" && selected.value?.lockedWhy === LOCKED_FOR_PLAN);
 // What a finished proposal did not make, each with the reason the server kept.
@@ -346,10 +356,12 @@ const retryNote = computed(() => {
 // The parts of a plan the person unticked, by the change they belong to. Only their places in the stored plan are sent back.
 const leftOut = ref({});
 const leftOutAt = (i) => leftOut.value[i];
-const wholeChanges = computed(() => editable.value.length === (selected.value?.changes || []).length);
+const wholeChanges = computed(() => !changesEdited(editable.value, selected.value?.changes));
+// An edited write to a connected app comes back to its owner on a new card; this click sends nothing.
+const checksAgain = computed(() => !wholeChanges.value && (selected.value?.changes || []).some((c) => c.card));
 const canPick = computed(() => selected.value?.status === "pending" && canDecide.value && !editing.value && !selected.value?.batch && wholeChanges.value);
-// The card is the server's reading of a change for this viewer, never part of the change sent back.
-const asFiled = (change) => Object.fromEntries(Object.entries(change).filter(([key]) => key !== "preview"));
+// The preview and the card are the server's reading of a change, never part of the change sent back.
+const asFiled = (change) => Object.fromEntries(Object.entries(change).filter(([key]) => key !== "preview" && key !== "card"));
 const laterLine = (out) => [
     out?.left?.waiting?.length ? t("Inbox.queue_left_waiting") : "",
     out?.left?.retry?.length ? t("Inbox.queue_left_retry") : ""
@@ -469,6 +481,12 @@ const onApprove = async () => {
         const body = wholeChanges.value ? (canPick.value && partsChoice(editable.value, leftOutAt)) || {} : { changes: editable.value.map(asFiled) };
         opened.value = "";
         const out = await decide(selected.value._id, "approve", body);
+        if (out?.reshown) {
+            selected.value = { ...selected.value, changes: out.proposal.changes };
+            $toast.info(t("Connectors.approval.reshown"), { position: "top-right" });
+            await reload({ inPlace: true });
+            return;
+        }
         opened.value = openedProjectId(out);
         const unapplied = unappliedOf(out);
         const later = laterLine(out);
@@ -551,6 +569,8 @@ onMounted(() => Promise.all([reload(), loadApprovals(), route?.query?.report ? o
 .ai-decline__skip { border: 0; background: transparent; color: var(--ink-2); font: var(--text-small); cursor: pointer; text-decoration: underline; padding: 0 4px; }
 .ai-detail__feedback { margin-top: 12px; }
 .ai-locked { margin-top: 14px; }
+.ai-write { margin: 6px 0 10px 22px; }
+@media (max-width: 480px) { .ai-write { margin-left: 0; } }
 .ai-batch { display: flex; flex-direction: column; gap: 6px; margin-bottom: 7px; min-width: 0; }
 .ai-batch__mark { align-self: flex-start; }
 .ai-change--card { align-items: flex-start; flex-wrap: wrap; }

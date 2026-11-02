@@ -71,6 +71,26 @@ beforeEach(() => {
     seedProposal('already decided', { status: 'approved' });
 });
 
+describe('a write to a connected app in the Inbox', () => {
+    const card = { provider: 'fake', tool: 'fake.notes.create', label: 'Connectors.tool.fakeNotesCreate', target: 'Board', title: 'Minutes', text: 'Approved.', attachments: [] };
+    const seedWrite = () => seedProposal('a write', {
+        gate: 'connection_owner', connectionOwner: MEMBER,
+        changes: [{ action: 'fake.notes.create', params: { title: 'Minutes', body: 'Approved.', connectionId: 'c1' }, label: 'Minutes', reversible: false, card }],
+    });
+    const rowOf = async (uid) => (await queueOf(uid)).find((row) => row.what === 'a write');
+
+    it('carries its card, the only place a person sees what goes out', async () => {
+        seedWrite();
+        expect((await rowOf(OWNER)).changes[0].card).toEqual(card);
+    });
+
+    it('is locked for an owner, who still reads the card and may decline', async () => {
+        seedWrite();
+        expect(await rowOf(OWNER)).toMatchObject({ locked: true, lockedWhy: 'connection_owner', mayDecline: true });
+        expect((await rowOf(OWNER)).changes[0].params).toBeUndefined();
+    });
+});
+
 describe('the approval queue in the Inbox', () => {
     it.each([['an owner', OWNER], ['an admin', ADMIN]])('%s sees every waiting proposal, and none is locked', async (_who, uid) => {
         const rows = await queueOf(uid);

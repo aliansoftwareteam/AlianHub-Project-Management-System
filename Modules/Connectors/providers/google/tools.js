@@ -84,6 +84,15 @@ const eventCard = (input, attendeesLabel) => ({
     ].filter((row) => row && (row.value || row.valueLabel)),
 });
 
+const EVENT_EDITS = Object.freeze([
+    { param: 'summary', label: 'Connectors.card.title' },
+    { param: 'start', label: 'Connectors.card.start' },
+    { param: 'end', label: 'Connectors.card.end' },
+    { param: 'location', label: 'Connectors.card.where' },
+    { param: 'attendees', label: 'Connectors.card.attendees' },
+    { param: 'description', label: 'Connectors.card.description', long: true },
+]);
+
 const notifyOf = (input) => ({ sendUpdates: input.notifyAttendees ? 'all' : 'none' });
 
 const spaceId = (space) => encodeURIComponent(String(space).replace(/^spaces\//, ''));
@@ -156,6 +165,7 @@ module.exports = [{
     },
     caps: { maxItems: 1, maxChars: 500 },
     card: (input) => ({ ...eventCard(input, 'Connectors.card.attendees'), title: input.summary }),
+    editable: EVENT_EDITS,
     run: async ({ input, connection }) => {
         const event = json(await connection.request(eventsUrl(input), { method: 'post', query: notifyOf(input), json: eventBody(input) }));
         return `Created event ${event.id}: ${event.htmlLink}`;
@@ -180,6 +190,7 @@ module.exports = [{
         }
         return { ...eventCard(input, 'Connectors.card.attendeesReplaced'), title: String(input.summary || '').trim() || input.eventId };
     },
+    editable: EVENT_EDITS,
     run: async ({ input, connection }) => {
         const event = json(await connection.request(eventUrl(input), { method: 'patch', query: notifyOf(input), json: eventBody(input) }));
         return `Updated event ${event.id}: ${event.htmlLink}`;

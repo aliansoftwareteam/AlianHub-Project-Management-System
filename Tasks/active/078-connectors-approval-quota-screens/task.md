@@ -1,7 +1,7 @@
 ---
 id: 078
 title: Connectors — Inbox approval cards and quota settings screens
-status: backlog
+status: active
 priority: high
 depends_on: [069, 070]
 created: 2026-10-28

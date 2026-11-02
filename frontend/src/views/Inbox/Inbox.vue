@@ -100,7 +100,7 @@
                 />
 
                 <template v-else>
-                    <ApprovalQueue v-if="queue.length || applied.length" :proposals="queue" :applied="applied" :stamp="stamp" @decided="onQueueDecided" @undone="onQueueUndone" @open-task="openQueueTask" />
+                    <ApprovalQueue v-if="queue.length || applied.length" :proposals="queue" :applied="applied" :stamp="stamp" @decided="onQueueDecided" @undone="onQueueUndone" @reshown="onQueueReshown" @open-task="openQueueTask" />
                     <article
                         v-for="(it, i) in rows"
                         :key="rowKey(it)"
@@ -920,6 +920,9 @@ const onQueueDecided = ({ id, verb, undo: canUndo, madeProjects, opens, more }) 
     Object.assign(undo.value, { approved, undoIds, opens: approved.length === 1 ? opens || '' : '' });
 };
 const openQueueTask = (task) => openTask({ companyId: companyId?.value, projectId: task.projectId, sprintId: task.sprintId, folderId: task.folderId || '', taskId: task.taskId });
+const onQueueReshown = ({ id, changes }) => {
+    queue.value = queue.value.map((p) => (p.proposalId === id ? { ...p, changes } : p));
+};
 const onQueueUndone = ({ id }) => {
     applied.value = applied.value.filter((p) => p.proposalId !== id);
     $toast.success(t('Inbox.always_undone'), { position: 'top-right' });

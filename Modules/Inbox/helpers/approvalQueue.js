@@ -43,7 +43,7 @@ const toRow = (previews, batches = new Map(), viewer = null, mine = () => false)
     changes: (Array.isArray(proposal.changes) ? proposal.changes : []).map((change, at) => {
         const preview = (previews.get(String(proposal._id)) || [])[at];
         const asFiled = proposal.source !== SOURCE_MCP && !standing.locked ? { params: change.params || {} } : {};
-        return { action: change.action, ...asFiled, label: change.label || change.action, reversible: Boolean(change.reversible), ...(preview ? { preview } : {}), ...changeLabels.markOf(change) };
+        return { action: change.action, ...asFiled, label: change.label || change.action, reversible: Boolean(change.reversible), ...(preview ? { preview } : {}), ...(change.card ? { card: change.card } : {}), ...changeLabels.markOf(change) };
     }),
     ...(batches.has(String(proposal._id)) ? { batch: batches.get(String(proposal._id)) } : {}),
     ...(proposal.retryBy ? { retry: { why: proposal.retryWhy || '' } } : {}),

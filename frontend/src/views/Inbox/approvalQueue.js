@@ -23,13 +23,24 @@ export const laterLine = (t, data) => {
 /* Why each part of an undo stayed as it was, in the server's words. */
 const keptByUndo = (data) => (Array.isArray(data?.results) ? data.results : []).filter((part) => part && part.ok === false).map((part) => part.message || part.reason || '').filter(Boolean);
 
+const paramsOf = (changes) => JSON.stringify((changes || []).map((change) => change.params));
+
+/* Whether what the person holds differs from what was filed: a change dropped or a field retyped. */
+export const changesEdited = (held, filed) => paramsOf(held) !== paramsOf(filed);
+
+/* A proposal's results are kept per sent change, so a change's own is the nth of its action. */
+export const deliveryOfChange = (delivery, changes, change) => {
+    const sameAction = (entry) => entry.action === change.action;
+    return (delivery || []).filter(sameAction)[(changes || []).filter(sameAction).indexOf(change)] || null;
+};
+
 /* One decision through the agent API. A refusal is an answer, never a throw, so a caller working through several keeps going. */
 export const decideOne = async (send, id, verb, body, fallback) => {
     try {
         const res = await send(id, verb, body);
         if (!res?.data?.status) return { id, ok: false, error: refusalOf(res, fallback) };
         const data = res.data.data || {};
-        return { id, ok: true, undo: Boolean(data.undoUntil), unapplied: unappliedOf(data), left: keptByUndo(data), later: laterOf(data), standing: data.standing || null, madeProjects: madeProjectIds(data), opens: openedProjectId(data), trashedProjects: trashedProjectIds(data) };
+        return { id, ok: true, undo: Boolean(data.undoUntil), unapplied: unappliedOf(data), left: keptByUndo(data), later: laterOf(data), standing: data.standing || null, reshown: data.reshown === true, reshownChanges: data.proposal?.changes || [], madeProjects: madeProjectIds(data), opens: openedProjectId(data), trashedProjects: trashedProjectIds(data) };
     } catch (error) {
         return { id, ok: false, error: refusalOf(error, fallback) };
     }

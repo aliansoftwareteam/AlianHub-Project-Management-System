@@ -95,6 +95,21 @@ describe('a write tool definition', () => {
         expect(connectorTools.problemsOf(fake, [{ ...noCard, kind: 'write' }]).join()).toMatch(/a write has no card/);
         expect(typeof card).toBe('function');
     });
+
+    it.each([
+        ['an input it does not take', [{ param: 'cc', label: 'Connectors.card.title' }], /not a free text input/],
+        ['a label outside Connectors.card', [{ param: 'title', label: 'Title' }], /no Connectors\.card\.\* label/],
+    ])('does not load with an editable field naming %s', (_what, editable, why) => {
+        const fake = require('./fixtures/connectors/fake');
+        expect(connectorTools.problemsOf(fake, [{ ...connectorTools.get(KEY), editable }]).join()).toMatch(why);
+    });
+
+    it('puts what its owner may retype on the card', () => {
+        const editable = [{ param: 'title', label: 'Connectors.card.title' }];
+        const card = writes.cardOf({ ...connectorTools.get(KEY), editable }, NOTE);
+        expect(card.fields).toEqual(editable);
+        expect(writes.cardOf(connectorTools.get(KEY), NOTE).fields).toBeUndefined();
+    });
 });
 
 describe('every write is a proposal', () => {

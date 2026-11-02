@@ -39,8 +39,11 @@ const appRoutes = (app) => {
 };
 
 exports.init = (app) => {
-    // Owners and admins only, never an API token; the handler checks the seat itself.
-    if (flag.named().length) app.put('/api/v2/connectors/admin/quotas', ctrl.setQuotas);
+    // Owners and admins only, never an API token; the handlers check the seat themselves.
+    if (flag.named().length) {
+        app.get('/api/v2/connectors/admin/quotas', ctrl.getQuotas);
+        app.put('/api/v2/connectors/admin/quotas', ctrl.setQuotas);
+    }
     if (flag.requested().includes('slack')) slackRoutes(app);
     if (flag.requestedGoogle().length) googleRoutes(app);
     if (flag.requested().length) appRoutes(app);

@@ -20,6 +20,7 @@
                 <p v-if="error" class="ah-field__error">{{ error }}</p>
 
                 <GoogleConnection v-if="hasGoogle && (view === 'all' || view === 'apps')" />
+                <ConnectorQuotas v-if="connectors.length && (view === 'all' || view === 'apps')" />
 
                 <div class="conn__grid">
                     <article v-for="card in visible" :key="card.key" class="ah-card conn__card">
@@ -86,6 +87,7 @@ import * as env from "@/config/env";
 import ShellIcon from "@/components/organisms/Shell/ShellIcon.vue";
 import AiSidebar from "@/views/Ai/AiSidebar.vue";
 import GoogleConnection from "./GoogleConnection.vue";
+import ConnectorQuotas from "./ConnectorQuotas.vue";
 import { AI_RIGHT, useAiRights } from "@/composable/aiRights";
 
 // Connections (13e). Only what this workspace can actually connect to is listed:

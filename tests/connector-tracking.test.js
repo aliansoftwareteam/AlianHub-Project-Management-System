@@ -249,6 +249,42 @@ describe('PUT /api/v2/connectors/admin/quotas', () => {
     });
 });
 
+describe('GET /api/v2/connectors/admin/quotas', () => {
+    const readQuotas = async ({ role = 1, apiToken } = {}) => {
+        getRoleType.mockResolvedValue(role);
+        const res = { status: jest.fn(() => res), send: jest.fn(() => res) };
+        await controller.getQuotas({ headers: { companyid: C }, aud: C, uid: ADMIN, apiToken, get: () => '', ip: '' }, res);
+        return { code: res.status.mock.calls.length ? res.status.mock.calls[0][0] : 200, body: res.send.mock.calls[0][0] };
+    };
+
+    it('answers the defaults and ceilings before anything is saved', async () => {
+        process.env.CONNECTOR_QUOTA_MAX_READS = '600';
+        const { code, body } = await readQuotas();
+        expect(code).toBe(200);
+        expect(body.data).toEqual({
+            workspace: { reads: null, writeProposals: null, agentReads: null }, members: [], agents: [],
+            defaults: quotas.DEFAULTS, ceilings: { reads: 600, writeProposals: 500, agentReads: 2000 },
+        });
+    });
+
+    it('lists what was saved, and not an override that was taken away', async () => {
+        await setQuota({ scope: 'workspace', writeProposals: 20 });
+        await setQuota({ scope: 'member', targetId: MEMBER, reads: 9 });
+        await setQuota({ scope: 'member', targetId: PRISHA, reads: 3 });
+        await setQuota({ scope: 'member', targetId: PRISHA, reads: null });
+        await setQuota({ scope: 'agent', targetId: AGENT_ID, agentReads: 7 });
+        const { data } = (await readQuotas()).body;
+        expect(data.workspace).toEqual({ reads: null, writeProposals: 20, agentReads: null });
+        expect(data.members).toEqual([{ targetId: MEMBER, limits: { reads: 9, writeProposals: null } }]);
+        expect(data.agents).toEqual([{ targetId: AGENT_ID, limits: { agentReads: 7 } }]);
+    });
+
+    it('is for an owner or admin in person', async () => {
+        expect((await readQuotas({ role: 3 })).code).toBe(403);
+        expect((await readQuotas({ apiToken: { _id: 't' } })).code).toBe(403);
+    });
+});
+
 describe('a provider that says to slow down', () => {
     const limited = { status: 429, headers: { 'retry-after': '120' }, body: '{}' };
 

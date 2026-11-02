@@ -64,6 +64,7 @@ const cardOf = (tool, args) => {
         text: runner.plain(shown.text),
         attachments: (Array.isArray(shown.attachments) ? shown.attachments : []).map(line).filter(Boolean),
         ...(Array.isArray(shown.rows) && shown.rows.length ? { rows: shown.rows.map(rowOf) } : {}),
+        ...(tool.editable ? { fields: tool.editable.map((field) => ({ ...field })) } : {}),
     };
     const part = partTooLong(card);
     if (part) throw refuse(`The ${part} of this write is too long to show whole on its approval card, so it was not filed. Shorten it and ask again.`, 'card_too_long', 400);

@@ -6,6 +6,7 @@ const DIR = path.join(__dirname, 'providers');
 // A provider with products names the product too: google.calendar.events.list (063 contract, section 3).
 const KEY = /^[a-z][a-z0-9_]*(\.[a-z][a-z0-9_]*){2,3}$/;
 const LABEL = /^Connectors\.tool\.[A-Za-z0-9_]+$/;
+const CARD_LABEL = /^Connectors\.card\.[A-Za-z0-9_]+$/;
 const KIND = Object.freeze({ READ: 'read', WRITE: 'write' });
 const PROPERTY_TYPES = Object.freeze(['string', 'integer', 'number', 'boolean']);
 const MIN_DESCRIPTION = 20;
@@ -31,6 +32,18 @@ const inputProblems = (input) => {
     return found;
 };
 
+/* What its owner may retype on the approval card: free text only, since the send is checked against the input schema. */
+const editableProblems = (tool) => {
+    if (tool.editable === undefined) return [];
+    if (!Array.isArray(tool.editable)) return ['editable is not a list'];
+    const properties = (tool.input && tool.input.properties) || {};
+    return tool.editable.flatMap((field) => {
+        const schema = properties[field && field.param];
+        if (!schema || schema.type !== 'string' || schema.enum) return [`editable names ${field && field.param}, which is not a free text input`];
+        return CARD_LABEL.test(String(field.label || '')) ? [] : [`editable ${field.param} has no Connectors.card.* label`];
+    });
+};
+
 const toolProblems = (definition, tool) => {
     if (!isObject(tool)) return ['a tool is not an object'];
     const key = String(tool.key || '');
@@ -47,6 +60,7 @@ const toolProblems = (definition, tool) => {
     if (typeof tool.run !== 'function') found.push(`${key}: run is not a function`);
     // The approval card is the only place a person sees what a write sends, so a write without one never loads.
     if (tool.kind === KIND.WRITE && typeof tool.card !== 'function') found.push(`${key}: a write has no card`);
+    found.push(...editableProblems(tool).map((problem) => `${key}: ${problem}`));
     return found;
 };
 

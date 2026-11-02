@@ -34,6 +34,133 @@ const decided = () => (wrapper.emitted('decided') || []).map(([payload]) => payl
 beforeEach(() => { sendProposalDecision.mockReset(); sendProposalDecision.mockImplementation(() => done()); });
 afterEach(() => { wrapper?.unmount(); wrapper = null; });
 
+describe('a write to a connected app', () => {
+    const KEY = 'google.calendar.events.create';
+    const card = (over = {}) => ({
+        provider: 'google', tool: KEY, label: 'Connectors.tool.googleCalendarEventsCreate', target: '', targetLabel: 'Connectors.card.primaryCalendar', title: 'Board review', text: 'First line\nSecond line',
+        attachments: ['agenda.pdf'], rows: [{ label: 'Connectors.card.where', value: 'Room 4' }, { label: 'Connectors.card.notifyAttendees', valueLabel: 'Connectors.card.no' }],
+        fields: [{ param: 'summary', label: 'Connectors.card.title' }, { param: 'location', label: 'Connectors.card.where' }, { param: 'description', label: 'Connectors.card.description', long: true }],
+        ...over,
+    });
+    const write = (over = {}) => ({ action: KEY, params: { summary: 'Board review', connectionId: 'c1' }, label: 'Board review', reversible: false, card: card(), ...over });
+    const cardOf = (id) => rowOf(id).find('[data-test="connector-card"]');
+    const saveEdit = async (id) => { await rowOf(id).find('[data-test="queue-approve"]').trigger('click'); await flushPromises(); };
+
+    it('shows where it goes, its title, its whole text, its details and its attachments', () => {
+        mountQueue([row('p1', { changes: [write()] })]);
+        const shown = cardOf('p1');
+        expect(shown.find('[data-test="connector-card-tool"]').text()).toBe(en.Connectors.tool.googleCalendarEventsCreate);
+        expect(shown.find('[data-test="connector-card-target"]').text()).toBe(en.Connectors.card.primaryCalendar);
+        expect(shown.find('[data-test="connector-card-title"]').text()).toBe('Board review');
+        expect(shown.find('[data-test="connector-card-text"]').element.textContent).toBe('First line\nSecond line');
+        expect(shown.findAll('[data-test="connector-card-row"]').map((r) => r.text())).toEqual(['Room 4', en.Connectors.card.no]);
+        expect(shown.find('[data-test="connector-card-attachment"]').text()).toBe('agenda.pdf');
+    });
+
+    it('names a target the tool gives as text', () => {
+        mountQueue([row('p1', { changes: [write({ card: card({ target: 'team@acme.test', targetLabel: undefined }) })] })]);
+        expect(cardOf('p1').find('[data-test="connector-card-target"]').text()).toBe('team@acme.test');
+    });
+
+    it('is under no other change', () => {
+        mountQueue([row('p1', { changes: [change('Comment')] })]);
+        expect(cardOf('p1').exists()).toBe(false);
+    });
+
+    it('for anyone but the connection\'s owner shows the card, says why, and offers no Approve', () => {
+        mountQueue([row('p1', { gate: 'connection_owner', changes: [write({ params: undefined })], locked: true, lockedWhy: 'connection_owner', mayDecline: true })]);
+        expect(cardOf('p1').exists()).toBe(true);
+        expect(rowOf('p1').find('[data-test="queue-locked"]').text()).toBe(en.Connectors.approval.locked);
+        expect(rowOf('p1').find('[data-test="queue-locked-note"]').text()).toBe(en.Connectors.approval.locked_note);
+        expect(rowOf('p1').find('[data-test="queue-approve"]').exists()).toBe(false);
+        expect(rowOf('p1').find('[data-test="queue-decline"]').exists()).toBe(true);
+    });
+
+    it('for its owner approves as it stands', async () => {
+        mountQueue([row('p1', { gate: 'connection_owner', changes: [write()] })]);
+        expect(rowOf('p1').find('[data-test="queue-approve"]').text()).toBe(en.Inbox.approve);
+        await saveEdit('p1');
+        expect(sendProposalDecision).toHaveBeenCalledWith('p1', 'approve', {});
+    });
+
+    it('shows the card in a bulk review before approving', async () => {
+        mountQueue([row('p1', { changes: [write()] }), row('p2')]);
+        await wrapper.find('[data-test="queue-select-all"]').setValue(true);
+        await wrapper.find('[data-test="queue-bulk-review"]').trigger('click');
+        expect(wrapper.find('[data-test="queue-review-item"] [data-test="connector-card-text"]').exists()).toBe(true);
+    });
+
+    describe('edited by its owner', () => {
+        const editing = async () => {
+            mountQueue([row('p1', { gate: 'connection_owner', changes: [write()] })]);
+            await rowOf('p1').find('[data-test="queue-edit"]').trigger('click');
+        };
+        const NEW_CARD = card({ title: 'Board review, moved' });
+        const reshown = () => Promise.resolve({ data: { status: true, data: { applied: [], reshown: true, proposal: { changes: [write({ params: { summary: 'Board review, moved', connectionId: 'c1' }, card: NEW_CARD })] } } } });
+
+        it('offers each field the tool allows, filled from what was filed', async () => {
+            await editing();
+            expect(cardOf('p1').find('[data-test="connector-field-summary"]').element.value).toBe('Board review');
+            expect(cardOf('p1').find('[data-test="connector-field-description"]').element.tagName).toBe('TEXTAREA');
+        });
+
+        it('with nothing changed still approves as filed', async () => {
+            await editing();
+            expect(rowOf('p1').find('[data-test="queue-approve"]').text()).toBe(en.Inbox.approve);
+            await saveEdit('p1');
+            expect(sendProposalDecision).toHaveBeenCalledWith('p1', 'approve', {});
+        });
+
+        it('sends the retyped params and never the card, says it will check first, and shows the new card without sending', async () => {
+            sendProposalDecision.mockImplementation(reshown);
+            await editing();
+            await cardOf('p1').find('[data-test="connector-field-summary"]').setValue('Board review, moved');
+            expect(rowOf('p1').find('[data-test="queue-approve"]').text()).toBe(en.Connectors.approval.check_again);
+            await saveEdit('p1');
+            const [, verb, body] = sendProposalDecision.mock.calls[0];
+            expect(verb).toBe('approve');
+            expect(body.changes[0].params).toEqual({ summary: 'Board review, moved', connectionId: 'c1' });
+            expect(body.changes[0].card).toBeUndefined();
+            expect(decided()).toEqual([]);
+            expect(wrapper.emitted('reshown')[0][0]).toMatchObject({ id: 'p1', changes: [{ card: NEW_CARD }] });
+            expect(wrapper.find('[data-test="queue-summary"]').text()).toBe(en.Connectors.approval.reshown);
+            expect(cardOf('p1').find('[data-test="connector-card-form"]').exists()).toBe(false);
+        });
+
+        it('leaves a field it never named unnamed when typed in and emptied, since a blank clears it', async () => {
+            await editing();
+            const where = cardOf('p1').find('[data-test="connector-field-location"]');
+            await where.setValue('Room 4');
+            await where.setValue('');
+            expect(rowOf('p1').find('[data-test="queue-approve"]').text()).toBe(en.Inbox.approve);
+        });
+
+        it('sends a blank for a named field emptied on purpose', async () => {
+            sendProposalDecision.mockImplementation(reshown);
+            await editing();
+            await cardOf('p1').find('[data-test="connector-field-summary"]').setValue('');
+            await saveEdit('p1');
+            expect(sendProposalDecision.mock.calls[0][2].changes[0].params.summary).toBe('');
+        });
+
+        it('keeps the form and says why when the server refuses the edit', async () => {
+            sendProposalDecision.mockImplementation(() => refused('google.calendar.events.create: start is not valid'));
+            await editing();
+            await cardOf('p1').find('[data-test="connector-field-summary"]').setValue('Moved');
+            await saveEdit('p1');
+            expect(rowOf('p1').find('[data-test="queue-row-error"]').text()).toContain('start is not valid');
+            expect(cardOf('p1').find('[data-test="connector-card-form"]').exists()).toBe(true);
+        });
+    });
+
+    it('shows no fields to an owner of a tool with none to retype, and they can still approve', async () => {
+        mountQueue([row('p1', { changes: [write({ card: card({ fields: undefined }) })] })]);
+        await rowOf('p1').find('[data-test="queue-edit"]').trigger('click');
+        expect(cardOf('p1').find('[data-test="connector-card-form"]').exists()).toBe(false);
+        expect(cardOf('p1').find('[data-test="connector-card-title"]').exists()).toBe(true);
+    });
+});
+
 describe('a row of the approval queue', () => {
     it('says who proposes, what, why and each change', () => {
         mountQueue([row('p1', { agentName: 'Claude', source: 'mcp', requestedBy: 'u-priya', editable: false, changes: [change('Close the task', { reversible: false })] })]);
