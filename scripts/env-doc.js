@@ -21,7 +21,8 @@ const REGENERATE = 'node scripts/env-doc.js';
 const STRICT_CHECK = 'npm run env:doc:check';
 const SELF = 'scripts/env-doc.js';
 const FLAGS = ['secret', 'required', 'external'];
-const ENTRY_FIELDS = ['group', 'description', 'default', ...FLAGS];
+const ENTRY_FIELDS = ['group', 'description', 'default', 'managed', ...FLAGS];
+const MANAGED_CLASSES = ['bootstrap', 'platform', 'customer', 'fixed', 'dev'];
 const UNDESCRIBED = Object.freeze({ group: 'general', description: 'Not described yet.' });
 
 function walk(target, out = []) {
@@ -98,6 +99,7 @@ function entryProblems(key, entry) {
     if (!GROUP_ORDER.includes(entry.group)) return [`unknown group "${entry.group}": ${key}`];
     if (typeof entry.description !== 'string' || !entry.description.trim()) return [`no description: ${key}`];
     if (entry.default !== undefined && typeof entry.default !== 'string') return [`"default" must be text: ${key}`];
+    if (entry.managed !== undefined && !MANAGED_CLASSES.includes(entry.managed)) return [`"managed" must be one of ${MANAGED_CLASSES.join(', ')}: ${key}`];
     const notFlag = FLAGS.find((flag) => entry[flag] !== undefined && typeof entry[flag] !== 'boolean');
     if (notFlag) return [`"${notFlag}" must be true or false: ${key}`];
     const unknown = Object.keys(entry).find((field) => !ENTRY_FIELDS.includes(field));
@@ -194,6 +196,7 @@ function build() {
         drift: {
             undescribed: Object.keys(reads).filter((key) => !meta[key]).sort(),
             unread: Object.keys(meta).filter((key) => !reads[key] && !meta[key].external).sort(),
+            unclassified: Object.keys(reads).filter((key) => meta[key] && !meta[key].managed).sort(),
         },
         files: {
             [OUTPUTS.docs]: renderDocs(described, reads),
@@ -209,8 +212,11 @@ const staleFiles = (files) => Object.entries(files)
 
 /* A pull request must describe the variables it reads, which it can do alone. Whether the generated files are current,
  * and whether a description is still read, depends on what else has merged, so those only fail when asked to. */
-function driftReport({ undescribed, unread, stale }, strict = false) {
-    const own = undescribed.map((key) => `used but not described in ${META_NAME}: ${key}`);
+function driftReport({ undescribed, unread, stale, unclassified = [] }, strict = false) {
+    const own = [
+        ...undescribed.map((key) => `used but not described in ${META_NAME}: ${key}`),
+        ...unclassified.map((key) => `not classified for hosting ("managed") in ${META_NAME}: ${key}`),
+    ];
     const drift = [...stale, ...unread.map((key) => `described but never read: ${key}`)];
     return strict ? { problems: [...own, ...drift], warnings: [] } : { problems: own, warnings: drift };
 }
@@ -240,4 +246,4 @@ function main(argv) {
 
 if (require.main === module) process.exitCode = main(process.argv.slice(2));
 
-module.exports = { backendReads, frontendReads, readByText, metaShapeProblems, driftReport, scanBackend, scanFrontend, loadMeta, build, check };
+module.exports = { MANAGED_CLASSES, backendReads, frontendReads, readByText, metaShapeProblems, driftReport, scanBackend, scanFrontend, loadMeta, build, check };

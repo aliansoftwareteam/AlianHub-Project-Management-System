@@ -2850,7 +2850,14 @@ const schema = {
         agentAccount: {
             type: Object,
             required: false
-        }
+        },
+        // Written by the JWT middleware at most once an hour (Config/lastSeen.js), for the platform usage report.
+        lastSeenAt: { type: Date, required: false },
+        // HOSTING_MODE=managed: an owner the platform created without a password; set until the activation link is used.
+        activationPending: { type: Boolean, required: false },
+        // HOSTING_MODE=managed: the one AlianHub Support account (Modules/Platform/supportSession.js), never a seat.
+        isSupportUser: { type: Boolean, required: false },
+        supportSession: { type: Object, required: false }
     },
     adminDetail: {
         companyName: {
@@ -3201,6 +3208,10 @@ const schema = {
             type : Number,
             required : false
         },
+        trackshotSize: {
+            type: Number,
+            required: false,
+        },
         isPaymentFailed: {
             type: Boolean,
             required: false,
@@ -3501,6 +3512,8 @@ const schema = {
         scimFamilyName: { type: String, required: false },
         // Set when SCIM deactivates a live seat; a deactivated row without it may never have been a membership.
         scimDeactivatedSeatAt: { type: Date, required: false },
+        // The AlianHub Support account's seat, given for a support session only and not counted as a seat.
+        isSupportUser: { type: Boolean, required: false },
         // The userId of this member's manager in the same company. Empty means no
         // reporting line is recorded, which is the normal state for most workspaces.
         managerId: {
@@ -5401,6 +5414,12 @@ const schema = {
             type: Object,
             required: false,
         },
+        // { [purpose]: { hash, expiresAt } } for activation and sign-in links (Modules/Platform/ownerLinks.js):
+        // one live token per purpose, its sha256 only, cleared on use.
+        oneTimeTokens: {
+            type: Object,
+            required: false,
+        },
     },
     resetAttempt: {
         ip: {
@@ -5541,6 +5560,76 @@ const schema = {
         apiTokenStrictSince: { type: Date, required: false },
         // When the maximum API token lifetime first applied; tokens made earlier with a longer expiry count from here.
         apiTokenMaxLifetimeSince: { type: Date, required: false },
+        // HOSTING_MODE=managed: what the platform pushed (PUT /api/v2/platform/config), replaced whole on each push.
+        platformValues: { type: Object, required: false },
+        platformUpdatedAt: { type: Date, required: false },
+        platformUpdatedBy: { type: String, required: false },
+        // Owner-triggered restarts, newest last, kept to the hourly limit.
+        restartsAt: { type: [Date], required: false },
+    },
+    // One row per workspace (_id: companyId) plus "public" for avatars and shared assets: bytes kept
+    // by common-storage/storageUsage.js on every put and delete, set from a full listing every night.
+    // HOSTING_MODE=managed: what the platform API stores, one document per _id: 'provision', 'entitlements',
+    // 'lifecycle', 'keys', 'support' (Modules/Platform/platformState.js), and 'mail' (064).
+    platformState: {
+        _id: { type: String, required: true },
+        provisionId: { type: String, required: false },
+        userId: { type: String, required: false },
+        companyId: { type: String, required: false },
+        startedAt: { type: Date, required: false },
+        completedAt: { type: Date, required: false },
+        token: { type: String, required: false },
+        payload: { type: Object, required: false },
+        version: { type: Number, required: false },
+        source: { type: String, required: false },
+        kid: { type: String, required: false },
+        appliedAt: { type: Date, required: false },
+        state: { type: String, required: false },
+        previous: { type: String, required: false },
+        reason: { type: String, required: false },
+        message: { type: String, required: false },
+        graceUntil: { type: Date, required: false },
+        extraKeys: { type: [Object], required: false, default: undefined },
+        staffEmail: { type: String, required: false },
+        staffName: { type: String, required: false },
+        expiresAt: { type: Date, required: false },
+        endedAt: { type: Date, required: false },
+        companyIds: { type: [String], required: false, default: undefined },
+        day: { type: String, required: false },
+        sent: { type: Number, required: false },
+        updatedAt: { type: Date, required: false },
+    },
+    // HOSTING_MODE=managed: mail held back by the daily cap (064), sent from the next UTC day on.
+    mailQueue: {
+        kind: { type: String, required: true },
+        subject: { type: String, required: false },
+        html: { type: String, required: false },
+        to: { type: mongoose.Schema.Types.Mixed, required: false },
+        isHtml: { type: Boolean, required: false },
+        attachments: { type: mongoose.Schema.Types.Mixed, required: false },
+        recipients: { type: Number, required: false },
+        queuedAt: { type: Date, required: true },
+        sendAfter: { type: Date, required: true },
+        attempts: { type: Number, required: false },
+        lastError: { type: String, required: false },
+    },
+    // HOSTING_MODE=managed: one row per platform API call; never a request body.
+    platformAudit: {
+        at: { type: Date, required: true },
+        action: { type: String, required: true },
+        requestId: { type: String, required: false },
+        ok: { type: Boolean, required: true },
+        summary: { type: String, required: false },
+        durationMs: { type: Number, required: false },
+    },
+    storageUsage: {
+        _id: { type: String, required: true },
+        bytes: { type: Number, required: false },
+        objects: { type: Number, required: false },
+        updatedAt: { type: Date, required: false },
+        reconciledAt: { type: Date, required: false },
+        drift: { type: Number, required: false },
+        removalPending: { type: Boolean, required: false },
     },
     globalSettings: {
         name: {

@@ -6,36 +6,14 @@
 //   STORAGE_TYPE=server  -> absolute path on disk (nodemailer reads it directly)
 //   STORAGE_TYPE=wasabi  -> short-lived presigned https URL
 //
-// Self-contained on purpose: it does not modify or re-export any existing
-// storage module, it only mirrors how Modules/storage/wasabi/controller.js
-// builds its S3 client.
 const path = require('path');
 const fs = require('fs');
-const awsRef = require('../../Config/aws.js');
-const { requestHandler } = require('../../Config/config');
 const { safeRelativePath } = require('../../utils/uploadConfig');
 const logger = require('../../Config/loggerConfig');
 
 const LOG_PREFIX = '[general-reminders]';
 // Presigned URLs only need to outlive the SMTP fetch.
 const MAIL_URL_TTL_SECONDS = 3600;
-
-let cachedClient = null;
-function getS3Client() {
-    if (cachedClient) return cachedClient;
-    // Required lazily so a server-storage deployment never loads the S3 SDK.
-    const { S3Client } = require('@aws-sdk/client-s3');
-    cachedClient = new S3Client({
-        region: awsRef.region,
-        credentials: {
-            accessKeyId: awsRef.wasabiAccessKey,
-            secretAccessKey: awsRef.wasabiSecretAccessKey,
-        },
-        endpoint: awsRef.wasabiEndPoint,
-        requestHandler,
-    });
-    return cachedClient;
-}
 
 function storageType() {
     return process.env.STORAGE_TYPE || 'wasabi';
@@ -50,11 +28,9 @@ function resolveLocalPath(companyId, key) {
     return fs.existsSync(abs) ? abs : null;
 }
 
+// Required lazily so a server-storage deployment never loads the S3 SDK.
 async function resolvePresignedUrl(companyId, key) {
-    const { GetObjectCommand } = require('@aws-sdk/client-s3');
-    const { getSignedUrl } = require('@aws-sdk/s3-request-presigner');
-    const command = new GetObjectCommand({ Bucket: String(companyId), Key: String(key) });
-    return getSignedUrl(getS3Client(), command, { expiresIn: MAIL_URL_TTL_SECONDS });
+    return require('../../common-storage/s3Store').signedGetUrl(String(companyId), String(key), MAIL_URL_TTL_SECONDS);
 }
 
 // Turn the reminder's stored attachments into nodemailer attachment objects.

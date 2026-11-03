@@ -138,6 +138,9 @@
                         <button type="button" class="ah-pop__item" role="menuitem" @click="logout()">
                             <ShellIcon name="logout" :size="15" /><span>{{ $t('Shell.logout') }}</span>
                         </button>
+                        <a class="ah-pop__item" :href="sourceUrl" target="_blank" rel="noopener" role="menuitem" data-test="rail-source-code" @click="closePopovers()">
+                            <ShellIcon name="github" :size="15" /><span>{{ $t('Shell.source_code') }}</span>
+                        </a>
                         <div class="ah-rail__version ah-mono" @click="openInNewTab({ name: 'Changelog', params: { cid: companyId } })">v{{ version }}</div>
                     </div>
                 </transition>
@@ -171,7 +174,7 @@ const companyId = inject("$companyId");
 const userId = inject("$userId");
 const { getters } = useStore();
 const { getUser } = useGetterFunctions();
-const { version } = useAppVersion();
+const { version, sourceUrl } = useAppVersion();
 const { logOut } = useAuth();
 const router = useRouter();
 const { rail, more, isActive, moreActive } = useNavItems(companyId);

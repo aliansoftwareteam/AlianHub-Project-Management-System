@@ -8,12 +8,19 @@ const { requestAddress } = require('../../utils/requestAddress');
 
 const OBJECT_ID_PATTERN = /^[a-f0-9]{24}$/i;
 
+/* The AlianHub Support account acts for a named staff member during a support session (062 T10);
+ * whatever the caller wrote as the actor's name, the row says who that was. */
+const withSupportStaff = (entry = {}) => {
+    const label = entry.actorId ? require('../Platform/supportSession').supportActorLabel(entry.actorId) : null;
+    return label ? { ...entry, actorName: label } : entry;
+};
+
 // SEC-04 — record an audit row. Fire-and-forget: NEVER throws to the caller, so
 // a logging hiccup can never break the mutation it's recording.
 const recordAudit = (companyId, entry) => {
     try {
         if (!companyId) return;
-        const n = normalizeAuditEntry(entry);
+        const n = normalizeAuditEntry(withSupportStaff(entry));
         if (!n.valid) return;
         chain.saveAuditRow(companyId, n.entry)
             .catch((e) => logger.error(`recordAudit ${companyId}: ${e.message || e}`));

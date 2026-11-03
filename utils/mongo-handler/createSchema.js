@@ -456,6 +456,12 @@ oauthGrantsSchema.index({ userId: 1, createdAt: -1 });
 const oauthClientApprovalsSchema = new Schema(schema.oauthClientApprovals, {strict: true, timestamps: false});
 oauthClientApprovalsSchema.index({ companyId: 1, clientId: 1 }, { unique: true, name: 'company_client' });
 oauthClientApprovalsSchema.index({ companyId: 1, status: 1 });
+const storageUsageSchema = new Schema(schema.storageUsage, {strict: true, timestamps: false});
+const platformStateSchema = new Schema(schema.platformState, {strict: true, timestamps: false, minimize: false});
+const platformAuditSchema = new Schema(schema.platformAudit, {strict: true, timestamps: false});
+platformAuditSchema.index({ at: 1 }, { expireAfterSeconds: 400 * 24 * 60 * 60, name: 'kept_400_days' });
+const mailQueueSchema = new Schema(schema.mailQueue, {strict: true, timestamps: false, minimize: false});
+mailQueueSchema.index({ sendAfter: 1 });
 
 const cspReportsSchema = new Schema(schema.cspReports, {strict: true, timestamps: false});
 cspReportsSchema.index({ day: 1, directive: 1, blockedHost: 1, documentPath: 1 }, { unique: true, name: 'report_key' });
@@ -650,6 +656,10 @@ module.exports = {
     oauthGrantsSchema,
     oauthTokensSchema,
     oauthClientApprovalsSchema,
+    storageUsageSchema,
+    platformStateSchema,
+    platformAuditSchema,
+    mailQueueSchema,
     historySchema,
     userIdSchema, 
     usersSchema,

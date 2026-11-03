@@ -140,9 +140,10 @@ function compileAllowlist(text) {
 let cached = { text: null, allowlist: null };
 
 /* Read on every save and every delivery, so removing an entry stops deliveries
- * that were saved while it was listed. */
+ * that were saved while it was listed. On a hosted instance the private network is
+ * ours, so nothing may be listed, whatever any source says. */
 function webhookAllowlist() {
-    const text = process.env.WEBHOOK_ALLOWED_PRIVATE_HOSTS || '';
+    const text = require('../../../Config/hostingMode').isManaged() ? '' : (process.env.WEBHOOK_ALLOWED_PRIVATE_HOSTS || '');
     if (cached.text !== text) cached = { text, allowlist: compileAllowlist(text) };
     return cached.allowlist;
 }

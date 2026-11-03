@@ -25,7 +25,9 @@ import trash from './trash';
 import { useCustomComposable } from '@/composable'
 import { i18n } from '@/locales/main'
 import dashboard from "../plugins/dashboard/router";
-import { apiRequestWithoutCompnay } from '@/services'
+import { apiRequestWithoutCompnay, apiRequestWithoutSecure } from '@/services'
+import { applyPublicConfig, isManagedHosting, publicConfig } from '@/config/publicConfig'
+import { isBillingRoute, upgradeTarget } from '@/composable/upgradeLink'
 import * as env from '@/config/env';
 import Cookies from 'js-cookie'
 import { loginReturnPath } from '@/views/Integrations/githubReturn'
@@ -141,6 +143,10 @@ router.beforeEach(async(to, _, next) => {
 		if (setup && !setup.installed && to.name !== 'Setup') { next({ name: 'Setup' }); return; }
 	}
 	if (to.name === 'Setup' && isKnownInstalled()) { next({ name: 'Log-in' }); return; }
+	if (isBillingRoute(to) && await hostedInstance()) {
+		next(upgradeTarget(router, to.params.cid) || { name: 'Home', params: { cid: to.params.cid } });
+		return;
+	}
 
 	let query = to.query;
 	let fullPath = to.fullPath;
@@ -190,6 +196,14 @@ router.beforeEach(async(to, _, next) => {
 		}
 	// })
 })
+
+/* A deep link can arrive before App.vue has asked for the public config. */
+async function hostedInstance() {
+	if (!publicConfig.loaded) {
+		await apiRequestWithoutSecure('get', env.INSTANCE_PUBLIC_CONFIG).then((res) => applyPublicConfig(res?.data?.data || {})).catch(() => {});
+	}
+	return isManagedHosting();
+}
 
 function removeCodeParam(url) {
     const [path, queryString] = url.split("?");

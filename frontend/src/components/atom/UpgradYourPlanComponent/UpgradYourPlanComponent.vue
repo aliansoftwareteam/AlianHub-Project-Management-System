@@ -12,7 +12,7 @@
                     <p class="upw__message font-size-16 font-weight-400 text-center line-height-23-68 mt-10px mb-20px">
                         {{props.message}}
                     </p>
-                    <button @click="router.push({name: 'Upgrade', params: {cid: companyId}})" class="upw__btn cursor-pointer font-size-16 font-weight-400 text-center line-height-23-68 border-0 border-radius-4-px p3x-14px">
+                    <button @click="openUpgrade(router, companyId)" class="upw__btn cursor-pointer font-size-16 font-weight-400 text-center line-height-23-68 border-0 border-radius-4-px p3x-14px">
                         {{buttonText}}
                     </button>
                 </div>
@@ -22,6 +22,7 @@
 </template>
 <script setup>
     import { useRouter } from "vue-router";
+    import { openUpgrade } from "@/composable/upgradeLink";
     const router = useRouter();
     //upgradePlan
     const upgradePlan = require("@/assets/images/png/upgradePlan.png");

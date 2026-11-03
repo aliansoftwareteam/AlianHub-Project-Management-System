@@ -5,6 +5,14 @@ const { requireAdmin, rotateScimToken, getScimConfig } = require('./auth');
 const prov = require('./provisioning');
 const R = require('./helpers/scimRules');
 const discovery = require('./discovery');
+const { isRefusalError } = require('../Entitlements/answers');
+
+/* A plan limit is the caller's to fix (403, with the plan's own message); anything else is ours. */
+const scimFailure = (res, where, e) => {
+    if (isRefusalError(e)) return res.status(403).json(R.scimError(403, e.message));
+    logger.error(`${where}: ${e.message}`);
+    return res.status(500).json(R.scimError(500, e.message));
+};
 
 const baseUrlOf = (req) => {
     const proto = String(req.headers['x-forwarded-proto'] || req.protocol || 'https').split(',')[0].trim();
@@ -132,7 +140,7 @@ exports.createUser = async (req, res) => {
         const { uid } = await prov.provision(companyId, input);
         audit(req, { action: 'scim.user_provision', entityType: 'member', entityId: String(uid), entityName: email });
         return res.status(201).json(await resourceOf(req, await prov.getCompanyUser(companyId, uid)));
-    } catch (e) { logger.error(`scim.createUser: ${e.message}`); return res.status(500).json(R.scimError(500, e.message)); }
+    } catch (e) { return scimFailure(res, `scim.createUser`, e); }
 };
 
 exports.replaceUser = async (req, res) => {
@@ -147,7 +155,7 @@ exports.replaceUser = async (req, res) => {
         });
         if (req.body.active !== undefined) await prov.setActive(companyId, id, req.body.active !== false);
         return res.json(await resourceOf(req, await prov.getCompanyUser(companyId, id)));
-    } catch (e) { logger.error(`scim.replaceUser: ${e.message}`); return res.status(500).json(R.scimError(500, e.message)); }
+    } catch (e) { return scimFailure(res, `scim.replaceUser`, e); }
 };
 
 exports.patchUser = async (req, res) => {
@@ -163,7 +171,7 @@ exports.patchUser = async (req, res) => {
             audit(req, { action: ops.active ? 'scim.user_activate' : 'scim.user_deactivate', entityType: 'member', entityId: String(id) });
         }
         return res.json(await resourceOf(req, await prov.getCompanyUser(companyId, id)));
-    } catch (e) { logger.error(`scim.patchUser: ${e.message}`); return res.status(500).json(R.scimError(500, e.message)); }
+    } catch (e) { return scimFailure(res, `scim.patchUser`, e); }
 };
 
 exports.deleteUser = async (req, res) => {

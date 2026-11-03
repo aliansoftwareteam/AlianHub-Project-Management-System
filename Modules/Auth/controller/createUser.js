@@ -80,7 +80,7 @@ exports.buildUserDocument = ({ firstName, lastName, email, assignCompany, isInvi
 
 exports.addUserMongodbV2 = (data) => new Promise((resolve, reject) => {
     const object = { type: dbCollections.USERS, data: exports.buildUserDocument(data) };
-    ctr.insertAuthFun({ email: data.email, password: data.password }, (iUserRes) => {
+    ctr.insertAuthFun({ email: data.email, password: data.password, ...(data.password === null ? { passwordless: true } : {}) }, (iUserRes) => {
         if (!iUserRes.status) return reject(iUserRes.message);
         object.data._id = iUserRes.data._id;
         mongoRef.MongoDbCrudOpration(dbCollections.GLOBAL, object, 'save')

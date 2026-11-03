@@ -6,6 +6,10 @@ const { updateCompanyFun } = require("../Company/controller/updateCompany");
 const { updateMemberFunction } = require('../settings/Members/controller.js');
 const { getRoleType, isPrivileged } = require('../../Config/permissionGuard');
 const { pinSessionTenant } = require('../../Config/tenant');
+const { answerRefusal } = require('../Entitlements/answers');
+
+/* Hosted (064): the add-on must be on, and the instance-wide tracker seats must have room. Removing access is never refused. */
+const trackerSeatRefusal = (userId, adding) => (adding ? require('../Entitlements/guards').trackerSeatRefusal(userId) : Promise.resolve(null));
 
 exports.handleTrackerUserPermission = (req,res) => {
     try {
@@ -24,8 +28,11 @@ exports.handleTrackerUserPermission = (req,res) => {
                 res.status(403).send({status: false, message: 'Only an owner or admin can change tracker access'});
                 return undefined;
             }
-            return exports.updateTrackerUsersAndUser(req.body.DataObj, companyId).then((res1)=>{
-                res.send(res1);
+            return trackerSeatRefusal(req.body.DataObj.ops ? req.body.DataObj.data && req.body.DataObj.data.userId : null, req.body.DataObj.ops).then((refusal) => {
+                if (refusal) return answerRefusal(res, refusal);
+                return exports.updateTrackerUsersAndUser(req.body.DataObj, companyId).then((res1)=>{
+                    res.send(res1);
+                });
             });
         })
         .catch((err)=>{
@@ -58,7 +65,7 @@ exports.updateTrackerUsersAndUser = async (dataObj, companyId) => {
 
             updateCompanyFun(SCHEMA_TYPE.GOLBAL,updateCompanyQuery,"findOneAndUpdate",companyId,true)
             .then((companyData) => {
-                if (!dataObj.ops && companyData && companyData?.data?.planFeature?.timeTrackerUser > 0 && companyData?.data?.trackerUsers > companyData?.data?.planFeature.timeTrackerUser) {
+                if (dataObj.ops && companyData && companyData?.data?.planFeature?.timeTrackerUser > 0 && companyData?.data?.trackerUsers > companyData?.data?.planFeature.timeTrackerUser) {
                     rollbackTrackerCount();
                 } else {
                     const memberObject = [

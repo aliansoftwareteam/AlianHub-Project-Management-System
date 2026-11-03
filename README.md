@@ -373,6 +373,8 @@ Needs Docker with Compose. Images are published to GHCR (`ghcr.io/aliansoftwaret
 docker compose pull && docker compose up -d
 ```
 
+Installed before container and volume names followed the Compose project, and now replacing `docker-compose.yml`? Add `COMPOSE_FILE=docker-compose.yml:docker-compose.legacy.yml` to `.env` first, so the install keeps its old volume names and data ([docs/ADMIN-GUIDE.md#upgrade](docs/ADMIN-GUIDE.md#upgrade)).
+
 Migrations run automatically at boot, before the server starts listening, and each one is recorded in the database. A failed migration does not stop the server: `/health` reports `migrationError` and the next boot retries it. To run them by hand set `MIGRATIONS_AUTO=false` and use `npm run migrate:status`, `npm run migrate -- up --dry-run` and `npm run migrate`. Back up before a major upgrade. **Settings → Instance → Upgrade** shows the running version, the latest release and the migration state. The full walkthrough is in [docs/ADMIN-GUIDE.md](docs/ADMIN-GUIDE.md).
 
 </details>

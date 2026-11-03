@@ -38,7 +38,7 @@ exports.requestMagicLink = async (req, res) => {
         config.myCache.set(limitKey, sent + 1, PER_EMAIL_WINDOW);
 
         const user = await findUserByEmail(email);
-        if (user && user._id && user.isEmailVerified !== false && user.isActive !== false) {
+        if (user && user._id && user.isEmailVerified !== false && user.isActive !== false && !user.activationPending && !user.isSupportUser) {
             const token = crypto.randomBytes(32).toString('base64url');
             config.myCache.set(`magic:${hash(token)}`, { uid: String(user._id), redirect: safeRedirect(req.body.redirect_url) }, TTL_SECONDS);
             const link = `${config.APIURL}api/v2/auth/magic-link/verify?token=${encodeURIComponent(token)}`;
@@ -46,7 +46,7 @@ exports.requestMagicLink = async (req, res) => {
             await new Promise((resolve) => sendMail.SendEmail(mail.subject, mail.mail, email, true, (result) => {
                 if (!result.status) logger.error(`magic-link mail failed for ${email}: ${result.error}`);
                 resolve();
-            }));
+            }, { accountMail: true }));
         }
         return res.send({ status: true, statusText: 'If that address has an account, a login link is on its way.' });
     } catch (error) {

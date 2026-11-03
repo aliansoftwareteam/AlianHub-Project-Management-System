@@ -1,16 +1,22 @@
 import React, { useEffect, useRef } from 'react';
-import { useDispatch } from 'react-redux';
+import { useDispatch, useSelector } from 'react-redux';
 import { login } from '../../store/authSlice';
 import { useRouter } from 'next/router';
 import { getUserData } from '../../controller/user/user';
 import { getAssignCompanyData } from '../../controller/company/company';
-const { publicRuntimeConfig } = getConfig();
-import getConfig from "next/config";
+import { takeAutoSignIn } from '../../controller/workspace/workspace';
+import { selectCurrentWorkspace } from '../../store/workspace';
 import { apiRequestWithoutSecure} from '../../utils/services';
-const { APIURL } = publicRuntimeConfig
+import { getWorkspaceBase } from '../../utils/workspaceBase';
+import { workspaceHost } from '../../utils/workspaceAddress';
+
+// Tells the sign-in page which link to send the code back on; an older server ignores it and uses myapp://.
+const RETURN_SCHEME = 'alianhub-tracker';
+
 const Login = () => {
   const dispatch = useDispatch();
   const router = useRouter();
+  const workspace = useSelector(selectCurrentWorkspace);
 
   // The verifier for the sign-in this window started. It stays in memory, is spent on the first
   // deep link that follows, and is the only thing that makes an incoming `authorize` link ours.
@@ -77,8 +83,12 @@ const Login = () => {
   async function openAlianhub() {
     const { verifier, challenge } = await window.ipc.invoke("tracker:pkce");
     pendingVerifier.current = verifier;
-    window.ipc.send("open-external-url", `${APIURL}/#/oauth2?code_challenge=${encodeURIComponent(challenge)}`)
+    window.ipc.send("open-external-url", `${getWorkspaceBase()}/#/oauth2?code_challenge=${encodeURIComponent(challenge)}&scheme=${RETURN_SCHEME}`)
   }
+
+  useEffect(() => {
+    if (workspace && takeAutoSignIn(workspace.url)) openAlianhub();
+  }, [workspace && workspace.url]);
 
   return (
     <div className="flex justify-center items-center h-[calc(100vh-45px)] bg-white relative overflow-hidden">
@@ -98,6 +108,11 @@ const Login = () => {
         <div className="flex flex-col items-center text-center text-[#3A3A3A] mb-6">
           <h3 className="font-bold text-2xl m-0">Login to your Account</h3>
           <p className="font-normal text-xs leading-[19px] mt-2 mb-0">See what is going on with your business</p>
+          {workspace && (
+            <p className="font-normal text-xs leading-[19px] mt-2 mb-0 text-[#6B7280] truncate max-w-full" title={workspace.url}>
+              {workspace.name ? `${workspace.name} · ` : ''}{workspaceHost(workspace.url)}
+            </p>
+          )}
         </div>
         <button
           type="submit"
@@ -105,6 +120,13 @@ const Login = () => {
           className="w-full bg-[#2F3990] border border-[#2F3990] text-white py-2.5 text-sm leading-[23px] rounded hover:bg-[#252d75] transition-colors cursor-pointer"
         >
           Browser Login 
+        </button>
+        <button
+          type="button"
+          onClick={() => router.push('/connect')}
+          className="block mx-auto mt-3 text-xs text-[#2F3990] underline bg-transparent border-0 cursor-pointer"
+        >
+          Use another workspace
         </button>
       </div>
     </div>

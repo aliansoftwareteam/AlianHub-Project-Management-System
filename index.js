@@ -9,6 +9,7 @@ const bodyParser = require("body-parser");
 const config =  require('./Config/config.js');
 const { loadDotEnv, applyEnvMap } = require('./Config/applyEnv.js');
 loadDotEnv();
+require('./Config/hostingMode').refuseBadBoot();
 const { makeDefaultBrandSettings } = require("./Modules/Admin/common/controller.js");
 const { installCors } = require('./utils/cors.js');
 const { trustProxySetting } = require('./Config/trustProxy.js');
@@ -38,6 +39,8 @@ require('./Config/appShellWorker').install(app, path.join(__dirname, './frontend
 app.use(require('./Config/shellPage').shellPage(path.join(__dirname, './frontend/dist/index.html')));
 app.use(express.static(path.join(__dirname, './frontend/dist')));
 app.use(require('./Modules/Instance/maintenance.js').maintenanceGuard);
+require('./Config/setMiddleware.js').setPlanGuards(app);
+app.use(require('./Config/billingRoutes').closeBillingWhenHosted);
 
 // ADD DEFAULT BRAND SETTINGS
 makeDefaultBrandSettings()
@@ -98,6 +101,7 @@ function initializeControllers() {
     require('./Modules/Milestone/init.js').init(app);
     require('./Modules/Company/init.js').init(app);
     require('./Modules/trackerDownload/init.js').init(app);
+    require('./Modules/DesktopTracker/init').init(app);
     require('./Modules/notification/notification-middleware/init').init(app);
     require('./Modules/notification/prepare-notification-data/init').init(app);
     require('./Modules/projectSetting/init').init(app);
@@ -106,6 +110,8 @@ function initializeControllers() {
     require('./Modules/notification-count/init').init(app);
     require('./Modules/trackerUserPermission/init').init(app);
     require('./Modules/Instance/init').init(app);
+    require('./Modules/Platform/init').init(app);
+    require('./Modules/Entitlements/init').init(app);
     require('./Modules/CspReport/init').init(app);
     require('./Modules/Pickers/init').init(app);
     require('./Modules/ScreenshotRetention/init').init(app);
@@ -259,5 +265,6 @@ async function applySavedSettings() {
         console.log("Server ready on " + config.PORT);
     });
     require('./Modules/Agents/engine/timeouts').applyServerTimeouts(server);
+    require('./Modules/Instance/restart').attach(server);
     initSocket(server);
 })();
