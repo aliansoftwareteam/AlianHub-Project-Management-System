@@ -58,6 +58,8 @@ exports.init = (app) => {
     app.get('/api/v2/agents/skills', skillsCtrl.listSkills);
     app.post('/api/v2/agents/skills', setByPerson('agent.skill.create'), skillsCtrl.createSkill);
     app.post('/api/v2/agents/skills/:key/dry-run', skillsCtrl.dryRunSkill);
+    app.post('/api/v2/agents/skills/:key/approve', setByPerson('agent.skill.approve'), skillsCtrl.decideSkill(true));
+    app.post('/api/v2/agents/skills/:key/decline', setByPerson('agent.skill.decline'), skillsCtrl.decideSkill(false));
     app.get('/api/v2/agents/skills/:key', skillsCtrl.getSkill);
     app.put('/api/v2/agents/skills/:key', setByPerson('agent.skill.update'), skillsCtrl.updateSkill);
     app.delete('/api/v2/agents/skills/:key', setByPerson('agent.skill.retire'), skillsCtrl.retireSkill);
@@ -109,6 +111,8 @@ exports.init = (app) => {
     app.delete('/api/v2/agents/:id', setByPerson('agent.delete'), ctrl.deleteAgent);
     app.post('/api/v2/agents/:id/pause', setByPerson('agent.pause'), ctrl.setPaused(true));
     app.post('/api/v2/agents/:id/resume', setByPerson('agent.resume'), ctrl.setPaused(false));
+    app.post('/api/v2/agents/:id/approve', setByPerson('agent.approve'), ctrl.decideAgent(true));
+    app.post('/api/v2/agents/:id/decline', setByPerson('agent.decline'), ctrl.decideAgent(false));
     app.get('/api/v2/agents/:id/schedules', schedulesCtrl.listSchedules);
     app.post('/api/v2/agents/:id/schedules', setByPerson('agent.schedule.create'), schedulesCtrl.createSchedule);
     app.put('/api/v2/agents/:id/schedules/:scheduleId', setByPerson('agent.schedule.update'), schedulesCtrl.updateSchedule);
@@ -118,4 +122,5 @@ exports.init = (app) => {
     app.get('/api/v2/agents/:id/revisions/:n', ctrl.getRevision);
     app.post('/api/v2/agents/:id/revisions/:n/promote', setByPerson('agent.revision.promote'), ctrl.promoteRevision);
     app.post('/api/v2/agents/:id/revisions/:n/rollback', setByPerson('agent.revision.rollback'), ctrl.rollbackRevision);
+    app.post('/api/v2/agents/:id/revisions/:n/decline', setByPerson('agent.revision.decline'), ctrl.declineRevision);
 };

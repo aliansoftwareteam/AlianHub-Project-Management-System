@@ -28,8 +28,10 @@ const CONSENT = 'https://accounts.google.com/o/oauth2/v2/auth?client_id=x&state=
 const CONNECTED_AT = '2026-10-01T09:00:00.000Z';
 const MAYA = '6f0000000000000000000a03';
 
-const storeFor = (roleType) => createStore({ modules: {
-    settings: { namespaced: true, getters: { companyUserDetail: () => ({ roleType }) } },
+// A member's role connects apps for AI, as a new workspace sets it; `connects: false` takes that away.
+const aiRules = (connects) => ({ artificial_intelligence: { ai_connectors: { roles: connects ? [{ key: 3, permission: true }] : [] } } });
+const storeFor = (roleType, connects = true) => createStore({ modules: {
+    settings: { namespaced: true, getters: { companyUserDetail: () => ({ roleType }), rules: () => aiRules(connects) } },
     users: { namespaced: true, getters: { users: () => [{ _id: MAYA, Employee_Name: 'Maya Shah' }] } },
 } });
 
@@ -53,10 +55,10 @@ const serve = ({ mine = [mineOf()], members = [], answers = {} } = {}) => {
     });
 };
 
-const open = async ({ roleType = 3, query = {}, navigate = vi.fn(), ...served } = {}) => {
+const open = async ({ roleType = 3, connects = true, query = {}, navigate = vi.fn(), ...served } = {}) => {
     route.query = query;
     serve(served);
-    const wrapper = mount(GoogleConnection, { props: { navigate }, global: { plugins: [storeFor(roleType)], mocks: { $t: t } } });
+    const wrapper = mount(GoogleConnection, { props: { navigate }, global: { plugins: [storeFor(roleType, connects)], mocks: { $t: t } } });
     await flushPromises();
     return { wrapper, navigate };
 };
@@ -80,6 +82,12 @@ describe('my Google connection', () => {
         await flushPromises();
         expect(callsTo('post')).toEqual([[`/${G}/connect`, undefined]]);
         expect(navigate).toHaveBeenCalledWith(CONSENT);
+    });
+
+    it('offers no connect to a member whose role does not connect apps for AI, and says why', async () => {
+        const { wrapper } = await open({ connects: false, mine: [notConnected()] });
+        expect(wrapper.find('[data-test="google-connect"]').exists()).toBe(false);
+        expect(wrapper.find('[data-test="google-not-allowed"]').text()).toBe(t('AgentAccess.connectors_not_allowed'));
     });
 
     it('goes nowhere when the answer is not Google\'s consent address', async () => {

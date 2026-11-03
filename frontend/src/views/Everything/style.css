@@ -27,6 +27,9 @@
 .evr__chip-anchor > .evr__pop { position: absolute; top: calc(100% + 6px); inset-inline-start: 0; z-index: 40; width: 240px; }
 .ah-input.evr__pop-search { height: 30px; margin-bottom: 6px; font-size: var(--fs-sm, 12px); }
 .evr__pop-list { max-height: 280px; overflow-y: auto; }
+.evr__bulk { display: flex; justify-content: space-between; gap: 8px; padding: 2px 10px 6px; border-bottom: 1px solid var(--hairline); margin-bottom: 4px; }
+.tv-link.evr__bulk-btn { font-size: var(--fs-sm, 12px); }
+.tv-link.evr__bulk-btn:disabled { color: var(--ink-2); cursor: default; text-decoration: none; }
 .evr__tick { width: 14px; flex: none; display: inline-flex; color: var(--brand); }
 .evr__option-label { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .evr__pop-empty { padding: 8px 10px; font: var(--text-small); color: var(--ink-2); }

@@ -19,7 +19,7 @@ const {defaultProjectTours} = require("../utils/Tempates/projectTours");
 const { addSprintFun } = require('../Modules/Sprints/controller');
 const { updateMainChat } = require('../Modules/MainChats/controller');
 const { toSlug } = require('../Modules/settings/ProjectSkills/skillRules');
-const { MEMBER_DEFAULT_PERMISSIONS } = require('../Modules/settings/securityPermissions/memberDefaults');
+const { MEMBER_DEFAULT_PERMISSIONS, GUEST_DEFAULT_PERMISSIONS } = require('../Modules/settings/securityPermissions/memberDefaults');
 const { ROLE_GUEST, ROLE_OWNER, ROLE_ADMIN, ROLE_MEMBER } = require('../Config/roleTypes');
 const { addMissingViews } = require('../Modules/projectTabs/catalogue');
 const { templatesProblem, templateWritesOf } = require('../Modules/ImportSettings/templateWrite');
@@ -1019,10 +1019,19 @@ exports.importCompanyRules = async(companyName,type,projectId) => {
             dependency: "artificial_intelligence",
             desc: "",
             selectionField: true
-        }
+        },
+        { name: "Ask AI and writing help", key: "ai_assistant", dependency: "artificial_intelligence", desc: "", switchOnly: true },
+        { name: "Work with agents", key: "ai_agent_use", dependency: "artificial_intelligence", desc: "", switchOnly: true },
+        { name: "Agents", key: "ai_agents", dependency: "artificial_intelligence", desc: "" },
+        { name: "Skills", key: "ai_skills", dependency: "artificial_intelligence", desc: "" },
+        { name: "Skills an agent may use", key: "ai_skill_risk", dependency: "artificial_intelligence", desc: "", riskField: true },
+        { name: "App connectors", key: "ai_connectors", dependency: "artificial_intelligence", desc: "", switchOnly: true },
+        { name: "Connect your own AI", key: "ai_external_clients", dependency: "artificial_intelligence", desc: "", switchOnly: true },
     ]
 
     if(type === 'project'){
+        // AI rights are company-wide (Config/permissionGuard isCompanyWideKey); a project only keeps the token limit.
+        aiRules = aiRules.filter((x) => x.key === 'per_user_generate_limit');
         subProjectRules = subProjectRules.filter((x) => x.key !== 'project_list' &&  x.key !== 'project_create' && x.key !== 'public_projects' && x.key !== 'private_projects');
         let dbType = SCHEMA_TYPE.RULES;
         let findObj = {
@@ -1145,6 +1154,8 @@ exports.importCompanyRules = async(companyName,type,projectId) => {
                                 roles = rule.roles || [];
                             }
                         }
+                    } else if(!guest && GUEST_DEFAULT_PERMISSIONS[rule.key] !== undefined) {
+                        roles.push({ key: ROLE_GUEST, permission: GUEST_DEFAULT_PERMISSIONS[rule.key] });
                     } else if(!guest) {
                         if(roles.length) {
                             roles.push({

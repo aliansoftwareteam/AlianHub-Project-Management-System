@@ -4,7 +4,7 @@ jest.mock('../utils/mongo-handler/mongoQueries', () => ({ MongoDbCrudOpration: (
 jest.mock('../event/socketEventEmitter', () => ({ emit: jest.fn() }));
 jest.mock('../Config/loggerConfig', () => ({ info: jest.fn(), error: jest.fn(), warn: jest.fn() }));
 jest.mock('../utils/commonFunctions', () => ({ removeCache: jest.fn() }));
-jest.mock('../Config/permissionGuard', () => ({ getRoleType: jest.fn(async (c, uid) => ({ owner1: 1, admin1: 2, member1: 3, member2: 3, guest1: 0 })[uid]), isPrivileged: (r) => r === 1 || r === 2 }));
+jest.mock('../Config/permissionGuard', () => ({ getRoleType: jest.fn(async (c, uid) => ({ owner1: 1, admin1: 2, member1: 3, member2: 3, guest1: 0 })[uid]), isPrivileged: (r) => r === 1 || r === 2, evaluatePermission: jest.fn(async () => null), isWritable: (p) => p === true || p === 1 || p === 2, isReadable: (p) => p !== null && p !== undefined && p !== 0 }));
 jest.mock('../Modules/Agents/scope', () => ({ visibleProjectIds: jest.fn(async () => ['p1']) }));
 jest.mock('../Modules/Agents/actions', () => ({ ...jest.requireActual('../Modules/Agents/actions'), personRefusal: jest.fn(async () => '') }));
 jest.mock('../Modules/Tasks/helpers/taskWritePlacement', () => ({ readableTaskIds: jest.fn(async (companyId, uid, ids) => ids) }));
@@ -46,10 +46,10 @@ beforeEach(() => {
 });
 
 describe('AGT-01 creating an agent', () => {
-    it.each(['member1', 'guest1'])('refuses %s and stores nothing', async (uid) => {
+    it.each(['member1', 'guest1'])('refuses %s, whose role does not build agents, and stores nothing', async (uid) => {
         const r = await call(ctrl.createAgent, req(uid, { body: { name: 'Mine', autonomy: 3, spendCapUsd: 500 } }));
         expect(r.code).toBe(403);
-        expect(r.body).toMatchObject({ status: false, statusText: 'Only an Owner or an Admin can manage agents.' });
+        expect(r.body).toMatchObject({ status: false, statusText: 'Your role does not include building agents. Ask an Owner or an Admin to turn it on in Security & Permissions.' });
         expect(rows(SCHEMA_TYPE.AGENTS)).toHaveLength(2);
     });
 

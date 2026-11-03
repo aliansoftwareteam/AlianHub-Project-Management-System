@@ -1,14 +1,39 @@
 <template>
-    <div class="ah-page tv-page ap">
-        <div class="tv-head">
-            <h1 class="tv-title">{{ $t('Time.approvals') }}</h1>
-            <span v-if="count" class="ap__count">{{ count }}</span>
-            <TimesheetTabs active="approvals" />
-            <nav class="tv-tabs ap__tabs" :aria-label="$t('Time.approval_types')">
-                <button v-for="f in filters" :key="f.key" type="button" class="tv-tab" :class="{ 'is-active': filter === f.key }" @click="filter = f.key">{{ $t(f.label) }}</button>
-            </nav>
-        </div>
+    <div class="ah-page rpt ap">
+        <ReportToolbar
+            :title="$t('Time.approvals')"
+            tab="approvals"
+            :exporting="exporting"
+            :canExport="isManager && visibleCards.length > 0"
+            @export="onExport"
+        >
+            <template v-if="count" #meta><span class="ap__count">{{ count }}</span></template>
+        </ReportToolbar>
+        <ReportFilterBar
+            v-if="isManager"
+            :filters="reportFilters"
+            :presets="APPROVAL_PRESETS"
+            :fields="['people']"
+            :options="{ people: options.people.value }"
+            @apply="applyFilters"
+            @step="step"
+            @clear="clear"
+        >
+            <div class="ah-tabs" role="group" :aria-label="$t('Time.approval_types')">
+                <button
+                    v-for="f in filters"
+                    :key="f.key"
+                    type="button"
+                    class="ah-tab"
+                    :class="{ 'is-active': filter === f.key }"
+                    :aria-pressed="filter === f.key ? 'true' : 'false'"
+                    :data-test="`approvals-type-${f.key}`"
+                    @click="filter = f.key"
+                >{{ $t(f.label) }}</button>
+            </div>
+        </ReportFilterBar>
 
+        <div class="rpt__body ap__body">
         <div v-if="!isManager" class="tv-empty"><span>{{ $t('Time.no_access') }}</span></div>
         <template v-else>
             <p v-if="error" class="tv-error">{{ error }}</p>
@@ -141,6 +166,15 @@
                     :message="$t('Time.agent_empty')"
                 />
                 <EmptyState
+                    v-else-if="!visibleCards.length && !loading && cards.length && (narrowing || reportFilters.preset !== ANY_TIME)"
+                    illustration="inbox"
+                    data-test="approvals-empty-filtered"
+                    :title="$t('Reports.empty_filtered_title')"
+                    :message="$t('Time.approvals_hidden', { n: cards.length })"
+                    :action-label="$t('Time.show_all_approvals')"
+                    @action="showAll"
+                />
+                <EmptyState
                     v-else-if="!visibleCards.length && !loading"
                     illustration="inbox"
                     data-test="approvals-empty"
@@ -152,6 +186,7 @@
                 <div v-else-if="loading && !visibleCards.length" class="ah-small">{{ $t('Time.loading') }}</div>
             </div>
         </template>
+        </div>
         <ProposalWhyDialog v-if="whyCard" :proposal="whyCard.row" @close="closeWhy" />
     </div>
 </template>
@@ -169,7 +204,13 @@ import * as env from '@/config/env';
 import { useGetterFunctions } from '@/composable';
 import { formatHm } from '@/composable/useTimer';
 import { canApprove } from './approvalAccess';
-import TimesheetTabs from '@/views/Timesheet/TimesheetTabs.vue';
+import ReportToolbar from '@/views/Timesheet/report/ReportToolbar.vue';
+import ReportFilterBar from '@/views/Timesheet/report/ReportFilterBar.vue';
+import { useReportFilters } from '@/views/Timesheet/report/useReportFilters';
+import { useReportOptions } from '@/views/Timesheet/report/useReportOptions';
+import { useReportExport } from '@/views/Timesheet/report/useReportExport';
+import { PRESETS, ANY_TIME } from '@/views/Timesheet/report/reportRange';
+import { hoursOf } from '@/views/Timesheet/report/reportTable';
 import { fetchPendingProposals, sendProposalDecision } from '@/composable/agentProposals';
 import { showProjects } from '@/composable/approvedProjects';
 import { madeProjectIds } from '@/composable/approvedProjectIds';
@@ -212,7 +253,16 @@ const filters = [
     { key: 'leave', label: 'Time.filter_leave' },
     { key: 'agent', label: 'Time.filter_ai' },
 ];
-const filter = ref('all');
+const APPROVAL_PRESETS = [ANY_TIME, ...PRESETS];
+const TYPES = ['all', 'timesheet', 'leave', 'agent'];
+const { filters: reportFilters, range, narrowing, apply: applyFilters, step, clear } = useReportFilters({ defaultPreset: ANY_TIME, presets: APPROVAL_PRESETS });
+const options = useReportOptions(companyId);
+const { exporting, exportReport } = useReportExport((field, value) => options.labelOf(field, value));
+/* The card type is part of the URL like the other filters. */
+const filter = computed({
+    get: () => (TYPES.includes(reportFilters.value.types[0]) ? reportFilters.value.types[0] : 'all'),
+    set: (type) => applyFilters({ types: type === 'all' ? [] : [type] }),
+});
 const timesheets = ref([]);
 const leave = ref([]);
 const approvedLeave = ref([]);
@@ -275,7 +325,19 @@ const cards = computed(() => {
     }));
     return [ts, lv, ag].flatMap(oldestFirst);
 });
-const visibleCards = computed(() => cards.value.filter((c) => filter.value === 'all' || c.kind === filter.value));
+const overlaps = (start, end) => {
+    const from = moment(start).format('YYYY-MM-DD');
+    const to = moment(end || start).format('YYYY-MM-DD');
+    return from <= range.value.end && to >= range.value.start;
+};
+const inRange = (c) => {
+    if (c.kind === 'timesheet') return overlaps(c.row.periodStart, c.row.periodEnd);
+    if (c.kind === 'leave') return overlaps(c.row.startDate, c.row.endDate);
+    return overlaps(c.row.createdAt);
+};
+const ofPeople = (c) => !reportFilters.value.people.length || (c.kind !== 'agent' && reportFilters.value.people.includes(String(c.row.userId)));
+const showAll = () => applyFilters({ preset: ANY_TIME, people: [], types: [] });
+const visibleCards = computed(() => cards.value.filter((c) => (filter.value === 'all' || c.kind === filter.value) && inRange(c) && ofPeople(c)));
 const count = computed(() => cards.value.length);
 
 const bodyOf = (res) => (res && res.data) || {};
@@ -475,17 +537,39 @@ const closeWhy = async () => {
     if (button && button.isConnected) button.focus();
 };
 const openDetail = (row) => {
-    router.push({ name: 'User Timesheet', params: { cid: cid.value }, query: { userId: row.userId, week: moment(row.periodStart).format('YYYY-MM-DD') } });
+    const from = moment(row.periodStart).format('YYYY-MM-DD');
+    router.push({ name: 'User Timesheet', params: { cid: cid.value }, query: { range: 'custom', from, to: moment(from).add(6, 'days').format('YYYY-MM-DD'), people: [String(row.userId)] } });
 };
 
-onMounted(() => { if (isManager.value) load(); });
+const KIND_LABEL = { timesheet: 'Time.filter_time', leave: 'Time.filter_leave', agent: 'Time.filter_ai' };
+const onExport = async (format) => {
+    await exportReport(format, {
+        name: 'approvals',
+        title: t('Time.approvals'),
+        filters: reportFilters.value,
+        columns: [
+            { key: 'type', label: t('Reports.col_type'), value: (c) => t(KIND_LABEL[c.kind]) },
+            { key: 'who', label: t('Reports.col_person'), value: (c) => c.name || '' },
+            { key: 'title', label: t('Reports.col_title'), value: (c) => c.title || '' },
+            { key: 'detail', label: t('Reports.col_detail'), value: (c) => c.sub || '' },
+            { key: 'hours', label: t('Reports.col_hours'), value: (c) => (c.kind === 'timesheet' ? hoursOf(weekMinutes(c.row)) : '') },
+            { key: 'at', label: t('Reports.col_submitted'), value: (c) => (c.at ? moment(c.at).format('YYYY-MM-DD HH:mm') : '') },
+        ],
+        rows: visibleCards.value,
+    });
+};
+
+onMounted(() => {
+    if (!isManager.value) return;
+    load();
+    options.ready();
+});
 </script>
 
 <style src="../Timesheet/timeV2.css"></style>
 <style scoped>
-.ap { max-width: 720px; }
+.ap__body { max-width: calc(720px + 2 * var(--page-pad-x, 22px)); width: 100%; box-sizing: border-box; }
 .ap__count { background: var(--brand); color: var(--on-brand); font: 700 10px/1 var(--font-ui); padding: 4px 7px; border-radius: 9px; }
-.ap__tabs { margin-left: auto; }
 .ap__list { display: flex; flex-direction: column; gap: 10px; }
 .ap__card { padding: 12px 14px; display: flex; flex-direction: column; gap: 8px; border-radius: 14px; }
 .ap__card--agent { border-color: rgba(107, 92, 231, .35); }

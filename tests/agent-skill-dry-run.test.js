@@ -4,7 +4,7 @@ const mockDb = require('./fixtures/fakeMongo').create();
 jest.mock('../utils/mongo-handler/mongoQueries', () => ({ MongoDbCrudOpration: (...a) => mockDb.crud(...a) }));
 jest.mock('../event/socketEventEmitter', () => ({ emit: jest.fn() }));
 jest.mock('../Config/loggerConfig', () => ({ info: jest.fn(), error: jest.fn(), warn: jest.fn() }));
-jest.mock('../Config/permissionGuard', () => ({ ROLE_OWNER: 1, ROLE_ADMIN: 2, getRoleType: jest.fn(async () => 1), isPrivileged: (r) => r === 1 || r === 2 }));
+jest.mock('../Config/permissionGuard', () => ({ ROLE_OWNER: 1, ROLE_ADMIN: 2, getRoleType: jest.fn(async () => 1), isPrivileged: (r) => r === 1 || r === 2, evaluatePermission: jest.fn(async () => null), isWritable: (p) => p === true || p === 1 || p === 2, isReadable: (p) => p !== null && p !== undefined && p !== 0 }));
 jest.mock('../utils/commonFunctions', () => ({ removeCache: jest.fn() }));
 jest.mock('../Modules/Agents/actor', () => ({ resolveActor: jest.fn(async (req) => ({ kind: req.agent ? 'agent' : 'human', userId: req.uid || null })), isAgent: (a) => a && a.kind === 'agent' }));
 jest.mock('../Modules/AICore/llmProvider', () => ({ getProvider: jest.fn(), isAnyProviderConfigured: jest.fn(() => true) }));
@@ -110,7 +110,7 @@ describe('POST /api/v2/agents/skills/:key/dry-run', () => {
         expect(unknown.code).toBe(404);
     });
 
-    it('is owner and admin only', async () => {
+    it('is for whoever may write skills, and refuses a member whose role does not', async () => {
         mockDb.seed(SCHEMA_TYPE.AGENT_SKILLS, dataSkill());
         mockDb.seed(SCHEMA_TYPE.TASKS, task());
         getRoleType.mockResolvedValue(3);

@@ -1,6 +1,6 @@
 const logger = require('../../Config/loggerConfig');
 const aiSwitch = require('../AICore/aiSwitch');
-const { callerOf, canManageAgents, REFUSAL } = require('./access');
+const { callerOf, agentRightsOf, REFUSAL } = require('./access');
 const builder = require('./builder');
 
 const fail = (res, statusText, code, extra) => res.status(code || 400).send({ status: false, statusText, message: statusText, ...(extra || {}) });
@@ -12,7 +12,7 @@ exports.draftAgent = async (req, res) => {
         if (!companyId) return fail(res, 'companyId is required.');
         const caller = await callerOf(req, companyId);
         if (!caller.human) return fail(res, 'Agents cannot draft agents.', 403);
-        if (!canManageAgents(caller)) return fail(res, REFUSAL.MANAGE, 403);
+        if (!(await agentRightsOf(companyId, caller)).build) return fail(res, REFUSAL.BUILD, 403);
         const draft = await builder.draftAgent({ companyId, userId: String(caller.actor.userId), description: (req.body || {}).description });
         return res.send({ status: true, statusText: 'Draft ready.', data: draft });
     } catch (e) {

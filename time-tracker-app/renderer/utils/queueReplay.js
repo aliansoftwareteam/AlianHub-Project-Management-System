@@ -9,6 +9,9 @@ import {
   apiRequestWithoutCompnay,
   apiRequestWithoutSecure,
 } from './services';
+import signOut from './signOut';
+
+const { signInRefused } = signOut;
 
 // Draining the offline queue.
 //
@@ -59,6 +62,7 @@ async function sendOne(req) {
  * any failure would quietly lose work, and dropping on none blocks the app forever.
  */
 function isPermanentRejection(error) {
+  if (signInRefused(error)) return false;
   const status = error && error.response && error.response.status;
   return typeof status === 'number' && status >= 400 && status < 500;
 }

@@ -203,13 +203,24 @@ export function useAgents() {
         return out.data;
     };
 
-    const saveAgent = async (agent) => {
+    /* `full` returns the whole answer, which says whether the change waits for an owner or admin (pendingRevision). */
+    const saveAgent = async (agent, { full = false } = {}) => {
         const out = agent._id
             ? await request("put", `${env.AGENTS}/${agent._id}`, agent.builtIn ? { name: agent.name } : agent, "Ai.save_failed")
             : await request("post", env.AGENTS, agent, "Ai.save_failed");
         await loadAgents();
+        return full ? out : out.data;
+    };
+
+    const answerAgent = async (agentId, approve, reason = "") => {
+        const out = await request("post", `${env.AGENTS}/${agentId}/${approve ? "approve" : "decline"}`, approve ? {} : { reason }, "AgentAccess.answer_failed");
+        await loadAgents();
         return out.data;
     };
+
+    const declineRevision = async (agentId, n, reason) => (await request("post", `${env.AGENTS}/${agentId}/revisions/${n}/decline`, { reason }, "AgentAccess.answer_failed")).data;
+
+    const answerSkill = async (key, approve, reason = "") => (await request("post", `${env.AGENT_SKILLS}/${encodeURIComponent(key)}/${approve ? "approve" : "decline"}`, approve ? {} : { reason }, "AgentAccess.answer_failed")).data;
 
     const draftAgent = async (description) => (await request("post", env.AGENT_DRAFT, { description }, "AgentCatalogue.draft_failed")).data;
 
@@ -238,7 +249,7 @@ export function useAgents() {
         waiting, AUTONOMY,
         loadAll, loadAgents, loadProposals, loadSummary, loadSpend, loadRegistry,
         loadSkills, loadCatalogues, loadSkill, createSkill, updateSkill, retireSkill, dryRunSkill,
-        decide, setPaused, pauseAll, runNow, saveAgent, draftAgent, deleteAgent, activeRuns, loadActiveRuns, stopActive,
+        decide, setPaused, pauseAll, runNow, saveAgent, answerAgent, declineRevision, answerSkill, draftAgent, deleteAgent, activeRuns, loadActiveRuns, stopActive,
         loadRun, revertRun, loadRunReplay, loadRevisions, promoteRevision, rollbackRevision
     };
 }

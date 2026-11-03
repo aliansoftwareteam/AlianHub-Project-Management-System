@@ -10,6 +10,7 @@ const {
 const threads = require('./askThreads');
 const { askAnswerToken } = require('./shareToken');
 const askContext = require('./askContext');
+const { BRIEFING_TOKENS } = require('./askBriefing');
 
 const FOLLOW_UP = `
 - Earlier turns of this conversation come before the QUESTION. Use them to understand what the
@@ -93,7 +94,7 @@ const askStream = async (req, res) => {
             const result = await getProvider().chat({
                 systemPrompt: `${research ? RESEARCH_SYSTEM : SYSTEM}${thread ? FOLLOW_UP : ''}${explicit.system}`,
                 messages: [...threads.historyOf(thread), { role: 'user', content: promptFor(asked, gathered.sources, gathered.intent, about) }],
-                maxTokens: research ? RESEARCH_TOKENS : ASK_TOKENS,
+                maxTokens: research ? RESEARCH_TOKENS : (explicit.briefed ? BRIEFING_TOKENS : ASK_TOKENS),
                 temperature: 0.2,
                 spend: { feature: FEATURES.ASK, companyId, userId: uid },
                 onText: (text) => {

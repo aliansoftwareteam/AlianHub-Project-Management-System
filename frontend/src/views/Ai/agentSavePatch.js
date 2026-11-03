@@ -11,6 +11,9 @@ export const formFromAgent = (agent) => ({
     model: agent.model || "",
     projectIds: (agent.projectIds || []).map(String),
     role: agent.role || "",
+    // An agent from before sharing has no visibility and is everyone's (Modules/Agents/agentAudience.js).
+    visibility: ["private", "shared", "everyone"].includes(agent.visibility) ? agent.visibility : "everyone",
+    sharedWith: { userIds: ((agent.sharedWith || {}).userIds || []).map(String), teamIds: ((agent.sharedWith || {}).teamIds || []).map(String) },
 });
 
 export const skillsPayload = (skills, namedKeys) => skills

@@ -120,8 +120,7 @@ const PUBLIC_ROUTES = [
     'POST /api/v1/setPresetCompany',
     'GET /connections/:id',
     'GET /api/v1/setPresetCompany/:id',
-    // SPA shell, liveness and version probes.
-    'GET /',
+    // Liveness and version probes.
     'GET /health',
     'GET /version',
 ];

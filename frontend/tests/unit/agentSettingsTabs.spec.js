@@ -37,28 +37,29 @@ const projects = [
 ];
 
 const ok = (data) => Promise.resolve({ data: { status: true, data } });
-const serve = () => apiRequest.mockImplementation((type, url) => {
+const serve = (listed = [agent]) => apiRequest.mockImplementation((type, url) => {
     if (type !== 'get') return ok({});
-    if (url === '/api/v2/agents') return ok([agent]);
+    if (url === '/api/v2/agents') return ok(listed);
     if (url === '/api/v2/agents/skills') return ok(manifest);
     if (url === '/api/v2/agents/registry') return ok({ actions: [], never: [], autonomy: [{ level: 0 }, { level: 1 }, { level: 2 }, { level: 3 }] });
     return ok([]);
 });
 
-const store = (roleType) => createStore({
+const BUILDS_AGENTS = { artificial_intelligence: { ai_agents: { roles: [{ key: MEMBER, permission: true }] } } };
+const store = (roleType, rules = {}) => createStore({
     modules: {
-        settings: { namespaced: true, getters: { companyUserDetail: () => ({ roleType }) } },
+        settings: { namespaced: true, getters: { companyUserDetail: () => ({ roleType }), rules: () => rules } },
         projectData: { namespaced: true, getters: { projects: () => ({ data: projects }) } }
     }
 });
 
 const mounted = [];
-const mountSettings = async ({ roleType = OWNER, query = {} } = {}) => {
+const mountSettings = async ({ roleType = OWNER, query = {}, rules } = {}) => {
     route.query = query;
     const wrapper = mount(AgentSettings, {
         attachTo: document.body,
         global: {
-            plugins: [store(roleType)],
+            plugins: [store(roleType, rules)],
             provide: { $userId: ref('u1'), $companyId: ref('company-1') },
             stubs: { RouterLink: RouterLinkStub, ShellIcon: true, AgentRevisionHistory: true, AgentSchedules: true, AiSidebar: true }
         }
@@ -142,7 +143,34 @@ describe('agent settings tabs', () => {
     });
 });
 
+describe('an agent made by a member whose role builds agents', () => {
+    it('gives its maker the Save bar to send a change for approval and the Delete tab, but no History', async () => {
+        serve([{ ...agent, ownerId: 'u1' }]);
+        const wrapper = await mountSettings({ roleType: MEMBER, rules: BUILDS_AGENTS });
+        expect(tabKeys(wrapper)).toEqual(['skills', 'projects', 'autonomy', 'limits', 'runs', 'delete']);
+        expect(wrapper.find('[data-test="save"]').text()).toContain('save_for_approval');
+        expect(wrapper.find('[data-test="read-only"]').exists()).toBe(false);
+    });
+
+    it('keeps an agent another member made read-only for them', async () => {
+        serve([{ ...agent, ownerId: 'u9' }]);
+        const wrapper = await mountSettings({ roleType: MEMBER, rules: BUILDS_AGENTS });
+        expect(tabKeys(wrapper)).toEqual(['skills', 'projects', 'autonomy', 'limits', 'runs']);
+        expect(wrapper.find('[data-test="savebar"]').exists()).toBe(false);
+        expect(wrapper.find('[data-test="read-only"]').exists()).toBe(true);
+    });
+});
+
 describe('unsaved changes', () => {
+    it('shows who can use the agent on the Projects tab, and marks the tab once it changes', async () => {
+        const wrapper = await mountSettings();
+        await wrapper.find('[data-tab="projects"]').trigger('click');
+        expect(wrapper.find('[data-test="audience"]').isVisible()).toBe(true);
+        expect(wrapper.find('[data-test="dirty-projects"]').exists()).toBe(false);
+        await wrapper.find('[data-test="audience-private"]').trigger('change');
+        expect(wrapper.find('[data-test="dirty-projects"]').exists()).toBe(true);
+    });
+
     it('marks the bar and the tab that changed, and clears both after Save', async () => {
         const wrapper = await mountSettings();
         expect(wrapper.find('[data-test="unsaved"]').exists()).toBe(false);

@@ -22,12 +22,17 @@
                 :placeholder="$t('Everything.find_option')"
                 :aria-label="$t('Everything.find_option')"
             />
+            <div v-if="bulk && !single && shown.length > 1" class="evr__bulk">
+                <button type="button" class="tv-link evr__bulk-btn" :disabled="allShownOn" data-test="evr-select-all" @click="selectShown">{{ $t('Everything.select_all') }}</button>
+                <button type="button" class="tv-link evr__bulk-btn" :disabled="!someShownOn" data-test="evr-deselect-all" @click="deselectShown">{{ $t('Everything.deselect_all') }}</button>
+            </div>
             <div class="evr__pop-list ah-scroll">
                 <button
                     v-for="option in shown"
                     :key="option.value"
                     type="button"
                     class="ah-pop__item evr__option"
+                    :class="{ 'is-active': highlightPicked && isOn(option) }"
                     role="option"
                     :aria-selected="isOn(option) ? 'true' : 'false'"
                     data-test="evr-option"
@@ -57,7 +62,9 @@ const props = defineProps({
     label: { type: String, required: true },
     options: { type: Array, default: () => [] },
     modelValue: { type: Array, default: () => [] },
-    single: { type: Boolean, default: false }
+    single: { type: Boolean, default: false },
+    highlightPicked: { type: Boolean, default: false },
+    bulk: { type: Boolean, default: false }
 });
 const emit = defineEmits(["update:modelValue"]);
 
@@ -82,6 +89,17 @@ function pick(option) {
         return;
     }
     emit("update:modelValue", isOn(option) ? props.modelValue.filter((value) => value !== option.value) : [...props.modelValue, option.value]);
+}
+
+/* Over the options in view, so a search first narrows what "all" means. */
+const allShownOn = computed(() => shown.value.every(isOn));
+const someShownOn = computed(() => shown.value.some(isOn));
+function selectShown() {
+    emit("update:modelValue", [...new Set([...props.modelValue, ...shown.value.map((option) => option.value)])]);
+}
+function deselectShown() {
+    const off = new Set(shown.value.map((option) => option.value));
+    emit("update:modelValue", props.modelValue.filter((value) => !off.has(value)));
 }
 
 function clear() {

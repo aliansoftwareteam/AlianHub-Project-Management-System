@@ -328,6 +328,22 @@ exports.deleteProject = (req, res, next) => {
 };
 ```
 
+### AI rights
+
+The AI rows of Security & Permissions (`Config/aiRights.js`) are company-wide: a project's own rules never change them. They are checked in the handler and always enforced, whatever `PERMISSION_ENFORCEMENT_MODE` says for browser sessions, because they replace owner/admin checks that were always enforced.
+
+```javascript
+const aiRights = require('../../Config/aiRights');
+
+// A route that only needs the row
+app.post('/api/v1/ai/ask', askedByPeople, aiRights.requireAiRight(aiRights.AI_RIGHT.ASSISTANT), handler);
+
+// Inside a handler, judged as the person behind any token
+if (!(await aiRights.mayUse(companyId, req.uid, aiRights.AI_RIGHT.CONNECTORS))) return refuse(res, 403, aiRights.REFUSAL[aiRights.AI_RIGHT.CONNECTORS]);
+```
+
+A new AI row goes in three places, or existing workspaces never get it: `utils/data.js` (`aiRules`), `memberDefaults.js` (and `GUEST_DEFAULT_PERMISSIONS`), and `SENTINEL_KEYS` in `reconcileRules.js`, with a migration like `078-ai-access-rules.js` for what existing roles keep.
+
 ---
 
 ## CORS & Cross-Origin Security

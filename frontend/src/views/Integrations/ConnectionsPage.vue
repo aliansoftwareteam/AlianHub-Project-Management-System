@@ -39,7 +39,8 @@
                             <div class="ah-label">{{ $t('Parity.mcp_setup') }}</div>
                             <code class="conn__code ah-mono">{{ mcpCommand }}</code>
                             <div class="conn__actions">
-                                <router-link v-if="tokensNeedExpiry" class="ah-btn ah-btn--secondary ah-btn--sm" :to="{ name: 'AiAccounts', params: { cid } }">
+                                <span v-if="!canConnectOwnAi" class="ah-small" data-test="mint-not-allowed">{{ $t('AgentAccess.own_ai_not_allowed') }}</span>
+                                <router-link v-else-if="tokensNeedExpiry" class="ah-btn ah-btn--secondary ah-btn--sm" :to="{ name: 'AiAccounts', params: { cid } }">
                                     {{ $t('Parity.mint_on_accounts') }}
                                 </router-link>
                                 <button v-else type="button" class="ah-btn ah-btn--secondary ah-btn--sm" :disabled="minting" @click="mint">
@@ -85,6 +86,7 @@ import * as env from "@/config/env";
 import ShellIcon from "@/components/organisms/Shell/ShellIcon.vue";
 import AiSidebar from "@/views/Ai/AiSidebar.vue";
 import GoogleConnection from "./GoogleConnection.vue";
+import { AI_RIGHT, useAiRights } from "@/composable/aiRights";
 
 // Connections (13e). Only what this workspace can actually connect to is listed:
 // the integrations catalogue the server serves, and the MCP server this product
@@ -186,6 +188,8 @@ const availableNames = computed(() => catalog.value
 const apiBase = computed(() => String(env.API_URI || "").replace(/\/$/, ""));
 const mcpUrl = computed(() => `${apiBase.value}/mcp?companyId=${cid.value || ""}`);
 const mcpCommand = computed(() => `claude mcp add alianhub --transport http ${mcpUrl.value} --header "Authorization: Bearer <token>"`);
+
+const canConnectOwnAi = useAiRights().mayUse(AI_RIGHT.EXTERNAL_CLIENTS);
 
 const mint = async () => {
     minting.value = true;

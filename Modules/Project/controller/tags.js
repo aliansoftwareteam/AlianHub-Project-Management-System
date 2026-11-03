@@ -3,6 +3,7 @@ const { SCHEMA_TYPE } = require("../../../Config/schemaType");
 const { MongoDbCrudOpration } = require("../../../utils/mongo-handler/mongoQueries");
 const { removeCache } = require('../../../utils/commonFunctions');
 const logger = require('../../../Config/loggerConfig');
+const socketEmitter = require('../../../event/socketEventEmitter');
 const { recordTagDefinitionChange } = require('../helpers/projectItemHistory');
 const { isItemId, badRequest } = require('../../Company/helpers/callerQueryRules');
 const { escapeRegex } = require('../../../utils/escapeRegex');
@@ -97,6 +98,8 @@ exports.handleTags = async (req, res) => {
         removeCache('UserProjectData:', true);
 
         if (previous) {
+            // Without it the project the list and board views hold never learns a new tag, so a task carrying it shows no chip.
+            socketEmitter.emit('update', { type: 'update', companyId: String(companyId), data: previous, updatedFields: { tagsArray: operation }, module: 'project' });
             recordTagDefinitionChange({ companyId, projectId: id, actorId: req.uid, previous, body: req.body })
                 .catch((error) => logger.error(`project tags history: ${error && error.message}`));
             return res.status(200).json({ status: true });

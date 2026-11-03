@@ -155,6 +155,8 @@ exports.answer = async (req, res) => {
 
         const companyId = single(body.workspace);
         if (!(await workspaces.isMember(req.uid, companyId))) return refuse(res, 403, 'access_denied', 'You are not a member of that workspace.');
+        const aiRights = require('../../Config/aiRights');
+        if (!(await aiRights.mayUse(companyId, req.uid, aiRights.AI_RIGHT.EXTERNAL_CLIENTS))) return refuse(res, 403, 'access_denied', aiRights.REFUSAL[aiRights.AI_RIGHT.EXTERNAL_CLIENTS]);
         if (!granted.length) return (await spend('')) ? back({ error: 'access_denied', error_description: 'the user granted nothing that was asked for' }) : alreadyAnswered();
         const approval = await store.approvals.find(companyId, client.clientId);
         const standing = standingIn(companyId, client, approval, granted);

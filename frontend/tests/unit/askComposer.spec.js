@@ -46,11 +46,12 @@ const streamed = (chunks) => () => {
 };
 const done = (over = {}) => ({ event: 'done', configured: true, mode: 'ask', threadId: 'th1', turnId: 'tu1', answer: 'Fine.', cited: [], sources: [], scope: { projects: 1 }, usage: { model: 'm' }, ...over });
 
-const SEARCH = {
-    tasks: [{ _id: 't1', TaskName: 'Budget review', TaskKey: 'OPS-1', ProjectID: 'p1' }],
-    projects: [{ _id: 'p1', ProjectName: 'Ops' }],
-    pages: [{ _id: 'g1', title: 'Budget runbook', ProjectID: 'p1' }],
-    comments: []
+const MENTIONS = {
+    items: [
+        { kind: 'project', id: 'p1', title: 'Ops', sub: '' },
+        { kind: 'task', id: 't1', title: 'Budget review', sub: 'OPS-1 · Ops' },
+        { kind: 'page', id: 'g1', title: 'Budget runbook', sub: 'Ops' }
+    ]
 };
 
 const TARGET = {
@@ -66,7 +67,7 @@ const serve = (extra = () => undefined) => {
         if (url === env.AI_ASK_SOURCES) return Promise.resolve({ data: { status: true, data: { configured: true, projects: PROJECTS } } });
         if (String(url).startsWith(env.AGENT_MODELS)) return Promise.resolve({ data: { status: true, data: { models: [] } } });
         if (type === 'get' && url === env.AI_ASK_THREADS) return Promise.resolve({ data: { status: true, data: { threads: [] } } });
-        if (type === 'post' && url === env.GLOBAL_SEARCH) return Promise.resolve({ data: { status: true, data: SEARCH } });
+        if (type === 'get' && String(url).startsWith(env.AI_ASK_MENTIONS)) return Promise.resolve({ data: { status: true, data: MENTIONS } });
         if (type === 'get' && String(url).startsWith(`${env.AI_ASK_BUILD}/`)) return Promise.resolve({ data: { status: true, data: TARGET } });
         return Promise.reject(new Error(`unexpected ${type} ${url}`));
     });
@@ -93,6 +94,7 @@ let wrapper;
 beforeEach(() => {
     vi.useRealTimers();
     apiRequest.mockReset();
+    localStorage.clear();
     skills.list = [
         { key: 'digest.ceo', name: 'Reporter', description: 'A digest' },
         { key: 'brief.parse', name: 'Brief parser', description: 'Parses a brief' }
@@ -238,20 +240,37 @@ describe('@ adds context', () => {
         const box = await type(wrapper, 'what changed in @bud');
         await new Promise((resolve) => setTimeout(resolve, 260));
         await flushPromises();
-        expect(apiRequest).toHaveBeenCalledWith('post', env.GLOBAL_SEARCH, { query: 'bud' });
+        expect(apiRequest).toHaveBeenCalledWith('get', `${env.AI_ASK_MENTIONS}?q=bud`);
         const items = wrapper.findAll('[data-test="ask-menu-item"]');
         expect(items.map((i) => i.attributes('data-kind'))).toEqual(['project', 'task', 'page']);
+        expect(wrapper.findAll('[data-test="ask-menu-group"]')).toHaveLength(3);
 
         await box.trigger('keydown', { key: 'ArrowDown' });
         await box.trigger('keydown', { key: 'Enter' });
         await flushPromises();
         expect(wrapper.findAll('[data-test="ask-context-chip"]').map((c) => c.text())).toEqual([expect.stringContaining('Budget review')]);
-        expect(box.element.value).toBe('what changed in ');
+        expect(box.element.value).toBe('what changed in Budget review ');
 
         await box.trigger('keydown', { key: 'Enter' });
         await flushPromises();
-        expect(bodyOf(fetch.mock.calls[0])).toEqual({ question: 'what changed in', mode: 'ask', context: [{ kind: 'task', id: 't1' }] });
+        expect(bodyOf(fetch.mock.calls[0])).toEqual({ question: 'what changed in Budget review', mode: 'ask', context: [{ kind: 'task', id: 't1' }] });
         expect(wrapper.findAll('[data-test="ask-context-chip"]')).toHaveLength(0);
+        expect(wrapper.find('[data-test="ask-turn-mentions"]').text()).toContain('Budget review');
+    });
+
+    it('suggests on a bare @, scoped to the chosen project, with recent picks first', async () => {
+        localStorage.setItem('ask.recentMentions', JSON.stringify({ c1: [{ kind: 'task', id: 't9', title: 'Recent pick', sub: '' }] }));
+        serve();
+        wrapper = mount(AskPage, { attachTo: document.body, global: { provide: { $companyId: 'c1' }, stubs: { RouterLink: LinkStub, teleport: true } } });
+        await flushPromises();
+        await wrapper.find('select').setValue('p2');
+        await type(wrapper, '@');
+        await new Promise((resolve) => setTimeout(resolve, 20));
+        await flushPromises();
+        expect(apiRequest).toHaveBeenCalledWith('get', `${env.AI_ASK_MENTIONS}?q=&projectId=p2`);
+        const tasks = wrapper.findAll('[data-test="ask-menu-item"][data-kind="task"]').map((i) => i.text());
+        expect(tasks[0]).toContain('Recent pick');
+        expect(tasks).toEqual([expect.stringContaining('Recent pick'), expect.stringContaining('Budget review')]);
     });
 
     it('removes a chip with its button', async () => {

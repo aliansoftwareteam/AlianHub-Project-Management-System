@@ -5,7 +5,7 @@
             <div class="ah-toolbar">
                 <div class="ah-toolbar__title">{{ $t('Ai.agents') }}</div>
                 <div class="ah-toolbar__spacer"></div>
-                <button v-if="canManage" type="button" class="ah-btn ah-btn--primary ah-btn--sm" data-test="new-agent" @click="browsing = true">
+                <button v-if="canBuild" type="button" class="ah-btn ah-btn--primary ah-btn--sm" data-test="new-agent" @click="browsing = true">
                     <ShellIcon name="plus" :size="14" />{{ $t('Ai.new_agent') }}
                 </button>
                 <router-link v-if="canManage" class="ah-btn ah-btn--secondary ah-btn--sm" :to="{ name: 'WorkflowBuilder', params: { cid: companyId } }">{{ $t('WorkflowBuilder.nav') }}</router-link>
@@ -15,13 +15,26 @@
             <div class="ai-page__body ah-scroll">
                 <p class="ai-lead">{{ $t('Ai.hub_lead') }}</p>
 
+                <section v-if="canManage && waiting.length" class="ah-card ai-agent ai-waiting" data-test="waiting-approval">
+                    <div class="ah-label">{{ $t('AgentAccess.waiting_title', { n: waiting.length }, waiting.length) }}</div>
+                    <ul class="ai-waiting__list">
+                        <li v-for="item in waiting" :key="item.key" class="ai-waiting__row">
+                            <span class="ai-waiting__what">
+                                <strong>{{ item.agent.name }}</strong>
+                                <span class="ah-small">{{ item.edit ? $t('AgentAccess.waiting_edit_by', { name: item.by || $t('AgentAccess.someone') }) : $t('AgentAccess.waiting_agent_by', { name: item.by || $t('AgentAccess.someone') }) }}</span>
+                            </span>
+                            <router-link class="ah-btn ah-btn--secondary ah-btn--sm" :to="{ name: 'AiAgent', params: { cid: companyId, id: item.agent._id } }">{{ $t('AgentAccess.review') }}</router-link>
+                        </li>
+                    </ul>
+                </section>
+
                 <div v-if="lastError" class="ah-empty">{{ lastError }}</div>
                 <div v-else-if="loading" class="ah-empty">{{ $t('Ai.loading') }}</div>
 
                 <div v-else-if="!agents.length" class="ah-card ai-agent">
                     <h3 class="ah-h3">{{ $t('Ai.empty_title') }}</h3>
                     <p class="ai-lead" style="margin:6px 0 12px">{{ $t('Ai.empty_lead') }}</p>
-                    <div v-if="canManage" class="ai-templates" data-test="templates">
+                    <div v-if="canBuild" class="ai-templates" data-test="templates">
                         <button v-for="tpl in templates" :key="tpl.slug" type="button" class="ah-btn ah-btn--secondary ah-btn--sm" @click="openWizard(templateToPrefill(t, tpl))">
                             {{ templateName(t, tpl) }}
                         </button>
@@ -39,8 +52,13 @@
                                     <span class="ah-chip ah-chip--agent" data-test="agent-autonomy" :title="autonomyTip(t, agent.autonomy)">{{ autonomyName(t, agent.autonomy) }}</span>
                                     <span v-if="agent.roleName" class="ah-chip ah-chip--brand" data-test="agent-role">{{ agent.roleName }}</span>
                                     <span v-if="agent.paused" class="ah-chip ah-chip--warn">{{ $t('Ai.paused') }}</span>
+                                    <span v-if="approvalStateOf(agent) === 'pending'" class="ah-chip ah-chip--warn" data-test="agent-pending">{{ $t('AgentAccess.state_pending') }}</span>
+                                    <span v-else-if="approvalStateOf(agent) === 'declined'" class="ah-chip ah-chip--danger" data-test="agent-declined">{{ $t('AgentAccess.state_declined') }}</span>
+                                    <span v-if="agent.pendingEdit" class="ah-chip ah-chip--warn" data-test="agent-edit-waiting">{{ $t('AgentAccess.change_waiting') }}</span>
+                                    <span class="ah-chip" data-test="agent-visibility">{{ $t(`AgentAccess.visibility_${visibilityOf(agent)}`) }}</span>
                                 </div>
                                 <div class="ai-agent__scope">{{ scopeOf(agent) }}</div>
+                                <div class="ah-small ai-agent__maker" data-test="agent-maker">{{ makerOf(agent) }}</div>
                             </div>
                         </div>
 
@@ -53,9 +71,9 @@
 
                         <div class="ai-agent__foot">
                             <router-link class="ah-btn ah-btn--secondary ah-btn--sm" :to="{ name: 'AiAgent', params: { cid: companyId, id: agent._id } }">{{ $t('Ai.open') }}</router-link>
-                            <button type="button" class="ah-btn ah-btn--ghost ah-btn--sm" :disabled="agent.paused || busyId === agent._id" @click="picking = agent">{{ $t('Ai.run_now') }}</button>
+                            <button v-if="canUseAgents" type="button" class="ah-btn ah-btn--ghost ah-btn--sm" :disabled="agent.paused || awaitsApproval(agent) || busyId === agent._id" @click="picking = agent">{{ $t('Ai.run_now') }}</button>
                             <button v-if="stoppableRuns(agent).length" type="button" class="ah-btn ah-btn--ghost ah-btn--sm" data-test="stop" :disabled="busyId === agent._id" @click="onStop(agent)">{{ $t('Ai.stop') }}</button>
-                            <button v-if="canManage" type="button" class="ah-btn ah-btn--ghost ah-btn--sm" data-test="pause" :disabled="busyId === agent._id" @click="onPause(agent)">
+                            <button v-if="mayEdit(agent)" type="button" class="ah-btn ah-btn--ghost ah-btn--sm" data-test="pause" :disabled="busyId === agent._id" @click="onPause(agent)">
                                 {{ agent.paused ? $t('Ai.resume') : $t('Ai.pause') }}
                             </button>
                             <span class="ai-agent__trigger">{{ $t('Ai.runs_when_started') }}</span>
@@ -98,7 +116,7 @@ import { actionLabel, autonomyName, autonomyTip, skillAbout, skillLabel } from "
 import { selectableTemplates, templateName, templateToPrefill } from "./agentCatalogue";
 import { requirementsOf } from "./skillInputs";
 import { projectScopeOf } from "./agentFit";
-import { useAgentAccess } from "./agentAccess";
+import { approvalStateOf, awaitsApproval, useAgentAccess } from "./agentAccess";
 
 defineOptions({ name: "AiHubPage" });
 
@@ -106,7 +124,7 @@ const { t } = useI18n();
 const $toast = useToast();
 const companyId = inject("$companyId");
 const { agents, spend, registryManifest, loading, lastError, AUTONOMY, loadAll, setPaused, runNow, activeRuns, loadActiveRuns, stopActive } = useAgents();
-const { canManage, mayStop } = useAgentAccess();
+const { canManage, canBuild, canUseAgents, mayEdit, mayStop } = useAgentAccess();
 const stoppableRuns = (agent) => (activeRuns.value[agent._id] || []).filter(mayStop);
 
 const EMPTY_HUB_TEMPLATES = 4;
@@ -136,6 +154,15 @@ const onPause = (agent) => withAgent(agent, async () => {
 });
 
 const templates = computed(() => selectableTemplates().slice(0, EMPTY_HUB_TEMPLATES));
+
+const visibilityOf = (agent) => (["private", "shared", "everyone"].includes(agent.visibility) ? agent.visibility : "everyone");
+const makerOf = (agent) => (agent.builtIn || agent.madeBy || !agent.ownerId ? t("AgentAccess.built_in") : t("AgentAccess.created_by", { name: agent.ownerName || t("AgentAccess.someone") }));
+
+/* What waits for an owner or admin: new agents, then changes to approved ones. */
+const waiting = computed(() => [
+    ...agents.value.filter((agent) => approvalStateOf(agent) === "pending").map((agent) => ({ key: `a-${agent._id}`, agent, edit: false, by: agent.ownerName })),
+    ...agents.value.filter((agent) => agent.pendingEdit).map((agent) => ({ key: `e-${agent._id}`, agent, edit: true, by: agent.pendingEdit.createdByName })),
+]);
 
 const neverList = computed(() => (registryManifest.value.never || []).map((key) => actionLabel(t, key)).join(" · "));
 

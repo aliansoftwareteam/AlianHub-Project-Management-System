@@ -391,12 +391,13 @@ const canClear = (it) => clearable(it) && tab.value !== 'cleared';
 const canSnooze = (it) => clearable(it) && (tab.value === 'primary' || tab.value === 'other');
 const whenLabel = (iso) => formatWhen(iso, timeZone.value, locale?.value);
 
+const APPROVAL_NOTICES = ['agent_approval_requested', 'agent_approval_decided'];
 const glyphIcon = (it) => {
     if (it.kind === 'mention' || it.changeType === 'doc_mention') return 'at';
     if (it.changeType === 'agent_alert') return 'alert';
     if (it.changeType === 'goal_reached') return 'target';
     if (it.changeType === 'credential_expiring') return 'key';
-    if (it.changeType === 'agent_report') return 'agent';
+    if (it.changeType === 'agent_report' || APPROVAL_NOTICES.includes(it.changeType)) return 'agent';
     if (/milestone/i.test(it.key || '')) return 'alert';
     if (/status/i.test(it.key || '')) return 'refresh';
     if (/comment/i.test(it.key || '')) return 'chat';
@@ -846,6 +847,12 @@ const opensOverTheInbox = (it) => !!(it.taskId && it.projectId && it.sprintId &&
     && (it.sourceType === 'mention' || String(it.type || '').toLowerCase() !== 'project'));
 const open = (it) => {
     if (it.unread && it.kind !== 'approval') setRead(it, true).then((ok) => { if (ok && tab.value !== 'done') removeRow(it); });
+    if (APPROVAL_NOTICES.includes(it.changeType)) {
+        const data = it.changeData || {};
+        if (data.kind === 'skill' && router.hasRoute('AiSkills')) router.push({ name: 'AiSkills', params: { cid: companyId?.value } }).catch(() => {});
+        else if (data.agentId && router.hasRoute('AiAgent')) router.push({ name: 'AiAgent', params: { cid: companyId?.value, id: String(data.agentId) }, query: data.n ? { rev: String(data.n) } : {} }).catch(() => {});
+        return;
+    }
     if (it.changeType === 'agent_report' && it.changeData?.runId && router.hasRoute('AiInbox')) {
         router.push({ name: 'AiInbox', params: { cid: companyId?.value }, query: { report: String(it.changeData.runId) } }).catch(() => {});
         return;

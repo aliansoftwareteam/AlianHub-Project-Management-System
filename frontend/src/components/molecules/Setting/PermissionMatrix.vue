@@ -61,6 +61,14 @@
                                     @change="setValue(rule, role, Number($event.target.value))"
                                 />
                             </template>
+                            <template v-else-if="rule.riskField">
+                                <select class="pm__select" :value="String(value(rule, role))" :disabled="cellDisabled(rule, role)" :aria-label="`${ruleName(rule)} · ${role.name}`" @change="setValue(rule, role, parseOption($event.target.value))">
+                                    <option value="null">{{ $t('Permissions.None') }}</option>
+                                    <option value="1">{{ $t('Permissions.risk_low') }}</option>
+                                    <option value="2">{{ $t('Permissions.risk_medium') }}</option>
+                                    <option value="3">{{ $t('Permissions.risk_any') }}</option>
+                                </select>
+                            </template>
                             <template v-else-if="rule.selectionField">
                                 <select class="pm__select" :value="String(value(rule, role))" :disabled="cellDisabled(rule, role)" :aria-label="`${ruleName(rule)} · ${role.name}`" @change="setValue(rule, role, parseOption($event.target.value))">
                                     <option value="null">{{ $t('Permissions.None') }}</option>
@@ -69,7 +77,7 @@
                                     <option value="2">{{ $t('Projects.everyone') }}</option>
                                 </select>
                             </template>
-                            <template v-else-if="mode === 'simple'">
+                            <template v-else-if="mode === 'simple' || rule.switchOnly">
                                 <AhSwitch
                                     small
                                     :modelValue="value(rule, role) === true"

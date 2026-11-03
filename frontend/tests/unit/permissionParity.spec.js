@@ -16,7 +16,8 @@ vi.spyOn(console, 'error').mockImplementation(() => {});
 const { useCustomComposable } = await import('@/composable');
 const { checkPermission } = useCustomComposable();
 
-const COMPANY_WIDE_PREFIX = 'settings.';
+const COMPANY_WIDE_PREFIXES = ['settings.', 'artificial_intelligence.ai_'];
+const companyWide = (key) => COMPANY_WIDE_PREFIXES.some((prefix) => key.startsWith(prefix));
 
 const gettersFor = (testCase) => {
     const clone = (rows) => JSON.parse(JSON.stringify(rows));
@@ -31,10 +32,10 @@ const gettersFor = (testCase) => {
     };
 };
 
-/* The web app passes project.isGlobalPermission wherever a project is open, and never passes it for a settings key. */
+/* The web app passes project.isGlobalPermission wherever a project is open, and never passes it for a settings key or an AI right. */
 const webValue = (testCase) => {
     const options = { gettersVal: gettersFor(testCase) };
-    if (!testCase.project || testCase.key.startsWith(COMPANY_WIDE_PREFIX)) return checkPermission(testCase.key, undefined, options);
+    if (!testCase.project || companyWide(testCase.key)) return checkPermission(testCase.key, undefined, options);
     return checkPermission(testCase.key, testCase.project.isGlobalPermission, options);
 };
 
@@ -58,8 +59,8 @@ describe('the call-site convention the parity harness relies on', () => {
         return /\.(vue|js)$/.test(entry.name) ? [full] : [];
     });
 
-    it('no settings key is checked against a project\'s own rules', () => {
-        const projectScopedSettingsCheck = /checkPermission\(\s*['"`]settings\.[^'"`]+['"`]\s*,\s*(?!true\b|undefined\b)[^)\s]/;
+    it('no settings key or AI right is checked against a project\'s own rules', () => {
+        const projectScopedSettingsCheck = /checkPermission\(\s*['"`](?:settings\.|artificial_intelligence\.ai_)[^'"`]+['"`]\s*,\s*(?!true\b|undefined\b)[^)\s]/;
         const offenders = sources(path.resolve(__dirname, '../../src'))
             .filter((file) => projectScopedSettingsCheck.test(fs.readFileSync(file, 'utf8')))
             .map((file) => path.relative(path.resolve(__dirname, '../..'), file));

@@ -85,6 +85,7 @@ const create = (mockDb) => {
 
     const seed = () => {
         rules.reset();
+        require('./aiRules').seedAiRules(mockDb);
         grantToMembers('task', 'task_activity_log');
         grantToMembers('project', 'project_details');
         delete process.env.MCP_TOOLS_V2;
