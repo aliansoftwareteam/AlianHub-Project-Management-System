@@ -2,6 +2,9 @@ const ID = /^[a-z][a-z0-9_]{0,39}$/;
 const URL_KEYS = Object.freeze(['authorizeUrl', 'tokenUrl', 'revokeUrl']);
 const CREDENTIAL_KEYS = Object.freeze(['clientId', 'clientSecret', 'client_id', 'client_secret']);
 const PKCE = Object.freeze(['S256']);
+const SCOPE_PARAM = /^[a-z_]{1,40}$/;
+const SCOPE_SEPARATORS = Object.freeze([' ', ',']);
+const REVOKE_WITH = Object.freeze(['refresh', 'access']);
 
 const isPlainObject = (value) => !!value && typeof value === 'object' && !Array.isArray(value);
 const isText = (value) => typeof value === 'string' && value.trim().length > 0;
@@ -30,6 +33,10 @@ const authProblems = (auth, hosts) => {
         problems.push('auth.extraParams must map names to strings');
     }
     if (auth.baseScopes !== undefined && !(Array.isArray(auth.baseScopes) && auth.baseScopes.every(isText))) problems.push('auth.baseScopes must be a list of scopes');
+    if (auth.scopeParam !== undefined && !SCOPE_PARAM.test(String(auth.scopeParam))) problems.push('auth.scopeParam must be a parameter name');
+    if (auth.scopeSeparator !== undefined && !SCOPE_SEPARATORS.includes(auth.scopeSeparator)) problems.push('auth.scopeSeparator must be a space or a comma');
+    if (auth.tokenAnswer !== undefined && typeof auth.tokenAnswer !== 'function') problems.push('auth.tokenAnswer is not a function');
+    if (auth.revokeWith !== undefined && !REVOKE_WITH.includes(auth.revokeWith)) problems.push('auth.revokeWith must be refresh or access');
     CREDENTIAL_KEYS.filter((key) => auth[key] !== undefined).forEach((key) => problems.push(`auth.${key} must not be in the definition`));
     return problems;
 };
@@ -55,6 +62,7 @@ const validate = (definition) => {
     if (definition.rateLimit !== undefined && !(isPlainObject(definition.rateLimit) && Array.isArray(definition.rateLimit.statuses) && definition.rateLimit.statuses.every(Number.isInteger))) {
         problems.push('rateLimit.statuses must be a list of HTTP statuses');
     }
+    if (definition.answerError !== undefined && typeof definition.answerError !== 'function') problems.push('answerError is not a function');
     if (definition.deadGrantErrors !== undefined && !(Array.isArray(definition.deadGrantErrors) && definition.deadGrantErrors.every(isText))) {
         problems.push('deadGrantErrors must be a list of error codes');
     }

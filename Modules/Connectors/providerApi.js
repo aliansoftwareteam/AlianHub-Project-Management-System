@@ -8,12 +8,20 @@ const MAX_SCOPES = 50;
 
 const ERROR = Object.freeze({ UNREACHABLE: 'unreachable', RATE_LIMITED: 'rate_limited', BAD_RESPONSE: 'bad_response' });
 
+/* Some providers (Slack) answer a refusal with 200 and the error inside the body. */
+const errorIn = (definition, body) => {
+    if (!definition || typeof definition.answerError !== 'function') return '';
+    const code = definition.answerError(body);
+    if (!code) return '';
+    return ERROR_CODE.test(String(code)) ? String(code) : ERROR.BAD_RESPONSE;
+};
+
 const scrub = (text, hide) => hide.filter(Boolean).reduce((out, secret) => out.split(String(secret)).join('[hidden]'), String(text || ''));
 
 /* One attempt, never a retry. Only an error code in the provider's own format is passed on; its description and
  * anything else in a failed answer are dropped, so nothing sent can come back in an error. The host is fixed in
  * the provider definition, and the call names a workspace, so that workspace's egress list applies. */
-const post = async ({ companyId, actor, url, form, hide = [] }) => {
+const post = async ({ definition, companyId, actor, url, form, hide = [] }) => {
     let res;
     try {
         res = await egressContext.run(
@@ -27,7 +35,11 @@ const post = async ({ companyId, actor, url, form, hide = [] }) => {
     let body = null;
     try { body = res.body ? JSON.parse(res.body) : {}; } catch (e) { body = null; }
     const answered = body && typeof body === 'object' && !Array.isArray(body);
-    if (res.status >= 200 && res.status < 300) return answered ? { ok: true, body } : { ok: false, error: ERROR.BAD_RESPONSE };
+    if (res.status >= 200 && res.status < 300) {
+        if (!answered) return { ok: false, error: ERROR.BAD_RESPONSE };
+        const refused = errorIn(definition, body);
+        return refused ? { ok: false, error: refused } : { ok: true, body };
+    }
     return { ok: false, error: answered && ERROR_CODE.test(String(body.error || '')) ? String(body.error) : `http_${res.status}` };
 };
 
@@ -36,7 +48,7 @@ const consentUrl = ({ definition, clientId, redirectUri, scopes, state, challeng
         client_id: clientId,
         redirect_uri: redirectUri,
         response_type: 'code',
-        scope: scopes.join(' '),
+        [definition.auth.scopeParam || 'scope']: scopes.join(definition.auth.scopeSeparator || ' '),
         state,
         ...(definition.auth.extraParams || {}),
     };
@@ -44,26 +56,33 @@ const consentUrl = ({ definition, clientId, redirectUri, scopes, state, challeng
     return `${definition.auth.authorizeUrl}?${new URLSearchParams(params)}`;
 };
 
+/* A verifier goes only where the consent sent its challenge: Slack refuses one it was not asked to check. */
 const exchange = ({ definition, companyId, actor, client, code, verifier, redirectUri }) => post({
-    companyId, actor, url: definition.auth.tokenUrl, hide: [client.clientSecret, code, verifier],
+    definition, companyId, actor, url: definition.auth.tokenUrl, hide: [client.clientSecret, code, verifier],
     form: {
-        grant_type: 'authorization_code', code, ...(verifier ? { code_verifier: verifier } : {}),
+        grant_type: 'authorization_code', code, ...(verifier && definition.auth.pkce === 'S256' ? { code_verifier: verifier } : {}),
         client_id: client.clientId, client_secret: client.clientSecret, redirect_uri: redirectUri,
     },
 });
 
 const refresh = ({ definition, companyId, actor, client, refreshToken }) => post({
-    companyId, actor, url: definition.auth.tokenUrl, hide: [client.clientSecret, refreshToken],
+    definition, companyId, actor, url: definition.auth.tokenUrl, hide: [client.clientSecret, refreshToken],
     form: { grant_type: 'refresh_token', refresh_token: refreshToken, client_id: client.clientId, client_secret: client.clientSecret },
 });
 
 /* A provider without a revoke endpoint cannot be told; disconnect still retires the secrets and closes the row. */
 const revoke = ({ definition, companyId, actor, token }) => (definition.auth.revokeUrl
-    ? post({ companyId, actor, url: definition.auth.revokeUrl, hide: [token], form: { token } })
+    ? post({ definition, companyId, actor, url: definition.auth.revokeUrl, hide: [token], form: { token } })
     : Promise.resolve({ ok: true, body: {}, skipped: true }));
 
 const isGrantRefused = (definition, code) => (definition.deadGrantErrors || ['invalid_grant']).includes(String(code));
 
-const scopesOf = (granted) => String(granted || '').split(/\s+/).filter(Boolean).slice(0, MAX_SCOPES).map((scope) => scope.slice(0, 200));
+const scopesOf = (granted) => String(granted || '').split(/[\s,]+/).filter(Boolean).slice(0, MAX_SCOPES).map((scope) => scope.slice(0, 200));
 
-module.exports = { ERROR, consentUrl, exchange, refresh, revoke, isGrantRefused, scopesOf };
+/* The token fields of a token or refresh answer; Slack nests a user token under `authed_user`. */
+const tokensOf = (definition, body) => {
+    const found = typeof definition.auth.tokenAnswer === 'function' ? definition.auth.tokenAnswer(body) : body;
+    return found && typeof found === 'object' ? found : {};
+};
+
+module.exports = { ERROR, consentUrl, exchange, refresh, revoke, isGrantRefused, scopesOf, tokensOf, errorIn };

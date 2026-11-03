@@ -869,6 +869,10 @@ const open = (it) => {
         router.push({ name: 'Goal', params: { cid: companyId?.value, goalId: String(it.changeData.goalId) } }).catch(() => {});
         return;
     }
+    if (it.changeType === 'connector_slack_bot_retired' && router.hasRoute('Connections')) {
+        router.push({ name: 'Connections', params: { cid: companyId?.value } }).catch(() => {});
+        return;
+    }
     if (it.changeType === 'credential_expiring' && router.hasRoute('AiAccounts')) {
         router.push({ name: 'AiAccounts', params: { cid: companyId?.value }, query: { tab: it.changeData?.kind === 'connection' ? 'connected' : 'link' } }).catch(() => {});
         return;

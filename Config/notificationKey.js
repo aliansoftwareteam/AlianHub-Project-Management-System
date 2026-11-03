@@ -56,6 +56,7 @@ const Notification_key = {
   DOC_SHARED:"doc_shared",
   CREDENTIAL_EXPIRING:"credential_expiring",
   CONNECTOR_BROKEN:"connector_broken",
+  CONNECTOR_SLACK_BOT_RETIRED:"connector_slack_bot_retired",
 }
 const TemplateType = {
  CREATE:'create',

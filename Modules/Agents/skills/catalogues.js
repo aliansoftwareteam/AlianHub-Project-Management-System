@@ -6,7 +6,6 @@ const registry = require('../registry');
 const { isBlockedHostname } = require('../engine/safeFetch');
 const workKinds = require('../workKinds');
 const externalReads = require('./externalReads');
-const { SLACK_READ } = require('../connectors/readLimits');
 
 const { MIN_BRIEF_CHARS } = workKinds;
 
@@ -117,7 +116,7 @@ const connectorReaders = () => Object.fromEntries(require('../../Connectors/tool
         // Kept so a connectionId naming someone else's connection reaches the runner and is refused, not silently dropped.
         connectionId: Object.freeze({ type: 'string', maxLength: CONNECTION_ID_MAX }),
     }),
-    fields: Object.freeze(['text', 'chars', 'truncated']),
+    fields: Object.freeze(['text', 'chars', 'truncated', ...(tool.fields || [])]),
 })]));
 
 /* Context a skill may read before the model is asked. Each reader is a call into
@@ -200,20 +199,6 @@ const READER_CATALOGUE = Object.freeze({
         params: externalReadParams(['json', 'text', 'diff']),
         fields: Object.freeze(['status', 'json', 'text', 'bytes']),
     }),
-    'slack.channel': Object.freeze({
-        label: 'Recent messages of a Slack channel',
-        description: `The latest messages of one public channel an owner or admin allowed agents to read, as plain text with people left as Slack ids: at most ${SLACK_READ.MESSAGES} messages and ${SLACK_READ.CHARS} characters. With no channel named it reads the first allowed one. What it reads marks the run, which makes no web fetch after it.`,
-        connector: 'slack',
-        action: 'slack.channel.read',
-        params: Object.freeze({
-            channel: Object.freeze({ type: 'channel' }),
-            postable: Object.freeze({ type: 'boolean', default: false }),
-            hours: Object.freeze({ type: 'number', min: 1, max: SLACK_READ.HOURS, default: SLACK_READ.DEFAULT_HOURS }),
-            limit: Object.freeze({ type: 'number', min: 1, max: SLACK_READ.MESSAGES, default: SLACK_READ.MESSAGES }),
-            maxChars: Object.freeze({ type: 'number', min: 500, max: SLACK_READ.CHARS, default: SLACK_READ.CHARS }),
-        }),
-        fields: Object.freeze(['channel', 'channelId', 'count', 'text', 'chars', 'truncated']),
-    }),
     ...connectorReaders(),
 });
 
@@ -267,11 +252,7 @@ const EMIT_REQUIRED = Object.freeze({
 
 /* Connector writes are registered only while their connector is on, so they are offered beside the fixed list
  * rather than in it. Each is propose-only: a skill that emits one files a proposal, never a message. */
-const CONNECTOR_EMIT_REQUIRED = Object.freeze({
-    'slack.message.post': Object.freeze(['channelId', 'text']),
-});
 const connectorEmitRequired = () => ({
-    ...CONNECTOR_EMIT_REQUIRED,
     ...Object.fromEntries(require('../../Connectors/tools').writes().map((tool) => [tool.key, Object.freeze([...(tool.input.required || [])])])),
 });
 const emitActions = () => [...EMIT_ACTIONS, ...Object.keys(connectorEmitRequired()).filter((key) => registry.has(key))];

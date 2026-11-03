@@ -432,10 +432,6 @@ const executors = {
         return { result: { pageId: String(saved._id) }, undo: { kind: 'page', pageId: String(saved._id) }, entityType: 'page', entityId: saved._id, entityName: title };
     },
 
-    async 'slack.message.post'({ companyId, actor, params }) {
-        return require('./connectors/slackPost').post({ companyId, actor, params });
-    },
-
     /* For the person behind the agent, on the task named: the reminder the task screen sets. */
     async 'reminder.create'({ companyId, actor, params }) {
         const task = await tools.getTask(companyId, params.taskId);

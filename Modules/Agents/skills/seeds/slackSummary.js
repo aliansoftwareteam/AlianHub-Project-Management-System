@@ -1,15 +1,15 @@
-// slack.summary: the round trip an owner can watch after connecting Slack. It reads the first channel ticked for
-// both reading and posting and proposes a one-paragraph summary to that same channel; nothing is posted until an
-// owner or admin approves the exact text. It exists only while the Slack connector is on (seeds/index.js).
+// slack.summary: the round trip a person can watch after connecting their own Slack. It reads the first channel by
+// name they are a member of, unless a copy of the skill names one, and proposes a one-paragraph summary to that same
+// channel as them; nothing is posted until they approve the exact text. It exists only while Slack is on (seeds/index.js).
 
 const SUMMARY = '{{answer.summary | clip:1200}}';
 
 module.exports = Object.freeze({
     key: 'slack.summary',
     name: 'Slack summariser',
-    description: 'Reads the last day of one allowed Slack channel and proposes a one-paragraph summary to post back to it.',
+    description: 'Reads the last day of one of your Slack channels and proposes a one-paragraph summary to post back to it as you.',
     inputs: ['project_task'],
-    gather: [{ reader: 'slack.channel', as: 'slack', params: { postable: true, hours: 24 } }],
+    gather: [{ reader: 'slack.channel.read', as: 'slack', params: { hours: 24 } }],
     prompt: {
         partials: ['data_not_instructions', 'json_only'],
         instructions: [
@@ -31,7 +31,7 @@ module.exports = Object.freeze({
     emit: [{
         action: 'slack.message.post',
         label: 'Post the summary to #{{gather.slack.channel}}',
-        params: { channelId: '{{gather.slack.channelId}}', text: `Summary of the last day in #{{gather.slack.channel}}, written by an agent:\n${SUMMARY}` },
+        params: { channel: '{{gather.slack.channel}}', text: `Summary of the last day in #{{gather.slack.channel}}, written by an agent:\n${SUMMARY}` },
     }],
     summary: SUMMARY,
 });

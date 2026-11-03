@@ -10,6 +10,7 @@ const quotas = require('./quotas');
 const rateLimits = require('./rateLimits');
 const health = require('./health');
 const callAudit = require('./callAudit');
+const providerApi = require('./providerApi');
 
 const VIA = Object.freeze({ AGENT: 'agent', MCP: 'mcp', APPROVED: 'approved' });
 const STATE = Object.freeze({ PENDING: 'pending', APPLIED: 'applied', FAILED: 'failed', REFUSED: 'refused' });
@@ -73,6 +74,14 @@ const callProvider = async ({ tool, companyId, userId, connection, trace }, url,
 // eslint-disable-next-line no-control-regex
 const plain = (value) => String(value === undefined || value === null ? '' : value).replace(/[\u0000-\u0008\u000b-\u001f\u007f]/g, ' ').trim();
 
+const FIELD_MAX = 200;
+
+/* A read may hand a skill a few named values besides its text (the Slack channel it read, to post back to). */
+const fieldsOf = (tool, given) => Object.fromEntries((tool.fields || []).map((name) => {
+    const value = given && given[name];
+    return [name, Number.isFinite(value) ? value : plain(value).slice(0, FIELD_MAX)];
+}));
+
 const runs = () => require('../Agents/runs');
 
 /* The read is pushed onto the run before the provider is called and counts from then on, failed or not, so an agent
@@ -100,9 +109,21 @@ const claimRunRead = async (companyId, runId, entry, maxChars) => {
 
 /* safeFetch hands back any status, so a provider's refusal becomes an error here: a write must not be kept as a
  * delivery, and a read must not hand the model an error page as if it were the person's data. */
-const accepted = (call, res) => {
-    if (res.status < 200 || res.status >= 300) throw refusal('provider_refused', `${call.tool.definition.name} answered ${res.status}, so this did not go through.`);
-    return res;
+const accepted = async (call, res) => {
+    const { definition } = call.tool;
+    if (res.status < 200 || res.status >= 300) throw refusal('provider_refused', `${definition.name} answered ${res.status}, so this did not go through.`);
+    let body = null;
+    if (typeof definition.answerError === 'function') {
+        try { body = JSON.parse(res.body); } catch (e) { throw refusal('provider_refused', `${definition.name} did not answer in a form that can be read, so this did not go through.`); }
+    }
+    const code = body ? providerApi.errorIn(definition, body) : '';
+    if (!code) return res;
+    if (providerApi.isGrantRefused(definition, code)) {
+        await connections.markBroken({ companyId: String(call.companyId), connectionId: call.connection.connectionId, reason: code });
+        await health.tellBroken(call.companyId, call.userId, call.tool.provider, definition.name);
+        throw refusal('broken', MESSAGES.broken(definition.name));
+    }
+    throw refusal('provider_refused', `${definition.name} answered ${code}, so this did not go through.`);
 };
 
 /* The tool is handed a request function, never the token, which goes only to the provider's own hosts. A read tool can only GET. */
@@ -186,7 +207,8 @@ const readAdmitted = async ({ companyId, userId, via, runId, callerId, key, inpu
         if (!trace.called) await quota.release();
         throw error;
     }
-    const whole = plain(raw);
+    const answered = raw && typeof raw === 'object' ? raw : { text: raw };
+    const whole = plain(answered.text);
     const text = whole.slice(0, maxChars);
     const source = taint.connector(tool.provider, taint.hashed(`${key}:${JSON.stringify(args)}`));
 
@@ -197,7 +219,7 @@ const readAdmitted = async ({ companyId, userId, via, runId, callerId, key, inpu
         taint.note(source);
     }
     trace.chars = text.length;
-    return { text, chars: text.length, truncated: whole.length > text.length, taint: [source] };
+    return { ...fieldsOf(tool, answered.fields), text, chars: text.length, truncated: whole.length > text.length, taint: [source] };
 };
 
 /* `callerId` is the agent on a run and the AI client over MCP: what the usage row and the audit row name besides the person. */

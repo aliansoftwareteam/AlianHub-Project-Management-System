@@ -6,9 +6,6 @@ const { apiRequest } = vi.hoisted(() => ({ apiRequest: vi.fn() }));
 vi.mock('@/services', () => ({ apiRequest }));
 vi.mock('@/composable', () => ({ useGetterFunctions: () => ({ getUser: () => ({}) }) }));
 vi.mock('@/utils/iconMask', () => ({ maskOf: () => ({}) }));
-vi.mock('@/views/Integrations/SlackConnector.vue', () => ({
-    default: { name: 'SlackConnector', template: '<div data-test="slack-connector-stub"></div>' },
-}));
 
 import IntegrationsHub from '@/views/Integrations/IntegrationsHub.vue';
 import en from '@/locales/en.js';
@@ -28,17 +25,18 @@ const openSlack = async (catalogue) => {
     return wrapper;
 };
 
-describe('the Slack connector on the Integrations screen', () => {
+describe('the Slack note on the Integrations screen', () => {
     beforeEach(() => { apiRequest.mockReset(); });
 
-    it('has no section while the server does not name the connector', async () => {
+    it('says nothing of personal Slack while the server does not name it', async () => {
         const wrapper = await openSlack({ status: true, data: [] });
-        expect(wrapper.find('[data-test="slack-connector-stub"]').exists()).toBe(false);
+        expect(wrapper.find('[data-test="slack-personal-note"]').exists()).toBe(false);
         expect(apiRequest.mock.calls.some(([, url]) => String(url).includes('/connectors'))).toBe(false);
     });
 
-    it('shows the section once the server names the connector', async () => {
+    it('points to My connections once the server names Slack, with no bot form', async () => {
         const wrapper = await openSlack({ status: true, data: [], connectors: ['slack'] });
-        expect(wrapper.find('[data-test="slack-connector-stub"]').exists()).toBe(true);
+        expect(wrapper.find('[data-test="slack-personal-note"]').text()).toContain('My connections');
+        expect(wrapper.find('[data-test="slack-secret"]').exists()).toBe(false);
     });
 });

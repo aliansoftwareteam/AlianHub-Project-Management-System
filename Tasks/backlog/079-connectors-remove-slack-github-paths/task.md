@@ -16,7 +16,11 @@ Track B's old connection paths are gone.
 
 ## Scope
 - Delete `slackConnection.js`, `slackApi.js`, `slackRead.js`, `slackPost.js`, the `Modules/Integrations/appConnections` GitHub sync and the `APP_CONNECTIONS` flag
+- Delete `frontend/src/views/Ai/SlackPostPreview.vue` and its spec once no stored bot-era delivery needs it, and the `slackOn` helper in `Modules/Agents/connectors/flag.js`
 - Keep the Slack slash command and the rest of the `integration_connections` catalogue (FR-38)
+
+## Already done in 074
+The Slack bot's routes and handlers (`/api/v2/connectors/slack/*`), its agent registry group (`Modules/Agents/registry/connectors.js`), its executor, reader and proposal hooks, its screen (`SlackConnector.vue`) with the `SlackConnector.*` strings, and its three test files are already gone. Only the four files above have no caller left.
 
 ## Out of scope
 - Google Calendar and CloudStorage old paths (077, track A)

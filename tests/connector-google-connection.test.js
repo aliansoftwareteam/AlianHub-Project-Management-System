@@ -808,7 +808,7 @@ describe('the flag', () => {
         expect(routesOf().filter((r) => r.includes('google'))).toEqual([]);
         process.env.CONNECTORS = `slack, ${G}`;
         expect(routesOf().filter((r) => r.includes('google'))).toEqual(GOOGLE_ROUTES);
-        expect(routesOf().filter((r) => r.includes('slack'))).toHaveLength(5);
+        expect(routesOf().filter((r) => r.includes('/slack'))).toEqual([]);
     });
 
     it('routes a real DELETE for the app to removeApp, while the google /:connector route still disconnects', async () => {
