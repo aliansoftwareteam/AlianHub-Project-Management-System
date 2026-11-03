@@ -59,7 +59,7 @@ The code exchange always sent a `code_verifier`, even when the consent asked no 
 
 ## Not done here
 
-- **A check with a real Slack app.** It needs 072, a Slack app with token rotation, and an https tunnel.
+- **A connect with a real Slack app.** On a local merge with 072, My connections lists Slack and Connect reaches Slack's real sign-in page, and real Slack's refusal of a bad code is read correctly. Allowing access with a real account still needs a Slack app with token rotation and an https tunnel.
 - **`docs/API.md`.** It goes in the docs PR after merge (Rule 4), because this removes the bot routes.
 - **Migration number 080.** Renumber at merge if another branch takes 080.
 
