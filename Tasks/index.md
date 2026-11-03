@@ -78,7 +78,7 @@ Auto-maintained registry of all tasks. Reflects YAML frontmatter from each `task
 | 070 | Connectors — audit, health, usage counts, quotas and provider backoff | active | high | 063, 068 | active/070-connectors-tracking-quotas |
 | 071 | Connectors — Google pilot tools: Calendar, Meet and Drive (no Gmail) | active | high | 068, 069 | active/071-connectors-google-pilot-tools |
 | 072 | Connectors — My connections, admin overview and company apps screens | backlog | high | 066 | backlog/072-connectors-connection-screens |
-| 073 | Connectors — migrate Google Calendar connections onto the Google provider | backlog | medium | 064, 066 | backlog/073-connectors-migrate-google-calendar |
+| 073 | Connectors — migrate Google Calendar connections onto the Google provider | active | medium | 064, 066 | active/073-connectors-migrate-google-calendar |
 | 074 | Connectors — Slack as a personal OAuth provider; retire the workspace bot | backlog | medium | 069, 070, 078 | backlog/074-connectors-slack-personal |
 | 075 | Connectors — GitHub as a personal, on-demand provider; retire the task 049 sync | backlog | medium | 069, 070, 078 | backlog/075-connectors-github-personal |
 | 076 | Connectors — Drive/Dropbox attachment picker on the module | backlog | medium | 066, 072 | backlog/076-connectors-attachment-picker |
