@@ -127,7 +127,7 @@ describe('instance console as the owner', () => {
     it('confirms owner access', async () => {
         const { api } = await as('owner');
         const res = await api.get('/api/v2/instance/access');
-        expect(res.body).toEqual({ status: true, statusText: expect.any(String), data: { allowed: true, via: 'owner' } });
+        expect(res.body).toEqual({ status: true, statusText: expect.any(String), data: { allowed: true, via: 'owner', managed: false } });
     });
 
     it('INS-07 saves a setting from the owner session, shows it in the public config and restores it', async () => {
