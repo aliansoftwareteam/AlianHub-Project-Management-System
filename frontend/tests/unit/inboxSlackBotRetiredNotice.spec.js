@@ -1,4 +1,4 @@
-/* Task 074: the bell line owners and admins get when migration 080 retires the Slack workspace bot. It is
+/* Task 074: the bell line owners and admins get when migration 081 retires the Slack workspace bot. It is
    rendered from i18n, never from the stored English message. */
 import { describe, expect, it } from 'vitest';
 import { createI18n } from 'vue-i18n';

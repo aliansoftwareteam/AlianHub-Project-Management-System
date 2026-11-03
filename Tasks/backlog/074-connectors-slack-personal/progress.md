@@ -6,7 +6,7 @@
 - [x] Provider definition
 - [x] Tools
 - [x] Agent wiring
-- [x] Retire bot + notify admins (migration 080)
+- [x] Retire bot + notify admins (migration 081, first written as 080)
 - [x] Screens (bot form removed; the connect screen is 072's)
 - [x] Setup doc
 - [x] Tests
