@@ -542,6 +542,33 @@ describe('with the flag off', () => {
     });
 });
 
+/* The three connection cards render on a flag the catalogue carries, so the flag has to match the route condition it
+ * stands in for: the connect/members routes exist only where a registry provider is named. */
+describe('the catalogue says when a registry provider is named', () => {
+    const flagged = async (value) => {
+        process.env.CONNECTORS = value;
+        return (await call(integrations.listCatalog, OWNER)).body;
+    };
+
+    it('says nothing of a registry provider while only a legacy connector is named', async () => {
+        const body = await flagged('slack');
+        expect(body.connectors).toEqual(['slack']);
+        expect(body.registryConnectors).toBeUndefined();
+    });
+
+    it('flags it once the registry provider itself is named, with no legacy connector requested', async () => {
+        const body = await flagged('google');
+        expect(body.registryConnectors).toBe(true);
+        expect(body.connectors).toBeUndefined();
+    });
+
+    it('carries both flags when a legacy connector and the registry provider are named together', async () => {
+        const body = await flagged('slack google');
+        expect(body.connectors).toEqual(['slack']);
+        expect(body.registryConnectors).toBe(true);
+    });
+});
+
 describe('a data skill may emit the action only while it is registered', () => {
     const { validateSkill } = require('../Modules/Agents/skills/validateSkill');
     const doc = () => ({

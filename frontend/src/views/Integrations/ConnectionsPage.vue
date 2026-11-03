@@ -20,9 +20,9 @@
                 <p v-if="error" class="ah-field__error">{{ error }}</p>
 
                 <template v-if="view === 'all' || view === 'apps'">
-                    <MyConnections />
-                    <AdminConnections />
-                    <CompanyApps />
+                    <MyConnections v-if="registryConnectors && !isGuest" />
+                    <AdminConnections v-if="registryConnectors" />
+                    <CompanyApps v-if="connectors.length" />
                 </template>
 
                 <GoogleConnection v-if="hasGoogle && (view === 'all' || view === 'apps')" />
@@ -88,6 +88,7 @@
 import { computed, onMounted, ref } from "vue";
 import { useI18n } from "vue-i18n";
 import { useRoute } from "vue-router";
+import { useStore } from "vuex";
 import { apiRequest, apiRequestWithoutCompnay } from "@/services";
 import * as env from "@/config/env";
 import ShellIcon from "@/components/organisms/Shell/ShellIcon.vue";
@@ -98,6 +99,7 @@ import MyConnections from "./MyConnections.vue";
 import AdminConnections from "./AdminConnections.vue";
 import CompanyApps from "./CompanyApps.vue";
 import { AI_RIGHT, useAiRights } from "@/composable/aiRights";
+import { ROLE_GUEST } from "@/utils/roles";
 
 // Connections (13e). Only what this workspace can actually connect to is listed:
 // the integrations catalogue the server serves, and the MCP server this product
@@ -107,6 +109,7 @@ defineOptions({ name: "ConnectionsPage" });
 
 const { t } = useI18n();
 const route = useRoute();
+const { getters } = useStore();
 const cid = computed(() => route.params.cid);
 
 const tabs = ["all", "apps", "mcp", "agents"];
@@ -114,6 +117,9 @@ const view = ref("all");
 const catalog = ref([]);
 const connectors = ref([]);
 const connectorLimits = ref(false);
+// A registry provider is named, so the connect/members routes the first two cards call exist. Guests have no own connection.
+const registryConnectors = ref(false);
+const isGuest = computed(() => Number(getters["settings/companyUserDetail"]?.roleType) === ROLE_GUEST);
 const hasGoogle = computed(() => connectors.value.includes("google_calendar"));
 const connections = ref([]);
 const mcpManifest = ref({});
@@ -235,6 +241,7 @@ onMounted(async () => {
         catalog.value = cat?.data?.status ? cat.data.data || [] : [];
         connectors.value = cat?.data?.status ? cat.data.connectors || [] : [];
         connectorLimits.value = cat?.data?.status === true && cat.data.connectorLimits === true;
+        registryConnectors.value = cat?.data?.status === true && cat.data.registryConnectors === true;
         connections.value = conns?.data?.status ? conns.data.data || [] : [];
         mcpManifest.value = manifest?.data?.status ? manifest.data.data || {} : {};
         await loadTokens();
