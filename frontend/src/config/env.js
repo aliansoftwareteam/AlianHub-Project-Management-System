@@ -388,6 +388,7 @@ module.exports.PERSONAL_PROJECT = '/api/v1/project/personal';
 module.exports.TIMESHEET_WEEK = '/api/v1/timesheet/week';
 module.exports.TIMESHEET_BILLABLE_ENTRIES = '/api/v1/timesheet/entries/billable';
 module.exports.WORKLOAD_GRID = '/api/v1/timesheet/workload-grid';
+module.exports.REPORT_FACETS = '/api/v1/timesheet/report-facets';
 module.exports.WORKLOAD_MOVE = '/api/v1/timesheet/workload-move';
 module.exports.WORKLOAD_CAPACITY = '/api/v1/timesheet/workload-capacity';
 module.exports.TIMER_RUNNING = '/api/v2/timetracker/running';

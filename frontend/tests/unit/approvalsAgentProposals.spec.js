@@ -12,7 +12,7 @@ vi.mock('@/store/index', () => ({ default: { getters: {} } }));
 vi.mock('@/composable', () => ({ useGetterFunctions: () => ({ getUser: () => ({}) }) }));
 vi.mock('@/views/Timesheet/TimesheetTabs.vue', () => ({ default: { name: 'TimesheetTabs', render: () => null } }));
 vi.mock('vue-i18n', async (importOriginal) => ({ ...(await importOriginal()), useI18n: () => ({ t: echo }) }));
-vi.mock('vue-router', () => ({ useRouter: () => ({ push: vi.fn() }) }));
+vi.mock('vue-router', () => ({ useRoute: () => ({ query: {} }), useRouter: () => ({ push: vi.fn(), replace: vi.fn(() => Promise.resolve()) }) }));
 
 import Approvals from '@/views/Approvals/Approvals.vue';
 
@@ -58,7 +58,7 @@ const open = async (opts) => {
 };
 
 const showTab = async (wrapper, labelKey) => {
-    await wrapper.findAll('.tv-tab').find((b) => b.text() === labelKey).trigger('click');
+    await wrapper.findAll('[data-test^="approvals-type-"]').find((b) => b.text() === labelKey).trigger('click');
     await flushPromises();
 };
 

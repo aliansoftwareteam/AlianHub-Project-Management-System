@@ -10,34 +10,50 @@
 </div>
 <AppState v-else-if="!allowed" kind="denied" />
 <div v-else-if="isMobile" class="ah-page tv-page"><div class="tv-empty"><span>{{ $t('Time.desktop_only') }}</span></div></div>
-<div v-else class="wl">
-    <div class="ah-toolbar wl__bar">
-        <span class="tv-sq" :style="{ background: activeProject && activeProject.color ? activeProject.color : 'var(--brand)' }"></span>
-        <select v-model="projectId" class="tv-select wl__project">
-            <option value="">{{ $t('Time.all_projects') }}</option>
-            <option v-for="p in projectList" :key="p._id" :value="String(p._id)">{{ p.ProjectName }}</option>
-        </select>
-        <TimesheetTabs active="workload" />
-        <span class="tv-range wl__range">
-            <button type="button" :aria-label="$t('Time.prev_week')" @click="shift(-7)">‹</button>
-            <span>{{ rangeLabel }}</span>
-            <button type="button" :aria-label="$t('Time.next_week')" @click="shift(7)">›</button>
-        </span>
-        <div class="ah-toolbar__spacer"></div>
-        <select v-model="mode" class="tv-select">
-            <option value="estimate">{{ $t('Time.by_estimate') }}</option>
-            <option value="logged">{{ $t('Time.by_logged') }}</option>
-        </select>
-        <button type="button" class="ah-btn ah-btn--outline ah-btn--sm" @click="suggestBalance">{{ $t('Time.balance') }}</button>
-    </div>
+<div v-else class="ah-page rpt wl">
+    <ReportToolbar
+        :title="$t('Time.tab_workload')"
+        tab="workload"
+        :exporting="exporting"
+        :canExport="users.length > 0"
+        @export="onExport"
+    >
+        <template #actions>
+            <button v-if="dayMode" type="button" class="ah-btn ah-btn--outline ah-btn--sm" @click="suggestBalance">{{ $t('Time.balance') }}</button>
+        </template>
+    </ReportToolbar>
 
-    <div class="wl__body">
+    <ReportFilterBar
+        :filters="filters"
+        :presets="PRESETS"
+        :fields="filterFields"
+        :options="filterOptions"
+        @apply="apply"
+        @step="step"
+        @clear="clear"
+        @need-lists="options.loadListsFor(filters.projects)"
+    >
+        <div class="ah-tabs" role="group" :aria-label="$t('Time.workload_mode')" data-test="workload-mode">
+            <button
+                v-for="m in ['estimate', 'logged']"
+                :key="m"
+                type="button"
+                class="ah-tab"
+                :class="{ 'is-active': mode === m }"
+                :aria-pressed="mode === m ? 'true' : 'false'"
+                :data-test="`workload-mode-${m}`"
+                @click="mode = m"
+            >{{ $t(`Reports.show_${m}`) }}</button>
+        </div>
+    </ReportFilterBar>
+
+    <div class="rpt__body wl__body">
         <p v-if="error" class="tv-error">{{ error }}</p>
         <p v-else-if="notice" class="tv-ok">{{ notice }}</p>
-        <div class="wl__grid" :style="{ '--days': visibleDays.length || 10 }">
+        <div class="wl__grid" :style="{ '--days': columns.length || 10 }" :class="{ 'is-loading': loading, 'is-buckets': !dayMode }">
             <div class="wl__row wl__row--head">
                 <span></span>
-                <span v-for="d in visibleDays" :key="d" :class="{ 'is-today': d === today }">{{ dayHead(d) }}</span>
+                <span v-for="c in columns" :key="c.key" :class="{ 'is-today': c.today }" :title="c.title">{{ c.label }}</span>
                 <span>{{ $t('Time.col_total') }}</span>
             </div>
             <div v-for="u in users" :key="u.userId" class="wl__row">
@@ -51,13 +67,20 @@
                     </div>
                 </div>
                 <div
-                    v-for="d in u.days.filter((x) => visibleDays.includes(x.date))"
-                    :key="d.date"
+                    v-for="d in cellsOf(u)"
+                    :key="d.key"
                     class="wl__cell"
-                    :class="{ 'is-pto': isOff(d), 'is-today': d.date === today, 'is-drop': dropKey === `${u.userId}|${d.date}`, 'tv-hatch': isOff(d) }"
-                    @dragover.prevent="onDragOver(u, d)"
+                    role="button"
+                    tabindex="0"
+                    :aria-label="cellLabel(u, d)"
+                    :class="{ 'is-pto': isOff(d), 'is-today': d.key === today, 'is-drop': dropKey === `${u.userId}|${d.date}`, 'tv-hatch': isOff(d), 'is-open': isOpenCell(u, d) }"
+                    data-test="workload-cell"
+                    @click="openCell(u, d)"
+                    @keydown.enter.prevent="openCell(u, d)"
+                    @keydown.space.prevent="openCell(u, d)"
+                    @dragover.prevent="dayMode && onDragOver(u, d)"
                     @dragleave="onDragLeave(u, d)"
-                    @drop.prevent="onDrop(u, d)"
+                    @drop.prevent="dayMode && onDrop(u, d)"
                 >
                     <template v-if="isOff(d)"><span class="wl__pto">{{ d.pto ? $t('Time.pto') : $t('Time.unavailable') }}</span></template>
                     <template v-else>
@@ -69,12 +92,12 @@
                                 v-for="c in d.chips.slice(0, 2)"
                                 :key="c.estimateId"
                                 class="wl__chip"
-                                :draggable="Boolean(c.name)"
+                                :draggable="dayMode && Boolean(c.name)"
                                 :title="`${c.name || $t('Time.task_not_open')} · ${formatHm(c.minutes)}`"
                                 @dragstart="onDragStart($event, u, d, c)"
                                 @dragend="onDragEnd"
                             >{{ c.name || $t('Time.task_not_open') }}</span>
-                            <span v-if="d.chips.length > 2" class="wl__chip wl__chip--more" :title="d.chips.slice(2).map((c) => c.name || $t('Time.task_not_open')).join(', ')">+{{ d.chips.length - 2 }}</span>
+                            <span v-if="d.chips.length > 2" class="wl__chip wl__chip--more">+{{ d.chips.length - 2 }}</span>
                         </div>
                     </template>
                 </div>
@@ -82,15 +105,15 @@
                     {{ hLabel(mode === 'estimate' ? u.totalEstimated : u.totalLogged) }}<small>/{{ Math.round(u.capacityMinutes / 60) }}</small>
                 </div>
             </div>
-            <div v-if="!users.length" class="tv-empty wl__empty"><span>{{ loading ? $t('Time.loading') : $t('Time.workload_empty') }}</span></div>
+            <div v-if="!users.length" class="tv-empty wl__empty"><span>{{ loading ? $t('Time.loading') : (narrowing ? $t('Reports.empty_filtered') : $t('Time.workload_empty')) }}</span></div>
         </div>
 
         <div class="wl__foot">
             <div class="tv-legend">
-                <span><i style="background: var(--brand)"></i>{{ mode === 'estimate' ? $t('Time.legend_estimated') : $t('Time.legend_logged') }}</span>
-                <span><i style="background: var(--brand); opacity: .5"></i>{{ $t('Time.legend_tentative') }}</span>
-                <span><i style="background: var(--danger)"></i>{{ $t('Time.legend_over') }}</span>
-                <span v-if="!hint" class="ah-muted">{{ $t('Time.drag_hint') }}</span>
+                <span><i class="wl__key"></i>{{ mode === 'estimate' ? $t('Time.legend_estimated') : $t('Time.legend_logged') }}</span>
+                <span><i class="wl__key wl__key--tentative"></i>{{ $t('Time.legend_tentative') }}</span>
+                <span><i class="wl__key wl__key--over"></i>{{ $t('Time.legend_over') }}</span>
+                <span v-if="!hint" class="ah-muted">{{ dayMode ? $t('Time.workload_cell_hint') : $t('Time.workload_bucket_hint') }}</span>
             </div>
             <div v-if="hint" class="wl__hint">
                 <ShellIcon name="info" :size="13" class="tv-spark" />
@@ -99,12 +122,16 @@
             </div>
         </div>
     </div>
+
+    <transition name="ah-slide-right">
+        <WorkloadCellPanel v-if="openedCell" :key="openedKey" :person="openedCell.user" :cell="openedCell.cell" :color="colorFor(openedCell.user.userId)" @close="closeCell" @open-task="openTaskFromCell" />
+    </transition>
 </div>
 </template>
 
 <script setup>
 import AvatarImage from '@/components/atom/AvatarImage/AvatarImage.vue';
-import { ref, computed, inject, onMounted, watch } from 'vue';
+import { ref, computed, inject, onBeforeUnmount, onMounted, watch } from 'vue';
 import ShellIcon from '@/components/organisms/Shell/ShellIcon.vue';
 import { useStore } from 'vuex';
 import { useI18n } from 'vue-i18n';
@@ -115,7 +142,16 @@ import { useCustomComposable, useGetterFunctions } from '@/composable';
 import { formatHm } from '@/composable/useTimer';
 import UpgradePlan from '@/components/atom/UpgradYourPlanComponent/UpgradYourPlanComponent.vue';
 import AppState from '@/components/molecules/AppState/AppState.vue';
-import TimesheetTabs from '@/views/Timesheet/TimesheetTabs.vue';
+import ReportToolbar from '@/views/Timesheet/report/ReportToolbar.vue';
+import ReportFilterBar from '@/views/Timesheet/report/ReportFilterBar.vue';
+import { useReportFilters } from '@/views/Timesheet/report/useReportFilters';
+import { useReportOptions } from '@/views/Timesheet/report/useReportOptions';
+import { useReportExport } from '@/views/Timesheet/report/useReportExport';
+import { PRESETS, granularityOf, bucketsOf } from '@/views/Timesheet/report/reportRange';
+import { hoursOf } from '@/views/Timesheet/report/reportTable';
+import WorkloadCellPanel from './WorkloadCellPanel.vue';
+import { bucketDays } from './workloadBuckets';
+import { openTask, onTaskClosed } from '@/components/organisms/TaskDetailOverlay/useTaskOverlay';
 import { gridWeek, workingDaysOnly } from '@/views/Projects/WorkloadView/workloadUnits';
 
 defineOptions({ name: 'WorkloadTimesheet' });
@@ -125,16 +161,21 @@ const { t } = useI18n();
 const { checkPermission } = useCustomComposable();
 const { getUser } = useGetterFunctions();
 const currentUserId = inject('$userId');
+const companyId = inject('$companyId');
 const clientWidth = inject('$clientWidth');
 
 const uid = computed(() => (currentUserId && currentUserId.value) || localStorage.getItem('userId') || '');
 const currentCompany = computed(() => getters['settings/selectedCompany']);
 const allowed = computed(() => checkPermission('sheet_settings.workload_timesheet') !== null);
 const isMobile = computed(() => !!(clientWidth && clientWidth.value < 768));
+const isEveryone = computed(() => [true, 2].includes(checkPermission('sheet_settings.workload_timesheet')));
 
-const start = ref(moment().startOf('isoWeek'));
-const projectId = ref('');
-const projectList = ref([]);
+const { filters, range, narrowing, serverFilters, apply, step, clear } = useReportFilters({ defaultPreset: 'this_week' });
+const options = useReportOptions(companyId);
+const { exporting, failed: exportFailed, exportReport } = useReportExport((field, value) => options.labelOf(field, value));
+const filterFields = computed(() => [...(isEveryone.value ? ['people'] : []), 'projects', 'lists', 'status', 'tags']);
+const filterOptions = options.narrowed(filters, range);
+
 const mode = ref('estimate');
 const users = ref([]);
 const days = ref([]);
@@ -146,18 +187,47 @@ const busy = ref(false);
 const drag = ref(null);
 const dropKey = ref('');
 const hint = ref(null);
+const opened = ref(null);
 
 const today = computed(() => moment().format('YYYY-MM-DD'));
-const endDate = computed(() => start.value.clone().add(11, 'days'));
-const startIso = computed(() => start.value.format('YYYY-MM-DD'));
-const endIso = computed(() => endDate.value.format('YYYY-MM-DD'));
-const rangeLabel = computed(() => `${start.value.format('MMM D')} – ${endDate.value.format(start.value.isSame(endDate.value, 'month') ? 'D' : 'MMM D')}`);
-const selectedProject = computed(() => projectList.value.find((x) => String(x._id) === projectId.value) || null);
+const selectedProject = computed(() => (filters.value.projects.length === 1 ? options.projectById.value[filters.value.projects[0]] || null : null));
 const visibleDays = computed(() => workingDaysOnly(days.value, gridWeek(answeredWeek.value, currentCompany.value, selectedProject.value)));
-const activeProject = computed(() => {
-    const p = selectedProject.value;
-    return p ? { color: p.projectIcon && p.projectIcon.type === 'color' ? p.projectIcon.data : '' } : null;
+const granularity = computed(() => granularityOf(range.value));
+const dayMode = computed(() => granularity.value === 'day');
+const buckets = computed(() => bucketsOf(range.value, granularity.value));
+const bucketLabel = (b) => (granularity.value === 'month' ? moment(b.start).format('MMM') : t('Reports.week_of', { date: moment(b.start).format('MMM D') }));
+const columns = computed(() => (dayMode.value
+    ? visibleDays.value.map((d) => ({ key: d, label: dayHead(d), today: d === today.value, title: moment(d).format('ddd, MMM D') }))
+    : buckets.value.map((b) => ({ key: b.key, label: bucketLabel(b), today: b.days.includes(today.value), title: `${moment(b.start).format('MMM D')} – ${moment(b.end).format('MMM D')}` }))));
+/* Day columns show the person's working days; weeks and months fold every day of the period into one cell. */
+const cellsOf = (u) => (dayMode.value
+    ? u.days.filter((d) => visibleDays.value.includes(d.date)).map((d) => ({ ...d, key: d.date, start: d.date, end: d.date }))
+    : bucketDays(u.days, buckets.value));
+const cellLabel = (u, d) => `${u.name} · ${d.start === d.end ? moment(d.start).format('ddd, MMM D') : `${moment(d.start).format('MMM D')} – ${moment(d.end).format('MMM D')}`} · ${hLabel(value(d))}`;
+const openedCell = computed(() => {
+    if (!opened.value) return null;
+    const user = users.value.find((u) => u.userId === opened.value.userId);
+    const cell = user && cellsOf(user).find((d) => d.key === opened.value.key);
+    return user && cell ? { user, cell } : null;
 });
+const openedKey = computed(() => (opened.value ? `${opened.value.userId}|${opened.value.key}` : ''));
+const isOpenCell = (u, d) => openedKey.value === `${u.userId}|${d.key}`;
+const openCell = (u, d) => { opened.value = { userId: u.userId, key: d.key }; };
+const closeCell = () => { opened.value = null; };
+/* The task panel opens over the page, so the list steps aside and comes back when the task is closed. */
+let stopWaiting = null;
+const openTaskFromCell = (task) => {
+    const back = opened.value;
+    opened.value = null;
+    if (stopWaiting) stopWaiting();
+    stopWaiting = onTaskClosed(() => {
+        stopWaiting();
+        stopWaiting = null;
+        opened.value = back;
+    });
+    openTask({ companyId: (companyId && companyId.value) || '', projectId: task.projectId, sprintId: task.sprintId, taskId: task.taskId }, { history: 'push' });
+};
+onBeforeUnmount(() => { if (stopWaiting) stopWaiting(); });
 const timeZone = computed(() => (getUser(uid.value) || {}).timeZone || Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC');
 
 const PALETTE = ['var(--brand)', 'var(--ok)', 'var(--warn)', 'var(--agent)'];
@@ -190,7 +260,8 @@ const load = async () => {
     error.value = '';
     try {
         const body = ((await apiRequest('post', env.WORKLOAD_GRID, {
-            start: startIso.value, end: endIso.value, projectIds: projectId.value ? [projectId.value] : [], hoursPerDay: 8, timeZone: timeZone.value,
+            start: range.value.start, end: range.value.end, projectIds: filters.value.projects, userIds: filters.value.people,
+            filters: serverFilters.value, hoursPerDay: 8, timeZone: timeZone.value,
         })) || {}).data || {};
         if (!body.status) throw new Error(body.statusText || 'load_failed');
         users.value = body.data.users || [];
@@ -202,16 +273,6 @@ const load = async () => {
         loading.value = false;
     }
 };
-const loadProjects = async () => {
-    try {
-        const b = ((await apiRequest('get', env.PROJECT)) || {}).data;
-        const list = Array.isArray(b) ? b : (b && b.data) || [];
-        projectList.value = list.filter((p) => p && p.status !== 'close' && p.deletedStatusKey !== 1 && p.deletedStatusKey !== 2);
-    } catch (e) {
-        projectList.value = [];
-    }
-};
-const shift = (n) => { start.value = start.value.clone().add(n, 'days'); };
 const flash = (msg) => { notice.value = msg; setTimeout(() => { if (notice.value === msg) notice.value = ''; }, 4000); };
 
 const move = async ({ chip, fromUser, fromDay, toUser, toDay }) => {
@@ -288,22 +349,37 @@ const suggestBalance = () => {
 };
 const applyHint = () => { if (hint.value && hint.value.apply && !busy.value) move(hint.value.apply); };
 
-watch([start, projectId], load);
+const onExport = async (format) => {
+    const head = [
+        { key: 'person', label: t('Reports.col_person'), value: (u) => u.name },
+        ...columns.value.map((c) => ({ key: c.key, label: c.label, value: (u) => (u.isTotal ? '' : hoursOf(value(cellsOf(u).find((d) => d.key === c.key) || {}))) })),
+        { key: 'total', label: t('Reports.col_total_hours'), value: (u) => hoursOf(mode.value === 'estimate' ? u.totalEstimated : u.totalLogged) },
+        { key: 'capacity', label: t('Reports.col_capacity_hours'), value: (u) => hoursOf(u.capacityMinutes) },
+    ];
+    await exportReport(format, {
+        name: 'workload',
+        title: `${t('Time.tab_workload')} · ${mode.value === 'estimate' ? t('Time.by_estimate') : t('Time.by_logged')}`,
+        filters: filters.value,
+        columns: head,
+        rows: users.value,
+    });
+    if (exportFailed.value) error.value = t('Time.action_failed');
+};
+
+watch(() => [range.value.start, range.value.end, filters.value.projects.join(','), filters.value.people.join(','), JSON.stringify(serverFilters.value)], load);
 onMounted(() => {
     if (!allowed.value || isMobile.value) return;
     load();
-    loadProjects();
+    options.ready();
 });
 </script>
 
 <style src="../timeV2.css"></style>
 <style scoped>
-.wl { display: flex; flex-direction: column; min-height: 100%; color: var(--ink); font: var(--text-small); }
-.wl__bar { gap: 12px; }
-.wl__project { font-weight: 600; font-size: 14px; max-width: 240px; border-color: transparent; padding-left: 4px; }
-.wl__range { margin-left: 6px; }
-.wl__body { flex: 1; padding: 16px 20px; display: flex; flex-direction: column; gap: 8px; min-height: 0; }
-.wl__grid { display: flex; flex-direction: column; gap: 8px; overflow-x: auto; }
+.wl__body { gap: 8px; }
+.wl__grid { display: flex; flex-direction: column; gap: 8px; overflow-x: auto; transition: opacity var(--t-state) var(--ease); }
+.wl__grid.is-loading { opacity: .6; }
+.wl__grid.is-buckets .wl__row { grid-template-columns: 150px repeat(var(--days), minmax(64px, 1fr)) 70px; }
 .wl__row { display: grid; grid-template-columns: 150px repeat(var(--days), minmax(48px, 1fr)) 70px; gap: 5px; align-items: stretch; height: 74px; }
 .wl__row--head { height: auto; font: var(--text-label); letter-spacing: .06em; color: var(--ink-2); text-align: center; }
 .wl__row--head .is-today { color: var(--brand); }
@@ -314,6 +390,10 @@ onMounted(() => {
 .wl__sub { font-size: 11px; color: var(--ink-2); }
 .wl__sub.is-over { color: var(--danger); }
 .wl__cell { position: relative; background: var(--surface); border: 1px solid var(--hairline); border-radius: 8px; padding: 4px; display: flex; flex-direction: column; justify-content: flex-end; overflow: hidden; transition: border-color var(--t-state) var(--ease), box-shadow var(--t-state) var(--ease); }
+.wl__cell { cursor: pointer; }
+.wl__cell:hover { border-color: var(--border); }
+.wl__cell:focus-visible { outline: none; box-shadow: var(--focus); }
+.wl__cell.is-open { border-color: var(--brand); box-shadow: var(--focus); }
 .wl__cell.is-today { border: 1.5px solid var(--brand); }
 .wl__cell.is-drop { border: 1px dashed var(--brand); box-shadow: var(--focus); }
 .wl__cell.is-pto { display: grid; place-items: center; border-color: var(--hairline); }
@@ -330,5 +410,8 @@ onMounted(() => {
 .wl__total.is-over { color: var(--danger); }
 .wl__empty { grid-column: 1 / -1; }
 .wl__foot { margin-top: auto; display: flex; gap: 14px; align-items: center; flex-wrap: wrap; justify-content: space-between; }
+.wl__key { background: var(--brand); }
+.wl__key--tentative { opacity: .5; }
+.wl__key--over { background: var(--danger); }
 .wl__hint { display: flex; align-items: center; gap: 6px; color: var(--brand); font-weight: 600; font-size: 11.5px; }
 </style>

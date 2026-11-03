@@ -20,6 +20,7 @@ const { canReadTask } = require('../../Tasks/helpers/taskReadAccess');
 const { assigneeProblem } = require('../helpers/planMoveAccess');
 const { visibilityStage } = require('../../Tasks/helpers/taskQueryGuard');
 const { openTasksById, openProjectsById } = require('../../Tasks/helpers/openNames');
+const { normalizeReportFilters, reportTimeClauses, narrowMatch, estimateClausesOf, needsTasks, taskIdsIn } = require('../helpers/reportFilters');
 const oid = (id) => { try { return new mongoose.Types.ObjectId(String(id)); } catch (e) { return null; } };
 
 /* A scope that reads everyone already knows the tasks of the private lists its person is not on. */
@@ -28,6 +29,14 @@ const withoutPlansOnHiddenLists = (companyId, scope, rows) => (scope.closedTasks
     : withoutHiddenSprintPlans(companyId, scope.uid, rows));
 const safeZone = (z) => (z && DateTime.local().setZone(z).isValid ? z : 'UTC');
 const isDay = (s) => /^\d{4}-\d{2}-\d{2}$/.test(String(s || ''));
+/* Logged minutes per person per day, summed in the database: a year of a large workspace is tens of thousands of logs. */
+const loggedPerDay = (match, zone) => [
+    { $match: match },
+    { $group: {
+        _id: { u: '$Loggeduser', d: { $dateToString: { date: { $toDate: { $multiply: ['$LogStartTime', 1000] } }, format: '%Y-%m-%d', timezone: zone } } },
+        minutes: { $sum: '$LogTimeDuration' },
+    } },
+];
 const dayBounds = (day) => ({ start: new Date(`${day}T00:00:00.000Z`), end: new Date(`${day}T23:59:59.999Z`) });
 
 const nameMap = async (userIds) => {
@@ -134,7 +143,7 @@ const unitGrid = async ({ companyId, unit, userIds, inProjects, openToCaller, da
     return { users, unpointed };
 };
 
-// POST /api/v1/timesheet/workload-grid  body: { start, end, userIds?, projectIds?, hoursPerDay?, timeZone?, unit? }
+// POST /api/v1/timesheet/workload-grid  body: { start, end, userIds?, projectIds?, hoursPerDay?, timeZone?, unit?, filters? }
 // People × days against capacity (working time − approved PTO). unit 'hours' (the default) reads estimate chips and
 // logged minutes; 'points' and 'count' read open tasks against the person's capacity in that unit.
 exports.getWorkloadGrid = async (req, res) => {
@@ -171,16 +180,21 @@ exports.getWorkloadGrid = async (req, res) => {
         const startSec = Math.floor(DateTime.fromISO(b.start, { zone }).startOf('day').toSeconds());
         const endSec = Math.floor(DateTime.fromISO(b.end, { zone }).endOf('day').toSeconds());
 
-        const estMatch = { ...scopedEstimateMatch(scope), UserId: { $in: userIds }, Date: { $gte: rangeStart, $lte: rangeEnd } };
-        const logMatch = { ...scopedTimeMatch(scope, { userIds, projectIds: askedProjects.length ? askedProjects : null }), LogStartTime: { $gte: startSec, $lte: endSec } };
+        const reportFilters = normalizeReportFilters(b.filters);
+        let estMatch = { ...scopedEstimateMatch(scope), UserId: { $in: userIds }, Date: { $gte: rangeStart, $lte: rangeEnd } };
         if (inProjects) estMatch.ProjectId = inProjects;
+        const baseLogMatch = { ...scopedTimeMatch(scope, { userIds, projectIds: askedProjects.length ? askedProjects : null }), LogStartTime: { $gte: startSec, $lte: endSec } };
+        const plannedTasks = needsTasks(reportFilters) ? await taskIdsIn(companyId, SCHEMA_TYPE.ESTIMATES_TIME, estMatch, 'TaskId') : [];
+        const { clauses: timeClauses, taskIds } = await reportTimeClauses(companyId, scope, reportFilters, { baseMatch: baseLogMatch, extraCandidates: plannedTasks });
+        const logMatch = narrowMatch(baseLogMatch, timeClauses);
+        estMatch = narrowMatch(estMatch, estimateClausesOf(taskIds));
 
         const [estimates, logs, ptoRows, names] = await Promise.all([
             MongoDbCrudOpration(companyId, { type: SCHEMA_TYPE.ESTIMATES_TIME, data: [estMatch, { UserId: 1, TaskId: 1, ProjectId: 1, Date: 1, EstimatedTime: 1 }] }, 'find')
                 .catch(() => [])
                 .then((rows) => withoutPlansOnHiddenLists(companyId, scope, rows)),
             unit === 'hours'
-                ? MongoDbCrudOpration(companyId, { type: SCHEMA_TYPE.TIMESHEET, data: [logMatch, { Loggeduser: 1, LogStartTime: 1, LogTimeDuration: 1 }] }, 'find').catch(() => [])
+                ? MongoDbCrudOpration(companyId, { type: SCHEMA_TYPE.TIMESHEET, data: [loggedPerDay(logMatch, zone)] }, 'aggregate').catch(() => [])
                 : [],
             MongoDbCrudOpration(companyId, { type: SCHEMA_TYPE.PTO_ENTRIES, data: [{ userId: { $in: userIds }, status: 'approved', deletedStatusKey: { $ne: 1 }, startDate: { $lte: rangeEnd }, endDate: { $gte: rangeStart } }] }, 'find').catch(() => []),
             nameMap(userIds),
@@ -220,11 +234,10 @@ exports.getWorkloadGrid = async (req, res) => {
             });
         });
         const loggedByUser = {};
-        (logs || []).forEach((l) => {
-            const uid = String(l.Loggeduser || '');
-            const day = DateTime.fromSeconds(Number(l.LogStartTime) || 0, { zone }).toISODate();
+        (logs || []).forEach((row) => {
+            const uid = String((row._id && row._id.u) || '');
             const perUser = loggedByUser[uid] || (loggedByUser[uid] = {});
-            perUser[day] = (perUser[day] || 0) + (Number(l.LogTimeDuration) || 0);
+            perUser[row._id.d] = (perUser[row._id.d] || 0) + (Number(row.minutes) || 0);
         });
         const users = userIds.map((uid) => {
             const grid = R.workloadDays({

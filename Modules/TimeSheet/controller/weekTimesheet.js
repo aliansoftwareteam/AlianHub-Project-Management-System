@@ -11,6 +11,7 @@ const R = require('../helpers/weekRules');
 const { workingDaysOf, weekendOf } = require('../../Company/helpers/companyWeek');
 const { resolveTimeScope, withoutHidden, openProjects } = require('../helpers/timeScope');
 const { openTasksById, openProjectsById } = require('../../Tasks/helpers/openNames');
+const { normalizeReportFilters, reportTimeClauses, narrowMatch } = require('../helpers/reportFilters');
 
 const RUNNING_WINDOW_SEC = 10 * 60;
 const { sessionTenantOf, TenantError } = require('../../../Config/tenant');
@@ -33,7 +34,7 @@ const approvalFor = async (companyId, userId, start, end) => {
     }, 'findOne').catch(() => null);
 };
 
-// GET /api/v1/timesheet/week?start=&end=&userId=&projectId=&hoursPerDay=&timeZone=
+// GET /api/v1/timesheet/week?start=&end=&userId=&projectId=|projectIds=a,b&hoursPerDay=&timeZone=&filters=<JSON lists/status/tags/billable>
 exports.getWeekTimesheet = async (req, res) => {
     try {
         const companyId = sessionTenantOf(req);
@@ -50,8 +51,10 @@ exports.getWeekTimesheet = async (req, res) => {
         const hoursPerDay = Number(q.hoursPerDay) > 0 ? Number(q.hoursPerDay) : 8;
         const days = R.dayKeys(q.start, q.end);
 
-        const match = { Loggeduser: userId, LogStartTime: { $gte: Math.floor(startDt.toSeconds()), $lte: Math.floor(endDt.toSeconds()) }, ...withoutHidden(scope) };
-        if (q.projectId) match.ProjectId = { $in: idForms(openProjects(scope, [String(q.projectId)])) };
+        let match = { Loggeduser: userId, LogStartTime: { $gte: Math.floor(startDt.toSeconds()), $lte: Math.floor(endDt.toSeconds()) }, ...withoutHidden(scope) };
+        const askedProjects = String(q.projectIds || q.projectId || '').split(',').map((id) => id.trim()).filter(Boolean);
+        if (askedProjects.length) match.ProjectId = { $in: idForms(openProjects(scope, askedProjects)) };
+        match = narrowMatch(match, (await reportTimeClauses(companyId, scope, normalizeReportFilters(q.filters), { baseMatch: match })).clauses);
         const entries = await MongoDbCrudOpration(companyId, {
             type: SCHEMA_TYPE.TIMESHEET,
             data: [match, { TicketID: 1, ProjectId: 1, LogTimeDuration: 1, LogStartTime: 1, billable: 1 }],
@@ -73,7 +76,7 @@ exports.getWeekTimesheet = async (req, res) => {
             type: SCHEMA_TYPE.PTO_ENTRIES,
             data: [{ userId, status: 'approved', deletedStatusKey: { $ne: 1 }, startDate: { $lte: new Date(q.end) }, endDate: { $gte: new Date(q.start) } }],
         }, 'find').catch(() => []);
-        const workingDays = await workingDaysOf(companyId, q.projectId);
+        const workingDays = await workingDaysOf(companyId, askedProjects.length === 1 ? askedProjects[0] : undefined);
         const dayCaps = R.dayCapacity({ days, hoursPerDay, ptoDays: R.ptoDaysIn(ptoRows, days), weekendDays: weekendOf(workingDays) });
         const totals = R.totals(rows, days);
         const today = DateTime.now().setZone(zone).toISODate();
