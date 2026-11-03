@@ -23,7 +23,7 @@ Task 074, FR-36 of the 056 PRD. Each member connects their own Slack account wit
 - **Screens**: the bot form is gone. Integrations › Slack points to My connections, and the bell notice opens the Connections page.
 - **Docs**: the Slack row in the research matrix, `docs/connectors/slack.md` (app setup, token rotation, the tunnel for local development), and env docs for `CONNECTOR_SLACK_CLIENT_ID` / `_SECRET`.
 
-## 072 is merged (#1755): one conflict to resolve
+## 072 is merged (#1755): two things to fix in the merge
 
 `tests/connector-slack-post.test.js` was deleted here (it tested the retired bot) and changed in 072, which added three tests of the catalogue's `registryConnectors` flag. Resolve by keeping the delete, and move those three tests to a file of their own with one change: `CONNECTORS=slack` now names a registry provider, so it sets `registryConnectors: true` (it no longer counts as legacy-only). Everything else merges cleanly.
 
