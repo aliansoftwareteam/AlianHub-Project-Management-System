@@ -176,13 +176,23 @@ describe('coming back from Google', () => {
     });
 
     it.each([
-        ['a connector this page does not know', { connector: '../slack', state: 's', code: 'c' }],
         ['no code', { connector: G, state: 's' }],
         ['a repeated code', { connector: G, state: 's', code: ['a', 'b'] }],
-    ])('with %s it sends nothing', async (label, query) => {
+    ])('with %s on its own connector it sends nothing but still clears the address', async (label, query) => {
         await open({ query, mine: [notConnected()] });
         expect(callsTo('post')).toEqual([]);
         expect(router.replace).toHaveBeenCalledWith({ query: {} });
+    });
+
+    it.each([
+        ['the generic google return My connections owns', { connector: 'google', state: 's', code: 'c' }],
+        ['a connector this page does not know', { connector: '../slack', state: 's', code: 'c' }],
+        ['a generic error return', { connector: 'google', result: 'error', reason: 'state' }],
+    ])('leaves %s to another handler: no post, no notice, and the address untouched', async (label, query) => {
+        const { wrapper } = await open({ query, mine: [notConnected()] });
+        expect(callsTo('post')).toEqual([]);
+        expect(router.replace).not.toHaveBeenCalled();
+        expect(wrapper.find('[data-test="google-notice"]').exists()).toBe(false);
     });
 
     it('leaves the address alone when it is not a return', async () => {

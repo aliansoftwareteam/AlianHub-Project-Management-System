@@ -76,8 +76,11 @@ const foldedRepo = async (companyId, uid, existing, config, projectId) => {
 exports.listCatalog = async (req, res) => {
     try {
         const flag = require('../Agents/connectors/flag');
+        const registry = require('../Connectors/registry');
         const connectors = flag.requested();
-        return res.send({ status: true, data: R.getCatalog(), ...(connectors.length ? { connectors } : {}), ...(flag.named().length ? { connectorLimits: true } : {}) });
+        // Mirrors the connect/members route condition exactly: those routes exist only where a registry provider is named.
+        const registryNamed = registry.list().some((definition) => flag.named().includes(definition.id));
+        return res.send({ status: true, data: R.getCatalog(), ...(connectors.length ? { connectors } : {}), ...(registryNamed ? { registryConnectors: true } : {}), ...(flag.named().length ? { connectorLimits: true } : {}) });
     }
     catch (e) { logger.error(`listCatalog: ${e.message}`); return res.send({ status: false, statusText: e.message }); }
 };
