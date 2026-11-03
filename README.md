@@ -19,7 +19,7 @@
 
 <p align="center">
   <a href="https://demo.alianhub.com"><img src="https://img.shields.io/badge/Live_demo-3D36CC?style=for-the-badge&logo=googlechrome&logoColor=white" alt="Live demo"></a>
-  <a href="https://help.alianhub.com"><img src="https://img.shields.io/badge/Docs-F241CD?style=for-the-badge&logo=readthedocs&logoColor=white" alt="Documentation"></a>
+  <a href="https://docs.alianhub.com/"><img src="https://img.shields.io/badge/Docs-F241CD?style=for-the-badge&logo=readthedocs&logoColor=white" alt="Documentation"></a>
   <a href="#self-host-in-1-minute"><img src="https://img.shields.io/badge/Self--host-2496ED?style=for-the-badge&logo=docker&logoColor=white" alt="Self-host with Docker"></a>
   <a href="https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/stargazers"><img src="https://img.shields.io/github/stars/aliansoftwareteam/AlianHub-Project-Management-System?style=for-the-badge&logo=github&label=Star&color=24292f" alt="Star AlianHub on GitHub"></a>
 </p>
@@ -539,7 +539,7 @@ Yes. Start a timer on a task or add time by hand, send in a weekly timesheet for
 <summary><b>Where is the documentation?</b></summary>
 <br/>
 
-📘 **Full user guide & API reference:** [help.alianhub.com](https://help.alianhub.com)
+📘 **Full user guide & API reference:** [docs.alianhub.com](https://docs.alianhub.com/)
 
 - New to project tools? [docs/guide/first-hour/](docs/guide/first-hour/README.md) walks through your first hour, one short page at a time.
 - Going deeper? [docs/guide/](docs/guide/README.md) is the guide's index: [views, filters and saved views](docs/guide/views.md), [custom fields](docs/guide/custom-fields.md) and [rules](docs/guide/rules.md).
@@ -571,7 +571,7 @@ Contributions are welcome — bug reports, feature ideas, documentation fixes, a
 
 | What | Where |
 |---|---|
-| 📘 **Read the docs** | [help.alianhub.com](https://help.alianhub.com) · [website](https://alianhub.com) |
+| 📘 **Read the docs** | [docs.alianhub.com](https://docs.alianhub.com/) · [website](https://alianhub.com) |
 | 💬 **Ask a question** | [GitHub Discussions](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/discussions) |
 | 🐛 **Report a bug** | [Bug Report issue](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/issues/new?template=bug_report.yml) |
 | 🚀 **Request a feature** | [Feature Request issue](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/issues/new?template=feature_request.yml) |

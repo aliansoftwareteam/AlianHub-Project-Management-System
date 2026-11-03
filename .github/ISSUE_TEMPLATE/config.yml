@@ -3,7 +3,7 @@ blank_issues_enabled: false
 
 contact_links:
   - name: 📖 Documentation & User Guide
-    url: https://help.alianhub.com
+    url: https://docs.alianhub.com/
     about: Most usage questions are answered in the docs. Please check here first.
 
   - name: 💬 Live Demo
