@@ -5,6 +5,7 @@
             <EverythingFilterChip
                 :name="field"
                 highlight-picked
+                :bulk="field !== 'people' || !singlePerson"
                 :label="$t(`Reports.filter_${field}`)"
                 :options="options[field] || []"
                 :modelValue="filters[field] || []"
@@ -63,6 +64,7 @@ const props = defineProps({
     presets: { type: Array, required: true },
     fields: { type: Array, default: () => [] },
     options: { type: Object, default: () => ({}) },
+    singlePerson: { type: Boolean, default: false },
 });
 defineEmits(['apply', 'step', 'clear', 'need-lists']);
 const { t } = useI18n();

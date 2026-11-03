@@ -61,3 +61,26 @@ describe('time report filters (task 086)', () => {
         expect(F.estimateClausesOf([TASK])[0].TaskId.$in.map(String)).toContain(TASK);
     });
 });
+
+describe('task filters read only the tasks the report rows name', () => {
+    beforeEach(() => MongoDbCrudOpration.mockReset());
+
+    it('looks up the candidate tasks of the base match, not every task of the company', async () => {
+        MongoDbCrudOpration
+            .mockResolvedValueOnce([{ _id: TASK }, { _id: null }])
+            .mockResolvedValueOnce([{ _id: TASK }]);
+        const base = { Loggeduser: 'me', LogStartTime: { $gte: 1, $lte: 2 } };
+        const { taskIds } = await F.reportTimeClauses('c1', {}, F.normalizeReportFilters({ status: ['Done'] }), { baseMatch: base });
+        const [[, group], [, tasks]] = MongoDbCrudOpration.mock.calls;
+        expect(group.data[0][0]).toEqual({ $match: base });
+        expect(tasks.data[0]._id.$in.map(String)).toEqual([TASK]);
+        expect(taskIds).toEqual([TASK]);
+    });
+
+    it('reads no tasks when the range has no rows', async () => {
+        MongoDbCrudOpration.mockResolvedValueOnce([]);
+        const { clauses } = await F.reportTimeClauses('c1', {}, F.normalizeReportFilters({ tags: ['t'] }), { baseMatch: { a: 1 } });
+        expect(MongoDbCrudOpration).toHaveBeenCalledTimes(1);
+        expect(clauses).toEqual([{ TicketID: { $in: [] } }]);
+    });
+});

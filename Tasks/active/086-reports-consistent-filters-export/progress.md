@@ -31,3 +31,25 @@
 - New route `POST /api/v1/timesheet/report-facets` (people × range → projects worked in), company-scoped and inside the caller's sheet scope. Run `npm run api:doc` in the docs PR after merge.
 - Tests: `tests/report-filter-facets.test.js`, `tests/timesheet-report-facets-route.test.js`. Checked on the demo DB (2 people: Any → 3 projects, All → 1); screenshot `screenshots/after-workload-people-all.jpg`.
 - Not yet measured on the large database: the local API could not be started against it from this session (blocked by a permission check).
+
+## 2026-11-03 — filter row, select all, speed on the large database
+
+- Workload's Estimated | Logged and Variance's By project | By person are segmented controls in the filter row, not the toolbar.
+- Every multi-select filter has Select all / Deselect all at the top of its list (over the options in view, so a search narrows it). Opt-in `bulk` prop on `EverythingFilterChip`; not on Mine's single-person picker.
+- Speed, measured read-only against the "Alian Software" workspace (264k time logs, 81k plans, 117k tasks), owner scope:
+
+  | Query | Week | Month | Quarter | Year |
+  |---|---|---|---|---|
+  | Mine: one person's logs | 30 ms | 90 ms | 139 ms | 484 ms |
+  | Project: logs by day × project (everyone) | 1401 ms | 1546 ms | 2238 ms | 3556 ms |
+  | Project: plans by day × project | 248 ms | 239 ms | 327 ms | 499 ms |
+  | Workload: plans, all members | 46 ms | 100 ms | 289 ms | 634 ms |
+  | Workload: logs, all members | 95 ms | 195 ms | 855 ms | 2069 ms |
+  | People → projects facets (5 people) | 108 ms | 36 ms | 57 ms | 83 ms |
+  | Status filter, before (all 75k "Complete" tasks → logs) | 5282 ms | 4588 ms | 3968 ms | 5110 ms |
+  | Status filter, after, one person | 150 ms | 320 ms | 591 ms | 514 ms |
+  | Status filter, after, everyone (no date index yet) | 1592 ms | 2930 ms | 4016 ms | 8786 ms |
+
+- Cause of the slow company-wide reads: `timesheets` has no index starting with `LogStartTime`, so a date-only match scans every log (explain: COLLSCAN, 264,014 examined for 188 returned). Added `{ LogStartTime: 1 }` to the schema and migration `078-timesheet-date-index` (createIndexes only; not run against the live database from here).
+- Task filters now look up only the tasks the report's rows name in the range (plus planned tasks on Workload and the estimate route), not every task in the company.
+- Tests: `tests/migration-timesheet-date-index.test.js`, two new cases in `tests/timesheet-report-filters.test.js`; 74 time/report suites pass.

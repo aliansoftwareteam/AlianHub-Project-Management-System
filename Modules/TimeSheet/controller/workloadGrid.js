@@ -20,7 +20,7 @@ const { canReadTask } = require('../../Tasks/helpers/taskReadAccess');
 const { assigneeProblem } = require('../helpers/planMoveAccess');
 const { visibilityStage } = require('../../Tasks/helpers/taskQueryGuard');
 const { openTasksById, openProjectsById } = require('../../Tasks/helpers/openNames');
-const { normalizeReportFilters, reportTimeClauses, narrowMatch, estimateClausesOf } = require('../helpers/reportFilters');
+const { normalizeReportFilters, reportTimeClauses, narrowMatch, estimateClausesOf, needsTasks, taskIdsIn } = require('../helpers/reportFilters');
 const oid = (id) => { try { return new mongoose.Types.ObjectId(String(id)); } catch (e) { return null; } };
 
 /* A scope that reads everyone already knows the tasks of the private lists its person is not on. */
@@ -172,10 +172,13 @@ exports.getWorkloadGrid = async (req, res) => {
         const startSec = Math.floor(DateTime.fromISO(b.start, { zone }).startOf('day').toSeconds());
         const endSec = Math.floor(DateTime.fromISO(b.end, { zone }).endOf('day').toSeconds());
 
-        const { clauses: timeClauses, taskIds } = await reportTimeClauses(companyId, scope, normalizeReportFilters(b.filters));
+        const reportFilters = normalizeReportFilters(b.filters);
         let estMatch = { ...scopedEstimateMatch(scope), UserId: { $in: userIds }, Date: { $gte: rangeStart, $lte: rangeEnd } };
-        const logMatch = narrowMatch({ ...scopedTimeMatch(scope, { userIds, projectIds: askedProjects.length ? askedProjects : null }), LogStartTime: { $gte: startSec, $lte: endSec } }, timeClauses);
         if (inProjects) estMatch.ProjectId = inProjects;
+        const baseLogMatch = { ...scopedTimeMatch(scope, { userIds, projectIds: askedProjects.length ? askedProjects : null }), LogStartTime: { $gte: startSec, $lte: endSec } };
+        const plannedTasks = needsTasks(reportFilters) ? await taskIdsIn(companyId, SCHEMA_TYPE.ESTIMATES_TIME, estMatch, 'TaskId') : [];
+        const { clauses: timeClauses, taskIds } = await reportTimeClauses(companyId, scope, reportFilters, { baseMatch: baseLogMatch, extraCandidates: plannedTasks });
+        const logMatch = narrowMatch(baseLogMatch, timeClauses);
         estMatch = narrowMatch(estMatch, estimateClausesOf(taskIds));
 
         const [estimates, logs, ptoRows, names] = await Promise.all([

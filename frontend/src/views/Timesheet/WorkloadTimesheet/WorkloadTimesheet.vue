@@ -19,10 +19,6 @@
         @export="onExport"
     >
         <template #actions>
-            <select v-model="mode" class="ah-input rpt__select" :aria-label="$t('Time.workload_mode')" data-test="workload-mode">
-                <option value="estimate">{{ $t('Time.by_estimate') }}</option>
-                <option value="logged">{{ $t('Time.by_logged') }}</option>
-            </select>
             <button v-if="dayMode" type="button" class="ah-btn ah-btn--outline ah-btn--sm" @click="suggestBalance">{{ $t('Time.balance') }}</button>
         </template>
     </ReportToolbar>
@@ -36,7 +32,20 @@
         @step="step"
         @clear="clear"
         @need-lists="options.loadListsFor(filters.projects)"
-    />
+    >
+        <div class="ah-tabs" role="group" :aria-label="$t('Time.workload_mode')" data-test="workload-mode">
+            <button
+                v-for="m in ['estimate', 'logged']"
+                :key="m"
+                type="button"
+                class="ah-tab"
+                :class="{ 'is-active': mode === m }"
+                :aria-pressed="mode === m ? 'true' : 'false'"
+                :data-test="`workload-mode-${m}`"
+                @click="mode = m"
+            >{{ $t(`Reports.show_${m}`) }}</button>
+        </div>
+    </ReportFilterBar>
 
     <div class="rpt__body wl__body">
         <p v-if="error" class="tv-error">{{ error }}</p>

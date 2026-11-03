@@ -17,7 +17,7 @@ exports.getProjectTimeSheet = async(req,res) => {
                 $lte: endNumber/1000
             }
         };
-        const timeQuery = narrowMatch(scoped, (await reportTimeClauses(req.headers['companyid'], scope, normalizeReportFilters(filters))).clauses);
+        const timeQuery = narrowMatch(scoped, (await reportTimeClauses(req.headers['companyid'], scope, normalizeReportFilters(filters), { baseMatch: scoped })).clauses);
         const query = [
             {
                 $match: timeQuery

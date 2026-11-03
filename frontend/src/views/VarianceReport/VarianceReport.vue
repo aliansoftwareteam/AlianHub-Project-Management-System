@@ -2,13 +2,7 @@
     <div class="ah-page rpt vr">
         <ReportToolbar :title="$t('Time.variance')" :exporting="exporting" :canExport="groups.length > 0" @export="onExport">
             <template #meta><span class="rpt__range-text vr__headline">{{ headline }}</span></template>
-            <template #actions>
-                <span v-if="ownTimeOnly" class="ah-small">{{ $t('Time.variance_own_only') }}</span>
-                <select v-else v-model="groupBy" class="ah-input rpt__select" :aria-label="$t('Time.group_by')">
-                    <option value="project">{{ $t('Time.by_project') }}</option>
-                    <option value="person">{{ $t('Time.by_person') }}</option>
-                </select>
-            </template>
+            <template v-if="ownTimeOnly" #actions><span class="ah-small">{{ $t('Time.variance_own_only') }}</span></template>
         </ReportToolbar>
         <ReportFilterBar
             :filters="filters"
@@ -18,7 +12,19 @@
             @apply="apply"
             @step="step"
             @clear="clear"
-        />
+        >
+            <div v-if="!ownTimeOnly" class="ah-tabs" role="group" :aria-label="$t('Time.group_by')" data-test="variance-group">
+                <button
+                    v-for="g in ['project', 'person']"
+                    :key="g"
+                    type="button"
+                    class="ah-tab"
+                    :class="{ 'is-active': groupBy === g }"
+                    :aria-pressed="groupBy === g ? 'true' : 'false'"
+                    @click="groupBy = g"
+                >{{ $t(g === 'project' ? 'Time.by_project' : 'Time.by_person') }}</button>
+            </div>
+        </ReportFilterBar>
 
         <div class="rpt__body vr__body">
         <p v-if="error" class="tv-error">{{ error }}</p>

@@ -44,6 +44,7 @@
         :filters="filters"
         :presets="PRESETS"
         :fields="filterFields"
+        single-person
         :options="filterOptions"
         @apply="applyFilters"
         @step="step"

@@ -512,6 +512,8 @@ historySchema.index({ ProjectId: 1, createdAt: -1 });
 // timesheet: by task ID (timesheet linking) and by user.
 timeSheetSchema.index({ TicketID: 1 });
 timeSheetSchema.index({ userId: 1, ProjectId: 1 });
+// The Time reports read a date range across everyone (owner and admin scope); without this it scans every log.
+timeSheetSchema.index({ LogStartTime: 1 });
 
 // userId notification counters — keyed by user.
 userIdSchema.index({ userId: 1 });

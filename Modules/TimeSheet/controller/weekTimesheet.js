@@ -54,7 +54,7 @@ exports.getWeekTimesheet = async (req, res) => {
         let match = { Loggeduser: userId, LogStartTime: { $gte: Math.floor(startDt.toSeconds()), $lte: Math.floor(endDt.toSeconds()) }, ...withoutHidden(scope) };
         const askedProjects = String(q.projectIds || q.projectId || '').split(',').map((id) => id.trim()).filter(Boolean);
         if (askedProjects.length) match.ProjectId = { $in: idForms(openProjects(scope, askedProjects)) };
-        match = narrowMatch(match, (await reportTimeClauses(companyId, scope, normalizeReportFilters(q.filters))).clauses);
+        match = narrowMatch(match, (await reportTimeClauses(companyId, scope, normalizeReportFilters(q.filters), { baseMatch: match })).clauses);
         const entries = await MongoDbCrudOpration(companyId, {
             type: SCHEMA_TYPE.TIMESHEET,
             data: [match, { TicketID: 1, ProjectId: 1, LogTimeDuration: 1, LogStartTime: 1, billable: 1 }],

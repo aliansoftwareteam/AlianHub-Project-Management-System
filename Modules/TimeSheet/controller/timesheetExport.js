@@ -22,7 +22,7 @@ exports.exportTimesheetCsv = async (req, res) => {
             projectIds: Array.isArray(projectArray) && projectArray.length ? projectArray : null,
         });
         if (start && end) scoped.LogStartTime = { $gte: Number(start), $lte: Number(end) };
-        const match = narrowMatch(scoped, (await reportTimeClauses(companyId, scope, normalizeReportFilters(filters))).clauses);
+        const match = narrowMatch(scoped, (await reportTimeClauses(companyId, scope, normalizeReportFilters(filters), { baseMatch: scoped })).clauses);
 
         const entries = await MongoDbCrudOpration(companyId, {
             type: SCHEMA_TYPE.TIMESHEET,
