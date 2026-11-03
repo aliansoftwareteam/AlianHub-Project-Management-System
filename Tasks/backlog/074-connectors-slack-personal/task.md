@@ -23,7 +23,7 @@ Slack is used with each person's own Slack user token, and the workspace bot is 
 ## Changes made while building (2026-11-03, confirmed by Prinsa the same day)
 These go beyond or differ from the scope as first written; each is named in the PR body for the reviewer.
 - **The connect screen is 072's.** The first scope said Slack shows on My connections like Google. That screen, for every registry provider, is task 072 (track A), so 074 ships the routes and 072 the screen. Until 072 merges, nobody can connect Slack from the UI; 074 should merge with or after 072.
-- **More of the bot is gone than "no caller".** Besides leaving the four `slack*.js` files with no caller, 074 removed the bot's routes and handlers (`/api/v2/connectors/slack/*`), its agent registry group (`registry/connectors.js`), its screen (`SlackConnector.vue`) with its `SlackConnector.*` strings, and the bot's three test files, so the bot cannot be set up again after migration 080. 079 deletes the four files and `SlackPostPreview.vue`.
+- **More of the bot is gone than "no caller".** Besides leaving the four `slack*.js` files with no caller, 074 removed the bot's routes and handlers (`/api/v2/connectors/slack/*`), its agent registry group (`registry/connectors.js`), its screen (`SlackConnector.vue`) with its `SlackConnector.*` strings, and the bot's three test files, so the bot cannot be set up again after migration 081. 079 deletes the four files and `SlackPostPreview.vue`.
 - **The Slack summary skill picks a channel differently.** With no allow-list, it reads the first channel by name the person is a member of, unless a copy of the skill names one, and posts back to that channel by name.
 - **The migration also revokes the bot token at Slack** (`auth.revoke`) before it retires the secrets, and goes on if Slack cannot be reached.
 
@@ -43,7 +43,7 @@ These go beyond or differ from the scope as first written; each is named in the 
   - The old entries for these keys in `Modules/Agents/registry/connectors.js` and `actions.js` give way to the connector tools.
   - Channel type is checked at every call with `conversations.info`; a DM or group DM is refused.
 - **Agent wiring**: the `slack.channel` reader and the Slack summary seed use the new tools on the run owner's connection; with no connection they refuse with "Connect Slack on My connections".
-- **Retire the bot** — migration `080-retire-slack-bot`: asks Slack to revoke the bot token, retires the bot token and signing secret in the secrets store, closes the workspace `connector: 'slack'` row, expires pending old-path posts (decision 4), tells owners and admins (decision 3), audits `connector.revoke`. Safe to run twice.
+- **Retire the bot** — migration `081-retire-slack-bot`: asks Slack to revoke the bot token, retires the bot token and signing secret in the secrets store, closes the workspace `connector: 'slack'` row, expires pending old-path posts (decision 4), tells owners and admins (decision 3), audits `connector.revoke`. Safe to run twice.
 - **Screens**: the workspace bot form (`SlackConnector.vue`) is removed and the Integrations › Slack section points to My connections; the bot-retired notice opens the Connections page. The connect, reconnect and disconnect screen for every registry provider, Slack included, is 072's. All strings through i18n, colours from tokens.
 - **Setup doc** — `docs/connectors/slack.md`: create the Slack app, add the user scopes, turn on token rotation, Redirect URL `<APIURL>/api/v1/connector-oauth/slack/callback`, `CONNECTOR_SLACK_CLIENT_ID/SECRET`, `CONNECTORS=…,slack`, and a tunnel for local development (HTTPS only).
 
@@ -67,4 +67,4 @@ These go beyond or differ from the scope as first written; each is named in the 
 - Depends on: 069, 070, 078
 - Replaces `slackConnection.js`, `slackApi.js`, `slackRead.js`, `slackPost.js` on the agent path; 079 deletes them.
 - Slack's Redirect URL must be HTTPS and the `redirect_uri` must match it or be a subdirectory of it; localhost is not allowed, so local development uses a tunnel (`APIURL` set to the tunnel's https URL).
-- Migration number 080 may collide with another branch; renumber at merge if so.
+- Migration 080 was taken by 073 (`080-connectors-google-calendar-to-google`), so the bot retirement is 081.

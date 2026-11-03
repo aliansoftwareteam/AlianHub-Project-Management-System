@@ -19,15 +19,17 @@ Task 074, FR-36 of the 056 PRD. Each member connects their own Slack account wit
   - `auth.revokeWith: 'access'` (`auth.revoke` takes the access token).
 
   A dead token on a tool call marks the connection broken.
-- **Migration `080-retire-slack-bot`**: in every workspace that had the bot, it asks Slack to revoke the bot token, retires the bot secrets, closes the bot row, declines Inbox posts still waiting on the bot, and tells owners and admins in the bell. It goes on if Slack cannot be reached, and a second run changes nothing.
+- **Migration `081-retire-slack-bot`**: in every workspace that had the bot, it asks Slack to revoke the bot token, retires the bot secrets, closes the bot row, declines Inbox posts still waiting on the bot, and tells owners and admins in the bell. It goes on if Slack cannot be reached, and a second run changes nothing.
 - **Screens**: the bot form is gone. Integrations › Slack points to My connections, and the bell notice opens the Connections page.
 - **Docs**: the Slack row in the research matrix, `docs/connectors/slack.md` (app setup, token rotation, the tunnel for local development), and env docs for `CONNECTOR_SLACK_CLIENT_ID` / `_SECRET`.
 
-## 072 is merged (#1755): two things to fix in the merge
+## Merged with `feat/per-user-connectors` (072 #1755, 073 #1761)
 
-`tests/connector-slack-post.test.js` was deleted here (it tested the retired bot) and changed in 072, which added three tests of the catalogue's `registryConnectors` flag. Resolve by keeping the delete, and move those three tests to a file of their own with one change: `CONNECTORS=slack` now names a registry provider, so it sets `registryConnectors: true` (it no longer counts as legacy-only). Everything else merges cleanly.
+This branch already merges the base, so the PR merges cleanly. The merge resolved three things:
 
-**A second break that git does not flag:** 074 drops `const flag = require('../Agents/connectors/flag');` from `Modules/Connectors/controller.js` (only the bot used it), while 072's `appCatalog` in that file calls `flag.named()`. The merge is clean, but `GET /api/v2/connectors/apps` then fails with a `ReferenceError` (500) and the Company OAuth apps section does not load. Add that `require` back in the merge.
+- **`tests/connector-slack-post.test.js`**: deleted here (it tested the retired bot) and changed in 072, which added three tests of the catalogue's `registryConnectors` flag. The delete stays, and those tests moved to `tests/connector-catalogue-flags.test.js` with one change: `CONNECTORS=slack` now names a registry provider, so it sets `registryConnectors: true`.
+- **A break git does not flag:** 074 dropped the `flag` require from `Modules/Connectors/controller.js` (only the bot used it), while 072's `appCatalog` there calls `flag.named()`. Without the require, `GET /api/v2/connectors/apps` answers 500 and the Company OAuth apps section does not load. The require is back.
+- **Migration number:** 073 took 080 (`080-connectors-google-calendar-to-google`), so the bot retirement is now `081-retire-slack-bot`.
 
 On My connections, 072's screen lists Slack from the registry, with the labels "Slack" and "Messages" humanised from the ids.
 
@@ -61,6 +63,5 @@ The code exchange always sent a `code_verifier`, even when the consent asked no 
 
 - **A connect with a real Slack app.** On a local merge with 072, My connections lists Slack and Connect reaches Slack's real sign-in page, and real Slack's refusal of a bad code is read correctly. Allowing access with a real account still needs a Slack app with token rotation and an https tunnel.
 - **`docs/API.md`.** It goes in the docs PR after merge (Rule 4), because this removes the bot routes.
-- **Migration number 080.** Renumber at merge if another branch takes 080.
 
 🤖 Generated with [Claude Code](https://claude.com/claude-code)

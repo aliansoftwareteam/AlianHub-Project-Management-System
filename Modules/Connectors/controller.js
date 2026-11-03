@@ -5,6 +5,9 @@ const logger = require('../../Config/loggerConfig');
 const { requestAddress } = require('../../utils/requestAddress');
 const quotas = require('./quotas');
 const apps = require('./apps');
+const registry = require('./registry');
+const connection = require('./connection');
+const flag = require('../Agents/connectors/flag');
 
 const refuse = (res, code, statusText, extra = {}) => res.status(code).send({ status: false, statusText, ...extra });
 
@@ -62,7 +65,26 @@ const handleApps = (what, statusText, run) => async (req, res) => {
     }
 };
 
-exports.getApps = handleApps('list connector apps', 'Connector apps fetched.', (companyId) => apps.describeApps(companyId));
+/* The providers a company app can be set for, with the display name, whether the instance already has an app,
+ * whether this company has set one, and the exact redirect URI to register at the provider. Read-only: the screen
+ * (072) cannot be drawn without it, and no write path reads it. */
+const appCatalog = (configured) => {
+    const set = new Set(configured.map((app) => app.provider));
+    return registry.list()
+        .filter((definition) => flag.named().includes(definition.id))
+        .map((definition) => ({
+            provider: definition.id,
+            name: definition.name,
+            hasInstanceApp: Boolean(apps.instanceApp(definition.id)),
+            companyAppSet: set.has(definition.id),
+            redirectUri: connection.redirectUri(definition.id),
+        }));
+};
+
+exports.getApps = handleApps('list connector apps', 'Connector apps fetched.', async (companyId) => {
+    const configured = await apps.describeApps(companyId);
+    return { apps: configured, catalog: appCatalog(configured) };
+});
 
 exports.setApp = handleApps('set a connector app', 'Connector app saved.', (companyId, req) => {
     const body = req.body || {};

@@ -37,7 +37,7 @@ Slack accepts only an `https` Redirect URL, and localhost does not work. Run a t
 
 ## 4. The old workspace bot
 
-Migration `080-retire-slack-bot` runs once in every workspace that had the bot. It:
+Migration `081-retire-slack-bot` runs once in every workspace that had the bot. It:
 
 - asks Slack to revoke the bot token (`auth.revoke`); if Slack cannot be reached, or the workspace's egress list leaves `slack.com` out, it goes on, since AlianHub never uses the token again;
 - retires the bot token and the signing secret in the secrets store;

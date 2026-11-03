@@ -12,7 +12,7 @@ const slack = require('../Modules/Connectors/providers/slack');
  * the bot app in Slack. The bot's row is the one without a `provider`; a person's own Slack connection is never touched.
  * A closed row is not found again, so a second run changes nothing. */
 
-const ID = '080-retire-slack-bot';
+const ID = '081-retire-slack-bot';
 const ACTOR = Object.freeze({ id: 'system' });
 const POST = 'slack.message.post';
 const RETIRED = 'The Slack workspace bot was retired. Connect Slack on My connections and ask again.';
@@ -78,7 +78,7 @@ module.exports = {
     async up(ctx) {
         await ctx.forEachCompany(async (companyId) => {
             const done = await retireCompany(ctx, companyId);
-            if (done.retired) ctx.logger.info(`[migrations] 080 ${companyId}: Slack bot retired, ${done.expired} waiting posts ended, ${done.told} owners and admins told`);
+            if (done.retired) ctx.logger.info(`[migrations] 081 ${companyId}: Slack bot retired, ${done.expired} waiting posts ended, ${done.told} owners and admins told`);
             return done;
         });
     },
