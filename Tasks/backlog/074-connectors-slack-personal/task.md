@@ -53,7 +53,7 @@ These go beyond or differ from the scope as first written; each is named in the 
 - DMs and group DMs; search; reactions; threads beyond the channel's top-level messages.
 
 ## Acceptance criteria
-- [ ] A member connects Slack on My connections with their own Slack account; only the granted user scopes are stored. *(Backend verified in `connector-slack-connection`; the screen waits on 072, and a real-Slack check on 072 and a tunnel.)*
+- [ ] A member connects Slack on My connections with their own Slack account; only the granted user scopes are stored. *(Backend verified in `connector-slack-connection`. With 072 merged, My connections lists Slack and Connect reaches Slack's real sign-in page. Allowing access with a real Slack account waits on a Slack app and a tunnel.)*
 - [x] Reads are capped by run, quota and tool caps, and tainted; a DM or group DM is refused.
 - [x] Posts are proposals approved by the connection's owner in the Inbox; nothing is sent before.
 - [x] A dead token (`invalid_auth`, `token_revoked`, `token_expired`, `invalid_refresh_token`) marks the connection broken and tells the person once a day.
