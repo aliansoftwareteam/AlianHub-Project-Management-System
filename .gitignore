@@ -161,3 +161,11 @@ package-lock.json
 
 # Screenshot atlases written by npm run atlas and npm run atlas:compare
 /artifacts/atlas/
+
+# Docs site: dependencies, build output and pages generated from docs/API.md
+/docs-site/node_modules
+/docs-site/.vitepress/cache
+/docs-site/.vitepress/dist
+/docs-site/.vitepress/api-sidebar.mjs
+/docs-site/api
+/docs-site/public/openapi.json
