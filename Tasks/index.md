@@ -81,7 +81,7 @@ Auto-maintained registry of all tasks. Reflects YAML frontmatter from each `task
 | 073 | Connectors — migrate Google Calendar connections onto the Google provider | active | medium | 064, 066 | active/073-connectors-migrate-google-calendar |
 | 074 | Connectors — Slack as a personal OAuth provider; retire the workspace bot | backlog | medium | 069, 070, 078 | backlog/074-connectors-slack-personal |
 | 075 | Connectors — GitHub as a personal, on-demand provider; retire the task 049 sync | backlog | medium | 069, 070, 078 | backlog/075-connectors-github-personal |
-| 076 | Connectors — Drive/Dropbox attachment picker on the module | backlog | medium | 066, 072 | backlog/076-connectors-attachment-picker |
+| 076 | Connectors — Drive/Dropbox attachment picker on the module | active | medium | 066, 072 | active/076-connectors-attachment-picker |
 | 077 | Connectors — remove the old Google Calendar and CloudStorage paths; Google and Dropbox setup pages | backlog | medium | 073, 076 | backlog/077-connectors-remove-calendar-picker-paths |
 | 078 | Connectors — Inbox approval cards and quota settings screens | active | high | 069, 070 | active/078-connectors-approval-quota-screens |
 | 079 | Connectors — remove the old Slack bot and GitHub sync paths | backlog | medium | 074, 075 | backlog/079-connectors-remove-slack-github-paths |

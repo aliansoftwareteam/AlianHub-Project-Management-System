@@ -339,6 +339,23 @@
     "description": "Client secret of that Google OAuth client. Type it into .env yourself; it is sent only to Google's token endpoint and is never logged, stored in the database or shown. Without both this and CONNECTOR_GOOGLE_CLIENT_ID the google_calendar connector stays off and the server says so in one startup log line.",
     "secret": true
   },
+  "CONNECTOR_GOOGLE_PICKER_API_KEY": {
+    "group": "integrations",
+    "description": "The Google Picker API key the Drive attachment picker uses, from the same Google Cloud project as CONNECTOR_GOOGLE_CLIENT_ID. It is not OAuth, so it rides here as an instance default (a company's own app sets it on the connectors company-apps screen instead). Without it the Drive picker cannot open. Safe for the browser."
+  },
+  "CONNECTOR_GOOGLE_APP_ID": {
+    "group": "integrations",
+    "description": "The Google Cloud project number of that same project, used by the Drive attachment picker. Without it a drive.file grant never reaches a picked file, so its preview and import fail with \"File not found\". Safe for the browser."
+  },
+  "CONNECTOR_DROPBOX_CLIENT_ID": {
+    "group": "integrations",
+    "description": "App key of the Dropbox app the connectors use (CONNECTORS=dropbox). Create a Scoped-access app at dropbox.com/developers; the app key is also the OAuth client id, so it is safe for the browser (the attachment Chooser signs the person in with it). Add the redirect address <APIURL>/api/v1/connector-oauth/dropbox/callback to the app and your hostnames to its Chooser/Saver/Embedder domains."
+  },
+  "CONNECTOR_DROPBOX_CLIENT_SECRET": {
+    "group": "integrations",
+    "description": "App secret of that Dropbox app. Type it into .env yourself; it is sent only to Dropbox's token endpoint and is never logged, stored in the database or shown. Needed to import copies and to end a connection at Dropbox; the Chooser links work without it.",
+    "secret": true
+  },
   "CONNECTOR_SLACK_CLIENT_ID": {
     "group": "integrations",
     "description": "Client id of the Slack app the connectors use (CONNECTORS=slack). Create it at api.slack.com/apps with the user scopes channels:read, groups:read, channels:history, groups:history and chat:write, turn on token rotation (Slack sends no refresh token without it, so the connection is refused), and add the Redirect URL <APIURL>/api/v1/connector-oauth/slack/callback. Slack accepts only an https Redirect URL, so local development needs APIURL on an https tunnel. See docs/connectors/slack.md. Not a secret."

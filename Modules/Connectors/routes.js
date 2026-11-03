@@ -3,6 +3,7 @@ const flag = require('../Agents/connectors/flag');
 const ctrl = require('./controller');
 const google = require('./googleController');
 const providers = require('./connectorsController');
+const picker = require('./pickerController');
 const registry = require('./registry');
 const { agentsRefused } = require('../Agents/guard');
 const { CALLBACK_PATH } = require('../Agents/connectors/googleConnection');
@@ -11,6 +12,9 @@ const { CALLBACK_PATH } = require('../Agents/connectors/googleConnection');
 const providerLimiter = rateLimit({ windowMs: 60 * 1000, limit: 12, standardHeaders: true, legacyHeaders: false });
 // Reachable without a session, so it has a limiter of its own.
 const callbackLimiter = rateLimit({ windowMs: 60 * 1000, limit: 30, standardHeaders: true, legacyHeaders: false });
+// The attachment picker: a token or a thumbnail per pick/render, so looser than a provider call; an import streams bytes, so it is kept modest.
+const pickerLimiter = rateLimit({ windowMs: 60 * 1000, limit: 60, standardHeaders: true, legacyHeaders: false });
+const importLimiter = rateLimit({ windowMs: 60 * 1000, limit: 20, standardHeaders: true, legacyHeaders: false });
 
 const googleRoutes = (app) => {
     // Outside the /api/v2/connectors prefix on purpose: that prefix demands a session, and Google's redirect has none.
@@ -47,6 +51,16 @@ const genericRoutes = (app) => {
     app.delete('/api/v2/connectors/connections/:id', agentsRefused('connector.revoke'), providerLimiter, providers.disconnect);
 };
 
+/* The Drive/Dropbox attachment picker (076). `picker` is a literal segment, so `:source` never collides with a
+ * provider's own /:provider routes. Every handler takes the person from the session, never the body, so no route
+ * reaches another person's account. Agents never pick files, so these stay human-only (the handlers refuse an API
+ * token and a guest). */
+const pickerRoutes = (app) => {
+    app.get('/api/v2/connectors/picker/:source/token', pickerLimiter, picker.token);
+    app.get('/api/v2/connectors/picker/:source/thumbnail', pickerLimiter, picker.thumbnail);
+    app.post('/api/v2/connectors/picker/:source/import', importLimiter, picker.importFile);
+};
+
 exports.init = (app) => {
     // Owners and admins only, never an API token; the handlers check the seat themselves.
     if (flag.named().length) {
@@ -55,7 +69,7 @@ exports.init = (app) => {
     }
     // Before the legacy google routes: the generic '/:provider/callback' and the legacy google callback share one
     // redirect URI, and the generic handler hands a legacy state back to the legacy handler (coexistence until 073).
-    if (registry.list().some((definition) => flag.named().includes(definition.id))) genericRoutes(app);
+    if (registry.list().some((definition) => flag.named().includes(definition.id))) { genericRoutes(app); pickerRoutes(app); }
     if (flag.requestedGoogle().length) googleRoutes(app);
     if (flag.requested().length) appRoutes(app);
 };

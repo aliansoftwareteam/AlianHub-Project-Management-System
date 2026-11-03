@@ -21,12 +21,12 @@ const scrub = (text, hide) => hide.filter(Boolean).reduce((out, secret) => out.s
 /* One attempt, never a retry. Only an error code in the provider's own format is passed on; its description and
  * anything else in a failed answer are dropped, so nothing sent can come back in an error. The host is fixed in
  * the provider definition, and the call names a workspace, so that workspace's egress list applies. */
-const post = async ({ definition, companyId, actor, url, form, hide = [] }) => {
+const post = async ({ definition, companyId, actor, url, form, hide = [], token }) => {
     let res;
     try {
         res = await egressContext.run(
             { companyId: String(companyId), actor: String(actor || '') },
-            () => agentFetch.callProvider(url, { form, timeoutMs: TIMEOUT_MS, maxBytes: MAX_BYTES }),
+            () => agentFetch.callProvider(url, { form, token, timeoutMs: TIMEOUT_MS, maxBytes: MAX_BYTES }),
         );
     } catch (e) {
         return { ok: false, error: ERROR.UNREACHABLE, detail: scrub(e && e.message, hide).slice(0, 300) };
@@ -70,10 +70,16 @@ const refresh = ({ definition, companyId, actor, client, refreshToken }) => post
     form: { grant_type: 'refresh_token', refresh_token: refreshToken, client_id: client.clientId, client_secret: client.clientSecret },
 });
 
-/* A provider without a revoke endpoint cannot be told; disconnect still retires the secrets and closes the row. */
-const revoke = ({ definition, companyId, actor, token }) => (definition.auth.revokeUrl
-    ? post({ definition, companyId, actor, url: definition.auth.revokeUrl, hide: [token], form: { token } })
-    : Promise.resolve({ ok: true, body: {}, skipped: true }));
+/* A provider without a revoke endpoint cannot be told; disconnect still retires the secrets and closes the row.
+ * Most providers (Google, Slack) take the token to revoke as a form field; some (Dropbox) authenticate the revoke
+ * call with the token in the Authorization header and an empty body — `auth.revokeAuth: 'bearer'` selects that. */
+const revoke = ({ definition, companyId, actor, token }) => {
+    if (!definition.auth.revokeUrl) return Promise.resolve({ ok: true, body: {}, skipped: true });
+    const base = { definition, companyId, actor, url: definition.auth.revokeUrl, hide: [token] };
+    return definition.auth.revokeAuth === 'bearer'
+        ? post({ ...base, token, form: {} })
+        : post({ ...base, form: { token } });
+};
 
 const isGrantRefused = (definition, code) => (definition.deadGrantErrors || ['invalid_grant']).includes(String(code));
 

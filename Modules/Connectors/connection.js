@@ -283,7 +283,11 @@ const sharesGrant = async (companyId, row) => {
     return others.some((other) => String(other._id) !== String(row._id) && holdsToken(other) && other.account && other.account.id === id);
 };
 
-/* Slack's auth.revoke takes no refresh token, so an expired access token is refreshed first, only to be revoked. */
+/* Which token the revoke call uses. Google revokes the refresh token in a form field; Slack takes no refresh token
+ * and revokes an access token, refreshing an expired one first; Dropbox revokes an access token in a bearer header.
+ * `auth.revokeWith: 'access'` selects resolving an access token here; `auth.revokeAuth` (in providerApi) selects how
+ * it is sent. The access-token path bypasses the seat check on purpose — member removal must revoke a departed
+ * person's grant — and never throws, so a disconnect is not blocked by a mint that fails. */
 const revokeToken = async ({ companyId, actor, provider, row, definition }) => {
     const refreshToken = await store.resolve({ companyId, handle: row.handles.refresh }).catch(() => null);
     if (definition.auth.revokeWith !== 'access') return refreshToken;
