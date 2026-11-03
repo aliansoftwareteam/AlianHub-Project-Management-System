@@ -52,3 +52,4 @@
     .rpt__step { width: 36px; height: 36px; }
     .evr__chip-anchor > .rpt__date-pop { position: fixed; inset-inline: 12px; top: auto; bottom: calc(var(--tabbar-h, 56px) + 12px); width: auto; z-index: 60; }
 }
+.ah-tabs.rpt__match { flex: none; margin-inline-start: -4px; }

@@ -2,9 +2,10 @@ const { PRESETS, isDay, rangeOf, localDay } = require('./reportRange');
 
 const LIST_FIELDS = Object.freeze(['people', 'projects', 'lists', 'status', 'tags', 'types']);
 const BILLABLE = Object.freeze(['billable', 'non_billable']);
-const QUERY_KEYS = Object.freeze(['range', 'from', 'to', 'billable', ...LIST_FIELDS]);
+const MATCH = Object.freeze(['any', 'all']);
+const QUERY_KEYS = Object.freeze(['range', 'from', 'to', 'billable', 'match', ...LIST_FIELDS]);
 /* Carried from tab to tab: what each tab reads the same way. */
-const SHARED_KEYS = Object.freeze(['range', 'from', 'to', 'people', 'projects']);
+const SHARED_KEYS = Object.freeze(['range', 'from', 'to', 'people', 'match', 'projects']);
 const MAX_VALUES = 200;
 
 const listOf = (value) => {
@@ -12,7 +13,7 @@ const listOf = (value) => {
     return [...new Set(raw.map((item) => String(item == null ? '' : item).trim()).filter(Boolean))].slice(0, MAX_VALUES);
 };
 
-const emptyFilters = (preset = 'this_week') => ({ preset, start: '', end: '', people: [], projects: [], lists: [], status: [], tags: [], types: [], billable: '' });
+const emptyFilters = (preset = 'this_week') => ({ preset, start: '', end: '', people: [], projects: [], lists: [], status: [], tags: [], types: [], billable: '', match: 'any' });
 
 /* The filters a route query asks for, on `today`. Anything malformed falls back to the tab's default preset. */
 const readFilters = (query = {}, { defaultPreset = 'this_week', presets = PRESETS, today = localDay() } = {}) => {
@@ -22,6 +23,7 @@ const readFilters = (query = {}, { defaultPreset = 'this_week', presets = PRESET
     const filters = { ...emptyFilters(preset), ...range };
     LIST_FIELDS.forEach((field) => { filters[field] = listOf(query[field]); });
     filters.billable = BILLABLE.includes(String(query.billable)) ? String(query.billable) : '';
+    filters.match = MATCH.includes(String(query.match)) ? String(query.match) : 'any';
     return filters;
 };
 
@@ -39,6 +41,7 @@ const writeFilters = (filters, base = {}, { defaultPreset = 'this_week' } = {}) 
         if (values.length) query[field] = values;
     });
     if (BILLABLE.includes(filters.billable)) query.billable = filters.billable;
+    if (filters.match === 'all' && listOf(filters.people).length > 1) query.match = 'all';
     return query;
 };
 
@@ -57,4 +60,4 @@ const serverFilters = (filters) => {
     return out;
 };
 
-module.exports = { LIST_FIELDS, QUERY_KEYS, SHARED_KEYS, BILLABLE, emptyFilters, readFilters, writeFilters, sharedQuery, activeCount, serverFilters, listOf };
+module.exports = { MATCH, LIST_FIELDS, QUERY_KEYS, SHARED_KEYS, BILLABLE, emptyFilters, readFilters, writeFilters, sharedQuery, activeCount, serverFilters, listOf };

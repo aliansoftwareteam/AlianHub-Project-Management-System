@@ -14,7 +14,7 @@
             :filters="filters"
             :presets="PRESETS"
             :fields="ownTimeOnly ? ['projects'] : ['projects', 'people']"
-            :options="{ projects: options.projects.value, people: options.people.value }"
+            :options="filterOptions"
             @apply="apply"
             @step="step"
             @clear="clear"
@@ -101,6 +101,7 @@ const { t } = useI18n();
 const companyId = inject('$companyId');
 const { filters, range, apply, step, clear } = useReportFilters({ defaultPreset: 'this_month' });
 const options = useReportOptions(companyId);
+const filterOptions = options.narrowed(filters, range);
 const { exporting, exportReport } = useReportExport((field, value) => options.labelOf(field, value));
 const groupBy = ref('project');
 const data = ref(null);

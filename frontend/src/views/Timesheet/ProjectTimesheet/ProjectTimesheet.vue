@@ -97,7 +97,7 @@
     const options = useReportOptions(companyId);
     const { exporting, failed: exportFailed, exportReport } = useReportExport((field, value) => options.labelOf(field, value));
     const filterFields = computed(() => [...(projectTimesheetPermission.value ? ['people'] : []), 'projects', 'lists', 'status', 'billable', 'tags']);
-    const filterOptions = computed(() => ({ people: options.people.value, projects: options.projects.value, lists: options.lists.value, status: options.statuses.value, tags: options.tags.value }));
+    const filterOptions = options.narrowed(filters, range);
     const localDate = (iso) => moment(iso, 'YYYY-MM-DD').toDate();
     const dateRange = computed(() => ({ startDate: localDate(range.value.start), endDate: localDate(range.value.end) }));
     const dateColumns = ref([]);

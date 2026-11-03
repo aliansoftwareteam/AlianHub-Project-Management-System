@@ -22,3 +22,12 @@
 - `CustomReports` and `MilestoneReport` not moved onto the shared bar.
 - Teams as a filter source in the shared bar.
 - Mine's under-capacity hint and last-week card only show for a one-week range.
+
+## 2026-11-03 — owner review: filters that follow each other
+
+- People narrow the Projects list to the projects they are on (directly or through a team) or logged/planned time in over the range. With two or more people an **Any / All** switch appears beside People: Any = union, All = projects every one of them shares; kept in the URL as `match=all` and carried between tabs.
+- Lists, Status and Tags take their options from the chosen projects, else the people's projects, else all.
+- Picked options are listed first and highlighted in every filter dropdown (`EverythingFilterChip` gains an opt-in `highlightPicked`; Everything itself is unchanged).
+- New route `POST /api/v1/timesheet/report-facets` (people × range → projects worked in), company-scoped and inside the caller's sheet scope. Run `npm run api:doc` in the docs PR after merge.
+- Tests: `tests/report-filter-facets.test.js`, `tests/timesheet-report-facets-route.test.js`. Checked on the demo DB (2 people: Any → 3 projects, All → 1); screenshot `screenshots/after-workload-people-all.jpg`.
+- Not yet measured on the large database: the local API could not be started against it from this session (blocked by a permission check).

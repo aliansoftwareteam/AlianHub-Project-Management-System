@@ -100,7 +100,7 @@
     const { exporting, failed: exportFailed, exportReport } = useReportExport((field, value) => options.labelOf(field, value));
     const dateValue = computed(() => moment(range.value.start, 'YYYY-MM-DD').toDate());
     const filterFields = computed(() => [...(isEveryOne.value ? ['people'] : []), 'projects']);
-    const filterOptions = computed(() => ({ people: options.people.value, projects: options.projects.value }));
+    const filterOptions = options.narrowed(filters, range);
     /* The tracker route still takes the filter chips of the old screen. */
     const selectedFilters = computed(() => [
         ...(isEveryOne.value ? filters.value.people.map((id) => ({ type: 'Users', id })) : []),

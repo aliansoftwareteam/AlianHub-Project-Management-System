@@ -28,6 +28,7 @@
                     :key="option.value"
                     type="button"
                     class="ah-pop__item evr__option"
+                    :class="{ 'is-active': highlightPicked && isOn(option) }"
                     role="option"
                     :aria-selected="isOn(option) ? 'true' : 'false'"
                     data-test="evr-option"
@@ -57,7 +58,8 @@ const props = defineProps({
     label: { type: String, required: true },
     options: { type: Array, default: () => [] },
     modelValue: { type: Array, default: () => [] },
-    single: { type: Boolean, default: false }
+    single: { type: Boolean, default: false },
+    highlightPicked: { type: Boolean, default: false }
 });
 const emit = defineEmits(["update:modelValue"]);
 

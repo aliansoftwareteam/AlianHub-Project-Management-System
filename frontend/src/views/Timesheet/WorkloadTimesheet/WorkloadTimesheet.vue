@@ -165,7 +165,7 @@ const { filters, range, narrowing, serverFilters, apply, step, clear } = useRepo
 const options = useReportOptions(companyId);
 const { exporting, failed: exportFailed, exportReport } = useReportExport((field, value) => options.labelOf(field, value));
 const filterFields = computed(() => [...(isEveryone.value ? ['people'] : []), 'projects', 'lists', 'status', 'tags']);
-const filterOptions = computed(() => ({ people: options.people.value, projects: options.projects.value, lists: options.lists.value, status: options.statuses.value, tags: options.tags.value }));
+const filterOptions = options.narrowed(filters, range);
 
 const mode = ref('estimate');
 const users = ref([]);

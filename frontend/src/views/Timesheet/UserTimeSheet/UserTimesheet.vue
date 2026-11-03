@@ -208,7 +208,7 @@ if (route.query.week || route.query.userId) {
 }
 
 const filterFields = computed(() => [...(isEveryone.value ? ['people'] : []), 'projects', 'lists', 'status', 'billable', 'tags']);
-const filterOptions = computed(() => ({ people: options.people.value, projects: options.projects.value, lists: options.lists.value, status: options.statuses.value, tags: options.tags.value }));
+const filterOptions = options.narrowed(filters, range);
 /* The sheet is one person's: picking someone replaces whoever was picked. */
 const applyFilters = (patch) => {
     if (patch.people) patch = { ...patch, people: patch.people.slice(-1) };
