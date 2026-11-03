@@ -69,3 +69,8 @@
   | Mine: one person | 39 ms | 126 ms | 154 ms | 341 ms |
 
 - Still heavy: a whole year for everyone with a status filter (4.6 s; 46k matching logs) and a year of plans for everyone (1.2 s, 16.8k rows). Both are far rarer views; a summed-in-DB read for plans is the next step if needed.
+
+## 2026-11-03 — custom range redesigned
+
+- The From/To native date boxes overflowed the popover and looked out of place. The date popover is now two columns: presets on the left, and the app's own themed date picker (`@vuepic/vue-datepicker`, already styled by `assets/css/datepicker.css`) shown inline on the right, Monday-first, with the current range highlighted. Click a start day and an end day; it applies on the second click. Tracker shows a single-day calendar. On a phone the presets wrap above the calendar.
+- Checked on the demo copy (:5412): picking Nov 10 then Nov 20 sets `range=custom&from=2026-11-10&to=2026-11-20`. Screenshot `screenshots/after-date-range-calendar.jpg`.

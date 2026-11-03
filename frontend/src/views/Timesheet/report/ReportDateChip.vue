@@ -18,7 +18,7 @@
                 <ShellIcon name="chevronDown" :size="12" aria-hidden="true" />
             </button>
             <div v-if="open" class="ah-pop evr__pop rpt__date-pop" role="dialog" :aria-label="$t('Reports.date_range')">
-                <div class="rpt__presets">
+                <div class="rpt__presets" :class="{ 'is-single': single }">
                     <button
                         v-for="preset in quickPresets"
                         :key="preset"
@@ -30,19 +30,21 @@
                         @click="pick(preset)"
                     >{{ $t(`Reports.preset_${preset}`) }}</button>
                 </div>
-                <form class="rpt__custom" data-test="report-custom" @submit.prevent="applyCustom">
-                    <label class="ah-field">
-                        <span class="ah-field__label">{{ single ? $t('Reports.day') : $t('Reports.from') }}</span>
-                        <input v-model="draftStart" type="date" class="ah-input rpt__date-input" required data-test="report-from" />
-                    </label>
-                    <label v-if="!single" class="ah-field">
-                        <span class="ah-field__label">{{ $t('Reports.to') }}</span>
-                        <input v-model="draftEnd" type="date" class="ah-input rpt__date-input" required data-test="report-to" />
-                    </label>
-                    <div class="rpt__custom-actions">
-                        <button type="submit" class="ah-btn ah-btn--primary ah-btn--sm" data-test="report-custom-apply">{{ $t('Reports.apply_range') }}</button>
-                    </div>
-                </form>
+                <div class="rpt__custom" data-test="report-custom">
+                    <span class="rpt__custom-hint">{{ single ? $t('Reports.pick_day') : $t('Reports.pick_range') }}</span>
+                    <VueDatePicker
+                        :model-value="draft"
+                        inline
+                        auto-apply
+                        :range="!single"
+                        :partial-range="false"
+                        :enable-time-picker="false"
+                        :week-start="1"
+                        model-type="yyyy-MM-dd"
+                        :month-change-on-scroll="false"
+                        @update:model-value="applyCustom"
+                    />
+                </div>
             </div>
         </div>
         <button v-if="steppable" type="button" class="rpt__step" :aria-label="$t('Reports.range_next')" data-test="report-range-next" @click="$emit('step', 1)">
@@ -55,6 +57,8 @@
 import { computed, onBeforeUnmount, ref, watch } from 'vue';
 import moment from 'moment';
 import { useI18n } from 'vue-i18n';
+import VueDatePicker from '@vuepic/vue-datepicker';
+import '@vuepic/vue-datepicker/dist/main.css';
 import ShellIcon from '@/components/organisms/Shell/ShellIcon.vue';
 
 defineOptions({ name: 'ReportDateChip' });
@@ -68,8 +72,7 @@ const { t } = useI18n();
 
 const anchor = ref(null);
 const open = ref(false);
-const draftStart = ref('');
-const draftEnd = ref('');
+const draft = ref(null);
 
 const single = computed(() => !props.presets.some((preset) => !['today', 'yesterday', 'custom'].includes(preset)));
 const quickPresets = computed(() => props.presets.filter((preset) => preset !== 'custom'));
@@ -85,18 +88,19 @@ const rangeText = computed(() => {
 });
 
 const toggle = () => {
-    draftStart.value = props.filters.start;
-    draftEnd.value = props.filters.end;
+    draft.value = single.value ? props.filters.start : [props.filters.start, props.filters.end];
     open.value = !open.value;
 };
 const pick = (preset) => {
     open.value = false;
     emit('apply', { preset });
 };
-const applyCustom = () => {
-    if (!draftStart.value) return;
+/* The calendar answers once a day (or both ends of a range) is picked. */
+const applyCustom = (value) => {
+    const [start, end] = Array.isArray(value) ? value : [value, value];
+    if (!start) return;
     open.value = false;
-    emit('apply', { preset: 'custom', start: draftStart.value, end: single.value ? draftStart.value : (draftEnd.value || draftStart.value) });
+    emit('apply', { preset: 'custom', start, end: end || start });
 };
 
 const onOutside = (event) => { if (anchor.value && !anchor.value.contains(event.target)) open.value = false; };

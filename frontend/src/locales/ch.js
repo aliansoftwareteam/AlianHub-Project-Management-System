@@ -4444,6 +4444,8 @@ export default {
         "from": "From",
         "to": "To",
         "apply_range": "Apply",
+        "pick_range": "Or pick a start and an end day",
+        "pick_day": "Or pick a day",
         "preset_today": "Today",
         "preset_yesterday": "Yesterday",
         "preset_this_week": "This week",

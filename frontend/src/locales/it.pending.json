@@ -9058,6 +9058,8 @@
     "Reports.nothing_here": "Nothing in this group.",
     "Reports.off_track": "Off track",
     "Reports.on_track": "On track",
+    "Reports.pick_day": "Or pick a day",
+    "Reports.pick_range": "Or pick a start and an end day",
     "Reports.points_n": "{n} pts",
     "Reports.portfolio_head": "{n} projects · week of {week}",
     "Reports.portfolio_name": "Name",
