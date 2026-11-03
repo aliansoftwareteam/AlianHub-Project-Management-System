@@ -1,6 +1,6 @@
 # Connectors research matrix
 
-Phase 0 of task 056. Sections 1–4 cover Google and Dropbox (task 061); each fact there cites a source from section 4 as `[S#]`. Sections 5–8 cover the new connectors, their Phase 3 ranking and Gmail (task 062), with sources per provider in section 8 and `*` marking a fact no official page confirms. Slack and GitHub are researched in tasks 074 and 075. All sources were checked on **2026-10-28** and re-checked on **2026-10-29** in review. Secondary sources are marked.
+Phase 0 of task 056. Sections 1–4 cover Google and Dropbox (task 061); each fact there cites a source from section 4 as `[S#]`. Sections 5–8 cover the new connectors, their Phase 3 ranking and Gmail (task 062), with sources per provider in section 8 and `*` marking a fact no official page confirms. Slack is researched in section 9 (task 074), GitHub in task 075. All sources were checked on **2026-10-28** and re-checked on **2026-10-29** in review. Secondary sources are marked.
 
 ## 1. Pilot matrix: Google and Dropbox
 
@@ -126,3 +126,24 @@ The TAC pages refused automated access on 2026-10-29, so their prices could not 
 - Shopify: [auth code grant](https://shopify.dev/docs/apps/build/authentication-authorization/get-access-tokens/auth-code-grant/implement-auth-code-grants-manually), [offline tokens](https://shopify.dev/docs/apps/build/authentication-authorization/access-token-types/offline-access-tokens), [distribution](https://shopify.dev/docs/apps/launch/distribution), [rate limits](https://shopify.dev/docs/apps/build/apis/graphql-admin/rate-limits), [App Store review](https://shopify.dev/docs/apps/launch/app-store-review/review-process)
 - Wispr Flow: [developer API](https://api-docs.wisprflow.ai/quickstart), [remote MCP](https://docs.wisprflow.ai/articles/9551372685-connect-an-mcp-client-to-wispr-flow-remote-mcp-server)
 - Gmail and CASA: [restricted scope verification](https://developers.google.com/identity/protocols/oauth2/production-readiness/restricted-scope-verification), [CASA tiering](https://appdefensealliance.dev/casa/casa-tiering), [ADA authorized labs](https://www.appdefensealliance.org/certification/authorized-labs)
+
+## 9. Slack (task 074)
+
+Read from docs.slack.dev on **2026-11-03**. `*` marks a fact no official page states.
+
+| | Slack — personal user token |
+|---|---|
+| **Auth type** | OAuth 2.0 v2. Authorize at `https://slack.com/oauth/v2/authorize` with user scopes in `user_scope` (comma-separated); `scope` is for bot scopes and is left out [L1]. Exchange at `https://slack.com/api/oauth.v2.access` [L2] |
+| **PKCE** | `oauth.v2.access` takes `code_verifier` [L2]; the app setting `pkce_enabled` cannot be turned off once on [L9]. The authorize page does not list `code_challenge`* |
+| **Per-person support** | Yes. A user token acts "as if by the user themselves" and reaches every public channel and every private conversation the person is in [L3], [L6] |
+| **Least scopes** | `channels:read`, `groups:read` (list), `channels:history`, `groups:history` (read), `chat:write` (post) [L5], [L6], [L7]. `im:*` and `mpim:*` left out: no DMs (074 decision 2). `identify` is added by Slack and not asked for [L8] |
+| **Token answer** | The user token is in `authed_user`: `id`, `scope`, `access_token`, `token_type: user`; the workspace in `team.id` / `team.name` [L2]. A failed call answers `{ ok: false, error }`; the HTTP status is not stated* |
+| **Token life** | Without rotation tokens never expire [L1]. With **token rotation** (required by 074) the answer adds `refresh_token` and `expires_in: 43200` (12 h); access tokens start `xoxe.xoxp-` [L4]. A refresh token is single-use and is revoked shortly after it is used; every answer's `refresh_token` must be kept [L4]. Rotation cannot be turned off once on [L4]. Refreshing for a user token answers the same `authed_user` fields*, per [L4]'s snippet |
+| **Revoke** | `auth.revoke` with the **access** token, as a Bearer header or `token` form field; answers `{ ok: true, revoked: true }` [L10]. Whether the refresh token ends with it is not stated* |
+| **Limits** | Per method, per workspace, per app. `conversations.list` Tier 2 (20+/min), `conversations.history` Tier 3 (50+/min), `chat.postMessage` about 1 per second per channel. 429 with `Retry-After` seconds [L11] |
+| **Dead token** | `invalid_auth`, `token_revoked`, `token_expired`, `not_authed`, `invalid_refresh_token` [L2], [L6] |
+| **Callback constraints** | HTTPS only. The `redirect_uri` must equal a registered Redirect URL or be a subdirectory of it; no `#` [L1]. Localhost is not mentioned; HTTPS rules it out*, so local development uses a tunnel |
+| **Review needed** | None to install in other workspaces: "Activate Public Distribution" (unlisted) needs HTTPS redirect URLs only. Marketplace listing is recommended for commercial use [L9]. A workspace admin may require approval of apps; a user-scope app is uninstalled when its installer leaves [L9]. No install cap stated* |
+| **Verdict** | **Go.** User scopes only, token rotation on, no DMs |
+
+Sources: [L1] [Installing with OAuth](https://docs.slack.dev/authentication/installing-with-oauth), [L2] [oauth.v2.access](https://docs.slack.dev/reference/methods/oauth.v2.access), [L3] [Tokens](https://docs.slack.dev/authentication/tokens), [L4] [Using token rotation](https://docs.slack.dev/authentication/using-token-rotation), [L5] [conversations.list](https://docs.slack.dev/reference/methods/conversations.list), [L6] [conversations.history](https://docs.slack.dev/reference/methods/conversations.history), [L7] [chat.postMessage](https://docs.slack.dev/reference/methods/chat.postMessage), [L8] [identify scope](https://docs.slack.dev/reference/scopes/identify), [L9] [Distribution](https://docs.slack.dev/app-management/distribution), [L10] [auth.revoke](https://docs.slack.dev/reference/methods/auth.revoke), [L11] [Rate limits](https://docs.slack.dev/apis/web-api/rate-limits).

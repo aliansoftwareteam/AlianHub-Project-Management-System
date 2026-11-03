@@ -12,6 +12,9 @@ module.exports = {
         authorizeUrl: 'https://www.dropbox.com/oauth2/authorize',
         tokenUrl: 'https://api.dropboxapi.com/oauth2/token',
         revokeUrl: 'https://api.dropboxapi.com/2/auth/token/revoke',
+        // Dropbox revokes an access token (revokeWith) sent in the Authorization header (revokeAuth), not a refresh
+        // token in a form field — see connection.revokeToken and providerApi.revoke.
+        revokeWith: 'access',
         revokeAuth: 'bearer',
         pkce: 'S256',
         // Without offline access Dropbox returns only a short-lived token and no refresh token.

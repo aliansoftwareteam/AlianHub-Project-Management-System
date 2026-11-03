@@ -259,7 +259,10 @@
                         </div>
                         <p class="ig-note">{{ $t('IntegrationsHub.slack_commands') }}</p>
                     </div>
-                    <SlackConnector v-if="connectors.includes('slack')" />
+                    <p v-if="connectors.includes('slack')" class="ig-note" data-test="slack-personal-note">
+                        {{ $t('IntegrationsHub.slack_personal_note') }}
+                        <router-link :to="{ name: 'Connections', params: { cid } }">{{ $t('IntegrationsHub.slack_personal_link') }}</router-link>
+                    </p>
                     <details class="ig-help">
                         <summary>{{ $t('IntegrationsHub.slack_help_title') }}</summary>
                         <ol>
@@ -293,7 +296,6 @@ import { apiRequest } from '@/services';
 import { useGetterFunctions } from '@/composable';
 import * as env from '@/config/env';
 import { maskOf } from '@/utils/iconMask';
-import SlackConnector from './SlackConnector.vue';
 
 const homeIcon = require('@/assets/images/svg/Home.svg');
 

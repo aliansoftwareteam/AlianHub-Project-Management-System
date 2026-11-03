@@ -141,14 +141,15 @@ const load = async () => {
  * happens, and only this signed-in session can complete the attempt it started. */
 const finishReturn = async () => {
     const query = route.query || {};
-    if (!query.connector) return;
     const { connector, state, code, result, reason } = query;
+    // Only this page's own connectors. A generic return (connector=google) belongs to My connections, which completes it; touching it here would strip the address first and show a stray error on this card.
+    if (!CONNECTORS.includes(connector)) return;
     await router.replace({ query: Object.fromEntries(Object.entries(query).filter(([key]) => !RETURN_KEYS.includes(key))) });
     if (result === 'error') {
         notice.value = { warn: true, text: t(RETURN_ERRORS[reason] || 'GoogleConnection.error_generic') };
         return;
     }
-    if (!CONNECTORS.includes(connector) || typeof state !== 'string' || typeof code !== 'string') return;
+    if (typeof state !== 'string' || typeof code !== 'string') return;
     completing.value = true;
     try {
         answered(await apiRequest('post', `${BASE}/${connector}/complete`, { state, code }));
