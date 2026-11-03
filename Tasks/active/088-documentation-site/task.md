@@ -29,7 +29,8 @@ Nothing from it is lost: each topic maps to a page in the new site (getting-star
 - **Edit links** point to `main` on GitHub (`docs-site/<path>`). Generated API pages turn them off.
 - **Screenshots** come from a local server (port 4430) against the demo database, signed in as the demo owner, read-only. They live in `docs-site/public/screenshots/`.
 - Reports, timesheet screens and Ask AlianHub are being reworked in parallel (tasks 086, 087); their pages describe purpose and main steps, not pixel detail.
-- **Not deployed.** Hosting (GitHub Pages, Netlify, or the help.alianhub.com DNS switch) and pointing the in-app help links (`brandSettings.json`, `TaskFilter.vue`, `Modules/Admin/common/controller.js`, `Modules/Scim/discovery.js`) at the new site are for the owner to decide.
+- **Hosting (decided with the owner, 2026-11-03):** GitHub Pages at https://docs.alianhub.com, free for the public repo. `.github/workflows/docs.yml` builds on pull requests and deploys from `main`; `docs-site/public/CNAME` holds the domain. The owner turns on Pages (Source: GitHub Actions) and adds the DNS record `docs` CNAME `aliansoftwareteam.github.io`.
+- Pointing the in-app help links (`brandSettings.json`, `TaskFilter.vue`, `Modules/Admin/common/controller.js`, `Modules/Scim/discovery.js`) at the new site are for the owner to decide.
 
 ## Information architecture
 - **Getting started** — what AlianHub is, quick tour, concepts glossary, "Your first hour" (9 steps).

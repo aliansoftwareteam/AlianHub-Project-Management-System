@@ -203,6 +203,7 @@ export default defineConfig({
   srcExclude: ['STYLE.md', 'README.md'],
   vite: { build: { chunkSizeWarningLimit: 2000 } },
   lastUpdated: true,
+  sitemap: { hostname: 'https://docs.alianhub.com' },
   ignoreDeadLinks: [/^https?:\/\/localhost/],
   head: [
     ['link', { rel: 'icon', type: 'image/png', href: '/favicon.png' }],

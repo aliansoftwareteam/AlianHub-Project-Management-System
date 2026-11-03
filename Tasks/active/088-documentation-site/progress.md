@@ -15,7 +15,9 @@
 - [x] `npm run docs:build` with no dead links; checked in the browser (home, a guide page, an API page, dark mode, search)
 - [x] Committed locally on `docs/documentation-site`
 - [ ] Owner review
-- [ ] Decide hosting and point the in-app help links at the new site (follow-up)
+- [x] Hosting decided: GitHub Pages at docs.alianhub.com (workflow, CNAME, sitemap)
+- [ ] Owner: Settings → Pages → Source: GitHub Actions; DNS `docs` CNAME `aliansoftwareteam.github.io`; Enforce HTTPS
+- [ ] Point the in-app help links at docs.alianhub.com (follow-up)
 
 ## Last step
 
@@ -60,6 +62,10 @@ Site builds clean (92 written pages + 23 generated API pages, about 130,000 word
 None.
 
 ## Log
+
+### 2026-11-03
+- Header gained a **Try the live demo** button.
+- Hosting: GitHub Pages workflow `.github/workflows/docs.yml`, `docs-site/public/CNAME`, sitemap for docs.alianhub.com. Branch rebuilt on `origin/staging` and opened as a PR into `staging`.
 
 ### 2026-11-02
 - Worktree reset to `origin/chore/pre-staging` and branch renamed `docs/documentation-site`.
