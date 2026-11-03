@@ -6,6 +6,12 @@
       "runtimeExecutable": "npm",
       "runtimeArgs": ["run", "nodemon"],
       "port": 4000
+    },
+    {
+      "name": "docs-site",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": ["--prefix", "docs-site", "run", "docs:preview", "--", "--port", "4173"],
+      "port": 4173
     }
   ]
 }
