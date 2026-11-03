@@ -86,3 +86,4 @@ Auto-maintained registry of all tasks. Reflects YAML frontmatter from each `task
 | 078 | Connectors — Inbox approval cards and quota settings screens | backlog | high | 069, 070 | backlog/078-connectors-approval-quota-screens |
 | 079 | Connectors — remove the old Slack bot and GitHub sync paths | backlog | medium | 074, 075 | backlog/079-connectors-remove-slack-github-paths |
 | 088 | Documentation site — in-depth user, admin, developer and API docs to replace help.alianhub.com | active | high | — | active/088-documentation-site |
+| 089 | Quick UI/UX review — fix small UI issues with before/after screenshots | active | medium | — | active/089-quick-ui-review |
