@@ -224,9 +224,9 @@ export default defineConfig({
           { text: 'FAQ', link: '/help/faq' },
           { text: 'Troubleshooting', link: '/help/troubleshooting' },
           { text: 'Changelog', link: '/help/changelog' },
-          { text: 'Live demo', link: 'https://demo.alianhub.com' },
         ],
       },
+      { text: 'Try the live demo', link: 'https://demo.alianhub.com' },
     ],
     sidebar: {
       '/getting-started/': gettingStarted,

@@ -25,3 +25,23 @@
   border-radius: 8px;
   box-shadow: 0 4px 16px rgba(23, 22, 28, 0.06);
 }
+
+.VPNavBarMenuLink[href="https://demo.alianhub.com"] {
+  margin-left: 8px;
+  padding: 0 14px;
+  height: 32px;
+  line-height: 32px;
+  align-self: center;
+  border-radius: 16px;
+  background-color: var(--vp-c-brand-1);
+  color: var(--vp-c-white) !important;
+  font-weight: 600;
+}
+
+.VPNavBarMenuLink[href="https://demo.alianhub.com"]:hover {
+  background-color: var(--vp-c-brand-2);
+}
+
+.dark .VPNavBarMenuLink[href="https://demo.alianhub.com"] {
+  color: var(--vp-c-black) !important;
+}
