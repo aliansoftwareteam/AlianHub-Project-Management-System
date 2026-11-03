@@ -1,10 +1,11 @@
-/* Migration 080 retires the Slack workspace bot (task 074): its secrets, its row, the posts still waiting on it, and
-   one bell notice to owners and admins. A person's own Slack connection is left alone, and a second run changes nothing. */
+/* Migration 080 retires the Slack workspace bot (task 074): the bot token at Slack, its secrets, its row, the posts
+   still waiting on it, and one bell notice to owners and admins. A person's own Slack connection is left alone, and a second run changes nothing. */
 const mockDb = require('./fixtures/fakeMongo').create();
 
 jest.mock('../utils/mongo-handler/mongoQueries', () => ({ MongoDbCrudOpration: (...a) => mockDb.crud(...a) }));
 jest.mock('../Config/loggerConfig', () => ({ info: jest.fn(), error: jest.fn(), warn: jest.fn() }));
-jest.mock('../Config/secrets', () => ({ retire: jest.fn(async () => 'revoked') }));
+jest.mock('../Config/secrets', () => ({ retire: jest.fn(async () => 'revoked'), resolve: jest.fn(async ({ handle }) => (handle === 'sec_bot' ? 'xoxb-bot-token' : 'signing')) }));
+jest.mock('../Modules/Connectors/providerApi', () => ({ revoke: jest.fn(async () => ({ ok: true, body: { revoked: true } })) }));
 jest.mock('../Modules/Audit/recorder', () => ({ recordAudit: jest.fn() }));
 jest.mock('../Modules/Inbox/helpers/workspaceNotice', () => ({ ownersAndAdmins: jest.fn(async () => ['owner-1', 'admin-1']), sendNotice: jest.fn(async () => {}) }));
 
@@ -13,6 +14,7 @@ const { SCHEMA_TYPE } = require('../Config/schemaType');
 const store = require('../Config/secrets');
 const { recordAudit } = require('../Modules/Audit/recorder');
 const { sendNotice } = require('../Modules/Inbox/helpers/workspaceNotice');
+const providerApi = require('../Modules/Connectors/providerApi');
 const migration = require('../migrations/080-retire-slack-bot');
 
 const C = '6f00000000000000000000c1';
@@ -33,6 +35,26 @@ beforeEach(() => {
 });
 
 describe('080-retire-slack-bot', () => {
+    it('asks Slack to revoke the bot token, and never sends it the signing secret', async () => {
+        await migration.retireCompany(ctx(), C);
+        expect(providerApi.revoke).toHaveBeenCalledTimes(1);
+        expect(providerApi.revoke).toHaveBeenCalledWith(expect.objectContaining({ companyId: C, token: 'xoxb-bot-token', definition: expect.objectContaining({ id: 'slack' }) }));
+        expect(recordAudit).toHaveBeenCalledWith(C, expect.objectContaining({ meta: expect.objectContaining({ atSlack: ['revoked'] }) }));
+    });
+
+    it.each([
+        ['Slack cannot be reached', () => providerApi.revoke.mockRejectedValueOnce(new Error('offline')), 'failed'],
+        ['Slack refuses the token', () => providerApi.revoke.mockResolvedValueOnce({ ok: false, error: 'invalid_auth' }), 'failed'],
+        ['the token cannot be read', () => store.resolve.mockResolvedValueOnce(null), 'unreadable'],
+    ])('still retires everything when %s', async (_why, arrange, atSlack) => {
+        arrange();
+        await migration.retireCompany(ctx(), C);
+        expect(store.retire).toHaveBeenCalledTimes(2);
+        expect(rows(T).find((r) => r._id === 'bot')).toMatchObject({ deletedStatusKey: 1, status: 'retired' });
+        expect(sendNotice).toHaveBeenCalledTimes(1);
+        expect(recordAudit).toHaveBeenCalledWith(C, expect.objectContaining({ meta: expect.objectContaining({ atSlack: [atSlack] }) }));
+    });
+
     it('retires the bot secrets, closes its row, declines its waiting posts and tells owners and admins', async () => {
         await migration.retireCompany(ctx(), C);
         expect(store.retire.mock.calls.map(([arg]) => arg.handle).sort()).toEqual(['sec_bot', 'sec_sign']);
@@ -54,6 +76,7 @@ describe('080-retire-slack-bot', () => {
         jest.clearAllMocks();
         expect(await migration.retireCompany(ctx(), C)).toEqual({ retired: 0, expired: 0, told: 0 });
         expect(store.retire).not.toHaveBeenCalled();
+        expect(providerApi.revoke).not.toHaveBeenCalled();
         expect(sendNotice).not.toHaveBeenCalled();
     });
 

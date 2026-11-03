@@ -39,9 +39,10 @@ Slack accepts only an `https` Redirect URL, and localhost does not work. Run a t
 
 Migration `080-retire-slack-bot` runs once in every workspace that had the bot. It:
 
+- asks Slack to revoke the bot token (`auth.revoke`); if Slack cannot be reached, or the workspace's egress list leaves `slack.com` out, it goes on, since AlianHub never uses the token again;
 - retires the bot token and the signing secret in the secrets store;
 - closes the bot's connection and its channel allow-list;
 - declines every Inbox proposal that was still waiting to post through the bot, so nothing is sent;
 - tells each owner and admin in the bell.
 
-A second run changes nothing. After it runs, uninstall the old bot app from Slack yourself.
+A second run changes nothing. After it runs, uninstall the old bot app from Slack yourself: the signing secret has no revoke at Slack, and a revoke that did not reach Slack leaves the bot token working there.
