@@ -214,9 +214,10 @@ jobs:
           name: e2e-frontend-dist
           path: frontend/dist
       # A service container cannot be given the "server /data" command MinIO needs, so it is started here.
+      # minio/minio left Docker Hub; pgsty/minio is the community build of the same server.
       - name: Start MinIO for tests/integration/s3-storage.int.test.js
         run: |
-          docker run -d --name minio -p 9000:9000 -e MINIO_ROOT_USER=minioadmin -e MINIO_ROOT_PASSWORD=minioadmin minio/minio:latest server /data
+          docker run -d --name minio -p 9000:9000 -e MINIO_ROOT_USER=minioadmin -e MINIO_ROOT_PASSWORD=minioadmin pgsty/minio:RELEASE.2026-08-04T00-00-00Z server /data
           for i in $(seq 1 30); do curl -sf http://127.0.0.1:9000/minio/health/live && exit 0; sleep 1; done
           docker logs minio
           exit 1

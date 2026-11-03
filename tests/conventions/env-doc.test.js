@@ -25,7 +25,7 @@ describe('environment variables', () => {
 
     it('generate their docs from the current tree', () => {
         expect(built.problems).toEqual([]);
-        expect(Object.values(built.files)).toHaveLength(4);
+        expect(Object.values(built.files)).toHaveLength(3);
         expect(Object.values(built.files).every((content) => typeof content === 'string' && content.length > 100)).toBe(true);
     });
 

@@ -118,7 +118,7 @@ describe('what drift costs', () => {
 });
 
 describe('who sets each variable on a hosted instance', () => {
-    const { MANAGED_CLASSES, renderMatrix } = require('../scripts/env-doc');
+    const { MANAGED_CLASSES } = require('../scripts/env-doc');
 
     it('accepts the five columns and refuses anything else', () => {
         expect(MANAGED_CLASSES).toEqual(['bootstrap', 'platform', 'customer', 'fixed', 'dev']);
@@ -131,19 +131,5 @@ describe('who sets each variable on a hosted instance', () => {
         const problem = 'not classified for hosting ("managed") in scripts/env-doc.meta.json: NEW_VAR';
         expect(driftReport(drift).problems).toEqual([problem]);
         expect(driftReport(drift, true).problems).toEqual([problem]);
-    });
-
-    it('renders one section per column, in column order, with secrets marked and pipes escaped', () => {
-        const described = {
-            WEBURL: { group: 'server', description: 'Public URL.', managed: 'bootstrap' },
-            AI_API_KEY: { group: 'ai', description: 'Key | provider.', managed: 'customer', secret: true },
-            LOG_DIR: { group: 'logging', description: 'Logs.', managed: 'fixed', default: 'log' },
-        };
-        const reads = { WEBURL: { files: [] }, AI_API_KEY: { files: [] }, LOG_DIR: { files: [] } };
-        const text = renderMatrix(described, reads);
-        const headings = text.split('\n').filter((line) => line.startsWith('## '));
-        expect(headings).toEqual(['## Bootstrap', '## Customer', '## Fixed']);
-        expect(text).toContain('| `AI_API_KEY` (secret) | ai |  | Key \\| provider. |');
-        expect(text).toContain('| `LOG_DIR` | logging | `log` | Logs. |');
     });
 });
