@@ -3,7 +3,7 @@
  * without it that read scans every time log (1.4–3.6 s on a workspace with 264k logs). No row is rewritten.
  * createIndexes builds only what is missing and drops nothing, so a second run changes nothing. */
 
-const ID = '078-timesheet-date-index';
+const ID = '079-timesheet-date-index';
 
 const INDEX = 'LogStartTime_1';
 
@@ -20,7 +20,7 @@ module.exports = {
     async up(ctx) {
         await ctx.forEachCompany(async (companyId) => {
             const built = await indexCompany(ctx, companyId);
-            ctx.logger.info(`[migrations] 078 ${companyId}: ${JSON.stringify(built)}`);
+            ctx.logger.info(`[migrations] 079 ${companyId}: ${JSON.stringify(built)}`);
             return built;
         });
     },

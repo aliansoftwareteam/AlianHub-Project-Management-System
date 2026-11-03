@@ -50,13 +50,13 @@
   | Status filter, after, one person | 150 ms | 320 ms | 591 ms | 514 ms |
   | Status filter, after, everyone (no date index yet) | 1592 ms | 2930 ms | 4016 ms | 8786 ms |
 
-- Cause of the slow company-wide reads: `timesheets` has no index starting with `LogStartTime`, so a date-only match scans every log (explain: COLLSCAN, 264,014 examined for 188 returned). Added `{ LogStartTime: 1 }` to the schema and migration `078-timesheet-date-index` (createIndexes only; not run against the live database from here).
+- Cause of the slow company-wide reads: `timesheets` has no index starting with `LogStartTime`, so a date-only match scans every log (explain: COLLSCAN, 264,014 examined for 188 returned). Added `{ LogStartTime: 1 }` to the schema and migration `079-timesheet-date-index` (createIndexes only; not run against the live database from here).
 - Task filters now look up only the tasks the report's rows name in the range (plus planned tasks on Workload and the estimate route), not every task in the company.
 - Tests: `tests/migration-timesheet-date-index.test.js`, two new cases in `tests/timesheet-report-filters.test.js`; 74 time/report suites pass.
 
 ## 2026-11-03 — date index built on the large database (owner approved)
 
-- Built `LogStartTime_1` on `timesheets` in the two workspaces with time logs (Alian Software: 264,020 logs, 2.6 s; one other: 4 logs). Same index migration 078 builds. A week's date read now examines 196 logs instead of 264,014 (IXSCAN, 3 ms on the server).
+- Built `LogStartTime_1` on `timesheets` in the two workspaces with time logs (Alian Software: 264,020 logs, 2.6 s; one other: 4 logs). Same index migration 079 builds. A week's date read now examines 196 logs instead of 264,014 (IXSCAN, 3 ms on the server).
 - Workload's logged minutes are now summed per person per day in the database instead of reading every log row; checked on the real quarter that all 2,568 person-day cells match the old sums exactly.
 - Timings after (read-only, from this machine to the database, so they include network time):
 
