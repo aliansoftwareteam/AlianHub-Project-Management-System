@@ -82,6 +82,18 @@ describe(ID, () => {
         expect(row.provider).toBeUndefined();
     });
 
+    it('holds on a default boot with CONNECTORS unset, before the serving path has cut over', async () => {
+        delete process.env.CONNECTORS;
+        const seeded = legacyRow({ secretHandles: { access_token: 'sec_a', refresh_token: 'sec_r' } });
+        const ctx = contextFor([C1]);
+        await migration.up(ctx);
+
+        expect(ctx.companies).toEqual({});
+        const row = rows().find((r) => r._id === seeded._id);
+        expect(row).toMatchObject({ connector: 'google_calendar' });
+        expect(row.provider).toBeUndefined();
+    });
+
     it('down reverses no data; a re-run after cutover then performs the migration', async () => {
         process.env.CONNECTORS = 'google_calendar';
         const seeded = legacyRow({ secretHandles: { access_token: 'sec_a', refresh_token: 'sec_r' } });

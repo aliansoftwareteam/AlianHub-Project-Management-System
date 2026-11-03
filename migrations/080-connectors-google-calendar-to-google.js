@@ -5,11 +5,13 @@
  * resolveConnection and refreshes without the person reconnecting (FR-35). The legacy grants were all minted by the
  * instance app (CONNECTOR_GOOGLE_*), so the row records `app.source: 'instance'`.
  *
- * Cutover gate: it reshapes a row only once CONNECTORS no longer names the legacy `google_calendar` connector. While
- * that name is served the legacy googleController still reads rows by `connector`/`secretHandles`, and reshaping them
- * then would make every live Calendar connection look disconnected — so while it is named this is a no-op that still
- * records itself applied, to be re-run after the cutover (the gate pattern of 031-secrets-by-handle). That keeps 073
- * safe to ship on its own: the data moves only when the serving path has, never breaking a live grant.
+ * Cutover gate: it reshapes a row only once CONNECTORS serves the new `google` provider and no longer names the legacy
+ * `google_calendar` connector — the registry offers a provider only when CONNECTORS names its id, so this is the moment
+ * the serving path has moved. Before then (legacy still named, or neither served on a default boot) the legacy
+ * googleController still reads rows by `connector`/`secretHandles`, and reshaping would make every live Calendar
+ * connection look disconnected — so until the cutover this is a no-op that still records itself applied, to be re-run
+ * after it (the gate pattern of 031-secrets-by-handle). That keeps 073 safe to ship on its own: the data moves only
+ * when the serving path has, never breaking a live grant and never running early on an install that has not cut over.
  *
  * `down` reverses no data: once 066 is live a genuine new-flow Google connection is the same shape as a migrated one,
  * so no reverse could tell them apart. It only clears the record so a later `up` re-evaluates the gate — the
@@ -23,7 +25,10 @@ const LEGACY = 'google_calendar';
 const PROVIDER = 'google';
 const PRODUCTS = Object.freeze(['calendar']);
 
-const legacyGoogleServed = () => require('../Modules/Agents/connectors/flag').requestedGoogle().length > 0;
+const cutOverReady = () => {
+    const flag = require('../Modules/Agents/connectors/flag');
+    return flag.named().includes(PROVIDER) && flag.requestedGoogle().length === 0;
+};
 
 const handlesOf = (secretHandles = {}) => {
     const handles = {};
@@ -61,8 +66,8 @@ module.exports = {
     id: ID,
     scope: 'company',
     async up(ctx) {
-        if (legacyGoogleServed()) {
-            ctx.logger.info(`[migrations] ${ID}: CONNECTORS still names ${LEGACY}, so the legacy Google path is live; nothing migrated. After the cutover to 'google', re-run: npm run migrate -- down ${ID} && npm run migrate -- up`);
+        if (!cutOverReady()) {
+            ctx.logger.info(`[migrations] ${ID}: holding — the data moves only once CONNECTORS names '${PROVIDER}' and no longer names '${LEGACY}', so the serving path has cut over before any row is reshaped; nothing migrated. Re-run after the cutover: npm run migrate -- down ${ID} && npm run migrate -- up`);
             return;
         }
         await ctx.forEachCompany(async (companyId) => {
