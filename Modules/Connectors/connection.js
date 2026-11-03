@@ -283,11 +283,31 @@ const sharesGrant = async (companyId, row) => {
     return others.some((other) => String(other._id) !== String(row._id) && holdsToken(other) && other.account && other.account.id === id);
 };
 
+/* A bearer-revoke provider (Dropbox) authenticates its revoke call with an access token, not the refresh token,
+ * so one is minted from the stored grant here. This bypasses the seat check on purpose — member removal must be
+ * able to revoke a departed person's grant — and never throws, so a disconnect is not blocked by a mint that fails. */
+const bearerRevokeToken = async ({ companyId, actor, provider, row }) => {
+    const handles = row.handles || {};
+    const access = handles.access ? await store.resolve({ companyId, handle: handles.access }).catch(() => null) : null;
+    const fresh = access && row.accessExpiresAt && new Date(row.accessExpiresAt).getTime() - EXPIRY_SKEW_MS > Date.now();
+    if (fresh) return access;
+    const refreshToken = handles.refresh ? await store.resolve({ companyId, handle: handles.refresh }).catch(() => null) : null;
+    if (!refreshToken) return access;
+    const app = await apps.resolveApp({ companyId, provider }).catch(() => null);
+    if (!app) return access;
+    const out = await api.refresh({ definition: definitionOf(provider), companyId, actor: actorOf(actor).id, client: app, refreshToken });
+    return out.ok && out.body && typeof out.body.access_token === 'string' && out.body.access_token ? out.body.access_token : access;
+};
+
 const revokeAtProvider = async ({ companyId, actor, provider, row }) => {
-    const token = holdsToken(row) ? await store.resolve({ companyId, handle: row.handles.refresh }).catch(() => null) : null;
-    if (!token) return 'skipped';
+    if (!holdsToken(row)) return 'skipped';
     if (await sharesGrant(companyId, row)) return 'shared';
-    const out = await api.revoke({ definition: definitionOf(provider), companyId, actor: actorOf(actor).id, token });
+    const definition = definitionOf(provider);
+    const token = definition.auth.revokeAuth === 'bearer'
+        ? await bearerRevokeToken({ companyId, actor, provider, row })
+        : await store.resolve({ companyId, handle: row.handles.refresh }).catch(() => null);
+    if (!token) return 'skipped';
+    const out = await api.revoke({ definition, companyId, actor: actorOf(actor).id, token });
     return out.ok ? (out.skipped ? 'no_endpoint' : 'revoked') : 'failed';
 };
 

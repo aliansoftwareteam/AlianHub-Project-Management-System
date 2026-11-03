@@ -596,6 +596,9 @@ describe('the routes register only when a provider is offered', () => {
             'GET /api/v2/connectors', 'GET /api/v2/connectors/members',
             'POST /api/v2/connectors/:provider/connect', 'POST /api/v2/connectors/:provider/complete',
             'PUT /api/v2/connectors/connections/:id/products', 'DELETE /api/v2/connectors/connections/:id',
+            'GET /api/v2/connectors/picker/:source/token',
+            'GET /api/v2/connectors/picker/:source/thumbnail',
+            'POST /api/v2/connectors/picker/:source/import',
         ]);
         process.env.CONNECTORS = 'slack';
         expect(routesOf()).toEqual([]);

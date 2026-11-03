@@ -6,7 +6,7 @@ vi.mock('@/services', () => ({ apiRequest }));
 
 import { pickCloudFiles } from '@/composable/cloudPicker';
 
-const TOKEN_ROUTE = '/api/v1/cloud-storage/google_drive/token';
+const TOKEN_ROUTE = '/api/v2/connectors/picker/google_drive/token';
 const POPUP_PATH = '/pickers/google-drive';
 const TOKEN = 'ya29.s8-drive-token';
 const ORIGIN = window.location.origin;

@@ -64,31 +64,6 @@
         </section>
 
         <div class="ig__list">
-            <div v-for="p in connectedProviders" :key="p.provider" class="ah-card ig__row">
-                <div class="ig__row-main">
-                    <span class="ig__mark" aria-hidden="true">{{ p.icon }}</span>
-                    <div class="ig__row-text">
-                        <div class="ig__row-name">{{ p.name }}</div>
-                        <div class="ah-small">
-                            <template v-if="p.oauth && p.connected">{{ $t('Integrations.cloud_your_account') }}: {{ p.accountEmail || $t('Integrations.cloud_connected') }}</template>
-                            <template v-else-if="p.oauth && p.connectionStatus === 'reauth_required'">{{ $t('Integrations.cloud_reauth') }}</template>
-                            <template v-else-if="p.oauth">{{ $t('Integrations.cloud_not_connected') }}</template>
-                            <template v-else>{{ $t('Integrations.cloud_no_signin_needed') }}</template>
-                        </div>
-                    </div>
-                    <span class="ig__status ah-small">
-                        <span class="ah-dot" :class="p.connected || !p.oauth ? 'ah-dot--ok' : 'ah-dot--warn'"></span>
-                        {{ p.connected || !p.oauth ? $t('Integrations.cloud_ready') : $t('Integrations.cloud_not_connected') }}
-                    </span>
-                    <div class="ig__row-actions">
-                        <button v-if="p.oauth && !p.connected" type="button" class="ig__link" @click="connectCloud(p)">{{ $t('Integrations.cloud_connect') }}</button>
-                        <button v-if="p.oauth && p.connected" type="button" class="ig__link ig__link--danger" @click="disconnectCloud(p)">{{ $t('Integrations.cloud_disconnect') }}</button>
-                        <button type="button" class="ig__link" @click="toggleCloudForm(p)">{{ cloudEditing === p.provider ? $t('Integrations.cancel') : $t('Settings.configure') }}</button>
-                        <button type="button" class="ig__link ig__link--danger" @click="removeCloud(p)">{{ $t('Integrations.delete') }}</button>
-                    </div>
-                </div>
-            </div>
-
             <div v-for="hook in webhooks" :key="hook._id" class="ah-card ig__row" :class="{ 'is-paused': !hook.active }">
                 <div class="ig__row-main">
                     <span class="ig__mark ig__mark--hook" :class="'is-' + (hook.format || 'json')" aria-hidden="true">{{ (hook.format || 'json').slice(0, 1).toUpperCase() }}</span>
@@ -125,42 +100,13 @@
                 </div>
             </div>
 
-            <div v-if="!connectedProviders.length && !webhooks.length && !isSpinner" class="ah-empty">{{ $t('Settings.integrations_empty') }}</div>
+            <div v-if="!webhooks.length && !isSpinner" class="ah-empty">{{ $t('Settings.integrations_empty') }}</div>
         </div>
 
         <div class="ah-label">{{ $t('Settings.available') }}</div>
         <div class="ig__chips">
-            <button v-for="p in availableProviders" :key="p.provider" type="button" class="ig__chip" :class="{ 'is-active': cloudEditing === p.provider }" @click="toggleCloudForm(p)"><span aria-hidden="true">{{ p.icon }}</span> {{ p.name }}</button>
             <button v-for="opt in formatOptions" :key="opt.value" type="button" class="ig__chip" @click="toggleWebhookForm(opt.value)">{{ opt.label }} {{ $t('Settings.webhook').toLowerCase() }}</button>
         </div>
-
-        <section v-if="editingProvider" class="ah-card">
-            <div class="ah-card__head">
-                <h3 class="ah-h3">{{ $t('Settings.set_up_provider', { provider: editingProvider.name }) }}</h3>
-                <button type="button" class="ah-btn ah-btn--ghost ah-btn--sm" :aria-label="$t('Integrations.cancel')" @click="cloudEditing = ''"><ShellIcon name="x" :size="16" /></button>
-            </div>
-            <div class="ah-card__body ig__form">
-                <div v-if="cloudRedirectUri" class="ig__redirect">
-                    <span class="ah-small">{{ $t('Integrations.cloud_redirect_uri') }}</span>
-                    <code class="ah-mono ig__code">{{ cloudRedirectUri }}</code>
-                    <button type="button" class="ig__link" @click="copyRedirectUri">{{ $t('Integrations.copy') }}</button>
-                    <div class="ah-field__hint">{{ $t('Integrations.cloud_redirect_hint') }}</div>
-                </div>
-                <ol v-if="editingProvider.requirements && editingProvider.requirements.length" class="ig__reqs">
-                    <li v-for="(req, i) in editingProvider.requirements" :key="i" v-html="formatRequirement(req)"></li>
-                </ol>
-                <div class="ig__form-grid">
-                    <div v-for="f in editingProvider.fields" :key="f.key" class="ah-field">
-                        <label class="ah-field__label" :for="'ig-cloud-' + f.key">{{ f.label }}</label>
-                        <input :id="'ig-cloud-' + f.key" class="ah-input ah-mono" :type="f.secret ? 'password' : 'text'" autocomplete="off" v-model.trim="cloudForm[f.key]" :placeholder="f.secret && editingProvider.secrets && editingProvider.secrets[f.key] ? $t('Integrations.cloud_secret_set') : ''" />
-                    </div>
-                </div>
-                <div class="ig__actions">
-                    <button type="button" class="ah-btn ah-btn--primary" :disabled="isSpinner" @click="saveCloud(editingProvider)">{{ $t('Integrations.save') }}</button>
-                    <button type="button" class="ah-btn ah-btn--secondary" @click="cloudEditing = ''">{{ $t('Integrations.cancel') }}</button>
-                </div>
-            </div>
-        </section>
 
         <StoredSecrets v-if="privileged" />
 
@@ -186,13 +132,6 @@ import { useStore } from 'vuex';
 import { apiRequest } from '../../../services';
 import { useI18n } from 'vue-i18n';
 import { isOwnerOrAdmin } from '@/utils/roles';
-import {
-    fetchCloudSettings,
-    saveCloudSettings,
-    clearCloudSettings,
-    connectCloudProvider,
-    disconnectCloudProvider,
-} from '@/composable/cloudPicker';
 
 const { t } = useI18n();
 const $toast = useToast();
@@ -407,131 +346,13 @@ const copySecret = async () => {
     catch (e) { /* ignore */ }
 };
 
-// ── AHE-3838 · cloud storage for attachments ───────────────────────────────
-//
-// Two levels here, and the UI keeps them visibly separate:
-//   the app registration  workspace-wide, owner/admin only
-//   the account grant     per user, because everyone has their own drive
-const cloudProviders = ref([]);
-const cloudRedirectUri = ref('');
-const cloudEditing = ref('');
-const cloudForm = ref({});
-const connectedProviders = computed(() => cloudProviders.value.filter((p) => p.configured));
-const availableProviders = computed(() => cloudProviders.value.filter((p) => !p.configured));
-const editingProvider = computed(() => cloudProviders.value.find((p) => p.provider === cloudEditing.value) || null);
-const connectedCount = computed(() => connectedProviders.value.length + webhooks.value.filter((h) => h.active).length);
-
-const loadCloudSettings = async () => {
-    try {
-        const data = await fetchCloudSettings();
-        cloudProviders.value = data.providers || [];
-        cloudRedirectUri.value = data.redirectUri || '';
-    } catch (error) {
-        // Non-fatal: the webhooks half of this page must still work.
-        console.error('Could not load cloud storage settings', error);
-        cloudProviders.value = [];
-    }
-};
-
-const toggleCloudForm = (p) => {
-    if (cloudEditing.value === p.provider) { cloudEditing.value = ''; return; }
-    // Prefill the non-secret values. Secrets are never sent to us, so their
-    // inputs start blank and a blank one means "keep what's stored".
-    cloudForm.value = { ...(p.config || {}) };
-    cloudEditing.value = p.provider;
-};
-
-const saveCloud = async (p) => {
-    isSpinner.value = true;
-    try {
-        await saveCloudSettings(p.provider, cloudForm.value);
-        cloudEditing.value = '';
-        await loadCloudSettings();
-        $toast.success(t('Integrations.cloud_saved', { provider: p.name }), { position: 'top-right' });
-    } catch (error) {
-        $toast.error(error?.message || t('Toast.something_went_wrong'), { position: 'top-right' });
-    } finally {
-        isSpinner.value = false;
-    }
-};
-
-const removeCloud = async (p) => {
-    // Only ever the caller's own credentials and grant — nobody else is affected.
-    if (!window.confirm(t('Integrations.cloud_confirm_remove', { provider: p.name }))) return;
-    isSpinner.value = true;
-    try {
-        await clearCloudSettings(p.provider);
-        await loadCloudSettings();
-        $toast.success(t('Integrations.cloud_removed', { provider: p.name }), { position: 'top-right' });
-    } catch (error) {
-        $toast.error(error?.message || t('Toast.something_went_wrong'), { position: 'top-right' });
-    } finally {
-        isSpinner.value = false;
-    }
-};
-
-const connectCloud = async (p) => {
-    try {
-        // Full-page redirect to the provider; we come back to this same page.
-        await connectCloudProvider(p.provider);
-    } catch (error) {
-        $toast.error(error?.message || t('Toast.something_went_wrong'), { position: 'top-right' });
-    }
-};
-
-const disconnectCloud = async (p) => {
-    isSpinner.value = true;
-    try {
-        await disconnectCloudProvider(p.provider);
-        await loadCloudSettings();
-        $toast.success(t('Integrations.cloud_disconnected', { provider: p.name }), { position: 'top-right' });
-    } catch (error) {
-        $toast.error(error?.message || t('Toast.something_went_wrong'), { position: 'top-right' });
-    } finally {
-        isSpinner.value = false;
-    }
-};
-
-
-/**
- * Render the light markup used in provider requirement strings: **bold** and
- * `code`. HTML is escaped FIRST, so even though these strings are our own
- * constants today, the renderer can never emit markup that came from data.
- */
-const formatRequirement = (text) => String(text || '')
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>')
-    .replace(/`([^`]+)`/g, '<code>$1</code>');
-
-const copyRedirectUri = async () => {
-    try {
-        await navigator.clipboard.writeText(cloudRedirectUri.value);
-        $toast.success(t('Integrations.copied'), { position: 'top-right' });
-    } catch (error) {
-        $toast.error(t('Toast.something_went_wrong'), { position: 'top-right' });
-    }
-};
+// The per-person cloud-storage app settings moved to the connectors module (076): connecting Drive/Dropbox for
+// attachments is done on My connections, and the workspace OAuth app on the connectors company-apps screen.
+const connectedCount = computed(() => webhooks.value.filter((h) => h.active).length);
 
 onMounted(() => {
     fetchEvents();
     fetchWebhooks();
-    loadCloudSettings();
-    // Coming back from a provider's consent screen — reflect the result and
-    // strip the query so a reload doesn't re-announce it.
-    const params = new URLSearchParams(window.location.search);
-    const outcome = params.get('cloudStorage');
-    if (outcome === 'connected') {
-        $toast.success(t('Integrations.cloud_connected_toast'), { position: 'top-right' });
-    } else if (outcome === 'error') {
-        $toast.error(params.get('reason') || t('Toast.something_went_wrong'), { position: 'top-right' });
-    }
-    if (outcome) {
-        params.delete('cloudStorage'); params.delete('reason'); params.delete('provider');
-        const qs = params.toString();
-        window.history.replaceState({}, '', window.location.pathname + (qs ? `?${qs}` : ''));
-    }
 });
 </script>
 
