@@ -12,7 +12,7 @@
 - [x] Tests
 
 ## Last step
-Built, tested and gap-checked against task.md; three local commits on `feat/074-connectors-slack-personal`, not pushed.
+Built, tested and gap-checked against task.md; Prinsa confirmed the scope changes. Four local commits on `feat/074-connectors-slack-personal`, not pushed. Left: a real-Slack connect once 072 merges.
 
 ## Blockers
 None. Connecting Slack from the UI waits on 072's My connections screen; the routes already work.
@@ -36,3 +36,4 @@ None. Connecting Slack from the UI waits on 072's My connections screen; the rou
 - Testing (second commit): the code exchange sent a `code_verifier` to Slack though its consent asked no PKCE challenge, so every real connection would have failed; it now goes only with `pkce: S256`. Disconnect checks a shared grant before refreshing a token to revoke it. `slack.channels.list` got its audit label and the generic callback its public-route reason. New `connector-slack-connection` (12) runs the real lifecycle on Slack's shapes, including refresh-then-revoke; `connector-slack-tools` grew to 31.
 - Wider run: 1,024 unit files related to the change and all 30 convention files. The 8 that failed either fail on the base commit too (5) or pass alone (3, timeouts under load). Two baseline files in this checkout were CRLF against `eol=lf` and were checked out again.
 - Gap check against task.md (third commit): migration 080 now asks Slack to revoke the bot token first and goes on if it cannot; the leftover `SlackConnector.*` strings were removed; the scope changes made while building are recorded in task.md for Prinsa to confirm, and 079's task notes what 074 already removed.
+- Prinsa confirmed the four changes made while building (connect screen is 072's, more of the bot removed, the summary skill's channel choice, the Slack-side revoke).

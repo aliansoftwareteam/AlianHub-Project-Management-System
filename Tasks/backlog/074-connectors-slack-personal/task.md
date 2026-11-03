@@ -20,7 +20,7 @@ Slack is used with each person's own Slack user token, and the workspace bot is 
 3. **Admins are told by an in-app notification** (the bell, like `CONNECTOR_BROKEN`) when the migration retires the bot.
 4. **Pending bot posts expire.** A proposal still waiting in the Inbox with an old-path `slack.message.post` is closed as `declined` with the reason "The Slack workspace bot was retired. Connect Slack on My connections and ask again.", and nothing is sent.
 
-## Changes made while building (2026-11-03, for Prinsa to confirm)
+## Changes made while building (2026-11-03, confirmed by Prinsa the same day)
 These go beyond or differ from the scope as first written; each is named in the PR body for the reviewer.
 - **The connect screen is 072's.** The first scope said Slack shows on My connections like Google. That screen, for every registry provider, is task 072 (track A), so 074 ships the routes and 072 the screen. Until 072 merges, nobody can connect Slack from the UI; 074 should merge with or after 072.
 - **More of the bot is gone than "no caller".** Besides leaving the four `slack*.js` files with no caller, 074 removed the bot's routes and handlers (`/api/v2/connectors/slack/*`), its agent registry group (`registry/connectors.js`), its screen (`SlackConnector.vue`) with its `SlackConnector.*` strings, and the bot's three test files, so the bot cannot be set up again after migration 080. 079 deletes the four files and `SlackPostPreview.vue`.
