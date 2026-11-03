@@ -53,3 +53,19 @@
 - Cause of the slow company-wide reads: `timesheets` has no index starting with `LogStartTime`, so a date-only match scans every log (explain: COLLSCAN, 264,014 examined for 188 returned). Added `{ LogStartTime: 1 }` to the schema and migration `078-timesheet-date-index` (createIndexes only; not run against the live database from here).
 - Task filters now look up only the tasks the report's rows name in the range (plus planned tasks on Workload and the estimate route), not every task in the company.
 - Tests: `tests/migration-timesheet-date-index.test.js`, two new cases in `tests/timesheet-report-filters.test.js`; 74 time/report suites pass.
+
+## 2026-11-03 — date index built on the large database (owner approved)
+
+- Built `LogStartTime_1` on `timesheets` in the two workspaces with time logs (Alian Software: 264,020 logs, 2.6 s; one other: 4 logs). Same index migration 078 builds. A week's date read now examines 196 logs instead of 264,014 (IXSCAN, 3 ms on the server).
+- Workload's logged minutes are now summed per person per day in the database instead of reading every log row; checked on the real quarter that all 2,568 person-day cells match the old sums exactly.
+- Timings after (read-only, from this machine to the database, so they include network time):
+
+  | Query | Week | Month | Quarter | Year |
+  |---|---|---|---|---|
+  | Project: logs by day × project (everyone) | 79 ms (was 1401) | 248 ms (1546) | 487 ms (2238) | 1623 ms (3556) |
+  | Workload: logged minutes, all members (summed in DB) | ~90 ms | ~280 ms | 265 ms (raw rows 1010) | 805 ms (raw rows 2772) |
+  | Status filter, everyone | 160 ms (was 5282) | 730 ms (4588) | 1677 ms (3968) | 4558 ms (5110) |
+  | Status filter, one person | 117 ms | 270 ms | 269 ms | 419 ms |
+  | Mine: one person | 39 ms | 126 ms | 154 ms | 341 ms |
+
+- Still heavy: a whole year for everyone with a status filter (4.6 s; 46k matching logs) and a year of plans for everyone (1.2 s, 16.8k rows). Both are far rarer views; a summed-in-DB read for plans is the next step if needed.
