@@ -15,7 +15,7 @@
  * clears nothing the second time. `down` restores no data — the secrets are gone and cannot be un-deleted — it only
  * clears the record so a later `up` re-evaluates the gate. */
 
-const ID = '081-cloud-storage-to-connectors';
+const ID = '082-cloud-storage-to-connectors';
 const PAIRS = Object.freeze([
     { source: 'google_drive', provider: 'google' },
     { source: 'dropbox', provider: 'dropbox' },

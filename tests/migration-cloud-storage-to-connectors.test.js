@@ -7,7 +7,7 @@ jest.mock('../Config/loggerConfig', () => ({ info: jest.fn(), error: jest.fn(), 
 const { buildContext, listMigrations, validateMigration } = require('../migrations');
 const { SCHEMA_TYPE } = require('../Config/schemaType');
 
-const ID = '081-cloud-storage-to-connectors';
+const ID = '082-cloud-storage-to-connectors';
 const migration = require(`../migrations/${ID}`);
 const T = SCHEMA_TYPE.CLOUD_STORAGE_CONNECTIONS;
 const C1 = '6f0000000000000000000c01';

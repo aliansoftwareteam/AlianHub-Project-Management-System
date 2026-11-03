@@ -14,7 +14,7 @@ Backend, migration, frontend and tests written. New/changed:
 - `providers/dropbox/index.js`, `pickerProviders.js`, `pickerController.js`, three owner-only routes.
 - `providerApi.revoke` + `connection.revokeAtProvider` gained a `revokeAuth: 'bearer'` branch (Dropbox revokes
   with the token in the Authorization header; Google's form path is unchanged).
-- `migrations/081-cloud-storage-to-connectors.js` — per-provider cutover gate, clears secrets, closes rows, twice-safe.
+- `migrations/082-cloud-storage-to-connectors.js` — per-provider cutover gate, clears secrets, closes rows, twice-safe.
 - `cloudPicker.js` repointed to `/api/v2/connectors/picker/...`; connect now routes to My connections; per-person
   settings dropped. `Integrations.vue` cloud-storage settings section removed.
 - `.env.example`: `CONNECTOR_GOOGLE_PICKER_API_KEY`, `CONNECTOR_GOOGLE_APP_ID`, `CONNECTOR_DROPBOX_CLIENT_ID/SECRET`.
@@ -50,7 +50,7 @@ controller/routes and adds the instance-admin setup pages.**
 - `Modules/Connectors/pickerProviders.js` — pure per-provider download/thumbnail/config builders
 - `Modules/Connectors/pickerController.js` — picker-token, thumbnail, import (owner session)
 - `Modules/Connectors/routes.js` — three new owner-only routes
-- `migrations/081-cloud-storage-to-connectors.js` — clear secrets, close rows
+- `migrations/082-cloud-storage-to-connectors.js` — clear secrets, close rows
 - `frontend/src/composable/cloudPicker.js` — repoint to the module, keep Chooser
 - `frontend/src/views/Settings/Integrations/Integrations.vue` — drop per-person app settings
 - i18n keys under `Connectors.picker.*`; docs via `npm run api:doc`
