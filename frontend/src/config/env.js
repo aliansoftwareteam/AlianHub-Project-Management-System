@@ -286,6 +286,7 @@ module.exports.AUTOMATIONS_BACKTEST = '/api/v2/automations/backtest';
 module.exports.AUTOMATIONS_AI_DRAFT = '/api/v2/automations/draft';
 module.exports.AI_ASK = '/api/v1/ai/ask';
 module.exports.AI_ASK_SOURCES = '/api/v1/ai/ask/sources';
+module.exports.AI_ASK_MENTIONS = '/api/v1/ai/ask/mentions';
 module.exports.AI_ASK_CARD = '/api/v1/ai/ask/card';
 module.exports.AI_ASK_POST = '/api/v1/ai/ask/post';
 module.exports.AI_ASK_POST_TARGETS = '/api/v1/ai/ask/post/targets';
