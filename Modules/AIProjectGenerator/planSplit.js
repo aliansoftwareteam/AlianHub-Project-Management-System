@@ -6,6 +6,7 @@ const { SCHEMA_TYPE } = require('../../Config/schemaType');
 const { MongoDbCrudOpration } = require('../../utils/mongo-handler/mongoQueries');
 const { splitFor, splitSummary } = require('../Agents/taskSplit');
 const skillRecord = require('../Agents/skillRecord');
+const { APPROVED_CLAUSE } = require('../Agents/agentApproval');
 
 const blockText = (blocks) => (Array.isArray(blocks) ? blocks : []).flatMap((b) => {
     if (!b || !b.data) return [];
@@ -27,7 +28,7 @@ const asRouterTask = (task = {}) => ({
 const loadLiveAgents = async (companyId, { includePaused = false } = {}) => {
     const rows = await MongoDbCrudOpration(companyId, {
         type: SCHEMA_TYPE.AGENTS,
-        data: [{ deletedStatusKey: { $ne: 1 }, ...(includePaused ? {} : { paused: { $ne: true } }) }],
+        data: [{ deletedStatusKey: { $ne: 1 }, ...(includePaused ? {} : { paused: { $ne: true }, ...APPROVED_CLAUSE }) }],
     }, 'find');
     return (rows || []).filter((a) => !(Array.isArray(a.projectIds) && a.projectIds.length));
 };

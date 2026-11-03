@@ -30,7 +30,7 @@
 
                     <div v-if="group.parent.key === 'artificial_intelligence' && !aiPlanPermission" class="pm__upgrade">
                         <span>{{ $t('AI.please_upgrade_plan_to_use_ai') }}</span>
-                        <router-link class="ah-btn ah-btn--primary ah-btn--sm" :to="{ name: 'Upgrade', params: { cid: companyId } }">{{ $t('Upgrades.upgrade_your_plan') }}</router-link>
+                        <button type="button" class="ah-btn ah-btn--primary ah-btn--sm" @click="openUpgrade(router, companyId)">{{ $t('Upgrades.upgrade_your_plan') }}</button>
                     </div>
 
                     <div
@@ -61,6 +61,14 @@
                                     @change="setValue(rule, role, Number($event.target.value))"
                                 />
                             </template>
+                            <template v-else-if="rule.riskField">
+                                <select class="pm__select" :value="String(value(rule, role))" :disabled="cellDisabled(rule, role)" :aria-label="`${ruleName(rule)} · ${role.name}`" @change="setValue(rule, role, parseOption($event.target.value))">
+                                    <option value="null">{{ $t('Permissions.None') }}</option>
+                                    <option value="1">{{ $t('Permissions.risk_low') }}</option>
+                                    <option value="2">{{ $t('Permissions.risk_medium') }}</option>
+                                    <option value="3">{{ $t('Permissions.risk_any') }}</option>
+                                </select>
+                            </template>
                             <template v-else-if="rule.selectionField">
                                 <select class="pm__select" :value="String(value(rule, role))" :disabled="cellDisabled(rule, role)" :aria-label="`${ruleName(rule)} · ${role.name}`" @change="setValue(rule, role, parseOption($event.target.value))">
                                     <option value="null">{{ $t('Permissions.None') }}</option>
@@ -69,7 +77,7 @@
                                     <option value="2">{{ $t('Projects.everyone') }}</option>
                                 </select>
                             </template>
-                            <template v-else-if="mode === 'simple'">
+                            <template v-else-if="mode === 'simple' || rule.switchOnly">
                                 <AhSwitch
                                     small
                                     :modelValue="value(rule, role) === true"
@@ -102,6 +110,8 @@
 <script setup>
 import { computed, inject } from "vue";
 import { useStore } from "vuex";
+import { useRouter } from "vue-router";
+import { openUpgrade } from "@/composable/upgradeLink";
 import { useI18n } from "vue-i18n";
 import AhSwitch from "@/components/molecules/Setting/AhSwitch.vue";
 import ShellIcon from "@/components/organisms/Shell/ShellIcon.vue";
@@ -122,6 +132,7 @@ const props = defineProps({
 const { t, te } = useI18n();
 const { getters } = useStore();
 const companyId = inject("$companyId");
+const router = useRouter();
 
 const DESTRUCTIVE_RE = /delete|archive/;
 const PROPOSES_RE = /create|edit|status|assignee|priority|due_date|start_date|tag|move|duplicate|merge|convert|comment|sprint|folder|milestone|custom_field|checklist|attachments|description|estimate|type/;

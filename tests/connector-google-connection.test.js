@@ -22,6 +22,7 @@ jest.mock('../Config/permissionGuard', () => ({
         return uid in roles ? roles[uid] : null;
     }),
     isPrivileged: (roleType) => roleType === 1 || roleType === 2,
+    evaluatePermission: jest.fn(async () => true), isWritable: (p) => p === true || p === 1 || p === 2, isReadable: (p) => p !== null && p !== undefined && p !== 0,
 }));
 jest.mock('../Modules/Agents/engine/safeFetch', () => ({
     ...jest.requireActual('../Modules/Agents/engine/safeFetch'),
@@ -621,6 +622,20 @@ describe('who may see and touch a connection', () => {
     };
 
     it.each(attempts)('a guest is refused when it %s', (what, handler, request) => unchanged(() => call(handler, GUEST, request)));
+
+    it('a member whose role does not connect apps for AI is refused a new connection, and still sees and ends their own', async () => {
+        const { evaluatePermission } = require('../Config/permissionGuard');
+        await connectAs(MEMBER);
+        evaluatePermission.mockImplementation(async (companyId, uid, path) => (path === 'artificial_intelligence.ai_connectors' ? null : true));
+        try {
+            const started = await call(ctrl.connect, MEMBER, { params: { connector: G } });
+            expect(started).toMatchObject({ code: 403, body: { status: false, statusText: expect.stringMatching(/connecting apps for AI/) } });
+            expect((await call(ctrl.mine, MEMBER, {})).code).toBe(200);
+            expect((await call(ctrl.disconnect, MEMBER, { params: { connector: G } })).code).toBe(200);
+        } finally {
+            evaluatePermission.mockImplementation(async () => true);
+        }
+    });
 
     it.each(attempts)('someone without a seat is refused when it %s', (what, handler, request) => unchanged(() => call(handler, '6f0000000000000000000a99', { ...request, sessionId: OTHER_SESSION })));
 

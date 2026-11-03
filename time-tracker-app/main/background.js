@@ -1,9 +1,17 @@
 import { app, ipcMain, Menu, Tray, BrowserWindow, shell, dialog, desktopCapturer, systemPreferences, powerMonitor, Notification,screen  } from 'electron'
 import serve from 'electron-serve'
+import Store from 'electron-store'
+import { autoUpdater } from 'electron-updater'
 import { createWindow } from './helpers'
 const path = require('node:path')
 const fs = require('fs')
 const nodeCrypto = require('node:crypto')
+const workspaceState = require('./helpers/workspaceState')
+const deepLinks = require('./helpers/deepLink')
+const legacyInstall = require('./helpers/legacyInstall')
+const updates = require('./helpers/updates')
+const PRODUCT_NAME = 'AlianHub Tracker'
+const UPDATE_CHECK_INTERVAL_MS = 6 * 60 * 60 * 1000
 const isProd = process.env.NODE_ENV === 'production'
 // Prod: assets are packaged into app/ (see electron-builder.yml). Dev: read from source resources/.
 const assetPath = (name) => isProd ? path.join(__dirname, name) : path.join(__dirname, '..', 'resources', name)
@@ -76,25 +84,18 @@ function saveIdleConfig() {
   }
 }
 
-if (process.defaultApp) {
-  if (process.argv.length >= 2) {
-    app.setAsDefaultProtocolClient('myapp', process.execPath, [path.resolve(process.argv[1])])
+deepLinks.SCHEMES.forEach((scheme) => {
+  if (process.defaultApp) {
+    if (process.argv.length >= 2) {
+      app.setAsDefaultProtocolClient(scheme, process.execPath, [path.resolve(process.argv[1])])
+    }
+  } else {
+    app.setAsDefaultProtocolClient(scheme)
   }
-} else {
-  app.setAsDefaultProtocolClient('myapp')
-}
+})
 
 let mainWindow
 let tray = null
-
-// Read the `type` query param from a myapp:// deep link, order-independently.
-const deepLinkType = (u) => {
-  try {
-    return new URLSearchParams((u || '').split('?').slice(1).join('?')).get('type')
-  } catch (e) {
-    return null
-  }
-}
 
 // Cold-launch buffering: a trackerStart deep link can arrive before the renderer
 // has loaded projects. Buffer it and deliver once the renderer signals ready.
@@ -117,6 +118,39 @@ ipcMain.on('deeplink:renderer-ready', () => {
     pendingTrackerDeepLink = null
   }
 })
+
+// "Open in tracker" (alianhub-tracker://connect?url=...) waits the same way, for the workspace list.
+let pendingConnectUrl = null
+let rendererReadyForConnect = false
+
+const deliverConnectLink = (link) => {
+  const url = deepLinks.connectTarget(link)
+  if (!url) return
+  if (rendererReadyForConnect && mainWindow && !mainWindow.isDestroyed()) {
+    mainWindow.webContents.send('workspace:connect', { url })
+  } else {
+    pendingConnectUrl = url
+  }
+}
+
+ipcMain.on('workspace:renderer-ready', () => {
+  rendererReadyForConnect = true
+  if (pendingConnectUrl && mainWindow && !mainWindow.isDestroyed()) {
+    mainWindow.webContents.send('workspace:connect', { url: pendingConnectUrl })
+    pendingConnectUrl = null
+  }
+})
+
+const handleDeepLink = (link) => {
+  const kind = deepLinks.deepLinkKind(link)
+  if (kind === 'connect') {
+    deliverConnectLink(link)
+  } else if (kind === 'trackerStart') {
+    deliverTrackerDeepLink(link)
+  } else if (kind === 'authorize' && mainWindow && !mainWindow.isDestroyed()) {
+    mainWindow.webContents.send('deeplinkUrl', { url: link })
+  }
+}
 let isTracking = null
 let activityInterval = null
 
@@ -125,9 +159,57 @@ const ACTIVE_IDLE_THRESHOLD_SEC = 2
 
 if (isProd) {
   serve({ directory: 'app' })
+  try {
+    legacyInstall.copyLegacySession({ appData: app.getPath('appData'), userData: app.getPath('userData'), fs })
+  } catch (error) {
+    console.error('Could not carry over the previous tracker sign-in:', error)
+  }
 } else {
   app.setPath('userData', `${app.getPath('userData')} (development)`)
 }
+
+const workspaceStore = new Store({ name: 'workspaces', defaults: workspaceState.emptyState() })
+const readWorkspaces = () => workspaceState.normaliseState(workspaceStore.store)
+const writeWorkspaces = (state) => {
+  workspaceStore.store = state
+  return state
+}
+
+const legacyServerAddress = () => {
+  if (!isProd) return null
+  const candidates = legacyInstall.legacyAsarCandidates({ platform: process.platform, env: process.env, home: app.getPath('home') })
+  return legacyInstall.findLegacyApiUrl({ candidates, readFile: (file) => fs.readFileSync(file, 'utf8') })
+}
+
+ipcMain.handle('workspace:load', (event, { buildDefault } = {}) => {
+  const state = readWorkspaces()
+  if (state.workspaces.length) return state
+  const seed = legacyServerAddress() || buildDefault
+  return seed ? writeWorkspaces(workspaceState.seedWorkspace(state, seed)) : state
+})
+ipcMain.handle('workspace:add', (event, entry) => writeWorkspaces(workspaceState.addWorkspace(readWorkspaces(), entry)))
+ipcMain.handle('workspace:select', (event, url) => writeWorkspaces(workspaceState.selectWorkspace(readWorkspaces(), url)))
+ipcMain.handle('workspace:update', (event, { url, ...patch } = {}) => writeWorkspaces(workspaceState.updateWorkspace(readWorkspaces(), url, patch)))
+ipcMain.handle('workspace:remove', (event, url) => writeWorkspaces(workspaceState.removeWorkspace(readWorkspaces(), url)))
+
+const checkForUpdates = () => autoUpdater.checkForUpdatesAndNotify().catch((error) => {
+  console.error('Update check failed:', error)
+  return null
+})
+
+const startAutoUpdates = () => {
+  if (!isProd) return
+  autoUpdater.setFeedURL({ provider: 'generic', url: updates.feedUrlFor(app.getVersion()) })
+  checkForUpdates()
+  setInterval(checkForUpdates, UPDATE_CHECK_INTERVAL_MS)
+}
+
+ipcMain.handle('updates:check', async () => {
+  if (!isProd) return { available: false }
+  const result = await checkForUpdates()
+  const version = result && result.updateInfo && result.updateInfo.version
+  return { available: Boolean(version && version !== app.getVersion()), version: version || null }
+})
 
 process.on("uncaughtException", (error) => {
   console.log("Uncaught Exception:", error)
@@ -270,9 +352,7 @@ function verifyScreenCapturePermission() {
   await app.whenReady()
 
   // Windows shows the AppUserModelID as the notification header ("attribution").
-  // Set a friendly one so toasts read "AlianHub Time Tracker" instead of the
-  // default "electron.app.alianhubtimetracker".
-  if (process.platform === 'win32') app.setAppUserModelId('AlianHub Time Tracker')
+  if (process.platform === 'win32') app.setAppUserModelId(PRODUCT_NAME)
   
   // Load saved permissions state
   loadPermissionsState()
@@ -286,7 +366,7 @@ function verifyScreenCapturePermission() {
   tray = new Tray(trayIconPath)
   const template = [
     {
-      label: 'Time Tracker',
+      label: PRODUCT_NAME,
       icon: trayIconPath,
       enabled: false,
     },
@@ -307,10 +387,10 @@ function verifyScreenCapturePermission() {
   ]
   const contextMenu = Menu.buildFromTemplate(template)
   tray.setContextMenu(contextMenu)
-  tray.setToolTip('Alianhub Time Tracker')
+  tray.setToolTip(PRODUCT_NAME)
 
   mainWindow = createWindow('main', {
-    title: "Time Tracker",
+    title: PRODUCT_NAME,
     width: 347,
     height: 628,
     icon: iconPath,
@@ -324,6 +404,8 @@ function verifyScreenCapturePermission() {
     },
   })
   
+  mainWindow.webContents.on('did-start-loading', () => { rendererReadyForConnect = false })
+
   if (isProd) {
     await mainWindow.loadURL('app://./home')
   } else {
@@ -334,26 +416,15 @@ function verifyScreenCapturePermission() {
   
   // Check permissions after window is created
   checkAndRequestPermissions()
-  
-  let deepLinkURL = process.argv.find(item => item.startsWith("myapp://")) || null
-  if (deepLinkURL) {
-    let type = deepLinkType(deepLinkURL);
-    if (type && type == 'trackerStart') {
-      deliverTrackerDeepLink(deepLinkURL)
-    } else {
-      mainWindow.webContents.send('deeplinkUrl', { url: deepLinkURL })
-    }
-  }
+  startAutoUpdates()
+
+  const launchLink = deepLinks.findTrackerLink(process.argv)
+  if (launchLink) handleDeepLink(launchLink)
 })()
 
 app.on('open-url', (event, deepLinkURL) => {
   event.preventDefault();
-  let type = deepLinkType(deepLinkURL);
-  if (type && type == 'trackerStart') {
-    deliverTrackerDeepLink(deepLinkURL)
-  } else {
-    mainWindow.webContents.send('deeplinkUrl', { url: deepLinkURL })
-  }
+  handleDeepLink(deepLinkURL)
 });
 
 const gotTheLock = app.requestSingleInstanceLock()
@@ -365,15 +436,8 @@ if (!gotTheLock) {
       if (mainWindow.isMinimized()) mainWindow.restore()
       mainWindow.focus()
     }
-    let url = commandLine.find(item => item.startsWith("myapp://")) || commandLine.pop()
-    if (url) {
-      let type = deepLinkType(url);
-      if (type && type == 'trackerStart') {
-        deliverTrackerDeepLink(url)
-      } else {
-        mainWindow.webContents.send('deeplinkUrl', { url: url })
-      }
-    }
+    const link = deepLinks.findTrackerLink(commandLine)
+    if (link) handleDeepLink(link)
   })
 }
 
@@ -497,7 +561,7 @@ ipcMain.on('alert:resume', () => {
   // so an estimate-exceeded task correctly refuses and explains why.
   const params = new URLSearchParams({ type: 'trackerStart', taskId: lastTaskCtx.taskId })
   if (lastTaskCtx.comment) params.set('comment', lastTaskCtx.comment)
-  deliverTrackerDeepLink(`myapp://open?${params.toString()}`)
+  deliverTrackerDeepLink(`alianhub-tracker://open?${params.toString()}`)
 })
 
 // TIME-05: configurable idle threshold (value in minutes; 0 disables auto-pause).
@@ -519,7 +583,7 @@ ipcMain.on("open-external-url", (event, url) => {
 
 // PKCE for the browser sign-in: the verifier never leaves this machine, only its
 // SHA-256 challenge travels through the browser, so a sign-in code picked up by
-// anything else on the myapp:// scheme cannot be exchanged for a session.
+// anything else on the tracker's link schemes cannot be exchanged for a session.
 ipcMain.handle('tracker:pkce', () => {
   const verifier = nodeCrypto.randomBytes(32).toString('base64url')
   return { verifier, challenge: nodeCrypto.createHash('sha256').update(verifier).digest('base64url') }

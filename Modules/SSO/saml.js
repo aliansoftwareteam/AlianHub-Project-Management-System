@@ -86,6 +86,7 @@ exports.samlAcs = async (req, res) => {
         return finalizeSsoSession(req, res, uid, `/${companyId}`);
     } catch (error) {
         if (error && error.code === SSO_NOT_ALLOWED) return res.redirect('/login?ssoError=not_allowed');
+        if (error && error.code === 'seat_limit') return res.redirect('/login?ssoError=seat_limit');
         logger.error(`samlAcs: ${error.message || error}`);
         return res.redirect('/login?ssoError=callback');
     }

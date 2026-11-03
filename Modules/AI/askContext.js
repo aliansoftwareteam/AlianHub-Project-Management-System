@@ -5,13 +5,17 @@ const logger = require('../../Config/loggerConfig');
 const { pageReachFilter } = require('../Pages/helpers/pageRules');
 const { hiddenSprintFilter } = require('../Sprints/helpers/sprintVisibility');
 const skillRecord = require('../Agents/skillRecord');
+const briefing = require('./askBriefing');
+const { askerZone } = require('./askStructured');
+const { taskContext, taskSources } = require('./taskContext');
 
 // What the asker attached with @ and the skill they chose with /. The client sends ids only, and every
 // id is read again here against the projects the asker can open: an id that does not resolve inside
 // them is dropped without saying why, so a guessed id tells the caller nothing.
 
 const MAX_PINNED = 8;
-const KINDS = new Set(['task', 'page', 'project']);
+const KINDS = new Set(['task', 'page', 'project', 'list', 'person']);
+const BRIEFED = new Set(['project', 'list', 'person']);
 const OBJECT_ID = /^[a-f0-9]{24}$/i;
 
 const clip = (s, n) => String(s == null ? '' : s).replace(/\s+/g, ' ').trim().slice(0, n);
@@ -99,7 +103,7 @@ const pinnedSources = async (companyId, uid, { context, projects = [] } = {}) =>
             }, 'title rawText ProjectID visibility updatedAt');
             return page ? pageSource(page, nameById) : null;
         }
-        if (!visibleIds.includes(id)) return null;
+        if (kind !== 'project' || !visibleIds.includes(id)) return null;
         const project = await findOne(companyId, SCHEMA_TYPE.PROJECTS, { _id: oid(id), deletedStatusKey: { $ne: 1 } }, 'ProjectName description updatedAt');
         return project ? projectSource(project) : null;
     };
@@ -137,17 +141,79 @@ const skillPrompt = (skill) => (skill
     ? `\n- The asker chose the skill "${skill.name}"${skill.description ? ` (${skill.description})` : ''}. Shape the answer the way that skill would, from the SOURCES only. It changes nothing here: you are answering, not acting.`
     : '');
 
-const pinnedPrompt = (count) => (count
-    ? `\n- The first ${count} SOURCES were attached by the asker with @: the question is about them first.`
+const pinnedPrompt = (refs) => (refs.length
+    ? `\n- The asker attached ${refs.map((r) => `[${r}]`).join(', ')} with @: the question is about them first, and the sources for them come first.`
     : '');
 
-/* The gathered sources with the attached ones first, and the lines the system prompt gains. */
-const pin = async (companyId, uid, gathered, { context, skill } = {}) => {
-    const [pinned, chosen] = await Promise.all([
+const quietly = async (label, work) => {
+    try {
+        return await work();
+    } catch (error) {
+        logger.error(`ai ask ${label}: ${error.message}`);
+        return null;
+    }
+};
+
+/* Comments, subtasks and linked docs of an attached task, under refs that name the task. */
+const taskExtras = async (companyId, uid, source, visibleIds) => {
+    const ctx = await taskContext({ companyId, uid, taskId: source.id });
+    if (!ctx || !visibleIds.includes(String(ctx.task.ProjectID))) return [];
+    return taskSources(ctx, source.project).slice(1).map((s) => (s.kind === 'comment' ? { ...s, ref: `${source.ref}/${s.ref}` } : s));
+};
+
+/* The project a question asks about as a whole: one in scope, or the one it names. */
+const overviewProjectId = (gathered) => {
+    const scoped = gathered.scopedProjectIds || [];
+    if (scoped.length === 1) return String(scoped[0]);
+    const named = (gathered.intent && gathered.intent.projects) || [];
+    return named.length === 1 ? String(named[0].id) : '';
+};
+
+const briefingsFor = async (companyId, uid, { refs, gathered, question, now }) => {
+    const projects = gathered.projects || [];
+    const byId = new Map(projects.map((p) => [String(p._id), p]));
+    const wanted = refs.filter((r) => BRIEFED.has(r.kind));
+    if (!wanted.length && briefing.isOverviewQuestion(question)) {
+        const id = overviewProjectId(gathered);
+        if (id && byId.has(id)) wanted.push({ kind: 'project', id, implied: true });
+    }
+    if (!wanted.length) return [];
+    const timeZone = await askerZone(uid).catch(() => 'UTC');
+    const read = ({ kind, id }) => quietly(`briefing ${kind}`, () => {
+        if (kind === 'project') return byId.has(id) ? briefing.projectBriefing(companyId, uid, { project: byId.get(id), openIds: [...byId.keys()], now, timeZone }) : null;
+        if (kind === 'list') return briefing.listBriefing(companyId, uid, { listId: id, projects, now, timeZone });
+        return briefing.personBriefing(companyId, uid, { personId: id, projects, now, timeZone });
+    });
+    const out = await Promise.all(wanted.map(read));
+    return out.map((sources, i) => ({ ref: wanted[i], sources: sources || [] }));
+};
+
+const dedupe = (sources) => {
+    const kept = [];
+    sources.forEach((s) => { if (!kept.some((k) => sameSource(k, s))) kept.push(s); });
+    return kept;
+};
+
+/* The gathered sources with the attached ones first, and the lines the system prompt gains. A project,
+ * list or person attached with @, or a whole-project question in a one-project scope, adds its briefing. */
+const pin = async (companyId, uid, gathered, { context, skill, question } = {}) => {
+    const refs = refsOf(context);
+    const visibleIds = (gathered.projects || []).map((p) => String(p._id));
+    const [pinned, chosen, briefed] = await Promise.all([
         pinnedSources(companyId, uid, { context, projects: gathered.projects || [] }),
         askSkill(companyId, skill),
+        refs.length || question ? briefingsFor(companyId, uid, { refs, gathered, question, now: Date.now() }) : [],
     ]);
-    return { gathered: withPinned(gathered, pinned), system: `${pinnedPrompt(pinned.length)}${skillPrompt(chosen)}` };
+    const extras = await Promise.all(pinned.filter((s) => s.kind === 'task')
+        .map((s) => quietly('task extras', () => taskExtras(companyId, uid, s, visibleIds))));
+    const briefSources = briefed.flatMap((b) => b.sources);
+    const lead = dedupe([...briefSources.filter((s) => s.kind !== 'task'), ...pinned, ...extras.flat().filter(Boolean), ...briefSources]);
+    const attached = [
+        ...briefed.filter((b) => !b.ref.implied && b.sources.length).map((b) => b.sources[0].ref),
+        ...pinned.filter((s) => !BRIEFED.has(s.kind) || !briefed.some((b) => b.sources.length && sameSource(b.sources[0], s))).map((s) => s.ref),
+    ];
+    const system = `${pinnedPrompt([...new Set(attached)])}${briefSources.length ? briefing.BRIEFING_SYSTEM : ''}${skillPrompt(chosen)}`;
+    return { gathered: withPinned(gathered, lead), system, briefed: briefSources.length > 0 };
 };
 
 module.exports = { pin, pinnedSources, withPinned, pinnedProjectId, askSkill, skillPrompt, MAX_PINNED };

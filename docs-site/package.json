@@ -1,0 +1,16 @@
+{
+  "name": "alianhub-docs",
+  "private": true,
+  "description": "AlianHub documentation site (VitePress)",
+  "type": "module",
+  "scripts": {
+    "api:pages": "node scripts/build-api-reference.mjs",
+    "docs:dev": "npm run api:pages && vitepress dev",
+    "docs:build": "npm run api:pages && vitepress build",
+    "docs:preview": "vitepress preview"
+  },
+  "devDependencies": {
+    "vitepress": "1.6.4",
+    "vue": "^3.5.13"
+  }
+}

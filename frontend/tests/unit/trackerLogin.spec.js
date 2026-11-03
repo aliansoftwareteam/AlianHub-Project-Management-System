@@ -69,6 +69,24 @@ describe('TrackerLogin', () => {
         expect(window.location.href).toBe(`myapp://authorize?client_id=user-1&code=${CODE}`);
     });
 
+    it('sends the code back on the link the tracker named', async () => {
+        apiRequestWithoutCompnay.mockResolvedValue({ data: { status: true, data: { code: CODE } } });
+        const wrapper = await open({ code_challenge: CHALLENGE, scheme: 'alianhub-tracker' });
+        await wrapper.find('button').trigger('click');
+        await flushPromises();
+
+        expect(window.location.href).toBe(`alianhub-tracker://authorize?client_id=user-1&code=${CODE}`);
+    });
+
+    it('never sends the code to a link outside the tracker\'s own', async () => {
+        apiRequestWithoutCompnay.mockResolvedValue({ data: { status: true, data: { code: CODE } } });
+        const wrapper = await open({ code_challenge: CHALLENGE, scheme: 'https' });
+        await wrapper.find('button').trigger('click');
+        await flushPromises();
+
+        expect(window.location.href).toBe(`myapp://authorize?client_id=user-1&code=${CODE}`);
+    });
+
     it('asks for a fresh code each time Continue is clicked', async () => {
         apiRequestWithoutCompnay.mockResolvedValue({ data: { status: true, data: { code: CODE } } });
         const wrapper = await open();

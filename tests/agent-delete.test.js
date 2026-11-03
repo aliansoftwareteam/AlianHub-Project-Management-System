@@ -2,12 +2,12 @@ const mockDb = require('./fixtures/fakeMongo').create();
 
 jest.mock('../utils/mongo-handler/mongoQueries', () => ({ MongoDbCrudOpration: (...a) => mockDb.crud(...a) }));
 jest.mock('../event/socketEventEmitter', () => ({ emit: jest.fn() }));
-jest.mock('../Config/permissionGuard', () => ({ getRoleType: jest.fn(async () => 'owner'), isPrivileged: (r) => r === 'owner' || r === 'admin' }));
+jest.mock('../Config/permissionGuard', () => ({ getRoleType: jest.fn(async () => 'owner'), isPrivileged: (r) => r === 'owner' || r === 'admin', evaluatePermission: jest.fn(async () => null), isWritable: (p) => p === true || p === 1 || p === 2, isReadable: (p) => p !== null && p !== undefined && p !== 0 }));
 jest.mock('../Modules/Agents/actor', () => ({ resolveActor: jest.fn(async (req) => ({ kind: req.agentToken ? 'agent' : 'human', userId: req.uid })), isAgent: (a) => a.kind === 'agent' }));
 jest.mock('../Modules/Agents/agentAudit', () => ({ recordAgentDeleted: jest.fn(async () => 'aud1'), AGENT_DELETED: 'agent.deleted' }));
 
 const { SCHEMA_TYPE } = require('../Config/schemaType');
-const { getRoleType } = require('../Config/permissionGuard');
+const { getRoleType, evaluatePermission } = require('../Config/permissionGuard');
 const agentAudit = require('../Modules/Agents/agentAudit');
 const socket = require('../event/socketEventEmitter');
 const ctrl = require('../Modules/Agents/controller');
@@ -44,12 +44,12 @@ describe('#15 DELETE /api/v2/agents/:id', () => {
         expect(socket.emit).toHaveBeenCalledWith('update', expect.objectContaining({ module: 'agent', data: { kind: 'agent', agentId: AGENT_ID, deleted: true } }));
     });
 
-    it('lets an admin who is not the agent owner delete it, but refuses a member, even the agent\'s owner', async () => {
+    it('lets an admin who is not the agent owner delete it, but refuses a member whose role does not build agents, even the agent\'s owner', async () => {
         getRoleType.mockResolvedValue('member');
         const member = res();
         await ctrl.deleteAgent(req(), member);
         expect(member.code).toBe(403);
-        expect(member.body.statusText).toBe('Only an Owner or an Admin can manage agents.');
+        expect(member.body.statusText).toBe('Your role does not include building agents. Ask an Owner or an Admin to turn it on in Security & Permissions.');
         expect(mockDb.store[SCHEMA_TYPE.AGENTS][0].deletedStatusKey).toBe(0);
 
         getRoleType.mockResolvedValue('admin');

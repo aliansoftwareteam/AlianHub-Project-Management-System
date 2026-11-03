@@ -27,9 +27,9 @@ const { updateCompanyFun, getCompanyDataFun } = require('../Modules/Company/cont
 
 const COMPANY = '64b1f0c2a1b2c3d4e5f60718';
 const MB = 1024 * 1024;
-const bucketSizeUpdate = (size) => [
+const bucketSizeUpdate = (size, trackshotSize) => [
     'global',
-    { type: 'companies', data: [{ _id: expect.anything() }, { $set: { bucketSize: size } }] },
+    { type: 'companies', data: [{ _id: expect.anything() }, { $set: { bucketSize: size, trackshotSize } }] },
     'findOneAndUpdate',
     COMPANY,
 ];
@@ -49,9 +49,14 @@ beforeEach(() => {
 
 describe('bucket size cron on server storage', () => {
     const bucketDir = path.resolve(__dirname, '..', 'storage', COMPANY);
+    const SHOT_DIR = path.join('Project', 'p1', 'Sprint', 's1', 'TimeLog', 't1');
     const fakeDisk = {
-        [bucketDir]: ['a.png', 'nested'],
+        [bucketDir]: ['a.png', 'nested', 'Project'],
         [path.join(bucketDir, 'nested')]: ['b.pdf'],
+        ...Object.fromEntries(SHOT_DIR.split(path.sep).map((part, i, parts) => [
+            path.join(bucketDir, ...parts.slice(0, i + 1)),
+            i + 1 < parts.length ? [parts[i + 1]] : ['shot.png'],
+        ])),
     };
 
     beforeEach(() => {
@@ -77,7 +82,7 @@ describe('bucket size cron on server storage', () => {
         expect(await outcome(run)).toBe('fulfilled');
 
         expect(getCompanyDataFun).toHaveBeenCalledWith([], true);
-        expect(updateCompanyFun).toHaveBeenCalledWith(...bucketSizeUpdate('2'));
+        expect(updateCompanyFun).toHaveBeenCalledWith(...bucketSizeUpdate('3', 1));
         const perCompanyOutcomes = await Promise.all(perCompany.mock.results.map((result) => outcome(result.value)));
         expect(perCompanyOutcomes).toEqual(['fulfilled']);
     });
@@ -103,11 +108,11 @@ describe('bucket size cron on server storage', () => {
 
 describe('bucket size cron on Wasabi storage', () => {
     it('lists the bucket through the storage client and stores its size', async () => {
-        s3Send.mockResolvedValue({ Contents: [{ Size: MB }, { Size: 3 * MB }] });
+        s3Send.mockResolvedValue({ Contents: [{ Key: 'companyIcon/a.png', Size: MB }, { Key: 'Project/p1/Sprint/s1/TimeLog/t1/shot.png', Size: 3 * MB }] });
         const { handleBucketSizeUpdateCron } = require('../common-storage/common-wasabi');
         await handleBucketSizeUpdateCron();
         expect(s3Send).toHaveBeenCalledWith(expect.objectContaining({ name: 'ListObjectsV2', input: expect.objectContaining({ Bucket: COMPANY }) }));
-        expect(updateCompanyFun).toHaveBeenCalledWith(...bucketSizeUpdate('4'));
+        expect(updateCompanyFun).toHaveBeenCalledWith(...bucketSizeUpdate('4', 3));
     });
 
     it('rejects when the company list cannot be read', async () => {

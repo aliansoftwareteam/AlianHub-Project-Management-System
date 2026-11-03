@@ -223,7 +223,6 @@
     "frontend/src/views/Ai/shipping.css": { "colours": 4, "legacyClasses": 0 },
     "frontend/src/views/Approvals/Approvals.vue": { "colours": 1, "legacyClasses": 0 },
     "frontend/src/views/Approvals/ProposalWhyDialog.vue": { "colours": 1, "legacyClasses": 0 },
-    "frontend/src/views/Authentication/authV2.css": { "colours": 1, "legacyClasses": 0 },
     "frontend/src/views/Automations/style.css": { "colours": 1, "legacyClasses": 0 },
     "frontend/src/views/Billing/style.css": { "colours": 2, "legacyClasses": 0 },
     "frontend/src/views/Changelog/Changelog.vue": { "colours": 1, "legacyClasses": 0 },

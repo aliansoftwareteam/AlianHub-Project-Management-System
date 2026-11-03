@@ -102,12 +102,11 @@ describe('Settings → General in dark mode', () => {
 describe('Project and Tracker timesheets', () => {
     const files = ['views/Timesheet/ProjectTimesheet/ProjectTimesheet.vue', 'views/Timesheet/TrackerTimeSheet/TrackerTimesheet.vue'];
 
-    test.each(files)('%s: the title strip holds the view tabs and follows the theme', (rel) => {
+    test.each(files)('%s: the shared report toolbar holds the view tabs, with no legacy title strip', (rel) => {
         const vue = read(rel);
-        const scoped = vue.slice(vue.indexOf('<style scoped>'));
-        expect(ruleBody(scoped, '.page-title')).toMatch(/background-color:\s*var\(--surface\)/);
-        expect(ruleBody(scoped, '.ts-legacy-tabs')).toMatch(/align-self:\s*stretch/);
-        expect(ruleBody(scoped, 'ul.breadcrumb.title_strip')).toMatch(/background-color:\s*transparent/);
+        expect(vue).toMatch(/<ReportToolbar[^>]*\btab="(project|tracker)"/);
+        expect(vue).not.toMatch(/breadcrumb title_strip/);
+        expect(vue).not.toMatch(/ts-legacy-tabs/);
     });
 });
 
@@ -245,7 +244,7 @@ describe('Project and Tracker timesheet bodies', () => {
     const sheet = read('views/Timesheet/style.css');
 
     test.each(['views/Timesheet/ProjectTimesheet/ProjectTimesheet.vue', 'views/Timesheet/TrackerTimeSheet/TrackerTimesheet.vue'])('%s is a themed page and needs no dark bridge', (rel) => {
-        expect(read(rel)).toMatch(/class="ah-page timesheet_view /);
+        expect(read(rel)).toMatch(/class="ah-page rpt timesheet_view /);
         expect(read(rel)).not.toMatch(/legacyTimesheetTheme/);
     });
 

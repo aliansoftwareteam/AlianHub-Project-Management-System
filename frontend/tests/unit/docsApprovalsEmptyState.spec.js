@@ -10,7 +10,7 @@ vi.mock('@/store/index', () => ({ default: { getters: {} } }));
 vi.mock('@/composable', () => ({ useGetterFunctions: () => ({ getUser: () => ({}) }) }));
 vi.mock('@/views/Timesheet/TimesheetTabs.vue', () => ({ default: { name: 'TimesheetTabs', render: () => null } }));
 vi.mock('@/components/molecules/Pages/PageDocument.vue', () => ({ default: { name: 'PageDocument', render: () => null } }));
-vi.mock('vue-router', () => ({ useRouter: () => ({ push: vi.fn() }) }));
+vi.mock('vue-router', () => ({ useRoute: () => ({ query: {} }), useRouter: () => ({ push: vi.fn(), replace: vi.fn(() => Promise.resolve()) }) }));
 
 import PagesPanel from '@/components/molecules/Pages/PagesPanel.vue';
 import Approvals from '@/views/Approvals/Approvals.vue';

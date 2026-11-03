@@ -115,9 +115,7 @@ AlianHub-Project-Management-System/
 │   ├── VarianceReport/
 │   ├── Webhooks/
 │   ├── service.js                        # shared helpers
-│   ├── serviceFunction.js                # shared helpers
-│   ├── servicewithAWS.js                 # shared helpers
-│   └── servicewithoutAWS.js              # shared helpers
+│   └── serviceFunction.js                # shared helpers
 │
 ├── frontend/                            # Vue.js web UI (SPA)
 │   ├── src/

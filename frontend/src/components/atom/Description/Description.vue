@@ -51,6 +51,7 @@ import { useRoute, useRouter } from "vue-router";
 import { useToast } from 'vue-toast-notification';
 import { useI18n } from "vue-i18n";
 import { canUseAi } from "@/composable/aiAvailability";
+import { openUpgrade } from "@/composable/upgradeLink";
 const { t } = useI18n();
 
 import PromptSidebar from "@/components/molecules/PromptSidebar/PromptSidebar.vue"
@@ -509,7 +510,7 @@ function openDescriptionWithAi () {
             showCloseButton:true    
         }).then((result) => {
             if (result.isConfirmed) {
-                router.push({name: 'Upgrade', params: {cid: companyId.value}})
+                openUpgrade(router, companyId.value)
             }
         })
         return;
@@ -538,7 +539,7 @@ function openAiWriteDescription() {
             showCloseButton:true
         }).then((result) => {
             if (result.isConfirmed) {
-                router.push({name: 'Upgrade', params: {cid: companyId.value}})
+                openUpgrade(router, companyId.value)
             }
         })
         return;

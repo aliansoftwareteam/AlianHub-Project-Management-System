@@ -7,14 +7,14 @@ test.describe('time screens as the owner', () => {
         const errors = [];
         page.on('console', (m) => { if (m.type() === 'error' && !/ERR_CONNECTION_REFUSED|Failed to load resource/.test(m.text())) errors.push(m.text()); });
         await page.goto(`/#/${state.companyId}/approvals`);
-        await expect(page.locator('.tv-title', { hasText: 'Approvals' })).toBeVisible();
+        await expect(page.getByRole('heading', { name: 'Approvals', level: 1 })).toBeVisible();
         await expect(page.getByText('Only owners and admins review approvals.')).toHaveCount(0);
         expect(errors).toEqual([]);
     });
 
     test('the variance report renders', async ({ page, state }) => {
         await page.goto(`/#/${state.companyId}/reports/variance`);
-        await expect(page.locator('.tv-title', { hasText: 'Variance' })).toBeVisible();
+        await expect(page.getByRole('heading', { name: 'Variance', level: 1 })).toBeVisible();
     });
 
     test('the time-off screen shows the request form', async ({ page, state }) => {

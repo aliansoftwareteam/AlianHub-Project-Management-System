@@ -12,6 +12,8 @@
                 <!-- Mounted at the root so an incoming call rings wherever the user is,
                      not only when the conversation that called them is on screen. -->
                 <CallOverlay />
+                <HostedBanners />
+                <PlanBanner />
                 <div class="ah-app">
                     <GlobalRail v-if="!$route.meta.hideHeader" @change="changeCompany($event)" />
                     <main class="ah-app__main" id="ah-main">
@@ -64,6 +66,8 @@ import { computed, defineAsyncComponent, defineComponent, onMounted, provide, re
 // COMPONENTS
 import TourCom from "@/components/organisms/Tour/TourComponet.vue"
 import MaintenanceBanner from "@/views/Settings/Instance/MaintenanceBanner.vue"
+import HostedBanners from "@/components/organisms/HostedBanners/HostedBanners.vue"
+import PlanBanner from "@/components/organisms/PlanBanner/PlanBanner.vue"
 import MaintenanceCard from "@/views/Settings/Instance/MaintenanceCard.vue"
 import { maintenanceOn } from "@/composable/maintenanceState"
 import GlobalRail from '@/components/organisms/Shell/GlobalRail.vue'
@@ -111,7 +115,8 @@ import { adoptAccountPrefs } from '@/views/Settings/Language/localePrefs';
 import { followClockPrefs } from '@/utils/clockText';
 import { CommandPalette, QuickCreateTask, TaskTemplateDialogHost, AiFieldFillDialog } from '@/config/shellParts';
 const AiOffPage = defineAsyncComponent(() => import(/* webpackChunkName: "ai" */ '@/views/Ai/AiOffPage.vue'));
-import { aiAvailability, loadAiAvailability, trackAiPlan } from '@/composable/aiAvailability';
+import { aiAvailability, loadAiAvailability, trackAiAssistant, trackAiPlan } from '@/composable/aiAvailability';
+import { AI_RIGHT, aiRightOf, isWritable } from '@/composable/aiRights';
 import { AI_GATE, aiGateFor } from '@/router/ai/gate';
 import { opensWithoutWorkspace } from '@/router/withoutWorkspace';
 const {tabSync} = tabSyncHelper();
@@ -152,6 +157,11 @@ watch(() => [logged.value, currentCompany.value?._id], ([isLogged, cid]) => {
 }, { immediate: true });
 
 watch(() => currentCompany.value?.planFeature, trackAiPlan, { immediate: true, deep: true });
+
+watch(() => [getters['settings/rules'], getters['settings/companyUserDetail']?.roleType], ([companyRules, roleType]) => {
+    const known = companyRules && Object.keys(companyRules).length && roleType !== undefined && roleType !== null;
+    trackAiAssistant(known ? isWritable(aiRightOf(companyRules, roleType, AI_RIGHT.ASSISTANT)) : null);
+}, { immediate: true });
 
 watch(() => [currentUser.value?.Time_Format, getters['settings/companyDateFormat']?.dateFormat], ([timeFormat, dateFormat]) => {
     followClockPrefs({ timeFormat, dateFormat });

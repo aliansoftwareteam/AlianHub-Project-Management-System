@@ -31,6 +31,7 @@
 }
 
 .hover__on-projectrightside {
+    box-sizing: border-box;
     width: calc(100% - 38%);
     padding: 8.5px 10px 8.5px 10px !important;
     margin-bottom: 5px;

@@ -8,6 +8,7 @@ jest.mock('../Config/permissionGuard', () => ({
     ROLE_OWNER: 1, ROLE_ADMIN: 2,
     getRoleType: jest.fn(async (c, uid) => ({ owner1: 1, admin1: 2, member1: 3 })[uid]),
     isPrivileged: (r) => r === 1 || r === 2,
+    evaluatePermission: jest.fn(async () => null), isWritable: (p) => p === true || p === 1 || p === 2, isReadable: (p) => p !== null && p !== undefined && p !== 0,
 }));
 jest.mock('../Modules/Agents/scope', () => ({
     visibleProjects: jest.fn(async () => [{ _id: '6f00000000000000000000a1', ProjectName: 'Mobile app' }]),
@@ -89,10 +90,10 @@ beforeEach(() => {
 });
 
 describe('who may draft an agent', () => {
-    it.each(['member1'])('refuses %s before any model call', async (uid) => {
+    it.each(['member1'])('refuses %s, whose role does not build agents, before any model call', async (uid) => {
         const r = await call(ctrl.draftAgent, req(uid, { description: DESCRIPTION }));
         expect(r.code).toBe(403);
-        expect(r.body).toMatchObject({ status: false, statusText: 'Only an Owner or an Admin can manage agents.' });
+        expect(r.body).toMatchObject({ status: false, statusText: 'Your role does not include building agents. Ask an Owner or an Admin to turn it on in Security & Permissions.' });
         expect(adapter.chat).not.toHaveBeenCalled();
         expect(ledger()).toHaveLength(0);
     });

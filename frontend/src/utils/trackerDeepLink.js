@@ -35,20 +35,37 @@ export const openInTracker = (params = {}, opts = {}) => {
     // happen within the timeout, the tracker is either NOT INSTALLED or too OLD
     // to register the myapp:// handler — indistinguishable from the web, so the
     // caller shows ONE generic "install / update the tracker" toast for both.
-    const onNotOpened = typeof opts.onNotOpened === 'function' ? opts.onNotOpened : null;
-    if (onNotOpened && typeof window !== 'undefined' && typeof document !== 'undefined') {
-      let opened = false;
-      const markOpened = () => { opened = true; };
-      const onVisibility = () => { if (document.hidden) opened = true; };
-      window.addEventListener('blur', markOpened, { once: true });
-      document.addEventListener('visibilitychange', onVisibility);
-      setTimeout(() => {
-        window.removeEventListener('blur', markOpened);
-        document.removeEventListener('visibilitychange', onVisibility);
-        if (!opened) onNotOpened();
-      }, 1500);
-    }
+    watchHandoff(opts.onNotOpened);
     window.location.href = buildTrackerDeepLink(params);
+    return { ok: true };
+  } catch (e) {
+    return { ok: false, reason: 'launch-failed' };
+  }
+};
+
+function watchHandoff(onNotOpened) {
+  if (typeof onNotOpened !== 'function' || typeof window === 'undefined' || typeof document === 'undefined') return;
+  let opened = false;
+  const markOpened = () => { opened = true; };
+  const onVisibility = () => { if (document.hidden) opened = true; };
+  window.addEventListener('blur', markOpened, { once: true });
+  document.addEventListener('visibilitychange', onVisibility);
+  setTimeout(() => {
+    window.removeEventListener('blur', markOpened);
+    document.removeEventListener('visibilitychange', onVisibility);
+    if (!opened) onNotOpened();
+  }, 1500);
+}
+
+// Only tracker 6 and later understand this link; it adds the workspace and starts the sign-in.
+export const buildTrackerConnectLink = (workspaceUrl) => `alianhub-tracker://connect?url=${encodeURIComponent(workspaceUrl)}`;
+
+export const openTrackerConnect = (workspaceUrl, opts = {}) => {
+  if (!workspaceUrl) return { ok: false, reason: 'missing' };
+  if (!isTrackerCapableDevice()) return { ok: false, reason: 'unsupported' };
+  try {
+    watchHandoff(opts.onNotOpened);
+    window.location.href = buildTrackerConnectLink(workspaceUrl);
     return { ok: true };
   } catch (e) {
     return { ok: false, reason: 'launch-failed' };

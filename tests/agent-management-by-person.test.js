@@ -159,8 +159,31 @@ const MANAGED = [
         expect((await send('PUT /api/v2/agents/:id', SESSION, { id: AGENT_ID }, { autonomy: 3 })).code).toBe(200);
         return { params: { id: AGENT_ID, n: '1' }, done: () => agent().autonomy === 1 };
     }, 403],
+    ['approving an agent someone asked for', 'POST /api/v2/agents/:id/approve', () => {
+        agent().approval = { state: 'pending', requestedBy: MEMBER, requestedAt: new Date() };
+        return { params: { id: AGENT_ID }, done: () => agent().approval.state === 'approved' };
+    }, 403],
+    ['declining an agent someone asked for', 'POST /api/v2/agents/:id/decline', () => {
+        agent().approval = { state: 'pending', requestedBy: MEMBER, requestedAt: new Date() };
+        return { params: { id: AGENT_ID }, body: { reason: 'It reaches every project' }, done: () => agent().approval.state === 'declined' };
+    }, 403],
+    ['declining an edit of an agent', 'POST /api/v2/agents/:id/revisions/:n/decline', async () => {
+        expect((await send('POST /api/v2/agents/:id/revisions', SESSION, { id: AGENT_ID }, { state: 'candidate', autonomy: 3 })).code).toBe(200);
+        const { n } = revisions().find((row) => row.state === 'candidate');
+        return { params: { id: AGENT_ID, n: String(n) }, body: { reason: 'Too much autonomy' }, done: () => revisions().some((row) => row.state === 'declined') };
+    }, 403],
     ['creating a skill', 'POST /api/v2/agents/skills', () => ({ body: skillDoc({ key: 'task.summary', name: 'Summariser' }), done: () => Boolean(skill('task.summary')), code: 201 }), 403],
     ['changing a skill', 'PUT /api/v2/agents/skills/:key', () => { seedSkill(); return { params: { key: SKILL_KEY }, body: { name: 'Renamed' }, done: () => skill().name === 'Renamed' }; }, 403],
+    ['approving a skill someone wrote', 'POST /api/v2/agents/skills/:key/approve', () => {
+        seedSkill();
+        Object.assign(skill(), { enabled: false, approval: { state: 'pending', requestedBy: MEMBER, requestedAt: new Date() } });
+        return { params: { key: SKILL_KEY }, done: () => skill().enabled === true };
+    }, 403],
+    ['declining a skill someone wrote', 'POST /api/v2/agents/skills/:key/decline', () => {
+        seedSkill();
+        Object.assign(skill(), { enabled: false, approval: { state: 'pending', requestedBy: MEMBER, requestedAt: new Date() } });
+        return { params: { key: SKILL_KEY }, body: { reason: 'It changes every task' }, done: () => skill().approval.state === 'declined' };
+    }, 403],
     ['retiring a skill', 'DELETE /api/v2/agents/skills/:key', () => { seedSkill(); return { params: { key: SKILL_KEY }, done: () => skill().enabled === false }; }, 403],
     ['adding a schedule', 'POST /api/v2/agents/:id/schedules', () => {
         agent().autonomy = 3;

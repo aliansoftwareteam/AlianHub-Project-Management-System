@@ -29,6 +29,7 @@ const AUTH = Object.freeze({
     SESSION_OR_TOKEN: 'session-or-token',
     SESSION: 'session',
     INSTANCE_ADMIN: 'instance-admin',
+    PLATFORM: 'platform',
 });
 
 const AUTH_LABEL = Object.freeze({
@@ -37,6 +38,7 @@ const AUTH_LABEL = Object.freeze({
     [AUTH.SESSION_OR_TOKEN]: 'Session or token',
     [AUTH.SESSION]: 'Session',
     [AUTH.INSTANCE_ADMIN]: 'Instance admin',
+    [AUTH.PLATFORM]: 'Platform key',
 });
 
 const samplePathOf = (routePath) => routePath.replace(/:\w+(\([^)]*\))?\??/g, SAMPLE_ID).replace(/\*/g, 'x');
@@ -49,6 +51,7 @@ function classifyAuth(route, entry = {}, context = {}) {
     }
     if (!route.guard) return { class: AUTH.PUBLIC, ...closed, companyHeader: 'none' };
     if (route.guard === 'instance-admin') return { class: AUTH.INSTANCE_ADMIN, ...closed, companyHeader: 'none' };
+    if (route.guard === 'platform') return { class: AUTH.PLATFORM, ...closed, companyHeader: 'none' };
 
     const companyHeader = route.guard === 'company' ? 'required' : 'with-token';
     const sample = samplePathOf(route.path);
@@ -176,6 +179,7 @@ const authText = (auth) => {
     if (auth.class === AUTH.API_TOKEN) return `API token with the ${code(auth.scope)} scope`;
     if (auth.class === AUTH.SESSION_OR_TOKEN) return `Session or API token with the ${code(auth.scope)} scope`;
     if (auth.class === AUTH.SESSION) return 'Session only; an API token is refused';
+    if (auth.class === AUTH.PLATFORM) return 'The x-platform-key header, on a hosted instance, from inside its host';
     if (auth.class === AUTH.INSTANCE_ADMIN) return 'The instance owner\'s session';
     return 'None';
 };
@@ -294,6 +298,7 @@ const SECURITY = Object.freeze({
     [AUTH.SESSION_OR_TOKEN]: [{ apiToken: [], companyId: [] }],
     [AUTH.SESSION]: [{ session: [] }],
     [AUTH.INSTANCE_ADMIN]: [{ session: [] }],
+    [AUTH.PLATFORM]: [{ platformKey: [] }],
 });
 
 const openApiPath = (routePath) => routePath.replace(/:(\w+)(\([^)]*\))?\??/g, '{$1}');
@@ -339,6 +344,7 @@ function openApiOf(grouped, context, builtFrom = '') {
             securitySchemes: {
                 apiToken: { type: 'http', scheme: 'bearer', description: 'A personal access token.' },
                 companyId: { type: 'apiKey', in: 'header', name: 'companyid', description: 'The workspace the request is for.' },
+                platformKey: { type: 'apiKey', in: 'header', name: 'x-platform-key', description: 'PLATFORM_API_KEY of a hosted instance (HOSTING_MODE=managed).' },
                 session: { type: 'apiKey', in: 'cookie', name: 'accessToken', description: 'The web app\'s signed-in session.' },
             },
         },

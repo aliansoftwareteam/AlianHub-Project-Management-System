@@ -32,7 +32,8 @@
                     </template>
                 </div>
                 <div v-if="conn.on" class="gcn__actions">
-                    <button type="button" class="ah-btn ah-btn--sm" :class="conn.connected ? 'ah-btn--secondary' : 'ah-btn--primary'" :disabled="Boolean(busy)" data-test="google-connect" @click="connect(conn.connector)">
+                    <span v-if="!canConnectApps" class="ah-small gcn__state" data-test="google-not-allowed">{{ $t('AgentAccess.connectors_not_allowed') }}</span>
+                    <button v-else type="button" class="ah-btn ah-btn--sm" :class="conn.connected ? 'ah-btn--secondary' : 'ah-btn--primary'" :disabled="Boolean(busy)" data-test="google-connect" @click="connect(conn.connector)">
                         {{ busy === conn.connector ? $t('GoogleConnection.connecting') : conn.connected ? $t('GoogleConnection.reconnect') : $t('GoogleConnection.connect') }}
                     </button>
                     <button v-if="conn.connected" type="button" class="ah-btn ah-btn--ghost ah-btn--sm" :disabled="Boolean(busy)" data-test="google-disconnect" @click="disconnect(conn.connector)">
@@ -78,6 +79,7 @@ import ShellIcon from '@/components/organisms/Shell/ShellIcon.vue';
 import { apiRequest } from '@/services';
 import * as env from '@/config/env';
 import { isOwnerOrAdmin } from '@/utils/roles';
+import { AI_RIGHT, useAiRights } from '@/composable/aiRights';
 
 const props = defineProps({
     navigate: { type: Function, default: (url) => window.location.assign(url) },
@@ -104,6 +106,7 @@ const busy = ref('');
 const completing = ref(false);
 
 const privileged = computed(() => isOwnerOrAdmin(Number(getters['settings/companyUserDetail']?.roleType)));
+const canConnectApps = useAiRights().mayUse(AI_RIGHT.CONNECTORS);
 const when = (d) => (d ? new Date(d).toLocaleString() : t('GoogleConnection.never'));
 const nameOf = (userId) => {
     const person = (getters['users/users'] || []).find((user) => String(user._id) === String(userId));

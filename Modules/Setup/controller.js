@@ -4,6 +4,7 @@ const { MongoDbCrudOpration } = require('../../utils/mongo-handler/mongoQueries'
 const { checkDb } = require('../Instance/health');
 const { computeSetupStatus, validateSetupPayload } = require('./helpers');
 const { emitListener } = require('./events');
+const hostingMode = require('../../Config/hostingMode');
 
 let installedOnce = false;
 
@@ -20,17 +21,22 @@ async function readStatus() {
     return computeSetupStatus({ db, userCount: installedOnce ? 1 : 0 });
 }
 
+const withMode = (status) => (hostingMode.isManaged() ? { ...status, managed: true } : status);
+
 exports.resetInstalledFlag = () => { installedOnce = false; };
 
 exports.getStatus = async (req, res) => {
     try {
-        res.send({ status: true, statusText: 'Setup status.', data: await readStatus() });
+        res.send({ status: true, statusText: 'Setup status.', data: withMode(await readStatus()) });
     } catch (error) {
         res.status(500).send({ status: false, statusText: error.message });
     }
 };
 
+/* Hosted, the platform creates the owner (062): a stranger who reached a fresh instance first
+ * could otherwise make themselves its owner. */
 exports.complete = async (req, res) => {
+    if (hostingMode.isManaged()) return res.status(403).send({ status: false, statusText: 'This workspace is created by AlianHub Cloud.' });
     const { data, errors, valid } = validateSetupPayload(req.body);
     if (!valid) return res.status(400).send({ status: false, statusText: 'Some fields need attention.', data: { errors } });
     const emit = (step) => emitListener(data.eventId, { step });

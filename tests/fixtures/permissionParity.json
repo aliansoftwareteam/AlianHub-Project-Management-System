@@ -278,6 +278,32 @@
       "expected": null
     },
     {
+      "name": "an AI right is read from the company rules inside a project with its own rules",
+      "role": 3,
+      "project": {"isGlobalPermission":false},
+      "companyRules": [
+        {"_id":"c-artificial_intelligence","key":"artificial_intelligence","name":"artificial_intelligence","isParent":true,"roles":[]},
+        {"_id":"c-artificial_intelligence-ai_agents","key":"ai_agents","name":"ai_agents","isParent":false,"parentId":"c-artificial_intelligence","roles":[{"key":3,"permission":true}]}
+      ],
+      "projectRules": [
+        {"_id":"p-task","key":"task","name":"task","isParent":true,"roles":[]}
+      ],
+      "key": "artificial_intelligence.ai_agents",
+      "expected": true
+    },
+    {
+      "name": "an AI right a role has no entry for gives nothing",
+      "role": 0,
+      "project": null,
+      "companyRules": [
+        {"_id":"c-artificial_intelligence","key":"artificial_intelligence","name":"artificial_intelligence","isParent":true,"roles":[]},
+        {"_id":"c-artificial_intelligence-ai_assistant","key":"ai_assistant","name":"ai_assistant","isParent":false,"parentId":"c-artificial_intelligence","roles":[{"key":3,"permission":true}]}
+      ],
+      "projectRules": [],
+      "key": "artificial_intelligence.ai_assistant",
+      "expected": null
+    },
+    {
       "name": "a project with its own rules but no rows gives a member nothing",
       "role": 3,
       "project": {"isGlobalPermission":false},

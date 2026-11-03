@@ -1,4 +1,6 @@
-img.screenShotDisplay__innerImageTimelog {
+/* Not tied to <img>: WasabiImage renders a skeleton <div> with this class while it fetches the URL. */
+.screenShotDisplay__innerImageTimelog {
+   display: block;
     width: 100%;
    height: 78px;
    -o-object-fit: cover;

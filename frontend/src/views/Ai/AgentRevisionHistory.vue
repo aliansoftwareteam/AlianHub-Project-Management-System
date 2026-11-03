@@ -104,7 +104,7 @@ const toLabel = computed(() => (to.value ? t("Ai.revision_n", { n: to.value }) :
 const diffTitle = computed(() => t("Ai.revision_diff_title", { from: fromLabel.value, to: toLabel.value }));
 
 const canPromote = (r) => r.state === "draft" || r.state === "candidate";
-const stateChip = (state) => ({ live: "ah-chip--ok", candidate: "ah-chip--brand", draft: "ah-chip--warn", superseded: "ah-chip--dark" }[state] || "");
+const stateChip = (state) => ({ live: "ah-chip--ok", candidate: "ah-chip--brand", draft: "ah-chip--warn", superseded: "ah-chip--dark", declined: "ah-chip--danger" }[state] || "");
 const when = (at) => (at ? new Date(at).toLocaleString() : "");
 const whoOf = (r) => r.createdByName || r.createdBy || t("Ai.revision_by_system");
 

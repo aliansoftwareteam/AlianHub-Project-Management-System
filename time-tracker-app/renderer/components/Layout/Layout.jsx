@@ -11,12 +11,17 @@ import { removeAllTimeLog, setTrackerStopTime } from '../../store/timelog';
 import { useDeepLinkStart } from '../../hooks/useDeepLinkStart';
 import { replayQueue } from '../../utils/queueReplay';
 import store from '../../store/store';
-const publicRoutes = ['/login']; // Add any public routes here
+import { selectCurrentWorkspace, setWorkspaces } from '../../store/workspace';
+import { checkWorkspace, loadWorkspaces, refreshWorkspace } from '../../controller/workspace/workspace';
+const CONNECT_ROUTE = '/connect';
+const publicRoutes = ['/login', CONNECT_ROUTE];
 
 const Layout = ({ children }) => {
   const router = useRouter();
   const dispatch = useDispatch();
   const { isAuthenticated, isInitialized } = useSelector((state) => state.auth);
+  const currentWorkspace = useSelector(selectCurrentWorkspace);
+  const currentWorkspaceUrl = currentWorkspace ? currentWorkspace.url : null;
   const timeLog = useSelector((state)=> state.timeLog);
   const timeLogRef = React.useRef(timeLog);
   const showOfflineQueueScreen = useSelector((state) => state.auth.showOfflineQueueScreen);
@@ -81,14 +86,54 @@ const Layout = ({ children }) => {
     if (!started) router.push('/home');
   };
 
+  // Every request goes to the current workspace, so nothing reads the session before it is known.
   useEffect(() => {
-    dispatch(initializeAuth());
+    loadWorkspaces()
+      .catch((error) => {
+        console.error('Could not load the workspaces', error);
+        store.dispatch(setWorkspaces({ workspaces: [], current: null }));
+      })
+      .finally(() => {
+        dispatch(initializeAuth());
+        window.ipc.send('workspace:renderer-ready');
+      });
   }, [dispatch]);
 
   useEffect(() => {
+    const unsubscribe = window.ipc.on('workspace:connect', (payload) => {
+      if (payload && payload.url) router.push({ pathname: CONNECT_ROUTE, query: { url: payload.url } });
+    });
+    return () => {
+      if (typeof unsubscribe === 'function') unsubscribe();
+    };
+  }, []);
+
+  // A plan that dropped the tracker, or a server that now needs a newer tracker, is shown on start.
+  // Any other failure (offline, a server too old to answer) leaves the tracker working as it was.
+  useEffect(() => {
+    if (!currentWorkspaceUrl) return undefined;
+    let active = true;
+    checkWorkspace(currentWorkspaceUrl).then((result) => {
+      if (!active) return;
+      const known = store.getState().workspace.workspaces.find((w) => w.url === currentWorkspaceUrl) || {};
+      if (result.outcome === 'ok' && (result.workspace.name !== known.name || result.workspace.logoUrl !== known.logoUrl)) {
+        refreshWorkspace(currentWorkspaceUrl, result.workspace).catch((error) => console.error(error));
+      } else if ((result.outcome === 'disabled' || result.outcome === 'tooOld') && !store.getState().timeLog.trackerStart) {
+        router.push({ pathname: CONNECT_ROUTE, query: { url: currentWorkspaceUrl, recheck: '1' } });
+      }
+    });
+    return () => { active = false; };
+  }, [currentWorkspaceUrl]);
+
+  useEffect(() => {
     if (isInitialized) {
+      if (!currentWorkspaceUrl) {
+        if (router.pathname !== CONNECT_ROUTE) router.push(CONNECT_ROUTE);
+        return;
+      }
+      if (router.pathname === CONNECT_ROUTE) return;
       const isPublicRoute = publicRoutes.includes(router.pathname);
-      
+
       if (!isAuthenticated && !isPublicRoute) {
         router.push('/login');
       } else if (isAuthenticated && isPublicRoute) {
@@ -105,7 +150,7 @@ const Layout = ({ children }) => {
         })
       }
     }
-  }, [isAuthenticated, isInitialized, router.pathname]);
+  }, [isAuthenticated, isInitialized, router.pathname, currentWorkspaceUrl]);
 
 
   useEffect(()=>{
@@ -269,7 +314,7 @@ const Layout = ({ children }) => {
       )}
         <Header />
         <div>{children}</div>
-        {isAuthenticated && !timeLog.trackerStart && <Footer />}
+        {isAuthenticated && !timeLog.trackerStart && router.pathname !== CONNECT_ROUTE && <Footer />}
         {/* {this.state.showFooter && <Footer />} */}
 
         {/* Deep link arrived while a tracker is already running. */}

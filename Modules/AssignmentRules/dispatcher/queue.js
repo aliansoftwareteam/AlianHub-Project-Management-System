@@ -3,6 +3,7 @@ const { SCHEMA_TYPE } = require('../../../Config/schemaType');
 const { MongoDbCrudOpration } = require('../../../utils/mongo-handler/mongoQueries');
 const { idForms } = require('../../../utils/mongo-handler/objectIdKeys');
 const projectLimits = require('../../Agents/projectLimits');
+const { APPROVED_CLAUSE } = require('../../Agents/agentApproval');
 
 // The role's queue is the agents' work queue (Modules/Agents/manager/workQueue.js): a handed-over row with the role in its
 // facts. Only the row is written; the task's assignees stay as they were.
@@ -33,7 +34,7 @@ const standing = async (companyId, task) => {
 /* The least loaded in-product agent that plays the role and may work in the project, counted by the role items it
  * already has; null when none does. An agent with no projects named may work in any. */
 const leastLoaded = async (companyId, role, projectId) => {
-    const agents = (await find(companyId, SCHEMA_TYPE.AGENTS, [{ role, paused: { $ne: true }, deletedStatusKey: { $ne: 1 } }, { name: 1, projectIds: 1 }]))
+    const agents = (await find(companyId, SCHEMA_TYPE.AGENTS, [{ role, paused: { $ne: true }, deletedStatusKey: { $ne: 1 }, ...APPROVED_CLAUSE }, { name: 1, projectIds: 1 }]))
         .filter((agent) => !(agent.projectIds || []).length || agent.projectIds.map(String).includes(String(projectId)));
     if (!agents.length) return null;
     const { HANDED_OVER, STATUS } = require('../../Agents/manager/findings');

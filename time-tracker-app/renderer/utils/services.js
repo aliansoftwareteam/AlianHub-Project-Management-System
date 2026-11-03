@@ -1,19 +1,16 @@
 import axios from 'axios';
-import getConfig from "next/config";
 import { addToQueue, formDataToObject } from './apiQueue';
-const { publicRuntimeConfig, serverRuntimeConfig } = getConfig();
-const { APIURL } = publicRuntimeConfig
-const apiHost = APIURL;
+import { withWorkspaceBase, workspaceUrl } from './workspaceBase';
 import store from '../store/store';
 import { getStore } from '../store/store';
 import { logoutFunction } from '../controller/user/user';
 import Router from 'next/router';
 import { setInternetLost, setShowOfflineQueueScreen } from '../store/authSlice';
-export const axiosInstance = axios.create({ baseURL: apiHost })
-export const axiosInstanceWithoutCompany = axios.create({ baseURL: apiHost })
-export const axiosInstanceWithFormData = axios.create({ baseURL: apiHost })
-export const axiosInstanceWithoutSecure = axios.create({ baseURL: apiHost });
-export const axiosInstanceWithoutSecureWithFormData = axios.create({ baseURL: apiHost });
+export const axiosInstance = axios.create()
+export const axiosInstanceWithoutCompany = axios.create()
+export const axiosInstanceWithFormData = axios.create()
+export const axiosInstanceWithoutSecure = axios.create();
+export const axiosInstanceWithoutSecureWithFormData = axios.create();
 axiosInstance.interceptors.request.use((req) => {
     const token = localStorage.getItem('token') || "";
     const companyId = localStorage.getItem("companyId")
@@ -25,7 +22,7 @@ axiosInstance.interceptors.request.use((req) => {
         'companyId': companyId
     }
     req.headers = headers;
-    return req;
+    return withWorkspaceBase(req);
 }, error => {
     return Promise.reject(error);
 });
@@ -38,7 +35,7 @@ axiosInstanceWithFormData.interceptors.request.use((req) => {
         'companyId': companyId
     }
     req.headers = headers;
-    return req;
+    return withWorkspaceBase(req);
 }, error => {
     return Promise.reject(error);
 });
@@ -52,7 +49,7 @@ axiosInstanceWithoutCompany.interceptors.request.use((req) => {
         'Authorization': 'Bearer ' + token
     }
     req.headers = headers;
-    return req;
+    return withWorkspaceBase(req);
 }, error => {
     return Promise.reject(error);
 });
@@ -62,7 +59,7 @@ axiosInstanceWithoutSecureWithFormData.interceptors.request.use((req) => {
         'Content-Type': 'multipart/form-data'
     }
     req.headers = headers;
-    return req;
+    return withWorkspaceBase(req);
 }, error => {
     return Promise.reject(error);
 });
@@ -73,7 +70,7 @@ axiosInstanceWithoutSecure.interceptors.request.use((req) => {
         'Content-Type': 'application/json'
     }
     req.headers = headers;
-    return req;
+    return withWorkspaceBase(req);
 }, error => {
     return Promise.reject(error);
 });
@@ -99,7 +96,7 @@ const requestAuth = (id) => {
             'refresh-token': refreshToken
         };
         let url = "/api/v2/generateToken";
-        axios.post(apiHost + url, data, { headers }).then((result) => {
+        axios.post(workspaceUrl(url), data, { headers }).then((result) => {
             localStorage.setItem('token', result.data.token)
             if (result.data.refreshToken) {
                 localStorage.setItem('refreshToken', result.data.refreshToken)
@@ -108,7 +105,6 @@ const requestAuth = (id) => {
         }).catch((error) => {
             console.error('error', error);
             if (error?.response?.data?.isLogout) {
-                pendingAuth = null;
                 logoutFunction()
                 .then(() => {
                     Router.push('/login');
@@ -116,12 +112,14 @@ const requestAuth = (id) => {
                 .catch((error) => {
                     console.error("ERROR: ", error);
                 });
-            } else {
-                reject(error);
             }
+            reject(error);
         });
     })
 };
+
+// A refresh that fails ends the request that asked for it, instead of leaving it waiting forever.
+const refreshed = () => getAuth(localStorage.getItem("userId")).then(() => true, () => false);
 
 export const apiRequest = (type, endPoint, data, dataType) => {
     return new Promise((resolve, reject) => {
@@ -148,8 +146,10 @@ export const apiRequest = (type, endPoint, data, dataType) => {
                             console.error("ERROR: ", error);
                         });
                     }else if (err?.response?.data?.isJwtError) {
-                        const userId = localStorage.getItem("userId");
-                        await getAuth(userId);
+                        if (!(await refreshed())) {
+                            reject(err);
+                            return;
+                        }
                         apiRequest(type, endPoint, data).then((sData)=>{
                             resolve(sData);
                         }).catch((err) => {
@@ -205,8 +205,10 @@ export const apiRequestFormData = (type, endPoint, data, dataType) => {
                             console.error("ERROR: ", error);
                         });
                     }else if (err?.response?.data?.isJwtError) {
-                        const userId = localStorage.getItem("userId");
-                        await getAuth(userId);
+                        if (!(await refreshed())) {
+                            reject(err);
+                            return;
+                        }
                         apiRequest(type, endPoint, data).then((sData)=>{
                             resolve(sData);
                         }).catch((err) => {
@@ -252,8 +254,10 @@ export const apiRequestWithoutCompnay = (type, endPoint, data) => {
                                 console.error("ERROR: ", error);
                             });
                         } else if (err?.response?.data?.isJwtError) {
-                        const userId = localStorage.getItem("userId");
-                        await getAuth(userId);
+                        if (!(await refreshed())) {
+                            reject(err);
+                            return;
+                        }
                         apiRequestWithoutCompnay(type, endPoint, data).then((sData)=>{
                             resolve(sData);
                         }).catch((err) => {

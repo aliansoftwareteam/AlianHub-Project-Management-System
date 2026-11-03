@@ -29,36 +29,18 @@ const readFromDisk = async (companyId, key, maxBytes) => {
     return { buffer, size: buffer.length };
 };
 
-let s3Client = null;
-
-/* Built lazily, so a server-storage install never loads the S3 SDK. */
-const client = () => {
-    if (s3Client) return s3Client;
-    const { S3Client } = require('@aws-sdk/client-s3');
-    const awsRef = require('../Config/aws.js');
-    const { requestHandler } = require('../Config/config');
-    s3Client = new S3Client({
-        region: awsRef.region,
-        credentials: { accessKeyId: awsRef.wasabiAccessKey, secretAccessKey: awsRef.wasabiSecretAccessKey },
-        endpoint: awsRef.wasabiEndPoint,
-        requestHandler,
-    });
-    return s3Client;
-};
-
-const isMissing = (error) => Boolean(error) && (['NoSuchKey', 'NotFound', 'NoSuchBucket'].includes(error.name || error.Code)
-    || (error.$metadata && error.$metadata.httpStatusCode === 404));
 
 const drop = (body) => { if (body && typeof body.destroy === 'function') body.destroy(); };
 
 /* A declared length is only what the bucket says, so the stream is counted too. */
 const readFromBucket = async (companyId, key, maxBytes) => {
-    const { GetObjectCommand } = require('@aws-sdk/client-s3');
+    const storage = require('./s3Store');
     let response;
     try {
-        response = await client().send(new GetObjectCommand({ Bucket: companyId, Key: key }));
+        response = await storage.get(companyId, key);
     } catch (error) {
-        if (isMissing(error)) throw refusal('not_found', 'No such stored file.');
+        if (storage.isMissing(error)) throw refusal('not_found', 'No such stored file.');
+        if (error && (error.code === 'invalid_key' || error.code === 'invalid_owner')) throw refusal('invalid_key', error.message);
         throw error;
     }
     const body = response && response.Body;

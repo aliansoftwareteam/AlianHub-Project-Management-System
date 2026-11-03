@@ -12,6 +12,7 @@ const { COUNTRY_NOT_ASKED } = require('../Company/helpers/companyDetails');
 const { updateUserFun } = require('../Users/controller');
 const { storeRefferalCode } = require('../Affiliate/controller');
 const { planObj } = require('./defaultSubscriptionData');
+const { planFeatureFor } = require('../Entitlements/entitlements');
 const { createDemoProject } = require('./demoProject');
 const { ensureViewCatalogue } = require('../projectTabs/catalogue');
 const vectorStore = require('../Knowledge/vectorStore');
@@ -25,7 +26,8 @@ const importSettings = (payload) => new Promise((resolve, reject) => {
 
 const reasonOf = (failure) => failure?.message || failure?.statusText || String(failure?.error || failure);
 
-async function createOwner({ firstName, lastName, email, password }) {
+/* `password: null` makes an owner with no password, who sets one through an activation link (062). */
+async function createOwner({ firstName, lastName, email, password }, profile = {}) {
     const created = await createUserRef.addUserMongodbV2({ firstName, lastName, email, password, isInvitation: false });
     const ownerId = String(created.statusText._id);
     // The person running setup is the operator and mail is rarely configured yet, so the
@@ -33,7 +35,7 @@ async function createOwner({ firstName, lastName, email, password }) {
     // Instance ownership is granted only here; the shared signup insert never writes it.
     await MongoDbCrudOpration(SCHEMA_TYPE.GOLBAL, {
         type: dbCollections.USERS,
-        data: [{ _id: ownerId }, { $set: { isProductOwner: true, isEmailVerified: true, verificationToken: '' } }],
+        data: [{ _id: ownerId }, { $set: { ...profile, isProductOwner: true, isEmailVerified: true, verificationToken: '' } }],
     }, 'findOneAndUpdate');
     return ownerId;
 }
@@ -103,7 +105,7 @@ async function createFirstCompany({ userId, email, companyName, teamFocus = '', 
     }, 'findOneAndUpdate', companyId, userId);
     await updateCompanyFun(SCHEMA_TYPE.GOLBAL, {
         type: dbCollections.COMPANIES,
-        data: [{ _id: companyId }, { planFeature: planObj }],
+        data: [{ _id: companyId }, { planFeature: planFeatureFor(planObj) }],
     }, 'findOneAndUpdate', companyId);
     await storeRefferalCode(companyId, userId);
 
