@@ -12,10 +12,10 @@
 - [x] Tests
 
 ## Last step
-Tested on a local merge with 072 (#1755): the screen and real Slack up to its sign-in work. Left: a real-Slack connect ("Allow"), which waits on a Slack app and a tunnel.
+Done. All acceptance boxes ticked; the last one checked against a real Slack workspace.
 
 ## Blockers
-None in code. The last acceptance box needs a Slack workspace, a Slack app with token rotation and an https tunnel.
+None.
 
 ## Log
 
@@ -44,3 +44,7 @@ None in code. The last acceptance box needs a Slack workspace, a Slack app with 
   - Real Slack refused a made-up code with `ok:false, invalid_code`, which 074 reads as a refusal (400). A bad state, a denial and a reused state are all refused.
   - Backend connector, agent, skill, MCP, migration and convention suites: 306 files, 9,152 tests pass. Frontend: the same 47 failures as on 074 alone, plus one timeout in `appWithoutWorkspace.spec.js` that passes on a rerun.
 - Seen there but not 074's: the frontend dev proxy does not forward `/mcp`, so the Connections page fails locally on `/mcp/manifest`; and the boot log calls `google` unknown in `CONNECTORS`.
+- Real Slack check, on the local merge with a test Slack workspace, an app made from a manifest (five user scopes, token rotation on, no PKCE) and a cloudflared tunnel:
+  - Connect on My connections opened Slack's consent page with only the five user scopes; after Allow, the connection is `connected` for the team and user, with exactly those scopes, an access expiry, and no token in the row.
+  - `slack.channels.list` listed the three channels; `slack.channel.read` read `#new-channel`, tainted.
+  - The approved send posted to `#new-channel` and the read showed it; a `<!here>` text was refused.

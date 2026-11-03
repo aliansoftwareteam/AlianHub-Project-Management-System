@@ -62,7 +62,7 @@ The code exchange always sent a `code_verifier`, even when the consent asked no 
 
 ## Not done here
 
-- **A connect with a real Slack app.** With 072 merged, My connections lists Slack and Connect reaches Slack's real sign-in page, and real Slack's refusal of a bad code is read correctly. Allowing access with a real account still needs a Slack app with token rotation and an https tunnel.
+- **A connect with a real Slack app.** With 072 merged, My connections lists Slack and Connect reaches Slack's real sign-in page, and real Slack's refusal of a bad code is read correctly. Checked later with a real Slack workspace: connect, the five scopes stored, channel list, read and a post all work.
 - **`docs/API.md`.** It goes in the docs PR after merge (Rule 4), because this removes the bot routes.
 
 🤖 Generated with [Claude Code](https://claude.com/claude-code)
