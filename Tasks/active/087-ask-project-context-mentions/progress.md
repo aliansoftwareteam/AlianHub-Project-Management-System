@@ -17,6 +17,10 @@
 - Picking a mention now puts its name where the `@word` was, so the question reads as a sentence ("How is Omar Haddad doing this week?"); before, the word was removed ("What is going on in and…").
 - The stale English copy of `Ask.composer_placeholder` in the other locales was updated to the new text.
 
+## 2026-11-03
+
+- Owner asked for the PR into `staging` directly: branch rebuilt on `origin/staging` (6a5e6a086) with the two commits cherry-picked; pre-staging's cloud work stays out. On staging the Ask routes carry the `assistant` AI-right guard, so `/ask/mentions` has it too. Ask, intent, AI-access and token-narrowing suites and the frontend Ask specs pass; convention failures are the Windows ones seen before plus `retired-flags` (backslash paths).
+
 ## Open
 
 - Answers not generated: no model key here. Needs one run with a key: ask "What is going on in this project?" on Platform Engineering and check the answer cites `[project:…]` and task refs and keeps the briefing's numbers.
