@@ -56,12 +56,13 @@ The code exchange always sent a `code_verifier`, even when the consent asked no 
   - `connector-slack-connection`, 12 tests on the real lifecycle with Slack's answer shapes: connect, refresh, dead refresh token, revoke with the access token;
   - `migration-retire-slack-bot`, 8 tests;
   - two frontend specs.
-- Connector, Slack, agent, skill, MCP, migration and convention suites: 216 files, 6,244 tests pass. Frontend specs: 147 pass. i18n, style, env-doc and lint are clean.
-- A wider run of the 1,024 unit files related to the change: 8 failed. 5 of them fail on the base commit too (`ai-connection`, `api-doc`, `demo-team-seed`, `role-prompts`, `upload-routes-order`). The other 3 failed on timeouts under load and pass when run alone.
+- After merging the base (072, 073): connector, Slack, agent, skill, MCP, migration, integration and convention suites, 310 files and 9,205 tests. All pass except `agent-run-instruction-guard`, which timed out under load and passes alone (8/8). i18n, style, env-doc and lint are clean.
+- Frontend specs on 074 merged with 072: the same 47 failures as on 074 alone, none in connector or integration specs, plus one timeout in `appWithoutWorkspace.spec.js` that passes on a rerun.
+- Before the merge, a wider run of the 1,024 unit files related to the change: 8 failed. 5 of them fail on the base commit too (`ai-connection`, `api-doc`, `demo-team-seed`, `role-prompts`, `upload-routes-order`). The other 3 failed on timeouts under load and pass when run alone.
 
 ## Not done here
 
-- **A connect with a real Slack app.** On a local merge with 072, My connections lists Slack and Connect reaches Slack's real sign-in page, and real Slack's refusal of a bad code is read correctly. Allowing access with a real account still needs a Slack app with token rotation and an https tunnel.
+- **A connect with a real Slack app.** With 072 merged, My connections lists Slack and Connect reaches Slack's real sign-in page, and real Slack's refusal of a bad code is read correctly. Allowing access with a real account still needs a Slack app with token rotation and an https tunnel.
 - **`docs/API.md`.** It goes in the docs PR after merge (Rule 4), because this removes the bot routes.
 
 🤖 Generated with [Claude Code](https://claude.com/claude-code)
