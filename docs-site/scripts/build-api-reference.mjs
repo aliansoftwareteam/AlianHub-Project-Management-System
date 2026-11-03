@@ -21,7 +21,6 @@ const githubSlug = (s) => s.trim().toLowerCase().replace(/`/g, '').replace(/[^\p
 const vitepressSlug = (s) => s
   .normalize('NFKD')
   .replace(/[\u0300-\u036F]/g, '')
-  .replace(/[\u0000-\u001f]/g, '')
   .replace(/[\s~`!@#$%^&*()\-_+=[\]{}|\\;:"'“”‘’<>,.?/]+/g, '-')
   .replace(/-{2,}/g, '-')
   .replace(/^-+|-+$/g, '')
