@@ -1,7 +1,7 @@
 ---
 id: 073
 title: Connectors — migrate Google Calendar connections onto the Google provider
-status: backlog
+status: active
 priority: medium
 depends_on: [064, 066]
 created: 2026-10-28
