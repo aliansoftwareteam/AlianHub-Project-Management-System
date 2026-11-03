@@ -60,9 +60,17 @@ The code exchange always sent a `code_verifier`, even when the consent asked no 
 - Frontend specs on 074 merged with 072: the same 47 failures as on 074 alone, none in connector or integration specs, plus one timeout in `appWithoutWorkspace.spec.js` that passes on a rerun.
 - Before the merge, a wider run of the 1,024 unit files related to the change: 8 failed. 5 of them fail on the base commit too (`ai-connection`, `api-doc`, `demo-team-seed`, `role-prompts`, `upload-routes-order`). The other 3 failed on timeouts under load and pass when run alone.
 
+## Checked against real Slack
+
+On a local merge with 072, with a test Slack workspace, an app made from a manifest (the five user scopes, token rotation on, no PKCE) and a cloudflared tunnel for the HTTPS redirect:
+
+- Connect on My connections opened Slack's consent page asking only the five user scopes. After Allow, the connection is `connected` for the team and user, with exactly those scopes and an access expiry, and the row holds no token.
+- `slack.channels.list` listed the workspace's three channels, and `slack.channel.read` read `#new-channel`, tainted.
+- The approved send posted to `#new-channel` and a read showed the message. A text with `<!here>` was refused.
+- Real Slack's refusal of a made-up code (`ok: false, invalid_code`) is read as a refusal, and a bad, denied or reused state is refused.
+
 ## Not done here
 
-- **A connect with a real Slack app.** With 072 merged, My connections lists Slack and Connect reaches Slack's real sign-in page, and real Slack's refusal of a bad code is read correctly. Checked later with a real Slack workspace: connect, the five scopes stored, channel list, read and a post all work.
 - **`docs/API.md`.** It goes in the docs PR after merge (Rule 4), because this removes the bot routes.
 
 🤖 Generated with [Claude Code](https://claude.com/claude-code)
