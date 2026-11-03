@@ -16,7 +16,7 @@ const OUTSIDE_EVERY_PROJECT = {
         'POST /api/v1/get-remaining-projects', 'POST /api/v1/getGlobalTemplate', 'POST /api/v1/mongoOpration', 'POST /api/v1/project/search',
         'POST /api/v1/reports/custom/run', 'POST /api/v1/tabSyncTask', 'POST /api/v1/task/find', 'POST /api/v2/tasks/everything',
         'POST /api/v1/timesheet', 'POST /api/v1/timesheet/billable-summary', 'POST /api/v1/timesheet/export-csv', 'POST /api/v1/timesheet/logDetail',
-        'POST /api/v1/timesheet/project', 'POST /api/v1/timesheet/timelog', 'POST /api/v1/timesheet/tracker', 'POST /api/v1/timesheet/user',
+        'POST /api/v1/timesheet/project', 'POST /api/v1/timesheet/report-facets', 'POST /api/v1/timesheet/timelog', 'POST /api/v1/timesheet/tracker', 'POST /api/v1/timesheet/user',
         'POST /api/v1/timesheet/workload', 'POST /api/v1/timesheet/workload-grid', 'POST /api/v2/timetracker/timelog',
         'POST /api/v1/user/find', 'POST /api/v1/userAndCompanyCheck', 'POST /api/v1/validateRefferalCode', 'POST /api/v2/checkPermission',
         'POST /api/v2/custom-fields/formula/validate', 'POST /api/v2/custom-fields/links/resolve',

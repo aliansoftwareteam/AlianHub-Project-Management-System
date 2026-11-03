@@ -228,7 +228,8 @@ describe('a task in extra lists is counted once, at its home', () => {
        to, each only to a reader of the task's home (tests/task-find-extra-lists.test.js,
        tests/socket-extra-list-relay.test.js); the agent tools are here because they run the web's own
        handlers as the person and search inside the caller's own clause (tests/mcp-extra-lists.test.js);
-       the welcome project's seeder is here because it calls addToList as the owner and reads nothing. */
+       the welcome project's seeder is here because it calls addToList as the owner and reads nothing;
+       the time reports' list filter is here because it only narrows rows the caller's time scope already reads. */
     test('no other server file reads the field', () => {
         const ROOT = path.join(__dirname, '..');
         const KNOWN = [
@@ -250,6 +251,7 @@ describe('a task in extra lists is counted once, at its home', () => {
             'Modules/Tasks/helpers/taskQueryGuard.js',
             'Modules/Tasks/helpers/taskWriteFields.js',
             'Modules/Tasks/helpers/task_class_Mongo.js',
+            'Modules/TimeSheet/helpers/reportFilters.js',
             'migrations/069-task-extra-lists-index.js',
             'socket/controller/taskSocket.js',
             'utils/mongo-handler/createSchema.js',
