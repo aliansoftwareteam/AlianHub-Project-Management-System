@@ -417,6 +417,7 @@
     "AgentActions.reminder_create": "Set a reminder",
     "AgentActions.screen_link": "Get a link to a screen",
     "AgentActions.slack_channel_read": "Read a Slack channel",
+    "AgentActions.slack_channels_list": "List your Slack channels",
     "AgentActions.slack_message_post": "Post a Slack message",
     "AgentActions.sprints_list": "List a project's lists",
     "AgentActions.statuses_list": "List a project's statuses",

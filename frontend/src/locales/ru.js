@@ -2456,6 +2456,7 @@ export default {
         "task_lists_add": "Add to another list",
         "task_lists_remove": "Take out of a list",
         "slack_message_post": "Post a Slack message",
+        "slack_channels_list": "List your Slack channels",
         "google_calendar_events_list": "List Google Calendar events",
         "google_calendar_events_get": "Read a Google Calendar event",
         "google_calendar_events_create": "Create a Google Calendar event",

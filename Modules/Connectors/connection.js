@@ -297,9 +297,10 @@ const revokeToken = async ({ companyId, actor, provider, row, definition }) => {
 
 const revokeAtProvider = async ({ companyId, actor, provider, row }) => {
     const definition = definitionOf(provider);
-    const token = holdsToken(row) ? await revokeToken({ companyId, actor, provider, row, definition }) : null;
-    if (!token) return 'skipped';
+    if (!holdsToken(row)) return 'skipped';
     if (await sharesGrant(companyId, row)) return 'shared';
+    const token = await revokeToken({ companyId, actor, provider, row, definition });
+    if (!token) return 'skipped';
     const out = await api.revoke({ definition, companyId, actor: actorOf(actor).id, token });
     return out.ok ? (out.skipped ? 'no_endpoint' : 'revoked') : 'failed';
 };

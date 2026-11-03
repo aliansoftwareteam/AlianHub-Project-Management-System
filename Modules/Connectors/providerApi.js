@@ -56,10 +56,11 @@ const consentUrl = ({ definition, clientId, redirectUri, scopes, state, challeng
     return `${definition.auth.authorizeUrl}?${new URLSearchParams(params)}`;
 };
 
+/* A verifier goes only where the consent sent its challenge: Slack refuses one it was not asked to check. */
 const exchange = ({ definition, companyId, actor, client, code, verifier, redirectUri }) => post({
     definition, companyId, actor, url: definition.auth.tokenUrl, hide: [client.clientSecret, code, verifier],
     form: {
-        grant_type: 'authorization_code', code, ...(verifier ? { code_verifier: verifier } : {}),
+        grant_type: 'authorization_code', code, ...(verifier && definition.auth.pkce === 'S256' ? { code_verifier: verifier } : {}),
         client_id: client.clientId, client_secret: client.clientSecret, redirect_uri: redirectUri,
     },
 });

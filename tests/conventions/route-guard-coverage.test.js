@@ -85,6 +85,8 @@ const PUBLIC_ROUTES = [
     'GET /api/v1/github-connect/callback',
     // Google's redirect for a person's connector: it exchanges nothing, and the signed-in page completes it.
     'GET /api/v1/connector-oauth/google/callback',
+    // The same redirect for every registry provider (Slack, and those after it); it too exchanges nothing.
+    'GET /api/v1/connector-oauth/:provider/callback',
     // Slack slash command: checked against the workspace's Slack verification token.
     'POST /api/v1/slack/command/:companyId',
     // Progress streams: EventSource cannot send a token, and they carry only step numbers.

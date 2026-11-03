@@ -24,7 +24,7 @@ const fs = require('fs');
 const path = require('path');
 const { SCHEMA_TYPE } = require('../Config/schemaType');
 const { safeFetch } = require('../Modules/Agents/engine/safeFetch');
-const { resolveConnection, markBroken } = require('../Modules/Connectors/resolveConnection');
+const { resolveConnection, markBroken, markBackoff } = require('../Modules/Connectors/resolveConnection');
 const connectorTools = require('../Modules/Connectors/tools');
 const providerApi = require('../Modules/Connectors/providerApi');
 const { validate } = require('../Modules/Connectors/validate');
@@ -64,7 +64,7 @@ const proposalRow = (id) => (mockDb.store[SCHEMA_TYPE.AGENT_PROPOSALS] || []).fi
 const fromAgentRun = (params) => proposals.create(C, {
     agent: { _id: AGENT_ID, name: 'Digest' }, projectId: PROJECT, what: 'Post it', why: 'Asked', changes: [{ action: 'slack.message.post', params }], connectionOwner: PRISHA,
 });
-const approve = (id) => proposals.approve(C, id, { decider: { kind: 'human', userId: PRISHA }, isPrivileged: false, ip: '' });
+const approve = (id, extra = {}) => proposals.approve(C, id, { decider: { kind: 'human', userId: PRISHA }, isPrivileged: false, ip: '', ...extra });
 const callsTo = (method) => fake.state.calls.filter((call) => call.url.pathname === `/api/${method}`);
 
 beforeEach(() => {
@@ -74,6 +74,7 @@ beforeEach(() => {
     fake = fakeSlack.create();
     connected();
     safeFetch.mockImplementation(fake.fetch);
+    markBackoff.mockImplementation(async ({ connectionId, until }) => mockDb.seed(SCHEMA_TYPE.CONNECTOR_CONNECTIONS, { _id: connectionId, backoffUntil: until }));
     mockDb.seed(SCHEMA_TYPE.AGENT_RUNS, { _id: RUN, status: 'running', connectorReads: [] });
     mockDb.seed(SCHEMA_TYPE.AGENTS, { _id: AGENT_ID, name: 'Digest', allowedActions: [], autonomy: 3 });
 });
@@ -241,5 +242,70 @@ describe('the Slack summary skill', () => {
         expect(skill).not.toBeNull();
         expect(seeds.SEEDS.slackSummary.gather[0].reader).toBe('slack.channel.read');
         expect(seeds.SEEDS.slackSummary.emit[0].params.channel).toBe('{{gather.slack.channel}}');
+    });
+});
+
+describe('Slack writes, checked again on edit and at send', () => {
+    it('refuses an edit on the approval card that would notify a whole channel, and sends nothing', async () => {
+        const p = await fromAgentRun({ channel: 'general', text: 'Release is out.' });
+        const id = p.proposalId || p._id;
+        const out = await approve(id, { changes: [{ action: 'slack.message.post', params: { channel: 'general', text: 'Release is out <!everyone>' } }] });
+        expect(out.error).toMatch(/notify a whole channel/);
+        expect(fake.state.posted).toEqual([]);
+        expect(proposalRow(id).status).toBe('pending');
+    });
+
+    it('shows an accepted edit again before it is sent, then sends exactly the edited text', async () => {
+        const p = await fromAgentRun({ channel: 'general', text: 'Release is out.' });
+        const id = p.proposalId || p._id;
+        expect(await approve(id, { changes: [{ action: 'slack.message.post', params: { channel: 'general', text: 'Release 2.1 is out.' } }] })).toMatchObject({ reshown: true, applied: [] });
+        expect(fake.state.posted).toEqual([]);
+        await approve(id, { revision: proposalRow(id).revision });
+        expect(fake.state.posted.map((m) => m.text)).toEqual(['Release 2.1 is out.']);
+    });
+
+    it('is not sent when the channel turned into a direct message by send time', async () => {
+        const p = await fromAgentRun({ channel: 'G0LEADS001', text: 'Budget is approved.' });
+        Object.assign(fake.state.channels.find((c) => c.id === 'G0LEADS001'), { is_mpim: true });
+        const out = await approve(p.proposalId || p._id);
+        expect(out.applied).toEqual([expect.objectContaining({ ok: false, error: expect.stringMatching(/direct message/) })]);
+        expect(fake.state.posted).toEqual([]);
+    });
+
+    it('a bot-era post still waiting in the Inbox names no connection owner, so even an admin cannot send it', async () => {
+        mockDb.seed(SCHEMA_TYPE.AGENT_PROPOSALS, { _id: '6f0000000000000000000f01', agentId: AGENT_ID, status: 'pending', gate: 'owner_admin', changes: [{ action: 'slack.message.post', params: { channelId: 'C0GENERAL1', text: 'old' } }] });
+        const out = await proposals.approve(C, '6f0000000000000000000f01', { decider: { kind: 'human', userId: PRISHA }, isPrivileged: true, ip: '' });
+        expect(out).toMatchObject({ status: 403, reason: 'not_permitted' });
+        expect(fake.state.posted).toEqual([]);
+    });
+});
+
+describe('when Slack says slow down, or a run has read enough', () => {
+    it('a 429 holds the connection, and the next call never reaches Slack', async () => {
+        fake.state.next = fakeSlack.answer(429, { ok: false, error: 'ratelimited' }, { 'retry-after': '30' });
+        expect(await mcpRead('slack.channels.list')).toMatchObject({ code: 'provider_busy' });
+        expect(markBackoff).toHaveBeenCalledWith(expect.objectContaining({ connectionId: MINE }));
+        const calls = fake.state.calls.length;
+        expect(await mcpRead('slack.channel.read', { channel: 'C0GENERAL1' })).toMatchObject({ code: 'provider_busy' });
+        expect(fake.state.calls).toHaveLength(calls);
+    });
+
+    it('stops an agent run after its connector read cap, without calling Slack again', async () => {
+        const { RUN } = require('../Modules/Agents/connectors/readLimits');
+        for (let i = 0; i < RUN.CALLS; i += 1) {
+            // eslint-disable-next-line no-await-in-loop
+            await agentRead('slack.channel.read', { channel: 'C0GENERAL1' });
+        }
+        const calls = fake.state.calls.length;
+        await expect(agentRead('slack.channel.read', { channel: 'C0GENERAL1' })).rejects.toMatchObject({ code: 'run_call_cap' });
+        expect(fake.state.calls).toHaveLength(calls);
+    });
+
+    it('never sends the token anywhere but slack.com, and keeps it out of what it stores', async () => {
+        const { proposalId } = await mcpWrite('slack.message.post', { channel: 'general', text: 'Hello' });
+        await approve(proposalId);
+        await agentRead('slack.channel.read', { channel: 'general' });
+        safeFetch.mock.calls.forEach(([url]) => expect(new URL(url).hostname).toBe('slack.com'));
+        expect(JSON.stringify(mockDb.store)).not.toContain(fakeSlack.TOKEN);
     });
 });
