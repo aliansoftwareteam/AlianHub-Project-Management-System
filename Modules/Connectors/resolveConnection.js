@@ -51,4 +51,6 @@ const markBackoff = ({ companyId, connectionId, until } = {}) => connection.mark
 
 const recordHealth = ({ companyId, connectionId, lastUsedAt, lastError } = {}) => connection.recordHealth({ companyId, connectionId, lastUsedAt, lastError });
 
-module.exports = { CODE, ConnectorError, resolveConnection, markBackoff, recordHealth };
+const markBroken = ({ companyId, connectionId, reason } = {}) => connection.markBrokenById({ companyId, connectionId, reason });
+
+module.exports = { CODE, ConnectorError, resolveConnection, markBackoff, recordHealth, markBroken };

@@ -15,7 +15,6 @@ const approverRights = require('./approverRights');
 const taint = require('./taint');
 const { externalClientActor } = require('./actor');
 const aiFeedback = require('../AI/feedback');
-const slackPost = require('./connectors/slackPost');
 const planFiling = require('./planFiling');
 const planLocks = require('./planLocks');
 const planShown = require('./planShown');
@@ -168,8 +167,7 @@ const create = async (companyId, { agent, runId, taskId, taskIds, projectId, wha
     const check = validateChanges(changes);
     if (!check.valid) throw Object.assign(new Error(check.reason), { status: 400 });
     const owner = connectorWrites.hasWrite(changes) ? connectionOwnerOf(source, requestedBy, connectionOwner) : '';
-    const slackReady = slackPost.hasSlackChange(changes) ? await slackPost.prepareChanges(companyId, changes) : changes;
-    const saved = await connectorWrites.fileChanges(companyId, owner, slackReady, { via: source === SOURCE_MCP ? 'mcp' : 'agent', id: String(agent._id), runId }, async (prepared) => {
+    const saved = await connectorWrites.fileChanges(companyId, owner, changes, { via: source === SOURCE_MCP ? 'mcp' : 'agent', id: String(agent._id), runId }, async (prepared) => {
         const scopedProjectId = projectId || await projectOfTask(companyId, taskId);
         return MongoDbCrudOpration(companyId, {
             type: SCHEMA_TYPE.AGENT_PROPOSALS,
@@ -371,9 +369,6 @@ const approve = async (companyId, id, { decider, isPrivileged, changes: edited, 
         // The gate kept at filing was read from the changes as filed; an edit is held to what it would run.
         if (gateOf(edited, p.gate) === GATE_OWNER_ADMIN && !isPrivileged) return needsAdmin;
         changes = edited.map((c) => ({ action: c.action, params: planFiling.storedParams(c.action, c.params || {}), label: c.label || c.action }));
-        if (slackPost.hasSlackChange(changes)) {
-            try { changes = await slackPost.prepareChanges(companyId, changes); } catch (e) { return { error: e.message, status: e.status || 400 }; }
-        }
         // An edited connector write is checked and shown to its owner again, never sent on the click that edited it.
         if (connectorWrites.hasWrite(changes)) return reshowEdited(companyId, id, p, changes, { decider, ip });
         status = STATUS.EDITED;
@@ -421,7 +416,7 @@ const approve = async (companyId, id, { decider, isPrivileged, changes: edited, 
     }
     // A write that left for a connected app stays there, so no window is offered that could not take it back.
     const undoUntil = connectorWrites.hasWrite(changes) ? null : new Date(Date.now() + UNDO_WINDOW_MS);
-    const delivery = [...slackPost.deliveryOf(changes, applied), ...connectorWrites.deliveryOf(changes, applied)];
+    const delivery = connectorWrites.deliveryOf(changes, applied);
     const notMade = planFollowUp.notMadeBy(changes, applied);
     const updated = await setStatus(companyId, id, { status, changes, undoUntil, auditIds, ...(delivery.length ? { delivery } : {}), ...(notMade.length ? { notMade } : {}) });
     await audit.recordProposalDecision(companyId, { ...decider, ...runTrace }, { proposalId: id, decision: status, agentName: p.agentName, runId: p.runId, changes: applied, ip });

@@ -283,11 +283,24 @@ const sharesGrant = async (companyId, row) => {
     return others.some((other) => String(other._id) !== String(row._id) && holdsToken(other) && other.account && other.account.id === id);
 };
 
+/* Slack's auth.revoke takes no refresh token, so an expired access token is refreshed first, only to be revoked. */
+const revokeToken = async ({ companyId, actor, provider, row, definition }) => {
+    const refreshToken = await store.resolve({ companyId, handle: row.handles.refresh }).catch(() => null);
+    if (definition.auth.revokeWith !== 'access') return refreshToken;
+    const fresh = row.handles.access && row.accessExpiresAt && new Date(row.accessExpiresAt).getTime() - EXPIRY_SKEW_MS > Date.now();
+    if (fresh) return store.resolve({ companyId, handle: row.handles.access }).catch(() => null);
+    const app = refreshToken ? await apps.resolveApp({ companyId, provider }).catch(() => null) : null;
+    if (!app) return null;
+    const out = await api.refresh({ definition, companyId, actor: actorOf(actor).id, client: app, refreshToken });
+    return out.ok ? api.tokensOf(definition, out.body).access_token || null : null;
+};
+
 const revokeAtProvider = async ({ companyId, actor, provider, row }) => {
-    const token = holdsToken(row) ? await store.resolve({ companyId, handle: row.handles.refresh }).catch(() => null) : null;
+    const definition = definitionOf(provider);
+    const token = holdsToken(row) ? await revokeToken({ companyId, actor, provider, row, definition }) : null;
     if (!token) return 'skipped';
     if (await sharesGrant(companyId, row)) return 'shared';
-    const out = await api.revoke({ definition: definitionOf(provider), companyId, actor: actorOf(actor).id, token });
+    const out = await api.revoke({ definition, companyId, actor: actorOf(actor).id, token });
     return out.ok ? (out.skipped ? 'no_endpoint' : 'revoked') : 'failed';
 };
 
@@ -312,8 +325,9 @@ const complete = async ({ companyId, userId, sessionId, provider, state, code, a
     const out = await api.exchange({ definition, companyId, actor: userId, client: app, code: given, verifier: pending.verifier, redirectUri: redirectUri(provider) });
     if (!out.ok) throw refusedByProvider(definition, out);
     const answer = out.body;
-    if (typeof answer.access_token !== 'string' || !answer.access_token) throw new ConnectionError(502, 'The provider sent no access token.', 'no_access_token');
-    if (typeof answer.refresh_token !== 'string' || !answer.refresh_token) {
+    const tokens = api.tokensOf(definition, answer);
+    if (typeof tokens.access_token !== 'string' || !tokens.access_token) throw new ConnectionError(502, 'The provider sent no access token.', 'no_access_token');
+    if (typeof tokens.refresh_token !== 'string' || !tokens.refresh_token) {
         throw new ConnectionError(409, 'The provider sent no refresh token, so the connection could not be kept. Start again and allow offline access.', 'no_refresh_token');
     }
     let account;
@@ -328,15 +342,15 @@ const complete = async ({ companyId, userId, sessionId, provider, state, code, a
     if (holdsToken(row) && before && before !== account.id) await revokeAtProvider({ companyId, actor: who, provider, row });
 
     const handles = {};
-    for (const [key, value] of [['refresh', answer.refresh_token], ['access', answer.access_token]]) {
+    for (const [key, value] of [['refresh', tokens.refresh_token], ['access', tokens.access_token]]) {
         // eslint-disable-next-line no-await-in-loop
         handles[key] = await keep({ companyId, userId, provider, handle: row.handles && row.handles[key], key, value, actor: who });
     }
-    const scopes = api.scopesOf(answer.scope);
+    const scopes = api.scopesOf(tokens.scope);
     const was = row.products || [];
     const products = Array.isArray(pending.products) ? pending.products : was;
     const saved = await update(companyId, row, { $set: {
-        status: STATUS.CONNECTED, handles, scopes, account, app: row.app || { source: app.source, appId: app.appId }, accessExpiresAt: lifetimeOf(answer.expires_in),
+        status: STATUS.CONNECTED, handles, scopes, account, app: row.app || { source: app.source, appId: app.appId }, accessExpiresAt: lifetimeOf(tokens.expires_in),
         products: [...products], connectedAt: new Date(), lastError: '', brokenAt: null, updatedBy: String(userId),
     } });
     audit(companyId, who, 'connector.connect', provider, { userId: String(userId), products: [...(saved.products || [])], scopes });
@@ -418,14 +432,21 @@ const accessTokenFor = async ({ companyId, userId, provider }) => {
         await markBroken(companyId, row, out.error);
         return none('broken');
     }
-    if (typeof out.body.access_token !== 'string' || !out.body.access_token) return none('refresh_failed');
+    const tokens = api.tokensOf(definition, out.body);
+    if (typeof tokens.access_token !== 'string' || !tokens.access_token) return none('refresh_failed');
     const actor = { id: String(userId) };
-    const next = { ...handles, access: await keep({ companyId, userId, provider, handle: handles.access, key: 'access', value: out.body.access_token, actor }) };
-    if (typeof out.body.refresh_token === 'string' && out.body.refresh_token) {
-        next.refresh = await keep({ companyId, userId, provider, handle: handles.refresh, key: 'refresh', value: out.body.refresh_token, actor });
+    const next = { ...handles, access: await keep({ companyId, userId, provider, handle: handles.access, key: 'access', value: tokens.access_token, actor }) };
+    if (typeof tokens.refresh_token === 'string' && tokens.refresh_token) {
+        next.refresh = await keep({ companyId, userId, provider, handle: handles.refresh, key: 'refresh', value: tokens.refresh_token, actor });
     }
-    await update(companyId, row, { $set: { handles: next, accessExpiresAt: lifetimeOf(out.body.expires_in), lastRefreshedAt: new Date(), lastUsedAt: new Date() } });
-    return { token: out.body.access_token, reason: '' };
+    await update(companyId, row, { $set: { handles: next, accessExpiresAt: lifetimeOf(tokens.expires_in), lastRefreshedAt: new Date(), lastUsedAt: new Date() } });
+    return { token: tokens.access_token, reason: '' };
+};
+
+/* A tool call the provider refused for a dead token (Slack answers `invalid_auth` on the call, not on a refresh). */
+const markBrokenById = async ({ companyId, connectionId, reason }) => {
+    const row = await byId(String(companyId), connectionId);
+    if (row && holdsToken(row) && row.status !== STATUS.BROKEN) await markBroken(String(companyId), row, reason);
 };
 
 const markBackoff = async ({ companyId, connectionId, until }) => {
@@ -521,5 +542,5 @@ module.exports = {
     STATUS, BY, STATE_TTL_SECONDS, SECRET_KIND, ConnectionError,
     isOffered, fallbackOrigin, redirectUri, callbackPath, byId, ownsState,
     describe, list, membersWithConnections, start, setProducts, returnFor, complete, disconnect,
-    findUsable, accessTokenFor, markBackoff, recordHealth, endForMember, sweepCompany,
+    findUsable, accessTokenFor, markBrokenById, markBackoff, recordHealth, endForMember, sweepCompany,
 };

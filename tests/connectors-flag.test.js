@@ -55,8 +55,9 @@ describe('the CONNECTORS flag', () => {
         expect(status.requested).toBe(true);
         expect(status.on).toBe(false);
         expect(status.problems.map((p) => p.code)).toEqual(codes);
-        expect(registry.has(ACTION)).toBe(false);
-        expect(actions.rating(ACTION)).toBeNull();
+        // The Slack tools are offered on the name and taint routing, like Google's; without a usable secrets store
+        // no connection can hold a token, so every call answers that the person must connect first.
+        expect(registry.has(ACTION)).toBe(!codes.includes('taint_routing_off'));
         flag.logBootState();
         expect(logger.error).toHaveBeenCalledTimes(1);
         expect(logger.error.mock.calls[0][0]).toContain('slack');
@@ -71,13 +72,13 @@ describe('the CONNECTORS flag', () => {
     }));
 });
 
-describe('slack.message.post is propose-only', () => {
+describe('slack.message.post is propose-only, on the person\'s own connection', () => {
     const agent = (autonomy) => ({ autonomy, projectIds: ['p1'], allowedActions: [] });
-    const params = { channelId: 'C012345678', text: 'Release is out.', projectId: 'p1' };
+    const params = { channel: 'releases', text: 'Release is out.', projectId: 'p1' };
 
     it('is a gated, irreversible, workspace-wide write', () => withEnv(READY, () => {
         const entry = registry.get(ACTION);
-        expect(entry).toMatchObject({ write: true, undoable: false, proposeOnly: true, gate: 'owner_admin' });
+        expect(entry).toMatchObject({ write: true, undoable: false, proposeOnly: true, gate: 'connection_owner' });
         expect(actions.rating(ACTION)).toEqual({ write: true, reversible: false, scope: 'workspace', money: false });
         expect(actions.unrated()).toEqual([]);
         expect(registry.mayActDirectly(3, ACTION)).toBe(false);

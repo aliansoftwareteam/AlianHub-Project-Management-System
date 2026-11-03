@@ -1425,6 +1425,8 @@ export default {
         "slack_channel": "Default channel (optional)",
         "slack_connect": "Connect Slack",
         "slack_commands": "Available commands: /alianhub help · /alianhub projects",
+        "slack_personal_note": "Agents use each person's own Slack now, not a workspace bot. Connect yours on My connections.",
+        "slack_personal_link": "Open My connections",
         "slack_help_title": "How to set it up",
         "slack_help_1": "At api.slack.com/apps open (or create) your app → Basic Information → copy the Verification Token into the field above and save.",
         "slack_help_2": "Features → Slash Commands → Create New Command: /alianhub, and paste the Request URL shown above.",
@@ -9514,6 +9516,7 @@ export default {
         "oauth_client_approval": "{client} asks to act for people in this workspace. An owner or admin can approve or deny it in Settings, Agent clients.",
         "unnamed_client": "An outside agent",
         "credential_expiring_token": "Your token {name} ends on {date}. Renew it under Accounts to keep its settings and get a new secret.",
+        "connector_slack_bot_retired": "The Slack workspace bot was retired. Each person now connects their own Slack on My connections.",
         "credential_expiring_connection": "The access you gave {name} ends on {date}. Connect it again from the app to keep it.",
         "title": "Inbox",
         "tab_all": "All",
@@ -13925,7 +13928,10 @@ export default {
             "googleMeetSpacesCreate": "Create a Google Meet meeting",
             "googleDriveFilesList": "List picked Google Drive files",
             "googleDriveFilesGet": "Read Google Drive file details",
-            "googleDriveFilesRead": "Read a Google Drive file"
+            "googleDriveFilesRead": "Read a Google Drive file",
+            "slackChannelsList": "List your Slack channels",
+            "slackChannelRead": "Read a Slack channel",
+            "slackMessagePost": "Post a Slack message as you"
         },
         "card": {
             "primaryCalendar": "Your primary calendar",

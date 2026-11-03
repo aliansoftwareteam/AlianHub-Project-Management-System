@@ -10,6 +10,8 @@ const CARD_LABEL = /^Connectors\.card\.[A-Za-z0-9_]+$/;
 const KIND = Object.freeze({ READ: 'read', WRITE: 'write' });
 const PROPERTY_TYPES = Object.freeze(['string', 'integer', 'number', 'boolean']);
 const MIN_DESCRIPTION = 20;
+const FIELD = /^[a-z][A-Za-z]{0,29}$/;
+const RESERVED_FIELDS = Object.freeze(['text', 'chars', 'truncated', 'taint']);
 
 const isObject = (value) => value !== null && typeof value === 'object' && !Array.isArray(value);
 const positive = (value) => Number.isInteger(value) && value > 0;
@@ -69,6 +71,9 @@ const toolProblems = (definition, tool) => {
     // The approval card is the only place a person sees what a write sends, so a write without one never loads.
     if (tool.kind === KIND.WRITE && typeof tool.card !== 'function') found.push(`${key}: a write has no card`);
     found.push(...editableProblems(tool).map((problem) => `${key}: ${problem}`));
+    if (tool.fields !== undefined && !(tool.kind === KIND.READ && Array.isArray(tool.fields) && tool.fields.every((name) => FIELD.test(String(name)) && !RESERVED_FIELDS.includes(name)))) {
+        found.push(`${key}: fields must be a read's list of extra value names`);
+    }
     return found;
 };
 

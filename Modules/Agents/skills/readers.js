@@ -285,10 +285,6 @@ const READERS = Object.freeze({
         };
     },
 
-    'slack.channel'(companyId, { runId, actor, allowedActions }, params) {
-        return require('../connectors/slackRead').read({ companyId, runId, actor, allowedActions, params });
-    },
-
     url: declaredRead('url'),
 
     api: declaredRead('api'),

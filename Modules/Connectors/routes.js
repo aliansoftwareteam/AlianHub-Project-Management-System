@@ -7,19 +7,10 @@ const registry = require('./registry');
 const { agentsRefused } = require('../Agents/guard');
 const { CALLBACK_PATH } = require('../Agents/connectors/googleConnection');
 
-// Saving a token, refreshing the channel list, and connecting or ending a Google connection each call the provider.
+// Connecting or ending a connection calls the provider.
 const providerLimiter = rateLimit({ windowMs: 60 * 1000, limit: 12, standardHeaders: true, legacyHeaders: false });
 // Reachable without a session, so it has a limiter of its own.
 const callbackLimiter = rateLimit({ windowMs: 60 * 1000, limit: 30, standardHeaders: true, legacyHeaders: false });
-
-const slackRoutes = (app) => {
-    // Owners and admins only, never an API token; the handlers check the seat themselves. No route returns a token.
-    app.get('/api/v2/connectors/slack', ctrl.getSlack);
-    app.put('/api/v2/connectors/slack/secrets', providerLimiter, ctrl.saveSlackSecrets);
-    app.delete('/api/v2/connectors/slack/secrets/:key', ctrl.removeSlackSecret);
-    app.post('/api/v2/connectors/slack/channels/refresh', providerLimiter, ctrl.refreshSlackChannels);
-    app.put('/api/v2/connectors/slack/channels', ctrl.setSlackChannels);
-};
 
 const googleRoutes = (app) => {
     // Outside the /api/v2/connectors prefix on purpose: that prefix demands a session, and Google's redirect has none.
@@ -62,7 +53,6 @@ exports.init = (app) => {
         app.get('/api/v2/connectors/admin/quotas', ctrl.getQuotas);
         app.put('/api/v2/connectors/admin/quotas', ctrl.setQuotas);
     }
-    if (flag.requested().includes('slack')) slackRoutes(app);
     // Before the legacy google routes: the generic '/:provider/callback' and the legacy google callback share one
     // redirect URI, and the generic handler hands a legacy state back to the legacy handler (coexistence until 073).
     if (registry.list().some((definition) => flag.named().includes(definition.id))) genericRoutes(app);
