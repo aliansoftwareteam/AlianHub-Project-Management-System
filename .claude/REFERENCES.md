@@ -7,7 +7,7 @@
 | Resource | URL | Purpose |
 |----------|-----|---------|
 | **Official Website** | https://alianhub.com | Project homepage |
-| **Documentation** | https://help.alianhub.com | User guides and API docs |
+| **Documentation** | https://docs.alianhub.com/ | User guides and API docs |
 | **Live Demo** | https://demo.alianhub.com | Try the app (read-only) |
 | **GitHub Repository** | https://github.com/aliansoftwareteam/AlianHub-Project-Management-System | Source code |
 | **Issue Tracker** | https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/issues | Report bugs, request features |
@@ -192,7 +192,7 @@ See [package.json](../../package.json) for complete list and exact versions.
 ## Getting Help
 
 ### Ask a Question
-1. **Search docs:** https://help.alianhub.com
+1. **Search docs:** https://docs.alianhub.com/
 2. **GitHub Issues:** https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/issues
 3. **This documentation:** Read CONVENTIONS.md, COMMON-TASKS.md
 

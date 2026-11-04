@@ -112,7 +112,7 @@ jobs:
             org.opencontainers.image.title=AlianHub
             org.opencontainers.image.description=Self-hosted, open-source project management system
             org.opencontainers.image.url=https://alianhub.com
-            org.opencontainers.image.documentation=https://help.alianhub.com
+            org.opencontainers.image.documentation=https://docs.alianhub.com/
             org.opencontainers.image.source=https://github.com/${{ github.repository }}
             org.opencontainers.image.licenses=AGPL-3.0-or-later
             org.opencontainers.image.vendor=Alian Software
