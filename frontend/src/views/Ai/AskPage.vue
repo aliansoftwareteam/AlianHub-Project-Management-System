@@ -352,7 +352,7 @@
 
 <script setup>
 import AiModelNotice from '@/components/molecules/AiUnavailable/AiModelNotice.vue';
-import { computed, inject, nextTick, onBeforeUnmount, onMounted, ref } from "vue";
+import { computed, inject, nextTick, onBeforeUnmount, onMounted, ref, watch } from "vue";
 import { useI18n } from "vue-i18n";
 import { useRoute } from "vue-router";
 import { useToast } from "vue-toast-notification";
@@ -393,7 +393,15 @@ const $toast = useToast();
 const companyId = inject("$companyId");
 const { agents, registryManifest, runs, routable, loadAgents, loadRegistry, loadRuns, loadRoutable, startRun } = useParity();
 const { spend, skillManifest, loadSkills, loadSpend } = useAgents();
-const { canManage } = useAgentAccess();
+const { canManage, canBuild, seesSkills } = useAgentAccess();
+// The server refuses the skill list to anyone without either right; the rights can arrive after mount.
+const maySeeSkills = computed(() => seesSkills.value || canBuild.value);
+let skillsRequested = false;
+watch(maySeeSkills, (allowed) => {
+    if (!allowed || skillsRequested) return;
+    skillsRequested = true;
+    loadSkills().catch(() => []);
+}, { immediate: true });
 const { turns, threadId, threads, threadsLoading, streaming, announcement, send, plan, decidePlan, stop, newQuestion, loadThreads, openThread, removeThread, seed } = useAskConversation({ t });
 
 const route = useRoute();
@@ -630,7 +638,7 @@ onMounted(async () => {
     if (sourceRes?.data?.status) sources.value = sourceRes.data.data || {};
     if (modelRes?.data?.status) models.value = modelRes.data.data?.models || [];
     try {
-        await Promise.all([loadRoutable("", { limit: BACKLOG_LIMIT }), loadAgents(), loadRegistry(), loadRuns(), loadSkills(), loadSpend()]);
+        await Promise.all([loadRoutable("", { limit: BACKLOG_LIMIT }), loadAgents(), loadRegistry(), loadRuns(), loadSpend()]);
     } catch (e) {
         error.value = reasonOf(e, "Ai.load_failed");
     } finally {
