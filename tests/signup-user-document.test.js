@@ -71,9 +71,9 @@ describe('buildUserDocument', () => {
         expect(doc).toMatchObject({ AssignCompany: [], Employee_Name: 'Ada Lovelace', isEmailVerified: false, isActive: true, isDeleted: false });
     });
 
-    it('starts every new account in Simple, whatever the request says', () => {
+    it('starts every new account in Full, whatever the request says', () => {
         const doc = createUser.buildUserDocument({ firstName: 'Ada', lastName: 'Lovelace', email: 'ada@example.com', ...PRIVILEGED });
-        expect(doc.navPreferences).toEqual({ mode: 'simple' });
+        expect(doc.navPreferences).toEqual({ mode: 'full' });
     });
 
     it('marks an admitted invitee verified in the invited company', () => {
