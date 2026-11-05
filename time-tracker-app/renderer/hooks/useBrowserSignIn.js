@@ -25,8 +25,13 @@ export function useBrowserSignIn(confirmStop) {
       if (arrived.workspace === current) {
         const payload = await window.ipc.invoke('tracker:sign-in-take', current);
         if (!payload) return;
-        await redeemSignInCode(payload, dispatch);
-        router.push('/home');
+        try {
+          await redeemSignInCode(payload, dispatch);
+          router.push('/home');
+        } catch (error) {
+          console.error('The workspace refused the sign-in code', error);
+          router.push('/login');
+        }
         return;
       }
       const result = await checkWorkspace(arrived.workspace);
