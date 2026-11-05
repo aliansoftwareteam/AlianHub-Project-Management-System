@@ -114,3 +114,10 @@ rule: no push without approval). Windows end-to-end: tracker half verified, brow
   renderer changed; deleting it fixed it (dev only).
 - Owner renamed the finder host from `login.alianhub.com` to `auth.alianhub.com`. It is already in the cloud's
   reserved subdomains (`packages/shared/src/subdomain.js`), so no customer can hold it.
+- Hosted the finder locally from its production image (`docker build -f finder/Dockerfile`, 290 MB, read-only,
+  no capabilities) at `auth.alianhub.localhost:4400`. With production settings it refuses private, loopback and
+  metadata addresses and will not start with `FINDER_ALLOW_PRIVATE`. Through the container: the tracker's own
+  challenge and state reached abb's `#/oauth2` link unchanged; the return link switched the tracker to abb and
+  the code was redeemed there (a fake code gave 400, and the tracker showed abb's sign-in screen).
+- Tests 2026-11-05: finder 45, backend tracker/auth/session/handshake 753 (39 suites), frontend sign-in 51,
+  all pass. Still open: the browser click-through with a real login, and the second round showing the hint.
