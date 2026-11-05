@@ -9,7 +9,7 @@
                 <div class="d-flex align-items-center justify-content-between filter-title" v-if="clientWidth <= 767">
                     <h3 class="m-0">{{$t('Filters.filter')}}</h3>
                     <div class="filter-info d-flex">
-                        <a href="https://docs.alianhub.com/" target="_blank">
+                        <a href="https://docs.alianhub.com/user-guide/views/" target="_blank">
                             <img src="@/assets/images/svg/info_icon.svg" alt="info icon" class="mr-5px"/>
                             {{$t('Filters.learnmorefilter')}}
                         </a>
@@ -32,7 +32,7 @@
                             <h2 class="m-0 font-size-18">{{ isEdit === true ? selectedRow.name : $t('Filters.filter')}}</h2>
                         </div>
                         <div class="filter-info d-flex">
-                            <a href="https://docs.alianhub.com/" target="_blank">
+                            <a href="https://docs.alianhub.com/user-guide/views/" target="_blank">
                                 <img src="@/assets/images/svg/info_icon.svg" alt="info icon" class="mr-5px"/>
                                 {{$t('Filters.learnmorefilter')}}
                             </a>

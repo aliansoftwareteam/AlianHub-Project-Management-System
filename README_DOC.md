@@ -282,7 +282,7 @@ Thereafter, navigate to <mark style="color:blue;">**http://localhost:4000**</mar
 
 Please make sure to follow through the installation guide properly without skipping any step.
 
-[_**Please follow this document**_](https://help.alianhub.com/app-installation-and-start-guide/1.-nodejs-configuration)
+[_**Please follow this document**_](https://docs.alianhub.com/admin/install-manual)
 
 
 <br>
