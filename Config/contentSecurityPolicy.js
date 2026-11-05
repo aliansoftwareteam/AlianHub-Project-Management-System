@@ -1,3 +1,5 @@
+const googleAnalytics = require('./googleAnalytics');
+
 const OFF = 'off';
 const REPORT = 'report';
 const ENFORCE = 'enforce';
@@ -160,7 +162,8 @@ const buildDirectives = (env = process.env, { reportingApi = false } = {}) => {
         'form-action': [SELF],
         'object-src': [NONE],
     };
-    for (const [directive, sources] of Object.entries(extrasOf(env))) directives[directive] = [...new Set([...directives[directive], ...sources])];
+    const additions = [googleAnalytics.cspSourcesOf(env), extrasOf(env)];
+    for (const [directive, sources] of additions.flatMap(Object.entries)) directives[directive] = [...new Set([...directives[directive], ...sources])];
     return { ...directives, 'report-uri': [REPORT_PATH], ...(reportingApi ? { 'report-to': [REPORT_GROUP] } : {}) };
 };
 

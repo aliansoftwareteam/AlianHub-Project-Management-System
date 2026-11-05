@@ -233,6 +233,7 @@ function publicConfig() {
             apiKey: env('APIKEY'), authDomain: env('AUTODOMAIN'), projectId: env('PROJECTID'), storageBucket: env('STORAGEBUCKET'),
             messagingSenderId: env('MESSAGINGSENDERID'), appId: env('APPID'), measurementId: env('MEASUREMENTID'),
         },
+        analytics: { gaMeasurementId: require('./googleAnalytics').measurementIdOf(process.env) },
         demoMode: env('DEMO_MODE') === 'true',
         mcpOAuth: require('../Modules/OAuthServer/config').isOn(process.env),
         hosting: { mode: hostingMode.mode(), portalUrl: hostingMode.portalUrl(), ...(hostingMode.isManaged() ? hostedLifecycle() : {}) },
