@@ -27,6 +27,7 @@ import { i18n } from '@/locales/main'
 import dashboard from "../plugins/dashboard/router";
 import { apiRequestWithoutCompnay, apiRequestWithoutSecure } from '@/services'
 import { applyPublicConfig, isManagedHosting, publicConfig } from '@/config/publicConfig'
+import { trackPageView } from '@/utils/analytics'
 import { isBillingRoute, upgradeTarget } from '@/composable/upgradeLink'
 import * as env from '@/config/env';
 import Cookies from 'js-cookie'
@@ -195,6 +196,10 @@ router.beforeEach(async(to, _, next) => {
 			return;
 		}
 	// })
+})
+
+router.afterEach((to, _, failure) => {
+	if (!failure) trackPageView(to);
 })
 
 /* A deep link can arrive before App.vue has asked for the public config. */

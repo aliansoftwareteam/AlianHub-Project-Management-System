@@ -1,5 +1,6 @@
 import { reactive } from "vue";
 import * as env from "@/config/env";
+import { startAnalytics } from "@/utils/analytics";
 
 const flag = (key) => process.env[key] === "true";
 
@@ -21,6 +22,7 @@ export const publicConfig = reactive({
         magicLink: false,
     },
     firebase: {},
+    analytics: { gaMeasurementId: "" },
     demoMode: false,
     mcpOAuth: false,
     hosting: { mode: "self", portalUrl: "" },
@@ -29,6 +31,7 @@ export const publicConfig = reactive({
 export function applyPublicConfig(data = {}) {
     Object.assign(publicConfig, data, { auth: { ...publicConfig.auth, ...(data.auth || {}) }, loaded: true });
     env.setRuntimeConfig(publicConfig);
+    startAnalytics(publicConfig.analytics?.gaMeasurementId);
     return publicConfig;
 }
 
