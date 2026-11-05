@@ -18,6 +18,7 @@ import AuthShell from "@/components/templates/AuthShell/AuthShell.vue";
 import ShellIcon from "@/components/organisms/Shell/ShellIcon.vue";
 import { apiRequestWithoutCompnay } from "@/services";
 import * as env from "@/config/env";
+import { buildTrackerAuthorizeLink } from "@/utils/trackerDeepLink";
 
 defineOptions({ name: "TrackerLoginPage" });
 
@@ -70,7 +71,13 @@ const redirect = async () => {
         const code = response?.data?.data?.code;
         if (!code) throw new Error("No tracker sign-in code");
         const scheme = RETURN_SCHEMES.includes(route?.query?.scheme) ? route.query.scheme : "myapp";
-        window.location.href = `${scheme}://authorize?client_id=${encodeURIComponent(userId.value)}&code=${encodeURIComponent(code)}`;
+        window.location.href = buildTrackerAuthorizeLink({
+            scheme,
+            userId: userId.value,
+            code,
+            state: route?.query?.state,
+            workspace: window.location.origin,
+        });
         waitForHandoff();
     } catch {
         failed.value = true;

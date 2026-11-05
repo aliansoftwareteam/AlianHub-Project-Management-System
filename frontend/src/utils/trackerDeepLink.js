@@ -71,3 +71,17 @@ export const openTrackerConnect = (workspaceUrl, opts = {}) => {
     return { ok: false, reason: 'launch-failed' };
   }
 };
+
+const SIGN_IN_STATE = /^[A-Za-z0-9_-]{16,128}$/;
+
+export const isSignInState = (value) => typeof value === 'string' && SIGN_IN_STATE.test(value);
+
+// A tracker that sent a state learns its workspace from this link, so the workspace is added only then.
+export const buildTrackerAuthorizeLink = ({ scheme, userId, code, state, workspace }) => {
+    const params = [`client_id=${encodeURIComponent(userId || '')}`, `code=${encodeURIComponent(code)}`];
+    if (isSignInState(state)) {
+        params.push(`state=${encodeURIComponent(state)}`);
+        if (workspace) params.push(`workspace=${encodeURIComponent(workspace)}`);
+    }
+    return `${scheme}://authorize?${params.join('&')}`;
+};

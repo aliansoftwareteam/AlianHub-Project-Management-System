@@ -13,6 +13,8 @@ import { replayQueue } from '../../utils/queueReplay';
 import store from '../../store/store';
 import { selectCurrentWorkspace, setWorkspaces } from '../../store/workspace';
 import { checkWorkspace, loadWorkspaces, refreshWorkspace } from '../../controller/workspace/workspace';
+import { useBrowserSignIn } from '../../hooks/useBrowserSignIn';
+import { useStopTimerPrompt } from '../Workspace/useStopTimerPrompt';
 const CONNECT_ROUTE = '/connect';
 const publicRoutes = ['/login', CONNECT_ROUTE];
 
@@ -29,6 +31,8 @@ const Layout = ({ children }) => {
   const isInternetLost = useSelector((state) => state.auth.isInternetLost);
   const intervalRef = useRef(null);
   const startFromDeepLink = useDeepLinkStart();
+  const [askStop, stopPrompt] = useStopTimerPrompt();
+  const finishBrowserSignIn = useBrowserSignIn(askStop);
   // Deep link that arrived while a tracker is already running — prompt the user.
   const [deepLinkPrompt, setDeepLinkPrompt] = useState(null); // { taskId, comment }
   // Entries still waiting to reach the server, so the offline screen can say what is
@@ -96,8 +100,16 @@ const Layout = ({ children }) => {
       .finally(() => {
         dispatch(initializeAuth());
         window.ipc.send('workspace:renderer-ready');
+        finishBrowserSignIn();
       });
   }, [dispatch]);
+
+  useEffect(() => {
+    const unsubscribe = window.ipc.on('tracker:sign-in-arrived', () => finishBrowserSignIn());
+    return () => {
+      if (typeof unsubscribe === 'function') unsubscribe();
+    };
+  }, [finishBrowserSignIn]);
 
   useEffect(() => {
     const unsubscribe = window.ipc.on('workspace:connect', (payload) => {
@@ -276,6 +288,7 @@ const Layout = ({ children }) => {
   // return children;
   return (
     <div>
+      {stopPrompt}
       {showOfflineQueueScreen && (
         <div className="fixed inset-0 flex items-center justify-center bg-white z-50">
           <div className="text-center px-6">

@@ -11,6 +11,7 @@ const helperCtr = require("../helper.js");
 const sesstionCtr = require("../session.js");
 const refreshSession = require("../helpers/refreshSession");
 const trackerCode = require("../helpers/trackerCode");
+const workspaceHint = require("../helpers/workspaceHint");
 const mongoose = require("mongoose");
 const { removeCache } = require("../../../utils/commonFunctions.js");
 const { updateUserFun } = require("../../Users/controller.js");
@@ -121,6 +122,7 @@ const finalizeSession = async (req, res, uid, next, onSuccess) => {
             };
             res.cookie("refreshToken", sData.data.refreshToken, { ...setCookie, maxAge: Number(process.env.SESSIONEXPIREDTIME || 172800)*1000 });
             res.cookie("accessToken", gData.token, { ...setCookie });
+            workspaceHint.rememberWorkspace(req, res);
             const payload = {
                 uid: uid,
                 refreshToken: sData.data.refreshToken,
@@ -263,6 +265,7 @@ exports.logout = async (req, res) => {
 
         res.cookie("accessToken","deleted",{...deleteCookie})
         res.cookie("refreshToken","deleted",{...deleteCookie})
+        workspaceHint.forgetWorkspace(req, res);
         
         res.status(200).json({
             status: true,

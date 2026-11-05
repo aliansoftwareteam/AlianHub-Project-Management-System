@@ -8,7 +8,7 @@ const { MongoDbCrudOpration } = require('../../utils/mongo-handler/mongoQueries'
 const retention = require('../ScreenshotRetention/helper');
 const { trackerAccess, trackerOnInstance } = require('./access');
 const { latestRelease } = require('./feed');
-const { buildHandshake, readProductName, minTrackerVersion, isManaged } = require('./handshake');
+const { buildHandshake, readProductName, minTrackerVersion, isManaged, canonicalUrl } = require('./handshake');
 const { portalUrl } = require('../../Config/hostingMode');
 
 const HANDSHAKE_KEY = 'tracker:handshake';
@@ -29,7 +29,7 @@ exports.handshake = async (req, res) => {
             });
             myCache.set(HANDSHAKE_KEY, payload, HANDSHAKE_TTL_SECONDS);
         }
-        return res.send({ status: true, statusText: 'Tracker handshake.', data: payload });
+        return res.send({ status: true, statusText: 'Tracker handshake.', data: { ...payload, url: canonicalUrl(req) } });
     } catch (error) {
         logger.error(`tracker handshake failed: ${error.message}`);
         return res.status(500).send({ status: false, statusText: 'This workspace could not answer the tracker.' });

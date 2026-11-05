@@ -56,6 +56,7 @@ beforeEach(() => {
     delete process.env.TRACKER_MIN_VERSION;
     delete process.env.TRACKER_UPDATE_URL;
     delete process.env.PLATFORM_URL;
+    delete process.env.WEBURL;
     process.env.APP_NAME = 'AlianHub';
     readFile = jest.spyOn(fs.promises, 'readFile').mockResolvedValue(JSON.stringify({ productName: 'Acme' }));
 });
@@ -72,6 +73,7 @@ describe('GET /api/v2/tracker/handshake', () => {
             statusText: 'Tracker handshake.',
             data: {
                 app: 'alianhub',
+                url: '',
                 version: '14.41.0-beta.12',
                 name: 'Acme',
                 logoUrl: '/api/v1/getLogo?key=logo&type=desktop',
@@ -131,9 +133,24 @@ describe('GET /api/v2/tracker/handshake', () => {
     it('reveals nothing beyond what the sign-in page shows', async () => {
         companies([{ _id: COMPANY, planFeature: { timeTrackerUser: 20 } }]);
         const res = await run(ctrl.handshake);
-        expect(Object.keys(res.body.data).sort()).toEqual(['app', 'logoUrl', 'managed', 'name', 'tracker', 'version']);
+        expect(Object.keys(res.body.data).sort()).toEqual(['app', 'logoUrl', 'managed', 'name', 'tracker', 'url', 'version']);
         expect(Object.keys(res.body.data.tracker).sort()).toEqual(['enabled', 'minVersion']);
         expect(JSON.stringify(res.body)).not.toContain(COMPANY);
+    });
+
+    it('names the address the workspace calls itself', async () => {
+        process.env.WEBURL = 'https://pm.acme.com/';
+        companies([{ _id: COMPANY }]);
+        const res = await run(ctrl.handshake, { protocol: 'https', headers: { host: 'acme.alianhub.com' } });
+        expect(res.body.data.url).toBe('https://pm.acme.com');
+    });
+
+    it('falls back to the address it was reached on, per request although the rest is cached', async () => {
+        companies([{ _id: COMPANY }]);
+        const first = await run(ctrl.handshake, { protocol: 'http', headers: { host: 'localhost:4000' } });
+        const second = await run(ctrl.handshake, { protocol: 'https', headers: { host: 'hub.example.com' } });
+        expect(first.body.data.url).toBe('http://localhost:4000');
+        expect(second.body.data.url).toBe('https://hub.example.com');
     });
 
     it('asks the database once a minute at most', async () => {
