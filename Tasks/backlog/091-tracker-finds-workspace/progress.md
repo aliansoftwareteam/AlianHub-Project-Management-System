@@ -46,7 +46,7 @@ tracker release (PR 4) reaches people.
       auto-redirect from a URL-supplied address).
 - [ ] Deploy: its own container/service, DNS `auth.alianhub.com`, TLS cert, uptime check.
 
-### PR 3 — `docs: 090 progress, beta log, api doc` → `staging`
+### PR 3 — `docs: 091 progress, beta log, api doc` → `staging`
 - [ ] After PR 0 and PR 1 merge: `npm run version:log`, `npm run api:doc` (handshake changed), commit
       `docs/BETA-LOG.md`, `docs/API.md`, `docs/api/openapi.json`, tick this file.
 
@@ -121,3 +121,7 @@ rule: no push without approval). Windows end-to-end: tracker half verified, brow
   the code was redeemed there (a fake code gave 400, and the tracker showed abb's sign-in screen).
 - Tests 2026-11-05: finder 45, backend tracker/auth/session/handshake 753 (39 suites), frontend sign-in 51,
   all pass. Still open: the browser click-through with a real login, and the second round showing the hint.
+- Renumbered 090 → 091 when rebasing on `staging`: 090 went to Optional Google Analytics meanwhile. Commit
+  messages from before the rebase still say 090.
+- Owner approved pushing and opening the PRs (2026-11-05). Shipped as one AlianHub PR and one alianhub-cloud PR
+  rather than the five planned, so the whole flow can be tried on a server together.
