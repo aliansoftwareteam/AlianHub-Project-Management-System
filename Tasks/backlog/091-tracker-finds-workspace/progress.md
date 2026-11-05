@@ -125,7 +125,7 @@ rule: no push without approval). Windows end-to-end: tracker half verified, brow
   messages from before the rebase still say 090.
 - Owner approved pushing and opening the PRs (2026-11-05). Shipped as one AlianHub PR and one alianhub-cloud PR
   rather than the five planned, so the whole flow can be tried on a server together.
-- #1774 merged into `staging` as build 14.42.0-beta.21. The finder is live at `https://auth.alianhub.com`
+- #1774 merged into `staging` as build 14.43.0-beta.6 (counted from v14.42.0 once #1777 back-merged the release). The finder is live at `https://auth.alianhub.com`
   (PM2 `alianhub-finder` on the control-plane host behind nginx, from alianhub-cloud PR 60's branch). Live
   workspaces without #1774 (alian, demo) get the `connect` fallback. A packaged Windows build from this branch
   starts (`dist/AlianHub-Tracker-Setup-6.0.0.exe`), which closes PR 0's packaged-build check.
