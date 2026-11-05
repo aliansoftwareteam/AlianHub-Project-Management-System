@@ -1835,7 +1835,7 @@
   "WORKSPACE_HINT_DOMAIN": {
     "group": "auth",
     "description": "Parent domain of the hosted workspaces, for example alianhub.com. On a managed instance whose host is one label under it, each web sign-in adds that label to the ah_ws cookie on this domain and sign-out removes it, so the desktop tracker's workspace finder can offer the workspace without the person typing its address. The cookie holds workspace labels only, never a session. Unset (the default) sets no cookie; a self-hosted instance and a custom domain never set one.",
-    "managed": "platform"
+    "managed": "bootstrap"
   },
   "HOSTING_MODE": {
     "group": "general",
