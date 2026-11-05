@@ -23,6 +23,15 @@ workspace: `APIURL=https://hub.example.com npm run build`.
    and the page sends the code back on `alianhub-tracker://authorize`.
 3. "Open in tracker" in the web app (Settings → Time tracking) opens
    `alianhub-tracker://connect?url=<encoded workspace address>`, which runs the same steps.
+4. "Sign in with your browser" on the Connect screen opens the workspace finder
+   (`https://login.alianhub.com/tracker`) with the challenge and a `state`. The finder picks the workspace
+   (from the browser's hint or a typed address) and sends the browser to its sign-in page, which returns
+   `alianhub-tracker://authorize?…&state=…&workspace=…`. The main process takes that link only for the
+   `state` it issued, the window checks the workspace with the handshake, switches to it and redeems the code
+   there. The verifier stays in the main process throughout (`main/helpers/signInStore.js`).
+
+`WORKSPACE_FINDER_URL` at build time names another finder; an empty value, or a build with `APIURL`, has none
+and the Connect screen asks only for an address.
 
 `myapp://` stays registered beside `alianhub-tracker://`, because tracker 5 links (the web app's
 "Start in tracker", older servers' sign-in page) use it.

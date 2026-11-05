@@ -5,11 +5,12 @@ import { autoUpdater } from 'electron-updater'
 import { createWindow } from './helpers'
 const path = require('node:path')
 const fs = require('fs')
-const nodeCrypto = require('node:crypto')
 const workspaceState = require('./helpers/workspaceState')
 const deepLinks = require('./helpers/deepLink')
 const legacyInstall = require('./helpers/legacyInstall')
 const updates = require('./helpers/updates')
+const { createSignInStore, authorizeParams } = require('./helpers/signInStore')
+const { normaliseWorkspaceAddress } = require('../renderer/utils/workspaceAddress')
 const PRODUCT_NAME = 'AlianHub Tracker'
 const UPDATE_CHECK_INTERVAL_MS = 6 * 60 * 60 * 1000
 const isProd = process.env.NODE_ENV === 'production'
@@ -133,6 +134,13 @@ const deliverConnectLink = (link) => {
   }
 }
 
+const signIns = createSignInStore({ normalise: (url) => normaliseWorkspaceAddress(url) })
+
+ipcMain.handle('tracker:begin-sign-in', (event, { workspace } = {}) => signIns.begin(workspace))
+ipcMain.handle('tracker:sign-in-peek', () => signIns.peek())
+ipcMain.handle('tracker:sign-in-take', (event, workspace) => signIns.take(workspace))
+ipcMain.handle('tracker:sign-in-drop', () => signIns.drop())
+
 ipcMain.on('workspace:renderer-ready', () => {
   rendererReadyForConnect = true
   if (pendingConnectUrl && mainWindow && !mainWindow.isDestroyed()) {
@@ -147,8 +155,12 @@ const handleDeepLink = (link) => {
     deliverConnectLink(link)
   } else if (kind === 'trackerStart') {
     deliverTrackerDeepLink(link)
-  } else if (kind === 'authorize' && mainWindow && !mainWindow.isDestroyed()) {
-    mainWindow.webContents.send('deeplinkUrl', { url: link })
+  } else if (kind === 'authorize' && signIns.receive(authorizeParams(link))) {
+    if (mainWindow && !mainWindow.isDestroyed()) {
+      if (mainWindow.isMinimized()) mainWindow.restore()
+      mainWindow.focus()
+      mainWindow.webContents.send('tracker:sign-in-arrived')
+    }
   }
 }
 let isTracking = null
@@ -587,11 +599,6 @@ ipcMain.on("open-external-url", (event, url) => {
 // PKCE for the browser sign-in: the verifier never leaves this machine, only its
 // SHA-256 challenge travels through the browser, so a sign-in code picked up by
 // anything else on the tracker's link schemes cannot be exchanged for a session.
-ipcMain.handle('tracker:pkce', () => {
-  const verifier = nodeCrypto.randomBytes(32).toString('base64url')
-  return { verifier, challenge: nodeCrypto.createHash('sha256').update(verifier).digest('base64url') }
-})
-
 ipcMain.on('minimize-app', () => {
   mainWindow.minimize()
 })

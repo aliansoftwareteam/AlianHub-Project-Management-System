@@ -9,12 +9,19 @@ const { version: appVersion } = require('../package.json');
 // A self-hosted build may still bake in its server: it becomes the first workspace, nothing more.
 const defaultWorkspace = process.env.APIURL || '';
 
+// The hosted workspace finder, unless a build names another; a self-hosted build that bakes in its
+// server, or sets it empty, has no finder and signs in only by address.
+const workspaceFinderUrl = process.env.WORKSPACE_FINDER_URL !== undefined
+  ? process.env.WORKSPACE_FINDER_URL
+  : (defaultWorkspace ? '' : 'https://login.alianhub.com/tracker');
+
 /** @type {import('next').NextConfig} */
 module.exports = {
   output: 'export',
   env: {
     NEXT_PUBLIC_APP_VERSION: appVersion,
     NEXT_PUBLIC_DEFAULT_WORKSPACE: defaultWorkspace,
+    NEXT_PUBLIC_WORKSPACE_FINDER_URL: workspaceFinderUrl,
   },
   distDir: process.env.NODE_ENV === 'production' ? '../app' : '.next',
   trailingSlash: true,
