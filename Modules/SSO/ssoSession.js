@@ -5,6 +5,7 @@ const logger = require("../../Config/loggerConfig");
 const { httpOnlyCookies } = require("../../Config/cookies");
 const serviceCtr = require("../serviceFunction.js");
 const { requestAddress } = require('../../utils/requestAddress');
+const workspaceHint = require('../Auth/helpers/workspaceHint');
 
 // SEC-02 — establish a real session for an SSO-authenticated user, then REDIRECT
 // the browser back to the app (the IdP flow is a full-page redirect, not an SPA
@@ -29,6 +30,7 @@ const finalizeSsoSession = (req, res, uid, redirectPath) => {
                 };
                 res.cookie('refreshToken', sData.data.refreshToken, { ...setCookie, maxAge: Number(process.env.SESSIONEXPIREDTIME || 172800) * 1000 });
                 res.cookie('accessToken', gData.token, { ...setCookie, maxAge: serviceCtr.convertToSeconds(process.env.JWT_EXP) * 1000 });
+                workspaceHint.rememberWorkspace(req, res);
                 return res.redirect(redirectPath || '/');
             });
         });
