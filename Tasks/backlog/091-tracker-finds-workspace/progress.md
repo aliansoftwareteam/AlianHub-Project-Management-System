@@ -10,7 +10,7 @@ tracker release (PR 4) reaches people.
       assign module.exports" from `main/helpers/workspaceState.js`). Found and fixed 2026-11-05, uncommitted.
 - [x] `main/background.js`: reset the renderer-ready flag on main-frame `did-start-navigation`, not
       `did-start-loading` (a second "Open in tracker" link stayed queued). Fixed 2026-11-05, uncommitted.
-- [ ] Check a packaged Windows build starts (`npm run build`), since the crash applies there too.
+- [x] Check a packaged Windows build starts (`npm run build`), since the crash applies there too.
 - [x] Rename branch to `fix/tracker-main-start`, rebuild on `origin/staging`, open PR.
 
 ### PR 1 — `feat(auth): workspace hint and tracker sign-in round trip` (AlianHub server + web) → `staging`
@@ -125,3 +125,7 @@ rule: no push without approval). Windows end-to-end: tracker half verified, brow
   messages from before the rebase still say 090.
 - Owner approved pushing and opening the PRs (2026-11-05). Shipped as one AlianHub PR and one alianhub-cloud PR
   rather than the five planned, so the whole flow can be tried on a server together.
+- #1774 merged into `staging` as build 14.42.0-beta.21. The finder is live at `https://auth.alianhub.com`
+  (PM2 `alianhub-finder` on the control-plane host behind nginx, from alianhub-cloud PR 60's branch). Live
+  workspaces without #1774 (alian, demo) get the `connect` fallback. A packaged Windows build from this branch
+  starts (`dist/AlianHub-Tracker-Setup-6.0.0.exe`), which closes PR 0's packaged-build check.
