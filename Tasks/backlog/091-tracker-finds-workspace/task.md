@@ -49,7 +49,7 @@ Tracker (no workspace yet): [Sign in]
   │ opens https://<finder>/tracker?code_challenge=…&state=…&v=<tracker version>
   ▼
 Finder page (alianhub-cloud, private repo)
-  ├─ dedicated app at login.alianhub.com; reads the ah_ws hint cookie (.alianhub.com)
+  ├─ dedicated app at auth.alianhub.com; reads the ah_ws hint cookie (.alianhub.com)
   ├─ 1 workspace  → "Continue to abb.alianhub.com"   [Continue]  [Use another workspace]
   ├─ several      → pick one from the list
   └─ none / other → "Enter your workspace" (abb · pm.abb.com · hub.example.com)
@@ -112,7 +112,7 @@ per-workspace sign-in (one extra browser hop).
     `?workspace=` hint only pre-fills the box.
 12. No storage, no logging of `code_challenge`/`state`; rate-limited per IP; `Cache-Control: no-store`;
     `Referrer-Policy: no-referrer`; CSP with no third-party scripts.
-13. **A dedicated app, built only for this**, at its own host `login.alianhub.com`: a new `finder/` package in
+13. **A dedicated app, built only for this**, at its own host `auth.alianhub.com`: a new `finder/` package in
     alianhub-cloud with its own small server, deploy and health check. It shares no code path, database or session
     with the portal, back office or control plane, so a fault or compromise there cannot reach it and it cannot
     reach them. It has no database at all; everything it knows comes from the request (`ah_ws`, query, the typed
@@ -166,7 +166,7 @@ per-workspace sign-in (one extra browser hop).
 
 ## Open questions (owner)
 
-1. ~~Finder host~~ — decided 2026-11-05: a dedicated app built only for this, at `login.alianhub.com`.
+1. ~~Finder host~~ — decided 2026-11-05: a dedicated app built only for this, at `auth.alianhub.com`.
 2. ~~Portal-account instances~~ — dropped with 1: the dedicated finder has no portal session.
 3. Hint lifetime: 400 days (browser max) or shorter?
 

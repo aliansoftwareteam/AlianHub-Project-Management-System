@@ -13,7 +13,7 @@ const defaultWorkspace = process.env.APIURL || '';
 // server, or sets it empty, has no finder and signs in only by address.
 const workspaceFinderUrl = process.env.WORKSPACE_FINDER_URL !== undefined
   ? process.env.WORKSPACE_FINDER_URL
-  : (defaultWorkspace ? '' : 'https://login.alianhub.com/tracker');
+  : (defaultWorkspace ? '' : 'https://auth.alianhub.com/tracker');
 
 /** @type {import('next').NextConfig} */
 module.exports = {

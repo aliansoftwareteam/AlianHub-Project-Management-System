@@ -1,4 +1,4 @@
-/* The ah_ws cookie tells the tracker's workspace finder (login.<hint domain>) which hosted
+/* The ah_ws cookie tells the tracker's workspace finder (auth.<hint domain>) which hosted
  * workspaces this browser signs in to. It holds subdomain labels only: the finder routes the
  * browser to a workspace, and that workspace signs the person in itself. */
 

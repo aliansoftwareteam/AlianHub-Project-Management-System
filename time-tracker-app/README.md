@@ -24,7 +24,7 @@ workspace: `APIURL=https://hub.example.com npm run build`.
 3. "Open in tracker" in the web app (Settings → Time tracking) opens
    `alianhub-tracker://connect?url=<encoded workspace address>`, which runs the same steps.
 4. "Sign in with your browser" on the Connect screen opens the workspace finder
-   (`https://login.alianhub.com/tracker`) with the challenge and a `state`. The finder picks the workspace
+   (`https://auth.alianhub.com/tracker`) with the challenge and a `state`. The finder picks the workspace
    (from the browser's hint or a typed address) and sends the browser to its sign-in page, which returns
    `alianhub-tracker://authorize?…&state=…&workspace=…`. The main process takes that link only for the
    `state` it issued, the window checks the workspace with the handshake, switches to it and redeems the code

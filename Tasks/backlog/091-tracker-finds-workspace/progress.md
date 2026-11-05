@@ -31,7 +31,7 @@ tracker release (PR 4) reaches people.
 - [x] `npm run i18n:check`, `npm run style:check`, backend + frontend tests for touched files.
 
 ### PR 2 — finder page (alianhub-cloud) → `main` of alianhub-cloud
-- [x] Host decided: a dedicated app built only for this, at `login.alianhub.com` (owner, 2026-11-05).
+- [x] Host decided: a dedicated app built only for this, at `auth.alianhub.com` (owner, 2026-11-05).
 - [ ] Owner answers Open question 3 (hint lifetime).
 - [x] Write `docs/tasks/tracker-workspace-finder/task.md` + `progress.md` in alianhub-cloud (cloud tasks live there).
 - [x] New package `finder/` in alianhub-cloud: own `package.json`, a small Node server, no database, no shared
@@ -44,7 +44,7 @@ tracker release (PR 4) reaches people.
       AlianHub look via the same tokens as the portal, copied, not imported.
 - [x] Tests: validation, hint parsing, SSRF refusals, fallback choice by version, redirect URL building (no
       auto-redirect from a URL-supplied address).
-- [ ] Deploy: its own container/service, DNS `login.alianhub.com`, TLS cert, uptime check.
+- [ ] Deploy: its own container/service, DNS `auth.alianhub.com`, TLS cert, uptime check.
 
 ### PR 3 — `docs: 090 progress, beta log, api doc` → `staging`
 - [ ] After PR 0 and PR 1 merge: `npm run version:log`, `npm run api:doc` (handshake changed), commit
@@ -93,7 +93,7 @@ rule: no push without approval). Windows end-to-end: tracker half verified, brow
 - Found while testing "Open in tracker" locally (`:4100` + dev tracker): the two PR 0 bugs above, and that the dev
   window's origin `http://localhost:8888` needs `CORS_ORIGINS` on a local server (a packaged tracker is `app://`).
 - Owner: the finder is something built only for this. Decided: a dedicated `finder/` app in alianhub-cloud at
-  `login.alianhub.com`, with no database and nothing shared with the portal, back office or control plane. The
+  `auth.alianhub.com`, with no database and nothing shared with the portal, back office or control plane. The
   portal-account instance list is dropped with it (the finder has no portal session).
 - Built PR 0, 1, 4 here and PR 2 in alianhub-cloud (`F:/Projects/alianhub-cloud-wt/tracker-finder`). Commit
   shape differs from the plan in two places: the "Open in tracker" branch work is one branch with one commit
@@ -103,7 +103,7 @@ rule: no push without approval). Windows end-to-end: tracker half verified, brow
   (covered by unit tests of the helper), the managed stack setting `WORKSPACE_HINT_DOMAIN` (the control
   plane writes instance env, so it belongs to the cloud deploy), macOS/Linux (owner: Windows first).
 - Windows local check (`abb.alianhub.localhost:4200` hosted mode from this branch, finder on
-  `login.alianhub.localhost:4400`, dev tracker): finder check by label and by full address answer the
+  `auth.alianhub.localhost:4400`, dev tracker): finder check by label and by full address answer the
   workspace's `#/oauth2` URL; an `authorize` link with a wrong state is ignored; with the right state the
   tracker handshakes abb, saves and switches to it, and redeems there once (a fake code got 400).
 - Found: on a managed instance the handshake's `tracker.enabled` reads the company `planFeature`, while
@@ -112,3 +112,5 @@ rule: no push without approval). Windows end-to-end: tracker half verified, brow
   read the entitlements in managed mode.
 - Found: a stale `renderer/.next` cache kept the dev window on "Loading…" with no error after the
   renderer changed; deleting it fixed it (dev only).
+- Owner renamed the finder host from `login.alianhub.com` to `auth.alianhub.com`. It is already in the cloud's
+  reserved subdomains (`packages/shared/src/subdomain.js`), so no customer can hold it.
