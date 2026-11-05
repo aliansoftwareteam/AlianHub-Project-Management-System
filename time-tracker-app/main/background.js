@@ -404,7 +404,10 @@ function verifyScreenCapturePermission() {
     },
   })
   
-  mainWindow.webContents.on('did-start-loading', () => { rendererReadyForConnect = false })
+  // did-start-loading also fires for loads after the page has said it is ready, which left later links queued.
+  mainWindow.webContents.on('did-start-navigation', (details) => {
+    if (details.isMainFrame && !details.isSameDocument) rendererReadyForConnect = false
+  })
 
   if (isProd) {
     await mainWindow.loadURL('app://./home')
