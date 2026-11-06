@@ -8,7 +8,7 @@ Need help with AlianHub? Here's where to go for what.
 
 | What you need | Where to go |
 |---|---|
-| **Read the docs** | 📘 [help.alianhub.com](https://help.alianhub.com) — official user guide and API reference |
+| **Read the docs** | 📘 [docs.alianhub.com](https://docs.alianhub.com/) — official user guide and API reference |
 | **Try the app** | 🎮 [demo.alianhub.com](https://demo.alianhub.com) — live demo, no signup |
 | **Ask a usage question** | 💬 [GitHub Discussions → Q&A](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/discussions/categories/q-a) |
 | **Share an idea** | 💡 [GitHub Discussions → Ideas](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/discussions/categories/ideas) |
@@ -25,7 +25,7 @@ Need help with AlianHub? Here's where to go for what.
 
 Save time for yourself and maintainers by checking:
 
-1. **The [documentation](https://help.alianhub.com)** — covers most common questions
+1. **The [documentation](https://docs.alianhub.com/)** — covers most common questions
 2. **Existing [issues](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/issues?q=is%3Aissue)** and [closed issues](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/issues?q=is%3Aissue+is%3Aclosed) — your problem may already be reported or fixed
 3. **[GitHub Discussions](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/discussions)** — usage questions often live here, not in Issues
 

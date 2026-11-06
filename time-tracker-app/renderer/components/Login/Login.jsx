@@ -1,89 +1,19 @@
-import React, { useEffect, useRef } from 'react';
-import { useDispatch, useSelector } from 'react-redux';
-import { login } from '../../store/authSlice';
+import React, { useEffect } from 'react';
 import { useRouter } from 'next/router';
-import { getUserData } from '../../controller/user/user';
-import { getAssignCompanyData } from '../../controller/company/company';
+import { useSelector } from 'react-redux';
 import { takeAutoSignIn } from '../../controller/workspace/workspace';
+import { beginSignIn, openInBrowser, signInPageUrl } from '../../controller/user/signIn';
 import { selectCurrentWorkspace } from '../../store/workspace';
-import { apiRequestWithoutSecure} from '../../utils/services';
-import { getWorkspaceBase } from '../../utils/workspaceBase';
 import { workspaceHost } from '../../utils/workspaceAddress';
 
-// Tells the sign-in page which link to send the code back on; an older server ignores it and uses myapp://.
-const RETURN_SCHEME = 'alianhub-tracker';
-
 const Login = () => {
-  const dispatch = useDispatch();
   const router = useRouter();
   const workspace = useSelector(selectCurrentWorkspace);
 
-  // The verifier for the sign-in this window started. It stays in memory, is spent on the first
-  // deep link that follows, and is the only thing that makes an incoming `authorize` link ours.
-  const pendingVerifier = useRef(null);
-
-  const loginAPI = (code, userId, codeVerifier) => {
-    return new Promise((resolve, reject) => {
-      try {
-        apiRequestWithoutSecure("post", `/api/v1/auth/loginAuthTracker`, {code, userId, codeVerifier}).then((ele) => {
-          resolve(ele?.data)
-        }).catch((error)=>{
-          reject(error);
-        })
-      } catch (error) {
-        reject(error)
-      }
-    })
-  }
-
-  useEffect(() => {
-    let isProcessing = false;
-    
-    const handleDeeplinkUrl = (url) => {
-      if (isProcessing) return; // Prevent multiple executions
-      // A link nobody here asked for is someone else's: without a pending sign-in there is no
-      // verifier to present, and a page that pushes an `authorize` link at the tracker would
-      // otherwise sign this computer in as whoever wrote the link.
-      const codeVerifier = pendingVerifier.current;
-      if (!codeVerifier) return;
-      pendingVerifier.current = null;
-      isProcessing = true;
-
-      const params = new URLSearchParams(url.url.split("?").slice(1).join("?"))
-      loginAPI(params.get("code"), params.get("client_id"), codeVerifier).then((ele)=>{
-        localStorage.setItem('refreshToken', ele.refreshToken)
-        localStorage.setItem('token', ele.accessToken)
-        localStorage.setItem("userId", ele.uid);
-        getUserData(dispatch).then(() => {
-          dispatch(login());
-          getAssignCompanyData().then(() => {
-            router.push('/home');
-          }).catch((error) => {
-            console.error("Error getting Company Data", error);
-            isProcessing = false; // Reset flag on error
-          });
-        }).catch((error) => {
-          console.error(error);
-          isProcessing = false; // Reset flag on error
-        });
-      }).catch((error) => {
-        console.error(error);
-        isProcessing = false; // Reset flag on error
-      });
-    };
-
-    window.ipc.on('deeplinkUrl', handleDeeplinkUrl);
-    
-    // Cleanup function to remove the event listener
-    return () => {
-      window.ipc.removeAll('deeplinkUrl');
-    };
-  }, [dispatch, router]);
-
   async function openAlianhub() {
-    const { verifier, challenge } = await window.ipc.invoke("tracker:pkce");
-    pendingVerifier.current = verifier;
-    window.ipc.send("open-external-url", `${getWorkspaceBase()}/#/oauth2?code_challenge=${encodeURIComponent(challenge)}&scheme=${RETURN_SCHEME}`)
+    if (!workspace) return;
+    const started = await beginSignIn(workspace.url);
+    openInBrowser(signInPageUrl(workspace.url, started));
   }
 
   useEffect(() => {

@@ -10,11 +10,11 @@ vi.mock('@/components/organisms/Shell/ShellIcon.vue', () => ({ default: { name: 
 vi.mock('@/components/molecules/AiUnavailable/AiModelNotice.vue', () => ({ default: { name: 'AiModelNotice', render: () => null } }));
 vi.mock('@/components/organisms/MainChat/MainChatRecorder.vue', () => ({ default: { name: 'MainChatRecorder', render: () => null } }));
 vi.mock('@/views/Ai/AiSidebar.vue', () => ({ default: { name: 'AiSidebar', render: () => null } }));
-vi.mock('@/views/Ai/agentAccess', () => ({ useAgentAccess: () => ({ canManage: ref(false) }) }));
+vi.mock('@/views/Ai/agentAccess', () => ({ useAgentAccess: () => ({ canManage: ref(false), canBuild: ref(false), seesSkills: ref(true) }) }));
 vi.mock('@/views/Ai/useAgents', () => ({
     reasonOf: (error, key) => key,
     autonomyOf: () => ({ key: 'suggest' }),
-    useAgents: () => ({ spend: ref({}), skillManifest: ref(skills.list), loadSkills: vi.fn(), loadSpend: vi.fn() })
+    useAgents: () => ({ spend: ref({}), skillManifest: ref(skills.list), loadSkills: vi.fn(async () => skills.list), loadSpend: vi.fn() })
 }));
 vi.mock('@/views/Ai/useParity', () => ({
     useParity: () => ({

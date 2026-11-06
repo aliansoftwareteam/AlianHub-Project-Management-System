@@ -28,7 +28,7 @@ test.describe('a newcomer', () => {
     test.use({ viewport: { width: 1280, height: 800 } });
     test.beforeEach(async ({ page }) => skipFirstRun(page));
 
-    test('signs up, picks a focus and opens a workspace with a sample project, a next step and Simple mode', async ({ page, state }) => {
+    test('signs up, picks a focus and opens a workspace with a sample project, a next step and Full mode', async ({ page, state }) => {
         const email = await registerAccount(state, { firstName: 'Nina', lastName: 'Newcomer' });
         const workspace = `Newcomer ${uniqueSuffix()}`;
 
@@ -59,11 +59,11 @@ test.describe('a newcomer', () => {
 
         const rail = page.getByRole('navigation', { name: 'Primary' });
         await expect(rail.getByRole('link', { name: 'Home' })).toBeVisible();
-        await expect(rail.getByRole('link', { name: 'Everything' })).toHaveCount(0);
-        await expect(rail.getByRole('link', { name: 'Chat' })).toHaveCount(0);
+        await expect(rail.getByRole('link', { name: 'Everything' })).toBeVisible();
+        await expect(rail.getByRole('link', { name: 'Chat' })).toBeVisible();
 
         await page.goto(`/#/${companyId}/settings/my-profile`);
-        await expect(page.getByRole('radio', { name: /^Simple/ })).toBeChecked();
+        await expect(page.getByRole('radio', { name: /^Full/ })).toBeChecked();
 
         await page.goto(`/#/${companyId}/project`);
         await expect(page.getByText('Welcome to AlianHub', { exact: true }).first()).toBeVisible();

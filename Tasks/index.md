@@ -89,3 +89,5 @@ Auto-maintained registry of all tasks. Reflects YAML frontmatter from each `task
 | 087 | Ask knows a project — grounded project, list, task and person answers, and a better @ picker | active | high | — | active/087-ask-project-context-mentions |
 | 088 | Documentation site — in-depth user, admin, developer and API docs to replace help.alianhub.com | active | high | — | active/088-documentation-site |
 | 089 | Quick UI/UX review — fix small UI issues with before/after screenshots | active | medium | — | active/089-quick-ui-review |
+| 090 | Optional Google Analytics — page-view traffic from one env variable | active | medium | — | active/090-google-analytics-env |
+| 091 | Tracker sign-in finds the workspace — one Sign in button, no address typing for hosted users | backlog | high | — | backlog/091-tracker-finds-workspace |

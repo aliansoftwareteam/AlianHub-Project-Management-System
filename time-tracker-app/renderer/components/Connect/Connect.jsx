@@ -4,6 +4,7 @@ import { useSelector } from 'react-redux';
 import { HOSTED_DOMAIN, normaliseWorkspaceAddress, workspaceHost } from '../../utils/workspaceAddress';
 import { APP_VERSION, checkWorkspace, connectWorkspace } from '../../controller/workspace/workspace';
 import { useStopTimerPrompt } from '../Workspace/useStopTimerPrompt';
+import { WORKSPACE_FINDER_URL, beginSignIn, finderUrl, openInBrowser } from '../../controller/user/signIn';
 
 const ADDRESS_ERRORS = {
   empty: 'Enter your workspace address.',
@@ -65,6 +66,12 @@ const Connect = () => {
     connect(linkedUrl, { signIn: !recheck });
   }, [linkedUrl]);
 
+  const signInWithBrowser = async () => {
+    const started = await beginSignIn(null);
+    openInBrowser(finderUrl(started));
+    setView({ phase: 'browser' });
+  };
+
   const submit = (event) => {
     event.preventDefault();
     connect(address, { signIn: true });
@@ -104,6 +111,19 @@ const Connect = () => {
         {(view.phase === 'form' || view.phase === 'checking') && (
           <form onSubmit={submit} noValidate>
             <h3 className="font-bold text-xl text-center m-0">Connect to your workspace</h3>
+            {WORKSPACE_FINDER_URL && !linkedUrl && (
+              <>
+                <button
+                  type="button"
+                  onClick={signInWithBrowser}
+                  disabled={view.phase === 'checking'}
+                  className="w-full mt-5 bg-[#2F3990] border border-[#2F3990] text-white py-2.5 text-sm rounded hover:bg-[#252d75] disabled:opacity-60 transition-colors cursor-pointer"
+                >
+                  Sign in with your browser
+                </button>
+                <p className="text-xs text-[#6B7280] text-center mt-4 mb-0">or enter your workspace address</p>
+              </>
+            )}
             <label htmlFor="workspace-address" className="block text-xs font-medium mt-5 mb-1">Workspace address</label>
             <div className="flex items-center border border-[#D1D5DB] rounded focus-within:border-[#2F3990]">
               <input
@@ -129,7 +149,7 @@ const Connect = () => {
             <button
               type="submit"
               disabled={view.phase === 'checking'}
-              className="w-full mt-3 bg-[#2F3990] border border-[#2F3990] text-white py-2.5 text-sm rounded hover:bg-[#252d75] disabled:opacity-60 transition-colors cursor-pointer"
+              className={`w-full mt-3 border border-[#2F3990] py-2.5 text-sm rounded disabled:opacity-60 transition-colors cursor-pointer ${WORKSPACE_FINDER_URL && !linkedUrl ? 'bg-white text-[#2F3990] hover:bg-[#EEF1FF]' : 'bg-[#2F3990] text-white hover:bg-[#252d75]'}`}
             >
               {view.phase === 'checking' ? `Checking ${host}…` : 'Continue'}
             </button>
@@ -142,6 +162,19 @@ const Connect = () => {
               </button>
             )}
           </form>
+        )}
+
+        {view.phase === 'browser' && (
+          <div role="status">
+            <h3 className="font-bold text-xl text-center m-0">Finish in your browser</h3>
+            <p className="text-sm text-center mt-3 mb-0">Choose your workspace in the browser page that opened, then approve the sign-in. The tracker connects on its own.</p>
+            <button type="button" onClick={signInWithBrowser} className="w-full mt-5 bg-[#2F3990] border border-[#2F3990] text-white py-2.5 text-sm rounded hover:bg-[#252d75] cursor-pointer">
+              Open the page again
+            </button>
+            <button type="button" onClick={tryAnother} className="w-full mt-2 bg-white border border-[#2F3990] text-[#2F3990] py-2.5 text-sm rounded hover:bg-[#EEF1FF] cursor-pointer">
+              Enter an address instead
+            </button>
+          </div>
         )}
 
         {view.phase === 'disabled' && (

@@ -1832,6 +1832,11 @@
     "default": "true",
     "managed": "customer"
   },
+  "WORKSPACE_HINT_DOMAIN": {
+    "group": "auth",
+    "description": "Parent domain of the hosted workspaces, for example alianhub.com. On a managed instance whose host is one label under it, each web sign-in adds that label to the ah_ws cookie on this domain and sign-out removes it, so the desktop tracker's workspace finder can offer the workspace without the person typing its address. The cookie holds workspace labels only, never a session. Unset (the default) sets no cookie; a self-hosted instance and a custom domain never set one.",
+    "managed": "bootstrap"
+  },
   "HOSTING_MODE": {
     "group": "general",
     "description": "self (the default) or managed. managed turns this into an AlianHub Cloud instance: the platform sets URLs, mail, storage, proxy and security values, which the Instance console then shows locked; the setup wizard, in-app billing and the backup, upgrade and log screens close. The server refuses to start in managed mode when INSTANCE_ID, PLATFORM_API_KEY, PLATFORM_PUBLIC_KEY, PLATFORM_URL, WEBURL or JWT_SECRET is missing or malformed, and on any other value here.",
@@ -1858,5 +1863,11 @@
     "description": "With HOSTING_MODE=managed, the key the platform presents to this instance; at least 32 characters.",
     "secret": true,
     "managed": "bootstrap"
+  },
+  "GA_MEASUREMENT_ID": {
+    "group": "integrations",
+    "description": "Google Analytics 4 measurement id (G-XXXXXXXXXX) for counting page views of the web app. Unset (the default) loads nothing and sends nothing to Google. When set, the web app (not the desktop app) loads gtag.js and sends one page_view per screen with the route path only, never the query string, user, email or company name; Google signals and ad personalisation are off, and the content security policy allows the Google Analytics hosts. A value that is not a GA4 id is logged once as a warning and treated as unset. There is no consent banner, so decide on consent before turning it on for visitors in the EU. Read at boot.",
+    "default": "",
+    "managed": "fixed"
   }
 }

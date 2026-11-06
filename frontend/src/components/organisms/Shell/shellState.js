@@ -48,7 +48,7 @@ export const shellState = reactive({
     moreOpen: false,
     profileOpen: false,
     sidebarCollapsed: false,
-    theme: localStorage.getItem(THEME_KEY) || "light",
+    theme: localStorage.getItem(THEME_KEY) || "system",
     contrast: CONTRAST_CHOICES.includes(localStorage.getItem(CONTRAST_KEY)) ? localStorage.getItem(CONTRAST_KEY) : "auto",
     variant: "",
     accent: DEFAULT_ACCENT,

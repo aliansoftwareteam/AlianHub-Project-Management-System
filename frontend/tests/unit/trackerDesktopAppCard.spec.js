@@ -89,6 +89,15 @@ describe('DesktopAppCard', () => {
         expect(wrapper.find('[data-test="own-builds"]').exists()).toBe(true);
     });
 
+    it('opens the tracker on a workspace served under a path with that path', () => {
+        const location = { origin: 'https://example.com', pathname: '/team/', href: 'https://example.com/team/#/settings' };
+        Object.defineProperty(window, 'location', { configurable: true, value: location });
+        const wrapper = mountCard({ info: info() });
+        return wrapper.find('[data-test="desktop-app-open"]').trigger('click').then(() => {
+            expect(location.href).toBe(buildTrackerConnectLink('https://example.com/team'));
+        });
+    });
+
     it('opens the tracker on this workspace, and says what to do when nothing happened', () => {
         vi.useFakeTimers();
         const location = { origin: 'https://acme.alianhub.com', href: 'https://acme.alianhub.com/#/settings' };
