@@ -129,3 +129,7 @@ rule: no push without approval). Windows end-to-end: tracker half verified, brow
   (PM2 `alianhub-finder` on the control-plane host behind nginx, from alianhub-cloud PR 60's branch). Live
   workspaces without #1774 (alian, demo) get the `connect` fallback. A packaged Windows build from this branch
   starts (`dist/AlianHub-Tracker-Setup-6.0.0.exe`), which closes PR 0's packaged-build check.
+- Review of the promotion PR #1776 found the tracker sign-in page and "Open in tracker" sending only the origin,
+  so a workspace served under a path reached the tracker without it. Fixed in #1778 (build 14.43.0-beta.9) with
+  `workspaceAddressOf` in `frontend/src/utils/trackerDeepLink.js`; the same PR keeps workspace and project ids
+  out of Google Analytics (#1773).
