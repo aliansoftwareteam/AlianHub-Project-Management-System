@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { buildTrackerConnectLink, buildTrackerDeepLink, isTrackerCapableDevice, openInTracker, openTrackerConnect } from '@/utils/trackerDeepLink';
+import { buildTrackerConnectLink, buildTrackerDeepLink, isTrackerCapableDevice, openInTracker, openTrackerConnect, workspaceAddressOf } from '@/utils/trackerDeepLink';
 
 const DESKTOP_UA = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/120 Safari/537.36';
 const originalLocation = window.location;
@@ -179,5 +179,16 @@ describe('trackerDeepLink', () => {
                 expect(onNotOpened).not.toHaveBeenCalled();
             });
         });
+    });
+
+    it.each([
+        [{ origin: 'https://acme.alianhub.com', pathname: '/' }, 'https://acme.alianhub.com'],
+        [{ origin: 'https://acme.alianhub.com' }, 'https://acme.alianhub.com'],
+        [{ origin: 'https://example.com', pathname: '/team/' }, 'https://example.com/team'],
+        [{ origin: 'https://example.com', pathname: '/team/index.html' }, 'https://example.com/team'],
+        [{ origin: 'http://localhost:4000', pathname: '/' }, 'http://localhost:4000'],
+        [{}, ''],
+    ])('names the workspace %o as %s', (location, address) => {
+        expect(workspaceAddressOf(location)).toBe(address);
     });
 });

@@ -91,6 +91,17 @@ describe('TrackerLogin', () => {
         );
     });
 
+    it('names a workspace served under a path with that path', async () => {
+        const state = 'k3V9xQ2mT7pL1sW8nB4yR6';
+        Object.defineProperty(window, 'location', { configurable: true, value: { href: '', origin: 'https://example.com', pathname: '/team/' } });
+        apiRequestWithoutCompnay.mockResolvedValue({ data: { status: true, data: { code: CODE } } });
+        const wrapper = await open({ code_challenge: CHALLENGE, scheme: 'alianhub-tracker', state });
+        await wrapper.find('button').trigger('click');
+        await flushPromises();
+
+        expect(window.location.href).toContain(`&workspace=${encodeURIComponent('https://example.com/team')}`);
+    });
+
     it('drops a malformed state and names no workspace', async () => {
         Object.defineProperty(window, 'location', { configurable: true, value: { href: '', origin: 'https://abb.alianhub.com' } });
         apiRequestWithoutCompnay.mockResolvedValue({ data: { status: true, data: { code: CODE } } });

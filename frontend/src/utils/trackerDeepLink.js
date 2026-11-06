@@ -57,6 +57,14 @@ function watchHandoff(onNotOpened) {
   }, 1500);
 }
 
+// The workspace address is its origin plus the path the app is served under; hash routing keeps the
+// route out of the path, so a workspace served from /team stays /team.
+export const workspaceAddressOf = (location) => {
+    if (!location || !location.origin) return '';
+    const base = String(location.pathname || '/').replace(/\/index\.html?$/i, '').replace(/\/+$/, '');
+    return `${location.origin}${base}`;
+};
+
 // Only tracker 6 and later understand this link; it adds the workspace and starts the sign-in.
 export const buildTrackerConnectLink = (workspaceUrl) => `alianhub-tracker://connect?url=${encodeURIComponent(workspaceUrl)}`;
 

@@ -18,7 +18,7 @@ import AuthShell from "@/components/templates/AuthShell/AuthShell.vue";
 import ShellIcon from "@/components/organisms/Shell/ShellIcon.vue";
 import { apiRequestWithoutCompnay } from "@/services";
 import * as env from "@/config/env";
-import { buildTrackerAuthorizeLink } from "@/utils/trackerDeepLink";
+import { buildTrackerAuthorizeLink, workspaceAddressOf } from "@/utils/trackerDeepLink";
 
 defineOptions({ name: "TrackerLoginPage" });
 
@@ -76,7 +76,7 @@ const redirect = async () => {
             userId: userId.value,
             code,
             state: route?.query?.state,
-            workspace: window.location.origin,
+            workspace: workspaceAddressOf(window.location),
         });
         waitForHandoff();
     } catch {

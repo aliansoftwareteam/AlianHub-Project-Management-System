@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it } from "vitest";
-import { pageLocationOf, resetAnalyticsForTests, startAnalytics, trackPageView } from "@/utils/analytics";
+import { pageLocationOf, resetAnalyticsForTests, routePatternOf, startAnalytics, trackPageView } from "@/utils/analytics";
 
 const BROWSER = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) Chrome/130.0 Safari/537.36";
 const DESKTOP = "Mozilla/5.0 (Windows NT 10.0) AlianHub/3.0 Chrome/130.0 Electron/33.0.0 Safari/537.36";
@@ -46,20 +46,26 @@ describe("Google Analytics", () => {
         expect(config[2].page_location).not.toMatch(/code|token|#/);
     });
 
-    it("sends the real route path but never a query string or fragment", () => {
+    it("sends the route pattern, never workspace, project or task ids, a query string or a fragment", () => {
         const win = fakeWindow();
         startAnalytics("G-ABCDEF12", win);
-        trackPageView({ path: "/6512ab/project/88f/list", name: "ProjectList" });
-        trackPageView({ path: "/reset-password?token=abc#x", name: "ResetPassword" });
+        trackPageView({ path: "/6512ab/project/88f/list", name: "ProjectList", matched: [{ path: "/:cid" }, { path: "/:cid/project/:id/list" }] });
+        trackPageView({ path: "/reset-password?token=abc#x", name: "ResetPassword", matched: [{ path: "/reset-password" }] });
         expect(events(win)).toEqual([
-            ["event", "page_view", { page_location: "https://app.example.com/6512ab/project/88f/list", page_path: "/6512ab/project/88f/list", route_name: "ProjectList" }],
+            ["event", "page_view", { page_location: "https://app.example.com/:cid/project/:id/list", page_path: "/:cid/project/:id/list", route_name: "ProjectList" }],
             ["event", "page_view", { page_location: "https://app.example.com/reset-password", page_path: "/reset-password", route_name: "ResetPassword" }],
         ]);
+        expect(JSON.stringify(events(win))).not.toMatch(/6512ab|88f|token/);
+    });
+
+    it("falls back to the route name, never the filled-in path, when no record matched", () => {
+        expect(routePatternOf({ path: "/6512ab/x", name: "Home" })).toBe("/Home");
+        expect(routePatternOf({ path: "/6512ab/x" })).toBe("/");
     });
 
     it("holds the first page view until the config arrives", () => {
         const win = fakeWindow();
-        trackPageView({ path: "/login", name: "Log-in" });
+        trackPageView({ path: "/login", name: "Log-in", matched: [{ path: "/login" }] });
         startAnalytics("G-ABCDEF12", win);
         expect(events(win)).toEqual([["event", "page_view", { page_location: "https://app.example.com/login", page_path: "/login", route_name: "Log-in" }]]);
     });
