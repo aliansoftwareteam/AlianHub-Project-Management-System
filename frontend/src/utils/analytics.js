@@ -10,6 +10,13 @@ let target = null;
 /* Hash routing hides the route from GA, and the query string carries sign-in, reset and referral
  * tokens, so GA only ever gets the origin plus the route path, never the address bar. */
 export const pagePathOf = (path) => String(path || "/").split(/[?#]/)[0] || "/";
+
+/* The filled-in path holds workspace, project and task ids; GA gets the route's pattern instead. */
+export const routePatternOf = (route) => {
+    const matched = Array.isArray(route?.matched) ? route.matched : [];
+    const record = matched[matched.length - 1];
+    return record?.path || (route?.name ? `/${String(route.name)}` : "/");
+};
 export const pageLocationOf = (path, origin) => `${origin}${pagePathOf(path)}`;
 
 const send = (win, path, name) => {
@@ -48,11 +55,12 @@ export function startAnalytics(measurementId, win = typeof window === "undefined
 export function trackPageView(route) {
     try {
         if (!route) return;
+        const path = routePatternOf(route);
         if (!started) {
-            pending = { path: route.path, name: route.name };
+            pending = { path, name: route.name };
             return;
         }
-        send(target, route.path, route.name);
+        send(target, path, route.name);
     } catch {
         // Analytics must never break navigation.
     }
