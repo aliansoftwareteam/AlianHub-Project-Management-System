@@ -46,7 +46,7 @@ import { computed, ref } from "vue";
 import { useStore } from "vuex";
 import { useI18n } from "vue-i18n";
 import { isOwnerOrAdmin } from "@/utils/roles";
-import { openTrackerConnect } from "@/utils/trackerDeepLink";
+import { openTrackerConnect, workspaceAddressOf } from "@/utils/trackerDeepLink";
 
 defineOptions({ name: "DesktopAppCard" });
 
@@ -108,7 +108,7 @@ const screenshotsText = computed(() => {
 
 const openTracker = () => {
     openHint.value = "";
-    const result = openTrackerConnect(window.location.origin, {
+    const result = openTrackerConnect(workspaceAddressOf(window.location), {
         onNotOpened: () => { openHint.value = t("TimeTracker.desktop_not_opened"); },
     });
     if (!result.ok) openHint.value = t(result.reason === "unsupported" ? "TimeTracker.desktop_only" : "TimeTracker.desktop_not_opened");
