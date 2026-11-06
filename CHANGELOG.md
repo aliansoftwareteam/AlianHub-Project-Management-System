@@ -16,6 +16,45 @@ from [Conventional Commits](https://www.conventionalcommits.org/) on `main`.
 
 ---
 
+## [14.43.0](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/compare/v14.42.0...v14.43.0) (2026-11-06)
+
+
+### 🚀 Features
+
+* **analytics:** optional Google Analytics from GA_MEASUREMENT_ID ([d66ca33](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/d66ca3349c934aeb5b91ac1e286996a2575b9835))
+* **analytics:** optional Google Analytics from GA_MEASUREMENT_ID ([95b98db](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/95b98db66df006005ee56af3cf210de31815c078))
+* **auth:** workspace hint cookie and tracker sign-in round trip ([addd39f](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/addd39fc8c5156ee727b3ad5073c5ede044cff11))
+* **tracker:** sign in without typing the workspace ([d78e7d5](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/d78e7d52695babedc4d8892fb932532012b89bcc))
+* **tracker:** sign in without typing the workspace ([25c385c](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/25c385c259fa4476b4986ef73f2a661d19afb477))
+
+
+### 🐛 Bug Fixes
+
+* **analytics:** send the route pattern, never workspace or project ids ([5b44e6d](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/5b44e6d0cebdaf2ab5f38ea6a7d9f0269fc949f1))
+* **ask:** ask for the skill list only with the right to see it ([1f40087](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/1f400879172ef2e9863d638397eee44f3caec68a))
+* **auth:** the control plane sets WORKSPACE_HINT_DOMAIN when it creates an instance ([c402d85](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/c402d85df6b44f73cd7cb195b49b419fa9ebb428))
+* keep ids out of Google Analytics and keep a workspace's path for the tracker ([3033259](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/30332599de97c866295a81d209d9045481a60aec))
+* link the remaining help.alianhub.com references to docs.alianhub.com ([87ae741](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/87ae74142a8d9c2023669befc7f6c748d4ec4a15))
+* link the remaining help.alianhub.com references to docs.alianhub.com ([0459018](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/04590186b34bb879057b2d65d03b4ea586e130ef))
+* point documentation links at docs.alianhub.com ([b9c6134](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/b9c61343a71fac1969cd4e635187d644bb95a511))
+* **settings:** default new users to System theme and Full menu ([cecfcfc](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/cecfcfceeafa4accb5abe245cb44ad28798086f9))
+* **settings:** default new users to System theme and Full menu ([d9e70d4](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/d9e70d46c7313ee487460765ac2977595b3c635f))
+* **tracker:** name a workspace served under a path with that path ([26716b3](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/26716b3ea5c088ec4d18ab583c61f18f93582143))
+* **tracker:** show the sign-in screen when a workspace refuses the code ([5a474f7](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/5a474f74a774b64301703aef4444898cc9ef324d))
+* **tracker:** start the main process and deliver every connect link ([cd705ba](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/cd705baf548c3c7ef00e1e1ca00d0d2871891395))
+
+
+### 📘 Documentation
+
+* beta log from v14.42.0, to build 7 ([94f7843](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/94f7843ea469b014f3544c821becdb7e54206d4e))
+* beta log to build 21, api doc, task 091 progress ([73b45a5](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/73b45a55bd06dd216ab7a13fb32933b33e887cc1))
+* beta log to build 7 (since v14.42.0), api doc, task 091 progress ([3ebd63d](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/3ebd63d2e56f15897a4860eb0c9c1434017e9140))
+* beta log to build 9, task 091 progress ([e78b41e](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/e78b41e717b35a7c19ae66b2b08c27b4bbfec8b2))
+* beta log to build 9, task 091 progress ([d79b6f2](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/d79b6f244014acb2c3b6979ac21d0c97643364f0))
+* **tasks:** 090 finder hosted locally, end-to-end through it ([2de03bf](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/2de03bfa0b019879ab3aa79510068a06c3064dd6))
+* **tasks:** 090 tracker sign-in finds the workspace ([c2af5ea](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/c2af5eaa530ea7d3935753ce66d8b62ffc205e67))
+* **tasks:** renumber the tracker finder task to 091 ([823748a](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/823748ac279aa3b2a160af4ccf446dc86939813a))
+
 ## [14.42.0](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/compare/v14.41.0...v14.42.0) (2026-11-03)
 
 
