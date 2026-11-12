@@ -1,7 +1,7 @@
 ---
 id: 101
 title: Connectors — screen redesign: AI → Customize → Connectors, like Claude's
-status: backlog
+status: active
 priority: high
 depends_on: [072]
 created: 2026-11-12

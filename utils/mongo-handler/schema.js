@@ -2264,9 +2264,36 @@ const schema = {
         // read | write, decided by the reviewer
         access: { type: String, default: 'write', required: false },
         enabled: { type: Boolean, default: false, required: false },
+        // A custom server's tool as its reviewer accepted it: the words a model is shown and the arguments it takes
+        label: { type: String, required: false },
+        description: { type: String, required: false },
+        inputSchema: { type: Object, required: false },
         reviewedBy: { type: String, default: '', required: false },
         reviewedAt: { type: Date, required: false },
         seenAt: { type: Date, required: true },
+    },
+    // A workspace's own MCP server, added by its address (task 096); members connect to it as `custom_<_id>`.
+    connectorServers: {
+        companyId: { type: String, required: true },
+        name: { type: String, required: true },
+        url: { type: String, required: true },
+        // self_register | registered_app | personal_token
+        signIn: { type: String, required: true },
+        // The sign-in addresses its metadata named: authorizeUrl, tokenUrl, revokeUrl, pkce, registration, registrationUrl
+        auth: { type: Object, required: false },
+        scopes: { type: [String], default: undefined, required: false },
+        hosts: { type: [String], required: true },
+        // The hosts this server put on the workspace egress list, taken off again when it is removed
+        egressAdded: { type: [String], default: undefined, required: false },
+        // A registered app's client; its secret is in the secrets store by handle
+        clientId: { type: String, default: '', required: false },
+        secretHandle: { type: String, default: '', required: false },
+        // active | needs_app
+        status: { type: String, required: true },
+        addedBy: { type: String, required: true },
+        updatedBy: { type: String, required: false },
+        createdAt: { type: Date, required: true },
+        updatedAt: { type: Date, required: true },
     },
     // An owner or admin's daily limit for the workspace, a member or an agent; a field left out falls to the wider
     // limit, then to the default in Modules/Connectors/quotas.js (FR-29).

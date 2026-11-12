@@ -45,3 +45,6 @@ None.
 
 ### 2026-11-12
 - Contract section 10 added (task 100): `auth.registration`, `auth.registrationUrl`, `auth.personalToken`, `account { url, read }`, `registry.signIns`, `connector_registrations`, the token route, and `signIn`/`kind` on connection rows. Additive and optional.
+
+### 2026-11-12
+- Contract section 11 added (task 096): custom MCP servers as providers `custom_<id>` built from `connector_servers` rows, `connection.definitionFor` and `registry.scopesIn`, and the three generic tools `custom.tools.list`, `custom.tool.read`, `custom.tool.write`. Additive: every catalog provider and tool is unchanged.

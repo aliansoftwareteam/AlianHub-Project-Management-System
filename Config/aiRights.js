@@ -20,6 +20,7 @@ const AI_RIGHT = Object.freeze({
     SKILL_RISK: 'ai_skill_risk',
     CONNECTORS: 'ai_connectors',
     EXTERNAL_CLIENTS: 'ai_external_clients',
+    CUSTOM_APPS: 'ai_custom_apps',
 });
 
 /* The matrix stores the highest skill risk as a number; owners and admins evaluate to true. */
@@ -35,6 +36,7 @@ const REFUSAL = Object.freeze({
     [AI_RIGHT.SKILLS]: 'Your role does not include writing skills. Ask an Owner or an Admin to turn it on in Security & Permissions.',
     [AI_RIGHT.CONNECTORS]: 'Your role does not include connecting apps for AI. Ask an Owner or an Admin to turn it on in Security & Permissions.',
     [AI_RIGHT.EXTERNAL_CLIENTS]: 'Your role does not include connecting your own AI. Ask an Owner or an Admin to turn it on in Security & Permissions.',
+    [AI_RIGHT.CUSTOM_APPS]: 'Your role does not include adding custom apps. Ask an Owner or an Admin to turn it on in Security & Permissions.',
 });
 const UNCHECKED = 'Your AI access could not be checked just now. Try again.';
 

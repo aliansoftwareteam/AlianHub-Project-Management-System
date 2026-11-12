@@ -64,9 +64,13 @@ const connectsApps = (run) => async (who, req, res) => {
     return undefined;
 };
 
+/* A catalog id, or a workspace's custom server (`custom_<id>`), which the lifecycle then looks up in the caller's own
+ * workspace only. */
+const knownProvider = (provider) => Boolean(registry.get(provider)) || require('./customServers').isCustomId(provider);
+
 const providerOf = (req, res) => {
     const provider = String((req.params || {}).provider || '');
-    if (!registry.get(provider)) { refuse(res, 404, 'This connector is not available.'); return ''; }
+    if (!knownProvider(provider)) { refuse(res, 404, 'This connector is not available.'); return ''; }
     return provider;
 };
 
@@ -135,7 +139,7 @@ exports.callback = async (req, res, next) => {
     }
     let target;
     try {
-        if (!registry.get(provider)) throw new Error('unknown provider');
+        if (!knownProvider(provider)) throw new Error('unknown provider');
         const query = req.query || {};
         const error = query.error === undefined || query.error === '' ? '' : (typeof query.error === 'string' ? query.error : 'provider_error');
         target = await connection.returnFor({ provider, state: query.state, code: query.code, error });
@@ -178,15 +182,22 @@ exports.setToolsOff = handle('change a connection\'s tools', 'Tools updated.', a
     return connection.setToolsOff({ companyId: who.companyId, row, toolsOff: [...new Set(given)], actor: who.actor });
 });
 
+/* A custom server's tools are reviewed on its own routes (customController.js), so these take catalog ids only. */
+const catalogProviderOf = (req, res) => {
+    const provider = String((req.params || {}).provider || '');
+    if (!registry.get(provider)) { refuse(res, 404, 'This connector is not available.'); return ''; }
+    return provider;
+};
+
 /* Owner/admin: each tool of an MCP app, and whether the app changed it since it was reviewed. */
 exports.tools = handle('list a connector\'s tools', 'Tools fetched.', managerOrRefuse(async (who, req, res) => {
-    const provider = providerOf(req, res);
+    const provider = catalogProviderOf(req, res);
     return provider ? { tools: await toolReviews.listFor(who.companyId, registry.get(provider), catalogToolsOf(provider)) } : undefined;
 }));
 
 /* Owner/admin: approve a changed tool as the app describes it now, or keep it off. */
 exports.reviewTool = handle('review a connector\'s tool', 'Tool reviewed.', managerOrRefuse(async (who, req, res) => {
-    const provider = providerOf(req, res);
+    const provider = catalogProviderOf(req, res);
     if (!provider) return undefined;
     const tool = String((req.params || {}).tool || '');
     if (!catalogToolsOf(provider).some((t) => t.mcp && t.mcp.tool === tool)) { refuse(res, 404, 'This app has no such tool.'); return undefined; }

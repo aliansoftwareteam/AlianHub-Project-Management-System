@@ -24,8 +24,6 @@
 
         <CompanyApps v-if="apps" />
 
-        <CustomServers />
-
         <div v-if="limits" ref="limitsAt" class="cx-ws__limits" tabindex="-1">
             <ConnectorQuotas />
         </div>
@@ -39,7 +37,6 @@ import AdminConnections from "./AdminConnections.vue";
 import CompanyApps from "./CompanyApps.vue";
 import ConnectorQuotas from "./ConnectorQuotas.vue";
 import ConnectorToolReviews from "./ConnectorToolReviews.vue";
-import CustomServers from "./CustomServers.vue";
 import { connectorApi } from "./connectorApi";
 
 defineOptions({ name: "ConnectorsWorkspace" });

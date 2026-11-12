@@ -601,7 +601,13 @@ describe('the routes register only when a provider is offered', () => {
             'GET /api/v2/connectors/picker/:source/token',
             'GET /api/v2/connectors/picker/:source/thumbnail',
             'POST /api/v2/connectors/picker/:source/import',
+            'GET /api/v2/connectors/servers', 'POST /api/v2/connectors/servers',
+            'PUT /api/v2/connectors/servers/:id', 'DELETE /api/v2/connectors/servers/:id',
+            'GET /api/v2/connectors/servers/:id/tools', 'PUT /api/v2/connectors/servers/:id/tools/:tool',
         ]);
+        process.env.CONNECTORS_CUSTOM = 'off';
+        expect(routesOf().filter((route) => route.includes('/servers'))).toEqual([]);
+        delete process.env.CONNECTORS_CUSTOM;
         process.env.CONNECTORS = 'slack';
         expect(routesOf()).toEqual([]);
     });

@@ -106,7 +106,10 @@ const readerParamOf = (schema) => {
     return Object.freeze({ type: schema.type, min: schema.minimum, max: schema.maximum, default: Number.isFinite(schema.default) ? schema.default : schema.minimum });
 };
 
-const connectorReaders = () => Object.fromEntries(require('../../Connectors/tools').reads().map((tool) => [tool.key, Object.freeze({
+// A custom app's tools depend on the workspace and the call, so no skill can declare them.
+const skillTools = (list) => list.filter((tool) => !tool.custom);
+
+const connectorReaders = () => Object.fromEntries(skillTools(require('../../Connectors/tools').reads()).map((tool) => [tool.key, Object.freeze({
     label: String(tool.input.description).slice(0, 120),
     description: `${tool.input.description} Reads only the connection of the person the agent acts for, and only for an agent with this tool ticked: at most ${tool.caps.maxChars} characters. What it reads marks the run, which makes no web fetch after it.`,
     connector: tool.provider,
@@ -255,7 +258,7 @@ const EMIT_REQUIRED = Object.freeze({
 /* Connector writes are registered only while their connector is on, so they are offered beside the fixed list
  * rather than in it. Each is propose-only: a skill that emits one files a proposal, never a message. */
 const connectorEmitRequired = () => ({
-    ...Object.fromEntries(require('../../Connectors/tools').writes().map((tool) => [tool.key, Object.freeze([...(tool.input.required || [])])])),
+    ...Object.fromEntries(skillTools(require('../../Connectors/tools').writes()).map((tool) => [tool.key, Object.freeze([...(tool.input.required || [])])])),
 });
 const emitActions = () => [...EMIT_ACTIONS, ...Object.keys(connectorEmitRequired()).filter((key) => registry.has(key))];
 const emitRequired = (action) => EMIT_REQUIRED[action] || (registry.has(action) && connectorEmitRequired()[action]) || [];

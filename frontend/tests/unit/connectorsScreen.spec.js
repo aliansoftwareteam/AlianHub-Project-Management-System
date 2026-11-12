@@ -63,6 +63,7 @@ const serve = (answers = {}) => {
         if (answers[key]) return answers[key](body);
         if (key === 'get ') return ok(LIST);
         if (key === 'get /google/tools') return ok({ tools: GOOGLE_TOOLS });
+        if (key === 'get /servers') return ok({ servers: [], mayAdd: false });
         if (key.startsWith('get /admin/tools/')) return ok({ tools: [] });
         return Promise.reject(new Error(`unexpected ${method} ${url}`));
     });
@@ -254,13 +255,22 @@ describe('browse', () => {
         expect(apiRequest).not.toHaveBeenCalled();
     });
 
-    it('shows the add-custom button to owners and admins only, and lets task 096 hook it', async () => {
-        expect((await open()).find('[data-test="cx-add-custom"]').exists()).toBe(false);
-        const admin = await open({ props: { privileged: true } });
-        const button = admin.find('[data-test="cx-add-custom"]');
-        expect(button.attributes('aria-disabled')).toBe('true');
-        await button.trigger('click');
-        expect(admin.emitted('add-custom')).toHaveLength(1);
+    it('shows the add-custom button only to someone who may add custom apps, and opens the add dialog', async () => {
+        const member = await open({ props: { privileged: true } });
+        expect(member.find('[data-test="cx-add-custom"]').exists()).toBe(false);
+        expect(member.find('[data-test="custom-servers"]').exists()).toBe(false);
+        member.unmount();
+        const adder = await open({ answers: { 'get /servers': () => ok({ servers: [], mayAdd: true }) } });
+        expect(adder.find('[data-test="csv-add"]').exists()).toBe(false);
+        await adder.find('[data-test="cx-add-custom"]').trigger('click');
+        expect(adder.find('[data-test="add-custom-connector"]').exists()).toBe(true);
+    });
+
+    it("leaves a workspace's custom apps off the catalog, for their own card to list", async () => {
+        const custom = { provider: 'custom_6f01', products: ['server'], signIn: ['token'], custom: true, name: 'Team notes' };
+        const wrapper = await open({ answers: { 'get ': () => ok({ ...LIST, providers: [...LIST.providers, custom] }) } });
+        expect(wrapper.find('[data-test="cx-connect-custom_6f01"]').exists()).toBe(false);
+        expect(connectorRows({ providers: [custom] }).browse).toEqual([]);
     });
 });
 

@@ -4,6 +4,8 @@ const ctrl = require('./controller');
 const google = require('./googleController');
 const providers = require('./connectorsController');
 const picker = require('./pickerController');
+const custom = require('./customController');
+const customFlag = require('./customFlag');
 const registry = require('./registry');
 const { agentsRefused } = require('../Agents/guard');
 const { CALLBACK_PATH } = require('../Agents/connectors/googleConnection');
@@ -59,6 +61,18 @@ const genericRoutes = (app) => {
     app.put('/api/v2/connectors/admin/tools/:provider/:tool', agentsRefused('connector.tool_reviewed'), providerLimiter, providers.reviewTool);
 };
 
+/* A workspace's own MCP servers (096). `servers` is a literal segment, like `connections` and `apps`; members connect
+ * to a server through the generic routes above as `custom_<id>`. Each handler checks CONNECTORS_CUSTOM again. */
+const customRoutes = (app) => {
+    app.get('/api/v2/connectors/servers', custom.list);
+    app.post('/api/v2/connectors/servers', agentsRefused('connector.server_added'), providerLimiter, custom.add);
+    app.put('/api/v2/connectors/servers/:id', agentsRefused('connector.server_changed'), providerLimiter, custom.update);
+    app.delete('/api/v2/connectors/servers/:id', agentsRefused('connector.server_removed'), providerLimiter, custom.remove);
+    // Listing reads the server through the reviewer's own connection, so it is limited like a provider call.
+    app.get('/api/v2/connectors/servers/:id/tools', providerLimiter, custom.tools);
+    app.put('/api/v2/connectors/servers/:id/tools/:tool', agentsRefused('connector.tool_reviewed'), providerLimiter, custom.reviewTool);
+};
+
 /* The Drive/Dropbox attachment picker (076). `picker` is a literal segment, so `:source` never collides with a
  * provider's own /:provider routes. Every handler takes the person from the session, never the body, so no route
  * reaches another person's account. Agents never pick files, so these stay human-only (the handlers refuse an API
@@ -77,7 +91,11 @@ exports.init = (app) => {
     }
     // Before the legacy google routes: the generic '/:provider/callback' and the legacy google callback share one
     // redirect URI, and the generic handler hands a legacy state back to the legacy handler (coexistence until 073).
-    if (registry.list().some((definition) => flag.named().includes(definition.id))) { genericRoutes(app); pickerRoutes(app); }
+    if (registry.list().some((definition) => flag.named().includes(definition.id))) {
+        genericRoutes(app);
+        pickerRoutes(app);
+        if (customFlag.asked()) customRoutes(app);
+    }
     if (flag.requestedGoogle().length) googleRoutes(app);
     if (flag.requested().length) appRoutes(app);
 };

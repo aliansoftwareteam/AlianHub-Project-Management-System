@@ -121,17 +121,25 @@ const providerOn = (provider) => require('../Agents/connectors/flag').named().in
  * `all()` still holds it, so owners and admins can see it waiting for review. */
 const reviewed = (tool) => !tool.mcp || SHAPE.test(String(tool.mcp.shape || ''));
 
-const make = (dir) => {
+/* The three generic tools of a workspace's custom servers (customTools.js) sit beside the catalog's from boot, so the
+ * agent registry and the MCP server hold them like any other; they are on only while custom servers are. */
+const customTools = () => require('./customTools');
+
+const make = (dir, { custom = false } = {}) => {
     let loaded = null;
-    const all = () => { loaded = loaded || load(dir); return loaded; };
+    const all = () => { loaded = loaded || Object.freeze([...load(dir), ...(custom ? customTools().TOOLS : [])]); return loaded; };
     const get = (key) => all().find((tool) => tool.key === String(key)) || null;
     const reads = () => all().filter((tool) => tool.kind === KIND.READ && reviewed(tool));
     const writes = () => all().filter((tool) => tool.kind === KIND.WRITE && reviewed(tool));
     const isWrite = (key) => { const tool = get(key); return Boolean(tool) && tool.kind === KIND.WRITE; };
-    const isOn = (tool) => providerOn(tool.provider) && reviewed(tool);
+    const isOn = (tool) => (tool.custom ? customTools().isOn() : providerOn(tool.provider) && reviewed(tool));
     return { all, get, reads, writes, isWrite, isOn, anyOn: () => all().some(isOn) };
 };
 
+/* A call of a custom tool names its server and tool, and becomes that server's reviewed tool here; any other tool is
+ * itself. */
+const bound = async (tool, { companyId, input }) => (typeof tool.bind === 'function' ? tool.bind({ companyId, input }) : { tool, args: input });
+
 const WRITE_GATE = 'connection_owner';
 
-module.exports = { KIND, WRITE_GATE, problemsOf, make, ...make(DIR) };
+module.exports = { KIND, WRITE_GATE, problemsOf, make, bound, ...make(DIR, { custom: true }) };

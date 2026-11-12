@@ -190,12 +190,13 @@ const ownConnection = async (tool, companyId, userId, asked) => {
 
 /* The stored params keep the connection's id, so a later send through any other is refused. */
 const admitWrite = async ({ companyId, userId, key, input = {} }) => {
-    const tool = tools.get(key);
-    if (!tool || tool.kind !== tools.KIND.WRITE || !tools.isOn(tool)) throw refusal('tool_off', `${key} is not available here.`);
+    const generic = tools.get(key);
+    if (!generic || generic.kind !== tools.KIND.WRITE || !tools.isOn(generic)) throw refusal('tool_off', `${key} is not available here.`);
     if (!userId) throw refusal('no_person', 'This write names no person, so no connection can be used.');
-    const { connectionId: asked, ...args } = input || {};
-    const problem = argsSchema.problemIn(tool.input, args);
+    const { connectionId: asked, ...given } = input || {};
+    const problem = argsSchema.problemIn(generic.input, given);
     if (problem) throw refusal('bad_input', `${key}: ${problem}`);
+    const { tool, args } = await tools.bound(generic, { companyId, input: given });
     const connection = await ownConnection(tool, companyId, userId, asked);
     return { tool, args, connection, params: { ...args, connectionId: String(connection.connectionId) } };
 };
@@ -218,17 +219,34 @@ const write = ({ companyId, userId, key, params = {}, beforeSend = async () => {
     },
 );
 
+/* The list of a workspace's reviewed custom tools reaches no app, so it takes no connection, quota or run read; it
+ * still marks the run, since the words in it began as a server's own. */
+const localRead = async ({ tool, companyId, userId, via }) => {
+    const whole = plain(await tool.list({ companyId: String(companyId), userId: String(userId) }));
+    const text = whole.slice(0, tool.caps.maxChars);
+    const source = taint.connector(tool.provider, taint.hashed(`${tool.key}:${companyId}`));
+    if (via === VIA.AGENT) egressContext.noteConnectorRead(tool.provider);
+    else taint.note(source);
+    return { text, chars: text.length, truncated: whole.length > text.length, taint: [source] };
+};
+
 /* An agent's read is refused unless the agent has the tool ticked; `agentConnectors` left out ticks nothing. */
 const readAdmitted = async ({ companyId, userId, via, runId, callerId, agentConnectors, key, input }, trace) => {
-    const tool = tools.get(key);
-    if (!tool || tool.kind !== tools.KIND.READ || !tools.isOn(tool)) throw refusal('tool_off', `${key} is not available here.`);
+    const generic = tools.get(key);
+    if (!generic || generic.kind !== tools.KIND.READ || !tools.isOn(generic)) throw refusal('tool_off', `${key} is not available here.`);
     if (!userId) throw refusal('no_person', 'This read names no person, so no connection can be used.');
-    const { connectionId: asked, ...args } = input || {};
-    const problem = argsSchema.problemIn(tool.input, args);
+    const { connectionId: asked, ...given } = input || {};
+    const problem = argsSchema.problemIn(generic.input, given);
     if (problem) throw refusal('bad_input', `${key}: ${problem}`);
     if (via === VIA.AGENT && !runId) throw refusal('run_required', 'A connected app can be read only while an agent is running.');
     const notTicked = via === VIA.AGENT ? require('../Agents/agentConnectors').refusalFor(agentConnectors, key) : '';
     if (notTicked) throw refusal('agent_not_allowed', notTicked);
+    if (generic.local) {
+        const out = await localRead({ tool: generic, companyId, userId, via });
+        trace.chars = out.chars;
+        return out;
+    }
+    const { tool, args } = await tools.bound(generic, { companyId, input: given });
 
     const connection = await ownConnection(tool, companyId, userId, asked);
     trace.connectionId = connection.connectionId;

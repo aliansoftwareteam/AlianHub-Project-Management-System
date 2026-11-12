@@ -1,5 +1,6 @@
 const agentFetch = require('../Agents/engine/agentFetch');
 const egressContext = require('../Agents/engine/egressContext');
+const fetcher = require('../Agents/engine/safeFetch');
 
 const TIMEOUT_MS = 8000;
 const MAX_BYTES = 64 * 1024;
@@ -14,10 +15,18 @@ const httpsUrl = (value) => {
     }
 };
 
-const getJson = async (url, hosts) => {
+/* A person adding a custom server reads its metadata before its hosts are on the workspace list, which the add puts
+ * them on; the address rules still apply to every request, with no redirect and no credential. */
+const unlistedGet = (url, hosts) => {
+    const target = new URL(String(url));
+    if (target.protocol !== 'https:' || !hosts.includes(target.hostname)) throw new Error('not a host of this server');
+    return fetcher.safeFetch(target.href, { method: 'get', timeoutMs: TIMEOUT_MS, maxBytes: MAX_BYTES, maxRedirects: 0, headers: { Accept: 'application/json' } });
+};
+
+const getJson = async (url, hosts, unlisted) => {
     let res;
     try {
-        res = await agentFetch.callApi(url, { hosts, timeoutMs: TIMEOUT_MS, maxBytes: MAX_BYTES });
+        res = unlisted ? await unlistedGet(url, hosts) : await agentFetch.callApi(url, { hosts, timeoutMs: TIMEOUT_MS, maxBytes: MAX_BYTES });
     } catch (e) {
         return null;
     }
@@ -30,10 +39,10 @@ const getJson = async (url, hosts) => {
     }
 };
 
-const firstJson = async (urls, host) => {
+const firstJson = async (urls, host, unlisted) => {
     for (const url of [...new Set(urls)]) {
         // eslint-disable-next-line no-await-in-loop
-        const found = await getJson(url, [host]);
+        const found = await getJson(url, [host], unlisted);
         if (found) return found;
     }
     return null;
@@ -42,14 +51,14 @@ const firstJson = async (urls, host) => {
 /* Where an MCP server sends a client to sign in: its protected-resource metadata (RFC 9728), then its authorization
  * server's metadata (RFC 8414, or OpenID discovery). Every address must be https. The hosts found are returned so
  * the caller can name them as the connector's egress hosts; nothing outside them is contacted later. */
-const discover = ({ url, companyId, actor }) => egressContext.run({ companyId: String(companyId), actor: String(actor || '') }, async () => {
+const find = async (url, unlisted) => {
     const server = httpsUrl(url);
     if (!server) return { ok: false, error: 'not_https' };
     const path = server.pathname.replace(/\/+$/, '');
     const resource = await firstJson([
         `${server.origin}/.well-known/oauth-protected-resource${path}`,
         `${server.origin}/.well-known/oauth-protected-resource`,
-    ], server.hostname);
+    ], server.hostname, unlisted);
     const named = resource && Array.isArray(resource.authorization_servers) ? resource.authorization_servers[0] : server.origin;
     const issuer = httpsUrl(named);
     if (!issuer) return { ok: false, error: 'not_https' };
@@ -58,7 +67,7 @@ const discover = ({ url, companyId, actor }) => egressContext.run({ companyId: S
         `${issuer.origin}/.well-known/oauth-authorization-server${issuerPath}`,
         `${issuer.origin}/.well-known/openid-configuration${issuerPath}`,
         `${issuer.origin}${issuerPath}/.well-known/openid-configuration`,
-    ], issuer.hostname);
+    ], issuer.hostname, unlisted);
     if (!meta) return { ok: false, error: 'no_metadata' };
 
     const authorize = httpsUrl(meta.authorization_endpoint);
@@ -78,6 +87,10 @@ const discover = ({ url, companyId, actor }) => egressContext.run({ companyId: S
         .filter((scope) => typeof scope === 'string' && scope.trim()).slice(0, MAX_SCOPES);
     const hosts = [...new Set([server, authorize, token, registration, revoke].filter(Boolean).map((u) => u.hostname))];
     return { ok: true, auth, scopes, hosts };
-});
+};
+
+const discover = ({ url, companyId, actor, unlisted = false }) => (unlisted
+    ? egressContext.run({}, () => find(url, true))
+    : egressContext.run({ companyId: String(companyId), actor: String(actor || '') }, () => find(url, false)));
 
 module.exports = { discover };

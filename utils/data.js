@@ -1027,6 +1027,7 @@ exports.importCompanyRules = async(companyName,type,projectId) => {
         { name: "Skills an agent may use", key: "ai_skill_risk", dependency: "artificial_intelligence", desc: "", riskField: true },
         { name: "App connectors", key: "ai_connectors", dependency: "artificial_intelligence", desc: "", switchOnly: true },
         { name: "Connect your own AI", key: "ai_external_clients", dependency: "artificial_intelligence", desc: "", switchOnly: true },
+        { name: "Add custom apps", key: "ai_custom_apps", dependency: "artificial_intelligence", desc: "", switchOnly: true },
     ]
 
     if(type === 'project'){

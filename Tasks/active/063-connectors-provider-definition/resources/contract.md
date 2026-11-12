@@ -241,3 +241,45 @@ Additive; nothing above changes.
 - `PUT /api/v2/connectors/connections/:id/tools`, body `{ toolsOff: [key] }`: the connection's owner only (anyone else, owners and admins included, gets 404), every key a catalog tool of that provider (else 400 `unknown_tool`), agents refused, audited `connector.tools_changed`. Answers the connection's view, which now carries `toolsOff`.
 - `GET /api/v2/connectors/:provider/tools` (any member with a seat): `{ tools: [{ key, label, kind, on }] }`, `on` being `tools.isOn()`. No shape, input or server text.
 - `GET /api/v2/connectors` also answers `unavailable: [{ provider }]`: named in `CONNECTORS` but with no way to sign in on this install yet.
+
+## 12. Custom MCP servers (task 096, 2026-11-12)
+
+Additive: every catalog provider, tool and route is unchanged.
+
+**A custom server is a provider.** Someone holding "Add custom apps" (`Config/aiRights.js`, `ai_custom_apps`) adds a server for the workspace by name and address (`POST /api/v2/connectors/servers`). It is stored in `connector_servers` and is the provider `custom_<row id>`: its definition is built from the row (`customServers.definitionOf`), never read from `providers/`, and is never in the registry's list.
+
+```js
+{
+    id: 'custom_6f…',              // matches the id rule of section 2
+    name: 'Team notes',            // the name its adder gave it
+    custom: true, serverId: '6f…',
+    signIn: 'self_register' | 'registered_app' | 'personal_token',
+    signIns: ['oauth'] | ['token'],
+    transport: 'mcp', mcp: { url },
+    auth: { authorizeUrl, tokenUrl, revokeUrl?, pkce?, registration?, registrationUrl? } | { personalToken: true },
+    products: { server: [scopes the server published] },
+    readAccount,                   // the token answer's sub/user_id/account_id/id, else one account per member
+    checkToken,                    // personal tokens only: one listing of the server's tools checks a pasted token
+    egressHosts: ['mcp.example.com', 'auth.example.com'],
+}
+```
+
+- `connection.definitionFor(companyId, provider)` answers a catalog definition from the registry, or a custom one from the caller's own workspace only. The lifecycle uses it wherever it needs a definition (`start`, `setProducts`, `complete`, `accessTokenFor`, `disconnect`, `revokeAtProvider`, `saveToken`); `isOffered`, `list`, `membersWithConnections`, `endForMember` and the sweep include custom servers. The registry's sync API stays as it was; `registry.scopesIn(definition, products)` answers what `scopesFor(id, products)` answers, from a definition.
+- `apps.resolveApp` answers a custom server's own app: the client it registered for the workspace (`registrations.js`, `source: 'registered'`) or the client id and secret its adder entered (`source: 'company'`, secret by handle). No instance, company or hosted app signs in to a custom server.
+- Adding checks every host the server and its sign-in name: https, a host name rather than a number, and not resolving to a private, loopback or link-local address (`safeFetch.resolvePublic`). `mcpAuth.discover({ …, unlisted: true })` reads the metadata before the hosts are on the workspace egress list; with `AGENT_EGRESS_ALLOWLIST` on and a list in use, the hosts are then added to it, and taken off with the server.
+- A server with sign-in metadata and a registration address registers itself; one without a registration address waits (`status: 'needs_app'`) until its client id and secret are entered, since the callback to register names the new row; one with no metadata takes members' own tokens.
+- Members connect through the generic routes with the provider `custom_<id>`.
+- Removing a server ends every connection to it (`disconnectedBy: 'server_removed'`), retires its client secret and registration, and deletes its `connector_tools` rows.
+
+**Its tools are reviewed rows.** A custom server's tools are rows of `connector_tools` under its provider id, with `access` (read or write), `enabled`, the reviewer-accepted `label` and `description`, and the reviewed `inputSchema` (the server's, bounded, with no `pattern`). Listing them for review (`GET /api/v2/connectors/servers/:id/tools`) reads the server through the reviewer's own connection and shows the server's own text as outside content; saving one (`PUT …/tools/:tool`) needs the `shape` the reviewer saw. A reviewed tool whose shape changes is turned off (`toolReviews.noteChanged`).
+
+**Three generic tools, registered once** (`Modules/Connectors/customTools.js`), on while `CONNECTORS_CUSTOM` is not `off` and the module is on:
+
+| Key | Kind | Takes | Does |
+|---|---|---|---|
+| `custom.tools.list` | read | nothing | the workspace's active servers and their reviewed, switched-on tools: accepted label, description, input schema, read or write. Reaches no server, so no connection, quota or run read; it marks the run |
+| `custom.tool.read` | read | `{ server, tool, arguments }` | runs a reviewed read on the caller's own connection |
+| `custom.tool.write` | write | `{ server, tool, arguments }` | files a proposal; the card names the app, the tool and the exact arguments |
+
+- `tools.all()` holds them beside the catalog's (`custom: true`), so the agent registry and AlianHub's MCP server register them; skills do not declare them.
+- `tools.bound(tool, { companyId, input })` turns a call into that server's reviewed tool: the tool must be enabled, reviewed as that kind, still of the reviewed shape, and `arguments` must fit the reviewed schema. From there `toolRunner` runs it as any MCP tool: own connection, caps, quotas, taint `custom_<id>`, audit, `connection_owner` approval and one send.

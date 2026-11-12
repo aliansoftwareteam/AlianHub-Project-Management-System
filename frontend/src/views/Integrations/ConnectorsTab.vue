@@ -5,18 +5,15 @@
                 <h2 class="ah-h2">{{ $t('Connectors.screen.connectors_title') }}</h2>
                 <p class="cx__lead">{{ $t('Connectors.screen.connectors_lead') }}</p>
             </div>
-            <div v-if="privileged" class="cx__add">
+            <div v-if="mayAddCustom && available && !guest" class="cx__add">
                 <button
                     type="button"
                     class="ah-btn ah-btn--secondary ah-btn--sm cx__add-btn"
-                    aria-disabled="true"
-                    :aria-describedby="addNoteId"
                     data-test="cx-add-custom"
-                    @click="emit('add-custom')"
+                    @click="customServers?.startAdd()"
                 >
                     <ShellIcon name="plus" :size="14" />{{ $t('Connectors.screen.add_custom') }}
                 </button>
-                <span :id="addNoteId" class="ah-small">{{ $t('Connectors.screen.add_custom_soon') }}</span>
             </div>
         </header>
 
@@ -133,6 +130,8 @@
                     </ul>
                 </section>
             </template>
+
+            <CustomServers ref="customServers" :own-add="false" @ready="mayAddCustom = $event.mayAdd" />
         </template>
 
         <GoogleConnection v-if="legacyGoogle && !guest" />
@@ -160,6 +159,7 @@ import GoogleConnection from "./GoogleConnection.vue";
 import ConnectorTile from "./ConnectorTile.vue";
 import ConnectorSignIn from "./ConnectorSignIn.vue";
 import ConnectorDetail from "./ConnectorDetail.vue";
+import CustomServers from "./CustomServers.vue";
 import { connectorApi, goToConsent } from "./connectorApi";
 import { formatDate, providerLabel, statusLabel } from "./connectorLabels";
 import {
@@ -174,13 +174,12 @@ const props = defineProps({
     privileged: { type: Boolean, default: false },
     legacyGoogle: { type: Boolean, default: false }
 });
-const emit = defineEmits(["add-custom", "open-workspace"]);
+const emit = defineEmits(["open-workspace"]);
 
 const { t, te } = useI18n();
 const route = useRoute();
 const router = useRouter();
 const uid = `cx-${useId()}`;
-const addNoteId = `${uid}-add-note`;
 
 const loading = ref(true);
 const loadError = ref("");
@@ -192,6 +191,8 @@ const query = ref("");
 const category = ref(ALL_CATEGORIES);
 const signingIn = ref(null);
 const detailProvider = ref("");
+const customServers = ref(null);
+const mayAddCustom = ref(false);
 
 const name = (provider) => providerLabel(t, te, provider);
 const line = (provider) => {

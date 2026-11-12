@@ -50,3 +50,6 @@ None.
 - Usage this week in the detail panel (FR-67) needs a member-facing usage read; not built.
 - The person's MCP manifest and the AI chat still list a tool they turned off; it is refused when called.
 - The shell rail's App connections tile and the project GitHub card's "Set up" link now lead to Customize; 079 removes them with the GitHub workspace connection.
+
+### 2026-11-12 — 096 merged
+- "Add custom connector" opens 096's add dialog for whoever holds "Add custom apps", rather than a "Coming soon" button for owners and admins; the custom apps card moved from the Workspace tab's placeholder to the foot of the Connectors tab, since members connect there. The `servers_*` and `add_custom_soon` strings are gone.

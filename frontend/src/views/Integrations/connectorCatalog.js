@@ -27,7 +27,8 @@ export const statusDot = (row) => (needsAttention(row) ? "ah-dot--warn" : "ah-do
 
 export const connectorRows = (data = {}) => {
     const held = new Map((data.connections || []).filter((conn) => conn && conn.connected).map((conn) => [conn.provider, conn]));
-    const offered = (data.providers || []).map((entry) => ({
+    // A workspace's custom apps are listed, connected and reviewed on their own card (CustomServers.vue).
+    const offered = (data.providers || []).filter((entry) => !entry.custom).map((entry) => ({
         provider: entry.provider,
         products: entry.products || [],
         signIn: entry.signIn || [],
