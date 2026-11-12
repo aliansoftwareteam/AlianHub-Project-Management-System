@@ -32,6 +32,8 @@ const OBJECT_ID = /^[a-f0-9]{24}$/i;
 const ERROR_CODE = /^[a-z0-9_]{1,60}$/;
 const STATUS = Object.freeze({ PENDING: 'pending', CONNECTED: 'connected', BROKEN: 'broken', REAUTH: 'reauth_required', REVOKED: 'revoked' });
 const BY = Object.freeze({ SELF: 'self', ADMIN: 'admin', MEMBER_REMOVED: 'member_removed' });
+const SIGN_IN = Object.freeze({ REGISTERED_APP: 'registered_app', SELF_REGISTER: 'self_register', PERSONAL_TOKEN: 'personal_token' });
+const MAX_PERSONAL_TOKEN = 4096;
 const SECRET_LABEL = Object.freeze({ refresh: 'refresh token', access: 'access token' });
 
 class ConnectionError extends Error {
@@ -42,9 +44,7 @@ const plain = (doc) => (doc && typeof doc.toObject === 'function' ? doc.toObject
 const actorOf = (actor) => (actor && typeof actor === 'object' ? actor : { id: actor });
 const hash = (text) => crypto.createHash('sha256').update(String(text)).digest('hex');
 const challengeOf = (verifier) => crypto.createHash('sha256').update(String(verifier)).digest('base64url');
-const apiBase = () => String(process.env.APIURL || '').replace(/\/+$/, '');
-const callbackPath = (provider) => `/api/v1/connector-oauth/${provider}/callback`;
-const redirectUri = (provider) => `${apiBase()}${callbackPath(provider)}`;
+const { apiBase, callbackPath, redirectUri } = require('./callbacks');
 const fallbackOrigin = () => String(process.env.WEBURL || '').split(',').map((entry) => entry.trim().replace(/\/+$/, '')).find(Boolean) || apiBase();
 const stateSecret = () => {
     const secret = String(process.env.JWT_SECRET || '');
@@ -73,7 +73,10 @@ const byId = async (companyId, connectionId) => (OBJECT_ID.test(String(connectio
 const update = async (companyId, row, change) => plain(await MongoDbCrudOpration(companyId, {
     type: T, data: [{ _id: row._id }, change, { returnDocument: 'after' }],
 }, 'findOneAndUpdate'));
-const holdsToken = (row) => Boolean(row && row.handles && row.handles.refresh);
+/* A pasted token is used as it is and never refreshed, so its row holds the access token alone. */
+const isPersonalToken = (row) => Boolean(row && row.signIn === SIGN_IN.PERSONAL_TOKEN);
+const tokenHandle = (row) => (row && row.handles ? (isPersonalToken(row) ? row.handles.access : row.handles.refresh) : null);
+const holdsToken = (row) => Boolean(tokenHandle(row));
 
 const audit = (companyId, actor, action, provider, meta = {}) => {
     const who = actorOf(actor);
@@ -122,6 +125,7 @@ const view = (provider, row) => {
         connected,
         status: connected ? row.status || STATUS.CONNECTED : null,
         account: connected ? { label: String((row.account && row.account.label) || '') } : null,
+        signIn: connected ? row.signIn || SIGN_IN.REGISTERED_APP : null,
         products: connected ? [...(row.products || [])] : [],
         scopes: connected ? [...(row.scopes || [])] : [],
         connectedAt: connected ? row.connectedAt || null : null,
@@ -148,7 +152,7 @@ const memberView = (row) => ({
 const describe = async (companyId, userId, provider) => {
     const row = await find(companyId, userId, provider);
     if (!holdsToken(row)) return view(provider, null);
-    const held = await store.describe({ companyId, handle: row.handles.refresh }).then(() => true).catch(() => false);
+    const held = await store.describe({ companyId, handle: tokenHandle(row) }).then(() => true).catch(() => false);
     return view(provider, held ? row : null);
 };
 
@@ -190,7 +194,10 @@ const start = async ({ companyId, userId, sessionId, provider, products, origin 
     } catch (e) {
         throw new ConnectionError(400, 'Those products are not offered by this connector.', 'bad_products');
     }
-    const app = await apps.resolveApp({ companyId, provider });
+    if (!registry.signIns(provider, await companyAppsOf(companyId)).includes(registry.SIGN_IN.OAUTH)) {
+        throw new ConnectionError(409, 'This connector is connected by pasting a token of your own.', 'token_only');
+    }
+    const app = await apps.resolveApp({ companyId, provider, actor: userId });
     return beginConsent({ companyId, userId, sessionId, provider, products: products || Object.keys(definitionOf(provider).products), origin, app, scopes });
 };
 
@@ -208,7 +215,7 @@ const setProducts = async ({ companyId, userId, sessionId, provider, connectionI
     } catch (e) {
         throw new ConnectionError(400, 'Those products are not offered by this connector.', 'bad_products');
     }
-    const app = await apps.resolveApp({ companyId, provider });
+    const app = await apps.resolveApp({ companyId, provider, actor: userId });
     return beginConsent({ companyId, userId, sessionId, provider, products, origin, app, scopes });
 };
 
@@ -299,14 +306,35 @@ const revokeToken = async ({ companyId, actor, provider, row, definition }) => {
     return out.ok ? api.tokensOf(definition, out.body).access_token || null : null;
 };
 
+/* A pasted token was made by the person at the provider, and only they can revoke it there. */
 const revokeAtProvider = async ({ companyId, actor, provider, row }) => {
     const definition = definitionOf(provider);
-    if (!holdsToken(row)) return 'skipped';
+    if (!holdsToken(row) || isPersonalToken(row)) return 'skipped';
     if (await sharesGrant(companyId, row)) return 'shared';
     const token = await revokeToken({ companyId, actor, provider, row, definition });
     if (!token) return 'skipped';
     const out = await api.revoke({ definition, companyId, actor: actorOf(actor).id, token });
     return out.ok ? (out.skipped ? 'no_endpoint' : 'revoked') : 'failed';
+};
+
+/* The account a connection belongs to: from the token answer, or with one call when the answer names none. */
+const accountFrom = async ({ definition, companyId, userId, answer, accessToken }) => {
+    const unnamed = () => new ConnectionError(502, 'The provider did not identify the account.', 'no_account');
+    let account = { id: '', label: '' };
+    if (typeof definition.readAccount === 'function') {
+        try {
+            const read = definition.readAccount({ tokenResponse: answer }) || {};
+            account = { id: String(read.id || ''), label: String(read.label || '').slice(0, 254) };
+        } catch (e) {
+            if (!definition.account) throw unnamed();
+        }
+    }
+    if (!account.id && definition.account) {
+        const out = await api.readAccountWith({ definition, companyId, actor: userId, token: accessToken });
+        if (out.ok) account = out.account;
+    }
+    if (!account.id) throw unnamed();
+    return account;
 };
 
 /* Only the session that started the attempt completes it. The state is used up before anything is checked against
@@ -326,8 +354,12 @@ const complete = async ({ companyId, userId, sessionId, provider, state, code, a
     if (definition.auth.pkce === 'S256' && !pending.verifier) throw refused('no_verifier');
 
     const who = actor || { id: String(userId) };
-    const app = await apps.resolveApp({ companyId, provider });
+    const app = await apps.resolveApp({ companyId, provider, actor: userId });
     const out = await api.exchange({ definition, companyId, actor: userId, client: app, code: given, verifier: pending.verifier, redirectUri: redirectUri(provider) });
+    if (!out.ok && app.source === 'registered' && out.error === 'invalid_client') {
+        await require('./registrations').forget({ companyId, definition, actor: userId });
+        throw new ConnectionError(409, `${definition.name} no longer knows AlianHub's sign-up. Start again from the Connections page.`, 'registration_dropped');
+    }
     if (!out.ok) throw refusedByProvider(definition, out);
     const answer = out.body;
     const tokens = api.tokensOf(definition, answer);
@@ -335,14 +367,7 @@ const complete = async ({ companyId, userId, sessionId, provider, state, code, a
     if (typeof tokens.refresh_token !== 'string' || !tokens.refresh_token) {
         throw new ConnectionError(409, 'The provider sent no refresh token, so the connection could not be kept. Start again and allow offline access.', 'no_refresh_token');
     }
-    let account;
-    try {
-        const read = definition.readAccount({ tokenResponse: answer }) || {};
-        account = { id: String(read.id || ''), label: String(read.label || '').slice(0, 254) };
-    } catch (e) {
-        throw new ConnectionError(502, 'The provider did not identify the account.', 'no_account');
-    }
-    if (!account.id) throw new ConnectionError(502, 'The provider did not identify the account.', 'no_account');
+    const account = await accountFrom({ definition, companyId, userId, answer, accessToken: tokens.access_token });
     const before = row.account && row.account.id;
     if (holdsToken(row) && before && before !== account.id) await revokeAtProvider({ companyId, actor: who, provider, row });
 
@@ -357,6 +382,7 @@ const complete = async ({ companyId, userId, sessionId, provider, state, code, a
     const saved = await update(companyId, row, { $set: {
         status: STATUS.CONNECTED, handles, scopes, account, app: row.app || { source: app.source, appId: app.appId }, accessExpiresAt: lifetimeOf(tokens.expires_in),
         products: [...products], connectedAt: new Date(), lastError: '', brokenAt: null, updatedBy: String(userId),
+        signIn: app.source === 'registered' ? SIGN_IN.SELF_REGISTER : SIGN_IN.REGISTERED_APP, kind: definition.transport || 'api',
     } });
     audit(companyId, who, 'connector.connect', provider, { userId: String(userId), products: [...(saved.products || [])], scopes });
     announce(companyId, userId, provider, 'connected');
@@ -390,6 +416,44 @@ const disconnect = async ({ companyId, userId, provider, connectionId, actor, by
     return view(provider, null);
 };
 
+/* A token the person made at the provider and pasted here (FR-42). One read checks it and names its account before
+ * anything is kept; it is never shown again and never refreshed. A connection already held is ended first, so the
+ * person keeps one live connection per provider. */
+const saveToken = async ({ companyId, userId, sessionId, provider, token, actor }) => {
+    if (!sessionId) throw new ConnectionError(403, 'Sign in again before connecting an account.', 'no_session');
+    if (!(await isOffered(companyId, provider))) throw new ConnectionError(404, 'This connector is not available.', 'provider_off');
+    const definition = definitionOf(provider);
+    if (definition.auth.personalToken !== true) throw new ConnectionError(409, `${definition.name} is connected by signing in, not with a pasted token.`, 'oauth_only');
+    const given = typeof token === 'string' ? token.trim() : '';
+    if (!given || given.length > MAX_PERSONAL_TOKEN || /\s/.test(given)) throw new ConnectionError(400, 'That is not a token this connector can use.', 'bad_token');
+    const checked = await api.readAccountWith({ definition, companyId, actor: userId, token: given });
+    if (!checked.ok || !checked.account.id) throw new ConnectionError(400, `${definition.name} did not accept that token.`, 'token_refused');
+
+    const who = actor || { id: String(userId) };
+    const existing = await find(companyId, userId, provider);
+    if (holdsToken(existing)) await disconnect({ companyId, userId, provider, actor: who });
+    const pending = await find(companyId, userId, provider);
+    const access = await keep({ companyId, userId, provider, handle: null, key: 'access', value: given, actor: who });
+    const products = Object.keys(definition.products);
+    const scopes = registry.scopesFor(provider, products);
+    const fields = {
+        status: STATUS.CONNECTED, signIn: SIGN_IN.PERSONAL_TOKEN, kind: definition.transport || 'api', handles: { access }, scopes, account: checked.account,
+        app: { source: 'personal', appId: null }, accessExpiresAt: null, products, connectedAt: new Date(), lastError: '', brokenAt: null, updatedBy: String(userId),
+    };
+    let saved;
+    if (pending) saved = await update(companyId, pending, { $set: fields, $unset: { oauth: 1 } });
+    else {
+        await MongoDbCrudOpration(companyId, {
+            type: T,
+            data: { _id: new mongoose.Types.ObjectId(), companyId: String(companyId), userId: String(userId), provider: String(provider), createdBy: String(userId), deletedStatusKey: 0, ...fields },
+        }, 'save');
+        saved = await find(companyId, userId, provider);
+    }
+    audit(companyId, who, 'connector.connect', provider, { userId: String(userId), signIn: SIGN_IN.PERSONAL_TOKEN, products, scopes });
+    announce(companyId, userId, provider, 'connected');
+    return view(provider, saved);
+};
+
 const markBroken = async (companyId, row, reason) => {
     await update(companyId, row, { $set: { status: STATUS.BROKEN, lastError: String(reason || '').slice(0, 60), brokenAt: new Date() } });
     audit(companyId, null, 'connector.broken', row.provider, { userId: String(row.userId), reason: String(reason || '').slice(0, 60) });
@@ -417,6 +481,12 @@ const accessTokenFor = async ({ companyId, userId, provider }) => {
     if (found.reason) return none(found.reason);
     const { row } = found;
     const handles = row.handles;
+    if (isPersonalToken(row)) {
+        const token = await store.resolve({ companyId, handle: handles.access }).catch(() => null);
+        if (!token) return none('token_unavailable');
+        await update(companyId, row, { $set: { lastUsedAt: new Date() } });
+        return { token, reason: '' };
+    }
     const held = await store.describe({ companyId, handle: handles.refresh }).then(() => true).catch(() => false);
     if (!held) return none('token_unavailable');
     const fresh = handles.access && row.accessExpiresAt && new Date(row.accessExpiresAt).getTime() - EXPIRY_SKEW_MS > Date.now();
@@ -473,13 +543,14 @@ const recordHealth = async ({ companyId, connectionId, lastUsedAt, lastError }) 
 
 /* Every provider offered to this workspace, with the person's own connection on each (FR, GET /api/v2/connectors). */
 const list = async (companyId, userId) => {
-    const offered = registry.offered(await companyAppsOf(companyId));
+    const appsHere = await companyAppsOf(companyId);
+    const offered = registry.offered(appsHere);
     const connections = [];
     for (const definition of offered) {
         // eslint-disable-next-line no-await-in-loop
         connections.push(await describe(companyId, userId, definition.id));
     }
-    return { providers: offered.map((d) => ({ provider: d.id, products: Object.keys(d.products) })), connections };
+    return { providers: offered.map((d) => ({ provider: d.id, products: Object.keys(d.products), signIn: registry.signIns(d.id, appsHere) })), connections };
 };
 
 const membersWithConnections = async (companyId) => {
@@ -544,8 +615,8 @@ const sweepCompany = async (companyId) => {
 };
 
 module.exports = {
-    STATUS, BY, STATE_TTL_SECONDS, SECRET_KIND, ConnectionError,
+    STATUS, BY, SIGN_IN, STATE_TTL_SECONDS, SECRET_KIND, ConnectionError,
     isOffered, fallbackOrigin, redirectUri, callbackPath, byId, ownsState,
-    describe, list, membersWithConnections, start, setProducts, returnFor, complete, disconnect,
+    describe, list, membersWithConnections, start, setProducts, returnFor, complete, disconnect, saveToken,
     findUsable, accessTokenFor, markBrokenById, markBackoff, recordHealth, endForMember, sweepCompany,
 };

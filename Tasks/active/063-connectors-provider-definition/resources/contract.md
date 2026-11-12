@@ -206,3 +206,27 @@ module.exports = [mcpTool({
 - At call time `mcpClient` lists the server's tools (kept ten minutes per provider) and calls a tool only while its shape still equals `shape`. A changed tool is refused as `tool_changed` and logged; a withdrawn one as `tool_missing`.
 - Every MCP request leaves through `agentFetch.callMcp`: only the connector's hosts, HTTPS, no redirect, the member's token set there and only the protocol's own headers passed on.
 - Server answers become the same refusals as an API provider's: 429 holds the connection (`markBackoff`), 401 marks it broken (`markBroken`, reason `mcp_unauthorized`), anything else fails that one call. A tool's own error text never reaches the model.
+
+## 10. Signing in without a registered app (task 100, 2026-11-12)
+
+Optional fields, so every built provider is unchanged:
+
+```js
+auth: {
+    // as in section 2, plus:
+    registration: 'dynamic',                                  // the server signs clients up itself (RFC 7591); needs pkce: 'S256'
+    registrationUrl: 'https://auth.notion.example/register',  // https, host in egressHosts
+    personalToken: true,                                      // a member may paste a token of their own
+},
+account: {                                                    // the account a token belongs to, read with one GET
+    url: 'https://api.github.com/user',                       // https, host in egressHosts
+    read: (body) => ({ id, label }),
+},
+// readAccount is optional when account is given; a pasted token needs account
+```
+
+- `registry.signIns(id, { companyApps })` answers `['oauth']`, `['token']` or both; `isOffered` is true when there is at least one. `GET /api/v2/connectors` lists it per provider as `signIn`.
+- A `dynamic` provider with no company or instance app gets a client registered once per workspace (`connector_registrations`, `Modules/Connectors/registrations.js`) and reused by every member; `apps.resolveApp` answers it with `source: 'registered'` and an empty secret, which the token calls leave out. A token answer of `invalid_client` drops the registration and the person starts again; a changed `APIURL` registers again.
+- `POST /api/v2/connectors/:provider/token` keeps a pasted token after one `account.url` read succeeds; the row has `signIn: 'personal_token'`, `handles.access` only, all the definition's scopes, and is never refreshed or revoked at the provider.
+- Every connection row now records `signIn` (`registered_app`, `self_register`, `personal_token`) and `kind` (`api`, `mcp`).
+- `Modules/Connectors/mcpAuth.js` `discover({ url, companyId, actor })` reads a server's protected-resource and authorization-server metadata and answers its endpoints, registration and hosts, for custom servers (096).

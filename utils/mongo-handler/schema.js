@@ -2161,6 +2161,10 @@ const schema = {
         companyId: { type: String, required() { return typeof this.provider === 'string'; } },
         provider: { type: String, required: false },
         products: { type: [String], default: undefined, required: false },
+        // api | mcp: how the provider is reached
+        kind: { type: String, required: false },
+        // registered_app | self_register | personal_token: how the person signed in
+        signIn: { type: String, required: false },
         // The person a personal connection belongs to; absent on a workspace connection.
         userId: { type: String, required: false },
         // { bot_token: 'sec_…', signing_secret: 'sec_…' } or { refresh_token: 'sec_…', access_token: 'sec_…' }
@@ -2224,6 +2228,38 @@ const schema = {
         day: { type: String, required: true },
         reads: { type: Number, default: 0, required: false },
         writeProposals: { type: Number, default: 0, required: false },
+    },
+    // The client an MCP server registered for this workspace when it signs clients up itself, reused by every member (FR-41).
+    connectorRegistrations: {
+        companyId: { type: String, required: true },
+        provider: { type: String, required: true },
+        clientId: { type: String, required: true },
+        // Empty for a public client, which proves itself with PKCE alone
+        secretHandle: { type: String, default: '', required: false },
+        // dcr: dynamic client registration
+        method: { type: String, required: true },
+        // A different APIURL needs a new registration, since the server checks the callback against it
+        redirectUri: { type: String, required: true },
+        registeredBy: { type: String, required: true },
+        registeredAt: { type: Date, required: true },
+    },
+    // A workspace's review of an MCP server's tool: what it looked like when reviewed and whether it is on (FR-44, FR-54).
+    connectorTools: {
+        companyId: { type: String, required: true },
+        provider: { type: String, required: true },
+        // The server's own tool name
+        tool: { type: String, required: true },
+        // The shape the server describes now, and the one a person last reviewed
+        shape: { type: String, required: true },
+        reviewedShape: { type: String, default: '', required: false },
+        // new | changed | reviewed
+        state: { type: String, required: true },
+        // read | write, decided by the reviewer
+        access: { type: String, default: 'write', required: false },
+        enabled: { type: Boolean, default: false, required: false },
+        reviewedBy: { type: String, default: '', required: false },
+        reviewedAt: { type: Date, required: false },
+        seenAt: { type: Date, required: true },
     },
     // An owner or admin's daily limit for the workspace, a member or an agent; a field left out falls to the wider
     // limit, then to the default in Modules/Connectors/quotas.js (FR-29).

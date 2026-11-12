@@ -3,6 +3,7 @@ const { MongoDbCrudOpration } = require('../../utils/mongo-handler/mongoQueries'
 const secrets = require('../../Config/secrets');
 const { recordAudit } = require('../Audit/recorder');
 const registry = require('./registry');
+const callbacks = require('./callbacks');
 
 const SECRET_KIND = 'connector_app';
 const MAX_CLIENT_ID = 400;
@@ -16,8 +17,9 @@ const CODE = Object.freeze({
     NOT_FOUND: 'app_not_found',
     CONFLICT: 'app_conflict',
     SECRET_UNREADABLE: 'app_secret_unreadable',
+    REGISTRATION_FAILED: 'app_registration_failed',
 });
-const STATUS_BY_CODE = { invalid_app: 400, unknown_provider: 404, app_not_found: 404, app_conflict: 409, app_secret_unreadable: 503 };
+const STATUS_BY_CODE = { invalid_app: 400, unknown_provider: 404, app_not_found: 404, app_conflict: 409, app_secret_unreadable: 503, app_registration_failed: 502 };
 
 const isDuplicateKey = (error) => !!error && (error.code === 11000 || /E11000|duplicate key/i.test(String(error.message || '')));
 
@@ -57,7 +59,7 @@ const describeApps = async (companyId) => ((await appsDb(companyId, [{ companyId
 
 /* Server-internal: the only path that yields the client secret, for 066's authorize and token calls. Company
  * app wins over the instance default (FR-5). */
-const resolveApp = async ({ companyId, provider } = {}) => {
+const resolveApp = async ({ companyId, provider, actor } = {}) => {
     const existing = await row(companyId, provider);
     if (existing) {
         const clientSecret = await secrets.resolve({ companyId, handle: existing.secretHandle });
@@ -65,8 +67,14 @@ const resolveApp = async ({ companyId, provider } = {}) => {
         return { source: 'company', appId: String(existing._id), clientId: existing.clientId, clientSecret, extra: existing.extra || {} };
     }
     const instance = instanceApp(provider);
-    if (!instance) throw new AppError(CODE.NOT_FOUND, `No OAuth app is set for ${provider}.`);
-    return instance;
+    if (instance) return instance;
+    const definition = registry.get(provider);
+    if (definition && definition.auth.registration === 'dynamic') {
+        const out = await require('./registrations').resolve({ companyId, definition, redirectUri: callbacks.redirectUri(provider), actor });
+        if (out.ok) return out.app;
+        throw new AppError(CODE.REGISTRATION_FAILED, `${definition.name} did not accept AlianHub's sign-up (${out.error}), so it cannot be connected right now.`);
+    }
+    throw new AppError(CODE.NOT_FOUND, `No OAuth app is set for ${provider}.`);
 };
 
 const extraProblems = (extra) => {

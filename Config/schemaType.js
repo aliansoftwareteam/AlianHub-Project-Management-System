@@ -139,6 +139,8 @@ const SCHEMA_TYPE = {
     CONNECTOR_APPS: "connector_apps",
     CONNECTOR_USAGE: "connector_usage",
     CONNECTOR_QUOTAS: "connector_quotas",
+    CONNECTOR_REGISTRATIONS: "connector_registrations",
+    CONNECTOR_TOOLS: "connector_tools",
     INSTRUCTION_PATTERNS: "instruction_patterns",
     SECRETS: "secrets",
     OAUTH_CLIENTS: "oauth_clients",

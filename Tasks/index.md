@@ -93,5 +93,5 @@ Auto-maintained registry of all tasks. Reflects YAML frontmatter from each `task
 | 097 | Connectors in the AI chat — @mention or name an app, read with the asker's own account | backlog | high | 075, 087, 092 | backlog/097-connectors-in-ai-chat |
 | 098 | Connectors — agents use connectors: ticked on the agent, declared as reads in skills | backlog | medium | 068 | backlog/098-connectors-for-agents |
 | 099 | Connectors — Outlook built connector on Microsoft Graph: mail and calendar | backlog | medium | 068, 069, 093 | backlog/099-connectors-outlook-built |
-| 100 | Connectors — sign-in for MCP apps: discovery, self-registration once per workspace, personal tokens | backlog | high | 066, 092 | backlog/100-connectors-mcp-sign-in |
+| 100 | Connectors — sign-in for MCP apps: discovery, self-registration once per workspace, personal tokens | active | high | 066, 092 | active/100-connectors-mcp-sign-in |
 | 101 | Connectors — screen redesign: AI → Customize → Connectors, like Claude's | backlog | high | 072 | backlog/101-connectors-screen-redesign |

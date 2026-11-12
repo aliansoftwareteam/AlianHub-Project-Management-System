@@ -5,6 +5,7 @@ const { named } = require('../Agents/connectors/flag');
 const { validate } = require('./validate');
 
 const LOG = '[connectors]';
+const SIGN_IN = Object.freeze({ OAUTH: 'oauth', TOKEN: 'token' });
 const PROVIDERS_DIR = path.join(__dirname, 'providers');
 
 const instanceApp = (id) => {
@@ -55,7 +56,15 @@ const createRegistry = ({ dir = PROVIDERS_DIR } = {}) => {
     const list = () => [...definitions().values()];
     const get = (id) => definitions().get(String(id || '')) || null;
 
-    const isOffered = (id, { companyApps = [] } = {}) => !!get(id) && named().includes(id) && (instanceApp(id) || companyApps.includes(id));
+    /* How a person can sign in to this provider on this install: through an OAuth app (the company's, the instance's,
+     * or one the server registers for itself), or by pasting a token of their own. */
+    const signIns = (id, { companyApps = [] } = {}) => {
+        const definition = get(id);
+        if (!definition) return [];
+        const oauth = instanceApp(id) || companyApps.includes(id) || definition.auth.registration === 'dynamic';
+        return [...(oauth ? [SIGN_IN.OAUTH] : []), ...(definition.auth.personalToken === true ? [SIGN_IN.TOKEN] : [])];
+    };
+    const isOffered = (id, options) => !!get(id) && named().includes(id) && signIns(id, options).length > 0;
     const offered = (options) => list().filter((definition) => isOffered(definition.id, options));
 
     const scopesFor = (id, products = []) => {
@@ -68,7 +77,7 @@ const createRegistry = ({ dir = PROVIDERS_DIR } = {}) => {
         return [...new Set([...(definition.auth.baseScopes || []), ...ticked.flatMap((product) => definition.products[product])])];
     };
 
-    return { list, get, isOffered, offered, scopesFor };
+    return { list, get, isOffered, offered, scopesFor, signIns, SIGN_IN };
 };
 
-module.exports = { ...createRegistry(), createRegistry };
+module.exports = { ...createRegistry(), createRegistry, SIGN_IN };

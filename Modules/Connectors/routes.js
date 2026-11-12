@@ -47,6 +47,7 @@ const genericRoutes = (app) => {
     // A person connects their own account; an agent or automation never may, so the write routes refuse one.
     app.post('/api/v2/connectors/:provider/connect', agentsRefused('connector.connect'), providerLimiter, providers.connect);
     app.post('/api/v2/connectors/:provider/complete', agentsRefused('connector.connect'), providerLimiter, providers.complete);
+    app.post('/api/v2/connectors/:provider/token', agentsRefused('connector.connect'), providerLimiter, providers.saveToken);
     app.put('/api/v2/connectors/connections/:id/products', agentsRefused('connector.products_changed'), providerLimiter, providers.setProducts);
     app.delete('/api/v2/connectors/connections/:id', agentsRefused('connector.revoke'), providerLimiter, providers.disconnect);
 };

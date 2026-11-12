@@ -97,6 +97,12 @@ exports.complete = handle('complete a connection', 'Connected.', connectsApps((w
     return connection.complete({ companyId: who.companyId, userId: who.userId, sessionId: req.sessionId, provider, state: body.state, code: body.code, actor: who.actor });
 }));
 
+exports.saveToken = handle('connect with a token', 'Connected.', connectsApps((who, req, res) => {
+    const provider = providerOf(req, res);
+    if (!provider) return undefined;
+    return connection.saveToken({ companyId: who.companyId, userId: who.userId, sessionId: req.sessionId, provider, token: (req.body || {}).token, actor: who.actor });
+}));
+
 exports.setProducts = handle('change a connection\'s products', 'Products updated.', connectsApps(async (who, req, res) => {
     const connectionId = String((req.params || {}).id || '');
     const row = await connection.byId(who.companyId, connectionId);

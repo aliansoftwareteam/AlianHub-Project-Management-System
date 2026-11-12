@@ -1,7 +1,7 @@
 ---
 id: 100
 title: Connectors — sign-in for MCP apps: discovery, self-registration once per workspace, personal tokens
-status: backlog
+status: active
 priority: high
 depends_on: [066, 092]
 created: 2026-11-12
@@ -31,11 +31,11 @@ A member connects an MCP app through the same connect flow as Google and Slack, 
 - The screens: the existing Connections page connects any offered provider; the redesign is 101
 
 ## Acceptance criteria
-- [ ] Against a fake self-registering server, a member connects with nothing in `.env`; a second member and a second session reuse the same registration
-- [ ] A forgotten registration is redone once, never in a loop
-- [ ] A personal token that fails its check read is not saved; a saved one is never returned
-- [ ] Two members connect the same MCP app with different accounts; each reaches only their own
-- [ ] Google and Slack connect exactly as before (their tests pass unchanged)
+- [x] Against a fake self-registering server, a member connects with nothing in `.env`; a second member and a second session reuse the same registration
+- [x] A forgotten registration is redone once, never in a loop
+- [x] A personal token that fails its check read is not saved; a saved one is never returned
+- [x] Two members connect the same MCP app with different accounts; each reaches only their own
+- [x] Google and Slack connect exactly as before (their tests pass unchanged)
 
 ## Constraints & notes
 - Track: A — connections (getting and keeping a person's access)

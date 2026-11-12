@@ -431,7 +431,7 @@ describe('listing and products', () => {
     it('GET /api/v2/connectors shows the offered providers and the person\'s own connection', async () => {
         await connectAs(MEMBER, { email: 'maya@example.test' });
         const out = await call(ctrl.list, MEMBER);
-        expect(out.body.data.providers).toEqual([{ provider: P, products: ['notes', 'files'] }]);
+        expect(out.body.data.providers).toEqual([{ provider: P, products: ['notes', 'files'], signIn: ['oauth'] }]);
         expect(out.body.data.connections).toEqual([expect.objectContaining({ provider: P, connected: true, account: { label: 'maya@example.test' } })]);
         const theirs = await call(ctrl.list, COLLEAGUE);
         expect(theirs.body.data.connections[0]).toMatchObject({ connected: false, account: null });
@@ -594,7 +594,7 @@ describe('the routes register only when a provider is offered', () => {
         expect(routesOf()).toEqual([
             'GET /api/v1/connector-oauth/:provider/callback',
             'GET /api/v2/connectors', 'GET /api/v2/connectors/members',
-            'POST /api/v2/connectors/:provider/connect', 'POST /api/v2/connectors/:provider/complete',
+            'POST /api/v2/connectors/:provider/connect', 'POST /api/v2/connectors/:provider/complete', 'POST /api/v2/connectors/:provider/token',
             'PUT /api/v2/connectors/connections/:id/products', 'DELETE /api/v2/connectors/connections/:id',
             'GET /api/v2/connectors/picker/:source/token',
             'GET /api/v2/connectors/picker/:source/thumbnail',

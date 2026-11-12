@@ -42,3 +42,6 @@ None.
 
 ### 2026-11-12
 - Contract section 9 added for PRD v2.0 (approved by the owner on 2026-11-12): MCP providers (`transport`, `mcp.url`, products without scopes) and MCP tools as data through `mcpTools.js` (`tool`, reviewed `shape`, `connection.mcp`). Additive and optional: Google, Slack and Dropbox are unchanged. Built in task 092; both tracks read it before 094, 095 and 100.
+
+### 2026-11-12
+- Contract section 10 added (task 100): `auth.registration`, `auth.registrationUrl`, `auth.personalToken`, `account { url, read }`, `registry.signIns`, `connector_registrations`, the token route, and `signIn`/`kind` on connection rows. Additive and optional.
