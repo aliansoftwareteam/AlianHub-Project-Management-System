@@ -32,13 +32,28 @@ const tasksOf = (chips) => {
         const key = chip.taskId || chip.estimateId;
         const row = rows.get(key) || {
             taskId: chip.taskId || '', name: chip.name || '', projectId: chip.projectId || '', projectName: chip.projectName || '',
-            projectColor: chip.projectColor || '', sprintId: chip.sprintId || '', minutes: 0, dates: [],
+            projectColor: chip.projectColor || '', sprintId: chip.sprintId || '', minutes: 0, dates: [], chips: [],
         };
         row.minutes += Number(chip.minutes) || 0;
+        row.chips.push(chip);
         if (chip.date && !row.dates.includes(chip.date)) row.dates.push(chip.date);
         rows.set(key, row);
     });
     return [...rows.values()].map((row) => ({ ...row, dates: row.dates.sort() })).sort((a, b) => b.minutes - a.minutes || a.name.localeCompare(b.name));
 };
 
-module.exports = { bucketDays, tasksOf };
+/* Under 3 minutes rounds to 0.0h, which would read as nothing planned. */
+const hoursLabel = (minutes) => {
+    const m = Number(minutes) || 0;
+    if (m > 0 && m < 3) return '<0.1h';
+    const h = m / 60;
+    return `${h >= 10 || Number.isInteger(h) ? Math.round(h) : Math.round(h * 10) / 10}h`;
+};
+
+const fillPercent = (minutes, capacityMinutes) => {
+    const m = Number(minutes) || 0;
+    if (!(capacityMinutes > 0)) return m > 0 ? 100 : 0;
+    return Math.min(100, (m / capacityMinutes) * 100);
+};
+
+module.exports = { bucketDays, tasksOf, hoursLabel, fillPercent };
