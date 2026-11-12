@@ -33,5 +33,6 @@ The catalog ships with `shape: null`, which means off, until a maintainer pins e
    It prints every tool the server offers now, with its description, input and shape, and marks it as pinned and unchanged, changed since pinned, not reviewed, or not in the catalog.
 3. Read each description and input. If the tool does what its AlianHub key says, and nothing that leaves the app unasked, copy the shape into `providers/<provider>/tools.js`. Correct `tool` and `args` where the server's names differ from the catalog's guess.
 4. Mark as `kind: 'write'` any tool that changes anything outside AlianHub, whatever the server's own hints say.
+5. A pinned tool joins the agent registry, so give it its words in `frontend/src/locales/en.js`: `AgentActions.<key with dots as underscores>` (the convention test `agent-action-labels` asks for it), then run `npm run i18n:backfill`.
 
 The tool names for Upwork, Wispr Flow, Dropbox and Canva are not published; their catalog entries are placeholders until step 3.

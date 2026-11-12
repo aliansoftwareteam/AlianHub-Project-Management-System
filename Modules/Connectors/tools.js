@@ -117,15 +117,16 @@ const load = (dir) => Object.freeze(createRegistry({ dir }).list()
  * from outside is routed to approval. Whether this workspace has an app for it is asked at call time. */
 const providerOn = (provider) => require('../Agents/connectors/flag').named().includes(provider) && require('../Agents/taint').enabled();
 
-/* An MCP tool nobody has reviewed is offered nowhere: not to agents, not over MCP, not to a skill run. */
+/* An MCP tool nobody has reviewed is offered nowhere: not registered for agents, MCP or skills, and refused if named.
+ * `all()` still holds it, so owners and admins can see it waiting for review. */
 const reviewed = (tool) => !tool.mcp || SHAPE.test(String(tool.mcp.shape || ''));
 
 const make = (dir) => {
     let loaded = null;
     const all = () => { loaded = loaded || load(dir); return loaded; };
     const get = (key) => all().find((tool) => tool.key === String(key)) || null;
-    const reads = () => all().filter((tool) => tool.kind === KIND.READ);
-    const writes = () => all().filter((tool) => tool.kind === KIND.WRITE);
+    const reads = () => all().filter((tool) => tool.kind === KIND.READ && reviewed(tool));
+    const writes = () => all().filter((tool) => tool.kind === KIND.WRITE && reviewed(tool));
     const isWrite = (key) => { const tool = get(key); return Boolean(tool) && tool.kind === KIND.WRITE; };
     const isOn = (tool) => providerOn(tool.provider) && reviewed(tool);
     return { all, get, reads, writes, isWrite, isOn, anyOn: () => all().some(isOn) };
