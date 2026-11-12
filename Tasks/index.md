@@ -92,4 +92,5 @@ Auto-maintained registry of all tasks. Reflects YAML frontmatter from each `task
 | 090 | Optional Google Analytics — page-view traffic from one env variable | active | medium | — | active/090-google-analytics-env |
 | 091 | Tracker sign-in finds the workspace — one Sign in button, no address typing for hosted users | backlog | high | — | backlog/091-tracker-finds-workspace |
 | 092 | Time reports — pick a whole team in the People filter | active | medium | 086 | active/092-report-people-filter-teams |
+| 093 | Workload — cells show the hours, readable at any size | active | medium | 086 | active/093-workload-cell-hours |
 | 102 | Chat message alerts and unread badge — the other person hears about a message, and the Chat icon shows a red count | active | high | — | active/102-chat-message-alerts-badge |

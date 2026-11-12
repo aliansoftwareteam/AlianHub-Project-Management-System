@@ -1,4 +1,4 @@
-const { bucketDays, tasksOf } = require('../frontend/src/views/Timesheet/WorkloadTimesheet/workloadBuckets');
+const { bucketDays, tasksOf, hoursLabel, fillPercent } = require('../frontend/src/views/Timesheet/WorkloadTimesheet/workloadBuckets');
 const { bucketsOf } = require('../frontend/src/views/Timesheet/report/reportRange');
 
 const day = (date, extra = {}) => ({ date, estimated: 0, logged: 0, capacityMinutes: 480, pto: false, unavailable: false, chips: [], ...extra });
@@ -35,5 +35,24 @@ describe('workload cells for weeks and months (task 086)', () => {
             ['t2', 180, ['2026-11-03']],
             ['', 15, []],
         ]);
+    });
+});
+
+describe('a workload cell reads as its hours (task 093)', () => {
+    it('labels hours to a tenth under ten, whole from ten, and never reads a little time as nothing', () => {
+        expect([0, 30, 15, 90, 480, 750, 2, 3].map(hoursLabel)).toEqual(['0h', '0.5h', '0.3h', '1.5h', '8h', '13h', '<0.1h', '0.1h']);
+    });
+
+    it('fills the bar to the share of capacity, full when over it or when there is no capacity', () => {
+        expect(fillPercent(240, 480)).toBe(50);
+        expect(fillPercent(600, 480)).toBe(100);
+        expect(fillPercent(30, 0)).toBe(100);
+        expect(fillPercent(0, 0)).toBe(0);
+    });
+
+    it('keeps each task row\'s estimates so the row can be moved as a whole', () => {
+        const [row] = tasksOf([{ taskId: 't1', estimateId: 'e1', name: 'Spec', minutes: 30 }, { taskId: 't1', estimateId: 'e2', name: 'Spec', minutes: 45 }]);
+        expect(row.minutes).toBe(75);
+        expect(row.chips.map((chip) => chip.estimateId)).toEqual(['e1', 'e2']);
     });
 });
