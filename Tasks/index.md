@@ -61,7 +61,7 @@ Auto-maintained registry of all tasks. Reflects YAML frontmatter from each `task
 | 053 | Industry demos — the dispatcher, the Company view and workflow runs | done | high | 052 | done/053-industry-demo-agentic-layers |
 | 054 | Industry demos for every blueprint, named by industry | done | high | 053 | done/054-industry-demos-every-blueprint |
 | 055 | Create Project modal — Member, Skills, Source and Due date pickers open above the modal | active | high | — | active/055-create-project-field-popovers |
-| 056 | Personal app connectors for AI and agents — one reusable module, then connectors one by one | backlog | high | 061–079 | backlog/056-personal-app-connectors |
+| 056 | App connectors for AI and agents — MCP first, built connectors where needed, one Connectors screen | backlog | high | 061–079, 092–101 | backlog/056-personal-app-connectors |
 | 057 | Projects settings — Open, Archived and Closed tabs; every undo returns the exact previous state | active | high | — | active/057-project-lifecycle-tabs |
 | 058 | Tracker timesheet — every screenshot card shows its image box and a loading state from the first paint | active | medium | — | active/058-tracker-screenshot-loading-placeholder |
 | 059 | Agent settings page — tabs, a searchable project picker and one sticky Save bar | active | high | — | active/059-agent-settings-tabs |
@@ -80,8 +80,18 @@ Auto-maintained registry of all tasks. Reflects YAML frontmatter from each `task
 | 072 | Connectors — My connections, admin overview and company apps screens | backlog | high | 066 | backlog/072-connectors-connection-screens |
 | 073 | Connectors — migrate Google Calendar connections onto the Google provider | active | medium | 064, 066 | active/073-connectors-migrate-google-calendar |
 | 074 | Connectors — Slack as a personal OAuth provider; retire the workspace bot | backlog | medium | 069, 070, 078 | backlog/074-connectors-slack-personal |
-| 075 | Connectors — GitHub as a personal, on-demand provider; retire the task 049 sync | backlog | medium | 069, 070, 078 | backlog/075-connectors-github-personal |
+| 075 | Connectors — GitHub through its MCP server, the first registered MCP app | backlog | high | 092, 093, 100 | backlog/075-connectors-github-personal |
 | 076 | Connectors — Drive/Dropbox attachment picker on the module | active | medium | 066, 072 | active/076-connectors-attachment-picker |
 | 077 | Connectors — remove the old Google Calendar and CloudStorage paths; Google and Dropbox setup pages | backlog | medium | 073, 076 | backlog/077-connectors-remove-calendar-picker-paths |
 | 078 | Connectors — Inbox approval cards and quota settings screens | active | high | 069, 070 | active/078-connectors-approval-quota-screens |
 | 079 | Connectors — remove the old Slack bot and GitHub sync paths | backlog | medium | 074, 075 | backlog/079-connectors-remove-slack-github-paths |
+| 092 | Connectors — MCP client and MCP provider definitions: call apps' MCP servers as the member, reviewed tools only | active | high | 063, 068 | active/092-connectors-mcp-client |
+| 093 | Connectors — shared sign-in for hosted instances: the instance side | backlog | high | 065, 066 | backlog/093-connectors-hosted-sign-in |
+| 094 | Connectors — Notion, the first app that registers itself | backlog | high | 092, 100 | backlog/094-connectors-notion-pilot |
+| 095 | Connectors — Supabase, Upwork, Wispr Flow, Dropbox, HubSpot and Canva through their MCP servers | backlog | medium | 075, 093, 094 | backlog/095-connectors-mcp-apps |
+| 096 | Connectors — custom MCP servers: added by address with a right, every tool reviewed | backlog | medium | 092, 100, 101 | backlog/096-connectors-custom-mcp-servers |
+| 097 | Connectors in the AI chat — @mention or name an app, read with the asker's own account | backlog | high | 075, 087, 092 | backlog/097-connectors-in-ai-chat |
+| 098 | Connectors — agents use connectors: ticked on the agent, declared as reads in skills | backlog | medium | 068 | backlog/098-connectors-for-agents |
+| 099 | Connectors — Outlook built connector on Microsoft Graph: mail and calendar | backlog | medium | 068, 069, 093 | backlog/099-connectors-outlook-built |
+| 100 | Connectors — sign-in for MCP apps: discovery, self-registration once per workspace, personal tokens | backlog | high | 066, 092 | backlog/100-connectors-mcp-sign-in |
+| 101 | Connectors — screen redesign: AI → Customize → Connectors, like Claude's | backlog | high | 072 | backlog/101-connectors-screen-redesign |

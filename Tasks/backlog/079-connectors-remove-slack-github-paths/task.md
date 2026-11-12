@@ -17,6 +17,7 @@ Track B's old connection paths are gone.
 ## Scope
 - Delete `slackConnection.js`, `slackApi.js`, `slackRead.js`, `slackPost.js`, the `Modules/Integrations/appConnections` GitHub sync and the `APP_CONNECTIONS` flag
 - Delete `frontend/src/views/Ai/SlackPostPreview.vue` and its spec once no stored bot-era delivery needs it, and the `slackOn` helper in `Modules/Agents/connectors/flag.js`
+- Retire the task 049 workspace GitHub connection, repo-to-project mapping and cron runner with a migration, after admins were told (075); remove `AppConnections.vue` and its route (redirected to Connectors by 101) (FR-37)
 - Keep the Slack slash command and the rest of the `integration_connections` catalogue (FR-38)
 
 ## Already done in 074
@@ -27,6 +28,7 @@ The Slack bot's routes and handlers (`/api/v2/connectors/slack/*`), its agent re
 
 ## Acceptance criteria
 - [ ] No caller of the removed paths remains
+- [ ] The 049 migration is safe to run twice and runs only after the admin notice
 - [ ] Full test suite, i18n, style and API-doc checks pass
 
 ## Constraints & notes

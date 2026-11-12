@@ -147,3 +147,58 @@ Read from docs.slack.dev on **2026-11-03**. `*` marks a fact no official page st
 | **Verdict** | **Go.** User scopes only, token rotation on, no DMs |
 
 Sources: [L1] [Installing with OAuth](https://docs.slack.dev/authentication/installing-with-oauth), [L2] [oauth.v2.access](https://docs.slack.dev/reference/methods/oauth.v2.access), [L3] [Tokens](https://docs.slack.dev/authentication/tokens), [L4] [Using token rotation](https://docs.slack.dev/authentication/using-token-rotation), [L5] [conversations.list](https://docs.slack.dev/reference/methods/conversations.list), [L6] [conversations.history](https://docs.slack.dev/reference/methods/conversations.history), [L7] [chat.postMessage](https://docs.slack.dev/reference/methods/chat.postMessage), [L8] [identify scope](https://docs.slack.dev/reference/scopes/identify), [L9] [Distribution](https://docs.slack.dev/app-management/distribution), [L10] [auth.revoke](https://docs.slack.dev/reference/methods/auth.revoke), [L11] [Rate limits](https://docs.slack.dev/apis/web-api/rate-limits).
+
+## 10. MCP servers: which apps AlianHub can reach through MCP (PRD v2.0)
+
+Checked 2026-11-12 by web search against provider docs, with third-party integration guides where the provider says little. "To confirm" rows are checked with a real test connection in each app's own task (075, 094, 095), which also writes that app's tool allow-list.
+
+"Registers itself" means the server accepts a client it has never seen, through dynamic client registration or a client ID metadata document, so an install needs no setup at the provider. "App registered once" means someone creates an app in the provider's developer console and gives AlianHub its client id and secret.
+
+### 10.1 First-stage apps
+
+| App | Official remote MCP server | How a client like AlianHub signs in | Status | Verdict |
+|---|---|---|---|---|
+| Notion | `https://mcp.notion.com/mcp` | Registers itself (dynamic client registration, RFC 7591), per Notion's own client guide. One integrator says otherwise; Notion's guide wins | GA | **MCP** — pilot |
+| Supabase | `https://mcp.supabase.com` | Registers itself by default; an OAuth app by hand is the fallback | GA | **MCP** |
+| Upwork | `https://mcp.upwork.com/mcp` | Upwork says it works with "any MCP-compatible agent"; sign-in kind not stated | Official | **MCP** — to confirm |
+| Wispr Flow | `api.wisprflow.ai/connect/mcp` | Each user signs in with OAuth, no key; needs Notetaker and MCP access on the account | Official | **MCP** — to confirm. Reaches meeting notes, transcripts, calendar events and Scratchpad notes, not dictation |
+| Dropbox | `https://mcp.dropbox.com/mcp` | Browser OAuth, "no extra setup" | Beta or GA (sources differ) | **MCP** — to confirm. The attachment picker stays built |
+| GitHub | `https://api.githubcopilot.com/mcp/` | App registered once: no dynamic registration. Also accepts a personal access token | GA | **MCP** — pilot |
+| Slack | `https://mcp.slack.com/mcp` | Slack app registered once with a fixed app ID, client id and secret; callback registered on the app; no dynamic registration. A secondary source says only Marketplace-listed or internal apps may use it | GA | **MCP** — Marketplace rule to confirm |
+| HubSpot | `https://mcp.hubspot.com` | "MCP auth app" created once under Development → MCP Auth Apps; PKCE required; no dynamic registration | GA | **MCP** |
+| Canva | `https://mcp.canva.com/mcp` (waitlist-approved metadata-document clients) or `https://api.canva.com/connect/v1/mcp` (developer-portal client with id and secret) | App registered once in the developer portal; metadata-document clients need waitlist approval | GA | **MCP** through a developer-portal app |
+| Google: Calendar, Meet, Drive | Google Workspace MCP servers, one per product (Gmail, Drive, Calendar, Chat, People) | Google OAuth app registered once; Google's review for sensitive scopes | Public developer preview (May 2026); one guide says an organisation must enrol in the Developer Preview Program. No Meet server | **Built** — switch Calendar and Drive to MCP when generally available |
+| Outlook | Microsoft Work IQ MCP servers (mail, calendar) | Microsoft Entra app registered once | Preview; needs a Microsoft 365 Copilot licence | **Built** on Microsoft Graph |
+| Shopify | Unclear: a hosted server is reported, but no Shopify doc found | Shopify app | — | Decide last (task 062) |
+
+### 10.2 Dropped from the first stage
+
+| App | Why |
+|---|---|
+| ClickUp | `https://mcp.clickup.com/mcp` admits only approved clients (Claude, Cursor, VS Code, Windsurf, ChatGPT); no API keys. AlianHub competes with ClickUp, so approval is unlikely |
+| Figma | `https://mcp.figma.com/mcp` admits only clients in Figma's MCP catalog and answers others with 403 at registration; personal tokens are not accepted. People reach Figma from their own Claude, Cursor or ChatGPT |
+
+Either returns as one catalog entry if it admits AlianHub.
+
+### 10.3 What this means for setup
+
+- **Registers itself (Notion, Supabase, likely Upwork, Wispr Flow, Dropbox):** nothing to set up on any install, hosted or self-hosted. AlianHub registers once per workspace and reuses it (some clients re-register every session and keep signing people out of Notion).
+- **App registered once (GitHub, Slack, HubSpot, Canva, Google, Microsoft):** hosted instances use Alian's apps through the shared sign-in address (decision 21), so no instance or custom domain is registered anywhere. Self-hosted installs register their own app once per app; GitHub also takes a personal token.
+- **Per-domain registration does not work anyway:** a GitHub OAuth app accepts one callback address, and Google wants every callback domain verified as the project owner's.
+
+### 10.4 Sources (2026-11-12)
+
+- Notion: [build an MCP client](https://developers.notion.com/guides/mcp/build-mcp-client); [Aembit, disagreeing](https://docs.aembit.io/ai-guide/mcp/identity-gateway/supported-servers/notion); [re-registration report](https://claudeissues.com/issue/65752-hosted-notion-mcp-dcr-client-re-registers-per-session-repeated-full-re-auth-orph)
+- Supabase: [Supabase MCP server](https://supabase.com/docs/guides/ai-tools/mcp)
+- Upwork: [Upwork MCP server](https://www.upwork.com/ai/mcp)
+- Wispr Flow: [connect an MCP client](https://docs.wisprflow.ai/articles/4759919286-how-to-connect-wispr-flow-to-claude-chatgpt-and-other-ai-tools-mcp)
+- Dropbox: [connect the Dropbox remote MCP server](https://help.dropbox.com/integrations/connect-dropbox-mcp-server)
+- GitHub: [remote MCP host integration guide](https://glama.ai/mcp/servers/@github/github-mcp-server/blob/bf6467855c13d3b8f5cf72f8dfd9c86f8336b20b/docs/host-integration.md); [Obot OAuth configuration](https://docs.obot.ai/configuration/oauth-configuration)
+- Slack: [Slack MCP server overview](https://docs.slack.dev/ai/slack-mcp-server/)
+- HubSpot: [integrate with the remote HubSpot MCP server](https://developers.hubspot.com/docs/apps/developer-platform/build-apps/integrate-with-the-remote-hubspot-mcp-server); [GA notice](https://developers.hubspot.com/changelog/remote-hubspot-mcp-server-is-now-generally-available)
+- Canva: [troubleshooting](https://www.canva.dev/docs/mcp/troubleshooting/); [GA notice](https://www.canva.dev/blog/developers/canva-mcp-ga/)
+- Google: [Workspace agent tools, May 2026](https://workspaceupdates.googleblog.com/2026/05/agent-tools-and-security-updates-for-workspace-developers.html); [preview enrolment](https://docs.aembit.io/ai-guide/mcp/identity-gateway/supported-servers/google-workspace/)
+- Microsoft: [Microsoft 365 MCP, Work IQ preview](https://toqan.ai/knowledge/how-to-add-the-microsoft-365-mcp-to-toqan/)
+- ClickUp: [ClickUp MCP server](https://clickup.com/blog/how-to-use-clickup-mcp-server/); [approved clients](https://mcp.directory/skills/clickup-mcp)
+- Figma: [403 for unlisted clients](https://workos.com/blog/figma-mcp-403-forbidden-client-name)
+- Shopify: [2026 setup guide (third party)](https://www.activepieces.com/blog/shopify-mcp-server-2026-setup-guide.md)
