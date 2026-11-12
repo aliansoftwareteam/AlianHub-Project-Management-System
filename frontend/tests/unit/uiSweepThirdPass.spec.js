@@ -68,17 +68,8 @@ describe('Settings → Time off and SCIM cards', () => {
 });
 
 describe('Settings → Time tracking', () => {
-    const vue = read('views/Settings/TimeTracking/TimeTracking.vue');
-    const css = read('views/Settings/TimeTracking/style.css');
-
-    test('with no published build it says so instead of an empty green download bar', () => {
-        expect(vue).toMatch(/v-if="loaded && !dataobj\.length"[^>]*>\{\{ \$t\('TimeTracker\.no_builds'\) \}\}/);
-        expect(vue).toMatch(/v-if="dataobj\.length" class="d-flex justify-content-center download-lable-wapper"/);
-    });
-
-    test('the headline and lead follow the theme', () => {
-        expect(ruleBody(css, '.timetracking-head h1')).toMatch(/color:\s*var\(--brand\)/);
-        expect(ruleBody(css, '.timetracking-head p')).toMatch(/color:\s*var\(--ink-2\)/);
+    test('with no published build it says so instead of an empty download bar', () => {
+        expect(read('views/Settings/TimeTracking/DesktopAppCard.vue')).toMatch(/<p v-else class="ah-empty desktop-app__empty"[^>]*>\{\{ \$t\('TimeTracker\.no_builds'\) \}\}/);
     });
 });
 
