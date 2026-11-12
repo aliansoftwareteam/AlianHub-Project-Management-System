@@ -90,7 +90,6 @@
                             :aria-label="t('Inbox.queue_drop_named', { change: changeText(change) })"
                             @click="kept.splice(i, 1)"
                         >{{ t('Ai.drop') }}</button>
-                        <SlackPostPreview v-if="change.action === SLACK_POST" class="aq__wide" :change="change" />
                         <ConnectorWriteCard v-if="change.card" class="aq__wide" :change="change" :editing="isEditing(p)" :disabled="busy" @update:params="change.params = $event" />
                     </li>
                 </ul>
@@ -231,7 +230,6 @@ import SimulatedChip from '@/components/atom/SimulatedChip/SimulatedChip.vue';
 import IntentPreview from '@/components/molecules/IntentPreview/IntentPreview.vue';
 import { intentSummary, intentTitle } from '@/components/molecules/IntentPreview/intentLines';
 import { keptSummary, partsChoice } from '@/components/molecules/IntentPreview/planPicks';
-import SlackPostPreview from '@/views/Ai/SlackPostPreview.vue';
 import ConnectorWriteCard from './ConnectorWriteCard.vue';
 import { DECLINE_REASONS } from '@/views/Ai/episodeText';
 import { proposalTitle } from '@/views/Ai/plainLabels';
@@ -250,7 +248,6 @@ const props = defineProps({
 });
 const emit = defineEmits(['decided', 'undone', 'open-task', 'reshown']);
 
-const SLACK_POST = 'slack.message.post';
 const SOURCE_MCP = 'mcp';
 const SOURCE_SYSTEM = 'system';
 const DECLINE_REASON_MAX = 200;

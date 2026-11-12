@@ -33,7 +33,7 @@ describe('the CONNECTORS flag', () => {
 
     it.each(['off', 'false', '', '  '])('reads "%s" as off', (value) => withEnv({ ...READY, CONNECTORS: value }, () => {
         expect(flag.requested()).toEqual([]);
-        expect(flag.slackOn()).toBe(false);
+        expect(flag.status('slack').on).toBe(false);
     }));
 
     it('switches Slack on when the secrets store and taint routing are on', () => withEnv(READY, () => {

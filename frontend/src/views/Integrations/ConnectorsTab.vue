@@ -20,7 +20,7 @@
         <p v-if="notice" class="cx__notice" role="status" data-test="cx-notice">{{ notice }}</p>
 
         <p v-if="guest" class="ah-empty" data-test="cx-guest">{{ $t('Connectors.screen.guest') }}</p>
-        <p v-else-if="!available && !legacyGoogle" class="ah-empty" data-test="cx-off">{{ $t('Connectors.conn.my_empty') }}</p>
+        <p v-else-if="!available" class="ah-empty" data-test="cx-off">{{ $t('Connectors.conn.my_empty') }}</p>
         <template v-else-if="available">
             <p v-if="loadError" class="ah-field__error" role="alert" data-test="cx-load-error">{{ loadError }}</p>
             <p v-else-if="loading" class="ah-small" data-test="cx-loading">{{ $t('Connectors.screen.loading') }}</p>
@@ -134,8 +134,6 @@
             <CustomServers ref="customServers" :own-add="false" @ready="mayAddCustom = $event.mayAdd" />
         </template>
 
-        <GoogleConnection v-if="legacyGoogle && !guest" />
-
         <ConnectorSignIn v-if="signingIn" :row="signingIn" :name="name(signingIn.provider)" @close="signingIn = null" @connected="onTokenConnected" />
         <ConnectorDetail
             v-if="detailRow"
@@ -155,7 +153,6 @@ import { computed, onMounted, reactive, ref, useId } from "vue";
 import { useI18n } from "vue-i18n";
 import { useRoute, useRouter } from "vue-router";
 import ShellIcon from "@/components/organisms/Shell/ShellIcon.vue";
-import GoogleConnection from "./GoogleConnection.vue";
 import ConnectorTile from "./ConnectorTile.vue";
 import ConnectorSignIn from "./ConnectorSignIn.vue";
 import ConnectorDetail from "./ConnectorDetail.vue";
@@ -163,7 +160,7 @@ import CustomServers from "./CustomServers.vue";
 import { connectorApi, goToConsent } from "./connectorApi";
 import { formatDate, providerLabel, statusLabel } from "./connectorLabels";
 import {
-    ALL_CATEGORIES, LEGACY_GOOGLE_CONNECTOR, asksBeforeConnect, categoriesIn, categoryOf, connectorRows, filterBrowse, needsAttention, sortMine, statusDot, takesOauth
+    ALL_CATEGORIES, asksBeforeConnect, categoriesIn, categoryOf, connectorRows, filterBrowse, needsAttention, sortMine, statusDot, takesOauth
 } from "./connectorCatalog";
 
 defineOptions({ name: "ConnectorsTab" });
@@ -171,8 +168,7 @@ defineOptions({ name: "ConnectorsTab" });
 const props = defineProps({
     available: { type: Boolean, default: false },
     guest: { type: Boolean, default: false },
-    privileged: { type: Boolean, default: false },
-    legacyGoogle: { type: Boolean, default: false }
+    privileged: { type: Boolean, default: false }
 });
 const emit = defineEmits(["open-workspace"]);
 
@@ -282,7 +278,7 @@ const CONSENT_REFUSED = ["access_denied", "consent_required"];
 
 const handleReturn = async () => {
     const { connector, state, code, result, reason } = route.query || {};
-    if (!connector || connector === LEGACY_GOOGLE_CONNECTOR) return;
+    if (!connector) return;
     const provider = String(connector);
     if (state && code) {
         try {

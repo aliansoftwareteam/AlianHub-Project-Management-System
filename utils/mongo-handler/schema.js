@@ -1818,19 +1818,11 @@ const schema = {
         connectionId: { type: String, required: false },
         taskId: { type: String, required: false },
     },
-    // AHE-3838 — one row per (user, cloud storage provider). Distinct from
-    // integrationConnections above, which holds the COMPANY's app registration:
-    // every person has their own Drive, so the OAuth grant has to be per-user.
-    // Tokens are AES-256-GCM ciphertext (Modules/CloudStorage/helpers/cloudCrypto),
-    // never plaintext, and are never returned to the browser.
+    // The retired per-person attachment picker (AHE-3838), replaced by the connectors module (076). Nothing reads
+    // these rows; they stay declared so migrations 082 and 083 can clear their stored client secrets and tokens.
     cloudStorageConnections: {
         provider: { type: String, required: true },      // google_drive | dropbox
         userId: { type: String, required: true },
-        // The user's OWN app registration for this provider (client id/secret,
-        // api key, app id / app key). Per-user, not per-company: one member must
-        // never see or overwrite another's credentials, and two people may point
-        // at the same drive account independently.
-        //
         // MUST stay declared — this sub-schema is strict: true, so an undeclared
         // path is silently dropped on save and only shows up as data that
         // vanishes after a reload.

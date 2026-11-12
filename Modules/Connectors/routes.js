@@ -1,14 +1,12 @@
 const rateLimit = require('express-rate-limit');
 const flag = require('../Agents/connectors/flag');
 const ctrl = require('./controller');
-const google = require('./googleController');
 const providers = require('./connectorsController');
 const picker = require('./pickerController');
 const custom = require('./customController');
 const customFlag = require('./customFlag');
 const registry = require('./registry');
 const { agentsRefused } = require('../Agents/guard');
-const { CALLBACK_PATH } = require('../Agents/connectors/googleConnection');
 
 // Connecting or ending a connection calls the provider.
 const providerLimiter = rateLimit({ windowMs: 60 * 1000, limit: 12, standardHeaders: true, legacyHeaders: false });
@@ -20,28 +18,16 @@ const importLimiter = rateLimit({ windowMs: 60 * 1000, limit: 20, standardHeader
 // A tool switch calls no provider, and a person may flip several in a row.
 const switchLimiter = rateLimit({ windowMs: 60 * 1000, limit: 60, standardHeaders: true, legacyHeaders: false });
 
-const googleRoutes = (app) => {
-    // Outside the /api/v2/connectors prefix on purpose: that prefix demands a session, and Google's redirect has none.
-    app.get(CALLBACK_PATH, callbackLimiter, google.callback);
-    // A person's own connection: any member with a seat, never a guest or an API token. No route returns a token.
-    app.get('/api/v2/connectors/google/mine', google.mine);
-    app.get('/api/v2/connectors/google/members', google.members);
-    app.post('/api/v2/connectors/google/:connector/connect', providerLimiter, google.connect);
-    app.post('/api/v2/connectors/google/:connector/complete', providerLimiter, google.complete);
-    app.delete('/api/v2/connectors/google/:connector', providerLimiter, google.disconnect);
-    app.delete('/api/v2/connectors/google/:connector/members/:userId', providerLimiter, google.disconnectMember);
-};
-
 const appRoutes = (app) => {
     // Owners and admins only, never an API token; the handlers check the seat themselves. No route returns a client secret.
-    // Under /apps, not /:provider/app, so the provider segment never collides with a provider's own /:connector routes.
+    // Under /apps, not /:provider/app, so the provider segment never collides with a provider's own routes.
     app.get('/api/v2/connectors/apps', ctrl.getApps);
     app.put('/api/v2/connectors/apps/:provider', providerLimiter, ctrl.setApp);
     app.delete('/api/v2/connectors/apps/:provider', providerLimiter, ctrl.removeApp);
 };
 
 /* The one lifecycle for every registry provider (066). `connections` and `apps` are literal segments, so a
- * provider id in `/:provider/connect` never collides with them or with the legacy google /:connector routes. */
+ * provider id in `/:provider/connect` never collides with them. */
 const genericRoutes = (app) => {
     // Outside the /api/v2/connectors prefix on purpose: a provider's redirect carries no session.
     app.get('/api/v1/connector-oauth/:provider/callback', callbackLimiter, providers.callback);
@@ -89,13 +75,10 @@ exports.init = (app) => {
         app.get('/api/v2/connectors/admin/quotas', ctrl.getQuotas);
         app.put('/api/v2/connectors/admin/quotas', ctrl.setQuotas);
     }
-    // Before the legacy google routes: the generic '/:provider/callback' and the legacy google callback share one
-    // redirect URI, and the generic handler hands a legacy state back to the legacy handler (coexistence until 073).
     if (registry.list().some((definition) => flag.named().includes(definition.id))) {
         genericRoutes(app);
         pickerRoutes(app);
+        appRoutes(app);
         if (customFlag.asked()) customRoutes(app);
     }
-    if (flag.requestedGoogle().length) googleRoutes(app);
-    if (flag.requested().length) appRoutes(app);
 };

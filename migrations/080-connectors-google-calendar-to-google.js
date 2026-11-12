@@ -1,5 +1,5 @@
 /* Moves each workspace's Google Calendar connections — the legacy `connector: 'google_calendar'` rows
- * Modules/Agents/connectors/googleConnection.js wrote — onto the connectors module's Google provider (064/066):
+ * the old Google Calendar connector wrote — onto the connectors module's Google provider (064/066):
  * `provider: 'google'` with Calendar ticked, the secret handles and account renamed to the module shape. The grant
  * is untouched (same refresh token under the same secrets-store handle), so a migrated connection resolves through
  * resolveConnection and refreshes without the person reconnecting (FR-35). The legacy grants were all minted by the
@@ -7,15 +7,13 @@
  *
  * Cutover gate: it reshapes a row only once CONNECTORS serves the new `google` provider and no longer names the legacy
  * `google_calendar` connector — the registry offers a provider only when CONNECTORS names its id, so this is the moment
- * the serving path has moved. Before then (legacy still named, or neither served on a default boot) the legacy
- * googleController still reads rows by `connector`/`secretHandles`, and reshaping would make every live Calendar
- * connection look disconnected — so until the cutover this is a no-op that still records itself applied, to be re-run
- * after it (the gate pattern of 031-secrets-by-handle). That keeps 073 safe to ship on its own: the data moves only
- * when the serving path has, never breaking a live grant and never running early on an install that has not cut over.
+ * the serving path has moved. Before then (legacy still named, or neither served on a default boot) the old
+ * connector still read rows by `connector`/`secretHandles`, and reshaping would have made every live Calendar
+ * connection look disconnected — so until the cutover this is a no-op that still records itself applied (the gate
+ * pattern of 031-secrets-by-handle). The old connector is gone since 077, and 083 reshapes whatever this left.
  *
  * `down` reverses no data: once 066 is live a genuine new-flow Google connection is the same shape as a migrated one,
- * so no reverse could tell them apart. It only clears the record so a later `up` re-evaluates the gate — the
- * cutover (077) runs `npm run migrate -- down 080-connectors-google-calendar-to-google && npm run migrate -- up`.
+ * so no reverse could tell them apart. It only clears the record so a later `up` re-evaluates the gate.
  *
  * The reshape is idempotent: the `connector` field, which only legacy rows carry, both selects the rows and is unset
  * here, so a second run finds none. Slack's legacy rows (`connector: 'slack'`) are a different provider, left for 074. */
@@ -26,8 +24,8 @@ const PROVIDER = 'google';
 const PRODUCTS = Object.freeze(['calendar']);
 
 const cutOverReady = () => {
-    const flag = require('../Modules/Agents/connectors/flag');
-    return flag.named().includes(PROVIDER) && flag.requestedGoogle().length === 0;
+    const named = require('../Modules/Agents/connectors/flag').named();
+    return named.includes(PROVIDER) && !named.includes(LEGACY);
 };
 
 const handlesOf = (secretHandles = {}) => {
@@ -37,22 +35,26 @@ const handlesOf = (secretHandles = {}) => {
     return handles;
 };
 
+const reshapeOf = (companyId, row) => {
+    const set = {
+        companyId: String(companyId),
+        provider: PROVIDER,
+        products: [...PRODUCTS],
+        handles: handlesOf(row.secretHandles),
+        app: { source: 'instance', appId: null },
+    };
+    if (row.account && row.account.sub) set.account = { id: String(row.account.sub), label: String(row.account.email || '') };
+    if (row.brokenReason != null) set.lastError = String(row.brokenReason);
+    return { $set: set, $unset: { connector: '', secretHandles: '', brokenReason: '' } };
+};
+
 async function migrateCompany(ctx, companyId, counts) {
     const type = ctx.SCHEMA_TYPE.CONNECTOR_CONNECTIONS;
     const rows = (await ctx.company(companyId, { type, data: [{ connector: LEGACY }] }, 'find')) || [];
     for (const row of rows) {
-        const set = {
-            companyId: String(companyId),
-            provider: PROVIDER,
-            products: [...PRODUCTS],
-            handles: handlesOf(row.secretHandles),
-            app: { source: 'instance', appId: null },
-        };
-        if (row.account && row.account.sub) set.account = { id: String(row.account.sub), label: String(row.account.email || '') };
-        if (row.brokenReason != null) set.lastError = String(row.brokenReason);
         try {
             // eslint-disable-next-line no-await-in-loop
-            await ctx.company(companyId, { type, data: [{ _id: row._id }, { $set: set, $unset: { connector: '', secretHandles: '', brokenReason: '' } }] }, 'updateOne');
+            await ctx.company(companyId, { type, data: [{ _id: row._id }, reshapeOf(companyId, row)] }, 'updateOne');
             counts.migrated += 1;
         } catch (error) {
             // A live account already on the Google provider trips the unique index; that row keeps its grant and the rest go on.
@@ -65,9 +67,11 @@ async function migrateCompany(ctx, companyId, counts) {
 module.exports = {
     id: ID,
     scope: 'company',
+    LEGACY,
+    reshapeOf,
     async up(ctx) {
         if (!cutOverReady()) {
-            ctx.logger.info(`[migrations] ${ID}: holding — the data moves only once CONNECTORS names '${PROVIDER}' and no longer names '${LEGACY}', so the serving path has cut over before any row is reshaped; nothing migrated. Re-run after the cutover: npm run migrate -- down ${ID} && npm run migrate -- up`);
+            ctx.logger.info(`[migrations] ${ID}: holding — the data moves only once CONNECTORS names '${PROVIDER}' and no longer names '${LEGACY}'; nothing migrated here, and 083 reshapes the rows this leaves.`);
             return;
         }
         await ctx.forEachCompany(async (companyId) => {

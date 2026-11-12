@@ -33,11 +33,11 @@ A GitHub App, not an OAuth App: an App's user tokens expire and refresh, which t
    CONNECTOR_GITHUB_CLIENT_ID=<the app's Client ID>
    CONNECTOR_GITHUB_CLIENT_SECRET=<the client secret>
    ```
-   A workspace owner or admin may instead set the company's own app on the Connections page; it wins for that workspace.
+   A workspace owner or admin may instead set the company's own app on the Workspace tab of AI › Customize › Connectors; it wins for that workspace.
 
 ## Personal tokens
 
-A member creates a **fine-grained personal access token** at github.com → Settings → Developer settings, with the repositories and the permissions above (read-only is enough unless they want comments), and pastes it on the Connections page. AlianHub checks it with one read of `api.github.com/user`, keeps it in the secrets store, never shows it again and never refreshes it. The member revokes it at GitHub when they want; disconnecting in AlianHub only forgets it.
+A member creates a **fine-grained personal access token** at github.com → Settings → Developer settings, with the repositories and the permissions above (read-only is enough unless they want comments), and pastes it under AI › Customize › Connectors. AlianHub checks it with one read of `api.github.com/user`, keeps it in the secrets store, never shows it again and never refreshes it. The member revokes it at GitHub when they want; disconnecting in AlianHub only forgets it.
 
 ## Tools
 

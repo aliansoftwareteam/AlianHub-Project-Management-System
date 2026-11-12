@@ -1,7 +1,7 @@
 ---
 id: 079
 title: Connectors — remove the old Slack bot and GitHub sync paths
-status: backlog
+status: active
 priority: medium
 depends_on: [074, 075]
 created: 2026-10-28

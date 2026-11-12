@@ -346,8 +346,6 @@ const copySecret = async () => {
     catch (e) { /* ignore */ }
 };
 
-// The per-person cloud-storage app settings moved to the connectors module (076): connecting Drive/Dropbox for
-// attachments is done on My connections, and the workspace OAuth app on the connectors company-apps screen.
 const connectedCount = computed(() => webhooks.value.filter((h) => h.active).length);
 
 onMounted(() => {

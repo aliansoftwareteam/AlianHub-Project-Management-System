@@ -243,10 +243,6 @@ const readState = (state) => {
     }
 };
 
-/* Whether a callback state is one this lifecycle signed (its audience). Lets the legacy google callback answer
- * its own states while both share one redirect URI (routes.js, until 073). */
-const ownsState = (state) => !!readState(state);
-
 const pendingFilter = (claims) => ({ ...live(claims.userId, claims.provider), 'oauth.stateHash': hash(claims.jti) });
 
 /* Answers the row as it was and clears the attempt in one write, so two requests cannot both use a state. */
@@ -663,7 +659,7 @@ const sweepCompany = async (companyId) => {
 
 module.exports = {
     STATUS, BY, SIGN_IN, STATE_TTL_SECONDS, SECRET_KIND, ConnectionError,
-    isOffered, definitionFor, fallbackOrigin, redirectUri, callbackPath, byId, ownsState,
+    isOffered, definitionFor, fallbackOrigin, redirectUri, callbackPath, byId,
     describe, list, membersWithConnections, start, setProducts, setToolsOff, returnFor, complete, disconnect, endOne, saveToken,
     findUsable, accessTokenFor, markBrokenById, markBackoff, recordHealth, endForMember, sweepCompany,
 };

@@ -1,6 +1,6 @@
 # Apps reached through their own MCP servers
 
-Notion, GitHub, Supabase, Upwork, Wispr Flow, Dropbox (AI tools), HubSpot and Canva each run an MCP server. AlianHub calls it as the member, with that member's own token, and offers only tools that were reviewed. Every write waits in the member's Inbox until they approve it. Google, Slack and Outlook are built connectors and have their own pages.
+Notion, GitHub, Supabase, Upwork, Wispr Flow, Dropbox (AI tools), HubSpot and Canva each run an MCP server. AlianHub calls it as the member, with that member's own token, and offers only tools that were reviewed. Every write waits in the member's Inbox until they approve it. Google ([google.md](google.md)), Slack ([slack.md](slack.md)) and Outlook are built connectors and have their own pages.
 
 ## What an install sets
 
@@ -13,7 +13,7 @@ Notion, GitHub, Supabase, Upwork, Wispr Flow, Dropbox (AI tools), HubSpot and Ca
 | Canva | `canva` | Nothing, or a Canva developer-portal app | Canva may admit only approved clients; then set `CONNECTOR_CANVA_CLIENT_ID` and `_SECRET` |
 | GitHub | `github` | A GitHub App, or members' own tokens | See [github.md](github.md) |
 | HubSpot | `hubspot` | An "MCP auth app" | HubSpot → Development → MCP Auth Apps; redirect URL `<APIURL>/api/v1/connector-oauth/hubspot/callback`; set `CONNECTOR_HUBSPOT_CLIENT_ID` and `_SECRET` |
-| Dropbox | `dropbox` | The Dropbox app the attachment picker already uses | One connection serves the picker and the AI |
+| Dropbox | `dropbox` | The Dropbox app the attachment picker already uses | One connection serves the picker and the AI; see [dropbox.md](dropbox.md) |
 
 On AlianHub Cloud, apps that need a registered app are signed in through the shared sign-in service, so nothing is set per instance.
 

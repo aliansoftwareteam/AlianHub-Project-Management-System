@@ -1,6 +1,4 @@
 export const SIGN_IN = Object.freeze({ OAUTH: "oauth", TOKEN: "token" });
-/* The Google Calendar connector from before the registry, with a card and a return of its own until task 077. */
-export const LEGACY_GOOGLE_CONNECTOR = "google_calendar";
 export const OTHER_CATEGORY = "other";
 export const ALL_CATEGORIES = "all";
 

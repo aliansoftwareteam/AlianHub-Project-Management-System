@@ -10,7 +10,7 @@ vi.mock('@/services', () => ({ apiRequest }));
 vi.mock('@/views/Ai/AiSidebar.vue', () => ({ default: { name: 'AiSidebar', render: () => null } }));
 vi.mock('@/views/Ai/ConnectYourAi.vue', () => ({ default: { name: 'ConnectYourAi', props: { embedded: Boolean }, render() { return h('div', { 'data-test': 'connect-ai', 'data-embedded': String(this.embedded) }); } } }));
 vi.mock('@/views/Integrations/ConnectorsTab.vue', () => ({
-    default: { name: 'ConnectorsTab', props: ['available', 'guest', 'privileged', 'legacyGoogle'], emits: ['open-workspace'], render() { return h('div', { 'data-test': 'connectors-tab', 'data-available': String(this.available), 'data-legacy': String(this.legacyGoogle) }); } },
+    default: { name: 'ConnectorsTab', props: ['available', 'guest', 'privileged'], emits: ['open-workspace'], render() { return h('div', { 'data-test': 'connectors-tab', 'data-available': String(this.available), 'data-privileged': String(this.privileged) }); } },
 }));
 vi.mock('@/views/Integrations/ConnectorsWorkspace.vue', () => ({
     default: { name: 'ConnectorsWorkspace', props: ['registry', 'apps', 'limits'], render() { return h('div', { 'data-test': 'workspace-tab', 'data-limits': String(this.limits) }); } },
@@ -24,7 +24,7 @@ import { CUSTOMIZE_ROUTE } from '@/router/ai/customize';
 const blank = { render: () => null };
 const OWNER = 1;
 const MEMBER = 3;
-const CATALOGUE = { status: true, data: [], connectors: ['google', 'google_calendar'], registryConnectors: true, connectorLimits: true };
+const CATALOGUE = { status: true, data: [], connectors: ['google'], registryConnectors: true, connectorLimits: true };
 
 const routerFor = () => createRouter({
     history: createMemoryHistory(),
@@ -61,7 +61,7 @@ describe('the Customize page', () => {
         expect(wrapper.find('[data-test="cz-tab-connectors"]').attributes('aria-selected')).toBe('true');
         const tab = wrapper.find('[data-test="connectors-tab"]');
         expect(tab.attributes('data-available')).toBe('true');
-        expect(tab.attributes('data-legacy')).toBe('true');
+        expect(tab.attributes('data-privileged')).toBe('false');
     });
 
     it('keeps the Workspace tab for owners and admins', async () => {

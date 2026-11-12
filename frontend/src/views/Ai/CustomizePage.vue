@@ -34,7 +34,6 @@
                             :available="flags.registry"
                             :guest="isGuest"
                             :privileged="privileged"
-                            :legacy-google="flags.requested.includes(LEGACY_GOOGLE_CONNECTOR)"
                             @open-workspace="choose(CUSTOMIZE_TAB.WORKSPACE)"
                         />
                         <ConnectYourAi v-else-if="tab === CUSTOMIZE_TAB.CONNECT_AI" embedded />
@@ -64,7 +63,6 @@ import ConnectYourAi from "./ConnectYourAi.vue";
 import { useAgentAccess } from "./agentAccess";
 import ConnectorsTab from "@/views/Integrations/ConnectorsTab.vue";
 import ConnectorsWorkspace from "@/views/Integrations/ConnectorsWorkspace.vue";
-import { LEGACY_GOOGLE_CONNECTOR } from "@/views/Integrations/connectorCatalog";
 
 defineOptions({ name: "CustomizePage" });
 

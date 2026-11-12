@@ -1,5 +1,4 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { h } from 'vue';
 import { DOMWrapper, config, flushPromises, mount } from '@vue/test-utils';
 
 const { apiRequest, route, router, goToConsent } = vi.hoisted(() => ({
@@ -12,7 +11,6 @@ const { apiRequest, route, router, goToConsent } = vi.hoisted(() => ({
 vi.mock('@/services', () => ({ apiRequest }));
 vi.mock('vue-router', () => ({ useRoute: () => route, useRouter: () => router }));
 vi.mock('@/components/organisms/Shell/ShellIcon.vue', () => ({ default: { name: 'ShellIcon', render: () => null } }));
-vi.mock('@/views/Integrations/GoogleConnection.vue', () => ({ default: { name: 'GoogleConnection', render: () => h('div', { 'data-test': 'google-connection' }) } }));
 vi.mock('@/views/Integrations/connectorApi', async (original) => ({ ...(await original()), goToConsent }));
 
 import ConnectorsTab from '@/views/Integrations/ConnectorsTab.vue';
@@ -185,12 +183,6 @@ describe('your connectors', () => {
         expect(router.replace).toHaveBeenCalledWith({ query: { tab: 'connectors' } });
         expect(wrapper.find('[data-test="cx-notice"]').text()).toBe(t('Connectors.conn.return_consent', { provider: 'Outlook' }));
     });
-
-    it('leaves the old Google Calendar return to its own card', async () => {
-        await open({ props: { legacyGoogle: true }, query: { connector: 'google_calendar', state: 's', code: 'c' } });
-        expect(callsTo('post')).toEqual([]);
-        expect(router.replace).not.toHaveBeenCalled();
-    });
 });
 
 describe('browse', () => {
@@ -242,11 +234,10 @@ describe('browse', () => {
         expect(goToConsent).not.toHaveBeenCalled();
     });
 
-    it('offers no connector routes while the server registers none, but keeps the old Google Calendar card', async () => {
-        const wrapper = await open({ props: { available: false, legacyGoogle: true } });
+    it('offers nothing to connect, and calls nothing, while the server registers no connector', async () => {
+        const wrapper = await open({ props: { available: false } });
         expect(apiRequest).not.toHaveBeenCalled();
-        expect(wrapper.find('[data-test="google-connection"]').exists()).toBe(true);
-        expect(wrapper.find('[data-test="cx-off"]').exists()).toBe(false);
+        expect(wrapper.find('[data-test="cx-off"]').exists()).toBe(true);
     });
 
     it('says nothing can be connected yet, and calls nothing, for a guest', async () => {

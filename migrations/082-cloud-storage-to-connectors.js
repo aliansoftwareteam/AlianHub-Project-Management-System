@@ -9,7 +9,7 @@
  * Cutover gate, per provider (the 080 pattern): a row is cleared only once CONNECTORS serves the module provider
  * that replaces it — `google` for `google_drive`, `dropbox` for `dropbox`. Before then the old picker is still the
  * only one a person has, so clearing their credentials would stranded them with no picker; the migration holds and
- * records itself applied, to be re-run after the cutover.
+ * records itself applied; the old picker is gone since 077, and 083 clears the rows this leaves.
  *
  * Idempotent: `status: 'migrated'` both marks a cleared row and excludes it from a second run, so running twice
  * clears nothing the second time. `down` restores no data — the secrets are gone and cannot be un-deleted — it only
@@ -41,10 +41,12 @@ async function clearCompany(ctx, companyId, pairs, counts) {
 module.exports = {
     id: ID,
     scope: 'company',
+    PAIRS,
+    clearCompany,
     async up(ctx) {
         const pairs = served();
         if (!pairs.length) {
-            ctx.logger.info(`[migrations] ${ID}: holding — CONNECTORS serves neither 'google' nor 'dropbox', so the module picker is not yet live; clearing the old per-person credentials would leave people with no picker. Re-run after the cutover: npm run migrate -- down ${ID} && npm run migrate -- up`);
+            ctx.logger.info(`[migrations] ${ID}: holding — CONNECTORS serves neither 'google' nor 'dropbox', so the module picker is not yet live; clearing the old per-person credentials would leave people with no picker. 083 clears the rows this leaves.`);
             return;
         }
         await ctx.forEachCompany(async (companyId) => {

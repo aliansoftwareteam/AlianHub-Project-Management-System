@@ -29,7 +29,7 @@ AlianHub never asks for `Mail.Send`, so it has no permission to send mail. Teams
 
 ## 2. Admin consent
 
-Many organisations let only an admin approve apps that read mail. A person in such an organisation sees Microsoft's **Need admin approval** (or **Approval required**) page when they connect. If they go back to AlianHub, Microsoft answers `access_denied`, and the Connections page explains that an admin may need to approve AlianHub first.
+Many organisations let only an admin approve apps that read mail. A person in such an organisation sees Microsoft's **Need admin approval** (or **Approval required**) page when they connect. If they go back to AlianHub, Microsoft answers `access_denied`, and the Connectors screen explains that an admin may need to approve AlianHub first.
 
 An admin of that organisation can grant consent for everyone in it in either of these ways:
 

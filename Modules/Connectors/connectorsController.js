@@ -6,15 +6,10 @@ const logger = require('../../Config/loggerConfig');
 const { requestAddress } = require('../../utils/requestAddress');
 const { buildCorsAllowList } = require('../../utils/cors');
 const aiRights = require('../../Config/aiRights');
-const flag = require('../Agents/connectors/flag');
-const { CALLBACK_PATH } = require('../Agents/connectors/googleConnection');
 const registry = require('./registry');
 const apps = require('./apps');
 const connection = require('./connection');
 const toolReviews = require('./toolReviews');
-
-// The generic '/:provider/callback' and the legacy google callback are the same URL for this provider id.
-const LEGACY_SHARED_PROVIDER = CALLBACK_PATH.split('/').filter(Boolean).slice(-2, -1)[0];
 
 const refuse = (res, code, statusText, extra = {}) => res.status(code).send({ status: false, statusText, ...extra });
 
@@ -129,14 +124,8 @@ exports.disconnect = handle('end a connection', 'Disconnected.', async (who, req
 
 /* Public: a redirect from the provider carries no session. It exchanges nothing and stores no token; it sends the
  * browser back to the signed-in page, which completes the connection under its own session. */
-exports.callback = async (req, res, next) => {
+exports.callback = async (req, res) => {
     const provider = String((req.params || {}).provider || '');
-    /* Until 073 the legacy google_calendar connector shares this redirect URI with the generic 'google' provider.
-     * A legacy state has a different audience, so hand it to the legacy handler (mounted after this one in
-     * routes.js); our own states, and every other provider, are answered here. */
-    if (provider === LEGACY_SHARED_PROVIDER && flag.requestedGoogle().length && !connection.ownsState((req.query || {}).state)) {
-        return next();
-    }
     let target;
     try {
         if (!knownProvider(provider)) throw new Error('unknown provider');

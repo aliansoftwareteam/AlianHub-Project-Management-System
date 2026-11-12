@@ -53,3 +53,6 @@ None.
 
 ### 2026-11-12 — 096 merged
 - "Add custom connector" opens 096's add dialog for whoever holds "Add custom apps", rather than a "Coming soon" button for owners and admins; the custom apps card moved from the Workspace tab's placeholder to the foot of the Connectors tab, since members connect there. The `servers_*` and `add_custom_soon` strings are gone.
+
+### 2026-11-12 — 077 merged
+- `GoogleConnection.vue` is deleted, so the Connectors tab no longer shows the old Google Calendar card and takes no `legacyGoogle`.

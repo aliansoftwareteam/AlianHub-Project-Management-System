@@ -82,9 +82,9 @@ Auto-maintained registry of all tasks. Reflects YAML frontmatter from each `task
 | 074 | Connectors — Slack as a personal OAuth provider; retire the workspace bot | backlog | medium | 069, 070, 078 | backlog/074-connectors-slack-personal |
 | 075 | Connectors — GitHub through its MCP server, the first registered MCP app | active | high | 092, 093, 100 | active/075-connectors-github-personal |
 | 076 | Connectors — Drive/Dropbox attachment picker on the module | active | medium | 066, 072 | active/076-connectors-attachment-picker |
-| 077 | Connectors — remove the old Google Calendar and CloudStorage paths; Google and Dropbox setup pages | backlog | medium | 073, 076 | backlog/077-connectors-remove-calendar-picker-paths |
+| 077 | Connectors — remove the old Google Calendar and CloudStorage paths; Google and Dropbox setup pages | active | medium | 073, 076 | active/077-connectors-remove-calendar-picker-paths |
 | 078 | Connectors — Inbox approval cards and quota settings screens | active | high | 069, 070 | active/078-connectors-approval-quota-screens |
-| 079 | Connectors — remove the old Slack bot and GitHub sync paths | backlog | medium | 074, 075 | backlog/079-connectors-remove-slack-github-paths |
+| 079 | Connectors — remove the old Slack bot and GitHub sync paths | active | medium | 074, 075 | active/079-connectors-remove-slack-github-paths |
 | 092 | Connectors — MCP client and MCP provider definitions: call apps' MCP servers as the member, reviewed tools only | active | high | 063, 068 | active/092-connectors-mcp-client |
 | 093 | Connectors — shared sign-in for hosted instances: the instance side | active | high | 065, 066 | active/093-connectors-hosted-sign-in |
 | 094 | Connectors — Notion, the first app that registers itself | active | high | 092, 100 | active/094-connectors-notion-pilot |
