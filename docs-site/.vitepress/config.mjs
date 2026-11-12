@@ -1,7 +1,6 @@
 import { defineConfig } from 'vitepress'
 import { apiSidebar } from './api-sidebar.mjs'
-
-const repo = 'https://github.com/aliansoftwareteam/AlianHub-Project-Management-System'
+import { REPO_URL as repo, SITE_URL, transformHead, transformPageData, writeLlmsFiles } from './seo.mjs'
 
 const gettingStarted = [
   {
@@ -203,7 +202,10 @@ export default defineConfig({
   srcExclude: ['STYLE.md', 'README.md'],
   vite: { build: { chunkSizeWarningLimit: 2000 } },
   lastUpdated: true,
-  sitemap: { hostname: 'https://docs.alianhub.com' },
+  sitemap: { hostname: SITE_URL },
+  transformPageData,
+  transformHead,
+  buildEnd: writeLlmsFiles,
   ignoreDeadLinks: [/^https?:\/\/localhost/],
   head: [
     ['link', { rel: 'icon', type: 'image/png', href: '/favicon.png' }],

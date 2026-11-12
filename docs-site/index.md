@@ -1,6 +1,8 @@
 ---
 layout: home
 title: AlianHub Docs
+titleTemplate: Open-source, self-hosted project management
+description: "How to use, install, run and extend AlianHub, the free, open-source project management system you host yourself: guides, admin setup, AI and the REST API."
 
 hero:
   name: AlianHub
