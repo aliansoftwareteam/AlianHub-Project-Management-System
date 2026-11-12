@@ -222,6 +222,10 @@
                             <button class="ig-mini del" @click="removeFeed(f)">{{ $t('IntegrationsHub.delete') }}</button>
                         </div>
                     </div>
+                    <p v-if="connectors.includes('google')" class="ig-note" data-test="calendar-connectors-note">
+                        {{ $t('IntegrationsHub.cal_connectors_note') }}
+                        <router-link :to="{ name: CUSTOMIZE_ROUTE, params: { cid } }">{{ $t('IntegrationsHub.connectors_link') }}</router-link>
+                    </p>
                     <details class="ig-help">
                         <summary>{{ $t('IntegrationsHub.cal_help_title') }}</summary>
                         <ol>
@@ -260,8 +264,8 @@
                         <p class="ig-note">{{ $t('IntegrationsHub.slack_commands') }}</p>
                     </div>
                     <p v-if="connectors.includes('slack')" class="ig-note" data-test="slack-personal-note">
-                        {{ $t('IntegrationsHub.slack_personal_note') }}
-                        <router-link :to="{ name: 'Connections', params: { cid } }">{{ $t('IntegrationsHub.slack_personal_link') }}</router-link>
+                        {{ $t('IntegrationsHub.slack_connectors_note') }}
+                        <router-link :to="{ name: CUSTOMIZE_ROUTE, params: { cid } }">{{ $t('IntegrationsHub.connectors_link') }}</router-link>
                     </p>
                     <details class="ig-help">
                         <summary>{{ $t('IntegrationsHub.slack_help_title') }}</summary>
@@ -296,6 +300,7 @@ import { apiRequest } from '@/services';
 import { useGetterFunctions } from '@/composable';
 import * as env from '@/config/env';
 import { maskOf } from '@/utils/iconMask';
+import { CUSTOMIZE_ROUTE } from '@/router/ai/customize';
 
 const homeIcon = require('@/assets/images/svg/Home.svg');
 

@@ -230,3 +230,14 @@ account: {                                                    // the account a t
 - `POST /api/v2/connectors/:provider/token` keeps a pasted token after one `account.url` read succeeds; the row has `signIn: 'personal_token'`, `handles.access` only, all the definition's scopes, and is never refreshed or revoked at the provider.
 - Every connection row now records `signIn` (`registered_app`, `self_register`, `personal_token`) and `kind` (`api`, `mcp`).
 - `Modules/Connectors/mcpAuth.js` `discover({ url, companyId, actor })` reads a server's protected-resource and authorization-server metadata and answers its endpoints, registration and hosts, for custom servers (096).
+
+## 11. Tools a person turns off for their own use (task 101, 2026-11-12)
+
+Additive; nothing above changes.
+
+- `connector_connections.toolsOff[]`: catalog tool keys of the row's provider that its owner turned off for their own use. Absent means none. A new connection (after a disconnect) starts with none; a reconnect keeps the list.
+- `resolveConnection` answers `{ connectionId, scopes, toolsOff, getAccessToken }`.
+- B's tool runner refuses a tool in `toolsOff` at admission, for a read and for a write (proposal and send), before the provider is called: code `tool_turned_off`, "You turned this <Provider> tool off for yourself…".
+- `PUT /api/v2/connectors/connections/:id/tools`, body `{ toolsOff: [key] }`: the connection's owner only (anyone else, owners and admins included, gets 404), every key a catalog tool of that provider (else 400 `unknown_tool`), agents refused, audited `connector.tools_changed`. Answers the connection's view, which now carries `toolsOff`.
+- `GET /api/v2/connectors/:provider/tools` (any member with a seat): `{ tools: [{ key, label, kind, on }] }`, `on` being `tools.isOn()`. No shape, input or server text.
+- `GET /api/v2/connectors` also answers `unavailable: [{ provider }]`: named in `CONNECTORS` but with no way to sign in on this install yet.

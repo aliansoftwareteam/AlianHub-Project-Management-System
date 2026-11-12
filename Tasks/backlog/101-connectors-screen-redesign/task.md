@@ -38,12 +38,12 @@ One light, easy screen where a member sees their connectors, browses and connect
 - The AI chat's connector picker (097) and agent settings (098)
 
 ## Acceptance criteria
-- [ ] From Customize → Connectors a member connects, ticks products, turns a tool off, reconnects and disconnects without leaving the page
-- [ ] A member sees only their own account labels; an admin can end a connection, but no route lets them use it
-- [ ] Browse search and category filter work; an app the install cannot sign in to explains why
-- [ ] The old routes redirect; no other page offers connector sign-in
+- [x] From Customize → Connectors a member connects, ticks products, turns a tool off, reconnects and disconnects without leaving the page
+- [x] A member sees only their own account labels; an admin can end a connection, but no route lets them use it
+- [x] Browse search and category filter work; an app the install cannot sign in to explains why
+- [x] The old routes redirect; no other page offers connector sign-in
 - [ ] Usable by keyboard and at 375 px wide
-- [ ] `i18n:check` and `style:check` pass
+- [x] `i18n:check` and `style:check` pass
 
 ## Constraints & notes
 - Track: A — connections (getting and keeping a person's access)

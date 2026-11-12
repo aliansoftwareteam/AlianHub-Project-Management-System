@@ -309,6 +309,7 @@ import { loadInboxDensity, saveInboxDensity } from './inboxDensity';
 import ViewDensityControl from '@/views/Projects/components/columns/ViewDensityControl.vue';
 import ApprovalQueue from './ApprovalQueue.vue';
 import { AGENTS_CHANGED_EVENT, PROPOSAL_CHANGE } from '@/views/Ai/agentFeed';
+import { CUSTOMIZE_ROUTE, CUSTOMIZE_TAB } from '@/router/ai/customize';
 
 defineOptions({ name: 'InboxPage' });
 
@@ -869,8 +870,9 @@ const open = (it) => {
         router.push({ name: 'Goal', params: { cid: companyId?.value, goalId: String(it.changeData.goalId) } }).catch(() => {});
         return;
     }
-    if (['connector_slack_bot_retired', 'connector_tool_changed'].includes(it.changeType) && router.hasRoute('Connections')) {
-        router.push({ name: 'Connections', params: { cid: companyId?.value } }).catch(() => {});
+    if (['connector_slack_bot_retired', 'connector_tool_changed'].includes(it.changeType) && router.hasRoute(CUSTOMIZE_ROUTE)) {
+        const query = it.changeType === 'connector_tool_changed' ? { tab: CUSTOMIZE_TAB.WORKSPACE } : {};
+        router.push({ name: CUSTOMIZE_ROUTE, params: { cid: companyId?.value }, query }).catch(() => {});
         return;
     }
     if (it.changeType === 'credential_expiring' && router.hasRoute('AiAccounts')) {

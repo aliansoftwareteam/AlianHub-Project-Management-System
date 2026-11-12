@@ -38,6 +38,7 @@ const resolveConnection = async ({ companyId, userId, provider } = {}) => {
     return {
         connectionId: String(row._id),
         scopes: [...(row.scopes || [])],
+        toolsOff: [...(row.toolsOff || [])],
         getAccessToken: async () => {
             const { token, reason } = await connection.accessTokenFor({ companyId: String(companyId), userId: String(userId), provider });
             if (token) return token;

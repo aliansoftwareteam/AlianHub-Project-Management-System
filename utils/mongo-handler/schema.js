@@ -2186,6 +2186,7 @@ const schema = {
         // { email, sub } on older ones
         scopes: { type: [String], default: undefined, required: false },
         account: { type: Object, required: false },
+        toolsOff: { type: [String], default: undefined, required: false },
         // { source: 'instance' | 'company', appId }: appId is the connector_apps id, null for the instance app
         app: { type: Object, required: false },
         // { access: 'sec_…', refresh: 'sec_…' } secrets store handles of a module row

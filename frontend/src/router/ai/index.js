@@ -1,4 +1,5 @@
 import { BLUEPRINT_WELCOME_PATH, BLUEPRINT_WELCOME_ROUTE, CONNECT_AI_ROUTE, CONNECT_AI_WELCOME_PATH, CONNECT_AI_WELCOME_ROUTE } from './connect';
+import { CUSTOMIZE_PATH, CUSTOMIZE_ROUTE, CUSTOMIZE_TAB, toCustomize } from './customize';
 
 export default [
     { path: '/:cid/ai', redirect: { name: 'AiAsk' } },
@@ -102,11 +103,12 @@ export default [
         meta: { title: 'Coding accounts', requiresAuth: true }
     },
     {
-        path: '/:cid/ai/connect',
-        name: CONNECT_AI_ROUTE,
-        component: () => import(/* webpackChunkName: "ai" */ '@/views/Ai/ConnectYourAi.vue'),
-        meta: { title: 'Connect your AI', requiresAuth: true }
+        path: CUSTOMIZE_PATH,
+        name: CUSTOMIZE_ROUTE,
+        component: () => import(/* webpackChunkName: "ai" */ '@/views/Ai/CustomizePage.vue'),
+        meta: { title: 'Customize', requiresAuth: true }
     },
+    { path: '/:cid/ai/connect', name: CONNECT_AI_ROUTE, redirect: toCustomize(CUSTOMIZE_TAB.CONNECT_AI) },
     {
         path: CONNECT_AI_WELCOME_PATH,
         name: CONNECT_AI_WELCOME_ROUTE,

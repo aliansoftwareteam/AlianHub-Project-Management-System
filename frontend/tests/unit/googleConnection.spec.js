@@ -15,7 +15,6 @@ vi.mock('@/components/organisms/Shell/ShellIcon.vue', () => ({ default: { name: 
 vi.mock('@/views/Ai/AiSidebar.vue', () => ({ default: { name: 'AiSidebar', render: () => null } }));
 
 import GoogleConnection from '@/views/Integrations/GoogleConnection.vue';
-import ConnectionsPage from '@/views/Integrations/ConnectionsPage.vue';
 import en from '@/locales/en.js';
 
 const i18n = config.global.plugins[0];
@@ -255,36 +254,5 @@ describe('what an owner or admin sees of the members\' connections', () => {
     it('shows no section when the list is refused', async () => {
         const { wrapper } = await open({ roleType: 1, answers: { 'get /members': () => refusal('Only an owner or admin.') } });
         expect(wrapper.find('[data-test="google-members"]').exists()).toBe(false);
-    });
-});
-
-describe('the Connections page', () => {
-    const openPage = async (catalogue) => {
-        route.query = {};
-        apiRequest.mockImplementation((method, url) => {
-            if (url.endsWith('/catalog')) return Promise.resolve({ data: catalogue });
-            if (url.startsWith(BASE)) return ok({ connections: [] });
-            return Promise.resolve({ data: { status: true, data: [] } });
-        });
-        apiRequestWithoutCompnay.mockResolvedValue({ data: { status: true, data: {} } });
-        const wrapper = mount(ConnectionsPage, { global: { plugins: [storeFor(3)], mocks: { $t: t }, stubs: { 'router-link': true } } });
-        await flushPromises();
-        return wrapper;
-    };
-
-    it('has no "My connections" section while the server does not name the connector', async () => {
-        const wrapper = await openPage({ status: true, data: [], connectors: ['slack'] });
-        expect(wrapper.find('[data-test="google-connection"]').exists()).toBe(false);
-        expect(apiRequest.mock.calls.some(([, url]) => String(url).includes('/connectors'))).toBe(false);
-    });
-
-    it('shows it once the server names the connector, and not on the MCP or agents tabs', async () => {
-        const wrapper = await openPage({ status: true, data: [], connectors: ['slack', G] });
-        expect(wrapper.find('[data-test="google-connection"]').exists()).toBe(true);
-        const tabs = wrapper.findAll('.ah-tab');
-        await tabs[2].trigger('click');
-        expect(wrapper.find('[data-test="google-connection"]').exists()).toBe(false);
-        await tabs[1].trigger('click');
-        expect(wrapper.find('[data-test="google-connection"]').exists()).toBe(true);
     });
 });

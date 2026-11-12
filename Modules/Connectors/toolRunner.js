@@ -182,6 +182,9 @@ const ownConnection = async (tool, companyId, userId, asked) => {
     if (tool.scope && !(connection.scopes || []).includes(tool.scope)) {
         throw refusal('scope_missing', `Tick ${tool.product} on your ${tool.definition.name} connection in My connections, then ask again.`);
     }
+    if ((connection.toolsOff || []).includes(tool.key)) {
+        throw refusal('tool_turned_off', `You turned this ${tool.definition.name} tool off for yourself, so it was not used. Turn it back on in AI › Customize › Connectors, then ask again.`);
+    }
     return connection;
 };
 
