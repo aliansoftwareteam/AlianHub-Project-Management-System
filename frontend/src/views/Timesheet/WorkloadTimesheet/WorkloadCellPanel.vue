@@ -1,5 +1,5 @@
 <template>
-    <aside ref="panel" class="wcp" role="dialog" aria-modal="false" :aria-labelledby="titleId" tabindex="-1" data-test="workload-panel" @keydown.esc.stop="$emit('close')">
+    <aside ref="panel" class="wcp" :class="{ 'is-dragging': dragging }" role="dialog" aria-modal="false" :aria-labelledby="titleId" tabindex="-1" data-test="workload-panel" @keydown.esc.stop="$emit('close')">
         <header class="wcp__head">
             <span class="ah-avatar" :style="{ background: color }">
                 <AvatarImage :src="person.avatar" :alt="person.name">{{ initial }}</AvatarImage>
@@ -22,9 +22,21 @@
 
         <div class="wcp__list ah-scroll">
             <h3 class="tv-section-label wcp__label">{{ $t('Time.scheduled_tasks', { n: tasks.length }) }}</h3>
+            <p v-if="draggableRows && tasks.some(canDrag)" class="wcp__hint">{{ $t('Time.drag_to_move') }}</p>
             <ul v-if="tasks.length" class="wcp__rows">
                 <li v-for="task in tasks" :key="task.taskId || task.name">
-                    <button type="button" class="wcp__row" :disabled="!task.taskId || !task.projectId" data-test="workload-panel-task" @click="open(task)">
+                    <button
+                        type="button"
+                        class="wcp__row"
+                        :class="{ 'is-draggable': canDrag(task) }"
+                        :disabled="!task.taskId || !task.projectId"
+                        :draggable="canDrag(task)"
+                        data-test="workload-panel-task"
+                        @click="open(task)"
+                        @dragstart="startDrag($event, task)"
+                        @dragend="endDrag"
+                    >
+                        <ShellIcon v-if="draggableRows" name="grip" :size="13" class="wcp__grip" :class="{ 'is-off': !canDrag(task) }" aria-hidden="true" />
                         <span class="tv-sq" :style="{ background: task.projectColor || 'var(--brand)' }"></span>
                         <span class="wcp__task">
                             <span class="wcp__task-name">{{ task.name || $t('Time.task_not_open') }}</span>
@@ -54,8 +66,9 @@ const props = defineProps({
     person: { type: Object, required: true },
     cell: { type: Object, required: true },
     color: { type: String, default: 'var(--brand)' },
+    draggableRows: { type: Boolean, default: false },
 });
-const emit = defineEmits(['close', 'open-task']);
+const emit = defineEmits(['close', 'open-task', 'drag-start', 'drag-end']);
 
 const titleId = `wcp-${Math.random().toString(36).slice(2, 8)}`;
 const initial = computed(() => (props.person.name || '?').trim().charAt(0).toUpperCase());
@@ -70,6 +83,21 @@ const periodLabel = computed(() => {
 const datesLabel = (dates) => dates.map((date) => moment(date).format('ddd D')).join(', ');
 
 const open = (task) => emit('open-task', task);
+
+const canDrag = (task) => props.draggableRows && Boolean(task.name) && task.chips.length > 0;
+const dragging = ref(false);
+function startDrag(event, task) {
+    if (!canDrag(task)) return;
+    event.dataTransfer.effectAllowed = 'move';
+    event.dataTransfer.setData('text/plain', task.taskId);
+    emit('drag-start', task);
+    /* Stepping aside in the same tick as dragstart cancels the drag in Chromium. */
+    requestAnimationFrame(() => { dragging.value = true; });
+}
+function endDrag() {
+    dragging.value = false;
+    emit('drag-end');
+}
 
 const panel = ref(null);
 onMounted(() => nextTick(() => panel.value && panel.value.focus()));
@@ -95,7 +123,13 @@ onMounted(() => nextTick(() => panel.value && panel.value.focus()));
 .wcp__facts dd.is-over { color: var(--danger-ink); }
 .wcp__off { margin: 0; padding: 8px 16px; color: var(--ink-2); background: var(--surface-2); border-bottom: 1px solid var(--hairline); }
 .wcp__list { flex: 1; min-height: 0; overflow-y: auto; padding: 12px 8px 16px; }
+.wcp.is-dragging { opacity: .3; pointer-events: none; transition: opacity var(--t-state) var(--ease); }
 .wcp__label { margin: 0 8px 6px; }
+.wcp__hint { margin: 0 8px 8px; font: var(--text-small); color: var(--ink-2); }
+.wcp__row.is-draggable { cursor: grab; }
+.wcp__row.is-draggable:active { cursor: grabbing; }
+.wcp__grip { flex: none; color: var(--ink-3); }
+.wcp__grip.is-off { visibility: hidden; }
 .wcp__rows { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 2px; }
 .wcp__row { width: 100%; display: flex; align-items: center; gap: 10px; padding: 9px 8px; border: 0; border-radius: 8px; background: transparent; color: var(--ink); text-align: start; cursor: pointer; }
 .wcp__row:hover:not(:disabled) { background: var(--surface-hover); }
