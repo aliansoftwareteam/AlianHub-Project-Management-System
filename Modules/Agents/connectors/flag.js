@@ -46,8 +46,6 @@ const status = (name) => {
     return { requested: asked, on: asked && !found.length, problems: found };
 };
 
-const slackOn = () => status('slack').on;
-
 const logBootState = () => {
     const logger = require('../../../Config/loggerConfig');
     const providers = require('../../Connectors/registry').list().map((definition) => definition.id);
@@ -67,4 +65,4 @@ const logBootState = () => {
     }
 };
 
-module.exports = { ENV_KEY, KNOWN, PROBLEM, named, requested, status, slackOn, logBootState };
+module.exports = { ENV_KEY, KNOWN, PROBLEM, named, requested, status, logBootState };

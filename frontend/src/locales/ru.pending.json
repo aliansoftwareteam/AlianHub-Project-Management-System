@@ -1208,8 +1208,6 @@
     "Ai.skills_open_library": "Open the skill library",
     "Ai.slack_post_channel": "Channel",
     "Ai.slack_post_failed": "Not posted: {error}",
-    "Ai.slack_post_note": "This is exactly what will be posted, as the workspace's Slack app. Nothing is sent until an Owner or Admin approves.",
-    "Ai.slack_post_outside": "leaves the workspace",
     "Ai.slack_post_sent": "Posted to Slack (message {ts}).",
     "Ai.slack_post_text": "Message",
     "Ai.slack_post_title": "Slack message",

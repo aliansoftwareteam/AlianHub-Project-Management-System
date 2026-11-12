@@ -47,10 +47,6 @@ const FETCHERS = {
             }
         },
     },
-    'Modules/Agents/connectors/slackApi.js': {
-        uses: ['helper:agentFetch.*'],
-        reach: () => require('../../Modules/Agents/connectors/slackApi').call({ companyId: CID, actor: ACTOR, token: 'xoxb-not-a-real-token', method: 'auth.test' }),
-    },
     'Modules/AgentSessions/announce.js': {
         uses: ['helper:agentFetch.*'],
         reach: () => require('../../Modules/AgentSessions/announce').deliver({ companyId: CID, actor: ACTOR, url: 'https://agent.example.com/hooks/alianhub', body: '{}', headers: {} }),
