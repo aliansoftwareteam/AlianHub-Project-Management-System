@@ -5,6 +5,7 @@ const PKCE = Object.freeze(['S256']);
 const SCOPE_PARAM = /^[a-z_]{1,40}$/;
 const SCOPE_SEPARATORS = Object.freeze([' ', ',']);
 const REVOKE_WITH = Object.freeze(['refresh', 'access']);
+const TRANSPORT = Object.freeze({ API: 'api', MCP: 'mcp' });
 
 const isPlainObject = (value) => !!value && typeof value === 'object' && !Array.isArray(value);
 const isText = (value) => typeof value === 'string' && value.trim().length > 0;
@@ -41,11 +42,22 @@ const authProblems = (auth, hosts) => {
     return problems;
 };
 
-const productProblems = (products) => {
+/* An MCP server may grant access with no scopes at all, so its products may list none. */
+const productProblems = (products, { scopesOptional = false } = {}) => {
     if (!isPlainObject(products) || !Object.keys(products).length) return ['products is empty'];
+    const scopesFit = (scopes) => isTextList(scopes) || (scopesOptional && Array.isArray(scopes) && scopes.every(isText));
     return Object.entries(products)
-        .filter(([name, scopes]) => !ID.test(name) || !isTextList(scopes))
-        .map(([name]) => `product ${name} needs a lower-case name and at least one scope`);
+        .filter(([name, scopes]) => !ID.test(name) || !scopesFit(scopes))
+        .map(([name]) => (scopesOptional ? `product ${name} needs a lower-case name and a list of scopes` : `product ${name} needs a lower-case name and at least one scope`));
+};
+
+const transportProblems = (definition, hosts) => {
+    const transport = definition.transport === undefined ? TRANSPORT.API : definition.transport;
+    if (!Object.values(TRANSPORT).includes(transport)) return ['transport must be api or mcp'];
+    if (transport !== TRANSPORT.MCP) return definition.mcp === undefined ? [] : ['mcp is set but transport is not mcp'];
+    const host = isPlainObject(definition.mcp) ? hostOf(definition.mcp.url) : null;
+    if (!host) return ['mcp.url is not an https URL'];
+    return hosts.includes(host) ? [] : [`mcp.url host ${host} is not in egressHosts`];
 };
 
 /* Returns every problem, so one startup log line can name them all. */
@@ -57,7 +69,8 @@ const validate = (definition) => {
     if (!isText(definition.name)) problems.push('name is missing');
     if (!hosts.length) problems.push('egressHosts is empty');
     problems.push(...authProblems(definition.auth, hosts));
-    problems.push(...productProblems(definition.products));
+    problems.push(...transportProblems(definition, hosts));
+    problems.push(...productProblems(definition.products, { scopesOptional: definition.transport === TRANSPORT.MCP }));
     if (typeof definition.readAccount !== 'function') problems.push('readAccount is not a function');
     if (definition.rateLimit !== undefined && !(isPlainObject(definition.rateLimit) && Array.isArray(definition.rateLimit.statuses) && definition.rateLimit.statuses.every(Number.isInteger))) {
         problems.push('rateLimit.statuses must be a list of HTTP statuses');
@@ -69,4 +82,4 @@ const validate = (definition) => {
     return problems;
 };
 
-module.exports = { validate };
+module.exports = { validate, TRANSPORT };

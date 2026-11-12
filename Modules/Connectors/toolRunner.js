@@ -11,6 +11,7 @@ const rateLimits = require('./rateLimits');
 const health = require('./health');
 const callAudit = require('./callAudit');
 const providerApi = require('./providerApi');
+const mcpClient = require('./mcpClient');
 
 const VIA = Object.freeze({ AGENT: 'agent', MCP: 'mcp', APPROVED: 'approved' });
 const STATE = Object.freeze({ PENDING: 'pending', APPLIED: 'applied', FAILED: 'failed', REFUSED: 'refused' });
@@ -118,11 +119,7 @@ const accepted = async (call, res) => {
     }
     const code = body ? providerApi.errorIn(definition, body) : '';
     if (!code) return res;
-    if (providerApi.isGrantRefused(definition, code)) {
-        await connections.markBroken({ companyId: String(call.companyId), connectionId: call.connection.connectionId, reason: code });
-        await health.tellBroken(call.companyId, call.userId, call.tool.provider, definition.name);
-        throw refusal('broken', MESSAGES.broken(definition.name));
-    }
+    if (providerApi.isGrantRefused(definition, code)) throw await brokenBy(call, code);
     throw refusal('provider_refused', `${definition.name} answered ${code}, so this did not go through.`);
 };
 
@@ -131,12 +128,55 @@ const requesterFor = (call) => async (url, { query } = {}) => accepted(call, awa
 
 const writeRequesterFor = (call) => async (url, { method = 'post', query, json } = {}) => accepted(call, await callProvider(call, url, { method, query, json }));
 
+const brokenBy = async (call, reason) => {
+    const { definition } = call.tool;
+    await connections.markBroken({ companyId: String(call.companyId), connectionId: call.connection.connectionId, reason });
+    await health.tellBroken(call.companyId, call.userId, call.tool.provider, definition.name);
+    return refusal('broken', MESSAGES.broken(definition.name));
+};
+
+/* An HTTP answer of the server becomes the same refusal an API provider's would: a rate limit holds the connection, a
+ * refused token marks it broken, anything else fails this one call. A refusal from the review check passes as it is. */
+const mcpRefusal = async (call, error) => {
+    const { tool, companyId, connection } = call;
+    const { name } = tool.definition;
+    if (error && error.deterministic) return error;
+    if (!(error && error.status)) return refusal('provider_refused', `${name} could not be reached, so this did not go through.`);
+    const res = { status: error.status, headers: error.headers || {}, body: '' };
+    if (rateLimits.isRateLimited(tool.definition, res)) return busy(tool, await rateLimits.hold(companyId, connection.connectionId, res));
+    if (error.status === 401) return brokenBy(call, 'mcp_unauthorized');
+    return refusal('provider_refused', `${name} answered ${error.status}, so this did not go through.`);
+};
+
+/* An MCP tool is handed a caller of the server's tools, never the token. Only the tool it was defined with is sent. */
+const mcpCallerFor = (call) => async (name, args) => {
+    const { tool, companyId, userId, connection, trace } = call;
+    if (name !== tool.mcp.tool) throw refusal('tool_off', `${tool.key} can only call ${tool.mcp.tool}.`);
+    const token = await connection.getAccessToken().catch(spoken(tool, companyId, userId));
+    trace.called = true;
+    let result;
+    try {
+        result = await mcpClient.callTool({
+            provider: tool.provider, url: tool.definition.mcp.url, hosts: tool.definition.egressHosts, token,
+            name, args, shape: tool.mcp.shape, timeoutMs: TIMEOUT_MS, maxBytes: MAX_BYTES,
+        });
+    } catch (error) {
+        throw await mcpRefusal(call, error);
+    }
+    if (result && result.isError) throw refusal('provider_refused', `${tool.definition.name} said this could not be done, so it did not go through.`);
+    return mcpClient.textOf(result);
+};
+
+const handedTo = (call, { write: writing = false } = {}) => (call.tool.mcp
+    ? { connectionId: call.connection.connectionId, mcp: mcpCallerFor(call) }
+    : { connectionId: call.connection.connectionId, request: (writing ? writeRequesterFor : requesterFor)(call) });
+
 const ownConnection = async (tool, companyId, userId, asked) => {
     const connection = await connectionOf(tool, companyId, userId);
     if (asked !== undefined && String(asked) !== String(connection.connectionId)) {
         throw refusal('not_connected', `This was filed on a connection that is not your current ${tool.definition.name} connection, so it was not sent. Ask for it again.`);
     }
-    if (!(connection.scopes || []).includes(tool.scope)) {
+    if (tool.scope && !(connection.scopes || []).includes(tool.scope)) {
         throw refusal('scope_missing', `Tick ${tool.product} on your ${tool.definition.name} connection in My connections, then ask again.`);
     }
     return connection;
@@ -164,7 +204,7 @@ const write = ({ companyId, userId, key, params = {}, beforeSend = async () => {
         await beforeSend();
         const raw = await egressContext.run(
             { companyId: String(companyId), actor: String(userId) },
-            () => tool.run({ input: args, connection: { connectionId: connection.connectionId, request: writeRequesterFor({ tool, companyId, userId, connection, trace }) }, caps: { ...tool.caps } }),
+            () => tool.run({ input: args, connection: handedTo({ tool, companyId, userId, connection, trace }, { write: true }), caps: { ...tool.caps } }),
         );
         const text = plain(raw).slice(0, tool.caps.maxChars);
         trace.chars = text.length;
@@ -200,7 +240,7 @@ const readAdmitted = async ({ companyId, userId, via, runId, callerId, key, inpu
     try {
         raw = await egressContext.run(
             { companyId: String(companyId), actor: String(userId) },
-            () => tool.run({ input: args, connection: { connectionId: connection.connectionId, request: requesterFor({ tool, companyId, userId, connection, trace }) }, caps: { maxItems: tool.caps.maxItems, maxChars } }),
+            () => tool.run({ input: args, connection: handedTo({ tool, companyId, userId, connection, trace }), caps: { maxItems: tool.caps.maxItems, maxChars } }),
         );
     } catch (error) {
         if (claim) await claim.settle({ state: STATE.FAILED, chars: 0 });

@@ -26,15 +26,15 @@ AlianHub calls an app's remote MCP server with the member's own access, offers o
 - A fake MCP server for tests: tools that change shape, return too much, time out, or answer 429
 
 ## Out of scope
-- Signing in and self-registration (066)
+- Signing in, discovery and self-registration (100)
 - Which tools each app offers: written in each app's task (075, 094, 095); custom servers (096)
 
 ## Acceptance criteria
-- [ ] A fake server's tool is called as the member, with that member's token only
-- [ ] A tool whose description or schema changes is hidden until reviewed, and owners and admins are told
-- [ ] A server's own description never reaches a model unreviewed
-- [ ] Output over the cap is cut; the run is tainted; a 429 backs off that server only
-- [ ] A request to a host not on the egress list is refused
+- [x] A fake server's tool is called as the member, with that member's token only
+- [ ] A tool whose description or schema changes is hidden until reviewed, and owners and admins are told *(refused at call time and logged; recording it in `connector_tools` and telling owners and admins is still open)*
+- [x] A server's own description never reaches a model unreviewed
+- [x] Output over the cap is cut; the run is tainted; a 429 holds that connection only
+- [x] A request to a host not on the egress list is refused
 
 ## Constraints & notes
 - Track: B — tools (using that access safely)

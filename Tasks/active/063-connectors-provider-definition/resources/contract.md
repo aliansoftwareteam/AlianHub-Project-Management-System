@@ -155,3 +155,54 @@ Indexes: unique (`companyId`, `userId`, `provider`, `account.id`); partial uniqu
 |---|---|---|
 | A — connections | Hetvi | 2026-10-29 |
 | B — tools | Prinsa | 2026-10-29 |
+
+## 9. MCP providers (PRD v2.0, task 092, 2026-11-12)
+
+The owner approved PRD v2.0 on 2026-11-12. These additions are optional, so Google, Slack and Dropbox are unchanged. Both tracks read them before building on MCP (094, 095, 100).
+
+**Provider definition.** A provider that is reached through the app's own MCP server adds two fields:
+
+```js
+module.exports = {
+    id: 'notion',
+    name: 'Notion',
+    transport: 'mcp',                         // 'api' when left out: the provider calls its own API, as today
+    mcp: { url: 'https://mcp.notion.com/mcp' },
+    auth: { /* as in section 2; task 100 adds discovery and self-registration */ },
+    products: { workspace: [] },              // an MCP product may list no scopes
+    readAccount: ({ tokenResponse }) => ({ id, label }),
+    egressHosts: ['mcp.notion.com'],
+};
+```
+
+`validate.js` also refuses a definition when:
+- `transport` is anything but `api` or `mcp`
+- `transport` is `mcp` and `mcp.url` is not `https`, or its host is not in `egressHosts`
+- `mcp` is set on a provider whose transport is not `mcp`
+- a product of an `api` provider has no scopes (unchanged)
+
+**Tool definition.** An MCP provider's `tools.js` lists its tools as data, through `Modules/Connectors/mcpTools.js`:
+
+```js
+const { mcpTool } = require('../../mcpTools');
+
+module.exports = [mcpTool({
+    key: 'notion.pages.search',          // AlianHub's own name; it never changes when the server renames its tool
+    label: 'Connectors.tool.notionPagesSearch',
+    kind: 'read',                        // AlianHub decides read or write; the server's hints are not trusted
+    product: 'workspace',
+    // no scope: the product lists none
+    input: { /* JSON schema, as in section 3 */ },
+    caps: { maxItems: 10, maxChars: 8000 },
+    tool: 'notion-search',               // the server's tool
+    shape: '<sha256>',                   // mcpClient.shapeOf() of the tool as reviewed; null until someone reviews it
+    args: (input) => input,              // optional: AlianHub's input as the server's arguments
+})];
+```
+
+- `run` comes from `mcpTool` and calls `connection.mcp(tool, args)`. An MCP tool is handed `connection.mcp` and never `connection.request`; an API tool is handed `request` as before.
+- `tools.js` refuses an MCP tool with no `mcp.tool`, a `shape` that is not a sha256 or `null`, or a `scope` its product does not list; and an API provider's tool that sets `mcp`.
+- A tool whose `shape` is `null` is never on: `isOn()` is false, so agents, MCP and skill runs never see it.
+- At call time `mcpClient` lists the server's tools (kept ten minutes per provider) and calls a tool only while its shape still equals `shape`. A changed tool is refused as `tool_changed` and logged; a withdrawn one as `tool_missing`.
+- Every MCP request leaves through `agentFetch.callMcp`: only the connector's hosts, HTTPS, no redirect, the member's token set there and only the protocol's own headers passed on.
+- Server answers become the same refusals as an API provider's: 429 holds the connection (`markBackoff`), 401 marks it broken (`markBroken`, reason `mcp_unauthorized`), anything else fails that one call. A tool's own error text never reaches the model.

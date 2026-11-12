@@ -12,6 +12,8 @@ const PROPERTY_TYPES = Object.freeze(['string', 'integer', 'number', 'boolean'])
 const MIN_DESCRIPTION = 20;
 const FIELD = /^[a-z][A-Za-z]{0,29}$/;
 const RESERVED_FIELDS = Object.freeze(['text', 'chars', 'truncated', 'taint']);
+const MCP_TOOL = /^[A-Za-z0-9_.\-/]{1,128}$/;
+const SHAPE = /^[a-f0-9]{64}$/;
 
 const isObject = (value) => value !== null && typeof value === 'object' && !Array.isArray(value);
 const positive = (value) => Number.isInteger(value) && value > 0;
@@ -54,6 +56,14 @@ const editableProblems = (tool) => {
     });
 };
 
+/* An MCP provider's tool names the server's tool it calls and the shape it was reviewed against; a provider that calls
+ * its own API has neither. */
+const mcpProblems = (definition, tool) => {
+    if (definition.transport !== 'mcp') return tool.mcp === undefined ? [] : ['mcp is set but the provider does not use MCP'];
+    if (!isObject(tool.mcp) || !MCP_TOOL.test(String(tool.mcp.tool || ''))) return ['mcp.tool names no tool of the server'];
+    return tool.mcp.shape === null || SHAPE.test(String(tool.mcp.shape)) ? [] : ['mcp.shape is not a reviewed shape or null'];
+};
+
 const toolProblems = (definition, tool) => {
     if (!isObject(tool)) return ['a tool is not an object'];
     const key = String(tool.key || '');
@@ -63,8 +73,11 @@ const toolProblems = (definition, tool) => {
     if (!LABEL.test(String(tool.label || ''))) found.push(`${key}: label is not a Connectors.tool.* key`);
     if (!Object.values(KIND).includes(tool.kind)) found.push(`${key}: kind is not read or write`);
     const products = isObject(definition.products) ? definition.products : {};
+    const productScopes = products[tool.product] || [];
     if (!Object.prototype.hasOwnProperty.call(products, tool.product)) found.push(`${key}: product "${tool.product}" is not one of ${Object.keys(products).join(', ')}`);
-    else if (!(products[tool.product] || []).includes(tool.scope)) found.push(`${key}: scope is not one of the ${tool.product} scopes`);
+    else if (productScopes.length && !productScopes.includes(tool.scope)) found.push(`${key}: scope is not one of the ${tool.product} scopes`);
+    else if (!productScopes.length && tool.scope !== undefined && tool.scope !== null) found.push(`${key}: ${tool.product} has no scopes, so the tool names none`);
+    found.push(...mcpProblems(definition, tool).map((problem) => `${key}: ${problem}`));
     found.push(...inputProblems(tool.input).map((problem) => `${key}: ${problem}`));
     if (!isObject(tool.caps) || !positive(tool.caps.maxItems) || !positive(tool.caps.maxChars)) found.push(`${key}: caps needs maxItems and maxChars above 0`);
     if (typeof tool.run !== 'function') found.push(`${key}: run is not a function`);
@@ -104,6 +117,9 @@ const load = (dir) => Object.freeze(createRegistry({ dir }).list()
  * from outside is routed to approval. Whether this workspace has an app for it is asked at call time. */
 const providerOn = (provider) => require('../Agents/connectors/flag').named().includes(provider) && require('../Agents/taint').enabled();
 
+/* An MCP tool nobody has reviewed is offered nowhere: not to agents, not over MCP, not to a skill run. */
+const reviewed = (tool) => !tool.mcp || SHAPE.test(String(tool.mcp.shape || ''));
+
 const make = (dir) => {
     let loaded = null;
     const all = () => { loaded = loaded || load(dir); return loaded; };
@@ -111,7 +127,8 @@ const make = (dir) => {
     const reads = () => all().filter((tool) => tool.kind === KIND.READ);
     const writes = () => all().filter((tool) => tool.kind === KIND.WRITE);
     const isWrite = (key) => { const tool = get(key); return Boolean(tool) && tool.kind === KIND.WRITE; };
-    return { all, get, reads, writes, isWrite, isOn: (tool) => providerOn(tool.provider), anyOn: () => all().some((tool) => providerOn(tool.provider)) };
+    const isOn = (tool) => providerOn(tool.provider) && reviewed(tool);
+    return { all, get, reads, writes, isWrite, isOn, anyOn: () => all().some(isOn) };
 };
 
 const WRITE_GATE = 'connection_owner';
