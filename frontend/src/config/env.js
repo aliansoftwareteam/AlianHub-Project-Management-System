@@ -352,6 +352,7 @@ module.exports.PLANFEATUREDISPLAY = '/api/v1/plan-feature-display';
 module.exports.SUBSCRIPTIONPLAN = '/api/v1/subscription';
 module.exports.TASK_DATA = '/api/v1/projectdata/taskData';
 module.exports.SET_CHATS = '/api/v1/main-chats/find';
+module.exports.MAIN_CHAT_UNREAD_KEYS = '/api/v1/main-chats/unread-keys';
 module.exports.SUBSCRIPTIONS = "/api/v1/subscriptions";
 module.exports.CUSTOMERUPDATE = "/api/v1/customer-update";
 module.exports.GET_COMPANY = "/api/v1/admin/company";

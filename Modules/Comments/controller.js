@@ -21,6 +21,7 @@ const { parseAgentMentionIds, parseOwnAiMentionIds } = require("./helpers/parseM
 const { withoutAiFields } = require("./helpers/aiActor");
 const { withoutImportFields } = require("./helpers/importFields");
 const { bumpUnreadCounts } = require("./helpers/unreadBumps");
+const { tellChatRecipients } = require("./helpers/chatNotices");
 const { isChatMessage, holdsThreads, replyLookup, withThreadSummary, readable, keptRootIds, announceThread } = require("./helpers/chatThreads");
 const { withoutServerOwnedFields } = require("./helpers/serverOwnedFields");
 const { keptFromCaller } = require("./helpers/conversationRows");
@@ -118,6 +119,8 @@ exports.save = async (req, res) => {
         }
         if (saved && !placement.parent) {
             bumpUnreadCounts(companyId, saved, mentionIds)
+                .then((reached) => tellChatRecipients(companyId, saved, reached)
+                    .catch((err) => logger.error(`[chat] message notice not sent: ${err.message}`)))
                 .catch((err) => logger.error(`[comments] unread counts not raised: ${err.message}`));
         }
         if (mentionIds.length && saved) {

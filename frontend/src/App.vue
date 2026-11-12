@@ -12,6 +12,7 @@
                 <!-- Mounted at the root so an incoming call rings wherever the user is,
                      not only when the conversation that called them is on screen. -->
                 <CallOverlay />
+                <ChatAlerts />
                 <HostedBanners />
                 <PlanBanner />
                 <div class="ah-app">
@@ -73,6 +74,7 @@ import { maintenanceOn } from "@/composable/maintenanceState"
 import GlobalRail from '@/components/organisms/Shell/GlobalRail.vue'
 import MobileTabBar from '@/components/organisms/Shell/MobileTabBar.vue'
 import ShellPanels from '@/components/organisms/Shell/ShellPanels.vue'
+import ChatAlerts from '@/components/organisms/Shell/ChatAlerts.vue'
 import TaskDetailOverlay from '@/components/organisms/TaskDetailOverlay/TaskDetailOverlay.vue'
 import AgentLiveStrip from '@/views/Ai/AgentLiveStrip.vue'
 import '@/components/organisms/Shell/style.css'
@@ -656,17 +658,20 @@ const handleSocketsConnection = async () => {
                     });
                     const timeStamp = await apiRequestWithoutCompnay("get", `/api/v1/getTime?zone=${Intl.DateTimeFormat().resolvedOptions().timeZone}`);
                     sessionStorage.setItem('tableaveTime',new Date(timeStamp.data.data).getTime());
-                    socket.value?.emit('disconnectNameSpace',socket.value.id);
+                    // Personal rooms stay, so a hidden tab still hears its counts and chat notices.
+                    socket.value?.emit('goIdle',socket.value.id);
                 } else {
                     if (userId.value !== null && companyId.value) {
                         // Keep the socket we already have if the retry fails, rather than
                         // trading a working connection for null.
+                        const idleSocket = socket.value;
                         const nextSocket = await connectServer(serverURL,namespace,{userRole: getters['settings/companyUserDetail'].roleType})
                         .catch((error) => {
                             console.error("ERROR in socket reconnect: ", error);
                             return null;
                         });
                         if (nextSocket) {
+                            if (idleSocket?.connected && idleSocket !== nextSocket) idleSocket.emit('disconnectNameSpace', idleSocket.id);
                             socket.value = nextSocket;
                             commit("settings/mutateSocketInstance", nextSocket);
                             dispatch("users/myCounts", {uid: userId.value})

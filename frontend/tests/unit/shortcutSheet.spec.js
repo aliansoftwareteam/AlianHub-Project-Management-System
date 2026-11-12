@@ -17,7 +17,7 @@ vi.mock('@/components/organisms/Shell/navItems', () => ({
         moreActive: { value: false }
     })
 }));
-vi.mock('@/components/organisms/Shell/inboxUnread', () => ({ useInboxUnread: () => ({ unread: ref(0), badge: ref('') }) }));
+vi.mock('@/components/organisms/Shell/navUnread', () => ({ useNavUnread: () => ({ counterOf: () => null, tuckedCount: () => null }) }));
 vi.mock('@/composable/index.js', () => ({ useGetterFunctions: () => ({ getUser: () => ({ Employee_Name: 'Asha', Employee_Email: 'asha@example.com' }) }) }));
 vi.mock('@/composable/useAppVersion', () => ({ useAppVersion: () => ({ version: ref('1.0.0') }) }));
 vi.mock('@/services', () => ({ useAuth: () => ({ logOut: vi.fn() }), apiRequestWithoutCompnay: vi.fn(() => Promise.resolve({ data: { status: true } })) }));
