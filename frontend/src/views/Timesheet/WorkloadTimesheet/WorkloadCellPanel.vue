@@ -128,7 +128,7 @@ onMounted(() => nextTick(() => panel.value && panel.value.focus()));
 .wcp__hint { margin: 0 8px 8px; font: var(--text-small); color: var(--ink-2); }
 .wcp__row.is-draggable { cursor: grab; }
 .wcp__row.is-draggable:active { cursor: grabbing; }
-.wcp__grip { flex: none; color: var(--ink-3); }
+.wcp__grip { flex: none; color: var(--ink-2); }
 .wcp__grip.is-off { visibility: hidden; }
 .wcp__rows { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 2px; }
 .wcp__row { width: 100%; display: flex; align-items: center; gap: 10px; padding: 9px 8px; border: 0; border-radius: 8px; background: transparent; color: var(--ink); text-align: start; cursor: pointer; }
