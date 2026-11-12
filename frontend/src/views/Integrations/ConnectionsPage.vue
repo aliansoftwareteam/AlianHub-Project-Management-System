@@ -25,7 +25,6 @@
                     <CompanyApps v-if="connectors.length" />
                 </template>
 
-                <GoogleConnection v-if="hasGoogle && (view === 'all' || view === 'apps')" />
                 <ConnectorQuotas v-if="connectorLimits && (view === 'all' || view === 'apps')" />
 
                 <div class="conn__grid">
@@ -93,7 +92,6 @@ import { apiRequest, apiRequestWithoutCompnay } from "@/services";
 import * as env from "@/config/env";
 import ShellIcon from "@/components/organisms/Shell/ShellIcon.vue";
 import AiSidebar from "@/views/Ai/AiSidebar.vue";
-import GoogleConnection from "./GoogleConnection.vue";
 import ConnectorQuotas from "./ConnectorQuotas.vue";
 import MyConnections from "./MyConnections.vue";
 import AdminConnections from "./AdminConnections.vue";
@@ -120,7 +118,6 @@ const connectorLimits = ref(false);
 // A registry provider is named, so the connect/members routes the first two cards call exist. Guests have no own connection.
 const registryConnectors = ref(false);
 const isGuest = computed(() => Number(getters["settings/companyUserDetail"]?.roleType) === ROLE_GUEST);
-const hasGoogle = computed(() => connectors.value.includes("google_calendar"));
 const connections = ref([]);
 const mcpManifest = ref({});
 const minted = ref(null);

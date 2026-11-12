@@ -81,7 +81,6 @@ function initializeControllers() {
     require('./Modules/Knowledge/init').init(app);
     require('./Modules/Workflows/init').init(app);
     require('./Modules/Integrations/init').init(app);
-    require('./Modules/CloudStorage/init').init(app);
     require('./Modules/Inbox/init').init(app);
     require('./Modules/ImportSettings/init').init(app);
     require('./Modules/Tasks/init.js').init(app);

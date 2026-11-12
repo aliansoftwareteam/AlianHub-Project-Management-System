@@ -28,4 +28,15 @@ describe('the catalogue says when a registry provider is named', () => {
         expect((await flagged('slack')).registryConnectors).toBe(true);
         expect((await flagged('slack google')).registryConnectors).toBe(true);
     });
+
+    it('lists the named registry providers, so the company app card shows wherever its routes exist', async () => {
+        expect((await flagged('google dropbox')).connectors).toEqual(['dropbox', 'google']);
+        expect((await flagged('slack')).connectors).toEqual(['slack']);
+    });
+
+    it('lists no name this server has no provider for, the old google_calendar among them', async () => {
+        const body = await flagged('google_calendar teleport');
+        expect(body.connectors).toBeUndefined();
+        expect(body.registryConnectors).toBeUndefined();
+    });
 });

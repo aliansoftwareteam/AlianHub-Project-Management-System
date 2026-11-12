@@ -13,9 +13,8 @@ const CATALOG = [
     { key: 'microsoft_teams', name: 'Microsoft Teams', category: 'Chat', icon: '👔', description: 'Post task updates to a Teams channel.', fields: [{ key: 'webhook_url', label: 'Incoming webhook URL', secret: true, required: true, format: 'public_https_url' }] },
     { key: 'zapier', name: 'Zapier', category: 'Automation', icon: '⚡', description: 'Connect to 6000+ apps via a catch hook.', fields: [{ key: 'hook_url', label: 'Zapier catch hook URL', secret: true, required: true, format: 'zapier_hook_url' }] },
     { key: 'custom_iframe', name: 'Custom embed', category: 'Apps', icon: '🪟', description: 'Embed an external tool as an app panel.', multiple: true, fields: [{ key: 'name', label: 'App name' }, { key: 'url', label: 'Embed URL (https)', required: true, format: 'embed_url' }] },
-    // Cloud storage providers (Google Drive / Dropbox) are deliberately absent:
-    // Modules/CloudStorage owns them on Settings → Integrations (AHE-3838), and a
-    // second place to configure the same thing would compete with it.
+    // Google Drive and Dropbox are deliberately absent: the attachment picker reaches them through each person's
+    // own connection on the connectors module (076), and a second place to configure them would compete with it.
 ];
 
 const MAX_FIELD_LENGTH = 2000;

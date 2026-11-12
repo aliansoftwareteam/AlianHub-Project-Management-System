@@ -48,10 +48,9 @@ describe('email-in inboxes take the company and user from the verified request',
     });
 });
 
-describe('integrations, cloud storage and audit logs take the company from the verified request', () => {
+describe('integrations and audit logs take the company from the verified request', () => {
     it.each([
         ['/api/v1/integrations/connections', () => owner],
-        ['/api/v1/cloud-storage/providers', () => member],
         ['/api/v1/audit-logs', () => owner],
     ])('%s answers a normal call and refuses a query naming another company', async (route, who) => {
         const normal = await who().api.get(route);

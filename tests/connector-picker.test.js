@@ -67,6 +67,51 @@ describe('pickerProviders (pure)', () => {
         expect(P.isDropboxContentUrl('http://dl.dropboxusercontent.com/x')).toBe(false);
         expect(P.isDropboxContentUrl('https://evil.com/x')).toBe(false);
     });
+
+    it.each([
+        'https://dl.dropboxusercontent.com/s/abc/file.pdf',
+        'https://www.dropbox.com/s/abc/file.pdf?dl=1',
+        'https://DL.DROPBOXUSERCONTENT.COM/x',
+    ])('accepts the Dropbox content URL %s', (url) => {
+        expect(P.isDropboxContentUrl(url)).toBe(true);
+    });
+
+    it.each([
+        'file:///etc/passwd',
+        'https://169.254.169.254/latest/meta-data',
+        'https://evil.test/dropbox.com',
+        'https://user:pw@dl.dropboxusercontent.com/x',
+        'https://notdropbox.com/x',
+        'https://dl.dropboxusercontent.com.evil.test/x',
+        'https://dl.dropboxusercontent.com/a b',
+        '',
+        null,
+    ])('refuses %p as a Dropbox content URL', (url) => {
+        expect(P.isDropboxContentUrl(url)).toBe(false);
+    });
+
+    it('encodes the Drive file id into the download and thumbnail paths', () => {
+        expect(P.downloadRequestFor('google_drive', 'a/b c').url).toBe('https://www.googleapis.com/drive/v3/files/a%2Fb%20c?alt=media&supportsAllDrives=true');
+        expect(P.thumbnailRequestFor('google_drive', 'a/b').url).toContain('/files/a%2Fb?fields=thumbnailLink,hasThumbnail');
+        expect(P.downloadRequestFor('onedrive', 'x')).toBeNull();
+    });
+
+    it('takes a Drive thumbnail only when the file has one', () => {
+        const { pick } = P.thumbnailRequestFor('google_drive', 'id1');
+        expect(pick({ hasThumbnail: true, thumbnailLink: 'https://t/x' })).toBe('https://t/x');
+        expect(pick({ hasThumbnail: false, thumbnailLink: 'https://t/x' })).toBe('');
+        expect(pick({ hasThumbnail: true })).toBe('');
+        expect(pick(null)).toBe('');
+    });
+
+    it('clips input and accepts only https URLs without spaces', () => {
+        expect(P.clip('x'.repeat(600))).toHaveLength(512);
+        expect(P.clip('abcdef', 3)).toBe('abc');
+        expect(P.clip(null)).toBe('');
+        expect(P.isHttpsUrl('https://a.test/x')).toBe(true);
+        expect(P.isHttpsUrl('http://a.test')).toBe(false);
+        expect(P.isHttpsUrl('https://a.test/a b')).toBe(false);
+    });
 });
 
 describe('providerApi.revoke — bearer vs form', () => {

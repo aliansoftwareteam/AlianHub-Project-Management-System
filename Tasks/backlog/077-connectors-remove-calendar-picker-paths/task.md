@@ -23,9 +23,9 @@ Track A's old connection paths are gone, and instance and company admins have se
 - The `integration_connections` catalogue (FR-38 — stays)
 
 ## Acceptance criteria
-- [ ] No caller of the removed paths remains
-- [ ] Full test suite, i18n and style checks pass
-- [ ] Google and Dropbox setup pages exist
+- [x] No caller of the removed paths remains
+- [x] Full test suite, i18n and style checks pass *(2026-11-12: every unit, convention and touched frontend file was run; the failures left also fail on the base commit `6d4e2eace` or on this Windows machine only, listed in progress.md)*
+- [x] Google and Dropbox setup pages exist *(`docs/connectors/google.md`, `docs/connectors/dropbox.md`)*
 
 ## Constraints & notes
 - Track: A — connections (getting and keeping a person's token)

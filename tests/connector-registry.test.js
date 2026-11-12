@@ -115,10 +115,16 @@ describe('a provider definition', () => {
         expect(google.readAccount({ tokenResponse: { id_token: `h.${claims}.s` } })).toEqual({ id: '1234', label: 'a@example.com' });
     });
 
+    it('labels a Google account with its email only when Google verified it', () => {
+        const claims = Buffer.from(JSON.stringify({ sub: '1234', email: 'a@example.com', email_verified: false })).toString('base64url');
+        expect(google.readAccount({ tokenResponse: { id_token: `h.${claims}.s` } })).toEqual({ id: '1234', label: '' });
+    });
+
     it('refuses a Google token response without an account id', () => {
         const noSub = Buffer.from(JSON.stringify({ email: 'a@example.com' })).toString('base64url');
         expect(() => google.readAccount({ tokenResponse: {} })).toThrow('no id_token subject');
         expect(() => google.readAccount({ tokenResponse: { id_token: `h.${noSub}.s` } })).toThrow('no id_token subject');
+        expect(() => google.readAccount({ tokenResponse: { id_token: 'not-a-jwt' } })).toThrow('no id_token subject');
     });
 });
 
