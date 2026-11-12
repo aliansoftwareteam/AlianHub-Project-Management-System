@@ -1,5 +1,11 @@
 import { isOfflineError } from '@/offline/offlineRules';
 
+/* A login link or single sign-on comes back here to finish signing in, so whatever account this browser
+ * remembers must not send it elsewhere first. */
+export const isSignInLanding = (route) => route?.name === 'Log-in'
+    && Boolean(route.query?.uid)
+    && (route.query.sso === 'ok' || route.query.magic === 'ok');
+
 /* `unreachable` means the server gave no answer at all, which says nothing about the session: the
  * person may still be signed in, so the caller must not treat it as signed out. */
 export const readSessionUser = async (userId, fetchUser) => {

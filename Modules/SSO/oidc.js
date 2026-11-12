@@ -6,10 +6,12 @@ const { extractIdentity } = require("./helpers/ssoRules");
 const { ssoSignInUser, SSO_NOT_ALLOWED } = require("./provisioning");
 const { finalizeSsoSession, ssoFailed } = require("./ssoSession");
 const { isKnownCompany } = require("../../Config/knownCompany");
+const { sameOriginPath } = require("../Auth/helpers/sameOriginPath");
 
 // `openid-client` is lazy-required so app load never breaks before `npm install`.
 const apiBase = () => String(process.env.APIURL || '').replace(/\/$/, '');
 const REDIRECT_URI = () => `${apiBase()}/api/v2/sso/oidc/callback`;
+const EMAIL = /^[^\s@]{1,64}@[^\s@]{1,190}$/;
 
 const loadConfig = async (companyId) => ((await isKnownCompany(companyId)) ? MongoDbCrudOpration(companyId, {
     type: SCHEMA_TYPE.SSO_CONFIGS, data: [{ deletedStatusKey: 0, isEnabled: true }],
@@ -39,9 +41,9 @@ const buildClient = async (cfg) => {
 exports.oidcInitiate = async (req, res) => {
     try {
         const companyId = req.query.companyId || req.headers['companyid']; // tenant-scoping: sign-in starts before any session; the company only picks the IdP, and the one-time state binds the callback to it
-        if (!companyId) return res.status(400).send('companyId is required');
+        if (!companyId) return ssoFailed(res, 'config');
         const cfg = await loadConfig(companyId);
-        if (!cfg || cfg.provider !== 'oidc') return res.status(404).send('OIDC SSO is not configured for this company');
+        if (!cfg || cfg.provider !== 'oidc') return ssoFailed(res, 'config');
         const { generators } = require('openid-client');
         const client = await buildClient(cfg);
         const state = generators.state();
@@ -49,13 +51,15 @@ exports.oidcInitiate = async (req, res) => {
         const codeVerifier = generators.codeVerifier();
         const codeChallenge = generators.codeChallenge(codeVerifier);
         // CSRF (state) + nonce + PKCE verifier, consumed once on callback (5 min TTL).
-        myCache.set(`sso:oidc:${state}`, { companyId: String(companyId), nonce, codeVerifier }, 300);
+        myCache.set(`sso:oidc:${state}`, { companyId: String(companyId), nonce, codeVerifier, redirect: sameOriginPath(req.query.redirect_url) }, 300);
+        const loginHint = String(req.query.login_hint || '').trim();
         const url = client.authorizationUrl({
             scope: (cfg.oidc && cfg.oidc.scopes) || 'openid email profile',
             state,
             nonce,
             code_challenge: codeChallenge,
             code_challenge_method: 'S256',
+            ...(EMAIL.test(loginHint) ? { login_hint: loginHint } : {}),
         });
         return res.redirect(url);
     } catch (error) {
@@ -71,7 +75,7 @@ exports.oidcCallback = async (req, res) => {
         const cached = params.state ? myCache.get(`sso:oidc:${params.state}`) : null;
         if (!cached) return ssoFailed(res, 'state');
         myCache.del(`sso:oidc:${params.state}`); // single-use → replay protection
-        const { companyId, nonce, codeVerifier } = cached;
+        const { companyId, nonce, codeVerifier, redirect } = cached;
         const cfg = await loadConfig(companyId);
         if (!cfg || cfg.provider !== 'oidc') return ssoFailed(res, 'config');
         const client = await buildClient(cfg);
@@ -79,7 +83,7 @@ exports.oidcCallback = async (req, res) => {
         const id = extractIdentity(tokenSet.claims(), (cfg.oidc && cfg.oidc.claimMap) || {});
         if (!id.valid) return ssoFailed(res, 'identity');
         const uid = await ssoSignInUser({ companyId, cfg, identity: id });
-        return finalizeSsoSession(req, res, uid, companyId);
+        return finalizeSsoSession(req, res, uid, companyId, redirect);
     } catch (error) {
         if (error && error.code === SSO_NOT_ALLOWED) return ssoFailed(res, 'not_allowed');
         if (error && error.code === 'seat_limit') return ssoFailed(res, 'seat_limit');

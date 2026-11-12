@@ -1,4 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import fs from 'fs';
+import path from 'path';
 import { flushPromises, mount } from '@vue/test-utils';
 
 const USER_ID = '6f0000000000000000000009';
@@ -28,6 +30,7 @@ vi.mock('@/plugins/oauth/ProviderButton.vue', () => ({ default: { name: 'Provide
 vi.mock('@/components/templates/AuthShell/AuthShell.vue', () => ({ default: { name: 'AuthShell', template: '<div><slot /></div>' } }));
 
 import * as env from '@/config/env';
+import { isSignInLanding } from '@/router/sessionCheck';
 import Login from '@/views/Authentication/Login/Login.vue';
 
 const landFromSso = async (query) => {
@@ -93,6 +96,22 @@ describe('landing on the sign-in page after single sign-on', () => {
         expect(mocks.replace).toHaveBeenCalledWith(`/${SSO_COMPANY}`);
     });
 
+    it('opens the page the person was on their way to', async () => {
+        const deepLink = `/${SSO_COMPANY}/project/p1/list`;
+
+        await landFromSso({ sso: 'ok', uid: USER_ID, workspace: SSO_COMPANY, redirect_url: deepLink });
+
+        expect(localStorage.getItem('selectedCompany')).toBe(SSO_COMPANY);
+        expect(mocks.replace).toHaveBeenCalledWith(deepLink);
+        expect(reload).toHaveBeenCalled();
+    });
+
+    it('opens the workspace instead of a page in a workspace the account is not in', async () => {
+        await landFromSso({ sso: 'ok', uid: USER_ID, workspace: SSO_COMPANY, redirect_url: `/${STRANGER_COMPANY}/project/p1/list` });
+
+        expect(mocks.replace).toHaveBeenCalledWith(`/${SSO_COMPANY}`);
+    });
+
     it('asks which workspace to open when the account does not belong to the one named', async () => {
         const wrapper = await landFromSso({ sso: 'ok', uid: USER_ID, workspace: STRANGER_COMPANY });
 
@@ -110,10 +129,39 @@ describe('landing on the sign-in page after single sign-on', () => {
         expect(reload).not.toHaveBeenCalled();
     });
 
-    it('shows why the identity provider refused the sign-in', async () => {
-        const wrapper = await landFromSso({ ssoError: 'not_allowed' });
+    it.each([
+        ['not_allowed', 'Auth.sso_not_allowed'],
+        ['seat_limit', 'Plan.refused.seat_limit'],
+        ['config', 'Auth.sso_not_configured'],
+        ['state', 'Auth.sso_failed'],
+    ])('says why single sign-on stopped when it comes back with %s', async (reason, message) => {
+        const wrapper = await landFromSso({ ssoError: reason });
 
-        expect(wrapper.text()).toContain('Auth.sso_not_allowed');
+        expect(wrapper.text()).toContain(message);
         expect(mocks.apiRequestWithoutCompnay).not.toHaveBeenCalled();
+    });
+});
+
+describe('the router on a sign-in landing', () => {
+    it.each([
+        [{ sso: 'ok', uid: USER_ID, workspace: SSO_COMPANY }, true],
+        [{ magic: 'ok', uid: USER_ID }, true],
+        [{ sso: 'ok' }, false],
+        [{ ssoError: 'not_allowed' }, false],
+        [{}, false],
+    ])('treats the login page with %o as a landing: %s', (query, landing) => {
+        expect(isSignInLanding({ name: 'Log-in', query })).toBe(landing);
+    });
+
+    it('treats no other page as a landing', () => {
+        expect(isSignInLanding({ name: 'Home', query: { sso: 'ok', uid: USER_ID } })).toBe(false);
+    });
+
+    it('lets a landing reach the sign-in page before it asks who this browser last signed in as', () => {
+        const guard = fs.readFileSync(path.resolve(__dirname, '../../src/router/index.js'), 'utf8');
+        const landing = guard.indexOf('if (isSignInLanding(to))');
+
+        expect(landing).toBeGreaterThan(-1);
+        expect(landing).toBeLessThan(guard.indexOf('readSessionUser(localUserId'));
     });
 });
