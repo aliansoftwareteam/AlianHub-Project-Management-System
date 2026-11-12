@@ -94,3 +94,4 @@ Auto-maintained registry of all tasks. Reflects YAML frontmatter from each `task
 | 092 | Time reports — pick a whole team in the People filter | active | medium | 086 | active/092-report-people-filter-teams |
 | 093 | Workload — cells show the hours, readable at any size | active | medium | 086 | active/093-workload-cell-hours |
 | 102 | Chat message alerts and unread badge — the other person hears about a message, and the Chat icon shows a red count | active | high | — | active/102-chat-message-alerts-badge |
+| 103 | Time tracking settings redesign — a quiet settings page instead of a marketing banner | active | medium | — | active/103-time-tracking-settings-redesign |
