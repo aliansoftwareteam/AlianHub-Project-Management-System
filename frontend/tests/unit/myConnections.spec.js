@@ -81,6 +81,13 @@ describe('coming back from a connector', () => {
         expect(router.replace).toHaveBeenCalled();
     });
 
+    it.each(['access_denied', 'consent_required'])('names the admin route when the provider answers %s', async (reason) => {
+        const wrapper = await open({ query: { connector: 'outlook', result: 'error', reason } });
+        expect(callsTo('post')).toEqual([]);
+        expect(wrapper.find('[data-test="mc-notice"]').text()).toBe(t('Connectors.conn.return_consent', { provider: 'Outlook' }));
+        expect(router.replace).toHaveBeenCalled();
+    });
+
     it('leaves the address alone when it is not a return', async () => {
         await open({ query: { tab: 'apps' } });
         expect(router.replace).not.toHaveBeenCalled();

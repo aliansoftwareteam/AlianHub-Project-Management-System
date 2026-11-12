@@ -251,11 +251,18 @@ const complete = async (provider, state, code) => {
     }
 };
 
+/* Microsoft answers access_denied both when the person declines and when their organisation lets only an admin
+ * approve apps, so the message names the admin route rather than guess which it was. */
+const CONSENT_REFUSED = ["access_denied", "consent_required"];
+
 const handleReturn = async () => {
-    const { connector, state, code, result } = route.query;
+    const { connector, state, code, result, reason } = route.query;
     if (!connector) return;
     if (state && code) await complete(String(connector), String(state), String(code));
-    else if (result === "error") notice.value = t("Connectors.conn.return_error", { provider: label(String(connector)) });
+    else if (result === "error") {
+        const key = CONSENT_REFUSED.includes(String(reason)) ? "Connectors.conn.return_consent" : "Connectors.conn.return_error";
+        notice.value = t(key, { provider: label(String(connector)) });
+    }
     clearReturn();
 };
 
