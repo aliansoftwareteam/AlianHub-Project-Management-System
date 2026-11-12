@@ -57,6 +57,7 @@ export const renderNotice = (it, { t, changeText }) => {
         return escapeHtml(t("Inbox.doc_shared", { doc: clip(data.pageTitle) || t("Docs.untitled") }));
     }
     if (it.changeType === "connector_slack_bot_retired") return escapeHtml(t("Inbox.connector_slack_bot_retired"));
+    if (it.changeType === "connector_tool_changed") return escapeHtml(t("Inbox.connector_tool_changed", { name: clip(data.name) }));
     if (it.changeType === "credential_expiring" && data.name && dayOf(data.expiresAt)) {
         const key = data.kind === "connection" ? "Inbox.credential_expiring_connection" : "Inbox.credential_expiring_token";
         return escapeHtml(t(key, { name: clip(data.name), date: dayOf(data.expiresAt) }));

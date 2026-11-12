@@ -11,6 +11,7 @@ const { CALLBACK_PATH } = require('../Agents/connectors/googleConnection');
 const registry = require('./registry');
 const apps = require('./apps');
 const connection = require('./connection');
+const toolReviews = require('./toolReviews');
 
 // The generic '/:provider/callback' and the legacy google callback are the same URL for this provider id.
 const LEGACY_SHARED_PROVIDER = CALLBACK_PATH.split('/').filter(Boolean).slice(-2, -1)[0];
@@ -145,6 +146,31 @@ exports.callback = async (req, res, next) => {
     res.set({ 'Cache-Control': 'no-store', 'Referrer-Policy': 'no-referrer' });
     return res.redirect(302, `${target.origin}/#${target.path}?${new URLSearchParams(target.query)}`);
 };
+
+const managerOrRefuse = (run) => async (who, req, res) => {
+    if (who.manager) return run(who, req, res);
+    refuse(res, 403, 'Only an owner or admin can review the tools of a connected app.');
+    return undefined;
+};
+
+const catalogToolsOf = (provider) => require('./tools').all().filter((tool) => tool.provider === provider);
+
+/* Owner/admin: each tool of an MCP app, and whether the app changed it since it was reviewed. */
+exports.tools = handle('list a connector\'s tools', 'Tools fetched.', managerOrRefuse(async (who, req, res) => {
+    const provider = providerOf(req, res);
+    return provider ? { tools: await toolReviews.listFor(who.companyId, registry.get(provider), catalogToolsOf(provider)) } : undefined;
+}));
+
+/* Owner/admin: approve a changed tool as the app describes it now, or keep it off. */
+exports.reviewTool = handle('review a connector\'s tool', 'Tool reviewed.', managerOrRefuse(async (who, req, res) => {
+    const provider = providerOf(req, res);
+    if (!provider) return undefined;
+    const tool = String((req.params || {}).tool || '');
+    if (!catalogToolsOf(provider).some((t) => t.mcp && t.mcp.tool === tool)) { refuse(res, 404, 'This app has no such tool.'); return undefined; }
+    const out = await toolReviews.review({ companyId: who.companyId, definition: registry.get(provider), tool, enabled: (req.body || {}).enabled === true, actor: who.actor });
+    if (!out.ok) { refuse(res, 409, 'This tool has not changed since it was reviewed, so there is nothing to look at again.', { code: out.code }); return undefined; }
+    return { tools: await toolReviews.listFor(who.companyId, registry.get(provider), catalogToolsOf(provider)) };
+}));
 
 /* Owner/admin: the connections members hold, without whose account or any handle. */
 exports.members = async (req, res) => {

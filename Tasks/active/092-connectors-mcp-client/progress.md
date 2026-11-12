@@ -8,10 +8,10 @@
 - [x] Runner hands MCP tools `connection.mcp`; 429 holds the connection, 401 marks it broken, a tool's error text stays out
 - [x] Contract section 9 (063)
 - [x] Fake MCP server and tests
-- [ ] Record changed tools in `connector_tools` and tell owners and admins
+- [x] Record changed tools in `connector_tools` and tell owners and admins; owner/admin re-approval
 
 ## Last step
-The MCP road works end to end against a fake server, from an agent read, AlianHub's MCP server and an approved write. Open: recording a changed tool and telling owners and admins.
+Done on `feat/connectors-mcp-transport`. Catalog shapes for real apps are pinned with `scripts/connector-tool-shapes.js` and a test account (094, 095, 075).
 
 ## Blockers
 None.
@@ -33,3 +33,9 @@ None.
   - The 92 connector, connectors, migration and MCP suites (3,418 tests) pass unchanged.
   - Conventions: 29 of 30 files pass. `plain-words` fails only its "baseline stored sorted" check, because this checkout wrote `scripts/plain-words-baseline.json` with CRLF while git stores it as LF (`eol=lf`); the file is untouched by this change.
 - A plain-Node run of `mcpClient` against the fake server left no open handles; one call took about 30 ms.
+
+- Finished the open box:
+  - `Modules/Connectors/toolReviews.js`: a call that finds a tool changed records it in `connector_tools` (state `changed`, off) and tells owners and admins once, through the Inbox notice `connector_tool_changed`. An owner or admin can approve the tool as the app describes it now, or keep it off: `GET /api/v2/connectors/admin/tools/:provider` and `PUT /api/v2/connectors/admin/tools/:provider/:tool`. An approved shape is what later calls go out with (`approvedShape`); read or write stays what the catalog says. A tool the catalog never reviewed stays off whatever is stored.
+  - Inbox: the notice renders from `Inbox.connector_tool_changed` and opens Connections. Audit words for `connector.tool_reviewed`, `connector.app_registered` and `connector.app_registration_dropped` are in `eventWords.js` and `en.js`; the i18n backfill has run.
+  - `scripts/connector-tool-shapes.js`: for catalog maintainers. It lists an MCP app's live tools with their shapes and descriptions next to what `tools.js` pins, using a test token in `CONNECTOR_REVIEW_TOKEN` (documented in env-doc). Pinning a shape after reading the description is the review.
+  - Tests: `tests/connector-mcp-review.test.js`, 5 tests: refused, recorded and told once; listed for an owner, refused for a member; approved and called again; kept off with no second notice; an unknown tool refused. With `connector-mcp.test.js`, 32 pass. The audit-label, i18n, env-doc and lifecycle tests pass.

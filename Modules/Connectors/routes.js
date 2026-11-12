@@ -50,6 +50,9 @@ const genericRoutes = (app) => {
     app.post('/api/v2/connectors/:provider/token', agentsRefused('connector.connect'), providerLimiter, providers.saveToken);
     app.put('/api/v2/connectors/connections/:id/products', agentsRefused('connector.products_changed'), providerLimiter, providers.setProducts);
     app.delete('/api/v2/connectors/connections/:id', agentsRefused('connector.revoke'), providerLimiter, providers.disconnect);
+    // Owners and admins look again at a tool an app changed; an agent never approves its own tools.
+    app.get('/api/v2/connectors/admin/tools/:provider', providers.tools);
+    app.put('/api/v2/connectors/admin/tools/:provider/:tool', agentsRefused('connector.tool_reviewed'), providerLimiter, providers.reviewTool);
 };
 
 /* The Drive/Dropbox attachment picker (076). `picker` is a literal segment, so `:source` never collides with a

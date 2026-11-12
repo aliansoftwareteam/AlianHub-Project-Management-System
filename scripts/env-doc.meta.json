@@ -1540,5 +1540,10 @@
   "CONNECTOR_SIGNIN_PROVIDERS": {
     "group": "integrations",
     "description": "With CONNECTOR_SIGNIN_URL, the providers the shared sign-in service has an app for, as a list separated by commas (for example github,slack,hubspot,canva). A workspace's own app for a provider still wins."
+  },
+  "CONNECTOR_REVIEW_TOKEN": {
+    "group": "integrations",
+    "description": "Only for scripts/connector-tool-shapes.js, run by whoever maintains the connector catalog: an access token of a test account at the MCP app being reviewed. Never set it on a running server.",
+    "secret": true
   }
 }

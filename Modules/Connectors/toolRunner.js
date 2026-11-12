@@ -12,6 +12,7 @@ const health = require('./health');
 const callAudit = require('./callAudit');
 const providerApi = require('./providerApi');
 const mcpClient = require('./mcpClient');
+const toolReviews = require('./toolReviews');
 
 const VIA = Object.freeze({ AGENT: 'agent', MCP: 'mcp', APPROVED: 'approved' });
 const STATE = Object.freeze({ PENDING: 'pending', APPLIED: 'applied', FAILED: 'failed', REFUSED: 'refused' });
@@ -152,15 +153,17 @@ const mcpRefusal = async (call, error) => {
 const mcpCallerFor = (call) => async (name, args) => {
     const { tool, companyId, userId, connection, trace } = call;
     if (name !== tool.mcp.tool) throw refusal('tool_off', `${tool.key} can only call ${tool.mcp.tool}.`);
+    const shape = await toolReviews.approvedShape(companyId, tool.provider, name, tool.mcp.shape);
     const token = await connection.getAccessToken().catch(spoken(tool, companyId, userId));
     trace.called = true;
     let result;
     try {
         result = await mcpClient.callTool({
             provider: tool.provider, url: tool.definition.mcp.url, hosts: tool.definition.egressHosts, token,
-            name, args, shape: tool.mcp.shape, timeoutMs: TIMEOUT_MS, maxBytes: MAX_BYTES,
+            name, args, shape, timeoutMs: TIMEOUT_MS, maxBytes: MAX_BYTES,
         });
     } catch (error) {
+        if (error && error.code === 'tool_changed') await toolReviews.noteChanged({ companyId, definition: tool.definition, tool: name, shape: error.current });
         throw await mcpRefusal(call, error);
     }
     if (result && result.isError) throw refusal('provider_refused', `${tool.definition.name} said this could not be done, so it did not go through.`);

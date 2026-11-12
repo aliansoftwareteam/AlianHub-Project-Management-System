@@ -126,7 +126,7 @@ const callTool = (call, now = Date.now()) => withSession(call, async (client, op
     if (!shapes.has(name)) throw refusal('tool_missing', `The app no longer offers ${name}, so it was not called.`);
     if (shapes.get(name) !== shape) {
         logger.error(`${LOG} ${provider} tool ${name} changed since it was reviewed; it stays off until it is reviewed again`);
-        throw refusal('tool_changed', `The app changed ${name} since it was reviewed, so it was not called. An owner or admin reviews it again first.`);
+        throw Object.assign(refusal('tool_changed', `The app changed ${name} since it was reviewed, so it was not called. An owner or admin reviews it again first.`), { current: shapes.get(name) });
     }
     return client.callTool({ name, arguments: args || {} }, undefined, options);
 });

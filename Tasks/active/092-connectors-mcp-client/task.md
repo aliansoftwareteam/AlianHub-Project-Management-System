@@ -31,7 +31,7 @@ AlianHub calls an app's remote MCP server with the member's own access, offers o
 
 ## Acceptance criteria
 - [x] A fake server's tool is called as the member, with that member's token only
-- [ ] A tool whose description or schema changes is hidden until reviewed, and owners and admins are told *(refused at call time and logged; recording it in `connector_tools` and telling owners and admins is still open)*
+- [x] A tool whose description or schema changes is hidden until reviewed, and owners and admins are told
 - [x] A server's own description never reaches a model unreviewed
 - [x] Output over the cap is cut; the run is tainted; a 429 holds that connection only
 - [x] A request to a host not on the egress list is refused

@@ -869,7 +869,7 @@ const open = (it) => {
         router.push({ name: 'Goal', params: { cid: companyId?.value, goalId: String(it.changeData.goalId) } }).catch(() => {});
         return;
     }
-    if (it.changeType === 'connector_slack_bot_retired' && router.hasRoute('Connections')) {
+    if (['connector_slack_bot_retired', 'connector_tool_changed'].includes(it.changeType) && router.hasRoute('Connections')) {
         router.push({ name: 'Connections', params: { cid: companyId?.value } }).catch(() => {});
         return;
     }
