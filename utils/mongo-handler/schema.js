@@ -2219,7 +2219,7 @@ const schema = {
         companyId: { type: String, required: true },
         connectionId: { type: String, required: true },
         userId: { type: String, required: true },
-        // { type: 'agent' | 'mcp', id }
+        // { type: 'agent' | 'mcp' | 'chat', id }
         actor: { type: Object, required: true },
         day: { type: String, required: true },
         reads: { type: Number, default: 0, required: false },

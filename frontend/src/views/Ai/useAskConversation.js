@@ -90,7 +90,8 @@ export function useAskConversation({ t }) {
                 mode: payload.mode,
                 usage: payload.usage,
                 turnId: payload.turnId || "",
-                shareToken: payload.shareToken || ""
+                shareToken: payload.shareToken || "",
+                connectors: payload.connectors || null
             });
             if (payload.threadId && payload.threadId !== threadId.value) {
                 threadId.value = payload.threadId;
@@ -110,6 +111,7 @@ export function useAskConversation({ t }) {
         }
         const data = payload.data || {};
         live.sources = data.sources || [];
+        live.connectors = data.connectors || null;
         if (data.configured === false) {
             live.status = "unconfigured";
             live.error = t("AiLanding.no_model_note");

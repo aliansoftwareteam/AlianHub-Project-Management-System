@@ -13,7 +13,7 @@ const callAudit = require('./callAudit');
 const providerApi = require('./providerApi');
 const mcpClient = require('./mcpClient');
 
-const VIA = Object.freeze({ AGENT: 'agent', MCP: 'mcp', APPROVED: 'approved' });
+const VIA = Object.freeze({ AGENT: 'agent', MCP: 'mcp', CHAT: 'chat', APPROVED: 'approved' });
 const STATE = Object.freeze({ PENDING: 'pending', APPLIED: 'applied', FAILED: 'failed', REFUSED: 'refused' });
 const TIMEOUT_MS = 10000;
 const MAX_BYTES = 512 * 1024;
@@ -262,10 +262,10 @@ const readAdmitted = async ({ companyId, userId, via, runId, callerId, key, inpu
     return { ...fieldsOf(tool, answered.fields), text, chars: text.length, truncated: whole.length > text.length, taint: [source] };
 };
 
-/* `callerId` is the agent on a run and the AI client over MCP: what the usage row and the audit row name besides the person. */
+/* `callerId` is the agent on a run, the AI client over MCP and Ask in the AI chat: what the usage row and the audit row name besides the person. */
 const read = ({ companyId, userId, via, runId = null, callerId = '', key, input = {} }) => tracked(
     { companyId, userId, via, callerId, runId, key, tool: tools.get(key), phase: callAudit.PHASE.READ, input },
     (trace) => readAdmitted({ companyId, userId, via, runId, callerId, key, input }, trace),
 );
 
-module.exports = { VIA, STATE, read, admitWrite, write, plain };
+module.exports = { VIA, STATE, read, admitWrite, write, plain, connectionOf };

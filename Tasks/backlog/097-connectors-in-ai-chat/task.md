@@ -30,12 +30,12 @@ In the AI chat, a member asks "what is the status of this PR?" or "@Notion what 
 - The command palette's one-shot Ask
 
 ## Acceptance criteria
-- [ ] `@GitHub` and typing "GitHub" both add the chip; removing it before sending stops the read
+- [x] `@GitHub` and typing "GitHub" both add the chip; removing it before sending stops the read
 - [ ] A pull request link in the question is read through the asker's GitHub and cited, with no model call to pick it
-- [ ] A model-picked call outside the turned-on read tools, or with arguments that fail the schema, is refused
-- [ ] A member without the connection is told "connect GitHub on Connectors"
+- [x] A model-picked call outside the turned-on read tools, or with arguments that fail the schema, is refused
+- [x] A member without the connection is told "connect GitHub on Connectors"
 - [ ] "Comment on that PR" lands in the Inbox, not in GitHub
-- [ ] Unit tests: name matching, chip payload, the read step's checks, the pull request rule
+- [x] Unit tests: name matching, chip payload, the read step's checks, the pull request rule
 
 ## Constraints & notes
 - Track: B — tools (using that access safely)
