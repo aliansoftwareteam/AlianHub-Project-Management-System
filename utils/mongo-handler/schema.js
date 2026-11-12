@@ -1201,6 +1201,12 @@ const schema = {
         skills: { type: Array, default: [], required: false },
         // Subset of Modules/Agents/registry.js keys this agent may use. Empty = every registry action.
         allowedActions: { type: Array, default: [], required: false },
+        // The connected apps and their tools this agent may use (Modules/Agents/agentConnectors.js). Empty = none, unlike allowedActions.
+        connectors: {
+            type: [{ _id: false, provider: { type: String, required: true }, tools: { type: [String], default: [] } }],
+            default: [],
+            required: false,
+        },
         // The role it plays ('blueprint/slug' of Modules/Agents/roles), so the dispatcher can give a role's task to the least loaded of its agents.
         role: { type: String, required: false },
         // 'team-pack:<blueprint>' on an agent a team pack made, so undoing the pack can find it again.

@@ -11,7 +11,7 @@ const KIND = Object.freeze({ READ: 'read', WRITE: 'write' });
 const PROPERTY_TYPES = Object.freeze(['string', 'integer', 'number', 'boolean']);
 const MIN_DESCRIPTION = 20;
 const FIELD = /^[a-z][A-Za-z]{0,29}$/;
-const RESERVED_FIELDS = Object.freeze(['text', 'chars', 'truncated', 'taint']);
+const RESERVED_FIELDS = Object.freeze(['text', 'chars', 'truncated', 'taint', 'failed', 'reason']);
 const MCP_TOOL = /^[A-Za-z0-9_.\-/]{1,128}$/;
 const SHAPE = /^[a-f0-9]{64}$/;
 

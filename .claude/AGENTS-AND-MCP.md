@@ -53,6 +53,7 @@ A change that waits is a proposal (`Modules/Agents/proposals.js`). It says what,
 - **Daily look** (`Modules/Agents/manager/`): rules find slipping, blocked, stale and unowned work and file proposals. It changes nothing itself.
 - **Triage of new tasks** (`Modules/Agents/managerTriage.js`, kept apart from the daily look so the look stays model-free): on a switched-on project's working day, one call to the server's configured, priced model for a batch of new tasks suggests a priority, an estimate and a likely duplicate. Each is a finding and a proposal a person accepts; the manager is at Suggest. It skips with AI off, no priced provider or the spend cap reached, and its calls are booked under `project_triage`. Task text and the model's answer are data.
 - **Per-project limits and pause**: `Modules/Agents/projectLimits.js`.
+- **Connector ticks** (`Modules/Agents/agentConnectors.js`, task 098): a built-in agent reads from or proposes to a connected app only with that tool ticked on its `connectors`; none ticked means none. `toolRunner.read` refuses an unticked read, `narrowChanges` drops an unticked write, and `proposals.create` refuses one that slipped past. The connection used is always the run's `startedBy`, never the agent's maker.
 
 ---
 

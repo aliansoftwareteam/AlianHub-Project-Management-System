@@ -233,6 +233,7 @@ module.exports.AGENT_SESSIONS = '/api/v2/agent-sessions';
 module.exports.TIMESHEET_HOURS_BY_SOURCE = '/api/v1/timesheet/hours-by-source';
 module.exports.AGENT_PROPOSALS = '/api/v2/agents/proposals';
 module.exports.AGENT_REGISTRY = '/api/v2/agents/registry';
+module.exports.AGENT_CONNECTORS = '/api/v2/agents/connectors';
 module.exports.AGENT_SKILLS = '/api/v2/agents/skills';
 module.exports.AGENT_ROLES = '/api/v2/agents/roles';
 module.exports.AGENT_SKILL_CATALOGUES = '/api/v2/agents/skills/catalogues';

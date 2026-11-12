@@ -212,7 +212,8 @@ const write = ({ companyId, userId, key, params = {}, beforeSend = async () => {
     },
 );
 
-const readAdmitted = async ({ companyId, userId, via, runId, callerId, key, input }, trace) => {
+/* An agent's read is refused unless the agent has the tool ticked; `agentConnectors` left out ticks nothing. */
+const readAdmitted = async ({ companyId, userId, via, runId, callerId, agentConnectors, key, input }, trace) => {
     const tool = tools.get(key);
     if (!tool || tool.kind !== tools.KIND.READ || !tools.isOn(tool)) throw refusal('tool_off', `${key} is not available here.`);
     if (!userId) throw refusal('no_person', 'This read names no person, so no connection can be used.');
@@ -220,6 +221,8 @@ const readAdmitted = async ({ companyId, userId, via, runId, callerId, key, inpu
     const problem = argsSchema.problemIn(tool.input, args);
     if (problem) throw refusal('bad_input', `${key}: ${problem}`);
     if (via === VIA.AGENT && !runId) throw refusal('run_required', 'A connected app can be read only while an agent is running.');
+    const notTicked = via === VIA.AGENT ? require('../Agents/agentConnectors').refusalFor(agentConnectors, key) : '';
+    if (notTicked) throw refusal('agent_not_allowed', notTicked);
 
     const connection = await ownConnection(tool, companyId, userId, asked);
     trace.connectionId = connection.connectionId;
@@ -263,9 +266,9 @@ const readAdmitted = async ({ companyId, userId, via, runId, callerId, key, inpu
 };
 
 /* `callerId` is the agent on a run and the AI client over MCP: what the usage row and the audit row name besides the person. */
-const read = ({ companyId, userId, via, runId = null, callerId = '', key, input = {} }) => tracked(
+const read = ({ companyId, userId, via, runId = null, callerId = '', agentConnectors, key, input = {} }) => tracked(
     { companyId, userId, via, callerId, runId, key, tool: tools.get(key), phase: callAudit.PHASE.READ, input },
-    (trace) => readAdmitted({ companyId, userId, via, runId, callerId, key, input }, trace),
+    (trace) => readAdmitted({ companyId, userId, via, runId, callerId, agentConnectors, key, input }, trace),
 );
 
 module.exports = { VIA, STATE, read, admitWrite, write, plain };

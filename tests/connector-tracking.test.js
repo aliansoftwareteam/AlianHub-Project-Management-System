@@ -56,14 +56,15 @@ const before = Object.fromEntries([...Object.keys(ENV), ...CEILING_NAMES].map((k
 const NOTES = { status: 200, headers: {}, body: JSON.stringify({ notes: [{ title: 'Board meeting' }] }) };
 const connectorError = (code) => Object.assign(new Error(code), { name: 'ConnectorError', code, provider: 'fake' });
 const connected = (scopes = ['notes.read', 'notes.write']) => resolveConnection.mockResolvedValue({ connectionId: MINE, scopes, getAccessToken: async () => 'secret-token' });
+const TICKED = [{ provider: 'fake', tools: [READ, WRITE] }];
 const mcpRead = (input = {}) => egressContext.run({ companyId: C }, () => runner.read({ companyId: C, userId: PRISHA, via: runner.VIA.MCP, callerId: 'oauth:client-1', key: READ, input }));
-const agentRead = () => egressContext.run({ companyId: C }, () => runner.read({ companyId: C, userId: PRISHA, via: runner.VIA.AGENT, runId: RUN, callerId: AGENT_ID, key: READ, input: {} }));
+const agentRead = () => egressContext.run({ companyId: C }, () => runner.read({ companyId: C, userId: PRISHA, via: runner.VIA.AGENT, runId: RUN, callerId: AGENT_ID, agentConnectors: TICKED, key: READ, input: {} }));
 const callRows = () => recordAudit.mock.calls.map(([, row]) => row).filter((row) => row.action === 'connector.call');
 const usageRows = () => mockDb.store[SCHEMA_TYPE.CONNECTOR_USAGE] || [];
 const counted = (field) => usageRows().reduce((sum, row) => sum + (row[field] || 0), 0);
 const seedUsage = (over) => mockDb.seed(SCHEMA_TYPE.CONNECTOR_USAGE, { companyId: C, connectionId: 'other', userId: PRISHA, actor: { type: 'mcp', id: 'other' }, day: usage.dayOf(), reads: 0, writeProposals: 0, ...over });
 const fileWrite = () => proposals.create(C, {
-    agent: { _id: AGENT_ID, name: 'Digest' }, projectId: null, what: 'Save the minutes', why: 'The meeting ended',
+    agent: { _id: AGENT_ID, name: 'Digest', connectors: TICKED }, projectId: null, what: 'Save the minutes', why: 'The meeting ended',
     changes: [{ action: WRITE, params: { title: 'Minutes', body: 'Approved the budget.' } }], connectionOwner: PRISHA,
 });
 const setQuota = async (body, { uid = ADMIN, role = 1, apiToken } = {}) => {

@@ -94,13 +94,19 @@ const prepareChanges = async (companyId, ownerId, changes) => {
 };
 
 /* Filing is what the daily limit counts and what the audit shows: an edit of a waiting proposal goes through prepareChanges alone.
- * `save` stores the proposal inside the claim, so a row that was never stored gives its count back. */
-const fileChanges = async (companyId, ownerId, changes, { via, id, runId = null }, save) => {
+ * `save` stores the proposal inside the claim, so a row that was never stored gives its count back. `refusalOf(action)`
+ * names why the filer may not use a tool at all (an agent without it ticked), and refuses the whole filing. */
+const fileChanges = async (companyId, ownerId, changes, { via, id, runId = null, refusalOf = null }, save) => {
     const list = Array.isArray(changes) ? changes : [];
     if (!hasWrite(list)) return save(list);
     const audited = (state, reason = '', connectionOf = () => '') => list.filter((c) => c && isWrite(c.action)).forEach((c) => callAudit.record(companyId, {
         userId: ownerId, via, callerId: id, runId, key: c.action, tool: tools.get(c.action), phase: callAudit.PHASE.PROPOSE, input: c.params, connectionId: connectionOf(c), state, reason,
     }));
+    const notAllowed = typeof refusalOf === 'function' ? list.filter((c) => c && isWrite(c.action)).map((c) => refusalOf(c.action)).find(Boolean) : '';
+    if (notAllowed) {
+        audited(runner.STATE.REFUSED, 'agent_not_allowed');
+        throw refuse(notAllowed, 'agent_not_allowed');
+    }
     let prepared;
     try {
         prepared = await prepareChanges(companyId, ownerId, list);
