@@ -1,4 +1,4 @@
-# Task Index
+| active |  |  | active/099-connectors-outlook-built || active |  |  | active/098-connectors-for-agents || active |  |  | active/097-connectors-in-ai-chat |# Task Index
 
 Auto-maintained registry of all tasks. Reflects YAML frontmatter from each `task.md`.
 
@@ -90,8 +90,8 @@ Auto-maintained registry of all tasks. Reflects YAML frontmatter from each `task
 | 094 | Connectors — Notion, the first app that registers itself | active | high | 092, 100 | active/094-connectors-notion-pilot |
 | 095 | Connectors — Supabase, Upwork, Wispr Flow, Dropbox, HubSpot and Canva through their MCP servers | active | medium | 075, 093, 094 | active/095-connectors-mcp-apps |
 | 096 | Connectors — custom MCP servers: added by address with a right, every tool reviewed | backlog | medium | 092, 100, 101 | backlog/096-connectors-custom-mcp-servers |
-| 097 | Connectors in the AI chat — @mention or name an app, read with the asker's own account | backlog | high | 075, 087, 092 | backlog/097-connectors-in-ai-chat |
-| 098 | Connectors — agents use connectors: ticked on the agent, declared as reads in skills | backlog | medium | 068 | backlog/098-connectors-for-agents |
-| 099 | Connectors — Outlook built connector on Microsoft Graph: mail and calendar | backlog | medium | 068, 069, 093 | backlog/099-connectors-outlook-built |
+| 097 | Connectors in the AI chat — @mention or name an app, read with the asker's own account | active | high | 075, 087, 092 | active/097-connectors-in-ai-chat |
+| 098 | Connectors — agents use connectors: ticked on the agent, declared as reads in skills | active | medium | 068 | active/098-connectors-for-agents |
+| 099 | Connectors — Outlook built connector on Microsoft Graph: mail and calendar | active | medium | 068, 069, 093 | active/099-connectors-outlook-built |
 | 100 | Connectors — sign-in for MCP apps: discovery, self-registration once per workspace, personal tokens | active | high | 066, 092 | active/100-connectors-mcp-sign-in |
 | 101 | Connectors — screen redesign: AI → Customize → Connectors, like Claude's | backlog | high | 072 | backlog/101-connectors-screen-redesign |

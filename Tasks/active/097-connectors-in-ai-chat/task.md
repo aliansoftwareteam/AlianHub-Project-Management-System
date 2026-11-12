@@ -1,7 +1,7 @@
 ---
 id: 097
 title: Connectors in the AI chat — @mention or name an app, read with the asker's own account
-status: backlog
+status: active
 priority: high
 depends_on: [075, 087, 092]
 created: 2026-11-12

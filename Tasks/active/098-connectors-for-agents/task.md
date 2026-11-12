@@ -1,7 +1,7 @@
 ---
 id: 098
 title: Connectors — agents use connectors: ticked on the agent, declared as reads in skills
-status: backlog
+status: active
 priority: medium
 depends_on: [068]
 created: 2026-11-12

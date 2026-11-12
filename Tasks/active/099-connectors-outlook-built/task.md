@@ -1,7 +1,7 @@
 ---
 id: 099
 title: Connectors — Outlook built connector on Microsoft Graph: mail and calendar
-status: backlog
+status: active
 priority: medium
 depends_on: [068, 069, 093]
 created: 2026-11-12
