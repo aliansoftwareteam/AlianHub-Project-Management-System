@@ -8,6 +8,9 @@
                 :bulk="field !== 'people' || !singlePerson"
                 :label="$t(`Reports.filter_${field}`)"
                 :options="options[field] || []"
+                :groups="field === 'people' ? teams : []"
+                :groupsLabel="$t('Reports.filter_teams')"
+                :optionsLabel="$t(`Reports.filter_${field}`)"
                 :modelValue="filters[field] || []"
                 @update:modelValue="(value) => $emit('apply', { [field]: value })"
                 @click.capture="field === 'lists' && $emit('need-lists')"
@@ -51,9 +54,11 @@
 <script setup>
 import { computed } from 'vue';
 import { useI18n } from 'vue-i18n';
+import { useStore } from 'vuex';
 import EverythingFilterChip from '@/views/Everything/EverythingFilterChip.vue';
 import ReportDateChip from './ReportDateChip.vue';
 import { activeCount, MATCH } from './reportQuery';
+import { teamOptions } from './reportFacets';
 import '@/views/Everything/style.css';
 import './report.css';
 
@@ -68,7 +73,10 @@ const props = defineProps({
 });
 defineEmits(['apply', 'step', 'clear', 'need-lists']);
 const { t } = useI18n();
+const { getters } = useStore();
 
+const teams = computed(() => (props.singlePerson ? [] : teamOptions(getters['settings/teams'] || [], props.options.people || []))
+    .map((team) => ({ ...team, hint: t('Reports.team_people', { n: team.members.length }, team.members.length) })));
 const multiFields = computed(() => ['people', 'projects', 'lists', 'status', 'tags', 'types'].filter((field) => props.fields.includes(field)));
 const billableOptions = computed(() => [
     { value: 'billable', label: t('Time.billable') },
