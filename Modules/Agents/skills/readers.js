@@ -133,10 +133,11 @@ const declaredRead = (reader) => async (companyId, { task, input, declaredHosts,
     }
 };
 
-const connectorReaders = () => Object.fromEntries(require('../../Connectors/tools').reads().map((tool) => [tool.key, async (companyId, { runId, actor, allowedActions }, params) => {
+/* `connectors` is what the run's agent has ticked; the runner refuses a tool missing from it. */
+const connectorReaders = () => Object.fromEntries(require('../../Connectors/tools').reads().map((tool) => [tool.key, async (companyId, { runId, actor, allowedActions, connectors }, params) => {
     await require('../actions').authorizeRead({ companyId, actor, action: tool.key, params: {}, allowedActions });
     const runner = require('../../Connectors/toolRunner');
-    return runner.read({ companyId, userId: actor && actor.userId, via: runner.VIA.AGENT, runId, callerId: String((actor && actor.agentId) || ''), key: tool.key, input: params });
+    return runner.read({ companyId, userId: actor && actor.userId, via: runner.VIA.AGENT, runId, callerId: String((actor && actor.agentId) || ''), agentConnectors: connectors, key: tool.key, input: params });
 }]));
 
 const READERS = Object.freeze({

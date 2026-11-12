@@ -25,10 +25,10 @@ An agent reads from apps only where it was allowed to, through the connection of
 - A free tool loop for agents
 
 ## Acceptance criteria
-- [ ] An agent with GitHub unticked cannot call any GitHub tool, even if its skill declares one
-- [ ] A scheduled run uses the schedule owner's connection, never the agent creator's
-- [ ] A declared read without a connection fails that step with the reason, and the run continues as the skill allows
-- [ ] `i18n:check` and `style:check` pass
+- [x] An agent with GitHub unticked cannot call any GitHub tool, even if its skill declares one (the rule is the same for every app; tested with the fixture API and MCP apps until GitHub's provider lands)
+- [x] A scheduled run uses the schedule owner's connection, never the agent creator's
+- [x] A declared read without a connection fails that step with the reason, and the run continues as the skill allows (a step marked optional carries on; otherwise the run stops with the reason)
+- [x] `i18n:check` and `style:check` pass
 
 ## Constraints & notes
 - Track: B — tools (using that access safely)

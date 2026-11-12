@@ -108,15 +108,17 @@ const readerParamOf = (schema) => {
 
 const connectorReaders = () => Object.fromEntries(require('../../Connectors/tools').reads().map((tool) => [tool.key, Object.freeze({
     label: String(tool.input.description).slice(0, 120),
-    description: `${tool.input.description} Reads only the connection of the person the agent acts for: at most ${tool.caps.maxChars} characters. What it reads marks the run, which makes no web fetch after it.`,
+    description: `${tool.input.description} Reads only the connection of the person the agent acts for, and only for an agent with this tool ticked: at most ${tool.caps.maxChars} characters. What it reads marks the run, which makes no web fetch after it.`,
     connector: tool.provider,
+    connectorName: tool.definition.name,
     action: tool.key,
     params: Object.freeze({
         ...Object.fromEntries(Object.entries(tool.input.properties || {}).map(([name, schema]) => [name, Object.freeze({ ...readerParamOf(schema), ...((tool.input.required || []).includes(name) ? { required: true } : {}) })])),
         // Kept so a connectionId naming someone else's connection reaches the runner and is refused, not silently dropped.
         connectionId: Object.freeze({ type: 'string', maxLength: CONNECTION_ID_MAX }),
     }),
-    fields: Object.freeze(['text', 'chars', 'truncated', ...(tool.fields || [])]),
+    // `failed` and `reason` are set only when an optional step was refused (compile.js).
+    fields: Object.freeze(['text', 'chars', 'truncated', ...(tool.fields || []), 'failed', 'reason']),
 })]));
 
 /* Context a skill may read before the model is asked. Each reader is a call into
@@ -311,7 +313,7 @@ const MAX_EMIT_EACH = 25;
 const catalogues = () => ({
     version: SKILL_VERSION,
     inputs: Object.entries(INPUT_CATALOGUE).map(([key, v]) => ({ key, label: v.label, description: v.description, needs: v.needs, scope: v.scope })),
-    readers: offeredReaders().map((key) => { const v = READER_CATALOGUE[key]; return { key, label: v.label, description: v.description, ...(v.external ? { external: true } : {}), ...(v.connector ? { connector: v.connector } : {}), params: v.params, fields: [...v.fields] }; }),
+    readers: offeredReaders().map((key) => { const v = READER_CATALOGUE[key]; return { key, label: v.label, description: v.description, ...(v.external ? { external: true } : {}), ...(v.connector ? { connector: v.connector, connectorName: v.connectorName } : {}), params: v.params, fields: [...v.fields] }; }),
     partials: Object.entries(PROMPT_PARTIALS).map(([key, text]) => ({ key, text })),
     actions: emitActions().map((key) => { const a = registry.get(key); return { key, label: a.label, risk: a.risk, undoable: a.undoable, required: [...emitRequired(key)] }; }),
     taskFields: [...TASK_FIELDS],

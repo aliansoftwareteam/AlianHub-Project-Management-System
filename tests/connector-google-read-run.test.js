@@ -60,7 +60,7 @@ const skillOf = (reader, params) => validateSkill({
     emit: [{ action: 'google.calendar.events.create', params: { summary: '{{answer.summary}}', start: '2026-11-09', end: '2026-11-10' } }],
 });
 
-const agent = () => ({ _id: AGENT_ID, name: 'Digest', autonomy: 3, allowedActions: [], projectIds: ['p1'], account: 'workspace', spendCapUsd: 0, paused: false, deletedStatusKey: 0 });
+const agent = () => ({ _id: AGENT_ID, name: 'Digest', autonomy: 3, allowedActions: [], connectors: [{ provider: 'google', tools: [...READS.map(([key]) => key), 'google.calendar.events.create'] }], projectIds: ['p1'], account: 'workspace', spendCapUsd: 0, paused: false, deletedStatusKey: 0 });
 const actor = { kind: 'agent', userId: OWNER, agentId: AGENT_ID, agentName: 'Digest', runId: null, viaAccount: 'workspace', tokenId: null };
 const chat = jest.fn();
 const rows = (type) => mockDb.store[type] || [];

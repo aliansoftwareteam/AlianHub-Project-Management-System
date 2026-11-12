@@ -7,16 +7,17 @@ const runs = require('./runs');
 const revisions = require('./revisions');
 const { DEFAULT_RATE_LIMIT_PER_DAY } = require('./dailyRunLimit');
 
-const DEFAULTS = Object.freeze({ autonomy: 0, spendCapUsd: 30, rateLimitPerDay: DEFAULT_RATE_LIMIT_PER_DAY, paused: false, account: 'workspace', deletedStatusKey: 0, projectIds: [] });
+const DEFAULTS = Object.freeze({ autonomy: 0, spendCapUsd: 30, rateLimitPerDay: DEFAULT_RATE_LIMIT_PER_DAY, paused: false, account: 'workspace', deletedStatusKey: 0, projectIds: [], connectors: [] });
 
 const createAgentRecord = async (companyId, fields, { ownerId } = {}) => {
     const name = String((fields && fields.name) || '').trim().slice(0, 80);
     if (!name) throw new Error('name is required.');
     const allowedActions = Array.isArray(fields.allowedActions) ? registry.allowedActionsToStore(fields.allowedActions) : [];
     const role = fields.role === undefined ? {} : { role: require('./agentRole').roleOf(fields.role) };
+    const connectors = fields.connectors === undefined ? [] : require('./agentConnectors').toStore(fields.connectors);
     const saved = await MongoDbCrudOpration(companyId, {
         type: SCHEMA_TYPE.AGENTS,
-        data: { ...DEFAULTS, ...fields, ...role, name, allowedActions, ownerId: ownerId ? String(ownerId) : undefined },
+        data: { ...DEFAULTS, ...fields, ...role, name, allowedActions, connectors, ownerId: ownerId ? String(ownerId) : undefined },
     }, 'save');
     await revisions.recordCreate(companyId, saved, { actor: ownerId ? { userId: String(ownerId) } : undefined });
     runs.emitAgent(companyId, { agent: saved });

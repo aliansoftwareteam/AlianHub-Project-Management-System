@@ -8,7 +8,7 @@ const readers = require('./readers');
 const externalReads = require('./externalReads');
 const { riskOf } = require('./validateSkill');
 const { ground } = require('./grounding');
-const { INPUT_CATALOGUE, PROMPT_PARTIALS, emitActions, emitRequired, TASK_FIELDS, TEMPLATE_ROOTS, plain } = require('./catalogues');
+const { INPUT_CATALOGUE, PROMPT_PARTIALS, emitActions, emitRequired, TASK_FIELDS, TEMPLATE_ROOTS, plain, readsConnector } = require('./catalogues');
 const { render, renderString, tagsIn } = require('./skillTemplate');
 const { readField } = require('../../Automations/engine/expression');
 
@@ -40,6 +40,12 @@ const systemPromptOf = (doc) => [
 
 const usesMemory = (doc) => [doc.prompt.template, doc.prompt.instructions].some((text) => tagsIn(text).some((tag) => tag.path.replace(/^task\./, '') === TEMPLATE_ROOTS.memory))
     || doc.gather.some((step) => step.reader === 'memory');
+
+/* A refusal is the app or the agent's settings saying no, which another try would not change; any other error
+ * still fails the run. */
+const refusedRead = (step, error) => readsConnector(step.reader) && Boolean(error) && (error.name === 'RefusedError' || error.deterministic === true);
+const reasonOf = (error) => String(error.message || '').replace(/^[a-z_]+: /, '');
+const failedRead = (reason) => ({ failed: true, reason, text: '', chars: 0, truncated: false });
 
 const scopeOf = (action) => { const rating = require('../actions').rating(action); return rating ? rating.scope : 'task'; };
 
@@ -109,7 +115,9 @@ const compile = (doc) => ({
     usesMemory: usesMemory(doc),
     systemPrompt: systemPromptOf(doc),
 
-    async gather({ task, companyId, memory, startedBy, runId, actor, allowedActions }) {
+    /* A connector read that is refused fails its step with the reason: an optional step hands the template
+     * { failed, reason } and the run goes on, any other skips the run with that reason. */
+    async gather({ task, companyId, memory, startedBy, runId, actor, allowedActions, connectors }) {
         if (!externalReads.enabled() && doc.gather.some((step) => externalReads.isExternal(step.reader))) throw externalReads.notAvailable(doc.key);
         const input = {};
         for (const key of doc.inputs) {
@@ -119,8 +127,15 @@ const compile = (doc) => ({
         }
         const gather = {};
         for (const step of doc.gather) {
-            // eslint-disable-next-line no-await-in-loop
-            const out = await readers.read(step.reader, companyId, { task, memory, startedBy, runId, actor, allowedActions, input, declaredHosts: doc.declaredHosts || [] }, step.params);
+            let out;
+            try {
+                // eslint-disable-next-line no-await-in-loop
+                out = await readers.read(step.reader, companyId, { task, memory, startedBy, runId, actor, allowedActions, connectors, input, declaredHosts: doc.declaredHosts || [] }, step.params);
+            } catch (error) {
+                if (!refusedRead(step, error)) throw error;
+                if (!step.optional) return { skip: reasonOf(error) };
+                out = failedRead(reasonOf(error));
+            }
             if (out && out.skip) return { skip: out.skip };
             gather[step.as] = out;
         }

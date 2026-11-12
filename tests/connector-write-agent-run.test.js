@@ -51,7 +51,7 @@ const ADMIN = 'u9';
 const ENV = { CONNECTORS: 'fake', AGENT_TAINT_ROUTING: 'on' };
 const before = Object.fromEntries(Object.keys(ENV).map((k) => [k, process.env[k]]));
 
-const agent = (autonomy) => ({ _id: AGENT_ID, name: 'Digest', autonomy, allowedActions: [], projectIds: ['p1'], account: 'workspace', spendCapUsd: 10 });
+const agent = (autonomy) => ({ _id: AGENT_ID, name: 'Digest', autonomy, allowedActions: [], connectors: [{ provider: 'fake', tools: [KEY] }], projectIds: ['p1'], account: 'workspace', spendCapUsd: 10 });
 const actor = { kind: 'agent', userId: OWNER, agentId: AGENT_ID, agentName: 'Digest', runId: null, viaAccount: 'workspace', tokenId: null };
 const proposalRows = () => mockDb.store[SCHEMA_TYPE.AGENT_PROPOSALS] || [];
 
