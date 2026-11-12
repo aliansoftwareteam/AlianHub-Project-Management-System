@@ -25,9 +25,9 @@ A member's AI reads their Outlook mail and calendar and proposes drafts and even
 - Sending mail; Teams, OneDrive, SharePoint
 
 ## Acceptance criteria
-- [ ] Every tool works from the AI chat, an agent run and MCP against the fake Graph server
-- [ ] A draft or an event is a proposal only the connection's owner approves; nothing is sent
-- [ ] A tenant that needs admin consent gets a clear message
+- [ ] Every tool works from the AI chat, an agent run and MCP against the fake Graph server (agent run and MCP done; the AI chat does not call connector tools on this base yet)
+- [x] A draft or an event is a proposal only the connection's owner approves; nothing is sent
+- [x] A tenant that needs admin consent gets a clear message
 
 ## Constraints & notes
 - Track: B — tools (using that access safely)

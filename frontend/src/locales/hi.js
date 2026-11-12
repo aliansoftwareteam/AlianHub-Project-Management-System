@@ -2466,6 +2466,11 @@ export default {
         "google_drive_files_list": "List picked Google Drive files",
         "google_drive_files_get": "Read Google Drive file details",
         "google_drive_files_read": "Read a Google Drive file",
+        "outlook_mail_search": "Search Outlook mail",
+        "outlook_mail_read": "Read an Outlook email",
+        "outlook_calendar_events_list": "List Outlook Calendar events",
+        "outlook_mail_reply_draft": "Draft an Outlook reply",
+        "outlook_calendar_events_create": "Create an Outlook Calendar event",
         "automation_create": "Add an automation",
         "project_create": "Create a project",
         "project_duplicate": "Copy a project",
@@ -13890,7 +13895,12 @@ export default {
             "googleDriveFilesRead": "Read a Google Drive file",
             "slackChannelsList": "List your Slack channels",
             "slackChannelRead": "Read a Slack channel",
-            "slackMessagePost": "Post a Slack message as you"
+            "slackMessagePost": "Post a Slack message as you",
+            "outlookMailSearch": "Search your Outlook mail",
+            "outlookMailRead": "Read an Outlook email",
+            "outlookCalendarEventsList": "List Outlook Calendar events",
+            "outlookMailReplyDraft": "Draft a reply in Outlook, not sent",
+            "outlookCalendarEventsCreate": "Create an Outlook Calendar event"
         },
         "card": {
             "primaryCalendar": "Your primary calendar",
@@ -13915,7 +13925,12 @@ export default {
             "timeHint": "Like 2026-11-05T10:00:00+05:30, or 2026-11-05 for all day.",
             "target": "Goes to",
             "text": "Text",
-            "attachments": "Attachments"
+            "attachments": "Attachments",
+            "outlookDrafts": "Your Outlook Drafts folder. Nothing is sent.",
+            "replyToMessage": "Replies to the email",
+            "replyAll": "Reply to everyone on the email",
+            "outlookCalendar": "Your default Outlook calendar",
+            "timeHintWithOffset": "Like 2026-11-05T10:00:00+05:30, with its offset."
         },
         "approval": {
             "outside": "Leaves AlianHub",
@@ -13961,7 +13976,9 @@ export default {
         },
         "conn": {
             "provider_google": "Google",
+            "provider_outlook": "Outlook",
             "product_calendar": "Calendar",
+            "product_mail": "Mail",
             "product_meet": "Meet",
             "product_drive": "Drive",
             "status_connected": "Connected",
@@ -13994,6 +14011,7 @@ export default {
             "reauth_note": "The app for this connector changed, so you need to reconnect.",
             "return_ok": "{provider} is connected.",
             "return_error": "The {provider} connection did not complete. Try again.",
+            "return_consent": "{provider} was not connected because access was not allowed. If your organisation lets only an admin approve apps, ask an admin to approve AlianHub for {provider}, then connect again.",
             "admin_title": "Everyone's connections",
             "admin_lead": "The connections members hold and what each one may do. You can end a connection but never use it, and account details stay private.",
             "admin_empty": "No member has connected an account yet.",

@@ -1,6 +1,6 @@
 const LOG = '[connectors]';
 const ENV_KEY = 'CONNECTORS';
-const KNOWN = Object.freeze(['slack', 'google_calendar']);
+const KNOWN = Object.freeze(['slack', 'google_calendar', 'outlook']);
 const GOOGLE = Object.freeze(['google_calendar']);
 const OFF = ['', 'off', 'false', '0', 'no', 'none'];
 
@@ -14,6 +14,7 @@ const PROBLEM = Object.freeze({
 const STARTED = Object.freeze({
     slack: 'each person connects their own Slack account, its tokens are kept in the secrets store and every message it sends needs that person\'s approval',
     google_calendar: 'each person connects their own Google account, and its tokens are kept in the secrets store',
+    outlook: 'each person connects their own Microsoft account for Outlook mail and calendar, its tokens are kept in the secrets store and every draft or event it makes needs that person\'s approval',
 });
 
 const named = () => {
@@ -37,6 +38,16 @@ const slackClient = () => ({
     id: String(process.env.CONNECTOR_SLACK_CLIENT_ID || '').trim(),
     secret: String(process.env.CONNECTOR_SLACK_CLIENT_SECRET || '').trim(),
 });
+
+const outlookClient = () => ({
+    id: String(process.env.CONNECTOR_OUTLOOK_CLIENT_ID || '').trim(),
+    secret: String(process.env.CONNECTOR_OUTLOOK_CLIENT_SECRET || '').trim(),
+});
+
+const INSTANCE_APPS = Object.freeze([
+    { name: 'slack', client: slackClient, settings: 'CONNECTOR_SLACK_CLIENT_ID and CONNECTOR_SLACK_CLIENT_SECRET', app: 'Slack app' },
+    { name: 'outlook', client: outlookClient, settings: 'CONNECTOR_OUTLOOK_CLIENT_ID and CONNECTOR_OUTLOOK_CLIENT_SECRET', app: 'Microsoft app' },
+]);
 
 const problems = (name) => {
     const store = require('../../../Config/secrets').storeConfig();
@@ -67,10 +78,10 @@ const logBootState = () => {
         if (state.on) logger.info(`${LOG} ${name} connector on: ${STARTED[name]}`);
         else logger.error(`${LOG} ${ENV_KEY} names ${name} but it stays off: ${state.problems.map((p) => p.text).join('; ')}`);
     });
-    const slack = slackClient();
-    if (status('slack').on && !(slack.id && slack.secret)) {
-        logger.info(`${LOG} slack has no instance app (CONNECTOR_SLACK_CLIENT_ID and CONNECTOR_SLACK_CLIENT_SECRET), so only a workspace that set its own Slack app can connect it`);
-    }
+    INSTANCE_APPS.forEach(({ name, client, settings, app }) => {
+        const { id, secret } = client();
+        if (status(name).on && !(id && secret)) logger.info(`${LOG} ${name} has no instance app (${settings}), so only a workspace that set its own ${app} can connect it`);
+    });
 };
 
 module.exports = { ENV_KEY, KNOWN, GOOGLE, PROBLEM, named, requested, requestedGoogle, status, slackOn, googleClient, logBootState };
