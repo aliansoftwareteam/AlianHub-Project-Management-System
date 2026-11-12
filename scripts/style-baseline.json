@@ -248,7 +248,6 @@
     "frontend/src/views/Settings/Template/CreateTemplate.vue": { "colours": 0, "legacyClasses": 10 },
     "frontend/src/views/Settings/Template/CreateTemplateWithAI.vue": { "colours": 0, "legacyClasses": 11 },
     "frontend/src/views/Settings/Template/TemplateBasicDetail.vue": { "colours": 0, "legacyClasses": 2 },
-    "frontend/src/views/Settings/TimeTracking/style.css": { "colours": 5, "legacyClasses": 0 },
     "frontend/src/views/Settings/TwoFactorAuth/TwoFactorAuth.vue": { "colours": 1, "legacyClasses": 0 },
     "frontend/src/views/TimeLog/LogTimeSheet.vue": { "colours": 2, "legacyClasses": 0 },
     "frontend/src/views/Timesheet/TrackerTimeSheet/TrackerTimesheet.vue": { "colours": 0, "legacyClasses": 1 },
