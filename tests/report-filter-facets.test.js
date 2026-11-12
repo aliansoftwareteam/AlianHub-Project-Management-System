@@ -43,3 +43,23 @@ describe('filter options narrowed by the chosen people (task 086)', () => {
         expect(Q.sharedQuery({ match: 'all', status: ['x'] })).toEqual({ match: 'all' });
     });
 });
+
+describe('teams in the People filter (task 092)', () => {
+    const people = [{ value: 'ann' }, { value: 'bob' }, { value: 'cat' }];
+
+    it('offers each team with the members the filter lists, sorted by name, and its colour', () => {
+        const teams = [
+            { _id: 't2', name: 'Web', assigneeUsersArray: ['bob', 'cat', 'bob'], teamColor: { bgColor: '#123456' } },
+            { _id: 't1', name: 'Design', assigneeUsersArray: ['ann', 'gone'] },
+        ];
+        expect(F.teamOptions(teams, people)).toEqual([
+            { value: 't1', label: 'Design', color: '', members: ['ann'] },
+            { value: 't2', label: 'Web', color: '#123456', members: ['bob', 'cat'] },
+        ]);
+    });
+
+    it('leaves out a team with nobody listed or without a name', () => {
+        expect(F.teamOptions([{ _id: 't1', name: 'Gone', assigneeUsersArray: ['gone'] }, { _id: 't2', name: '', assigneeUsersArray: ['ann'] }, { _id: 't3', name: 'Empty' }], people)).toEqual([]);
+        expect(F.teamOptions(undefined, people)).toEqual([]);
+    });
+});
