@@ -32,6 +32,9 @@
 .tv-link.evr__bulk-btn:disabled { color: var(--ink-2); cursor: default; text-decoration: none; }
 .evr__tick { width: 14px; flex: none; display: inline-flex; color: var(--brand); }
 .evr__option-label { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.evr__tick-some { width: 9px; height: 2px; margin: auto 2px; border-radius: 1px; background: currentColor; }
+.evr__group-mark { flex: none; color: var(--ink-2); }
+.evr__option-count { margin-inline-start: auto; flex: none; font: var(--text-small); color: var(--ink-2); font-variant-numeric: tabular-nums; }
 .evr__pop-empty { padding: 8px 10px; font: var(--text-small); color: var(--ink-2); }
 .evr__clear { margin-top: 4px; border-top: 1px solid var(--hairline); border-radius: 0 0 7px 7px; color: var(--ink-2); }
 
