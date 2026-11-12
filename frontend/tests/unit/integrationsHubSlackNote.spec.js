@@ -34,9 +34,9 @@ describe('the Slack note on the Integrations screen', () => {
         expect(apiRequest.mock.calls.some(([, url]) => String(url).includes('/connectors'))).toBe(false);
     });
 
-    it('points to My connections once the server names Slack, with no bot form', async () => {
+    it('points to the Connectors screen once the server names Slack, with no bot form', async () => {
         const wrapper = await openSlack({ status: true, data: [], connectors: ['slack'] });
-        expect(wrapper.find('[data-test="slack-personal-note"]').text()).toContain('My connections');
+        expect(wrapper.find('[data-test="slack-personal-note"]').text()).toContain('AI › Customize › Connectors');
         expect(wrapper.find('[data-test="slack-secret"]').exists()).toBe(false);
     });
 });

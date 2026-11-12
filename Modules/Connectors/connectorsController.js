@@ -155,6 +155,29 @@ const managerOrRefuse = (run) => async (who, req, res) => {
 
 const catalogToolsOf = (provider) => require('./tools').all().filter((tool) => tool.provider === provider);
 
+/* Any member: what each tool of an app does and whether it is on here. Never the app's own words or input shapes. */
+exports.memberTools = handle('list a connector\'s tools', 'Tools fetched.', (who, req, res) => {
+    const provider = providerOf(req, res);
+    if (!provider) return undefined;
+    const { isOn } = require('./tools');
+    return { tools: catalogToolsOf(provider).map((tool) => ({ key: tool.key, label: tool.label, kind: tool.kind, on: isOn(tool) })) };
+});
+
+/* Only the connection's owner turns its tools off for their own use. It can only narrow what the connection already
+ * allows, so unlike the products it is not a row of Security & Permissions. */
+exports.setToolsOff = handle('change a connection\'s tools', 'Tools updated.', async (who, req, res) => {
+    const connectionId = String((req.params || {}).id || '');
+    const row = await connection.byId(who.companyId, connectionId);
+    if (!row || String(row.userId) !== who.userId) { refuse(res, 404, 'There is no such connection.'); return undefined; }
+    const given = (req.body || {}).toolsOff;
+    const keys = catalogToolsOf(row.provider).map((tool) => tool.key);
+    if (!Array.isArray(given) || given.some((key) => !keys.includes(key))) {
+        refuse(res, 400, 'Those are not tools of this connector.', { code: 'unknown_tool' });
+        return undefined;
+    }
+    return connection.setToolsOff({ companyId: who.companyId, row, toolsOff: [...new Set(given)], actor: who.actor });
+});
+
 /* Owner/admin: each tool of an MCP app, and whether the app changed it since it was reviewed. */
 exports.tools = handle('list a connector\'s tools', 'Tools fetched.', managerOrRefuse(async (who, req, res) => {
     const provider = providerOf(req, res);

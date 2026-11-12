@@ -4,6 +4,7 @@ import { useStore } from "vuex";
 import { useCustomComposable } from "@/composable";
 import { isAiSectionRoute } from "@/router/ai/section";
 import { CONNECT_AI_ROUTE } from "@/router/ai/connect";
+import { CUSTOMIZE_ROUTE } from "@/router/ai/customize";
 import { aiAvailability, aiReachable, canUseAi } from "@/composable/aiAvailability";
 import { isOwnerOrAdmin as isOwnerOrAdminRole } from "@/utils/roles";
 import { canApprove } from "@/views/Approvals/approvalAccess";
@@ -59,7 +60,7 @@ export function useNavItems(companyId) {
                     { key: "automations", label: "Automations.title", icon: "automations", to: to("Automations"), match: (r) => r.name === "Automations", show: ready.value && exists("Automations") },
                     { key: "approvals", label: "Time.approvals", icon: "checkSquare", to: to("Approvals"), match: (r) => r.name === "Approvals", show: ready.value && exists("Approvals") && canApprove(companyUser.value) },
                     { key: "integrations", label: "Header.Integrations", icon: "integrations", to: to("IntegrationsHub"), match: (r) => r.name === "IntegrationsHub", show: ready.value && exists("IntegrationsHub") },
-                    { key: "connections", label: "Parity.nav_connections", icon: "key", to: to("Connections"), match: (r) => r.name === "Connections", show: ready.value && exists("Connections") },
+                    { key: "connections", label: "Connectors.screen.connectors_title", icon: "key", to: to(CUSTOMIZE_ROUTE), match: (r) => r.name === CUSTOMIZE_ROUTE, show: ready.value && exists(CUSTOMIZE_ROUTE) },
                     { key: "externalData", label: "Provenance.nav_external_data", icon: "globe", to: to("ExternalData"), match: (r) => r.name === "ExternalData", show: ready.value && exists("ExternalData") }
                 ]
             },

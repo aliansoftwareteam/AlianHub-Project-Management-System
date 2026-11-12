@@ -193,14 +193,27 @@ describe('the Connect your AI page', () => {
 });
 
 describe('the step at the end of sign-up', () => {
-    it('has a page of its own with no rail, and the same page inside the AI section', () => {
+    it('has a page of its own with no rail, and inside the AI section a tab of Customize', () => {
         const welcome = aiRoutes.find((entry) => entry.name === CONNECT_AI_WELCOME_ROUTE);
         const page = aiRoutes.find((entry) => entry.name === CONNECT_AI_ROUTE);
+        const customize = aiRoutes.find((entry) => entry.name === 'AiCustomize');
         expect(welcome.meta).toMatchObject({ requiresAuth: true, hideHeader: true, welcome: true });
         expect(welcome.path).toBe('/:cid/welcome/connect-ai');
         expect(connectAiWelcomePath('c1')).toBe('/c1/welcome/connect-ai');
-        expect(page.meta).toMatchObject({ requiresAuth: true });
-        expect(page.meta.hideHeader).toBeUndefined();
+        expect(page.redirect({ params: { cid: 'c1' }, query: {} })).toEqual({ name: 'AiCustomize', params: { cid: 'c1' }, query: { tab: 'connect-ai' } });
+        expect(customize.meta).toMatchObject({ requiresAuth: true });
+        expect(customize.meta.hideHeader).toBeUndefined();
+    });
+
+    it('drops its own rail and frame inside Customize', async () => {
+        route.name = 'AiCustomize';
+        route.meta = {};
+        apiRequest.mockImplementation(() => answer(STATUS));
+        const wrapper = mount(ConnectYourAi, { props: { embedded: true }, global: { components: { RouterLink: LinkStub } } });
+        await flushPromises();
+        expect(wrapper.classes()).toEqual(['cya', 'cya--embedded']);
+        expect(wrapper.findComponent({ name: 'AiSidebar' }).exists()).toBe(false);
+        expect(find(wrapper, 'connect-ai-way-claude').exists()).toBe(true);
     });
 
     it.each([

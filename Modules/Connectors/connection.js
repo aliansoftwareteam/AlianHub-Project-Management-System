@@ -129,6 +129,7 @@ const view = (provider, row) => {
         signIn: connected ? row.signIn || SIGN_IN.REGISTERED_APP : null,
         products: connected ? [...(row.products || [])] : [],
         scopes: connected ? [...(row.scopes || [])] : [],
+        toolsOff: connected ? [...(row.toolsOff || [])] : [],
         connectedAt: connected ? row.connectedAt || null : null,
         lastUsedAt: connected ? row.lastUsedAt || null : null,
         brokenReason: broken ? row.lastError || '' : '',
@@ -456,6 +457,15 @@ const saveToken = async ({ companyId, userId, sessionId, provider, token, actor 
     return view(provider, saved);
 };
 
+/* The caller has checked that `toolsOff` names only tools of the row's provider and that the row is the person's own. */
+const setToolsOff = async ({ companyId, row, toolsOff, actor }) => {
+    if (!holdsToken(row)) throw new ConnectionError(404, 'There is no such connection.', 'not_connected');
+    const saved = await update(companyId, row, { $set: { toolsOff: [...toolsOff], updatedBy: String(actorOf(actor).id || '') } });
+    audit(companyId, actor, 'connector.tools_changed', row.provider, { userId: String(row.userId), connectionId: String(row._id), toolsOff: [...toolsOff] });
+    announce(companyId, row.userId, row.provider, 'tools_changed');
+    return view(row.provider, saved);
+};
+
 const markBroken = async (companyId, row, reason) => {
     await update(companyId, row, { $set: { status: STATUS.BROKEN, lastError: String(reason || '').slice(0, 60), brokenAt: new Date() } });
     audit(companyId, null, 'connector.broken', row.provider, { userId: String(row.userId), reason: String(reason || '').slice(0, 60) });
@@ -552,7 +562,9 @@ const list = async (companyId, userId) => {
         // eslint-disable-next-line no-await-in-loop
         connections.push(await describe(companyId, userId, definition.id));
     }
-    return { providers: offered.map((d) => ({ provider: d.id, products: Object.keys(d.products), signIn: registry.signIns(d.id, appsHere) })), connections };
+    // Named for this install but with no way to sign in yet, so the screen can say an owner or admin has to set it up.
+    const unavailable = registry.list().filter((d) => named().includes(d.id) && !offered.includes(d)).map((d) => ({ provider: d.id }));
+    return { providers: offered.map((d) => ({ provider: d.id, products: Object.keys(d.products), signIn: registry.signIns(d.id, appsHere) })), connections, unavailable };
 };
 
 const membersWithConnections = async (companyId) => {
@@ -619,6 +631,6 @@ const sweepCompany = async (companyId) => {
 module.exports = {
     STATUS, BY, SIGN_IN, STATE_TTL_SECONDS, SECRET_KIND, ConnectionError,
     isOffered, fallbackOrigin, redirectUri, callbackPath, byId, ownsState,
-    describe, list, membersWithConnections, start, setProducts, returnFor, complete, disconnect, saveToken,
+    describe, list, membersWithConnections, start, setProducts, setToolsOff, returnFor, complete, disconnect, saveToken,
     findUsable, accessTokenFor, markBrokenById, markBackoff, recordHealth, endForMember, sweepCompany,
 };

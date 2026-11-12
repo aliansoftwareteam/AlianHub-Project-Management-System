@@ -73,6 +73,7 @@ const EVENTS = Object.freeze({
     'connector.app_registered': 'Signed AlianHub up with a connected service',
     'connector.app_registration_dropped': "A connected service no longer knew AlianHub's sign-up",
     'connector.tool_reviewed': 'Looked again at a tool a connected service changed',
+    'connector.tools_changed': 'Turned tools of a connected service on or off for themselves',
     'agent_session.delegated': 'Handed a task to an outside agent',
     'agent_session.endpoint_saved': 'Saved where an outside agent is reached',
     'agent_session.completed': 'An outside agent finished its work',
