@@ -1,7 +1,7 @@
 ---
 id: 095
 title: Connectors — Supabase, Upwork, Wispr Flow, Dropbox, HubSpot and Canva through their MCP servers
-status: backlog
+status: active
 priority: medium
 depends_on: [075, 093, 094]
 created: 2026-11-12

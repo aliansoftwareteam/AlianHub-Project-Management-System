@@ -4,10 +4,15 @@
  *
  * Dropbox returns the account id in the token response itself, so readAccount needs no extra call. Its
  * revoke endpoint authenticates with the token in the Authorization header rather than a form field
- * (unlike Google's), so the definition marks `revokeAuth: 'bearer'` — see providerApi.revoke. */
+ * (unlike Google's), so the definition marks `revokeAuth: 'bearer'` — see providerApi.revoke.
+ *
+ * Its AI tools (task 095) go through Dropbox's own MCP server, which takes the same Dropbox OAuth token, so one
+ * connection backs both the picker and the AI. */
 module.exports = {
     id: 'dropbox',
     name: 'Dropbox',
+    transport: 'mcp',
+    mcp: { url: 'https://mcp.dropbox.com/mcp' },
     auth: {
         authorizeUrl: 'https://www.dropbox.com/oauth2/authorize',
         tokenUrl: 'https://api.dropboxapi.com/oauth2/token',
@@ -29,7 +34,7 @@ module.exports = {
         if (!id) throw new Error('dropbox token response has no account_id');
         return { id: String(id), label: '' };
     },
-    egressHosts: ['www.dropbox.com', 'api.dropboxapi.com', 'content.dropboxapi.com'],
+    egressHosts: ['www.dropbox.com', 'api.dropboxapi.com', 'content.dropboxapi.com', 'mcp.dropbox.com'],
     rateLimit: { statuses: [429] },
     deadGrantErrors: ['invalid_grant'],
 };

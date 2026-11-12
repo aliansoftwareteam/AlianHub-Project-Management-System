@@ -1,7 +1,7 @@
 ---
 id: 075
 title: Connectors — GitHub through its MCP server, the first registered MCP app
-status: backlog
+status: active
 priority: high
 depends_on: [092, 093, 100]
 created: 2026-10-28

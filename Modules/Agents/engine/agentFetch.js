@@ -90,7 +90,8 @@ const callProvider = async (url, { form = {}, token, timeoutMs, maxBytes } = {})
         timeoutMs,
         maxBytes,
         maxRedirects: 0,
-        headers: { 'User-Agent': UA, 'Content-Type': 'application/x-www-form-urlencoded', ...(token ? { Authorization: `Bearer ${token}` } : {}) },
+        // GitHub answers a token call as a form unless JSON is asked for; the other providers answer JSON either way.
+        headers: { 'User-Agent': UA, Accept: 'application/json', 'Content-Type': 'application/x-www-form-urlencoded', ...(token ? { Authorization: `Bearer ${token}` } : {}) },
     });
     return { status: res.status, headers: res.headers || {}, body: res.body };
 };

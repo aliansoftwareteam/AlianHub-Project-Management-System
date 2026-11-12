@@ -60,7 +60,8 @@ const requestedGoogle = () => requested().filter((name) => GOOGLE.includes(name)
 
 const logBootState = () => {
     const logger = require('../../../Config/loggerConfig');
-    const unknown = named().filter((name) => !KNOWN.includes(name));
+    const providers = require('../../Connectors/registry').list().map((definition) => definition.id);
+    const unknown = named().filter((name) => !KNOWN.includes(name) && !providers.includes(name));
     if (unknown.length) logger.error(`${LOG} ${ENV_KEY} names ${unknown.join(', ')}, which this server does not have; known connectors: ${KNOWN.join(', ')}`);
     requested().forEach((name) => {
         const state = status(name);

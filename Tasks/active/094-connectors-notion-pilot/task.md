@@ -1,7 +1,7 @@
 ---
 id: 094
 title: Connectors — Notion, the first app that registers itself
-status: backlog
+status: active
 priority: high
 depends_on: [092, 100]
 created: 2026-11-12

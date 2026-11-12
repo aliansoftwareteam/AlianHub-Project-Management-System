@@ -7,6 +7,7 @@ const SCOPE_SEPARATORS = Object.freeze([' ', ',']);
 const REVOKE_WITH = Object.freeze(['refresh', 'access']);
 const TRANSPORT = Object.freeze({ API: 'api', MCP: 'mcp' });
 const REGISTRATION = Object.freeze(['dynamic']);
+const REGISTRATION_AUTH = Object.freeze(['none', 'client_secret_post']);
 
 const isPlainObject = (value) => !!value && typeof value === 'object' && !Array.isArray(value);
 const isText = (value) => typeof value === 'string' && value.trim().length > 0;
@@ -30,6 +31,7 @@ const registrationProblems = (auth, hosts) => {
     if (!host) problems.push('auth.registrationUrl is not an https URL');
     else if (!hosts.includes(host)) problems.push(`auth.registrationUrl host ${host} is not in egressHosts`);
     if (auth.pkce !== 'S256') problems.push('auth.registration needs pkce S256');
+    if (auth.registrationAuth !== undefined && !REGISTRATION_AUTH.includes(auth.registrationAuth)) problems.push('auth.registrationAuth must be none or client_secret_post');
     return problems;
 };
 

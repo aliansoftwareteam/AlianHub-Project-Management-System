@@ -44,12 +44,13 @@ const post = async ({ definition, companyId, actor, url, form, hide = [], token 
     return { ok: false, error: answered && ERROR_CODE.test(String(body.error || '')) ? String(body.error) : `http_${res.status}` };
 };
 
+/* An MCP app that grants access without scopes is asked for none, rather than for an empty scope. */
 const consentUrl = ({ definition, clientId, redirectUri, scopes, state, challenge }) => {
     const params = {
         client_id: clientId,
         redirect_uri: redirectUri,
         response_type: 'code',
-        [definition.auth.scopeParam || 'scope']: scopes.join(definition.auth.scopeSeparator || ' '),
+        ...(scopes.length ? { [definition.auth.scopeParam || 'scope']: scopes.join(definition.auth.scopeSeparator || ' ') } : {}),
         state,
         ...(definition.auth.extraParams || {}),
     };
@@ -104,12 +105,13 @@ const callJson = async ({ companyId, actor, url, method = 'get', json, token, ho
     return { ok: false, error: answered && ERROR_CODE.test(String(body.error || '')) ? String(body.error) : `http_${res.status}` };
 };
 
-/* Dynamic client registration (RFC 7591) as a public client: the token is bound to the attempt by PKCE. */
+/* Dynamic client registration (RFC 7591), as a public client bound by PKCE unless the app's token endpoint takes
+ * only confidential clients (`auth.registrationAuth`), in which case the secret it sends back is kept. */
 const register = ({ definition, companyId, actor, redirectUri }) => callJson({
     companyId, actor, url: definition.auth.registrationUrl, method: 'post', hosts: definition.egressHosts,
     json: {
         client_name: 'AlianHub', redirect_uris: [redirectUri], grant_types: ['authorization_code', 'refresh_token'],
-        response_types: ['code'], token_endpoint_auth_method: 'none',
+        response_types: ['code'], token_endpoint_auth_method: definition.auth.registrationAuth || 'none',
     },
 });
 
