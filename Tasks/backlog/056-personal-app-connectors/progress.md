@@ -54,5 +54,12 @@
   - 075 rewritten for GitHub through its MCP server; 079 widened.
   - Development starts with 092 on `feat/connectors-mcp-transport`.
 
+- 2026-11-12: Built the v2 tasks on `feat/connectors-mcp-transport` (not pushed):
+  - 092 MCP client and MCP provider definitions; 100 sign-in for MCP apps; 093 hosted sign-in, instance side; tool review by shape (`02cd81e8f`, `643a77c5d`, `2265374be`, `48fd937cf`).
+  - 094 Notion, 075 GitHub and 095 Supabase, Upwork, Wispr Flow, Dropbox, HubSpot and Canva through their MCP servers (`6d4e2eace`). Only reviewed tools are registered (`e01086f77`).
+  - 099 Outlook, 097 the AI chat, 098 agents, 101 the Connectors screen, 096 custom servers, and 077 with the Slack half of 079, each built on its own branch and merged here.
+  - Migrations: 083 agent connector ticks (098), 084 the Add custom apps right (096), 085 the legacy cutover (077).
+  - Open: every MCP tool waits for its shape to be pinned with a test account (`scripts/connector-tool-shapes.js`, then its AgentActions label); the hosted sign-in service in alianhub-cloud; real-account checks; the phone and keyboard pass on the screen; usage this week; hosted plan gating of custom apps; the GitHub half of 079; `api:doc` and `version:log` in the docs PR.
+
 ## Last step
-PRD v2.0 approved and re-applied on the integration branch; development started with 092.
+Every v2 task is built and merged on `feat/connectors-mcp-transport`; waiting for the owner to review it together before anything is pushed.

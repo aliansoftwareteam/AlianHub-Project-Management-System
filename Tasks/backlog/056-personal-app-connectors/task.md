@@ -389,19 +389,19 @@ The two tracks of 2026-10-28 built v1.1; the v2.0 tasks keep the same split. Tra
 | v1.1 | B | 074 Slack personal | 36 | 069, 070, 078 | Done |
 | v1.1 | A | 076 Attachment picker | 39, 40 | 066, 072 | Done |
 | v1.1 | B | 078 Approval cards, quota settings | 23, 29, 33, 34 | 069, 070 | Done; one box open |
-| 1 | B | 092 MCP client and MCP provider definitions | 1, 43–47 | 063, 068 | In progress |
-| 1 | A | 100 Sign-in for MCP apps: discovery, self-registration, personal tokens | 8, 41, 42 | 066, 092 | |
-| 1 | A | 093 Hosted sign-in, instance side | 48–51 | 065, 066 | |
-| 1 | A | 094 Notion, the first app that registers itself | 41 | 092, 100 | |
-| 1 | B | 075 GitHub, the first registered MCP app | 37, 42 | 092, 093, 100 | |
-| 1 | B | 097 Connectors in the AI chat | 56–60 | 075, 087, 092 | |
-| 1 | A | 101 Connectors screen redesign (Customize → Connectors) | 63–68 | 072 | |
-| 2 | B | 095 Supabase, Upwork, Wispr Flow, Dropbox files, HubSpot, Canva | — | 075, 093, 094 | |
-| 2 | A | 096 Custom MCP servers | 52–55, 66 | 092, 100, 101 | |
-| 2 | B | 098 Agents use connectors | 61, 62 | 068 | |
-| 2 | B | 079 Remove old Slack bot + GitHub sync paths | 38 | 074, 075 | |
-| 2 | A | 077 Remove old Calendar + CloudStorage paths; setup pages | — | 073, 076 | |
-| 3 | B | 099 Outlook built connector | — | 068, 069, 093 | |
+| 1 | B | 092 MCP client and MCP provider definitions | 1, 43–47 | 063, 068 | Built; every tool waits for its shape to be pinned |
+| 1 | A | 100 Sign-in for MCP apps: discovery, self-registration, personal tokens | 8, 41, 42 | 066, 092 | Built |
+| 1 | A | 093 Hosted sign-in, instance side | 48–51 | 065, 066 | Built; the service itself is open in alianhub-cloud |
+| 1 | A | 094 Notion, the first app that registers itself | 41 | 092, 100 | Built; real-account check and pinning open |
+| 1 | B | 075 GitHub, the first registered MCP app | 37, 42 | 092, 093, 100 | Built; real-account check and pinning open |
+| 1 | B | 097 Connectors in the AI chat | 56–60 | 075, 087, 092 | Built |
+| 1 | A | 101 Connectors screen redesign (Customize → Connectors) | 63–68 | 072 | Built; phone and keyboard pass, usage this week open |
+| 2 | B | 095 Supabase, Upwork, Wispr Flow, Dropbox files, HubSpot, Canva | — | 075, 093, 094 | Built; real-account checks and pinning open |
+| 2 | A | 096 Custom MCP servers | 52–55, 66 | 092, 100, 101 | Built; hosted plan gating open |
+| 2 | B | 098 Agents use connectors | 61, 62 | 068 | Built |
+| 2 | B | 079 Remove old Slack bot + GitHub sync paths | 38 | 074, 075 | Slack half built; GitHub half waits for 075 |
+| 2 | A | 077 Remove old Calendar + CloudStorage paths; setup pages | — | 073, 076 | Built |
+| 3 | B | 099 Outlook built connector | — | 068, 069, 093 | Built; real-account check open |
 
 **Cloud work:** the shared sign-in service is built and tracked in the alianhub-cloud repo (`docs/tasks/connector-sign-in/`, created with its PR), against the contract task 093 writes.
 
