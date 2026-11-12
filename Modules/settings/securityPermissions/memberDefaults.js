@@ -70,6 +70,10 @@ const MEMBER_DEFAULT_PERMISSIONS = Object.freeze({
     // Timesheets: their own only.
     user_timesheet: 1,
 
+    // Time tracking: any teammate can run the desktop tracker without an admin granting it.
+    time_tracking: true,
+    desktop_tracker: true,
+
     // AI: the everyday AI members had before the AI rows existed. Building agents, writing skills and
     // seeing every agent stay with owners and admins until one of them grants it.
     ai_assistant: true,
@@ -88,6 +92,7 @@ const GUEST_DEFAULT_PERMISSIONS = Object.freeze({
     ai_skill_risk: null,
     ai_connectors: null,
     ai_external_clients: true,
+    desktop_tracker: null,
 });
 
 module.exports = { MEMBER_ROLE_TYPE, MEMBER_DEFAULT_PERMISSIONS, GUEST_DEFAULT_PERMISSIONS };

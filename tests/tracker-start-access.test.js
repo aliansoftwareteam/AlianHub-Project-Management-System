@@ -1,3 +1,4 @@
+jest.mock('../Modules/DesktopTracker/trackerSeats', () => ({ ...jest.requireActual('../Modules/DesktopTracker/trackerSeats'), trackerAccessFor: async () => ({ allowed: true }) }));
 const verified = require('./fixtures/verifiedRequest');
 const fakeMongo = require('./fixtures/fakeMongo');
 

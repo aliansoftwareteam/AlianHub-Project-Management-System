@@ -92,6 +92,7 @@ async function buildUsage(now = Date.now()) {
         activityOf(supportUsers, now),
     ]);
     const seats = countSeats(rows, supportUsers);
+    const trackerLimit = timeTracker.enabled === false ? 0 : (timeTracker.seats ?? null);
     return {
         instanceId: process.env.INSTANCE_ID || '',
         at: new Date(now),
@@ -104,7 +105,8 @@ async function buildUsage(now = Date.now()) {
             level: storageLevel({ usedBytes: storage.bytes, limit: limits.storageBytes }),
             byWorkspace: storage.byWorkspace.map((row) => ({ companyId: row.companyId, name: names.get(row.companyId) || '', bytes: row.bytes })),
         },
-        timeTracker: { seatsUsed: seats.trackerSeats, limit: timeTracker.enabled === false ? 0 : (timeTracker.seats ?? null) },
+        // On an unlimited tracker the role alone decides, so no seat is held or counted.
+        timeTracker: { seatsUsed: trackerLimit === null ? 0 : seats.trackerSeats, limit: trackerLimit },
         mail: { sentToday: mail && mail.day === todayUtc(now) ? Number(mail.sent) || 0 : 0, limit: limits.emailsPerDay ?? null },
         activity,
         migrations: { pending: instanceState.migrationsPending, error: instanceState.migrationError },

@@ -224,7 +224,7 @@ describe('GET /api/v2/tracker/desktop-app', () => {
         company({ planFeature: {}, trackerUsers: 0 });
         const res = await run(ctrl.desktopApp, signedIn());
         expect(res.body.data.screenshots.bytes).toBeNull();
-        expect(res.body.data.seats).toEqual({ used: 0, limit: null });
+        expect(res.body.data.seats).toEqual({ used: null, limit: null });
     });
 
     it('offers no download when the plan has no tracker, and links a managed owner to the portal', async () => {

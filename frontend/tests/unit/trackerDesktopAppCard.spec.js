@@ -79,8 +79,8 @@ describe('DesktopAppCard', () => {
         expect(text(mountCard({ info: small }), 'desktop-app-screenshots')).toBe('Screenshots: 5 MB · kept 1 month');
     });
 
-    it('counts tracked users without a limit', () => {
-        expect(text(mountCard({ info: info({ seats: { used: 1, limit: null } }) }), 'desktop-app-seats')).toBe('1 tracked user');
+    it('counts no seats when the plan does not limit them', () => {
+        expect(text(mountCard({ info: info({ seats: { used: null, limit: null } }) }), 'desktop-app-seats')).toBe('Unlimited users');
     });
 
     it('falls back to the downloads this server hosts when the update feed has none', () => {

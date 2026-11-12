@@ -4,6 +4,8 @@ const { SCHEMA_TYPE } = require("../../../Config/schemaType");
 const { MongoDbCrudOpration } = require("../../../utils/mongo-handler/mongoQueries");
 const { removeCache } = require("../../../utils/commonFunctions");
 const { settingsDocUpdateProblem } = require("../settingsDocUpdate");
+const logger = require("../../../Config/loggerConfig");
+const { grantTrackerToNewRoles } = require("../../DesktopTracker/trackerSeats");
 
 exports.getRoles = async (req,res) => {
     try {
@@ -65,6 +67,11 @@ exports.updateRole = async(req,res) => {
             return res.status(400).json({ message: "Role not updated" });
         }
         removeCache(`role:${companyId}`,true);
+        const added = queryObj && queryObj.$push && queryObj.$push.settings;
+        if (added) {
+            const roleKeys = [].concat(added.$each || added).map((role) => role && role.key);
+            await grantTrackerToNewRoles(companyId, roleKeys).catch((error) => logger.error(`grantTrackerToNewRoles ${companyId}: ${error.message || error}`));
+        }
         return res.status(200).json(updateRoles);
     } catch (error) {
         res.status(500).json({ message: "An error occurred while updating the roles.", error: error.message });

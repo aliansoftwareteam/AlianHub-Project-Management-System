@@ -44,6 +44,7 @@
                     </div>
                 </template>
             </DesktopAppCard>
+            <TrackerSeatsCard v-if="seatHolders" :seats="desktopApp.seats" @released="loadDesktopApp" />
         </div>
     </div>
 </template>
@@ -51,6 +52,7 @@
 <script setup>
 import { onMounted, ref, computed ,inject} from "vue";
 import DesktopAppCard from "./DesktopAppCard.vue";
+import TrackerSeatsCard from "./TrackerSeatsCard.vue";
 import { apiRequest } from "@/services";
 import * as env from "@/config/env";
 
@@ -74,12 +76,18 @@ const dataobj = ref([]);
 const loaded = ref(false);
 const desktopApp = ref(null);
 const desktopLoading = ref(true);
-					
+const seatHolders = computed(() => {
+    const seats = desktopApp.value && desktopApp.value.enabled ? desktopApp.value.seats : null;
+    return Boolean(seats && seats.limit && Array.isArray(seats.holders));
+});
+
+const loadDesktopApp = () => apiRequest("get", env.TRACKER_DESKTOP_APP)
+    .then((res) => { desktopApp.value = res && res.data && res.data.status ? res.data.data : null; })
+    .catch((error) => console.error("ERROR in loading the desktop tracker card: ", error))
+    .finally(() => { desktopLoading.value = false; });
+
 onMounted(() => {
-    apiRequest("get", env.TRACKER_DESKTOP_APP)
-        .then((res) => { desktopApp.value = res && res.data && res.data.status ? res.data.data : null; })
-        .catch((error) => console.error("ERROR in loading the desktop tracker card: ", error))
-        .finally(() => { desktopLoading.value = false; });
+    loadDesktopApp();
     if(arrobj.value && !arrobj.value.length) {
             dispatch('settings/setTimeTrackerDownload', companyId.value).then((res)=>{                        
             dataobj.value = (res || []).map((element) =>{return {...element , image:imageObj.value[element.type]}})
