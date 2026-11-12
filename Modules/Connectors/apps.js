@@ -59,9 +59,28 @@ const publicApp = (r) => ({ provider: r.provider, clientId: r.clientId, extra: r
 
 const describeApps = async (companyId) => ((await appsDb(companyId, [{ companyId: String(companyId) }, { secretHandle: 0 }, { sort: { provider: 1 } }], 'find')) || []).map(plain).map(publicApp);
 
+/* A custom server's app is its own: the client it registered for this workspace, or the one its adder entered. No
+ * instance, company or hosted app ever signs in to a server a workspace added (096). */
+const customApp = async ({ companyId, provider, actor }) => {
+    const custom = require('./customServers');
+    const server = await custom.findRow(companyId, custom.serverIdOf(provider));
+    if (!server) throw new AppError(CODE.NOT_FOUND, 'This custom app is not set up here.');
+    const definition = custom.definitionOf(server);
+    if (server.signIn === custom.SIGN_IN.SELF_REGISTER) {
+        const out = await require('./registrations').resolve({ companyId, definition, redirectUri: callbacks.redirectUri(provider), actor });
+        if (out.ok) return out.app;
+        throw new AppError(CODE.REGISTRATION_FAILED, `${definition.name} did not accept AlianHub's sign-up (${out.error}), so it cannot be connected right now.`);
+    }
+    if (server.signIn !== custom.SIGN_IN.REGISTERED_APP || !server.clientId || !server.secretHandle) throw new AppError(CODE.NOT_FOUND, `No app is set for ${definition.name} yet.`);
+    const clientSecret = await secrets.resolve({ companyId, handle: server.secretHandle });
+    if (clientSecret === null) throw new AppError(CODE.SECRET_UNREADABLE, `The ${definition.name} app secret cannot be read.`);
+    return { source: 'company', appId: String(server._id), clientId: server.clientId, clientSecret };
+};
+
 /* Server-internal: the only path that yields the client secret, for 066's authorize and token calls. Company
  * app wins over the instance default (FR-5). */
 const resolveApp = async ({ companyId, provider, actor } = {}) => {
+    if (require('./customServers').isCustomId(provider)) return customApp({ companyId, provider, actor });
     const existing = await row(companyId, provider);
     if (existing) {
         const clientSecret = await secrets.resolve({ companyId, handle: existing.secretHandle });

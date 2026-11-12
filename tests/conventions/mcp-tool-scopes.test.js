@@ -16,6 +16,8 @@ describe('every registered MCP tool maps to one scope', () => {
     const savedApps = process.env.APP_CONNECTIONS;
     const savedConnectors = process.env.CONNECTORS;
     const savedTaint = process.env.AGENT_TAINT_ROUTING;
+    const savedStore = process.env.SECRETS_STORE;
+    const savedKey = process.env.SECRETS_KEY;
     const restore = (key, value) => { if (value === undefined) delete process.env[key]; else process.env[key] = value; };
 
     beforeAll(() => {
@@ -27,12 +29,15 @@ describe('every registered MCP tool maps to one scope', () => {
         process.env.APP_CONNECTIONS = 'on';
         process.env.CONNECTORS = 'google,slack';
         process.env.AGENT_TAINT_ROUTING = 'on';
+        // Custom apps' tools are registered only while tokens can be kept by handle.
+        process.env.SECRETS_STORE = 'true';
+        process.env.SECRETS_KEY = 'k'.repeat(48);
         tools = require('../../Modules/Mcp/tools');
         registry = require('../../Modules/Agents/registry');
         sessionTools = require('../../Modules/Mcp/sessionTools');
         ({ TOOL_SCOPES, scopeForTool } = require('../../Modules/Mcp/scopes'));
     });
-    afterAll(() => { restore('AGENT_PERFORMANCE_READ', saved); restore('EXTERNAL_AGENT_SESSIONS', savedSessions); restore('MCP_TOOLS_DATA', savedData); restore('MCP_TOOLS_MANAGE', savedManage); restore('MCP_TOOLS_WORK', savedWork); restore('APP_CONNECTIONS', savedApps); restore('CONNECTORS', savedConnectors); restore('AGENT_TAINT_ROUTING', savedTaint); });
+    afterAll(() => { restore('AGENT_PERFORMANCE_READ', saved); restore('EXTERNAL_AGENT_SESSIONS', savedSessions); restore('MCP_TOOLS_DATA', savedData); restore('MCP_TOOLS_MANAGE', savedManage); restore('MCP_TOOLS_WORK', savedWork); restore('APP_CONNECTIONS', savedApps); restore('CONNECTORS', savedConnectors); restore('AGENT_TAINT_ROUTING', savedTaint); restore('SECRETS_STORE', savedStore); restore('SECRETS_KEY', savedKey); });
 
     it('sees the flagged tools too (the scan works)', () => {
         expect(tools.names()).toContain('performance.read');

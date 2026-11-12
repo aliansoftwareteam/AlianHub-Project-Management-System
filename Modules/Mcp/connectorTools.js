@@ -26,7 +26,7 @@ const withConnectionId = (tool) => ({ ...tool.input, properties: { ...tool.input
 const readOf = (tool) => Object.freeze({
     name: tool.key,
     action: tool.key,
-    description: `${tool.input.description} It reads only your own ${tool.definition.name} connection, as text.`,
+    description: tool.mcpDescription || `${tool.input.description} It reads only your own ${tool.definition.name} connection, as text.`,
     input: withConnectionId(tool),
     strict: true,
     optIn: READ_SCOPE,

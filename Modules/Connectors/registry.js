@@ -47,6 +47,16 @@ const readDefinitions = (dir) => {
     return found;
 };
 
+/* Takes the definition itself, so a custom server's (built from its row, not read from providers/) is asked the same way. */
+const scopesIn = (definition, products = []) => {
+    const { id } = definition;
+    if (!Array.isArray(products)) throw new TypeError(`products for ${id} must be a list of product names`);
+    const unknown = products.filter((product) => !Object.prototype.hasOwnProperty.call(definition.products, product));
+    if (unknown.length) throw new Error(`${id} has no product ${unknown.join(', ')}`);
+    const ticked = Object.keys(definition.products).filter((product) => products.includes(product));
+    return [...new Set([...(definition.auth.baseScopes || []), ...ticked.flatMap((product) => definition.products[product])])];
+};
+
 const createRegistry = ({ dir = PROVIDERS_DIR } = {}) => {
     let cached = null;
     const definitions = () => {
@@ -71,14 +81,10 @@ const createRegistry = ({ dir = PROVIDERS_DIR } = {}) => {
     const scopesFor = (id, products = []) => {
         const definition = get(id);
         if (!definition) throw new Error(`unknown connector provider ${id}`);
-        if (!Array.isArray(products)) throw new TypeError(`products for ${id} must be a list of product names`);
-        const unknown = products.filter((product) => !Object.prototype.hasOwnProperty.call(definition.products, product));
-        if (unknown.length) throw new Error(`${id} has no product ${unknown.join(', ')}`);
-        const ticked = Object.keys(definition.products).filter((product) => products.includes(product));
-        return [...new Set([...(definition.auth.baseScopes || []), ...ticked.flatMap((product) => definition.products[product])])];
+        return scopesIn(definition, products);
     };
 
-    return { list, get, isOffered, offered, scopesFor, signIns, SIGN_IN };
+    return { list, get, isOffered, offered, scopesFor, scopesIn, signIns, SIGN_IN };
 };
 
-module.exports = { ...createRegistry(), createRegistry, SIGN_IN };
+module.exports = { ...createRegistry(), createRegistry, scopesIn, SIGN_IN };

@@ -138,7 +138,8 @@ const toggle = (provider, product) => {
 /* The list endpoint gives each provider's offered products and the person's own connection. The connection's own
  * products are the ones ticked for a connected provider; a provider with none connected starts with all offered. */
 const toRows = (data) => {
-    const offered = data.providers || [];
+    // A workspace's custom apps are listed, connected and reviewed on their own card (CustomServers.vue).
+    const offered = (data.providers || []).filter((entry) => !entry.custom);
     const byProvider = {};
     (data.connections || []).forEach((conn) => { byProvider[conn.provider] = conn; });
     return offered.map((entry) => {

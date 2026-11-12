@@ -30,12 +30,12 @@ A person with the right adds their team's own MCP server by its address, and eac
 - Servers that sign nobody in; local (stdio) servers (056 §12)
 
 ## Acceptance criteria
-- [ ] Without the right, the Add button is hidden and the routes refuse
-- [ ] A private or plain-HTTP address is refused with the reason
-- [ ] A new server's tools are offered to no AI until reviewed; a changed tool hides again
-- [ ] Two members connect their own accounts to the same custom server and each reaches only their own
-- [ ] Removing the server ends all its connections
-- [ ] `i18n:check` and `style:check` pass
+- [x] Without the right, the Add button is hidden and the routes refuse
+- [x] A private or plain-HTTP address is refused with the reason
+- [x] A new server's tools are offered to no AI until reviewed; a changed tool hides again
+- [x] Two members connect their own accounts to the same custom server and each reaches only their own
+- [x] Removing the server ends all its connections
+- [x] `i18n:check` and `style:check` pass
 
 ## Constraints & notes
 - Track: A — connections (getting and keeping a person's access)

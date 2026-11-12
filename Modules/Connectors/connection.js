@@ -32,7 +32,7 @@ const EXPIRY_SKEW_MS = 60 * 1000;
 const OBJECT_ID = /^[a-f0-9]{24}$/i;
 const ERROR_CODE = /^[a-z0-9_]{1,60}$/;
 const STATUS = Object.freeze({ PENDING: 'pending', CONNECTED: 'connected', BROKEN: 'broken', REAUTH: 'reauth_required', REVOKED: 'revoked' });
-const BY = Object.freeze({ SELF: 'self', ADMIN: 'admin', MEMBER_REMOVED: 'member_removed' });
+const BY = Object.freeze({ SELF: 'self', ADMIN: 'admin', MEMBER_REMOVED: 'member_removed', SERVER_REMOVED: 'server_removed' });
 const SIGN_IN = Object.freeze({ REGISTERED_APP: 'registered_app', SELF_REGISTER: 'self_register', PERSONAL_TOKEN: 'personal_token' });
 const MAX_PERSONAL_TOKEN = 4096;
 const SECRET_LABEL = Object.freeze({ refresh: 'refresh token', access: 'access token' });
@@ -55,11 +55,19 @@ const stateSecret = () => {
 
 const companyAppsOf = (companyId) => apps.companyProviders(companyId).then((list) => ({ companyApps: list }));
 const definitionOf = (provider) => registry.get(provider);
+const custom = () => require('./customServers');
+
+/* A catalog provider's definition is fixed at boot; a custom server's is built from its workspace's row (096). */
+const definitionFor = async (companyId, provider) => definitionOf(provider) || (custom().isCustomId(provider) ? custom().definitionFor(companyId, provider) : null);
+const nameOf = (provider, definition) => (definition || definitionOf(provider) || {}).name || String(provider);
+
+const signInsOf = async (companyId, definition) => (definition.custom ? [...definition.signIns] : registry.signIns(definition.id, await companyAppsOf(companyId)));
 
 /* Offered needs a definition, a name in CONNECTORS, and an app. The name is checked first and the instance app
  * next, both without the database, so a provider that is off or set by the instance is answered without a company
  * app lookup; only a named provider with no instance app reads `connector_apps`. */
 const isOffered = async (companyId, provider) => {
+    if (custom().isCustomId(provider)) return custom().isOffered(companyId, provider);
     if (!definitionOf(provider) || !named().includes(String(provider))) return false;
     if (registry.isOffered(provider, { companyApps: [] })) return true;
     const { companyApps } = await companyAppsOf(companyId);
@@ -79,11 +87,11 @@ const isPersonalToken = (row) => Boolean(row && row.signIn === SIGN_IN.PERSONAL_
 const tokenHandle = (row) => (row && row.handles ? (isPersonalToken(row) ? row.handles.access : row.handles.refresh) : null);
 const holdsToken = (row) => Boolean(tokenHandle(row));
 
-const audit = (companyId, actor, action, provider, meta = {}) => {
+const audit = (companyId, actor, action, provider, meta = {}, definition = null) => {
     const who = actorOf(actor);
     recordAudit(companyId, {
         actorId: String(who.id || 'system'), ...(who.ip ? { ip: String(who.ip) } : {}),
-        action, entityType: 'connector', entityId: String(provider), entityName: (definitionOf(provider) || {}).name || String(provider), meta,
+        action, entityType: 'connector', entityId: String(provider), entityName: nameOf(provider, definition), meta,
     });
 };
 
@@ -157,13 +165,12 @@ const describe = async (companyId, userId, provider) => {
     return view(provider, held ? row : null);
 };
 
-const scopesForProducts = (provider, products) => registry.scopesFor(provider, Array.isArray(products) && products.length ? products : Object.keys(definitionOf(provider).products));
+const scopesForProducts = (definition, products) => registry.scopesIn(definition, Array.isArray(products) && products.length ? products : Object.keys(definition.products));
 
 /* The state names the workspace, the person and the provider and is signed; what makes it single-use and ties it
  * to one session is the row, which keeps a hash of its id, the session that asked and the PKCE verifier. Starting
  * again replaces the earlier attempt. The app that will issue the token is recorded now (FR-6). */
-const beginConsent = async ({ companyId, userId, sessionId, provider, products, origin, app, scopes }) => {
-    const definition = definitionOf(provider);
+const beginConsent = async ({ companyId, userId, sessionId, provider, definition, products, origin, app, scopes }) => {
     const jti = crypto.randomBytes(32).toString('hex');
     const verifier = crypto.randomBytes(48).toString('base64url');
     const oauth = { stateHash: hash(jti), verifier, sessionId: String(sessionId), origin: String(origin || ''), products: [...products] };
@@ -190,17 +197,18 @@ const start = async ({ companyId, userId, sessionId, provider, products, origin 
     if (!sessionId) throw new ConnectionError(403, 'Sign in again before connecting an account.', 'no_session');
     if (!apiBase()) throw new ConnectionError(409, 'APIURL is not set on the server, so the provider cannot be told where to return.', 'apiurl_missing');
     if (!(await isOffered(companyId, provider))) throw new ConnectionError(404, 'This connector is not available.', 'provider_off');
+    const definition = await definitionFor(companyId, provider);
     let scopes;
     try {
-        scopes = scopesForProducts(provider, products);
+        scopes = scopesForProducts(definition, products);
     } catch (e) {
         throw new ConnectionError(400, 'Those products are not offered by this connector.', 'bad_products');
     }
-    if (!registry.signIns(provider, await companyAppsOf(companyId)).includes(registry.SIGN_IN.OAUTH)) {
+    if (!(await signInsOf(companyId, definition)).includes(registry.SIGN_IN.OAUTH)) {
         throw new ConnectionError(409, 'This connector is connected by pasting a token of your own.', 'token_only');
     }
     const app = await apps.resolveApp({ companyId, provider, actor: userId });
-    return beginConsent({ companyId, userId, sessionId, provider, products: products || Object.keys(definitionOf(provider).products), origin, app, scopes });
+    return beginConsent({ companyId, userId, sessionId, provider, definition, products: products || Object.keys(definition.products), origin, app, scopes });
 };
 
 /* Re-consents for the products the person ticked (incremental consent, FR-10). The live connection keeps its
@@ -211,21 +219,23 @@ const setProducts = async ({ companyId, userId, sessionId, provider, connectionI
     if (!(await isOffered(companyId, provider))) throw new ConnectionError(404, 'This connector is not available.', 'provider_off');
     const row = await find(companyId, userId, provider);
     if (!row || String(row._id) !== String(connectionId) || !holdsToken(row)) throw new ConnectionError(404, 'There is no such connection.', 'not_connected');
+    const definition = await definitionFor(companyId, provider);
     let scopes;
     try {
-        scopes = scopesForProducts(provider, products);
+        scopes = scopesForProducts(definition, products);
     } catch (e) {
         throw new ConnectionError(400, 'Those products are not offered by this connector.', 'bad_products');
     }
     const app = await apps.resolveApp({ companyId, provider, actor: userId });
-    return beginConsent({ companyId, userId, sessionId, provider, products, origin, app, scopes });
+    return beginConsent({ companyId, userId, sessionId, provider, definition, products, origin, app, scopes });
 };
 
 const readState = (state) => {
     if (typeof state !== 'string' || !state || state.length > MAX_STATE_LENGTH) return null;
     try {
         const claims = jwt.verify(state, stateSecret(), { algorithms: ['HS256'], audience: STATE_AUDIENCE });
-        const whole = claims && OBJECT_ID.test(String(claims.companyId)) && OBJECT_ID.test(String(claims.userId)) && typeof claims.jti === 'string' && !!definitionOf(claims.provider);
+        const known = Boolean(claims) && (!!definitionOf(claims.provider) || custom().isCustomId(claims.provider));
+        const whole = known && OBJECT_ID.test(String(claims.companyId)) && OBJECT_ID.test(String(claims.userId)) && typeof claims.jti === 'string';
         return whole ? claims : null;
     } catch (e) {
         return null;
@@ -266,7 +276,7 @@ const refusedByProvider = (definition, out) => {
     return new ConnectionError(502, `The provider could not complete the connection (${out.error}${out.detail ? `: ${out.detail}` : ''}).`, out.error);
 };
 
-const keep = async ({ companyId, userId, provider, handle, key, value, actor }) => {
+const keep = async ({ companyId, userId, provider, handle, key, value, actor, definition = null }) => {
     if (handle) {
         try {
             return (await store.rotate({ companyId, handle, value, actor })).handle;
@@ -274,7 +284,7 @@ const keep = async ({ companyId, userId, provider, handle, key, value, actor }) 
             if (!['revoked', 'not_found'].includes(error.code)) throw error;
         }
     }
-    const name = `${(definitionOf(provider) || {}).name || provider} connection of ${userId}: ${SECRET_LABEL[key]}`;
+    const name = `${nameOf(provider, definition)} connection of ${userId}: ${SECRET_LABEL[key]}`;
     return (await store.create({ companyId, name, kind: SECRET_KIND, value, actor })).handle;
 };
 
@@ -310,8 +320,9 @@ const revokeToken = async ({ companyId, actor, provider, row, definition }) => {
 
 /* A pasted token was made by the person at the provider, and only they can revoke it there. */
 const revokeAtProvider = async ({ companyId, actor, provider, row }) => {
-    const definition = definitionOf(provider);
     if (!holdsToken(row) || isPersonalToken(row)) return 'skipped';
+    const definition = await definitionFor(companyId, provider);
+    if (!definition) return 'skipped';
     if (await sharesGrant(companyId, row)) return 'shared';
     const token = await revokeToken({ companyId, actor, provider, row, definition });
     if (!token) return 'skipped';
@@ -343,8 +354,8 @@ const accountFrom = async ({ definition, companyId, userId, answer, accessToken 
  * it, so a refused attempt cannot be tried again. Only the scopes the provider actually granted are stored. */
 const complete = async ({ companyId, userId, sessionId, provider, state, code, actor }) => {
     const refused = (reason = 'state_invalid') => new ConnectionError(400, 'This connection attempt is no longer valid. Start again from the Connections page.', reason);
-    const definition = definitionOf(provider);
-    if (!definition) throw new ConnectionError(404, 'This connector is not available.', 'provider_off');
+    const definition = await definitionFor(companyId, provider);
+    if (!definition || (definition.custom && !(await isOffered(companyId, provider)))) throw new ConnectionError(404, 'This connector is not available.', 'provider_off');
     const claims = readState(state);
     if (!claims || claims.companyId !== String(companyId) || claims.userId !== String(userId) || claims.provider !== provider) throw refused();
     const given = typeof code === 'string' ? code.trim() : '';
@@ -376,7 +387,7 @@ const complete = async ({ companyId, userId, sessionId, provider, state, code, a
     const handles = {};
     for (const [key, value] of [['refresh', tokens.refresh_token], ['access', tokens.access_token]]) {
         // eslint-disable-next-line no-await-in-loop
-        handles[key] = await keep({ companyId, userId, provider, handle: row.handles && row.handles[key], key, value, actor: who });
+        handles[key] = await keep({ companyId, userId, provider, handle: row.handles && row.handles[key], key, value, actor: who, definition });
     }
     const scopes = api.scopesOf(tokens.scope);
     const was = row.products || [];
@@ -386,11 +397,11 @@ const complete = async ({ companyId, userId, sessionId, provider, state, code, a
         products: [...products], connectedAt: new Date(), lastError: '', brokenAt: null, updatedBy: String(userId),
         signIn: app.source === 'registered' ? SIGN_IN.SELF_REGISTER : SIGN_IN.REGISTERED_APP, kind: definition.transport || 'api',
     } });
-    audit(companyId, who, 'connector.connect', provider, { userId: String(userId), products: [...(saved.products || [])], scopes });
+    audit(companyId, who, 'connector.connect', provider, { userId: String(userId), products: [...(saved.products || [])], scopes }, definition);
     announce(companyId, userId, provider, 'connected');
     // A re-consent that changed the products of an already-connected account is also a product change (FR-10).
     if (holdsToken(row) && (was.length !== products.length || products.some((product) => !was.includes(product)))) {
-        audit(companyId, who, 'connector.products_changed', provider, { userId: String(userId), connectionId: String(row._id), products: [...products] });
+        audit(companyId, who, 'connector.products_changed', provider, { userId: String(userId), connectionId: String(row._id), products: [...products] }, definition);
         announce(companyId, userId, provider, 'products_changed');
     }
     return view(provider, saved);
@@ -413,9 +424,15 @@ const disconnect = async ({ companyId, userId, provider, connectionId, actor, by
         await store.retire({ companyId, handle, actor });
     }
     await close(companyId, row, by, actor);
-    audit(companyId, actor, 'connector.revoke', provider, { userId: String(userId), by, provider: providerResult });
+    audit(companyId, actor, 'connector.revoke', provider, { userId: String(userId), by, provider: providerResult }, await definitionFor(companyId, provider));
     announce(companyId, userId, provider, 'disconnected');
     return view(provider, null);
+};
+
+const endOne = async ({ companyId, row, actor, by }) => {
+    if (holdsToken(row)) return disconnect({ companyId, userId: String(row.userId), provider: row.provider, connectionId: String(row._id), actor, by });
+    await close(companyId, row, by, actor);
+    return view(row.provider, null);
 };
 
 /* A token the person made at the provider and pasted here (FR-42). One read checks it and names its account before
@@ -424,20 +441,23 @@ const disconnect = async ({ companyId, userId, provider, connectionId, actor, by
 const saveToken = async ({ companyId, userId, sessionId, provider, token, actor }) => {
     if (!sessionId) throw new ConnectionError(403, 'Sign in again before connecting an account.', 'no_session');
     if (!(await isOffered(companyId, provider))) throw new ConnectionError(404, 'This connector is not available.', 'provider_off');
-    const definition = definitionOf(provider);
+    const definition = await definitionFor(companyId, provider);
     if (definition.auth.personalToken !== true) throw new ConnectionError(409, `${definition.name} is connected by signing in, not with a pasted token.`, 'oauth_only');
     const given = typeof token === 'string' ? token.trim() : '';
     if (!given || given.length > MAX_PERSONAL_TOKEN || /\s/.test(given)) throw new ConnectionError(400, 'That is not a token this connector can use.', 'bad_token');
-    const checked = await api.readAccountWith({ definition, companyId, actor: userId, token: given });
+    // A custom server names no account to read, so its definition checks the token itself.
+    const checked = typeof definition.checkToken === 'function'
+        ? await definition.checkToken({ companyId, actor: userId, token: given })
+        : await api.readAccountWith({ definition, companyId, actor: userId, token: given });
     if (!checked.ok || !checked.account.id) throw new ConnectionError(400, `${definition.name} did not accept that token.`, 'token_refused');
 
     const who = actor || { id: String(userId) };
     const existing = await find(companyId, userId, provider);
     if (holdsToken(existing)) await disconnect({ companyId, userId, provider, actor: who });
     const pending = await find(companyId, userId, provider);
-    const access = await keep({ companyId, userId, provider, handle: null, key: 'access', value: given, actor: who });
+    const access = await keep({ companyId, userId, provider, handle: null, key: 'access', value: given, actor: who, definition });
     const products = Object.keys(definition.products);
-    const scopes = registry.scopesFor(provider, products);
+    const scopes = registry.scopesIn(definition, products);
     const fields = {
         status: STATUS.CONNECTED, signIn: SIGN_IN.PERSONAL_TOKEN, kind: definition.transport || 'api', handles: { access }, scopes, account: checked.account,
         app: { source: 'personal', appId: null }, accessExpiresAt: null, products, connectedAt: new Date(), lastError: '', brokenAt: null, updatedBy: String(userId),
@@ -451,7 +471,7 @@ const saveToken = async ({ companyId, userId, sessionId, provider, token, actor 
         }, 'save');
         saved = await find(companyId, userId, provider);
     }
-    audit(companyId, who, 'connector.connect', provider, { userId: String(userId), signIn: SIGN_IN.PERSONAL_TOKEN, products, scopes });
+    audit(companyId, who, 'connector.connect', provider, { userId: String(userId), signIn: SIGN_IN.PERSONAL_TOKEN, products, scopes }, definition);
     announce(companyId, userId, provider, 'connected');
     return view(provider, saved);
 };
@@ -500,7 +520,8 @@ const accessTokenFor = async ({ companyId, userId, provider }) => {
     }
     const refreshToken = await store.resolve({ companyId, handle: handles.refresh }).catch(() => null);
     if (!refreshToken) return none('token_unavailable');
-    const definition = definitionOf(provider);
+    const definition = await definitionFor(companyId, provider);
+    if (!definition) return none('off');
     const app = await apps.resolveApp({ companyId, provider }).catch(() => null);
     if (!app) return none('token_unavailable');
     const out = await api.refresh({ definition, companyId, actor: userId, client: app, refreshToken });
@@ -512,9 +533,9 @@ const accessTokenFor = async ({ companyId, userId, provider }) => {
     const tokens = api.tokensOf(definition, out.body);
     if (typeof tokens.access_token !== 'string' || !tokens.access_token) return none('refresh_failed');
     const actor = { id: String(userId) };
-    const next = { ...handles, access: await keep({ companyId, userId, provider, handle: handles.access, key: 'access', value: tokens.access_token, actor }) };
+    const next = { ...handles, access: await keep({ companyId, userId, provider, handle: handles.access, key: 'access', value: tokens.access_token, actor, definition }) };
     if (typeof tokens.refresh_token === 'string' && tokens.refresh_token) {
-        next.refresh = await keep({ companyId, userId, provider, handle: handles.refresh, key: 'refresh', value: tokens.refresh_token, actor });
+        next.refresh = await keep({ companyId, userId, provider, handle: handles.refresh, key: 'refresh', value: tokens.refresh_token, actor, definition });
     }
     await update(companyId, row, { $set: { handles: next, accessExpiresAt: lifetimeOf(tokens.expires_in), lastRefreshedAt: new Date(), lastUsedAt: new Date() } });
     return { token: tokens.access_token, reason: '' };
@@ -543,20 +564,31 @@ const recordHealth = async ({ companyId, connectionId, lastUsedAt, lastError }) 
     await MongoDbCrudOpration(String(companyId), { type: T, data: [{ _id: connectionId, status: { $ne: STATUS.BROKEN } }, { $set: fields }] }, 'updateOne');
 };
 
-/* Every provider offered to this workspace, with the person's own connection on each (FR, GET /api/v2/connectors). */
+/* Every provider offered to this workspace, with the person's own connection on each (FR, GET /api/v2/connectors).
+ * A workspace's custom servers follow the catalog, marked as such and named by their row. */
 const list = async (companyId, userId) => {
     const appsHere = await companyAppsOf(companyId);
     const offered = registry.offered(appsHere);
+    const customs = await custom().offered(companyId);
     const connections = [];
-    for (const definition of offered) {
+    for (const definition of [...offered, ...customs]) {
         // eslint-disable-next-line no-await-in-loop
         connections.push(await describe(companyId, userId, definition.id));
     }
-    return { providers: offered.map((d) => ({ provider: d.id, products: Object.keys(d.products), signIn: registry.signIns(d.id, appsHere) })), connections };
+    return {
+        providers: [
+            ...offered.map((d) => ({ provider: d.id, products: Object.keys(d.products), signIn: registry.signIns(d.id, appsHere) })),
+            ...customs.map((d) => ({ provider: d.id, products: Object.keys(d.products), signIn: [...d.signIns], custom: true, name: d.name })),
+        ],
+        connections,
+    };
 };
 
+/* What a departure ends: the catalog's offered providers and every custom server, switched on or not. */
+const endableIds = async (companyId) => [...registry.offered(await companyAppsOf(companyId)).map((d) => d.id), ...await custom().providerIds(companyId)];
+
 const membersWithConnections = async (companyId) => {
-    const offered = registry.offered(await companyAppsOf(companyId)).map((d) => d.id);
+    const offered = [...registry.offered(await companyAppsOf(companyId)).map((d) => d.id), ...(await custom().offered(companyId)).map((d) => d.id)];
     const found = ((await MongoDbCrudOpration(companyId, { type: T, data: [{ provider: { $in: offered }, deletedStatusKey: { $ne: 1 } }] }, 'find')) || []).map(plain);
     return found.filter(holdsToken).map(memberView);
 };
@@ -567,7 +599,7 @@ const endForMember = async (companyId, userId) => {
     if (!OBJECT_ID.test(String(companyId || '')) || !userId) return 0;
     let offered;
     try {
-        offered = registry.offered(await companyAppsOf(companyId)).map((d) => d.id);
+        offered = await endableIds(companyId);
     } catch (e) {
         return 0;
     }
@@ -596,7 +628,7 @@ const sweepCompany = async (companyId) => {
     if (!OBJECT_ID.test(String(companyId || ''))) return 0;
     let offered;
     try {
-        offered = registry.offered(await companyAppsOf(companyId)).map((d) => d.id);
+        offered = await endableIds(companyId);
     } catch (e) {
         return 0;
     }
@@ -618,7 +650,7 @@ const sweepCompany = async (companyId) => {
 
 module.exports = {
     STATUS, BY, SIGN_IN, STATE_TTL_SECONDS, SECRET_KIND, ConnectionError,
-    isOffered, fallbackOrigin, redirectUri, callbackPath, byId, ownsState,
-    describe, list, membersWithConnections, start, setProducts, returnFor, complete, disconnect, saveToken,
+    isOffered, definitionFor, fallbackOrigin, redirectUri, callbackPath, byId, ownsState,
+    describe, list, membersWithConnections, start, setProducts, returnFor, complete, disconnect, endOne, saveToken,
     findUsable, accessTokenFor, markBrokenById, markBackoff, recordHealth, endForMember, sweepCompany,
 };

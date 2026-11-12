@@ -21,6 +21,7 @@
 
                 <template v-if="view === 'all' || view === 'apps'">
                     <MyConnections v-if="registryConnectors && !isGuest" />
+                    <CustomServers v-if="registryConnectors && !isGuest" />
                     <AdminConnections v-if="registryConnectors" />
                     <CompanyApps v-if="connectors.length" />
                 </template>
@@ -98,6 +99,7 @@ import ConnectorQuotas from "./ConnectorQuotas.vue";
 import MyConnections from "./MyConnections.vue";
 import AdminConnections from "./AdminConnections.vue";
 import CompanyApps from "./CompanyApps.vue";
+import CustomServers from "./CustomServers.vue";
 import { AI_RIGHT, useAiRights } from "@/composable/aiRights";
 import { ROLE_GUEST } from "@/utils/roles";
 
