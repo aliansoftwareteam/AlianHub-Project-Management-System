@@ -93,4 +93,5 @@ Auto-maintained registry of all tasks. Reflects YAML frontmatter from each `task
 | 091 | Tracker sign-in finds the workspace — one Sign in button, no address typing for hosted users | backlog | high | — | backlog/091-tracker-finds-workspace |
 | 092 | Time reports — pick a whole team in the People filter | active | medium | 086 | active/092-report-people-filter-teams |
 | 093 | Workload — cells show the hours, readable at any size | active | medium | 086 | active/093-workload-cell-hours |
+| 103 | Time tracking settings redesign — a quiet settings page instead of a marketing banner | active | medium | — | active/103-time-tracking-settings-redesign |
 | 104 | Time tracker access by role — a role switch, on by default, with seats only on plans that have a limit | active | high | — | active/104-time-tracker-by-role |

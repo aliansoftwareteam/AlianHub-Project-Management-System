@@ -2,7 +2,7 @@
     <section class="ah-card tracker-seats" aria-labelledby="tracker-seats-title" data-test="tracker-seats-card">
         <header class="ah-card__head">
             <h2 id="tracker-seats-title" class="ah-h3">{{ $t('TimeTracker.seats_title') }}</h2>
-            <span class="ah-small" data-test="tracker-seats-used">{{ $t('TimeTracker.desktop_seats', { used: seats.used, limit: seats.limit }) }}</span>
+            <span class="ah-chip" data-test="tracker-seats-used">{{ $t('TimeTracker.desktop_seats', { used: seats.used, limit: seats.limit }) }}</span>
         </header>
         <div class="ah-card__body">
             <p class="ah-small tracker-seats__line">{{ $t('TimeTracker.seats_intro') }}</p>
@@ -77,9 +77,8 @@ const release = async (person) => {
 <style scoped>
 .tracker-seats {
     width: 100%;
-    max-width: 560px;
-    margin: var(--sp-8) auto 0;
-    text-align: left;
+    max-width: 720px;
+    margin-top: var(--sp-8);
 }
 .tracker-seats__line {
     margin: 0 0 var(--sp-4);

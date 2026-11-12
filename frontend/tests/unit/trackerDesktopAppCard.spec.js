@@ -12,6 +12,7 @@ import en from '@/locales/en';
 
 const WINDOWS_UA = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/120 Safari/537.36';
 const MAC_UA = 'Mozilla/5.0 (Macintosh; Intel Mac OS X 14_0) AppleWebKit/605.1.15 Safari/605.1.15';
+const ANDROID_UA = 'Mozilla/5.0 (Linux; Android 14; Pixel 8) AppleWebKit/537.36 Chrome/120 Mobile Safari/537.36';
 const FEED = 'https://downloads.alianhub.com/tracker/stable';
 const originalLocation = window.location;
 
@@ -40,6 +41,7 @@ const mountCard = (props, slots = {}) => {
     return mount(DesktopAppCard, { props, slots, global: { plugins: [i18n], mocks: { $t: i18n.global.t } } });
 };
 const text = (wrapper, test) => wrapper.find(`[data-test="${test}"]`).text();
+const otherNames = (wrapper) => wrapper.findAll('[data-test="desktop-app-other-name"]').map((name) => name.text());
 
 describe('DesktopAppCard', () => {
     beforeEach(() => {
@@ -59,8 +61,12 @@ describe('DesktopAppCard', () => {
         const primary = wrapper.find('[data-test="desktop-app-primary"]');
         expect(primary.text()).toBe('Download for Windows');
         expect(primary.attributes('href')).toBe(`${FEED}/AlianHub-Tracker-Setup-6.0.2.exe`);
-        expect(wrapper.text()).toContain('v6.0.2');
-        expect(text(wrapper, 'desktop-app-others')).toBe('macOS · Linux (AppImage) · Linux (deb)');
+        expect(wrapper.find('.desktop-app__primary').text()).toContain('v6.0.2');
+        expect(wrapper.find('.desktop-app__primary').text()).toContain('For this computer');
+        expect(otherNames(wrapper)).toEqual(['macOS', 'Linux (AppImage)', 'Linux (deb)']);
+        const macRow = wrapper.findAll('[data-test="desktop-app-others"] li')[0].find('a');
+        expect(macRow.attributes('href')).toBe(`${FEED}/AlianHub-Tracker-6.0.2-universal.dmg`);
+        expect(macRow.attributes('aria-label')).toBe('Download for macOS');
     });
 
     it('puts the Mac download first on a Mac', () => {
@@ -68,15 +74,26 @@ describe('DesktopAppCard', () => {
         vi.spyOn(window.navigator, 'platform', 'get').mockReturnValue('MacIntel');
         const wrapper = mountCard({ info: info() });
         expect(wrapper.find('[data-test="desktop-app-primary"]').text()).toBe('Download for macOS');
-        expect(text(wrapper, 'desktop-app-others')).toBe('Windows · Linux (AppImage) · Linux (deb)');
+        expect(otherNames(wrapper)).toEqual(['Windows', 'Linux (AppImage)', 'Linux (deb)']);
+    });
+
+    it('does not claim a desktop download is for a phone', () => {
+        vi.spyOn(window.navigator, 'userAgent', 'get').mockReturnValue(ANDROID_UA);
+        vi.spyOn(window.navigator, 'platform', 'get').mockReturnValue('Linux armv81');
+        const wrapper = mountCard({ info: info() });
+        expect(wrapper.find('[data-test="desktop-app-primary"]').text()).toBe('Download for Windows');
+        expect(wrapper.find('.desktop-app__primary').text()).not.toContain('For this computer');
     });
 
     it('shows screenshot storage and how long screenshots are kept', () => {
-        expect(text(mountCard({ info: info() }), 'desktop-app-screenshots')).toBe('Screenshots: 2.1 GB · kept 3 months');
+        const stats = (wrapper) => [text(wrapper, 'desktop-app-storage'), text(wrapper, 'desktop-app-kept')];
+        expect(stats(mountCard({ info: info() }))).toEqual(['2.1 GB', '3 months']);
         const pending = info({ screenshots: { bytes: null, retention: { enabled: false, maxAgeMonths: 3 } } });
-        expect(text(mountCard({ info: pending }), 'desktop-app-screenshots')).toBe('Screenshots: counted overnight · kept until deleted');
+        expect(stats(mountCard({ info: pending }))).toEqual(['Counted overnight', 'Until deleted']);
         const small = info({ screenshots: { bytes: 5 * 1024 * 1024, retention: { enabled: true, maxAgeMonths: 1 } } });
-        expect(text(mountCard({ info: small }), 'desktop-app-screenshots')).toBe('Screenshots: 5 MB · kept 1 month');
+        expect(stats(mountCard({ info: small }))).toEqual(['5 MB', '1 month']);
+        const large = info({ screenshots: { bytes: Math.round(1364.1 * 1024 * 1024 * 1024), retention: { enabled: false } } });
+        expect(stats(mountCard({ info: large }))).toEqual(['1.3 TB', 'Until deleted']);
     });
 
     it('counts no seats when the plan does not limit them', () => {
@@ -84,9 +101,28 @@ describe('DesktopAppCard', () => {
     });
 
     it('falls back to the downloads this server hosts when the update feed has none', () => {
-        const wrapper = mountCard({ info: info({ release: null }) }, { fallback: '<p data-test="own-builds">builds</p>' });
+        const localDownloads = [
+            { os: 'mac', name: 'Mac', version: '5.0.0', url: '/tracker/mac.dmg', note: '' },
+            { os: 'windows', name: 'Windows', version: '5.1.6', url: '/tracker/setup.exe', note: 'Compatible with Windows 8 or newer' },
+        ];
+        const wrapper = mountCard({ info: info({ release: null }), localDownloads });
+        const primary = wrapper.find('[data-test="desktop-app-primary"]');
+        expect(primary.text()).toBe('Download for Windows');
+        expect(primary.attributes('href')).toBe('/tracker/setup.exe');
+        expect(wrapper.find('.desktop-app__primary').text()).toContain('Compatible with Windows 8 or newer');
+        expect(otherNames(wrapper)).toEqual(['macOS']);
+    });
+
+    it('prefers the update feed over the downloads this server hosts', () => {
+        const localDownloads = [{ os: 'windows', name: 'Windows', version: '5.1.6', url: '/tracker/setup.exe', note: '' }];
+        const wrapper = mountCard({ info: info(), localDownloads });
+        expect(wrapper.find('[data-test="desktop-app-primary"]').attributes('href')).toBe(`${FEED}/AlianHub-Tracker-Setup-6.0.2.exe`);
+    });
+
+    it('says when no download is available at all', () => {
+        const wrapper = mountCard({ info: info({ release: null }) });
         expect(wrapper.find('[data-test="desktop-app-primary"]').exists()).toBe(false);
-        expect(wrapper.find('[data-test="own-builds"]').exists()).toBe(true);
+        expect(text(wrapper, 'desktop-app-none')).toBe('No desktop tracker download is available on this server yet.');
     });
 
     it('opens the tracker on a workspace served under a path with that path', () => {
