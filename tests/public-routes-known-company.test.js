@@ -100,7 +100,7 @@ describe('a route that names a company nobody has', () => {
     it('POST /api/v2/sso/saml/acs sends the browser back to the login page without reaching that database', async () => {
         const res = response();
         await saml.samlAcs({ headers: {}, query: { companyId: UNKNOWN }, body: {} }, res);
-        expect(res.redirectedTo).toBe('/login?ssoError=config');
+        expect(res.redirectedTo).toMatch(/\/#\/login\?ssoError=config$/);
         expect(touchedUnknown()).toEqual([]);
     });
 

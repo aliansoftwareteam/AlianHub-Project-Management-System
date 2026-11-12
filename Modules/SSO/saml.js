@@ -3,7 +3,7 @@ const { MongoDbCrudOpration } = require("../../utils/mongo-handler/mongoQueries"
 const logger = require("../../Config/loggerConfig");
 const { extractIdentity } = require("./helpers/ssoRules");
 const { ssoSignInUser, SSO_NOT_ALLOWED } = require("./provisioning");
-const { finalizeSsoSession } = require("./ssoSession");
+const { finalizeSsoSession, ssoFailed } = require("./ssoSession");
 const { isKnownCompany } = require("../../Config/knownCompany");
 
 // `samlify` (+ its schema validator) are lazy-required so app load never breaks
@@ -64,7 +64,7 @@ exports.samlInitiate = async (req, res) => {
         return res.redirect(context);
     } catch (error) {
         logger.error(`samlInitiate: ${error.message || error}`);
-        return res.redirect('/login?ssoError=initiate');
+        return ssoFailed(res, 'initiate');
     }
 };
 
@@ -72,23 +72,23 @@ exports.samlInitiate = async (req, res) => {
 exports.samlAcs = async (req, res) => {
     try {
         const companyId = req.query.companyId || (req.body && req.body.companyId); // tenant-scoping: the IdP posts here before any session; the company only picks whose IdP certificate must have signed the response
-        if (!companyId) return res.redirect('/login?ssoError=config');
+        if (!companyId) return ssoFailed(res, 'config');
         const cfg = await loadConfig(companyId);
-        if (!cfg || cfg.provider !== 'saml') return res.redirect('/login?ssoError=config');
+        if (!cfg || cfg.provider !== 'saml') return ssoFailed(res, 'config');
         ensureValidator();
         const sp = buildSp(companyId);
         const idp = buildIdp(cfg);
         const { extract } = await sp.parseLoginResponse(idp, 'post', req); // validates signature
         const claims = { ...(extract.attributes || {}), nameID: extract.nameID };
         const id = extractIdentity(claims, (cfg.saml && cfg.saml.attributeMap) || {});
-        if (!id.valid) return res.redirect('/login?ssoError=identity');
+        if (!id.valid) return ssoFailed(res, 'identity');
         const uid = await ssoSignInUser({ companyId, cfg, identity: id });
-        return finalizeSsoSession(req, res, uid, `/${companyId}`);
+        return finalizeSsoSession(req, res, uid, companyId);
     } catch (error) {
-        if (error && error.code === SSO_NOT_ALLOWED) return res.redirect('/login?ssoError=not_allowed');
-        if (error && error.code === 'seat_limit') return res.redirect('/login?ssoError=seat_limit');
+        if (error && error.code === SSO_NOT_ALLOWED) return ssoFailed(res, 'not_allowed');
+        if (error && error.code === 'seat_limit') return ssoFailed(res, 'seat_limit');
         logger.error(`samlAcs: ${error.message || error}`);
-        return res.redirect('/login?ssoError=callback');
+        return ssoFailed(res, 'callback');
     }
 };
 

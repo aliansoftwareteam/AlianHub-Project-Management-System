@@ -7,15 +7,16 @@ const serviceCtr = require("../serviceFunction.js");
 const { requestAddress } = require('../../utils/requestAddress');
 const workspaceHint = require('../Auth/helpers/workspaceHint');
 
-// SEC-02 — establish a real session for an SSO-authenticated user, then REDIRECT
-// the browser back to the app (the IdP flow is a full-page redirect, not an SPA
-// fetch). Reuses the exact session/token primitives the password login uses
-// (insertSessionFun + generateTokenV2Fun), only the response differs (cookies +
-// redirect instead of JSON). SameSite=Lax so the post-IdP top-level navigation
-// carries the cookies.
-const finalizeSsoSession = (req, res, uid, redirectPath) => {
+/* The SPA routes on the hash, so a path or query outside it never reaches the sign-in page. */
+const ssoLoginPage = (query) => `${String(config.WEBURL || '').replace(/\/+$/, '')}/#/login?${query}`;
+
+const ssoFailed = (res, reason) => res.redirect(ssoLoginPage(`ssoError=${encodeURIComponent(reason)}`));
+
+/* Lands on the sign-in page because only it records who signed in for the SPA. Lax cookies, because the
+ * IdP's redirect back here is a cross-site navigation. */
+const finalizeSsoSession = (req, res, uid, companyId) => {
     const clientIp = requestAddress(req);
-    const fail = (reason) => res.redirect(`/login?ssoError=${encodeURIComponent(reason)}`);
+    const fail = (reason) => ssoFailed(res, reason);
     sessionRefusalFor(uid).then((refusal) => {
         if (refusal) return fail('token');
         sesstionCtr.insertSessionFun({ userId: uid }, req.headers['user-agent'] || '', clientIp, (sData) => {
@@ -31,7 +32,7 @@ const finalizeSsoSession = (req, res, uid, redirectPath) => {
                 res.cookie('refreshToken', sData.data.refreshToken, { ...setCookie, maxAge: Number(process.env.SESSIONEXPIREDTIME || 172800) * 1000 });
                 res.cookie('accessToken', gData.token, { ...setCookie, maxAge: serviceCtr.convertToSeconds(process.env.JWT_EXP) * 1000 });
                 workspaceHint.rememberWorkspace(req, res);
-                return res.redirect(redirectPath || '/');
+                return res.redirect(ssoLoginPage(`sso=ok&uid=${encodeURIComponent(uid)}&workspace=${encodeURIComponent(companyId)}`));
             });
         });
     }, (error) => {
@@ -40,4 +41,4 @@ const finalizeSsoSession = (req, res, uid, redirectPath) => {
     });
 };
 
-module.exports = { finalizeSsoSession };
+module.exports = { finalizeSsoSession, ssoFailed };

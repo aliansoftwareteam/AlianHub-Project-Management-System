@@ -4,7 +4,7 @@ const { myCache } = require("../../Config/config");
 const logger = require("../../Config/loggerConfig");
 const { extractIdentity } = require("./helpers/ssoRules");
 const { ssoSignInUser, SSO_NOT_ALLOWED } = require("./provisioning");
-const { finalizeSsoSession } = require("./ssoSession");
+const { finalizeSsoSession, ssoFailed } = require("./ssoSession");
 const { isKnownCompany } = require("../../Config/knownCompany");
 
 // `openid-client` is lazy-required so app load never breaks before `npm install`.
@@ -60,7 +60,7 @@ exports.oidcInitiate = async (req, res) => {
         return res.redirect(url);
     } catch (error) {
         logger.error(`oidcInitiate: ${error.message || error}`);
-        return res.redirect('/login?ssoError=initiate');
+        return ssoFailed(res, 'initiate');
     }
 };
 
@@ -69,21 +69,21 @@ exports.oidcCallback = async (req, res) => {
     try {
         const params = req.query || {};
         const cached = params.state ? myCache.get(`sso:oidc:${params.state}`) : null;
-        if (!cached) return res.redirect('/login?ssoError=state');
+        if (!cached) return ssoFailed(res, 'state');
         myCache.del(`sso:oidc:${params.state}`); // single-use → replay protection
         const { companyId, nonce, codeVerifier } = cached;
         const cfg = await loadConfig(companyId);
-        if (!cfg || cfg.provider !== 'oidc') return res.redirect('/login?ssoError=config');
+        if (!cfg || cfg.provider !== 'oidc') return ssoFailed(res, 'config');
         const client = await buildClient(cfg);
         const tokenSet = await client.callback(REDIRECT_URI(), params, { state: params.state, nonce, code_verifier: codeVerifier });
         const id = extractIdentity(tokenSet.claims(), (cfg.oidc && cfg.oidc.claimMap) || {});
-        if (!id.valid) return res.redirect('/login?ssoError=identity');
+        if (!id.valid) return ssoFailed(res, 'identity');
         const uid = await ssoSignInUser({ companyId, cfg, identity: id });
-        return finalizeSsoSession(req, res, uid, `/${companyId}`);
+        return finalizeSsoSession(req, res, uid, companyId);
     } catch (error) {
-        if (error && error.code === SSO_NOT_ALLOWED) return res.redirect('/login?ssoError=not_allowed');
-        if (error && error.code === 'seat_limit') return res.redirect('/login?ssoError=seat_limit');
+        if (error && error.code === SSO_NOT_ALLOWED) return ssoFailed(res, 'not_allowed');
+        if (error && error.code === 'seat_limit') return ssoFailed(res, 'seat_limit');
         logger.error(`oidcCallback: ${error.message || error}`);
-        return res.redirect('/login?ssoError=callback');
+        return ssoFailed(res, 'callback');
     }
 };

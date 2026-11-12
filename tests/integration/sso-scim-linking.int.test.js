@@ -82,7 +82,8 @@ const seedOutsideAccount = async (email, first, last) => {
     return _id.toHexString();
 };
 
-const REFUSED = '/login?ssoError=not_allowed';
+const REFUSED = `${state.baseURL}/#/login?ssoError=not_allowed`;
+const signedInAs = (uid) => `${state.baseURL}/#/login?sso=ok&uid=${uid}&workspace=${state.companyId}`;
 
 beforeAll(async () => {
     client = await MongoClient.connect(resolveMongoUrl());
@@ -126,7 +127,7 @@ describe('SSO sign-in through a company IdP', () => {
 
         const { location, cookies } = await ssoSignIn(email);
 
-        expect(location).toBe(`/${state.companyId}`);
+        expect(location).toBe(signedInAs(uid));
         expect(cookies).toContain('accessToken=');
         expect(await sessionsOf(uid)).toBe(1);
         expect((await userOf(uid)).AssignCompany).toEqual([OTHER_COMPANY, state.companyId]);
@@ -135,7 +136,7 @@ describe('SSO sign-in through a company IdP', () => {
 
     it('still signs in a member of the company on an unverified domain', async () => {
         const { location } = await ssoSignIn(state.users.member.email);
-        expect(location).toBe(`/${state.companyId}`);
+        expect(location).toBe(signedInAs(state.users.member.userId));
     });
 
     it('creates no account for a new address on an unverified domain', async () => {

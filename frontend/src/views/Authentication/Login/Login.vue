@@ -259,11 +259,12 @@ onMounted(() => {
     if (route.query.magic === "invalid") banner.value = { kind: "danger", text: t("Auth.magic_invalid") };
     if (route.query.magic === "disabled") banner.value = { kind: "warn", text: t("Auth.magic_unavailable") };
     if (route.query.ssoError) banner.value = { kind: "danger", text: t(SSO_ERRORS[route.query.ssoError] || "Auth.sso_failed") };
-    if (route.query.magic === "ok" && route.query.uid) {
+    const landingFailure = route.query.magic === "ok" ? "Auth.magic_invalid" : route.query.sso === "ok" ? "Auth.sso_failed" : "";
+    if (landingFailure && route.query.uid) {
         busy.value = true;
-        proceedAfterAuth(String(route.query.uid)).catch(() => {
+        proceedAfterAuth(String(route.query.uid), { workspace: String(route.query.workspace || "") }).catch(() => {
             busy.value = false;
-            banner.value = { kind: "danger", text: t("Auth.magic_invalid") };
+            banner.value = { kind: "danger", text: t(landingFailure) };
         });
         return;
     }
@@ -333,7 +334,7 @@ const handleSubmit = async () => {
     }
 };
 
-const proceedAfterAuth = async (userId) => {
+const proceedAfterAuth = async (userId, { workspace = "" } = {}) => {
     localStorage.setItem("userId", userId);
     const [userResponse] = await Promise.all([userCompanyStatusCheck(userId), getAuth(userId, true)]);
     if (userResponse?.data?.status === false) { clearSession(); throw new Error("server"); }
@@ -350,6 +351,8 @@ const proceedAfterAuth = async (userId) => {
         else router.push({ name: "Create_Company" });
         return;
     }
+    // Single sign-on already chose the workspace: the one whose identity provider signed the person in.
+    if (workspace && uData.AssignCompany.includes(workspace)) { finishLogin(workspace, "/"); return; }
     const cid = localStorage.getItem("selectedCompany") ?? companyID;
     if (cid && isCompanyFind === false) { router.push({ name: "Create_Company" }); return; }
 
@@ -369,11 +372,10 @@ const backToInvitation = async () => {
     window.location.reload();
 };
 
-const finishLogin = async (cid) => {
+const finishLogin = async (cid, redirect = route.query.redirect_url) => {
     localStorage.setItem("selectedCompany", cid);
     localStorage.setItem("isLogging", "true");
     localStorage.removeItem("ForgotEmail");
-    const redirect = route.query.redirect_url;
     if (redirect && redirect !== "/login") {
         if (redirect === "/") await router.replace(`/${cid}`);
         else {
