@@ -55,7 +55,8 @@ const ME = '/v1.0/me';
 let fake;
 const connected = (scopes = ALL_SCOPES) => resolveConnection.mockResolvedValue({ connectionId: MINE, scopes, getAccessToken: async () => fakeMicrosoft.TOKEN });
 const actor = { kind: 'agent', userId: PRISHA, agentId: AGENT_ID, agentName: 'Digest', runId: RUN };
-const agentRead = (key, input = {}) => egressContext.run({ companyId: C }, () => readers.read(key, C, { runId: RUN, actor, allowedActions: [] }, input));
+const TICKED = [{ provider: 'outlook', tools: ['outlook.mail.search', 'outlook.mail.read', 'outlook.calendar.events.list', 'outlook.mail.reply.draft', 'outlook.calendar.events.create'] }];
+const agentRead = (key, input = {}) => egressContext.run({ companyId: C }, () => readers.read(key, C, { runId: RUN, actor, allowedActions: [], connectors: TICKED }, input));
 const mcpCaller = (scopes) => ({
     companyId: C, userId: PRISHA, actor: { kind: 'agent', userId: PRISHA, agentName: 'Claude', viaAccount: 'external' },
     token: { oauth: true, scopes }, oauth: { clientId: 'client-1', grantId: 'grant-1' }, canWrite: true, allowedActions: [],
@@ -64,7 +65,7 @@ const mcpRead = (key, input = {}) => mcpTools.call(mcpCaller(['connectors:read']
 const mcpWrite = (key, input = {}) => mcpTools.call(mcpCaller(['connectors:write']), key, input);
 const proposalRow = (id) => (mockDb.store[SCHEMA_TYPE.AGENT_PROPOSALS] || []).find((p) => String(p._id) === String(id));
 const fromAgentRun = (action, params) => proposals.create(C, {
-    agent: { _id: AGENT_ID, name: 'Digest' }, projectId: PROJECT, what: 'Do it', why: 'Asked', changes: [{ action, params }], connectionOwner: PRISHA,
+    agent: { _id: AGENT_ID, name: 'Digest', connectors: TICKED }, projectId: PROJECT, what: 'Do it', why: 'Asked', changes: [{ action, params }], connectionOwner: PRISHA,
 });
 const approveAs = (id, userId, extra = {}) => proposals.approve(C, id, { decider: { kind: 'human', userId }, isPrivileged: userId === ADMIN, ip: '', ...extra });
 const approve = (id, extra) => approveAs(id, PRISHA, extra);
@@ -83,7 +84,7 @@ beforeEach(() => {
     safeFetch.mockImplementation(fake.fetch);
     markBackoff.mockImplementation(async ({ connectionId, until }) => mockDb.seed(SCHEMA_TYPE.CONNECTOR_CONNECTIONS, { _id: connectionId, backoffUntil: until }));
     mockDb.seed(SCHEMA_TYPE.AGENT_RUNS, { _id: RUN, status: 'running', connectorReads: [] });
-    mockDb.seed(SCHEMA_TYPE.AGENTS, { _id: AGENT_ID, name: 'Digest', allowedActions: [], autonomy: 3 });
+    mockDb.seed(SCHEMA_TYPE.AGENTS, { _id: AGENT_ID, name: 'Digest', allowedActions: [], autonomy: 3, connectors: TICKED });
 });
 
 afterAll(() => Object.entries(before).forEach(([k, v]) => { if (v === undefined) delete process.env[k]; else process.env[k] = v; }));
