@@ -163,11 +163,13 @@ const mcpActor = async (p) => (p.oauthGrantId
 /* The person whose connection a connector write uses: who filed it over MCP, or whom the run works for. */
 const connectionOwnerOf = (source, requestedBy, connectionOwner) => String((source === SOURCE_MCP ? requestedBy : connectionOwner) || '');
 
+const CALLER_OF_SOURCE = Object.freeze({ [SOURCE_MCP]: 'mcp', [SOURCE_ASK]: 'chat' });
+
 const create = async (companyId, { agent, runId, taskId, taskIds, projectId, what, why, changes, gate, priority, cost, taint: marker, source, requestedBy, tokenId, tokenProjectIds, allowedActions, oauthClientId, oauthGrantId, finding, connectionOwner }) => {
     const check = validateChanges(changes);
     if (!check.valid) throw Object.assign(new Error(check.reason), { status: 400 });
     const owner = connectorWrites.hasWrite(changes) ? connectionOwnerOf(source, requestedBy, connectionOwner) : '';
-    const saved = await connectorWrites.fileChanges(companyId, owner, changes, { via: source === SOURCE_MCP ? 'mcp' : 'agent', id: String(agent._id), runId }, async (prepared) => {
+    const saved = await connectorWrites.fileChanges(companyId, owner, changes, { via: CALLER_OF_SOURCE[source] || 'agent', id: String(agent._id), runId }, async (prepared) => {
         const scopedProjectId = projectId || await projectOfTask(companyId, taskId);
         return MongoDbCrudOpration(companyId, {
             type: SCHEMA_TYPE.AGENT_PROPOSALS,
