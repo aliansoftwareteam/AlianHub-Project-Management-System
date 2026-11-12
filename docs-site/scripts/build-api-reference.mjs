@@ -1,6 +1,7 @@
 // Splits docs/API.md (written by `npm run api:doc` at the repo root) into one page per section,
 // so the API reference here never drifts from the generated source.
 import { readFileSync, writeFileSync, mkdirSync, rmSync, copyFileSync } from 'node:fs'
+import { execFileSync } from 'node:child_process'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
@@ -74,7 +75,16 @@ const escapeHtmlOutsideCode = (text) => {
 }
 
 const generatedNote = '<!-- Generated from docs/API.md by docs-site/scripts/build-api-reference.mjs. Edit the source, not this file. -->'
-const frontmatter = (title) => `---\ntitle: "${title.replace(/"/g, '\\"')}"\neditLink: false\n---\n\n${generatedNote}\n\n`
+// Generated pages are not in git, so VitePress cannot date them; the sitemap and page date use the source's.
+const sourceCommitDate = (() => {
+  try {
+    return execFileSync('git', ['log', '-1', '--format=%cI', '--', 'docs/API.md'], { cwd: repoRoot, encoding: 'utf8' }).trim()
+  } catch {
+    return ''
+  }
+})()
+const lastUpdatedLine = sourceCommitDate ? `lastUpdated: ${sourceCommitDate}\n` : ''
+const frontmatter = (title) => `---\ntitle: "${title.replace(/"/g, '\\"')}"\neditLink: false\n${lastUpdatedLine}---\n\n${generatedNote}\n\n`
 
 rmSync(outDir, { recursive: true, force: true })
 mkdirSync(outDir, { recursive: true })
