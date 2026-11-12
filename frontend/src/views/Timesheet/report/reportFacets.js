@@ -36,4 +36,19 @@ const keepAllowed = (options, allowedValues, picked = []) => (allowedValues
 /* The chosen options first, in the order shown, then the rest. */
 const pickedFirst = (options, picked = []) => [...options.filter((o) => picked.includes(o.value)), ...options.filter((o) => !picked.includes(o.value))];
 
-module.exports = { MATCH, projectsOfPerson, projectsForPeople, basisProjects, keepAllowed, pickedFirst };
+/* Teams as People filter groups. Members are kept to the people the filter lists, so a team never picks someone
+ * who has left; a team with none of them is not offered. */
+const teamOptions = (teams = [], people = []) => {
+    const listed = new Set(people.map((option) => option.value));
+    return teams
+        .map((team) => ({
+            value: String(team._id),
+            label: team.name || '',
+            color: (team.teamColor && team.teamColor.bgColor) || '',
+            members: [...new Set((team.assigneeUsersArray || []).map(String))].filter((uid) => listed.has(uid)),
+        }))
+        .filter((team) => team.label && team.members.length)
+        .sort((a, b) => a.label.localeCompare(b.label));
+};
+
+module.exports = { MATCH, projectsOfPerson, projectsForPeople, basisProjects, keepAllowed, pickedFirst, teamOptions };
