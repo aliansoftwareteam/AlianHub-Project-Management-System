@@ -4,6 +4,7 @@ const secrets = require('../../Config/secrets');
 const { recordAudit } = require('../Audit/recorder');
 const registry = require('./registry');
 const callbacks = require('./callbacks');
+const hosted = require('./hostedSignIn');
 
 const SECRET_KIND = 'connector_app';
 const MAX_CLIENT_ID = 400;
@@ -18,8 +19,9 @@ const CODE = Object.freeze({
     CONFLICT: 'app_conflict',
     SECRET_UNREADABLE: 'app_secret_unreadable',
     REGISTRATION_FAILED: 'app_registration_failed',
+    SERVICE_UNREACHABLE: 'service_unreachable',
 });
-const STATUS_BY_CODE = { invalid_app: 400, unknown_provider: 404, app_not_found: 404, app_conflict: 409, app_secret_unreadable: 503, app_registration_failed: 502 };
+const STATUS_BY_CODE = { invalid_app: 400, unknown_provider: 404, app_not_found: 404, app_conflict: 409, app_secret_unreadable: 503, app_registration_failed: 502, service_unreachable: 503 };
 
 const isDuplicateKey = (error) => !!error && (error.code === 11000 || /E11000|duplicate key/i.test(String(error.message || '')));
 
@@ -66,6 +68,13 @@ const resolveApp = async ({ companyId, provider, actor } = {}) => {
         if (clientSecret === null) throw new AppError(CODE.SECRET_UNREADABLE, `The ${provider} app secret cannot be read.`);
         return { source: 'company', appId: String(existing._id), clientId: existing.clientId, clientSecret, extra: existing.extra || {} };
     }
+    let hostedApp;
+    try {
+        hostedApp = await hosted.appFor(provider);
+    } catch (error) {
+        throw new AppError(CODE.SERVICE_UNREACHABLE, error.message);
+    }
+    if (hostedApp) return hostedApp;
     const instance = instanceApp(provider);
     if (instance) return instance;
     const definition = registry.get(provider);

@@ -1,5 +1,6 @@
 const agentFetch = require('../Agents/engine/agentFetch');
 const egressContext = require('../Agents/engine/egressContext');
+const hosted = require('./hostedSignIn');
 
 const TIMEOUT_MS = 8000;
 const MAX_BYTES = 64 * 1024;
@@ -59,19 +60,31 @@ const consentUrl = ({ definition, clientId, redirectUri, scopes, state, challeng
 /* A client a server registered without a secret proves itself with PKCE alone; an empty secret is left out. */
 const clientFields = (client) => ({ client_id: client.clientId, ...(client.clientSecret ? { client_secret: client.clientSecret } : {}) });
 
-/* A verifier goes only where the consent sent its challenge: Slack refuses one it was not asked to check. */
-const exchange = ({ definition, companyId, actor, client, code, verifier, redirectUri }) => post({
-    definition, companyId, actor, url: definition.auth.tokenUrl, hide: [client.clientSecret, code, verifier],
-    form: {
-        grant_type: 'authorization_code', code, ...(verifier && definition.auth.pkce === 'S256' ? { code_verifier: verifier } : {}),
-        ...clientFields(client), redirect_uri: redirectUri,
-    },
-});
+/* On a hosted instance the shared sign-in service holds the app secret and makes the token call; its answer is the
+ * provider's own, read the same way. */
+const fromService = (definition, out) => {
+    if (!out.ok) return out;
+    const refused = errorIn(definition, out.body);
+    return refused ? { ok: false, error: refused } : out;
+};
 
-const refresh = ({ definition, companyId, actor, client, refreshToken }) => post({
-    definition, companyId, actor, url: definition.auth.tokenUrl, hide: [client.clientSecret, refreshToken],
-    form: { grant_type: 'refresh_token', refresh_token: refreshToken, ...clientFields(client) },
-});
+/* A verifier goes only where the consent sent its challenge: Slack refuses one it was not asked to check. */
+const exchange = ({ definition, companyId, actor, client, code, verifier, redirectUri }) => {
+    const sentVerifier = verifier && definition.auth.pkce === 'S256' ? verifier : undefined;
+    if (client.source === 'hosted') return hosted.exchange({ provider: definition.id, code, verifier: sentVerifier, redirectUri }).then((out) => fromService(definition, out));
+    return post({
+        definition, companyId, actor, url: definition.auth.tokenUrl, hide: [client.clientSecret, code, verifier],
+        form: { grant_type: 'authorization_code', code, ...(sentVerifier ? { code_verifier: sentVerifier } : {}), ...clientFields(client), redirect_uri: redirectUri },
+    });
+};
+
+const refresh = ({ definition, companyId, actor, client, refreshToken }) => {
+    if (client.source === 'hosted') return hosted.refresh({ provider: definition.id, refreshToken }).then((out) => fromService(definition, out));
+    return post({
+        definition, companyId, actor, url: definition.auth.tokenUrl, hide: [client.clientSecret, refreshToken],
+        form: { grant_type: 'refresh_token', refresh_token: refreshToken, ...clientFields(client) },
+    });
+};
 
 const callJson = async ({ companyId, actor, url, method = 'get', json, token, hosts, hide = [] }) => {
     let res;
@@ -115,8 +128,9 @@ const readAccountWith = async ({ definition, companyId, actor, token }) => {
 /* A provider without a revoke endpoint cannot be told; disconnect still retires the secrets and closes the row.
  * Most providers (Google, Slack) take the token to revoke as a form field; some (Dropbox) authenticate the revoke
  * call with the token in the Authorization header and an empty body — `auth.revokeAuth: 'bearer'` selects that. */
-const revoke = ({ definition, companyId, actor, token }) => {
+const revoke = ({ definition, companyId, actor, token, viaService = false }) => {
     if (!definition.auth.revokeUrl) return Promise.resolve({ ok: true, body: {}, skipped: true });
+    if (viaService) return hosted.revoke({ provider: definition.id, token }).then((out) => fromService(definition, out));
     const base = { definition, companyId, actor, url: definition.auth.revokeUrl, hide: [token] };
     return definition.auth.revokeAuth === 'bearer'
         ? post({ ...base, token, form: {} })

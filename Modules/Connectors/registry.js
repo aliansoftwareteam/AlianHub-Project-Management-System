@@ -3,6 +3,7 @@ const path = require('path');
 const logger = require('../../Config/loggerConfig');
 const { named } = require('../Agents/connectors/flag');
 const { validate } = require('./validate');
+const hosted = require('./hostedSignIn');
 
 const LOG = '[connectors]';
 const SIGN_IN = Object.freeze({ OAUTH: 'oauth', TOKEN: 'token' });
@@ -61,7 +62,7 @@ const createRegistry = ({ dir = PROVIDERS_DIR } = {}) => {
     const signIns = (id, { companyApps = [] } = {}) => {
         const definition = get(id);
         if (!definition) return [];
-        const oauth = instanceApp(id) || companyApps.includes(id) || definition.auth.registration === 'dynamic';
+        const oauth = instanceApp(id) || companyApps.includes(id) || hosted.offers(id) || definition.auth.registration === 'dynamic';
         return [...(oauth ? [SIGN_IN.OAUTH] : []), ...(definition.auth.personalToken === true ? [SIGN_IN.TOKEN] : [])];
     };
     const isOffered = (id, options) => !!get(id) && named().includes(id) && signIns(id, options).length > 0;

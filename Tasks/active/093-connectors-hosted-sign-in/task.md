@@ -1,7 +1,7 @@
 ---
 id: 093
 title: Connectors — shared sign-in for hosted instances: the instance side
-status: backlog
+status: active
 priority: high
 depends_on: [065, 066]
 created: 2026-11-12
@@ -27,13 +27,13 @@ A hosted instance on any domain signs members in to apps that need a registered 
 - Self-hosted installs, which use their own apps
 
 ## Acceptance criteria
-- [ ] Against the fake service, a hosted instance connects a registered-app entry with no app configured on the instance
-- [ ] No app secret is on the instance; tokens are stored on the instance only
-- [ ] A forged or reused state is refused; a code forwarded for another instance is refused
-- [ ] With the service down, the member sees why and the connection stays as it was
-- [ ] Off hosted, the service is never used
+- [x] Against the fake service, a hosted instance connects a registered-app entry with no app configured on the instance
+- [x] No app secret is on the instance; tokens are stored on the instance only
+- [x] A forged or reused state is refused; a code forwarded for another instance is refused *(instance side: a state it did not sign is refused; the forged envelope is the service's check, in the contract)*
+- [x] With the service down, the member sees why and the connection stays as it was
+- [x] Off hosted, the service is never used
 
 ## Constraints & notes
 - Track: A — connections (getting and keeping a person's access)
 - Depends on: 065, 066
-- Reuse the platform key and signed-token code in `Modules/Platform` (`guard.js`, `entitlementsToken.js`). Key rotation (`rotate-key`) must not break sign-ins in flight.
+- This branch has no `Config/hostingMode` or `Modules/Platform` (they are on `staging`); the instance reads the same variables they use (`HOSTING_MODE`, `INSTANCE_ID`, `PLATFORM_API_KEY`). Switch to `hostingMode.isManaged()` when this branch takes `staging`. Key rotation: the service accepts the previous key during a rotation (contract).

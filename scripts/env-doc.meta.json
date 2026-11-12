@@ -1518,5 +1518,27 @@
     "group": "ai",
     "description": "Whether each workspace created from now on gets the built-in Workspace Guide agent. \"true\" (the default) adds it at creation; \"false\" adds none until an owner or admin adds it from the Team board. Existing workspaces are never changed by this setting, and a guide an admin removed is not made again.",
     "default": "true"
+  },
+  "HOSTING_MODE": {
+    "group": "general",
+    "description": "self (the default) or managed. managed turns this into an AlianHub Cloud instance run by the platform. With managed, CONNECTOR_SIGNIN_URL, INSTANCE_ID and PLATFORM_API_KEY, connectors sign members in through the shared sign-in service.",
+    "default": "self"
+  },
+  "INSTANCE_ID": {
+    "group": "general",
+    "description": "With HOSTING_MODE=managed, this instance's id on the AlianHub Cloud platform: ins_ followed by 20 to 32 lowercase letters or digits. Sent to the shared connector sign-in service with every request."
+  },
+  "PLATFORM_API_KEY": {
+    "group": "security",
+    "description": "With HOSTING_MODE=managed, the key this instance shares with the platform; at least 32 characters. It signs this instance's requests to the shared connector sign-in service and is never sent itself.",
+    "secret": true
+  },
+  "CONNECTOR_SIGNIN_URL": {
+    "group": "integrations",
+    "description": "With HOSTING_MODE=managed, the https address of AlianHub Cloud's shared connector sign-in service, set by the platform. Members then connect the apps named in CONNECTOR_SIGNIN_PROVIDERS through Alian's own apps, registered once for every hosted instance, so no instance or custom domain is registered at a provider. The app secrets stay in the service; members' tokens are stored only on this instance. Off on a self-hosted install. See Tasks/active/093-connectors-hosted-sign-in/resources/service-contract.md."
+  },
+  "CONNECTOR_SIGNIN_PROVIDERS": {
+    "group": "integrations",
+    "description": "With CONNECTOR_SIGNIN_URL, the providers the shared sign-in service has an app for, as a list separated by commas (for example github,slack,hubspot,canva). A workspace's own app for a provider still wins."
   }
 }

@@ -86,7 +86,7 @@ Auto-maintained registry of all tasks. Reflects YAML frontmatter from each `task
 | 078 | Connectors — Inbox approval cards and quota settings screens | active | high | 069, 070 | active/078-connectors-approval-quota-screens |
 | 079 | Connectors — remove the old Slack bot and GitHub sync paths | backlog | medium | 074, 075 | backlog/079-connectors-remove-slack-github-paths |
 | 092 | Connectors — MCP client and MCP provider definitions: call apps' MCP servers as the member, reviewed tools only | active | high | 063, 068 | active/092-connectors-mcp-client |
-| 093 | Connectors — shared sign-in for hosted instances: the instance side | backlog | high | 065, 066 | backlog/093-connectors-hosted-sign-in |
+| 093 | Connectors — shared sign-in for hosted instances: the instance side | active | high | 065, 066 | active/093-connectors-hosted-sign-in |
 | 094 | Connectors — Notion, the first app that registers itself | backlog | high | 092, 100 | backlog/094-connectors-notion-pilot |
 | 095 | Connectors — Supabase, Upwork, Wispr Flow, Dropbox, HubSpot and Canva through their MCP servers | backlog | medium | 075, 093, 094 | backlog/095-connectors-mcp-apps |
 | 096 | Connectors — custom MCP servers: added by address with a right, every tool reviewed | backlog | medium | 092, 100, 101 | backlog/096-connectors-custom-mcp-servers |

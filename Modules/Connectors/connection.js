@@ -14,6 +14,7 @@ const { removeCache } = require('../../utils/commonFunctions');
 const registry = require('./registry');
 const apps = require('./apps');
 const api = require('./providerApi');
+const hosted = require('./hostedSignIn');
 
 /* One person's connection to their own account at one provider, one live row per person and provider. The access
  * and refresh tokens are kept in the secrets store under the kind `connector` and the row holds their handles
@@ -181,7 +182,8 @@ const beginConsent = async ({ companyId, userId, sessionId, provider, products, 
         stateSecret(),
         { algorithm: 'HS256', audience: STATE_AUDIENCE, expiresIn: STATE_TTL_SECONDS },
     );
-    return { url: api.consentUrl({ definition, clientId: app.clientId, redirectUri: redirectUri(provider), scopes, state, challenge: challengeOf(verifier) }) };
+    const sent = app.source === 'hosted' ? hosted.wrapState(state) : state;
+    return { url: api.consentUrl({ definition, clientId: app.clientId, redirectUri: redirectUri(provider, app), scopes, state: sent, challenge: challengeOf(verifier) }) };
 };
 
 const start = async ({ companyId, userId, sessionId, provider, products, origin }) => {
@@ -313,7 +315,7 @@ const revokeAtProvider = async ({ companyId, actor, provider, row }) => {
     if (await sharesGrant(companyId, row)) return 'shared';
     const token = await revokeToken({ companyId, actor, provider, row, definition });
     if (!token) return 'skipped';
-    const out = await api.revoke({ definition, companyId, actor: actorOf(actor).id, token });
+    const out = await api.revoke({ definition, companyId, actor: actorOf(actor).id, token, viaService: Boolean(row.app && row.app.source === 'hosted') });
     return out.ok ? (out.skipped ? 'no_endpoint' : 'revoked') : 'failed';
 };
 
@@ -355,7 +357,7 @@ const complete = async ({ companyId, userId, sessionId, provider, state, code, a
 
     const who = actor || { id: String(userId) };
     const app = await apps.resolveApp({ companyId, provider, actor: userId });
-    const out = await api.exchange({ definition, companyId, actor: userId, client: app, code: given, verifier: pending.verifier, redirectUri: redirectUri(provider) });
+    const out = await api.exchange({ definition, companyId, actor: userId, client: app, code: given, verifier: pending.verifier, redirectUri: redirectUri(provider, app) });
     if (!out.ok && app.source === 'registered' && out.error === 'invalid_client') {
         await require('./registrations').forget({ companyId, definition, actor: userId });
         throw new ConnectionError(409, `${definition.name} no longer knows AlianHub's sign-up. Start again from the Connections page.`, 'registration_dropped');
