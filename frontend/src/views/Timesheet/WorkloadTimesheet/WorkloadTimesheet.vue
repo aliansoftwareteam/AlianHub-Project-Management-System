@@ -83,26 +83,13 @@
                     @drop.prevent="dayMode && onDrop(u, d)"
                 >
                     <template v-if="isOff(d)"><span class="wl__pto">{{ d.pto ? $t('Time.pto') : $t('Time.unavailable') }}</span></template>
-                    <template v-else>
-                        <div class="wl__fill" :class="{ 'is-over': isOver(d), 'is-tentative': isTentative(d.date) }" :style="{ height: `${fillPct(d)}%` }">
-                            <span v-if="value(d)">{{ hLabel(value(d)) }}</span>
-                        </div>
-                        <div v-if="mode === 'estimate' && d.chips.length" class="wl__chips">
-                            <span
-                                v-for="c in d.chips.slice(0, 2)"
-                                :key="c.estimateId"
-                                class="wl__chip"
-                                :draggable="dayMode && Boolean(c.name)"
-                                :title="`${c.name || $t('Time.task_not_open')} · ${formatHm(c.minutes)}`"
-                                @dragstart="onDragStart($event, u, d, c)"
-                                @dragend="onDragEnd"
-                            >{{ c.name || $t('Time.task_not_open') }}</span>
-                            <span v-if="d.chips.length > 2" class="wl__chip wl__chip--more">+{{ d.chips.length - 2 }}</span>
-                        </div>
+                    <template v-else-if="value(d)">
+                        <div class="wl__fill" :class="{ 'is-over': isOver(d), 'is-tentative': isTentative(d.date) }" :style="{ height: `${fillPercent(value(d), d.capacityMinutes)}%` }"></div>
+                        <span class="wl__hours" :class="{ 'is-over': isOver(d) }" data-test="workload-hours">{{ hoursLabel(value(d)) }}</span>
                     </template>
                 </div>
                 <div class="wl__total" :class="{ 'is-over': u.utilizationPct > 100 }">
-                    {{ hLabel(mode === 'estimate' ? u.totalEstimated : u.totalLogged) }}<small>/{{ Math.round(u.capacityMinutes / 60) }}</small>
+                    {{ hoursLabel(mode === 'estimate' ? u.totalEstimated : u.totalLogged) }}<small>/{{ Math.round(u.capacityMinutes / 60) }}</small>
                 </div>
             </div>
             <div v-if="!users.length" class="tv-empty wl__empty"><span>{{ loading ? $t('Time.loading') : (narrowing ? $t('Reports.empty_filtered') : $t('Time.workload_empty')) }}</span></div>
@@ -113,7 +100,7 @@
                 <span><i class="wl__key"></i>{{ mode === 'estimate' ? $t('Time.legend_estimated') : $t('Time.legend_logged') }}</span>
                 <span><i class="wl__key wl__key--tentative"></i>{{ $t('Time.legend_tentative') }}</span>
                 <span><i class="wl__key wl__key--over"></i>{{ $t('Time.legend_over') }}</span>
-                <span v-if="!hint" class="ah-muted">{{ dayMode ? $t('Time.workload_cell_hint') : $t('Time.workload_bucket_hint') }}</span>
+                <span v-if="!hint" class="ah-muted">{{ dayMode ? $t('Time.workload_cell_hint_panel') : $t('Time.workload_bucket_hint') }}</span>
             </div>
             <div v-if="hint" class="wl__hint">
                 <ShellIcon name="info" :size="13" class="tv-spark" />
@@ -124,7 +111,18 @@
     </div>
 
     <transition name="ah-slide-right">
-        <WorkloadCellPanel v-if="openedCell" :key="openedKey" :person="openedCell.user" :cell="openedCell.cell" :color="colorFor(openedCell.user.userId)" @close="closeCell" @open-task="openTaskFromCell" />
+        <WorkloadCellPanel
+            v-if="openedCell"
+            :key="openedKey"
+            :person="openedCell.user"
+            :cell="openedCell.cell"
+            :color="colorFor(openedCell.user.userId)"
+            :draggableRows="dayMode && mode === 'estimate' && !busy"
+            @close="closeCell"
+            @open-task="openTaskFromCell"
+            @drag-start="onPanelDragStart"
+            @drag-end="onDragEnd"
+        />
     </transition>
 </div>
 </template>
@@ -150,7 +148,7 @@ import { useReportExport } from '@/views/Timesheet/report/useReportExport';
 import { PRESETS, granularityOf, bucketsOf } from '@/views/Timesheet/report/reportRange';
 import { hoursOf } from '@/views/Timesheet/report/reportTable';
 import WorkloadCellPanel from './WorkloadCellPanel.vue';
-import { bucketDays } from './workloadBuckets';
+import { bucketDays, fillPercent, hoursLabel } from './workloadBuckets';
 import { openTask, onTaskClosed } from '@/components/organisms/TaskDetailOverlay/useTaskOverlay';
 import { gridWeek, workingDaysOnly } from '@/views/Projects/WorkloadView/workloadUnits';
 
@@ -203,7 +201,7 @@ const columns = computed(() => (dayMode.value
 const cellsOf = (u) => (dayMode.value
     ? u.days.filter((d) => visibleDays.value.includes(d.date)).map((d) => ({ ...d, key: d.date, start: d.date, end: d.date }))
     : bucketDays(u.days, buckets.value));
-const cellLabel = (u, d) => `${u.name} · ${d.start === d.end ? moment(d.start).format('ddd, MMM D') : `${moment(d.start).format('MMM D')} – ${moment(d.end).format('MMM D')}`} · ${hLabel(value(d))}`;
+const cellLabel = (u, d) => `${u.name} · ${d.start === d.end ? moment(d.start).format('ddd, MMM D') : `${moment(d.start).format('MMM D')} – ${moment(d.end).format('MMM D')}`} · ${hoursLabel(value(d))}`;
 const openedCell = computed(() => {
     if (!opened.value) return null;
     const user = users.value.find((u) => u.userId === opened.value.userId);
@@ -234,15 +232,10 @@ const PALETTE = ['var(--brand)', 'var(--ok)', 'var(--warn)', 'var(--agent)'];
 const colorFor = (id) => PALETTE[String(id || '').split('').reduce((s, c) => s + c.charCodeAt(0), 0) % PALETTE.length];
 const initial = (name) => (name || '?').trim().charAt(0).toUpperCase();
 const dayHead = (d) => `${moment(d).format('dd').charAt(0)}${moment(d).format('D')}`;
-const hLabel = (m) => {
-    const h = (Number(m) || 0) / 60;
-    return `${h >= 10 || Number.isInteger(h) ? Math.round(h) : Math.round(h * 10) / 10}h`;
-};
 const value = (d) => (mode.value === 'estimate' ? d.estimated : d.logged);
 /* The server names time off as PTO to the person and to owners and admins, and as unavailable to anyone else. */
 const isOff = (d) => Boolean(d.pto || d.unavailable);
 const isOver = (d) => (d.capacityMinutes > 0 ? value(d) > d.capacityMinutes : value(d) > 0);
-const fillPct = (d) => (d.capacityMinutes > 0 ? Math.min(100, (value(d) / d.capacityMinutes) * 100) : (value(d) ? 100 : 0));
 const isTentative = (date) => moment(date).isAfter(moment().endOf('isoWeek'));
 const subLabel = (u) => {
     if (u.utilizationPct > 100) return t('Time.pct_period', { pct: u.utilizationPct });
@@ -275,40 +268,43 @@ const load = async () => {
 };
 const flash = (msg) => { notice.value = msg; setTimeout(() => { if (notice.value === msg) notice.value = ''; }, 4000); };
 
-const move = async ({ chip, fromUser, fromDay, toUser, toDay }) => {
+const moveEstimate = async (chip, { fromUser, fromDay, toUser, toDay }) => {
+    const body = ((await apiRequest('post', env.WORKLOAD_MOVE, {
+        taskId: chip.taskId, estimateId: chip.estimateId, fromUserId: fromUser.userId, toUserId: toUser.userId, fromDate: fromDay.date, toDate: toDay.date,
+    })) || {}).data || {};
+    if (!body.status) throw new Error(body.statusText || 'move_failed');
+};
+/* A panel row is one task, which may carry more than one estimate on the day. */
+const move = async ({ task, ...where }) => {
     busy.value = true;
     error.value = '';
     try {
-        const body = ((await apiRequest('post', env.WORKLOAD_MOVE, {
-            taskId: chip.taskId, estimateId: chip.estimateId, fromUserId: fromUser.userId, toUserId: toUser.userId, fromDate: fromDay.date, toDate: toDay.date,
-        })) || {}).data || {};
-        if (!body.status) throw new Error(body.statusText || 'move_failed');
-        flash(t('Time.moved', { task: chip.name, name: toUser.name, day: moment(toDay.date).format('ddd D') }));
+        await task.chips.reduce((previous, chip) => previous.then(() => moveEstimate(chip, where)), Promise.resolve());
+        flash(t('Time.moved', { task: task.name, name: where.toUser.name, day: moment(where.toDay.date).format('ddd D') }));
         hint.value = null;
         await load();
     } catch (e) {
         error.value = t('Time.move_failed');
+        await load();
     } finally {
         busy.value = false;
     }
 };
 
-const onDragStart = (e, u, d, c) => {
-    drag.value = { chip: c, fromUser: u, fromDay: d };
-    e.dataTransfer.effectAllowed = 'move';
-    e.dataTransfer.setData('text/plain', c.taskId);
+const onPanelDragStart = (task) => {
+    if (openedCell.value) drag.value = { task, fromUser: openedCell.value.user, fromDay: openedCell.value.cell };
 };
 const onDragOver = (u, d) => {
     if (!drag.value || isOff(d)) return;
     const key = `${u.userId}|${d.date}`;
     if (dropKey.value === key) return;
     dropKey.value = key;
-    const { chip, fromUser } = drag.value;
+    const { task, fromUser } = drag.value;
     const same = fromUser.userId === u.userId;
     hint.value = {
         text: t('Time.dragging', {
-            task: chip.name, h: formatHm(chip.minutes), name: u.name, day: moment(d.date).format('ddd'),
-            from: fromUser.name, fromPct: pctAfter(fromUser, same ? 0 : -chip.minutes), toPct: pctAfter(u, same ? 0 : chip.minutes),
+            task: task.name, h: formatHm(task.minutes), name: u.name, day: moment(d.date).format('ddd'),
+            from: fromUser.name, fromPct: pctAfter(fromUser, same ? 0 : -task.minutes), toPct: pctAfter(u, same ? 0 : task.minutes),
         }),
     };
 };
@@ -344,7 +340,7 @@ const suggestBalance = () => {
             task: chip.name, h: formatHm(chip.minutes), from: worst.u.name, day: moment(worst.d.date).format('ddd'), to: target.u.name,
             fromPct: pctAfter(worst.u, -chip.minutes), toPct: pctAfter(target.u, chip.minutes),
         }),
-        apply: { chip, fromUser: worst.u, fromDay: worst.d, toUser: target.u, toDay: target.d },
+        apply: { task: { name: chip.name, minutes: chip.minutes, chips: [chip] }, fromUser: worst.u, fromDay: worst.d, toUser: target.u, toDay: target.d },
     };
 };
 const applyHint = () => { if (hint.value && hint.value.apply && !busy.value) move(hint.value.apply); };
@@ -398,13 +394,17 @@ onMounted(() => {
 .wl__cell.is-drop { border: 1px dashed var(--brand); box-shadow: var(--focus); }
 .wl__cell.is-pto { display: grid; place-items: center; border-color: var(--hairline); }
 .wl__pto { font: 500 9.5px/1 var(--font-mono); color: var(--ink-2); }
-.wl__fill { background: var(--brand); border-radius: 4px; display: grid; place-items: center; color: var(--on-brand); font: 600 10px/1 var(--font-mono); min-height: 0; transition: height var(--t-state) var(--ease); }
+.wl__fill { background: var(--brand); border-radius: 4px; min-height: 4px; transition: height var(--t-state) var(--ease); }
 .wl__fill.is-tentative { opacity: .5; }
 .wl__fill.is-over { background: var(--danger); }
-.wl__chips { position: absolute; top: 4px; left: 4px; right: 4px; display: flex; flex-direction: column; gap: 2px; pointer-events: none; }
-.wl__chip { pointer-events: auto; cursor: grab; font: 500 9.5px/1.2 var(--font-ui); background: var(--surface); color: var(--ink); border: 1px solid var(--border); border-radius: 4px; padding: 2px 5px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.wl__chip:active { cursor: grabbing; }
-.wl__chip--more { color: var(--ink-2); font-family: var(--font-mono); }
+/* Its own layer, not inside the bar, so a short bar never clips it. */
+.wl__hours {
+    position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
+    max-width: calc(100% - 6px); padding: 3px 7px; border-radius: 6px;
+    background: var(--surface); box-shadow: 0 0 0 1px var(--hairline);
+    color: var(--ink); font: 600 13px/1 var(--font-mono); white-space: nowrap; pointer-events: none;
+}
+.wl__hours.is-over { color: var(--danger-ink); }
 .wl__total { display: grid; place-items: center; font: 600 var(--row-font, 12px)/1 var(--font-mono); }
 .wl__total small { font: 400 10px/1 var(--font-mono); color: var(--ink-2); }
 .wl__total.is-over { color: var(--danger); }
