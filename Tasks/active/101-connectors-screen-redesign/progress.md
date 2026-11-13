@@ -56,3 +56,6 @@ None.
 
 ### 2026-11-12 — 077 merged
 - `GoogleConnection.vue` is deleted, so the Connectors tab no longer shows the old Google Calendar card and takes no `legacyGoogle`.
+
+### 2026-11-13 — official logos
+- The owner asked for each app's official logo so people recognise it at a glance; this replaces the "no brand colours" decision above. `ConnectorTile.vue` shows the logo from `frontend/src/assets/images/connectors/` on a `--logo-plate` that stays white in dark mode; custom servers keep their initials. Six logos come from SVG Logos (CC0), four from theSVG (MIT), and Wispr Flow's from its own site, all listed in `CREDITS.md`. A card that still needs an app keeps its 70% dimming, which shows more on the white plate in dark mode.
