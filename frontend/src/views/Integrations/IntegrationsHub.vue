@@ -4,7 +4,16 @@
             <router-link :to="{ name: 'Home', params: { cid: cid } }" class="ig-home" :title="$t('IntegrationsHub.home')" :aria-label="$t('IntegrationsHub.home')">
                 <span class="ah-mask-icon" :style="maskOf(homeIcon)" aria-hidden="true"></span>
             </router-link>
-            <h1 class="ig-title">{{ $t('IntegrationsHub.title') }}</h1>
+            <div class="ig-heading">
+                <h1 class="ig-title">{{ $t('IntegrationsHub.title') }}</h1>
+                <p class="ig-lead" data-test="integrations-lead">
+                    {{ $t('IntegrationsHub.lead') }}
+                    <template v-if="connectors.length">
+                        {{ $t('IntegrationsHub.lead_connectors') }}
+                        <router-link :to="{ name: CUSTOMIZE_ROUTE, params: { cid } }">{{ $t('IntegrationsHub.connectors_link') }}</router-link>
+                    </template>
+                </p>
+            </div>
         </div>
 
         <div class="ig-body">
@@ -277,6 +286,18 @@
                     </details>
                 </div>
 
+                <div v-else-if="active === 'github'" data-test="github-section">
+                    <div class="ig-head">
+                        <h2>{{ $t('IntegrationsHub.github') }}</h2>
+                        <p>{{ $t('IntegrationsHub.github_intro') }}</p>
+                    </div>
+                    <AppConnections :only="['github']" />
+                    <p v-if="connectors.includes('github')" class="ig-note" data-test="github-connectors-note">
+                        {{ $t('IntegrationsHub.github_connectors_note') }}
+                        <router-link :to="{ name: CUSTOMIZE_ROUTE, params: { cid } }">{{ $t('IntegrationsHub.connectors_link') }}</router-link>
+                    </p>
+                </div>
+
                 <!-- Placeholder sections (all real sections handled above) -->
                 <div v-else class="ig-soon-panel">
                     <div class="ig-soon-ic">{{ activeCat.icon }}</div>
@@ -296,11 +317,13 @@ export default { name: 'IntegrationsHub' };
 <script setup>
 import { ref, reactive, computed, onMounted, inject } from 'vue';
 import { useI18n } from 'vue-i18n';
+import { useRoute } from 'vue-router';
 import { apiRequest } from '@/services';
 import { useGetterFunctions } from '@/composable';
 import * as env from '@/config/env';
 import { maskOf } from '@/utils/iconMask';
 import { CUSTOMIZE_ROUTE } from '@/router/ai/customize';
+import AppConnections from './AppConnections.vue';
 
 const homeIcon = require('@/assets/images/svg/Home.svg');
 
@@ -318,9 +341,12 @@ const cats = [
     { key: 'calendar', icon: '📅', soon: false },
     { key: 'marketplace', icon: '🧩', soon: false },
     { key: 'slack', icon: '💬', soon: false },
+    { key: 'github', icon: '🔀', soon: false },
     { key: 'apps', icon: '🪟', soon: false },
 ];
-const active = ref('emailToTask');
+// A link (the old App connections address, a project's GitHub card) and a GitHub sign-in coming back name the section to open.
+const asked = useRoute()?.query || {};
+const active = ref(asked.github ? 'github' : (cats.some((c) => c.key === asked.section) ? String(asked.section) : 'emailToTask'));
 const activeCat = computed(() => cats.find((c) => c.key === active.value) || cats[0]);
 
 const projects = ref([]);
@@ -348,7 +374,7 @@ const apps = computed(() => connections.value.filter((c) => c.type === 'custom_i
 const filteredCatalog = computed(() => {
     const q = mpSearch.value.trim().toLowerCase();
     return catalog.value
-        .filter((i) => !i.multiple && i.key !== 'slack') // slack has its own dedicated section
+        .filter((i) => !i.multiple && i.key !== 'slack' && i.key !== 'github') // Slack and GitHub have sections of their own
         .filter((i) => !q || (i.name || '').toLowerCase().includes(q) || (i.category || '').toLowerCase().includes(q));
 });
 const connectedFor = (type) => connections.value.find((c) => c.type === type) || null;
@@ -512,7 +538,9 @@ onMounted(() => { loadProjects(); loadInboxes(); loadFeeds(); loadRules(); loadC
 .ig-topbar { display: flex; align-items: center; gap: 14px; padding: 12px 22px; border-bottom: 1px solid var(--hairline); background: var(--surface); }
 .ig-home { display: inline-flex; color: var(--ink-2); }
 .ig-home .ah-mask-icon { width: 20px; height: 20px; }
+.ig-heading { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
 .ig-title { font-size: 18px; margin: 0; color: var(--ink); }
+.ig-lead { margin: 0; font-size: 12.5px; color: var(--ink-2); }
 .ig-body { flex: 1; display: grid; grid-template-columns: 264px 1fr; min-height: 0; }
 @media (max-width: 820px) { .ig-body { grid-template-columns: 1fr; } }
 .ig-rail { border-right: 1px solid var(--hairline); background: var(--surface); padding: 12px; overflow-y: auto; }

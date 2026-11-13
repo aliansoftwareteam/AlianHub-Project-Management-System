@@ -111,8 +111,8 @@ exports.callback = (req, res) => {
     if (!claims) return go(oauth.fallbackOrigin(), '/', { github: 'expired' });
     const origin = claims.returnOrigin || oauth.fallbackOrigin();
     const toProject = OBJECT_ID.test(String(claims.projectId || ''));
-    const page = toProject ? `/${claims.companyId}/project/${claims.projectId}/p` : `/${claims.companyId}/app-connections`;
-    const at = toProject ? { tab: 'ProjectDetail', section: 'github' } : {};
+    const page = toProject ? `/${claims.companyId}/project/${claims.projectId}/p` : `/${claims.companyId}/integrations`;
+    const at = toProject ? { tab: 'ProjectDetail', section: 'github' } : { section: 'github' };
     if (query.error) return go(origin, page, { ...at, github: 'denied' });
     const code = oauth.usableCode(query.code);
     if (!code) return go(origin, page, { ...at, github: 'failed' });

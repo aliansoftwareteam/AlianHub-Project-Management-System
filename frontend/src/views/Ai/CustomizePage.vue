@@ -136,7 +136,7 @@ onMounted(async () => {
 
 <style scoped>
 .cz__body { flex: 1; min-height: 0; overflow: auto; padding: 16px 24px 32px; display: flex; flex-direction: column; gap: 18px; box-sizing: border-box; }
-.cz__tabs { align-self: flex-start; max-width: 100%; overflow-x: auto; }
+.cz__tabs { flex: none; align-self: flex-start; max-width: 100%; overflow-x: auto; }
 .cz__tabs .ah-tab { white-space: nowrap; }
 .cz__panel { min-width: 0; }
 @media (max-width: 640px) {

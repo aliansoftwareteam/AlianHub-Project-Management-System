@@ -109,9 +109,9 @@ describe('the old addresses', () => {
         return router.currentRoute.value;
     };
 
-    it('send Connections, App connections and Connect your AI to Customize', async () => {
+    it('send Connections and Connect your AI to Customize, and App connections to the GitHub section of Integrations', async () => {
         expect(await landOn({ name: 'Connections', params: { cid: 'c1' } })).toMatchObject({ name: CUSTOMIZE_ROUTE, params: { cid: 'c1' }, query: {} });
-        expect(await landOn('/c1/app-connections')).toMatchObject({ name: CUSTOMIZE_ROUTE, params: { cid: 'c1' } });
+        expect(await landOn('/c1/app-connections')).toMatchObject({ name: 'IntegrationsHub', params: { cid: 'c1' }, query: { section: 'github' } });
         expect(await landOn({ name: 'AiConnect', params: { cid: 'c1' } })).toMatchObject({ name: CUSTOMIZE_ROUTE, query: { tab: 'connect-ai' } });
     });
 
@@ -120,7 +120,9 @@ describe('the old addresses', () => {
         expect(route).toMatchObject({ name: CUSTOMIZE_ROUTE, query: { connector: 'notion', state: 's', code: 'c' } });
     });
 
-    it('let a GitHub workspace sign-in started on App connections finish there', async () => {
-        expect(await landOn('/c1/app-connections?github=1&state=s&code=c')).toMatchObject({ name: 'AppConnections' });
+    it('let a GitHub workspace sign-in that returns to App connections finish on Integrations', async () => {
+        expect(await landOn('/c1/app-connections?github=complete&state=s&code=c')).toMatchObject({
+            name: 'IntegrationsHub', params: { cid: 'c1' }, query: { section: 'github', github: 'complete', state: 's', code: 'c' },
+        });
     });
 });

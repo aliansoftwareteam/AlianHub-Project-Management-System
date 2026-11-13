@@ -11,7 +11,7 @@
             <button v-if="view.canManage && view.oneClick" type="button" class="ah-btn ah-btn--primary ah-btn--sm pgh__start" :disabled="busy" data-connect-github @click="connect">
                 {{ $t('ProjectGithub.connect') }}
             </button>
-            <router-link v-else-if="view.canManage" class="pgh__link" :to="{ name: 'AppConnections', params: { cid } }" data-set-up>{{ $t('ProjectGithub.set_up') }}</router-link>
+            <router-link v-else-if="view.canManage" class="pgh__link" :to="{ name: 'IntegrationsHub', params: { cid }, query: { section: 'github' } }" data-set-up>{{ $t('ProjectGithub.set_up') }}</router-link>
             <p v-else class="pgh__hint" data-ask-admin>{{ $t('ProjectGithub.ask_admin') }}</p>
         </template>
 

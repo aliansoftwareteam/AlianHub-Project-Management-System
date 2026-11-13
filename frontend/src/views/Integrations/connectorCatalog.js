@@ -7,6 +7,7 @@ export const CATEGORY_OF = Object.freeze({
     google: "productivity",
     wisprflow: "productivity",
     slack: "communication",
+    outlook: "communication",
     notion: "docs",
     dropbox: "files",
     github: "development",

@@ -1,4 +1,4 @@
-import { CUSTOMIZE_ROUTE, toCustomize } from '../ai/customize';
+import { toCustomize } from '../ai/customize';
 
 export default [
     {
@@ -11,16 +11,11 @@ export default [
         component: () => import(/* webpackChunkName: "IntegrationsHub" */ '@/views/Integrations/IntegrationsHub.vue'),
     },
     { path: '/:cid/connections', name: 'Connections', redirect: toCustomize() },
+    // The GitHub sync moved into Integrations; a sign-in that returns here keeps its query and finishes there.
     {
         path: '/:cid/app-connections',
         name: 'AppConnections',
-        meta: {
-            titleKey: "AppConnections.title",
-            requiresAuth: true
-        },
-        // A GitHub sign-in started here before the page moved still comes back here to finish, until task 079 retires it.
-        beforeEnter: (to) => (to.query.github ? true : { name: CUSTOMIZE_ROUTE, params: { cid: to.params.cid } }),
-        component: () => import(/* webpackChunkName: "IntegrationsHub" */ '@/views/Integrations/AppConnections.vue'),
+        redirect: (to) => ({ name: 'IntegrationsHub', params: { cid: to.params.cid }, query: { ...to.query, section: 'github' } }),
     },
     {
         path: '/:cid/external-data',

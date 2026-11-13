@@ -179,8 +179,8 @@ describe('the public callback', () => {
     it('exchanges and stores nothing; it hands code and state to the signed-in page in the fragment', async () => {
         const state = await stateFor();
         const r = callback({ code: 'code-1', state });
-        expect(r.location.startsWith(`http://localhost:8080/#/${COMPANY}/app-connections?`)).toBe(true);
-        expect(Object.fromEntries(returned(r))).toEqual({ github: 'complete', state, code: 'code-1' });
+        expect(r.location.startsWith(`http://localhost:8080/#/${COMPANY}/integrations?`)).toBe(true);
+        expect(Object.fromEntries(returned(r))).toEqual({ section: 'github', github: 'complete', state, code: 'code-1' });
         expect(r.headers).toMatchObject({ 'Cache-Control': 'no-store', 'Referrer-Policy': 'no-referrer' });
         expect(axios.post).not.toHaveBeenCalled();
         expect(rows()).toHaveLength(0);

@@ -73,7 +73,7 @@ const mounted = [];
 const open = async ({ props = {}, query = {}, answers = {} } = {}) => {
     route.query = query;
     serve(answers);
-    const component = mount(ConnectorsTab, { props: { available: true, ...props }, global: { mocks: { $t: t } }, attachTo: document.body });
+    const component = mount(ConnectorsTab, { props: { available: true, ...props }, global: { mocks: { $t: t }, stubs: { RouterLink: { props: ['to'], template: '<a :data-to="to.name"><slot /></a>' } } }, attachTo: document.body });
     mounted.push(component);
     await flushPromises();
     const page = () => new DOMWrapper(document.body);
@@ -238,6 +238,12 @@ describe('browse', () => {
         const wrapper = await open({ props: { available: false } });
         expect(apiRequest).not.toHaveBeenCalled();
         expect(wrapper.find('[data-test="cx-off"]').exists()).toBe(true);
+    });
+
+    it("says it holds each person's own accounts and points to Integrations for workspace-wide apps", async () => {
+        const note = (await open()).find('[data-test="cx-integrations-note"]');
+        expect(note.text()).toContain(t('Connectors.screen.integrations_note'));
+        expect(note.find('a').attributes('data-to')).toBe('IntegrationsHub');
     });
 
     it('says nothing can be connected yet, and calls nothing, for a guest', async () => {

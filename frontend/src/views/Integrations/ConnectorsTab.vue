@@ -4,6 +4,10 @@
             <div class="cx__intro">
                 <h2 class="ah-h2">{{ $t('Connectors.screen.connectors_title') }}</h2>
                 <p class="cx__lead">{{ $t('Connectors.screen.connectors_lead') }}</p>
+                <p class="cx__lead" data-test="cx-integrations-note">
+                    {{ $t('Connectors.screen.integrations_note') }}
+                    <router-link :to="{ name: 'IntegrationsHub', params: { cid: route.params.cid } }">{{ $t('Connectors.screen.integrations_link') }}</router-link>
+                </p>
             </div>
             <div v-if="mayAddCustom && available && !guest" class="cx__add">
                 <button
