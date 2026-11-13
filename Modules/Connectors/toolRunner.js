@@ -23,9 +23,9 @@ const TOKEN_FAILURES = Object.freeze(['refresh_failed', 'token_unavailable']);
 const refusal = (code, message) => Object.assign(new Error(`${code}: ${message}`), { code, deterministic: true });
 
 const MESSAGES = Object.freeze({
-    not_connected: (name) => `Connect ${name} on My connections first, then ask again.`,
+    not_connected: (name) => `Connect ${name} on Connectors first, then ask again.`,
     not_member: () => 'This is not available to you.',
-    broken: (name) => `${name} is no longer accepting your connection. Reconnect ${name} on My connections, then ask again.`,
+    broken: (name) => `${name} is no longer accepting your connection. Reconnect ${name} on Connectors, then ask again.`,
     provider_off: (name) => `${name} is not switched on here.`,
 });
 
@@ -180,7 +180,7 @@ const ownConnection = async (tool, companyId, userId, asked) => {
         throw refusal('not_connected', `This was filed on a connection that is not your current ${tool.definition.name} connection, so it was not sent. Ask for it again.`);
     }
     if (tool.scope && !(connection.scopes || []).includes(tool.scope)) {
-        throw refusal('scope_missing', `Tick ${tool.product} on your ${tool.definition.name} connection in My connections, then ask again.`);
+        throw refusal('scope_missing', `Tick ${tool.product} on your ${tool.definition.name} connection in Connectors, then ask again.`);
     }
     if ((connection.toolsOff || []).includes(tool.key)) {
         throw refusal('tool_turned_off', `You turned this ${tool.definition.name} tool off for yourself, so it was not used. Turn it back on in AI › Customize › Connectors, then ask again.`);

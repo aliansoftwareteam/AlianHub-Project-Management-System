@@ -13,7 +13,7 @@ describe('the Inbox line for the retired Slack bot', () => {
     it('says the bot was retired and where each person connects their own Slack', () => {
         const line = renderNotice(row, { t, changeText: () => 'stored text was used' });
         expect(line).toBe(t('Inbox.connector_slack_bot_retired'));
-        expect(line).toMatch(/My connections/);
+        expect(line).toMatch(/Customize › Connectors/);
         expect(line).not.toContain('stored');
     });
 });

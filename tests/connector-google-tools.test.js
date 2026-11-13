@@ -155,7 +155,7 @@ describe.each(READS)('the read %s', (key, input, shows) => {
     it('names the product to tick when its scope is missing', async () => {
         connected([]);
         const product = connectorTools.get(key).product;
-        expect(await mcpRead(key, input)).toEqual({ code: 'scope_missing', error: `Tick ${product} on your Google connection in My connections, then ask again.` });
+        expect(await mcpRead(key, input)).toEqual({ code: 'scope_missing', error: `Tick ${product} on your Google connection in Connectors, then ask again.` });
         expect(safeFetch).not.toHaveBeenCalled();
     });
 });
@@ -278,7 +278,7 @@ describe.each(WRITES)('the write %s', (key, input, madeAtGoogle, answer) => {
     it('names the product to tick when its scope is missing', async () => {
         connected([]);
         const product = connectorTools.get(key).product;
-        expect(await mcpWrite(key, input)).toEqual({ code: 'scope_missing', error: `Tick ${product} on your Google connection in My connections, then ask again.` });
+        expect(await mcpWrite(key, input)).toEqual({ code: 'scope_missing', error: `Tick ${product} on your Google connection in Connectors, then ask again.` });
     });
 });
 

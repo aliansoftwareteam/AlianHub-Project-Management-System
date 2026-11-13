@@ -180,7 +180,7 @@ describe.each(READS)('the read %s', (key, input, shows) => {
     it('names the product to tick when its scope is missing, and never calls Graph', async () => {
         connected(['openid', 'profile', 'offline_access']);
         const { product } = connectorTools.get(key);
-        expect(await mcpRead(key, input)).toEqual({ code: 'scope_missing', error: `Tick ${product} on your Outlook connection in My connections, then ask again.` });
+        expect(await mcpRead(key, input)).toEqual({ code: 'scope_missing', error: `Tick ${product} on your Outlook connection in Connectors, then ask again.` });
         expect(safeFetch).not.toHaveBeenCalled();
     });
 
@@ -339,7 +339,7 @@ describe.each(WRITES)('the write %s', (key, input, madeInOutlook, answer) => {
     it('names the product to tick when its scope is missing', async () => {
         connected(['openid']);
         const { product } = connectorTools.get(key);
-        expect(await mcpWrite(key, input)).toEqual({ code: 'scope_missing', error: `Tick ${product} on your Outlook connection in My connections, then ask again.` });
+        expect(await mcpWrite(key, input)).toEqual({ code: 'scope_missing', error: `Tick ${product} on your Outlook connection in Connectors, then ask again.` });
     });
 });
 

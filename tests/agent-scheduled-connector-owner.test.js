@@ -107,7 +107,7 @@ describe('a scheduled run of an agent that reads a connected app', () => {
             throw Object.assign(new Error('not_connected'), { name: 'ConnectorError', code: 'not_connected', provider: 'fake' });
         });
         const out = await fireSchedule();
-        expect(out).toMatchObject({ verdict: 'skipped', reason: 'Connect Fake on My connections first, then ask again.' });
+        expect(out).toMatchObject({ verdict: 'skipped', reason: 'Connect Fake on Connectors first, then ask again.' });
         expect(safeFetch).not.toHaveBeenCalled();
         expect(chat).not.toHaveBeenCalled();
     });

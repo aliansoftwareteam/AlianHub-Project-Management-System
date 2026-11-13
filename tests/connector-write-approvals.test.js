@@ -357,7 +357,7 @@ describe('what is approved is what is sent, once', () => {
         const p = await fromAgentRun();
         expect(p.changes[0].label).toBe(NOTE.title);
         await approveAs(p._id, PRISHA);
-        expect(proposalRow(p._id).delivery).toEqual([expect.objectContaining({ ok: false, error: 'Fake is no longer accepting your connection. Reconnect Fake on My connections, then ask again.' })]);
+        expect(proposalRow(p._id).delivery).toEqual([expect.objectContaining({ ok: false, error: 'Fake is no longer accepting your connection. Reconnect Fake on Connectors, then ask again.' })]);
         expect(safeFetch).not.toHaveBeenCalled();
     });
 
@@ -373,7 +373,7 @@ describe('what is approved is what is sent, once', () => {
 
     it('answers an MCP caller with no connection, and files nothing', async () => {
         resolveConnection.mockRejectedValue(Object.assign(new Error('not_connected'), { name: 'ConnectorError', code: 'not_connected', provider: 'fake' }));
-        expect(await mcpTools.call(oauthCaller(['connectors:write']), KEY, NOTE)).toEqual({ code: 'not_connected', error: 'Connect Fake on My connections first, then ask again.' });
+        expect(await mcpTools.call(oauthCaller(['connectors:write']), KEY, NOTE)).toEqual({ code: 'not_connected', error: 'Connect Fake on Connectors first, then ask again.' });
         expect(mockDb.store[SCHEMA_TYPE.AGENT_PROPOSALS] || []).toHaveLength(0);
     });
 

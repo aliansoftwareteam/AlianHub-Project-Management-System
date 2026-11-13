@@ -102,7 +102,7 @@ const fetchPickerToken = async (source) => {
     return payload.data || {};
 };
 
-/* Connecting a cloud account now lives on My connections (072): Google needs its Drive product ticked there, and
+/* Connecting a cloud account now lives on Connectors (072): Google needs its Drive product ticked there, and
  * Dropbox is a connection there too. The attach menu sends the person there rather than starting consent inline. */
 export const connectCloudProvider = async () => {
     const company = localStorage.getItem('selectedCompany') || '';

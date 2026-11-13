@@ -149,7 +149,7 @@ describe('what the answer says about the apps', () => {
                 connectors: {
                     proposals: [{ proposalId: 'p1', provider: 'github', app: 'GitHub' }],
                     notes: [
-                        { provider: 'github', app: 'GitHub', code: 'not_connected', text: 'Connect GitHub on My connections first, then ask again.' },
+                        { provider: 'github', app: 'GitHub', code: 'not_connected', text: 'Connect GitHub on Connectors first, then ask again.' },
                         { provider: 'fake', app: 'Fake', code: 'quota_reached', text: 'This person used today\'s 500 reads from connected apps.' }
                     ]
                 }

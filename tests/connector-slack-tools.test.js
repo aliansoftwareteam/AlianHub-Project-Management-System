@@ -206,7 +206,7 @@ describe('slack.channel.read', () => {
 
     it('names the product to tick when its scope is missing', async () => {
         connected(['chat:write']);
-        expect(await mcpRead('slack.channel.read', { channel: 'general' })).toEqual({ code: 'scope_missing', error: 'Tick messages on your Slack connection in My connections, then ask again.' });
+        expect(await mcpRead('slack.channel.read', { channel: 'general' })).toEqual({ code: 'scope_missing', error: 'Tick messages on your Slack connection in Connectors, then ask again.' });
     });
 });
 

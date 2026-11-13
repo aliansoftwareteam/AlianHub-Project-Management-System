@@ -138,7 +138,7 @@ describe('an optional read the agent may not use', () => {
         resolveConnection.mockRejectedValue(Object.assign(new Error('not_connected'), { name: 'ConnectorError', code: 'not_connected', provider: 'fake' }));
         const { out } = await runWith(agent([{ provider: 'fake', tools: [READ] }]), skillOf({ optional: true }));
         expect(out.status).toBe('waiting_approval');
-        expect(JSON.stringify(chat.mock.calls[0][0])).toContain('Connect Fake on My connections first');
+        expect(JSON.stringify(chat.mock.calls[0][0])).toContain('Connect Fake on Connectors first');
     });
 
     it('is refused when saved on a reader that is not a connected app', () => {

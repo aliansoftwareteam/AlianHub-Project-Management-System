@@ -1,7 +1,7 @@
 /* Retires the legacy per-person cloud-storage picker (Modules/CloudStorage) in favour of the connectors module
  * (076, FR-39). Each `cloud_storage_connections` row held that person's OWN OAuth app — the client id and, in the
  * clear, the client secret — plus their grant. Under the module the app is the instance's or company's, never a
- * person's, so those grants cannot be carried over: the person reconnects once on My connections (072). This
+ * person's, so those grants cannot be carried over: the person reconnects once on Connectors (072). This
  * migration therefore deletes the stored client secrets (the unsealed `config`) and the tokens, and closes the
  * row. Linked attachments already on tasks keep working (they carry the file id, not a connection), and files
  * imported as copies are ordinary uploads, so nothing of the person's data is lost.

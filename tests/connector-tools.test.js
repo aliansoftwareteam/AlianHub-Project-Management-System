@@ -217,18 +217,18 @@ describe('only the caller\'s own connection', () => {
 
     it('tells a person with no connection to connect the provider', async () => {
         resolveConnection.mockRejectedValue(connectorError('not_connected'));
-        expect(await mcpTools.call(mcp(['connectors:read']), KEY, {})).toEqual({ code: 'not_connected', error: 'Connect Fake on My connections first, then ask again.' });
+        expect(await mcpTools.call(mcp(['connectors:read']), KEY, {})).toEqual({ code: 'not_connected', error: 'Connect Fake on Connectors first, then ask again.' });
     });
 
     it('tells a person whose token cannot be refreshed to reconnect', async () => {
         resolveConnection.mockResolvedValue({ connectionId: MINE, scopes: ['notes.read'], getAccessToken: async () => { throw connectorError('broken'); } });
-        expect(await mcpTools.call(mcp(['connectors:read']), KEY, {})).toEqual({ code: 'broken', error: 'Fake is no longer accepting your connection. Reconnect Fake on My connections, then ask again.' });
+        expect(await mcpTools.call(mcp(['connectors:read']), KEY, {})).toEqual({ code: 'broken', error: 'Fake is no longer accepting your connection. Reconnect Fake on Connectors, then ask again.' });
         expect(safeFetch).not.toHaveBeenCalled();
     });
 
     it('names the product to tick when the connection lacks the tool\'s scope', async () => {
         connected(['files.read']);
-        expect(await mcpTools.call(mcp(['connectors:read']), KEY, {})).toEqual({ code: 'scope_missing', error: 'Tick notes on your Fake connection in My connections, then ask again.' });
+        expect(await mcpTools.call(mcp(['connectors:read']), KEY, {})).toEqual({ code: 'scope_missing', error: 'Tick notes on your Fake connection in Connectors, then ask again.' });
         expect(safeFetch).not.toHaveBeenCalled();
     });
 

@@ -283,7 +283,7 @@ describe('an app the asker cannot use', () => {
         resolveConnection.mockImplementation(async ({ provider }) => { throw connectorError('not_connected', provider); });
         const chat = model();
         const out = await step(`status of ${PR_LINK}`, ['github']);
-        expect(out.notes).toEqual([{ provider: 'github', app: 'GitHub', code: 'not_connected', text: 'Connect GitHub on My connections first, then ask again.' }]);
+        expect(out.notes).toEqual([{ provider: 'github', app: 'GitHub', code: 'not_connected', text: 'Connect GitHub on Connectors first, then ask again.' }]);
         expect(chat).not.toHaveBeenCalled();
         expect(safeFetch).not.toHaveBeenCalled();
     });
@@ -297,7 +297,7 @@ describe('an app the asker cannot use', () => {
     it('says what to tick when the connection lacks the tool\'s access', async () => {
         resolveConnection.mockImplementation(async ({ provider }) => ({ connectionId: `conn-${provider}`, scopes: [], getAccessToken: async () => 't' }));
         const out = await step(`status of ${PR_LINK}`, ['github']);
-        expect(out.notes).toEqual([expect.objectContaining({ code: 'scope_missing', text: 'Tick repos on your GitHub connection in My connections, then ask again.' })]);
+        expect(out.notes).toEqual([expect.objectContaining({ code: 'scope_missing', text: 'Tick repos on your GitHub connection in Connectors, then ask again.' })]);
         expect(safeFetch).not.toHaveBeenCalled();
     });
 });
