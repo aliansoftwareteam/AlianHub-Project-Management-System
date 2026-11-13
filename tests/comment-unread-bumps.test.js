@@ -51,7 +51,7 @@ beforeEach(() => {
             [DM]: { _id: DM, mainChat: true, AssigneeUserId: [AUTHOR, TEAMMATE] },
         },
         [SCHEMA_TYPE.SPRINTS]: {
-            [CHANNEL]: { _id: CHANNEL, private: true, AssigneeUserId: [AUTHOR, WATCHER, DEPARTED] },
+            [CHANNEL]: { _id: CHANNEL, private: true, AssigneeUserId: [AUTHOR, WATCHER, DEPARTED], name: 'design' },
             [OPEN_CHANNEL]: { _id: OPEN_CHANNEL, private: false },
         },
     };
@@ -111,5 +111,29 @@ describe('a new comment raises the unread counts the comment panels used to rais
         await bumpUnreadCounts(C, comment({ projectId: PROJECT, sprintId: SPRINT, taskId: '6f0000000000000000000e09' }), []);
 
         expect(bumps()).toEqual([]);
+    });
+});
+
+describe('it tells the save which people a chat message reached', () => {
+    it('a direct message reaches its other participant, in a chat space', async () => {
+        const reached = await bumpUnreadCounts(C, comment({ projectId: DIRECTS, sprintId: SPRINT, taskId: DM }), []);
+
+        expect(reached).toEqual({ userIds: [TEAMMATE], chatSpace: true, channelName: '' });
+    });
+
+    it('a channel post names its channel', async () => {
+        const reached = await bumpUnreadCounts(C, comment({ projectId: CHATS, sprintId: CHANNEL, taskId: 'default' }), []);
+
+        expect(reached).toEqual({ userIds: [WATCHER], chatSpace: true, channelName: 'design' });
+    });
+
+    it('a task comment is not in a chat space', async () => {
+        const reached = await bumpUnreadCounts(C, comment({ projectId: PROJECT, sprintId: SPRINT, taskId: TASK }), []);
+
+        expect(reached).toEqual({ userIds: [ALL, WATCHER, TEAMMATE], chatSpace: false, channelName: '' });
+    });
+
+    it('nothing for a thread that does not exist', async () => {
+        expect(await bumpUnreadCounts(C, comment({ projectId: '6f0000000000000000000b09' }), [])).toBeNull();
     });
 });

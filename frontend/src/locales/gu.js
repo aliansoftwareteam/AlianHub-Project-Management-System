@@ -1526,6 +1526,8 @@ export default {
         "palette_esc": "ESC",
         "primary_nav": "Primary",
         "inbox_unread": "Inbox, {n} unread",
+        "chat_unread": "Chat, {n} unread",
+        "more_unread": "More, {n} unread",
         "everything": "Everything",
         "goals": "Goals",
         "my_work": "My work",
@@ -10196,6 +10198,12 @@ export default {
         "secret_copied": "Signing secret copied to clipboard."
     },
     "Chat": {
+        "alerts_region": "New chat messages",
+        "alert_in_channel": "{name} in #{channel}",
+        "alert_sent_file": "Sent a file: {name}",
+        "alert_new_message": "Sent a message",
+        "alert_someone": "Someone",
+        "alert_dismiss": "Dismiss",
         "welcome_message": "BRAND_NAME માં આપનું સ્વાગત છે",
         "msg2": "આ એક બ્રાન્ડ-નવું ગ્રુપ છે. અહીં તમને પ્રારંભ કરવા માટે કેટલીક પગલાં છે. વધુ માટે, અમારી પ્રારંભિક માર્ગદર્શિકા તપાસો",
         "chats": "ચેટ્સ",

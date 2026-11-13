@@ -1526,6 +1526,8 @@ export default {
         "palette_esc": "ESC",
         "primary_nav": "Primary",
         "inbox_unread": "Inbox, {n} unread",
+        "chat_unread": "Chat, {n} unread",
+        "more_unread": "More, {n} unread",
         "everything": "Everything",
         "goals": "Goals",
         "my_work": "My work",
@@ -10196,6 +10198,12 @@ export default {
         "secret_copied": "Signing secret copied to clipboard."
     },
     "Chat": {
+        "alerts_region": "New chat messages",
+        "alert_in_channel": "{name} in #{channel}",
+        "alert_sent_file": "Sent a file: {name}",
+        "alert_new_message": "Sent a message",
+        "alert_someone": "Someone",
+        "alert_dismiss": "Dismiss",
         "welcome_message": "Добро пожаловать в BRAND_NAME",
         "msg2": "Это совершенно новая группа. Вот несколько шагов, которые помогут вам начать. Для получения дополнительной информации ознакомьтесь с нашим руководством по началу работы.",
         "chats": "Чаты",

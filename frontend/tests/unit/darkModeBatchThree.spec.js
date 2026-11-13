@@ -311,6 +311,7 @@ describe('a picture beside a written name is not read out as well', () => {
         'components/organisms/OnLeaveCard/OnLeaveCard.vue': [true],
         'components/organisms/ProjectDetailRightSide/ProjectDetailRightSide.vue': [true],
         'components/organisms/ProjectWatcher/ProjectWatcher.vue': [true],
+        'components/organisms/Shell/ChatAlerts.vue': [true],
         'components/organisms/Shell/GlobalRail.vue': [false, true],
         'components/organisms/Shell/MobileTabBar.vue': [true],
         'components/organisms/TaskDetailRightSide/TaskDetailRightSide.vue': [true],

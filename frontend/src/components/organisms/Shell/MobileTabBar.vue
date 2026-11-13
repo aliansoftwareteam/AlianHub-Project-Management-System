@@ -7,12 +7,12 @@
             class="ah-tabbar__item"
             :class="{ 'is-active': isActive(item) }"
             :aria-current="isActive(item) ? 'page' : null"
-            :aria-label="item.key === 'inbox' && unread ? $t('Shell.inbox_unread', { n: unread }) : null"
+            :aria-label="counterOf(item.key) ? $t(counterOf(item.key).label, { n: counterOf(item.key).n }) : null"
             :data-test="`tab-${item.key}`"
         >
             <span class="ah-tabbar__icon">
                 <ShellIcon :name="item.icon" :size="20" />
-                <span v-if="item.key === 'inbox' && unread" class="ah-unread-badge" aria-hidden="true">{{ badge }}</span>
+                <span v-if="counterOf(item.key)" class="ah-unread-badge" aria-hidden="true">{{ counterOf(item.key).badge }}</span>
             </span>
             <span>{{ $t(item.label) }}</span>
         </router-link>
@@ -20,8 +20,18 @@
             <ShellIcon name="plus" :size="20" />
             <span>{{ $t('QuickCreate.rail_label') }}</span>
         </button>
-        <button type="button" class="ah-tabbar__item" :class="{ 'is-active': sheet }" data-test="tab-more" @click="sheet = true">
-            <ShellIcon name="more" :size="20" />
+        <button
+            type="button"
+            class="ah-tabbar__item"
+            :class="{ 'is-active': sheet }"
+            :aria-label="tucked ? $t('Shell.more_unread', { n: tucked.n }) : null"
+            data-test="tab-more"
+            @click="sheet = true"
+        >
+            <span class="ah-tabbar__icon">
+                <ShellIcon name="more" :size="20" />
+                <span v-if="tucked" class="ah-unread-badge" aria-hidden="true">{{ tucked.badge }}</span>
+            </span>
             <span>{{ $t('Shell.more') }}</span>
         </button>
 
@@ -38,8 +48,19 @@
                             </div>
                         </div>
                         <div class="ah-sheet__grid">
-                            <router-link v-for="item in overflowRail" :key="item.key" :to="item.to" class="ah-sheet__cell" @click="sheet = false">
-                                <ShellIcon :name="item.icon" :size="18" /><span>{{ $t(item.label) }}</span>
+                            <router-link
+                                v-for="item in overflowRail"
+                                :key="item.key"
+                                :to="item.to"
+                                class="ah-sheet__cell"
+                                :aria-label="counterOf(item.key) ? $t(counterOf(item.key).label, { n: counterOf(item.key).n }) : null"
+                                @click="sheet = false"
+                            >
+                                <span class="ah-tabbar__icon">
+                                    <ShellIcon :name="item.icon" :size="18" />
+                                    <span v-if="counterOf(item.key)" class="ah-unread-badge" aria-hidden="true">{{ counterOf(item.key).badge }}</span>
+                                </span>
+                                <span>{{ $t(item.label) }}</span>
                             </router-link>
                         </div>
                         <template v-for="group in more" :key="group.label">
@@ -84,7 +105,7 @@ import { useNavItems } from "./navItems";
 import { PHONE_TABS } from "./navMode";
 import { shellState, openPanel, toggleTheme } from "./shellState";
 import { openQuickCreate } from "@/components/organisms/QuickCreateTask/quickCreateTask";
-import { useInboxUnread } from "./inboxUnread";
+import { useNavUnread } from "./navUnread";
 
 const companyId = inject("$companyId");
 const userId = inject("$userId");
@@ -96,13 +117,14 @@ const { rail, more, isActive, simple } = useNavItems(companyId);
 const sheet = ref(false);
 watch(() => route.fullPath, () => { sheet.value = false; });
 
-const { unread, badge } = useInboxUnread();
+const { counterOf, tuckedCount } = useNavUnread();
 
 // Inbox is the phone's triage surface, so it takes Planner's slot; Planner's week grid
 // needs a wide screen and stays one tap further away in More.
 const primary = computed(() => (simple.value ? PHONE_TABS.simple : PHONE_TABS.full));
 const tabs = computed(() => rail.value.filter((i) => primary.value.includes(i.key)).slice(0, 4));
 const overflowRail = computed(() => rail.value.filter((i) => !tabs.value.includes(i)));
+const tucked = computed(() => tuckedCount(overflowRail.value));
 const me = computed(() => getUser(userId.value) || {});
 const logout = () => logOut({ islogOut: true });
 </script>

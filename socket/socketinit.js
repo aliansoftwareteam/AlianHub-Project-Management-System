@@ -23,7 +23,7 @@ const { handshakeToken } = require('../Config/cookies');
 const { resolveAccessSession } = require('../Config/jwt');
 const logger = require('../Config/loggerConfig');
 const { corsOriginDelegate } = require('../utils/cors.js');
-const { removeRoom, removeBySocket } = require('./helper');
+const { removeRoom, removeBySocket, keepPersonalRoomsOnly } = require('./helper');
 const { identityOf } = require('./roomAccess');
 exports.changeStreams = [];
 const EventEmitter = require('events');
@@ -171,6 +171,11 @@ exports.initSocket = (server) => {
             if (id !== socket.id) return;
             socket.rooms.forEach((roomName) => removeRoom(roomName));
             socket.disconnect(true);
+        });
+
+        socket.on('goIdle', (id) => {
+            if (id !== socket.id) return;
+            keepPersonalRoomsOnly(socket);
         });
 
         socket.on('getRoomList', (socketId, callback) => {
