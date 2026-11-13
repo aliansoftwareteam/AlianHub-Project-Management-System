@@ -13,7 +13,7 @@
 
 ## Last step
 
-Built, tested and checked by two users on a local stack; nothing committed yet, awaiting the owner's go-ahead to commit and open the PR into `staging`.
+Merged into `staging` as #1787 on 2026-11-13 (build 14.43.0-beta.16); goes to `main` with the promotion #1790.
 
 ## Blockers
 
@@ -68,3 +68,7 @@ None.
 - Seen while testing, unchanged here: a conversation counts as read only once the reader clicks or types in
   it (MainChatPanel `engaged`), not on opening; a hidden tab also leaves its `call_` room, as it did when it
   disconnected, so an incoming call still rings only in a visible tab.
+
+### 2026-11-13
+
+- Merged into `staging` as #1787, build 14.43.0-beta.16. Beta log and API docs (new `GET /api/v1/main-chats/unread-keys`) updated in the follow-up docs PR; promotion to `main` in #1790.

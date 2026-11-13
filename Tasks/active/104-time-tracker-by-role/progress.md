@@ -15,7 +15,7 @@
 - [ ] Integration tests (`tests/integration`) run against a seeded database
 
 ## Last step
-Built and unit-tested on `feat/time-tracker-by-role`; PR into `staging` next.
+Merged into `staging` as #1786 on 2026-11-13 (build 14.43.0-beta.17); goes to `main` with the promotion #1790. Still open: a check in a running app and the integration tests.
 
 ## Blockers
 None.
@@ -47,3 +47,7 @@ None.
   form, ai-core-boundary, retired-flags, upload-routes-order; chatTokens, designVariantDefault,
   firstPaintSet, uiSweepThirdPass, listSearchPlainText, darkModeBatchThree) fail the same way on a clean
   `staging` checkout on this machine.
+
+### 2026-11-13
+
+- Merged into `staging` as #1786, build 14.43.0-beta.17. Beta log updated in the follow-up docs PR; promotion to `main` in #1790.
