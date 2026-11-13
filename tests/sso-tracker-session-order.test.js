@@ -1,6 +1,7 @@
 process.env.JWT_SECRET = 'sso-tracker-session-order-secret';
 process.env.JWT_ALGORITHM = 'HS256';
 process.env.JWT_EXP = '24h';
+process.env.WEBURL = 'https://app.example.test/';
 
 const mockDb = require('./fixtures/fakeMongo').create();
 
@@ -17,13 +18,14 @@ const { finalizeSsoSession } = require('../Modules/SSO/ssoSession');
 const VERIFIED = '6f00000000000000000000e0';
 const UNVERIFIED = '6f00000000000000000000e1';
 const MISSING = '6f00000000000000000000e2';
+const COMPANY = '6f00000000000000000000c1';
 
 const sessionsOf = (userId) => (mockDb.store[dbCollections.SESSIONS] || []).filter((s) => String(s.userId) === userId);
 
 const ssoReq = () => ({ headers: { 'user-agent': 'jest' }, ip: '127.0.0.1' });
 const ssoSignIn = (uid) => new Promise((resolve) => {
     const res = { cookie: jest.fn(), redirect: jest.fn((url) => resolve({ url })) };
-    finalizeSsoSession(ssoReq(), res, uid, '/home');
+    finalizeSsoSession(ssoReq(), res, uid, COMPANY);
 });
 
 const trackerSignIn = (uid) => new Promise((resolve) => {
@@ -46,13 +48,13 @@ beforeEach(() => {
 describe('finalizeSsoSession', () => {
     it.each([[UNVERIFIED], [MISSING]])('opens no session for %s and refuses like a failed token mint', async (uid) => {
         const { url } = await ssoSignIn(uid);
-        expect(url).toBe('/login?ssoError=token');
+        expect(url).toBe('https://app.example.test/#/login?ssoError=token');
         expect(sessionsOf(uid)).toHaveLength(0);
     });
 
-    it('still opens a session for a verified account', async () => {
+    it('still opens a session for a verified account and sends it to the sign-in page with who signed in where', async () => {
         const { url } = await ssoSignIn(VERIFIED);
-        expect(url).toBe('/home');
+        expect(url).toBe(`https://app.example.test/#/login?sso=ok&uid=${VERIFIED}&workspace=${COMPANY}`);
         expect(sessionsOf(VERIFIED)).toHaveLength(1);
     });
 });

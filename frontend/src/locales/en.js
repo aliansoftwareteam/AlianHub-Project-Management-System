@@ -341,6 +341,7 @@ export default {
         magic_invalid: "That login link has expired or was already used. Request a new one.",
         sso_failed: "Single sign-on didn't complete. Try again, or use a password.",
         sso_not_allowed: "This account can't join this workspace through single sign-on. Ask a workspace admin to invite you.",
+        sso_not_configured: "Single sign-on isn't set up for this workspace. Log in with your password, or ask a workspace admin.",
         choose_workspace: "Choose a workspace",
         belong_to: "You belong to {n}. We'll remember your pick.",
         create_workspace: "Create a new workspace",

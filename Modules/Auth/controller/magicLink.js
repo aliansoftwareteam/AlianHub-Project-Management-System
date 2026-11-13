@@ -7,6 +7,7 @@ const logger = require('../../../Config/loggerConfig');
 const sendMail = require('../../service.js');
 const magicLinkMail = require('../../Template/sendMagicLink.js');
 const { finalizeSession } = require('./loginSession');
+const { sameOriginPath } = require('../helpers/sameOriginPath');
 
 const TTL_SECONDS = 15 * 60;
 const PER_EMAIL_LIMIT = 3;
@@ -14,10 +15,6 @@ const PER_EMAIL_WINDOW = 10 * 60;
 
 const isEnabled = () => String(process.env.MAGIC_LINK_ENABLED || 'true') !== 'false';
 const hash = (token) => crypto.createHash('sha256').update(token).digest('hex');
-const safeRedirect = (raw) => {
-    const value = String(raw || '');
-    return value.startsWith('/') && !value.startsWith('//') ? value : '';
-};
 
 const findUserByEmail = (email) => mongoC.MongoDbCrudOpration('global', {
     type: dbCollections.USERS,
@@ -40,7 +37,7 @@ exports.requestMagicLink = async (req, res) => {
         const user = await findUserByEmail(email);
         if (user && user._id && user.isEmailVerified !== false && user.isActive !== false && !user.activationPending && !user.isSupportUser) {
             const token = crypto.randomBytes(32).toString('base64url');
-            config.myCache.set(`magic:${hash(token)}`, { uid: String(user._id), redirect: safeRedirect(req.body.redirect_url) }, TTL_SECONDS);
+            config.myCache.set(`magic:${hash(token)}`, { uid: String(user._id), redirect: sameOriginPath(req.body.redirect_url) }, TTL_SECONDS);
             const link = `${config.APIURL}api/v2/auth/magic-link/verify?token=${encodeURIComponent(token)}`;
             const mail = magicLinkMail(link, TTL_SECONDS / 60);
             await new Promise((resolve) => sendMail.SendEmail(mail.subject, mail.mail, email, true, (result) => {
