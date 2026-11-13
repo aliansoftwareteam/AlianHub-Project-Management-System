@@ -3,13 +3,13 @@ id: 056
 title: App connectors for AI and agents — MCP first, built connectors where needed, one Connectors screen
 status: backlog
 priority: high
-depends_on: [061, 062, 063, 064, 065, 066, 067, 068, 069, 070, 071, 072, 073, 074, 075, 076, 077, 078, 079, 092, 093, 094, 095, 096, 097, 098, 099, 100, 101]
+depends_on: [061, 062, 063, 064, 065, 066, 067, 068, 069, 070, 071, 072, 073, 074, 075, 076, 077, 078, 079, 092, 093, 094, 095, 096, 097, 098, 099, 100, 101, 106]
 created: 2026-10-23
 ---
 
 # 056 — App connectors for AI and agents (PRD)
 
-Status: backlog · PRD v2.0, 2026-11-12 · approved by the owner on 2026-11-12. v1.1 (2026-10-23) is in git history.
+Status: backlog · PRD v2.1, 2026-11-13 · v2.0 approved by the owner on 2026-11-12; v2.1 adds decisions 30–32 (connectors and integrations told apart). v1.1 (2026-10-23) is in git history.
 
 v2.0 keeps the base of v1: personal connections, approval for every outside write, full tracking. It changes how AlianHub reaches each app: through the app's own MCP server wherever that server admits AlianHub, and through a connector we build only where it does not. It adds a shared sign-in address for hosted instances, custom MCP servers, connectors in the AI chat, and one Connectors screen.
 
@@ -24,7 +24,7 @@ People run their work across GitHub, Slack, Google, Notion, HubSpot and other ap
 - Only Slack (one workspace bot) and Google Calendar (a per-person connection with no tools yet) are agent connectors, and GitHub is a workspace-wide sync.
 - There are four unrelated connection models, each with its own OAuth, storage and screens, so every new connector is a from-scratch build.
 - A connection is either shared by the whole workspace or limited to one per person, and an AI acting for one person can end up using an account that is not theirs.
-- Connector screens are spread over five pages (Integrations hub, Connections, App connections, Google, Slack) and are hard to find and use.
+- Connector screens are spread over five pages (Integrations hub, Connections, App connections, Google, Slack) and are hard to find and use, and nothing says which of them act for one person and which for the whole workspace.
 - Most apps want an OAuth app registered against each install's own address. With self-hosted installs and hosted instances on many domains, white-label and custom domains included, that cannot be done one domain at a time.
 
 ## 2. Goal and success measures
@@ -75,7 +75,7 @@ Either returns as one catalog entry if it admits AlianHub.
 6. **Tracking covers:** an audit row for every call, connection health and status, usage counts and limits, and an admin overview.
 7. **Tools first, sync later.** Background sync into AlianHub is a later decision per connector.
 8. **Slack moves to personal OAuth.** The workspace bot token, signing secret, channel allow-list and decision 3 of task 046 are retired. *v2: through Slack's MCP server (decision 18).*
-9. **GitHub moves to personal, on demand.** Pull requests are looked up and linked when a member or their AI asks. The workspace sign-in and the background PR → task sync of task 049 are retired. *v2: through GitHub's MCP server.*
+9. **GitHub moves to personal, on demand.** Pull requests are looked up and linked when a member or their AI asks. The workspace sign-in and the background PR → task sync of task 049 are retired. *v2: through GitHub's MCP server. v2.1: the 049 sync stays as an integration (decision 31); the personal connector is added beside it.*
 10. **Google is one connection per Google account** with products ticked (Gmail, Drive, Meet, Calendar); only ticked products' scopes are asked for, more added later by incremental consent.
 11. ~~Google is the pilot.~~ *Replaced by decision 27.*
 12. **Wispr Flow: research decides.** *Settled: Wispr Flow's MCP server (meeting notes and transcripts).*
@@ -95,10 +95,29 @@ Either returns as one catalog entry if it admits AlianHub.
 23. **Custom MCP servers.** A person holding the new "Add custom apps" right (owners and admins by default) adds an MCP server by its address for the workspace; each member connects their own account to it. Every tool starts hidden until that person or an owner/admin turns it on and marks it read or write. Hosted plans may switch it on per plan; an instance admin may switch it off.
 24. **The AI chat uses connectors.** Ask is the third user of connectors, next to agents and the person's own AI. It reads only through the asker's own connections; anything it would change outside AlianHub becomes an Inbox proposal.
 25. **Naming a connector uses it.** In the AI chat, `@` offers the asker's connectors next to projects, lists, tasks, docs and people. Typing a connected app's name (for example "GitHub") adds it as a chip the asker can remove before sending. A link or reference an app owns (a pull request link, `owner/repo#123`) is read the same way.
-26. **One Connectors screen, like Claude's.** AI → Customize → Connectors: the person's connectors, a browsable list of available ones with Connect, "Add custom connector", and a detail panel per connector. It replaces the connector parts of the Integrations hub and the Connections, App connections, Google and Slack pages. Integrations that are not connectors (email to task, automations, webhooks, Zapier, the Slack slash command) stay on the Integrations page.
+26. **One Connectors screen, like Claude's.** AI → Customize → Connectors: the person's connectors, a browsable list of available ones with Connect, "Add custom connector", and a detail panel per connector. It replaces the connector parts of the Integrations hub and the Connections, Google and Slack pages. Integrations that are not connectors (email to task, automations, webhooks, Zapier, the Slack slash command) stay on the Integrations page. *v2.1: so does the GitHub sync from the App connections page (decision 32).*
 27. **The first MCP apps are Notion and GitHub.** Notion proves an app that registers itself; GitHub proves a registered app and the hosted sign-in service, and answers "what is the status of this PR?". Google, the v1 pilot, is already built and stays a built connector.
 28. **Agents choose their connectors.** An agent uses only the connectors ticked on its settings, through the connection of the person it runs for. A skill declares the connector reads it needs, as it declares an outside read today.
 29. **What is built stays built.** Google (071), Slack (074) and the Dropbox picker (076) were built on the module before v2 and were checked against the real apps. They are not rebuilt on MCP. Any of them can move to its app's MCP server later by changing its provider definition, once that server admits AlianHub and is generally available.
+
+### New in v2.1 (owner, 2026-11-13)
+
+30. **A connector and an integration are different things.** If AI does it for one person when asked, it is a connector; if it runs for the whole workspace on its own, it is an integration.
+
+    | | Connector | Integration |
+    |---|---|---|
+    | What it is | One person's own account at an outside app | One link between the workspace and an outside app |
+    | Set up by | Each member, for themselves | An owner or admin, once for everyone |
+    | Credential | That person's own, never shared | One workspace credential, or none (a feed, a webhook) |
+    | Started by | A request: the AI chat, an agent that ticks it, the person's own AI over MCP | Nothing; it runs on its own (sync, webhook, slash command, feed) |
+    | Acts for | That person, on the outside app | The workspace, inside AlianHub |
+    | Outside writes | Only after that person approves the Inbox card | None; it brings things in |
+    | Ends when | That person disconnects or leaves | An owner or admin disconnects it |
+    | Lives on | AI › Customize › Connectors | The Integrations page |
+
+    Connectors: Google, Outlook, Slack, GitHub, Notion, Supabase, HubSpot, Upwork, Wispr Flow, Canva, Dropbox (with the attachment picker) and custom MCP servers. Integrations: the GitHub pull-request sync, the Slack slash command, the calendar feed, webhooks, Zapier, Teams posts, GitLab and app panels. An app on both sides (Slack, GitHub, Google) does a different job on each, and each card says which.
+31. **GitHub keeps its workspace sync.** The automatic pull-request linking of task 049 stays as an integration: an owner or admin connects one workspace GitHub account and maps repositories to projects, and a pull request that names a task key is linked to the task and commented on, and its merge moves the task to In Review. The personal GitHub connector is added beside it for AI. Reverses the retirement in decision 9 and FR-37.
+32. **Two places, not three.** The Integrations page holds everything the workspace sets up once, the GitHub sync included; Connectors (AI › Customize) holds each person's own accounts. The App connections page and its left-bar entry go, and its content moves to the Integrations page.
 
 ## 4. Users and roles
 
@@ -225,8 +244,9 @@ Not built, and needed by v2.0:
 
 - **FR-35** Google Calendar rows move into the Google provider as one connection with Calendar ticked; existing grants keep working.
 - **FR-36** *(v2)* Slack is a built provider (task 074): each person's own Slack account through the Slack app, with user scopes and token rotation; the workspace bot is retired (migration 081). It may move to Slack's MCP server later by changing its definition (decision 29).
-- **FR-37** *(v2)* GitHub is reached through GitHub's MCP server with the caller's own connection. `pull_request.get` becomes `github.pull_request.read`; linking a pull request to a task uses it. The workspace connection, repo-to-project mapping, cron runner and their screens (task 049) are retired with a migration; admins are told before it runs.
-- **FR-38** The Slack slash command and the other `integration_connections` catalogue entries are not connectors and stay as they are, on the Integrations page.
+- **FR-37** *(v2.1)* GitHub is reached through GitHub's MCP server with the caller's own connection. `pull_request.get` becomes `github.pull_request.read`; linking a pull request to a task on request uses it. The workspace connection, repo-to-project mapping and cron runner of task 049 stay as an integration (decision 31), managed on the Integrations page (FR-38).
+- **FR-38** *(v2.1)* The Slack slash command, the GitHub sync and the other `integration_connections` catalogue entries are integrations, not connectors, and are managed on the Integrations page, owners and admins only (decision 32). The App connections page, its route and its left-bar entry go; its old address, and a GitHub sign-in that returns to it, lead to the Integrations page.
+- **FR-38a** *(v2.1)* Each page says in one line what it holds and points to the other: Integrations, "Set up once for the whole workspace"; Connectors, "Your own accounts, used by AI when you ask". An app on both sides says on each card which job it does there.
 - **FR-39** The Drive/Dropbox attachment picker uses the module: Drive through the person's Google connection with Drive ticked (`drive.file`), Dropbox through a built Dropbox picker provider. The per-person app settings go; the instance, hosted or company app is used. Existing `cloud_storage_connections` rows are migrated or the person is asked to reconnect once, and their stored client secrets are deleted.
 - **FR-40** A picker token and a file import are available only to the connection's owner, taken from their own session; no route accepts another person's id. A file attached as a link opens for others only as Google or Dropbox sharing allows; a file imported as a copy is stored like an upload and seen by whoever can see the task. Nobody can browse or pick from another person's account.
 
@@ -272,7 +292,7 @@ Not built, and needed by v2.0:
 
 ### 7.15 Connectors screen
 
-- **FR-63** One place: the AI sidebar's **Customize** entry replaces Connections and Connect your AI. It opens Customize with the tabs **Connectors** (default) and **Connect your AI**. The old Connections and App connections routes redirect to it.
+- **FR-63** One place: the AI sidebar's **Customize** entry replaces Connections and Connect your AI. It opens Customize with the tabs **Connectors** (default) and **Connect your AI**. The old Connections route redirects to it; the App connections route leads to the Integrations page (FR-38).
 - **FR-64** **Your connectors**: each connected app with logo, account label (shown to its owner only), status dot and last used. A connector that needs attention comes first, with Reconnect.
 - **FR-65** **Browse**: every available entry as a card with logo, name, one line and category; search and category filter; Connect on the card. An entry this install cannot sign in to says why to members ("Your admin needs to set up Google") and links owners and admins to its setup.
 - **FR-66** **Add custom connector** (with the right): name and address, then the sign-in step that server needs, then its tool review list (FR-52, FR-54).
@@ -312,7 +332,7 @@ New:
 - `connector_tools`: `companyId`, `provider` or `serverId`, provider tool, AlianHub name, label and description as reviewed, read or write, on/off, shape hash, reviewed by and at. Holds custom servers' tools and each workspace's review of catalog tools that are new or changed.
 - On the agent record, `connectors: [{ provider or serverId, tools[] }]`.
 
-Migrations for FR-35 to FR-37 and FR-39, each safe to run twice.
+Migrations for FR-35, FR-36 and FR-39, each safe to run twice.
 
 ## 9. API surface (sketch)
 
@@ -399,7 +419,8 @@ The two tracks of 2026-10-28 built v1.1; the v2.0 tasks keep the same split. Tra
 | 2 | B | 095 Supabase, Upwork, Wispr Flow, Dropbox files, HubSpot, Canva | — | 075, 093, 094 | Built; real-account checks and pinning open |
 | 2 | A | 096 Custom MCP servers | 52–55, 66 | 092, 100, 101 | Built; hosted plan gating open |
 | 2 | B | 098 Agents use connectors | 61, 62 | 068 | Built |
-| 2 | B | 079 Remove old Slack bot + GitHub sync paths | 38 | 074, 075 | Slack half built; GitHub half waits for 075 |
+| 2 | B | 079 Remove old Slack bot + GitHub sync paths | 38 | 074, 075 | Slack half built; GitHub half dropped (decision 31) |
+| 2 | A | 106 Integrations and Connectors: two places; App connections moves into Integrations | 37, 38, 38a, 63 | 101 | Built; browser check open |
 | 2 | A | 077 Remove old Calendar + CloudStorage paths; setup pages | — | 073, 076 | Built |
 | 3 | B | 099 Outlook built connector | — | 068, 069, 093 | Built; real-account check open |
 
@@ -444,7 +465,8 @@ Shopify and Gmail tasks are created once their decisions are made.
 - [ ] An admin sees members' connections, scopes, status and usage and can end one, but no route lets them use it.
 - [ ] Removing or deactivating a member revokes their connections at the provider and clears their secrets; the sweep catches a removal made while the provider was off.
 - [ ] A company OAuth app replaces the hosted service or instance default for that workspace only; replacing it marks its connections for reconnect.
-- [ ] Google Calendar, Slack, GitHub and the attachment picker run on the module; the old paths are gone, with migrations that are safe to run twice.
+- [ ] Google Calendar, Slack and the attachment picker run on the module; the old paths are gone, with migrations that are safe to run twice. The GitHub sync keeps working as an integration on the Integrations page.
+- [ ] Integrations and Connectors are the only two places for outside apps; each says which kind it holds, and no screen calls an integration a connector or the other way round.
 - [ ] Every entry is tested against a fake provider or fake MCP server; i18n, style and API-doc checks pass.
 
 ## 14. Open questions
@@ -463,6 +485,6 @@ Shopify and Gmail tasks are created once their decisions are made.
 - **Tool poisoning** through a custom or compromised server: reviewed descriptions only, taint, caps, no web fetch after a read, and approval for every write.
 - **Gmail for personal accounts:** until the hosted app is verified, people on personal @gmail.com addresses on the hosted instance have no Gmail connector.
 - **Picker migration:** members who used the old picker must reconnect once if their grant cannot be carried over.
-- **Losing GitHub sync:** retiring task 049's automatic PR linking is a visible change; admins are told before migration.
+- **Two GitHub jobs:** the workspace sync and the personal connector both touch pull requests; the cards must make clear which one links automatically and which one AI uses, so nobody expects one to do the other's job.
 - **Slack user tokens** reach everything the person can see in Slack; reads stay capped and tainted, and writes approved.
 - **Prompt injection** through connector content (mail, Slack, CRM notes): taint, no web fetch after a read, and approval for every write; no tool may bypass them.

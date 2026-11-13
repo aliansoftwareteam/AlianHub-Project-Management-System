@@ -40,3 +40,7 @@ The Slack half is done on branch `refactor/connectors-remove-old-paths`, after t
 ### 2026-11-12
 - Widened for PRD v2.0 of 056: takes over the task 049 retirement migration and `AppConnections.vue` from 075, which now builds GitHub on its MCP server.
 - Slack half done (above). GitHub half held back until 075's tools are pinned and on.
+
+### 2026-11-13 — GitHub half dropped
+- The owner decided to keep the task 049 GitHub sync as a workspace integration (056 decisions 31 and 32). Nothing GitHub is removed. Moving the App connections page into the Integrations page is task 106.
+- With that, 079 is its Slack half, which is built and merged.

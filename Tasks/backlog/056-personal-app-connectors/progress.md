@@ -61,5 +61,13 @@
   - Migrations: 083 agent connector ticks (098), 084 the Add custom apps right (096), 085 the legacy cutover (077).
   - Open: every MCP tool waits for its shape to be pinned with a test account (`scripts/connector-tool-shapes.js`, then its AgentActions label); the hosted sign-in service in alianhub-cloud; real-account checks; the phone and keyboard pass on the screen; usage this week; hosted plan gating of custom apps; the GitHub half of 079; `api:doc` and `version:log` in the docs PR.
 
+- 2026-11-13: Reviewing the built branch with the owner, the App connections page and the new Connectors screen looked like the same thing. PRD v2.1 tells them apart:
+  - Decision 30: a connector is one person's own account that AI uses when asked; an integration is set up once for the whole workspace and runs on its own.
+  - Decision 31 (owner): the task 049 GitHub sync stays as an integration, beside the personal GitHub connector. Reverses decision 9's retirement; 079's GitHub half is dropped.
+  - Decision 32 (owner): two places, Integrations and Connectors; the App connections page moves into Integrations. Task 106 created.
+  - Found while reviewing, fixed and not yet committed: the Customize tab bar was squeezed to 4 px, and Outlook had no catalog line or category.
+
+- 2026-11-13: Task 106 built (see its progress). The two review fixes are committed with it.
+
 ## Last step
-Every v2 task is built and merged on `feat/connectors-mcp-transport`; waiting for the owner to review it together before anything is pushed.
+Task 106 built on feat/connectors-mcp-transport: Integrations holds the GitHub sync, Connectors and Integrations point to each other. Browser check of both pages still to do; nothing pushed.

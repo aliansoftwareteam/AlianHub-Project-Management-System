@@ -61,7 +61,7 @@ Auto-maintained registry of all tasks. Reflects YAML frontmatter from each `task
 | 053 | Industry demos — the dispatcher, the Company view and workflow runs | done | high | 052 | done/053-industry-demo-agentic-layers |
 | 054 | Industry demos for every blueprint, named by industry | done | high | 053 | done/054-industry-demos-every-blueprint |
 | 055 | Create Project modal — Member, Skills, Source and Due date pickers open above the modal | active | high | — | active/055-create-project-field-popovers |
-| 056 | App connectors for AI and agents — MCP first, built connectors where needed, one Connectors screen | backlog | high | 061–079, 092–101 | backlog/056-personal-app-connectors |
+| 056 | App connectors for AI and agents — MCP first, built connectors where needed, one Connectors screen | backlog | high | 061–079, 092–101, 106 | backlog/056-personal-app-connectors |
 | 057 | Projects settings — Open, Archived and Closed tabs; every undo returns the exact previous state | active | high | — | active/057-project-lifecycle-tabs |
 | 058 | Tracker timesheet — every screenshot card shows its image box and a loading state from the first paint | active | medium | — | active/058-tracker-screenshot-loading-placeholder |
 | 059 | Agent settings page — tabs, a searchable project picker and one sticky Save bar | active | high | — | active/059-agent-settings-tabs |
@@ -95,3 +95,4 @@ Auto-maintained registry of all tasks. Reflects YAML frontmatter from each `task
 | 099 | Connectors — Outlook built connector on Microsoft Graph: mail and calendar | active | medium | 068, 069, 093 | active/099-connectors-outlook-built |
 | 100 | Connectors — sign-in for MCP apps: discovery, self-registration once per workspace, personal tokens | active | high | 066, 092 | active/100-connectors-mcp-sign-in |
 | 101 | Connectors — screen redesign: AI → Customize → Connectors, like Claude's | active | high | 072 | active/101-connectors-screen-redesign |
+| 106 | Integrations and Connectors — two places, each saying what it holds; App connections moves into Integrations | active | high | 101 | active/106-integrations-and-connectors |
