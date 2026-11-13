@@ -12,6 +12,7 @@ AlianHub is one Node.js process (the API, the real-time Socket.io server and the
 | Create the owner account and first workspace | [First run](./first-run) |
 | Put it behind HTTPS | [HTTPS and reverse proxy](./https) |
 | Set mail, storage, sign-in, AI and security options | [The Instance console](./instance-console), [Environment variables](./env-reference) |
+| Let members connect their own apps for AI | [Connectors setup](./connectors) |
 | Take and test backups | [Backup and restore](./backups) |
 | Upgrade to new releases | [Upgrades](./upgrades) |
 | Watch health and logs, fix problems | [Logs and monitoring](./monitoring), [Troubleshooting](./troubleshooting) |

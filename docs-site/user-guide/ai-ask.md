@@ -34,7 +34,7 @@ When the built-in AI is not available to you, **Ask** in the menu leads to [Conn
 ## Ask a question
 
 1. Type in the box. You can ask, plan or build.
-2. To point Ask at something specific, add a task, doc or project to the question. Type `@` and pick one, or use **Add context** in the box's menu.
+2. To point Ask at something specific, add a task, doc or project to the question. Type `@` and pick one, or use **Add context** in the box's menu. To read from one of your [connected apps](./connectors#use-a-connector-in-ask), such as GitHub or Google Calendar, pick it from **Connectors** after `@`, or name it.
 3. Press Enter. While it works it shows "Answering…"; select **Stop** to cancel.
 4. Read the answer. Ask a follow-up in the same box.
 
@@ -92,18 +92,20 @@ Only you can see your memory, admins included. It is never used for anyone else'
 
 - **Ask sees what you see.** It searches only projects you can already open, private docs that are yours, company-wide docs, and calls you took part in. "Ask never widens what you can see."
 - **Ask acts as you.** A task or doc it creates is created by you, with your permissions. It cannot do what you could not.
+- **Connected apps are yours alone.** Ask reads a connected app only when you point it there, with your own account. A change you ask for in the app waits in your **Inbox** until you approve it.
 - **Text goes to the AI model your server uses.** To answer, Ask sends your question and the passages it found to that model. If your server uses a model on its own hardware, nothing leaves it. If it uses a hosted service, that service receives the text. Ask your admin which one you use.
 - **AI off means off.** When AI is turned off, nothing is sent to any model.
 
 ## Limits
 
-- Ask answers from your workspace, not from the web.
+- Ask answers from your workspace and the apps you connected, not from the web.
 - An answer can only cite what Ask found. If nothing matches, it says so: "Nothing in the projects you can open matches that."
 - A plan can only make the kinds of change listed above, in one project per sentence.
 - Ask cannot approve anything for you, and cannot change settings, roles or permissions.
 
 ## Related
 
+- [Connectors](./connectors)
 - [Agents in AlianHub](./agents)
 - [Connect your AI app](/ai/connect)
 - [What your AI sees](/ai/what-it-sees)

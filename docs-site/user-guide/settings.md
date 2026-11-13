@@ -70,9 +70,8 @@ A few connections belong to you alone, not to the workspace:
 
 | Where | What |
 |---|---|
-| **Settings**, **Integrations** | Cloud storage for attachments: connect your own Google Drive or Dropbox to attach files from there. Nobody else can see or use your connection. |
-| **AI**, **Connections** | **My connections**: connect your own Google account. Only you can use it. |
-| **AI**, **Connect your AI** and **Accounts** | Connect Claude, ChatGPT or another AI app to AlianHub, and see or end its access. See [Connect your AI app](/ai/connect). |
+| **AI**, **Customize**, **Connectors** | Connect your own Google, Slack, Outlook, GitHub, Dropbox and other accounts, for AlianHub's AI and for attaching files from Google Drive or Dropbox. Only you can use them. See [Connectors](./connectors). |
+| **AI**, **Customize**, **Connect your AI**, and **AI**, **Accounts** | Connect Claude, ChatGPT or another AI app to AlianHub, and see or end its access. See [Connect your AI app](/ai/connect). |
 
 ## Workspace settings (owners and admins)
 
@@ -104,6 +103,7 @@ The **Instance** group (**Health**, **Settings**, **Backups**, **Upgrade**, **Lo
 
 ## Related
 
+- [Connectors](./connectors)
 - [Notifications](./notifications)
 - [People and roles](./people-and-roles)
 - [Integrations](./integrations)

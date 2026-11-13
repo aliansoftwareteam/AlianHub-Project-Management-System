@@ -12,7 +12,8 @@ The bar down the left edge holds your places. On a phone it is a bar at the bott
 | Open the planner | **Planner** |
 | Talk to my team | **Chat** |
 | Ask the built-in AI | **AI**, then **Ask** |
-| Connect my AI app | **AI**, then **Connect your AI** |
+| Connect my AI app | **AI**, then **Customize**, **Connect your AI** |
+| Connect my own Google, Slack or GitHub for AI | **AI**, then **Customize**, **Connectors** |
 | Write a document | **Docs** |
 | Log or check time | **Time** |
 | Search for anything | Press Ctrl and K (Cmd and K on a Mac) |
