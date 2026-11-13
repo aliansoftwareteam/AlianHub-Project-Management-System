@@ -96,8 +96,8 @@ describe('DesktopAppCard', () => {
         expect(stats(mountCard({ info: large }))).toEqual(['1.3 TB', 'Until deleted']);
     });
 
-    it('counts tracked users without a limit', () => {
-        expect(text(mountCard({ info: info({ seats: { used: 1, limit: null } }) }), 'desktop-app-seats')).toBe('1 tracked user');
+    it('counts no seats when the plan does not limit them', () => {
+        expect(text(mountCard({ info: info({ seats: { used: null, limit: null } }) }), 'desktop-app-seats')).toBe('Unlimited users');
     });
 
     it('falls back to the downloads this server hosts when the update feed has none', () => {

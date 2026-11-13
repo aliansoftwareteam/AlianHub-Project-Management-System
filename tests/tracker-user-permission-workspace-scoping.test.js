@@ -44,15 +44,25 @@ describe(`POST ${PATH}`, () => {
         expect(mockUpdateCompany).not.toHaveBeenCalled();
     });
 
-    it.each([[OWNER], [ADMIN]])('lets an owner or admin change tracker access, only in the header\'s workspace (%s)', async (uid) => {
-        const res = await app.call('POST', PATH, { token: tokenFor(uid), companyId: WORKSPACE, body: body() });
+    it.each([[OWNER], [ADMIN]])('lets an owner or admin give a tracker seat back, only in the header\'s workspace (%s)', async (uid) => {
+        mockDb.store[dbCollections.COMPANY_USERS].find((row) => row.userId === MEMBER).isTrackerUser = true;
+        const res = await app.call('POST', PATH, { token: tokenFor(uid), companyId: WORKSPACE, body: body({ DataObj: { ops: false, data: { status: 2, userId: MEMBER } } }) });
         expect(res.status).toBe(200);
         expect(res.body.status).toBe(true);
         expect(unnamed(mockDb.calls)).toEqual([]);
+        expect(mockDb.store[dbCollections.COMPANY_USERS].find((row) => row.userId === MEMBER).isTrackerUser).toBe(false);
         expect(mockUpdateCompany).toHaveBeenCalledTimes(1);
         expect(mockUpdateCompany.mock.calls[0][3]).toBe(WORKSPACE);
-        expect(mockUpdateMember).toHaveBeenCalledTimes(1);
-        expect(mockUpdateMember.mock.calls[0][0]).toBe(WORKSPACE);
+        expect(mockUpdateCompany.mock.calls[0][1].data[1]).toEqual({ $set: { trackerUsers: 0 } });
+    });
+
+    it.each([[OWNER], [ADMIN]])('no longer grants access per member: it points an owner or admin to the role (%s)', async (uid) => {
+        const res = await app.call('POST', PATH, { token: tokenFor(uid), companyId: WORKSPACE, body: body() });
+        expect(res.status).toBe(200);
+        expect(res.body.status).toBe(false);
+        expect(res.body.message).toMatch(/Security & Permissions/);
+        expect(mockUpdateCompany).not.toHaveBeenCalled();
+        expect(mockDb.store[dbCollections.COMPANY_USERS].find((row) => row.userId === MEMBER).isTrackerUser).toBeUndefined();
     });
 
     it.each([[MEMBER, 'a member'], [GUEST, 'a guest']])('refuses %s with 403, and changes nothing', async (uid) => {

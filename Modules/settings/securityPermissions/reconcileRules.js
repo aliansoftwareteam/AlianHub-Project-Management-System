@@ -17,6 +17,8 @@ const SENTINEL_KEYS = [
     'ai_skill_risk',
     'ai_connectors',
     'ai_external_clients',
+    'time_tracking',
+    'desktop_tracker',
 ];
 
 function findMissingSentinels(rules) {

@@ -1,3 +1,4 @@
+jest.mock('../Modules/DesktopTracker/trackerSeats', () => ({ ...jest.requireActual('../Modules/DesktopTracker/trackerSeats'), trackerAccessFor: async () => ({ allowed: true }) }));
 const verified = require('./fixtures/verifiedRequest');
 process.env.STORAGE_TYPE = process.env.STORAGE_TYPE || 'server';
 

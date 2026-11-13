@@ -5,7 +5,10 @@
             <p class="ah-small">{{ $t('Plan.tracker_addon_body') }}</p>
             <a v-if="portalUrl && privileged" :href="portalUrl" target="_blank" rel="noopener" class="ah-btn ah-btn--primary ah-btn--sm">{{ $t('Plan.tracker_addon_action') }}</a>
         </div>
-        <DesktopAppCard v-else :info="desktopApp" :loading="cardLoading" :local-downloads="localDownloads" />
+        <template v-else>
+            <DesktopAppCard :info="desktopApp" :loading="cardLoading" :local-downloads="localDownloads" />
+            <TrackerSeatsCard v-if="seatHolders" :seats="desktopApp.seats" @released="loadDesktopApp" />
+        </template>
     </div>
 </template>
 
@@ -13,6 +16,7 @@
 import { onMounted, ref, computed, inject } from "vue";
 import { useStore } from "vuex";
 import DesktopAppCard from "./DesktopAppCard.vue";
+import TrackerSeatsCard from "./TrackerSeatsCard.vue";
 import { apiRequest } from "@/services";
 import * as env from "@/config/env";
 import { isManagedHosting, publicConfig } from "@/config/publicConfig";
@@ -42,11 +46,18 @@ const localDownloads = computed(() => builds.value
         note: build.description || "",
     })));
 
+const seatHolders = computed(() => {
+    const seats = desktopApp.value && desktopApp.value.enabled ? desktopApp.value.seats : null;
+    return Boolean(seats && seats.limit && Array.isArray(seats.holders));
+});
+
+const loadDesktopApp = () => apiRequest("get", env.TRACKER_DESKTOP_APP)
+    .then((res) => { desktopApp.value = res && res.data && res.data.status ? res.data.data : null; })
+    .catch((error) => console.error("ERROR in loading the desktop tracker card: ", error))
+    .finally(() => { desktopLoading.value = false; });
+
 onMounted(() => {
-    apiRequest("get", env.TRACKER_DESKTOP_APP)
-        .then((res) => { desktopApp.value = res && res.data && res.data.status ? res.data.data : null; })
-        .catch((error) => console.error("ERROR in loading the desktop tracker card: ", error))
-        .finally(() => { desktopLoading.value = false; });
+    loadDesktopApp();
 
     const cached = getters["settings/TimeTracker"];
     if (cached && cached.length) {

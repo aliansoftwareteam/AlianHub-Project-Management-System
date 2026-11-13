@@ -158,10 +158,10 @@ const downloadLabel = (download) => {
 };
 
 const seatsText = computed(() => {
-    const seats = (props.info && props.info.seats) || { used: 0, limit: null };
+    const seats = (props.info && props.info.seats) || { used: null, limit: null };
     return seats.limit
         ? t("TimeTracker.desktop_seats", { used: seats.used, limit: seats.limit })
-        : t("TimeTracker.desktop_seats_unlimited", { used: seats.used }, seats.used);
+        : t("TimeTracker.desktop_seats_any");
 });
 
 const TB = 1024 * 1024 * 1024 * 1024;

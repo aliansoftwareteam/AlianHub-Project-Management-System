@@ -25,6 +25,11 @@ jest.mock('../Modules/LogTime/controllerV2/helpers', () => ({
     updateProjectForTimelog: (...a) => mockProjectTime(...a),
     updateRemainingTime: (...a) => mockRemaining(...a),
 }));
+const mockTrackerAccess = jest.fn();
+jest.mock('../Modules/DesktopTracker/trackerSeats', () => ({
+    ...jest.requireActual('../Modules/DesktopTracker/trackerSeats'),
+    trackerAccessFor: (...a) => mockTrackerAccess(...a),
+}));
 
 const logger = require('../Config/loggerConfig');
 const { SCHEMA_TYPE } = require('../Config/schemaType');
@@ -82,8 +87,8 @@ beforeEach(() => {
     jest.spyOn(fs, 'unlink').mockImplementation((p, cb) => cb(null));
     mockUpload.mockResolvedValue(['stored-v1.png']);
     mockUploadFromDisk.mockResolvedValue(['stored.png']);
+    mockTrackerAccess.mockResolvedValue({ allowed: true });
     mockCrud.mockImplementation(async (companyId, { type }, method) => {
-        if (type === SCHEMA_TYPE.COMPANY_USERS) return { isTrackerUser: 1 };
         if (method === 'findOne') return sheet();
         return { acknowledged: true };
     });
@@ -291,34 +296,28 @@ describe.each(['captureTimetracker2', 'captureTimetracker3'])('%s upload source'
 });
 
 describe('captureTimetracker3 tracker users', () => {
-    it('asks whether the logged user is a tracker user in the caller company', async () => {
+    it('asks whether the logged user may track in the caller company, without taking a seat', async () => {
         await call('captureTimetracker3');
-        const lookup = mockCrud.mock.calls.find(([, { type }]) => type === SCHEMA_TYPE.COMPANY_USERS);
-        expect(lookup[0]).toBe(C);
-        expect(lookup[1].data).toEqual([{ userId: ME }, { isTrackerUser: 1, _id: 0 }]);
-        expect(lookup[2]).toBe('findOne');
+        expect(mockTrackerAccess).toHaveBeenCalledWith(C, ME);
     });
 
-    it('refuses a user who is not a tracker user and writes nothing', async () => {
-        mockCrud.mockImplementation(async (companyId, { type }) => (type === SCHEMA_TYPE.COMPANY_USERS ? { isTrackerUser: 0 } : sheet()));
+    it('refuses a user whose role does not allow the tracker and writes nothing', async () => {
+        mockTrackerAccess.mockResolvedValue({ allowed: false, refusal: { code: 'tracker_role' } });
         const r = await call('captureTimetracker3');
-        expect(r.body).toEqual({ status: false, isPermissionDenied: true, message: 'Permisson Denied' });
+        expect(r.body).toMatchObject({ status: false, isPermissionDenied: true, code: 'tracker_role' });
         expect(updateCalls()).toHaveLength(0);
         expect(mockProjectTime).not.toHaveBeenCalled();
     });
 
-    it('answers a failure and writes nothing when the user is not in the company at all', async () => {
-        mockCrud.mockImplementation(async (companyId, { type }) => (type === SCHEMA_TYPE.COMPANY_USERS ? null : sheet()));
+    it('refuses a user when the plan has no free tracker seat and writes nothing', async () => {
+        mockTrackerAccess.mockResolvedValue({ allowed: false, refusal: { ok: false, code: 'tracker_seat_limit', limit: 3, used: 3 } });
         const r = await call('captureTimetracker3');
-        expect(r.body.status).toBe(false);
+        expect(r.body).toMatchObject({ status: false, isPermissionDenied: true, code: 'tracker_seat_limit' });
         expect(updateCalls()).toHaveLength(0);
     });
 
-    it('answers the lookup error message when the user lookup fails', async () => {
-        mockCrud.mockImplementation(async (companyId, { type }) => {
-            if (type === SCHEMA_TYPE.COMPANY_USERS) throw new Error('lookup failed');
-            return sheet();
-        });
+    it('answers the lookup error message when the access check fails', async () => {
+        mockTrackerAccess.mockRejectedValue(new Error('lookup failed'));
         const r = await call('captureTimetracker3');
         expect(r.body).toEqual({ status: false, message: 'lookup failed' });
     });
