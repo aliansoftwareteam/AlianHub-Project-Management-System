@@ -15,7 +15,7 @@ export const seed = (() => {
 export const SEEDED_KEYS = Object.values(seed).filter(Array.isArray).flat().map((rule) => rule.key);
 
 // The parentId each forEach in importCompanyRules gives its array.
-export const CHILDREN_OF = { project: 'subProjectRules', task: 'taskRules', settings: 'settingRules', sheet_settings: 'sheet_settings', artificial_intelligence: 'aiRules', chat: 'chat_settings' };
+export const CHILDREN_OF = { project: 'subProjectRules', task: 'taskRules', settings: 'settingRules', sheet_settings: 'sheet_settings', artificial_intelligence: 'aiRules', chat: 'chat_settings', time_tracking: 'timeTrackingRules' };
 
 export const seededBody = () => seed.rules.flatMap((parent) => [
     { ...parent, _id: parent.key, roles: [] },

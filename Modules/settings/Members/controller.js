@@ -18,6 +18,7 @@ const logger = require('../../../Config/loggerConfig');
 const { releaseMemberSeat } = require('../../Company/helpers/companyCounters');
 const { acceptanceRefusal } = require('../../Entitlements/guards');
 const { answerRefusal } = require('../../Entitlements/answers');
+const { trackerAccessFor, releaseSeatsLater } = require('../../DesktopTracker/trackerSeats');
 
 const OBJECT_ID_PATTERN = /^[a-f0-9]{24}$/i;
 const ACTIVE = 2;
@@ -112,6 +113,13 @@ exports.getMembers = async (req, res) => {
     }
 }
 
+/* The desktop tracker reads isTrackerUser on its person's own row as "may track now", which the role and the plan's seats decide. */
+const withOwnTrackerAccess = async (companyId, uid, row) => {
+    if (!row || typeof row !== 'object' || String(row.userId || '') !== String(uid || '')) return row;
+    const access = await trackerAccessFor(companyId, uid).catch(() => ({ allowed: false }));
+    return { ...row, isTrackerUser: access.allowed };
+};
+
 exports.getMembersById = async (req, res) => {
     try {
         const companyId = req.headers['companyid'];
@@ -124,13 +132,13 @@ exports.getMembersById = async (req, res) => {
                 'FromCache': 'true',
                 'cacheExpireTime': myCache.getTtl(cacheKey)
             });
-            return res.status(200).json(wanted.view(member));
+            return res.status(200).json(await withOwnTrackerAccess(companyId, req.uid, wanted.view(member)));
         }
         const response = await MongoDbCrudOpration(companyId, {
             type: SCHEMA_TYPE.COMPANY_USERS,
             data: [wanted.filter]
         }, 'findOne');
-        return res.status(200).json(wanted.view(response));
+        return res.status(200).json(await withOwnTrackerAccess(companyId, req.uid, wanted.view(response)));
     } catch (error) {
         return res.status(500).json({
             message: "An error occurred while get the company user",
@@ -385,6 +393,7 @@ exports.updateMember = async (req, res) => {
         if (MEMBERSHIP_FIELDS.some((field) => Object.prototype.hasOwnProperty.call(data, field))) {
             forgetMembership(companyId, subject.userId);
         }
+        if (Object.prototype.hasOwnProperty.call(data, 'roleType') && response.isTrackerUser === true) releaseSeatsLater(companyId);
         socketEmitter.emit('update', {
             type: 'update',
             data: { data: memberRowFor(COLLEAGUE)(response) },

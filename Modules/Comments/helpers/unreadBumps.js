@@ -15,8 +15,12 @@ const findById = (companyId, type, id, fields) => MongoDbCrudOpration(companyId,
     data: [{ _id: new mongoose.Types.ObjectId(String(id)) }, fields],
 }, 'findOne');
 
-const spaceOf = async (companyId, projectId) => (await findById(companyId, SCHEMA_TYPE.PROJECTS, projectId, { watchers: 1 }))
-    || findById(companyId, SCHEMA_TYPE.MAIN_CHATS, projectId, { _id: 1 });
+const spaceOf = async (companyId, projectId) => {
+    const project = await findById(companyId, SCHEMA_TYPE.PROJECTS, projectId, { watchers: 1 });
+    if (project) return project;
+    const chatSpace = await findById(companyId, SCHEMA_TYPE.MAIN_CHATS, projectId, { _id: 1 });
+    return chatSpace ? { ...chatSpace, chatSpace: true } : null;
+};
 
 const companyMemberIds = async (companyId) => idsOf((await MongoDbCrudOpration(companyId, {
     type: SCHEMA_TYPE.COMPANY_USERS,
@@ -29,10 +33,14 @@ const companyMemberIds = async (companyId) => idsOf((await MongoDbCrudOpration(c
 const participantsOf = async (companyId, thread, space) => {
     if (thread.taskId === 'default') {
         const channel = isId(thread.sprintId)
-            ? await findById(companyId, SCHEMA_TYPE.SPRINTS, thread.sprintId, { private: 1, AssigneeUserId: 1 })
+            ? await findById(companyId, SCHEMA_TYPE.SPRINTS, thread.sprintId, { private: 1, AssigneeUserId: 1, name: 1 })
             : null;
         if (!channel) return null;
-        return { userIds: channel.private ? idsOf(channel.AssigneeUserId) : await companyMemberIds(companyId), closed: channel.private === true };
+        return {
+            userIds: channel.private ? idsOf(channel.AssigneeUserId) : await companyMemberIds(companyId),
+            closed: channel.private === true,
+            channelName: channel.name || '',
+        };
     }
     if (isId(thread.taskId)) {
         const task = await findById(companyId, SCHEMA_TYPE.TASKS, thread.taskId, { watchers: 1, AssigneeUserId: 1, mainChat: 1, ParentTaskId: 1 });
@@ -54,13 +62,14 @@ const threadCountFields = (thread, parentTaskId) => (thread.taskId
     ? { key: 2, sprintId: thread.sprintId, taskId: thread.taskId, ...(parentTaskId ? { parentTaskId: String(parentTaskId) } : {}) }
     : { key: 1 });
 
+/* Resolves with the people whose thread count rose, so a chat message can be announced to exactly them. */
 const bumpUnreadCounts = async (companyId, comment, mentionIds = []) => {
     const thread = threadOf(comment);
-    if (!isId(thread.projectId)) return;
+    if (!isId(thread.projectId)) return null;
     const space = await spaceOf(companyId, thread.projectId);
-    if (!space) return;
+    if (!space) return null;
     const participants = await participantsOf(companyId, thread, space);
-    if (!participants) return;
+    if (!participants) return null;
 
     const mentioned = idsOf(mentionIds).filter((uid) => uid !== String(comment.userId));
     const prefs = space.watchers && typeof space.watchers === 'object' && !Array.isArray(space.watchers) ? space.watchers : {};
@@ -76,6 +85,7 @@ const bumpUnreadCounts = async (companyId, comment, mentionIds = []) => {
         writes.push(updateUnReadCommentsCountFun({ body: { companyId, key: 4, userIds: mentioned, readAll: false } }));
     }
     await Promise.all(writes);
+    return { userIds, chatSpace: space.chatSpace === true, channelName: participants.channelName || '' };
 };
 
 module.exports = { bumpUnreadCounts };

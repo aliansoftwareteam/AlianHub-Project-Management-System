@@ -121,6 +121,18 @@ const findRoomsByPrefixes = (...prefixes) => {
     return out;
 };
 
+/* A hidden tab keeps the rooms that are its person's own, so counts and chat notices still reach it, and leaves
+ * every list, board and thread room until it is shown again. */
+const PERSONAL_ROOM_PREFIXES = ['userIdNotification_'];
+const keepPersonalRoomsOnly = (socket) => {
+    [...socket.rooms].forEach((roomName) => {
+        if (roomName === socket.id || PERSONAL_ROOM_PREFIXES.some((prefix) => roomName.startsWith(prefix))) return;
+        removeRoom(roomName);
+        socket.leave(roomName);
+    });
+};
+
+exports.keepPersonalRoomsOnly = keepPersonalRoomsOnly;
 exports.upsertRoom = upsertRoom;
 exports.removeRoom = removeRoom;
 exports.removeBySocket = removeBySocket;

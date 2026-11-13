@@ -26,6 +26,7 @@ const { handleFileUploadForTrackerSS,handleuploadMainFileForbase64Thumbnail } = 
  */
 const { updateProjectForTimelog, updateRemainingTime } = require('./helpers');
 const { pinSessionTenant } = require('../../../Config/tenant');
+const { trackerAccessFor, answerTrackerRefusal } = require('../../DesktopTracker/trackerSeats');
 exports.captureTimetracker = (req, res) => {
     try {
         const companyId = pinSessionTenant(req, res);
@@ -418,20 +419,8 @@ exports.captureTimetracker3 = (req, res) => {
                 }
                 MongoDbCrudOpration(companyId, objGet, "findOne")
                     .then((response) => {
-                        let object = {
-                            type: SCHEMA_TYPE.COMPANY_USERS,
-                            data: [
-                                {
-                                    userId: response.Loggeduser
-                                },
-                                {
-                                    isTrackerUser: 1,
-                                    _id: 0
-                                }
-                            ]
-                        }
-                        MongoDbCrudOpration(companyId, object,"findOne").then((cUser)=>{
-                            if (cUser.isTrackerUser) {    
+                        trackerAccessFor(companyId, response.Loggeduser).then((access)=>{
+                            if (access.allowed) {
                                 const utcDateTime = DateTime.utc();
                                 const timeStamp = Math.floor(utcDateTime.toSeconds());
                                 const calculateDuration = (startTimestamp, endTimestamp) => {
@@ -477,11 +466,7 @@ exports.captureTimetracker3 = (req, res) => {
                                     res.send({ status: false, message: err.message })
                                 })
                             } else {
-                                res.send({
-                                    status: false,
-                                    isPermissionDenied: true,
-                                    message: 'Permisson Denied'
-                                })
+                                answerTrackerRefusal(res, access.refusal);
                             }
                         }).catch((error)=>{
                             res.send({

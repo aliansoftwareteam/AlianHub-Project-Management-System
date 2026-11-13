@@ -6,6 +6,7 @@ jest.mock('../utils/data', () => ({ importUserNotifications: jest.fn(async () =>
 jest.mock('../Config/permissionGuard', () => ({ getRoleType: jest.fn(), isPrivileged: (roleType) => roleType === 1 || roleType === 2, evaluatePermission: jest.fn(), isWritable: (permission) => permission === true }));
 jest.mock('../Modules/Company/controller/updateCompany', () => ({ updateCompanyFun: jest.fn() }));
 jest.mock('../Modules/settings/Members/controller', () => ({ updateMemberFunction: jest.fn() }));
+jest.mock('../Modules/DesktopTracker/trackerSeats', () => ({ releaseTrackerSeat: jest.fn(async () => undefined) }));
 jest.mock('../Modules/Users/controller', () => ({ updateUserFun: jest.fn(), getUserByQueyFun: jest.fn() }));
 jest.mock('../Modules/Auth/controller', () => ({ addAndRemoveUserInMongodbNotificationCount: jest.fn(), insertAuthFun: jest.fn() }));
 jest.mock('../Modules/Auth/controller/sendVerificationMail', () => ({ storeVerificationToken: jest.fn(async () => 'token'), mailVerificationLink: jest.fn(async () => undefined) }));
@@ -272,35 +273,38 @@ describe('invitationPreview', () => {
 });
 
 describe('manageTrackerUserPermission', () => {
-    const body = { CompanyId: OTHER_COMPANY, DataObj: { userId: OTHER_USER } };
+    const { releaseTrackerSeat } = require('../Modules/DesktopTracker/trackerSeats');
+    const body = { CompanyId: OTHER_COMPANY, DataObj: { ops: false, data: { userId: OTHER_USER } } };
+
+    beforeEach(() => releaseTrackerSeat.mockClear());
 
     it('refuses a member', async () => {
         getRoleType.mockResolvedValue(3);
-        const spy = jest.spyOn(trackerPermission, 'updateTrackerUsersAndUser').mockResolvedValue({ status: true });
         const res = response();
         trackerPermission.handleTrackerUserPermission(request({ body }), res);
         await settle();
         expect(res.statusCode).toBe(403);
-        expect(spy).not.toHaveBeenCalled();
+        expect(releaseTrackerSeat).not.toHaveBeenCalled();
     });
 
     it('refuses a body naming another company', async () => {
         getRoleType.mockResolvedValue(2);
-        const spy = jest.spyOn(trackerPermission, 'updateTrackerUsersAndUser').mockResolvedValue({ status: true });
         const res = response();
         trackerPermission.handleTrackerUserPermission(request({ body }), res);
         await settle();
         expect(res.statusCode).toBe(403);
-        expect(spy).not.toHaveBeenCalled();
+        expect(releaseTrackerSeat).not.toHaveBeenCalled();
     });
 
-    it('lets an admin change the session company', async () => {
+    it('lets an admin give back a seat in the session company', async () => {
         getRoleType.mockResolvedValue(2);
-        const spy = jest.spyOn(trackerPermission, 'updateTrackerUsersAndUser').mockResolvedValue({ status: true });
+        MongoDbCrudOpration.mockResolvedValueOnce({ _id: MEMBER_ROW });
         const res = response();
         trackerPermission.handleTrackerUserPermission(request({ body: { DataObj: body.DataObj } }), res);
         await settle();
         expect(getRoleType).toHaveBeenCalledWith(COMPANY, USER);
-        expect(spy).toHaveBeenCalledWith(body.DataObj, COMPANY);
+        expect(MongoDbCrudOpration.mock.calls[0][0]).toBe(COMPANY);
+        expect(releaseTrackerSeat).toHaveBeenCalledWith(COMPANY, OTHER_USER);
+        expect(res.body).toMatchObject({ status: true });
     });
 });

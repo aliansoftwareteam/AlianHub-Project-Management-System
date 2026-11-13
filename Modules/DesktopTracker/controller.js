@@ -7,6 +7,8 @@ const { tenantOf } = require('../../Config/tenant');
 const { MongoDbCrudOpration } = require('../../utils/mongo-handler/mongoQueries');
 const retention = require('../ScreenshotRetention/helper');
 const { trackerAccess, trackerOnInstance } = require('./access');
+const { seatHolderIds } = require('./trackerSeats');
+const { getRoleType, isPrivileged } = require('../../Config/permissionGuard');
 const { latestRelease } = require('./feed');
 const { buildHandshake, readProductName, minTrackerVersion, isManaged, canonicalUrl } = require('./handshake');
 const { portalUrl } = require('../../Config/hostingMode');
@@ -36,13 +38,23 @@ exports.handshake = async (req, res) => {
     }
 };
 
-const desktopAppView = ({ company, access, release, policy, managed, portalUrl }) => {
+const NO_SEATS = Object.freeze({ used: null, limit: null });
+
+/* Seats are counted only on a plan that limits them; owners and admins also see who holds one. */
+const seatsOf = async (companyId, uid, company, access) => {
+    if (!access.enabled || access.seatLimit === null) return NO_SEATS;
+    const seats = { used: Math.max(Number(company.trackerUsers) || 0, 0), limit: access.seatLimit };
+    if (!isPrivileged(await getRoleType(companyId, uid))) return seats;
+    return { ...seats, holders: await seatHolderIds(companyId) };
+};
+
+const desktopAppView = ({ company, access, seats = NO_SEATS, release, policy, managed, portalUrl }) => {
     const sizeMb = company.trackshotSize == null ? NaN : Number(company.trackshotSize);
     return {
         enabled: access.enabled,
         managed,
         portalUrl: managed && portalUrl ? portalUrl : null,
-        seats: { used: Math.max(Number(company.trackerUsers) || 0, 0), limit: access.seatLimit },
+        seats,
         release: access.enabled ? release : null,
         screenshots: {
             bytes: Number.isFinite(sizeMb) ? Math.round(sizeMb * BYTES_PER_MB) : null,
@@ -71,8 +83,11 @@ exports.desktopApp = async (req, res) => {
         ]);
         const row = company || {};
         const access = trackerAccess(row.planFeature);
-        const release = access.enabled ? await latestRelease({ channel: 'stable' }) : null;
-        const data = desktopAppView({ company: row, access, release, policy, managed: isManaged(), portalUrl: portalUrl() });
+        const [release, seats] = await Promise.all([
+            access.enabled ? latestRelease({ channel: 'stable' }) : null,
+            seatsOf(companyId, req.uid, row, access),
+        ]);
+        const data = desktopAppView({ company: row, access, seats, release, policy, managed: isManaged(), portalUrl: portalUrl() });
         return res.send({ status: true, statusText: 'Desktop tracker.', data });
     } catch (error) {
         logger.error(`desktop tracker card failed companyId=${companyId}: ${error.message}`);
