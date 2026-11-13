@@ -1,12 +1,13 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { config, flushPromises, mount } from '@vue/test-utils';
+import { reactive } from 'vue';
 
-const { apiRequest, route } = vi.hoisted(() => ({ apiRequest: vi.fn(), route: { query: {}, params: { cid: 'c1' } } }));
+const { apiRequest, holder } = vi.hoisted(() => ({ apiRequest: vi.fn(), holder: { route: { query: {}, params: { cid: 'c1' } } } }));
 
 vi.mock('@/services', () => ({ apiRequest }));
 vi.mock('@/composable', () => ({ useGetterFunctions: () => ({ getUser: () => ({}) }) }));
 vi.mock('@/utils/iconMask', () => ({ maskOf: () => ({}) }));
-vi.mock('vue-router', async (importOriginal) => ({ ...(await importOriginal()), useRoute: () => route, useRouter: () => ({ replace: vi.fn() }) }));
+vi.mock('vue-router', async (importOriginal) => ({ ...(await importOriginal()), useRoute: () => holder.route, useRouter: () => ({ replace: vi.fn() }) }));
 
 import IntegrationsHub from '@/views/Integrations/IntegrationsHub.vue';
 import en from '@/locales/en.js';
@@ -20,7 +21,7 @@ const CATALOGUE = [
 ];
 
 const open = async ({ query = {}, connectors } = {}) => {
-    route.query = query;
+    holder.route = reactive({ query, params: { cid: 'c1' } });
     apiRequest.mockImplementation((method, url) => Promise.resolve({
         data: url.endsWith('/catalog') ? { status: true, data: CATALOGUE, ...(connectors ? { connectors } : {}) } : { status: true, data: [] },
     }));
@@ -46,6 +47,13 @@ describe('GitHub on the Integrations screen', () => {
 
     it('opens on the GitHub section when a GitHub sign-in comes back, so it can finish', async () => {
         const wrapper = await open({ query: { github: 'complete', state: 's', code: 'c' } });
+        expect(wrapper.find('[data-test="github-section"]').exists()).toBe(true);
+    });
+
+    it('follows a section named while the page is already open', async () => {
+        const wrapper = await open();
+        holder.route.query = { section: 'github' };
+        await flushPromises();
         expect(wrapper.find('[data-test="github-section"]').exists()).toBe(true);
     });
 

@@ -315,7 +315,7 @@ export default { name: 'IntegrationsHub' };
 </script>
 
 <script setup>
-import { ref, reactive, computed, onMounted, inject } from 'vue';
+import { ref, reactive, computed, onMounted, inject, watch } from 'vue';
 import { useI18n } from 'vue-i18n';
 import { useRoute } from 'vue-router';
 import { apiRequest } from '@/services';
@@ -345,8 +345,10 @@ const cats = [
     { key: 'apps', icon: '🪟', soon: false },
 ];
 // A link (the old App connections address, a project's GitHub card) and a GitHub sign-in coming back name the section to open.
-const asked = useRoute()?.query || {};
-const active = ref(asked.github ? 'github' : (cats.some((c) => c.key === asked.section) ? String(asked.section) : 'emailToTask'));
+const route = useRoute();
+const sectionOf = (query = {}) => (query.github ? 'github' : (cats.some((c) => c.key === query.section) ? String(query.section) : ''));
+const active = ref(sectionOf(route?.query) || 'emailToTask');
+watch(() => route?.query, (query) => { const asked = sectionOf(query); if (asked) active.value = asked; });
 const activeCat = computed(() => cats.find((c) => c.key === active.value) || cats[0]);
 
 const projects = ref([]);
