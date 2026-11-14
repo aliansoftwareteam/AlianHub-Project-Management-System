@@ -16,6 +16,23 @@ from [Conventional Commits](https://www.conventionalcommits.org/) on `main`.
 
 ---
 
+## [14.44.1](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/compare/v14.44.0...v14.44.1) (2026-11-14)
+
+
+### 🐛 Bug Fixes
+
+* **ci:** trigger Docker build after release-please auto-publishes a release ([bd10143](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/bd10143076422fa924435ad90d6edb5b0cc65bc0))
+* **ci:** trigger Docker build after release-please auto-publishes a release ([6a06ad9](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/6a06ad9e94064216970befa4b486fab650732aec))
+* **ci:** unset empty CSC_LINK/CSC_KEY_PASSWORD before packaging the tracker ([6aec001](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/6aec00155b0aa5a937822f664d7da39f6de7b9d5))
+* **deps:** bump mongoose to 8.24.9 for CVE-2026-125120 ([6d4daf9](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/6d4daf9a0f5f5e64f70154c1c5c7bdbb6933d0b4))
+* **deps:** bump mongoose to 8.24.9 for CVE-2026-125120 ([97608c4](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/97608c4f2de1bd260fcaec094469ae2ec28148bc))
+
+
+### 📘 Documentation
+
+* **tasks:** record the tracker CI fix and beta.2 release for task 091 ([93e080d](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/93e080d1daf852340c571115b3f54d6e84e2120a))
+* **tasks:** record the tracker CI fix and beta.2 release for task 091 ([4320456](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/4320456b599c6bf0c31f44eeb0e61cc02c442b80))
+
 ## [14.44.0](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/compare/v14.43.0...v14.44.0) (2026-11-14)
 
 
