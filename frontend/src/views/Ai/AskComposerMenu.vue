@@ -19,9 +19,10 @@
                 <span v-if="kind === 'mention'" class="ah-chip ah-chip--sm">{{ $t(KIND_LABELS[item.kind]) }}</span>
                 <span class="ask-menu__title">{{ item.title }}</span>
                 <span v-if="item.sub" class="ask-menu__sub">{{ item.sub }}</span>
+                <span v-if="item.kind === 'connector' && !item.connected" class="ask-menu__connect" data-test="ask-menu-connect">{{ $t('Ask.connector_connect') }}</span>
             </li>
         </ul>
-        <p v-if="!items.length" class="ask-menu__empty">{{ emptyText }}</p>
+        <p v-if="!items.length || short" class="ask-menu__empty">{{ emptyText }}</p>
     </div>
 </template>
 
@@ -41,7 +42,7 @@ const props = defineProps({
 });
 defineEmits(["pick", "hover"]);
 
-const KIND_LABELS = Object.freeze({ task: "Ask.kind_task", page: "Ask.kind_page", project: "Ask.kind_project" });
+const KIND_LABELS = Object.freeze({ task: "Ask.kind_task", page: "Ask.kind_page", project: "Ask.kind_project", connector: "Ask.kind_connector" });
 
 const { t } = useI18n();
 
@@ -61,4 +62,5 @@ const emptyText = computed(() => {
 .ask-menu__title { font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
 .ask-menu__sub { flex: 1; min-width: 0; color: var(--ink-2); font: var(--text-small); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .ask-menu__empty { margin: 0; padding: 4px; color: var(--ink-2); font: var(--text-small); }
+.ask-menu__connect { margin-left: auto; color: var(--brand); font: var(--text-small); font-weight: 600; white-space: nowrap; }
 </style>

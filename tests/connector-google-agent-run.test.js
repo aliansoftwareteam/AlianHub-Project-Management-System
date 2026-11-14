@@ -53,7 +53,7 @@ const WRITES = [
     ['google.meet.spaces.create', { accessType: 'TRUSTED' }, (fake) => fake.state.spaces.length === 2],
 ];
 
-const agent = (autonomy) => ({ _id: AGENT_ID, name: 'Digest', autonomy, allowedActions: [], projectIds: ['p1'], account: 'workspace', spendCapUsd: 10 });
+const agent = (autonomy) => ({ _id: AGENT_ID, name: 'Digest', autonomy, allowedActions: [], connectors: [{ provider: 'google', tools: WRITES.map(([key]) => key) }], projectIds: ['p1'], account: 'workspace', spendCapUsd: 10 });
 const actor = { kind: 'agent', userId: OWNER, agentId: AGENT_ID, agentName: 'Digest', runId: null, viaAccount: 'workspace', tokenId: null };
 const proposalRows = () => mockDb.store[SCHEMA_TYPE.AGENT_PROPOSALS] || [];
 

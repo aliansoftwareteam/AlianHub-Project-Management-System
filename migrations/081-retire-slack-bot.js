@@ -15,8 +15,8 @@ const slack = require('../Modules/Connectors/providers/slack');
 const ID = '081-retire-slack-bot';
 const ACTOR = Object.freeze({ id: 'system' });
 const POST = 'slack.message.post';
-const RETIRED = 'The Slack workspace bot was retired. Connect Slack on My connections and ask again.';
-const NOTICE = 'The Slack workspace bot was retired. Each person now connects their own Slack on My connections. Uninstall the old bot app in Slack.';
+const RETIRED = 'The Slack workspace bot was retired. Connect Slack on Connectors and ask again.';
+const NOTICE = 'The Slack workspace bot was retired. Each person now connects their own Slack under AI › Customize › Connectors. Uninstall the old bot app in Slack.';
 const NOTICE_SCOPE = 'connectors';
 
 const botRows = (ctx, companyId) => ctx.company(companyId, {

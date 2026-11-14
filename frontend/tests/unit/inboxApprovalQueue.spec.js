@@ -254,11 +254,14 @@ describe('a row of the approval queue', () => {
         expect(rowOf('p1').find('[data-test="queue-permanent"]').exists()).toBe(true);
     });
 
-    it('shows a Slack message with its channel and exact text', () => {
-        const slack = { action: 'slack.message.post', params: { channelName: 'launch', channelId: 'C1', text: 'We ship on Friday' }, label: 'Post to #launch', reversible: false };
+    it('shows a Slack message once, on its connector card, with its channel and exact text', () => {
+        const card = { provider: 'slack', tool: 'slack.message.post', label: 'Connectors.tool.slackMessagePost', target: '#launch', title: '', text: 'We ship on Friday', attachments: [], fields: [{ param: 'text', label: 'Connectors.card.text', long: true }] };
+        const slack = { action: 'slack.message.post', params: { channel: 'launch', text: 'We ship on Friday', connectionId: 'c1' }, label: '#launch', reversible: false, card };
         mountQueue([row('p1', { changes: [slack] })]);
-        expect(rowOf('p1').find('[data-test="slack-post-channel"]').text()).toContain('launch');
-        expect(rowOf('p1').find('[data-test="slack-post-text"]').text()).toBe('We ship on Friday');
+        expect(rowOf('p1').findAll('[data-test="connector-card"]')).toHaveLength(1);
+        expect(rowOf('p1').find('[data-test="connector-card-target"]').text()).toBe('#launch');
+        expect(rowOf('p1').find('[data-test="connector-card-text"]').text()).toBe('We ship on Friday');
+        expect(rowOf('p1').find('[data-test="slack-post"]').exists()).toBe(false);
     });
 
     it('is locked, with nothing to press, when it needs an owner or admin', () => {

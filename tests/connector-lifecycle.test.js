@@ -234,38 +234,6 @@ describe('connecting through the generic lifecycle', () => {
     });
 });
 
-describe('the generic google callback coexists with the legacy one (until 073)', () => {
-    // A state the generic lifecycle did not sign: the legacy google connector uses a different audience.
-    const legacyState = () => require('jsonwebtoken').sign(
-        { companyId: C, userId: MEMBER, provider: 'google', jti: 'legacy' },
-        `${process.env.JWT_SECRET}::connector-oauth-state`,
-        { algorithm: 'HS256', audience: 'alianhub:connector-oauth:google', expiresIn: 600 },
-    );
-    const hitGoogleCallback = async (next) => {
-        const r = res();
-        await ctrl.callback(verified({ headers: { origin: WEB }, params: { provider: 'google' }, query: { state: legacyState(), code: 'a-code' } }), r, next);
-        return r;
-    };
-
-    it('hands a legacy state to the next handler while the legacy google connector is also named', async () => {
-        process.env.CONNECTORS = `${P} google_calendar`;
-        const next = jest.fn();
-        const r = await hitGoogleCallback(next);
-        expect(next).toHaveBeenCalledTimes(1);
-        expect(r.location).toBe('');
-        expect(r.body).toBeNull();
-    });
-
-    it('answers it here when no legacy google connector is named, so nothing falls through to a 404', async () => {
-        process.env.CONNECTORS = P;
-        const next = jest.fn();
-        const r = await hitGoogleCallback(next);
-        expect(next).not.toHaveBeenCalled();
-        expect(r.code).toBe(302);
-        expect(landed(r.location).query).toMatchObject({ connector: 'google', result: 'error' });
-    });
-});
-
 describe('two people, two accounts', () => {
     it('each reaches only their own account, and a reconnect to a new account revokes the old grant', async () => {
         await connectAs(MEMBER, { accountId: 'acc-1', email: 'one@example.test' });
@@ -431,7 +399,7 @@ describe('listing and products', () => {
     it('GET /api/v2/connectors shows the offered providers and the person\'s own connection', async () => {
         await connectAs(MEMBER, { email: 'maya@example.test' });
         const out = await call(ctrl.list, MEMBER);
-        expect(out.body.data.providers).toEqual([{ provider: P, products: ['notes', 'files'] }]);
+        expect(out.body.data.providers).toEqual([{ provider: P, products: ['notes', 'files'], signIn: ['oauth'] }]);
         expect(out.body.data.connections).toEqual([expect.objectContaining({ provider: P, connected: true, account: { label: 'maya@example.test' } })]);
         const theirs = await call(ctrl.list, COLLEAGUE);
         expect(theirs.body.data.connections[0]).toMatchObject({ connected: false, account: null });
@@ -577,30 +545,51 @@ describe('the remaining branches have coverage', () => {
         expect(refusesAs('POST /api/v2/connectors/:provider/connect')).toBe('connector.connect');
         expect(refusesAs('POST /api/v2/connectors/:provider/complete')).toBe('connector.connect');
         expect(refusesAs('PUT /api/v2/connectors/connections/:id/products')).toBe('connector.products_changed');
+        expect(refusesAs('PUT /api/v2/connectors/connections/:id/tools')).toBe('connector.tools_changed');
         expect(refusesAs('DELETE /api/v2/connectors/connections/:id')).toBe('connector.revoke');
         expect(refusesAs('GET /api/v2/connectors')).toBeUndefined();
     });
 });
 
 describe('the routes register only when a provider is offered', () => {
-    const routesOf = () => {
+    const everyRoute = () => {
         const seen = [];
         const app = Object.fromEntries(['get', 'post', 'put', 'delete'].map((verb) => [verb, (p) => seen.push(`${verb.toUpperCase()} ${p}`)]));
         routes.init(app);
-        return seen.filter((r) => !r.includes('/slack') && !r.includes('/google') && !r.includes('/apps') && !r.includes('/admin'));
+        return seen;
     };
+    const routesOf = () => everyRoute().filter((r) => !r.includes('/apps') && !r.includes('/admin'));
 
     it('registers the generic routes while CONNECTORS names a registry provider, and none otherwise', () => {
         expect(routesOf()).toEqual([
             'GET /api/v1/connector-oauth/:provider/callback',
             'GET /api/v2/connectors', 'GET /api/v2/connectors/members',
-            'POST /api/v2/connectors/:provider/connect', 'POST /api/v2/connectors/:provider/complete',
-            'PUT /api/v2/connectors/connections/:id/products', 'DELETE /api/v2/connectors/connections/:id',
+            'POST /api/v2/connectors/:provider/connect', 'POST /api/v2/connectors/:provider/complete', 'POST /api/v2/connectors/:provider/token',
+            'PUT /api/v2/connectors/connections/:id/products', 'PUT /api/v2/connectors/connections/:id/tools', 'DELETE /api/v2/connectors/connections/:id',
+            'GET /api/v2/connectors/:provider/tools',
             'GET /api/v2/connectors/picker/:source/token',
             'GET /api/v2/connectors/picker/:source/thumbnail',
             'POST /api/v2/connectors/picker/:source/import',
+            'GET /api/v2/connectors/servers', 'POST /api/v2/connectors/servers',
+            'PUT /api/v2/connectors/servers/:id', 'DELETE /api/v2/connectors/servers/:id',
+            'GET /api/v2/connectors/servers/:id/tools', 'PUT /api/v2/connectors/servers/:id/tools/:tool',
         ]);
+        process.env.CONNECTORS_CUSTOM = 'off';
+        expect(routesOf().filter((route) => route.includes('/servers'))).toEqual([]);
+        delete process.env.CONNECTORS_CUSTOM;
         process.env.CONNECTORS = 'slack';
         expect(routesOf()).toEqual([]);
+    });
+
+    it('registers the company app routes with them, so a workspace can set its own app for any named provider', () => {
+        const appRoutes = ['GET /api/v2/connectors/apps', 'PUT /api/v2/connectors/apps/:provider', 'DELETE /api/v2/connectors/apps/:provider'];
+        expect(everyRoute().filter((r) => r.includes('/apps'))).toEqual(appRoutes);
+        process.env.CONNECTORS = 'google_calendar';
+        expect(everyRoute()).toEqual(['GET /api/v2/connectors/admin/quotas', 'PUT /api/v2/connectors/admin/quotas']);
+    });
+
+    it('serves no legacy Google route, whatever CONNECTORS names', () => {
+        process.env.CONNECTORS = `${P} google google_calendar`;
+        expect(everyRoute().filter((r) => r.includes('/google'))).toEqual([]);
     });
 });

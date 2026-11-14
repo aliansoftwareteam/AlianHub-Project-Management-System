@@ -736,9 +736,9 @@ const ALSO_BY_PEOPLE = {
     },
 };
 
-/* Changes the web app has no route for. A Slack message is sent by an approved proposal alone, and the connector's
- * own settings take no token of any kind. */
-const NO_WEB_ROUTE = ['deploy.staging', 'deploy.production', 'git.merge', 'slack.message.post', 'google.calendar.events.create', 'google.calendar.events.update', 'google.meet.spaces.create'];
+/* Changes the web app has no route for. A connector's write (a Slack message, a calendar event, a custom app's tool)
+ * is sent by an approved proposal alone, and the connector's own settings take no token of any kind. */
+const NO_WEB_ROUTE = ['deploy.staging', 'deploy.production', 'git.merge', 'slack.message.post', 'google.calendar.events.create', 'google.calendar.events.update', 'google.meet.spaces.create', 'outlook.mail.reply.draft', 'outlook.calendar.events.create', 'custom.tool.write'];
 
 const rowsOf = (table) => Object.entries(table).flatMap(([action, changes]) => Object.entries(changes).map(([name, [route, body, params, recordedAs]]) => [name, route, body, params, recordedAs || action]));
 const HELD_FOR_PEOPLE = [...rowsOf(PROPOSED_ON_THE_WEB), ...rowsOf(NEVER_ON_THE_WEB), ...rowsOf(SET_UP_BY_PEOPLE)];

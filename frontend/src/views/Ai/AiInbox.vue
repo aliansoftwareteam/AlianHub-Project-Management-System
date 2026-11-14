@@ -163,7 +163,7 @@
                             <span v-if="!change.reversible" class="ah-chip ah-chip--warn">{{ $t('Ai.not_reversible') }}</span>
                             <button v-if="editing" type="button" class="ah-btn ah-btn--ghost ah-btn--sm" @click="editable.splice(i, 1)">{{ $t('Ai.drop') }}</button>
                         </div>
-                        <SlackPostPreview v-if="change.action === SLACK_POST" :change="change" :delivery="slackDeliveryOf(change)" />
+                        <SlackPostPreview v-if="change.action === SLACK_POST && !change.card" :change="change" :delivery="slackDeliveryOf(change)" />
                         <ConnectorWriteCard v-if="change.card" class="ai-write" :change="change" :editing="editing" :disabled="busy" :delivery="deliveryOfChange(selected.delivery, editable, change)" :waiting="selected.status === 'pending'" @update:params="change.params = $event" />
                     </template>
 

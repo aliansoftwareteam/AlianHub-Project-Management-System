@@ -48,7 +48,8 @@ const ALL_SCOPES = Object.values(google.products).flat();
 let fake;
 const connected = (scopes = ALL_SCOPES) => resolveConnection.mockResolvedValue({ connectionId: MINE, scopes, getAccessToken: async () => fakeGoogle.TOKEN });
 const actor = { kind: 'agent', userId: PRISHA, agentId: AGENT_ID, agentName: 'Digest', runId: RUN };
-const agentRead = (key, input = {}) => egressContext.run({ companyId: C }, () => readers.read(key, C, { runId: RUN, actor, allowedActions: [] }, input));
+const TICKED = [{ provider: 'google', tools: require('../Modules/Connectors/tools').all().filter((tool) => tool.provider === 'google').map((tool) => tool.key) }];
+const agentRead = (key, input = {}) => egressContext.run({ companyId: C }, () => readers.read(key, C, { runId: RUN, actor, allowedActions: [], connectors: TICKED }, input));
 const mcpCaller = (scopes) => ({
     companyId: C, userId: PRISHA, actor: { kind: 'agent', userId: PRISHA, agentName: 'Claude', viaAccount: 'external' },
     token: { oauth: true, scopes }, oauth: { clientId: 'client-1', grantId: 'grant-1' }, canWrite: true, allowedActions: [],
@@ -57,7 +58,7 @@ const mcpRead = (key, input = {}) => mcpTools.call(mcpCaller(['connectors:read']
 const mcpWrite = (key, input = {}) => mcpTools.call(mcpCaller(['connectors:write']), key, input);
 const proposalRow = (id) => (mockDb.store[SCHEMA_TYPE.AGENT_PROPOSALS] || []).find((p) => String(p._id) === String(id));
 const fromAgentRun = (action, params) => proposals.create(C, {
-    agent: { _id: AGENT_ID, name: 'Digest' }, projectId: PROJECT, what: 'Do it', why: 'Asked', changes: [{ action, params }], connectionOwner: PRISHA,
+    agent: { _id: AGENT_ID, name: 'Digest', connectors: TICKED }, projectId: PROJECT, what: 'Do it', why: 'Asked', changes: [{ action, params }], connectionOwner: PRISHA,
 });
 const approve = (id) => proposals.approve(C, id, { decider: { kind: 'human', userId: PRISHA }, isPrivileged: false, ip: '' });
 const lastCall = () => fake.state.calls[fake.state.calls.length - 1];
@@ -154,7 +155,7 @@ describe.each(READS)('the read %s', (key, input, shows) => {
     it('names the product to tick when its scope is missing', async () => {
         connected([]);
         const product = connectorTools.get(key).product;
-        expect(await mcpRead(key, input)).toEqual({ code: 'scope_missing', error: `Tick ${product} on your Google connection in My connections, then ask again.` });
+        expect(await mcpRead(key, input)).toEqual({ code: 'scope_missing', error: `Tick ${product} on your Google connection in Connectors, then ask again.` });
         expect(safeFetch).not.toHaveBeenCalled();
     });
 });
@@ -277,7 +278,7 @@ describe.each(WRITES)('the write %s', (key, input, madeAtGoogle, answer) => {
     it('names the product to tick when its scope is missing', async () => {
         connected([]);
         const product = connectorTools.get(key).product;
-        expect(await mcpWrite(key, input)).toEqual({ code: 'scope_missing', error: `Tick ${product} on your Google connection in My connections, then ask again.` });
+        expect(await mcpWrite(key, input)).toEqual({ code: 'scope_missing', error: `Tick ${product} on your Google connection in Connectors, then ask again.` });
     });
 });
 

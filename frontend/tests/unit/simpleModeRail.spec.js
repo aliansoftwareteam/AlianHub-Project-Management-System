@@ -1,4 +1,4 @@
-/* Task 047, slice S-1: Simple shows six places and tucks the rest into More; Full is the app as it was.
+/* Task 047, slice S-1: Simple shows five places and tucks the rest into More; Full is the app as it was.
    The choice only hides entry points: no route, role or permission reads it. */
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { flushPromises, mount, RouterLinkStub } from '@vue/test-utils';
@@ -40,7 +40,7 @@ import GlobalRail from '@/components/organisms/Shell/GlobalRail.vue';
 
 const SRC = path.resolve(__dirname, '../../src');
 const ROUTE = '/api/v2/users/nav-preferences';
-const FULL_RAIL = ['home', 'everything', 'goals', 'projects', 'inbox', 'planner', 'chat', 'ai', 'docs', 'appConnections', 'dash', 'time'];
+const FULL_RAIL = ['home', 'everything', 'goals', 'projects', 'inbox', 'planner', 'chat', 'ai', 'docs', 'dash', 'time'];
 const TUCKED = ['goals', 'planner', 'chat', 'docs', 'dash', 'time'];
 const MORE_GROUPS = ['Shell.work', 'Header.Reports', 'Shell.tools', 'Shell.workspace'];
 
@@ -81,14 +81,13 @@ afterEach(() => {
 });
 
 describe('Full', () => {
-    it('is the app as it was: twelve places and the same More menu', () => {
+    it('is the app as it was: eleven places and the same More menu', () => {
         const nav = mountNav();
         expect(keysOf(nav.rail)).toEqual(FULL_RAIL);
         expect(nav.more.map((group) => group.label)).toEqual(MORE_GROUPS);
         expect(nav.rail.find((item) => item.key === 'everything')).toMatchObject({ label: 'Shell.everything', to: { name: 'Everything', query: undefined } });
         expect(nav.rail.find((item) => item.key === 'ai')).toMatchObject({ label: 'Shell.ai', to: { name: 'AiAsk' } });
-        expect(nav.rail.find((item) => item.key === 'appConnections')).toMatchObject({ label: 'AppConnections.nav', icon: 'appConnections', to: { name: 'AppConnections' } });
-        expect(nav.more.flatMap((group) => keysOf(group.items))).not.toContain('appConnections');
+        expect([...keysOf(nav.rail), ...nav.more.flatMap((group) => keysOf(group.items))]).not.toContain('appConnections');
     });
 
     it('is what an unknown or missing choice means', () => {
@@ -108,12 +107,12 @@ describe('Full', () => {
 });
 
 describe('Simple', () => {
-    it('shows six places: Home, My work, Projects, Inbox, Ask and App connections', () => {
+    it('shows five places: Home, My work, Projects, Inbox and Ask', () => {
         use('simple');
         const nav = mountNav();
-        expect(SIMPLE_PLACES).toEqual(['home', 'everything', 'projects', 'inbox', 'ai', 'appConnections']);
+        expect(SIMPLE_PLACES).toEqual(['home', 'everything', 'projects', 'inbox', 'ai']);
         expect(keysOf(nav.rail)).toEqual(SIMPLE_PLACES);
-        expect(nav.rail.map((item) => item.label)).toEqual(['Shell.home', 'Shell.my_work', 'Header.Projects', 'Inbox.title', 'Shell.ask', 'AppConnections.nav']);
+        expect(nav.rail.map((item) => item.label)).toEqual(['Shell.home', 'Shell.my_work', 'Header.Projects', 'Inbox.title', 'Shell.ask']);
     });
 
     it('opens My work as the Everything page narrowed to the person', () => {
@@ -137,7 +136,7 @@ describe('Simple', () => {
         permissions.denied = ['project.project_list', 'chat'];
         use('simple');
         const nav = mountNav();
-        expect(keysOf(nav.rail)).toEqual(['home', 'everything', 'inbox', 'ai', 'appConnections']);
+        expect(keysOf(nav.rail)).toEqual(['home', 'everything', 'inbox', 'ai']);
         expect(keysOf(nav.more[0].items)).toEqual(['goals', 'planner', 'docs', 'time']);
     });
 
@@ -175,12 +174,12 @@ describe('Ask', () => {
         applyAiAvailability({ state: AI_STATE.OFF_WORKSPACE, loaded: true });
         expect(keysOf(mountNav().rail)).not.toContain('ai');
         use('simple');
-        expect(keysOf(mountNav().rail)).toEqual(['home', 'everything', 'projects', 'inbox', 'appConnections']);
+        expect(keysOf(mountNav().rail)).toEqual(['home', 'everything', 'projects', 'inbox']);
     });
 });
 
 describe('a place the person opens stays on their rail', () => {
-    it('adds a tucked place after the six, once, and takes it out of More', async () => {
+    it('adds a tucked place after the five, once, and takes it out of More', async () => {
         use('simple');
         at('Planner');
         const nav = mountNav();
@@ -206,7 +205,7 @@ describe('a place the person opens stays on their rail', () => {
         expect(nav.more.map((group) => group.label)).toEqual(MORE_GROUPS);
     });
 
-    it('adds nothing for one of the six, for a More item, or for a place the person may not see', async () => {
+    it('adds nothing for one of the five, for a More item, or for a place the person may not see', async () => {
         use('simple');
         for (const name of ['Home', 'Everything', 'Approvals', 'Setting']) {
             at(name);
@@ -266,7 +265,7 @@ describe('the phone tab bar agrees with the rail', () => {
         const wrapper = await mountBar();
         expect(tabs(wrapper)).toEqual(['tab-home', 'tab-inbox', 'tab-chat', 'tab-ai']);
         await openSheet(wrapper);
-        expect(sheetText(wrapper, '.ah-sheet__cell')).toEqual(['Shell.everything', 'Shell.goals', 'Header.Projects', 'Shell.planner', 'Shell.docs', 'AppConnections.nav', 'Shell.dash', 'Shell.time']);
+        expect(sheetText(wrapper, '.ah-sheet__cell')).toEqual(['Shell.everything', 'Shell.goals', 'Header.Projects', 'Shell.planner', 'Shell.docs', 'Shell.dash', 'Shell.time']);
         expect(sheetText(wrapper, '.ah-pop__label')).toEqual(MORE_GROUPS);
     });
 
@@ -279,7 +278,7 @@ describe('the phone tab bar agrees with the rail', () => {
         expect(wrapper.findAll('.ah-tabbar > .ah-tabbar__item')).toHaveLength(6);
 
         await openSheet(wrapper);
-        expect(sheetText(wrapper, '.ah-sheet__cell')).toEqual(['Header.Projects', 'AppConnections.nav']);
+        expect(sheetText(wrapper, '.ah-sheet__cell')).toEqual(['Header.Projects']);
         expect(sheetText(wrapper, '.ah-pop__label')).toEqual(['Shell.more_places', ...MORE_GROUPS]);
         const tucked = wrapper.findAll('.ah-sheet a.ah-pop__item').map((el) => el.text().trim());
         expect(tucked.slice(0, TUCKED.length)).toEqual(['Shell.goals', 'Shell.planner', 'Shell.chat', 'Shell.docs', 'Shell.dash', 'Shell.time']);
@@ -289,7 +288,7 @@ describe('the phone tab bar agrees with the rail', () => {
         use('simple', ['planner']);
         const wrapper = await mountBar();
         await openSheet(wrapper);
-        expect(sheetText(wrapper, '.ah-sheet__cell')).toEqual(['Header.Projects', 'AppConnections.nav', 'Shell.planner']);
+        expect(sheetText(wrapper, '.ah-sheet__cell')).toEqual(['Header.Projects', 'Shell.planner']);
     });
 });
 
@@ -405,12 +404,12 @@ describe('the rail asks what the person\'s projects use', () => {
         expect(railLabels(wrapper)).toHaveLength(FULL_RAIL.length);
     });
 
-    it('starts a new account on six places, and adds Dash once a project has a dashboard', async () => {
+    it('starts a new account on five places, and adds Dash once a project has a dashboard', async () => {
         fetchDashboards.mockResolvedValue([{ _id: 'd2', visibility: 'project', projectId: 'p1' }]);
         people.list = [{ _id: 'u2', navPreferences: { mode: 'simple' } }];
         const wrapper = await mountRail('u2');
         expect(shellState.nav.mode).toBe('simple');
         expect(fetchDashboards).toHaveBeenCalledTimes(1);
-        expect(railLabels(wrapper)).toEqual(['Shell.home', 'Shell.my_work', 'Header.Projects', 'Inbox.title', 'Shell.ask', 'AppConnections.nav', 'Shell.dash']);
+        expect(railLabels(wrapper)).toEqual(['Shell.home', 'Shell.my_work', 'Header.Projects', 'Inbox.title', 'Shell.ask', 'Shell.dash']);
     });
 });

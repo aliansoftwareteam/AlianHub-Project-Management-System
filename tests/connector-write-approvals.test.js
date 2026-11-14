@@ -49,6 +49,7 @@ const KEY = 'fake.notes.create';
 const ENV = { CONNECTORS: 'fake', AGENT_TAINT_ROUTING: 'on' };
 const before = Object.fromEntries(Object.keys(ENV).map((k) => [k, process.env[k]]));
 const NOTE = { folder: 'Board', title: 'Minutes', body: 'Approved the budget for Q4.' };
+const TICKED = [{ provider: 'fake', tools: [KEY] }];
 
 const connected = (scopes = ['notes.read', 'notes.write']) => resolveConnection.mockResolvedValue({ connectionId: MINE, scopes, getAccessToken: async () => 'secret-token' });
 const provider = { status: 200, body: { id: 'n-77' } };
@@ -64,7 +65,7 @@ const oauthCaller = (scopes) => ({
 });
 
 const fromAgentRun = (change = NOTE) => proposals.create(C, {
-    agent: { _id: AGENT_ID, name: 'Digest' }, projectId: PROJECT, what: 'Save the minutes', why: 'The meeting ended',
+    agent: { _id: AGENT_ID, name: 'Digest', connectors: TICKED }, projectId: PROJECT, what: 'Save the minutes', why: 'The meeting ended',
     changes: [{ action: KEY, params: { ...change } }], connectionOwner: PRISHA,
 });
 
@@ -143,7 +144,7 @@ describe('every write is a proposal', () => {
     });
 
     it('from an agent run, is not filed without the person whose connection it uses', async () => {
-        await expect(proposals.create(C, { agent: { _id: AGENT_ID, name: 'Digest' }, projectId: PROJECT, what: 'x', why: 'y', changes: [{ action: KEY, params: NOTE }] }))
+        await expect(proposals.create(C, { agent: { _id: AGENT_ID, name: 'Digest', connectors: TICKED }, projectId: PROJECT, what: 'x', why: 'y', changes: [{ action: KEY, params: NOTE }] }))
             .rejects.toThrow(writes.REFUSAL.NO_OWNER);
     });
 
@@ -356,7 +357,7 @@ describe('what is approved is what is sent, once', () => {
         const p = await fromAgentRun();
         expect(p.changes[0].label).toBe(NOTE.title);
         await approveAs(p._id, PRISHA);
-        expect(proposalRow(p._id).delivery).toEqual([expect.objectContaining({ ok: false, error: 'Fake is no longer accepting your connection. Reconnect Fake on My connections, then ask again.' })]);
+        expect(proposalRow(p._id).delivery).toEqual([expect.objectContaining({ ok: false, error: 'Fake is no longer accepting your connection. Reconnect Fake on Connectors, then ask again.' })]);
         expect(safeFetch).not.toHaveBeenCalled();
     });
 
@@ -372,7 +373,7 @@ describe('what is approved is what is sent, once', () => {
 
     it('answers an MCP caller with no connection, and files nothing', async () => {
         resolveConnection.mockRejectedValue(Object.assign(new Error('not_connected'), { name: 'ConnectorError', code: 'not_connected', provider: 'fake' }));
-        expect(await mcpTools.call(oauthCaller(['connectors:write']), KEY, NOTE)).toEqual({ code: 'not_connected', error: 'Connect Fake on My connections first, then ask again.' });
+        expect(await mcpTools.call(oauthCaller(['connectors:write']), KEY, NOTE)).toEqual({ code: 'not_connected', error: 'Connect Fake on Connectors first, then ask again.' });
         expect(mockDb.store[SCHEMA_TYPE.AGENT_PROPOSALS] || []).toHaveLength(0);
     });
 

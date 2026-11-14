@@ -45,7 +45,8 @@ const notes = (url) => (new URL(url).hostname === 'api.fake.test'
     : { status: 404, headers: {}, body: '' });
 const actor = { kind: 'agent', userId: PRISHA, agentId: '6f0000000000000000000b01', agentName: 'Digest', runId: RUN };
 const runRow = () => (mockDb.store[SCHEMA_TYPE.AGENT_RUNS] || []).find((r) => String(r._id) === RUN);
-const agentRead = (input = {}) => egressContext.run({ companyId: C }, () => readers.read(KEY, C, { runId: RUN, actor, allowedActions: [] }, input));
+const TICKED = [{ provider: 'fake', tools: [KEY] }];
+const agentRead = (input = {}) => egressContext.run({ companyId: C }, () => readers.read(KEY, C, { runId: RUN, actor, allowedActions: [], connectors: TICKED }, input));
 const mcp = (scopes) => ({ companyId: C, userId: PRISHA, actor: { kind: 'token', userId: PRISHA }, token: { oauth: true, scopes } });
 
 beforeEach(() => {
@@ -150,7 +151,7 @@ describe('from an agent run', () => {
 
     it('makes no web fetch after the read', async () => {
         await egressContext.run({ companyId: C }, async () => {
-            await readers.read(KEY, C, { runId: RUN, actor, allowedActions: [] }, {});
+            await readers.read(KEY, C, { runId: RUN, actor, allowedActions: [], connectors: TICKED }, {});
             await expect(agentFetch.audit('https://example.com/')).rejects.toMatchObject({ code: 'connector_read' });
         });
     });
@@ -216,18 +217,18 @@ describe('only the caller\'s own connection', () => {
 
     it('tells a person with no connection to connect the provider', async () => {
         resolveConnection.mockRejectedValue(connectorError('not_connected'));
-        expect(await mcpTools.call(mcp(['connectors:read']), KEY, {})).toEqual({ code: 'not_connected', error: 'Connect Fake on My connections first, then ask again.' });
+        expect(await mcpTools.call(mcp(['connectors:read']), KEY, {})).toEqual({ code: 'not_connected', error: 'Connect Fake on Connectors first, then ask again.' });
     });
 
     it('tells a person whose token cannot be refreshed to reconnect', async () => {
         resolveConnection.mockResolvedValue({ connectionId: MINE, scopes: ['notes.read'], getAccessToken: async () => { throw connectorError('broken'); } });
-        expect(await mcpTools.call(mcp(['connectors:read']), KEY, {})).toEqual({ code: 'broken', error: 'Fake is no longer accepting your connection. Reconnect Fake on My connections, then ask again.' });
+        expect(await mcpTools.call(mcp(['connectors:read']), KEY, {})).toEqual({ code: 'broken', error: 'Fake is no longer accepting your connection. Reconnect Fake on Connectors, then ask again.' });
         expect(safeFetch).not.toHaveBeenCalled();
     });
 
     it('names the product to tick when the connection lacks the tool\'s scope', async () => {
         connected(['files.read']);
-        expect(await mcpTools.call(mcp(['connectors:read']), KEY, {})).toEqual({ code: 'scope_missing', error: 'Tick notes on your Fake connection in My connections, then ask again.' });
+        expect(await mcpTools.call(mcp(['connectors:read']), KEY, {})).toEqual({ code: 'scope_missing', error: 'Tick notes on your Fake connection in Connectors, then ask again.' });
         expect(safeFetch).not.toHaveBeenCalled();
     });
 

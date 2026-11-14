@@ -1,7 +1,8 @@
-.apc { background: var(--canvas); min-height: 100%; }
-.apc__body { flex: 1; min-height: 0; overflow: auto; padding: 20px 22px; display: flex; flex-direction: column; gap: 12px; }
+.apc { min-width: 0; }
+.apc__body { display: flex; flex-direction: column; gap: 12px; }
 .apc__off { padding: 14px 16px; margin: 0; color: var(--ink-2); }
 .apc__list { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; align-items: start; }
+.apc__list--one { grid-template-columns: minmax(0, 1fr); max-width: 720px; }
 .apc__card { padding: 12px 14px; display: flex; flex-direction: column; gap: 10px; min-width: 0; }
 .apc__top { display: flex; align-items: center; gap: 10px; }
 .apc__icon { width: 28px; height: 28px; border-radius: 7px; display: grid; place-items: center; background: var(--surface-hover); flex: none; }

@@ -11,6 +11,7 @@ export const AI_RIGHT = Object.freeze({
     SKILL_RISK: "ai_skill_risk",
     CONNECTORS: "ai_connectors",
     EXTERNAL_CLIENTS: "ai_external_clients",
+    CUSTOM_APPS: "ai_custom_apps",
 });
 
 const SECTION = "artificial_intelligence";

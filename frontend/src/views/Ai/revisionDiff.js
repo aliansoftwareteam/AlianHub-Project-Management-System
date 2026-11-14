@@ -20,16 +20,21 @@ const skillsSummary = (list, t) => (Array.isArray(list)
     ? list.map((s) => (s && typeof s === "object" && s.enabled === false ? t("Ai.revision_skill_off", { key: SKILL_KEY(s) }) : SKILL_KEY(s)))
     : []);
 
+const connectorsSummary = (list) => (Array.isArray(list) ? list : [])
+    .filter((entry) => entry && entry.provider)
+    .map((entry) => `${entry.provider}: ${(Array.isArray(entry.tools) ? entry.tools : []).join(", ")}`);
+
 export const formatValue = (field, value, t = identity) => {
     if (value === undefined || value === null || value === "") return t("Ai.revision_value_empty");
     if (field === "skills") return skillsSummary(value, t).join(", ") || t("Ai.revision_value_empty");
+    if (field === "connectors") return connectorsSummary(value).join("; ") || t("Ai.revision_value_empty");
     if (Array.isArray(value)) return value.length ? value.map(String).join(", ") : t("Ai.revision_value_empty");
     if (isObject(value)) return JSON.stringify(value);
     if (typeof value === "boolean") return t(value ? "Ai.revision_value_true" : "Ai.revision_value_false");
     return String(value);
 };
 
-const FIELD_ORDER = ["name", "description", "skills", "allowedActions", "projectIds", "autonomy", "spendCapUsd", "rateLimitPerDay", "account", "model", "schedule", "trigger"];
+const FIELD_ORDER = ["name", "description", "skills", "allowedActions", "connectors", "projectIds", "autonomy", "spendCapUsd", "rateLimitPerDay", "account", "model", "schedule", "trigger"];
 
 export const diffSnapshots = (from, to, t = identity) => {
     const a = from || {};

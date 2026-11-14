@@ -11,8 +11,10 @@ const rateLimits = require('./rateLimits');
 const health = require('./health');
 const callAudit = require('./callAudit');
 const providerApi = require('./providerApi');
+const mcpClient = require('./mcpClient');
+const toolReviews = require('./toolReviews');
 
-const VIA = Object.freeze({ AGENT: 'agent', MCP: 'mcp', APPROVED: 'approved' });
+const VIA = Object.freeze({ AGENT: 'agent', MCP: 'mcp', CHAT: 'chat', APPROVED: 'approved' });
 const STATE = Object.freeze({ PENDING: 'pending', APPLIED: 'applied', FAILED: 'failed', REFUSED: 'refused' });
 const TIMEOUT_MS = 10000;
 const MAX_BYTES = 512 * 1024;
@@ -21,9 +23,9 @@ const TOKEN_FAILURES = Object.freeze(['refresh_failed', 'token_unavailable']);
 const refusal = (code, message) => Object.assign(new Error(`${code}: ${message}`), { code, deterministic: true });
 
 const MESSAGES = Object.freeze({
-    not_connected: (name) => `Connect ${name} on My connections first, then ask again.`,
+    not_connected: (name) => `Connect ${name} on Connectors first, then ask again.`,
     not_member: () => 'This is not available to you.',
-    broken: (name) => `${name} is no longer accepting your connection. Reconnect ${name} on My connections, then ask again.`,
+    broken: (name) => `${name} is no longer accepting your connection. Reconnect ${name} on Connectors, then ask again.`,
     provider_off: (name) => `${name} is not switched on here.`,
 });
 
@@ -118,11 +120,7 @@ const accepted = async (call, res) => {
     }
     const code = body ? providerApi.errorIn(definition, body) : '';
     if (!code) return res;
-    if (providerApi.isGrantRefused(definition, code)) {
-        await connections.markBroken({ companyId: String(call.companyId), connectionId: call.connection.connectionId, reason: code });
-        await health.tellBroken(call.companyId, call.userId, call.tool.provider, definition.name);
-        throw refusal('broken', MESSAGES.broken(definition.name));
-    }
+    if (providerApi.isGrantRefused(definition, code)) throw await brokenBy(call, code);
     throw refusal('provider_refused', `${definition.name} answered ${code}, so this did not go through.`);
 };
 
@@ -131,25 +129,74 @@ const requesterFor = (call) => async (url, { query } = {}) => accepted(call, awa
 
 const writeRequesterFor = (call) => async (url, { method = 'post', query, json } = {}) => accepted(call, await callProvider(call, url, { method, query, json }));
 
+const brokenBy = async (call, reason) => {
+    const { definition } = call.tool;
+    await connections.markBroken({ companyId: String(call.companyId), connectionId: call.connection.connectionId, reason });
+    await health.tellBroken(call.companyId, call.userId, call.tool.provider, definition.name);
+    return refusal('broken', MESSAGES.broken(definition.name));
+};
+
+/* An HTTP answer of the server becomes the same refusal an API provider's would: a rate limit holds the connection, a
+ * refused token marks it broken, anything else fails this one call. A refusal from the review check passes as it is. */
+const mcpRefusal = async (call, error) => {
+    const { tool, companyId, connection } = call;
+    const { name } = tool.definition;
+    if (error && error.deterministic) return error;
+    if (!(error && error.status)) return refusal('provider_refused', `${name} could not be reached, so this did not go through.`);
+    const res = { status: error.status, headers: error.headers || {}, body: '' };
+    if (rateLimits.isRateLimited(tool.definition, res)) return busy(tool, await rateLimits.hold(companyId, connection.connectionId, res));
+    if (error.status === 401) return brokenBy(call, 'mcp_unauthorized');
+    return refusal('provider_refused', `${name} answered ${error.status}, so this did not go through.`);
+};
+
+/* An MCP tool is handed a caller of the server's tools, never the token. Only the tool it was defined with is sent. */
+const mcpCallerFor = (call) => async (name, args) => {
+    const { tool, companyId, userId, connection, trace } = call;
+    if (name !== tool.mcp.tool) throw refusal('tool_off', `${tool.key} can only call ${tool.mcp.tool}.`);
+    const shape = await toolReviews.approvedShape(companyId, tool.provider, name, tool.mcp.shape);
+    const token = await connection.getAccessToken().catch(spoken(tool, companyId, userId));
+    trace.called = true;
+    let result;
+    try {
+        result = await mcpClient.callTool({
+            provider: tool.provider, url: tool.definition.mcp.url, hosts: tool.definition.egressHosts, token,
+            name, args, shape, timeoutMs: TIMEOUT_MS, maxBytes: MAX_BYTES,
+        });
+    } catch (error) {
+        if (error && error.code === 'tool_changed') await toolReviews.noteChanged({ companyId, definition: tool.definition, tool: name, shape: error.current });
+        throw await mcpRefusal(call, error);
+    }
+    if (result && result.isError) throw refusal('provider_refused', `${tool.definition.name} said this could not be done, so it did not go through.`);
+    return mcpClient.textOf(result);
+};
+
+const handedTo = (call, { write: writing = false } = {}) => (call.tool.mcp
+    ? { connectionId: call.connection.connectionId, mcp: mcpCallerFor(call) }
+    : { connectionId: call.connection.connectionId, request: (writing ? writeRequesterFor : requesterFor)(call) });
+
 const ownConnection = async (tool, companyId, userId, asked) => {
     const connection = await connectionOf(tool, companyId, userId);
     if (asked !== undefined && String(asked) !== String(connection.connectionId)) {
         throw refusal('not_connected', `This was filed on a connection that is not your current ${tool.definition.name} connection, so it was not sent. Ask for it again.`);
     }
-    if (!(connection.scopes || []).includes(tool.scope)) {
-        throw refusal('scope_missing', `Tick ${tool.product} on your ${tool.definition.name} connection in My connections, then ask again.`);
+    if (tool.scope && !(connection.scopes || []).includes(tool.scope)) {
+        throw refusal('scope_missing', `Tick ${tool.product} on your ${tool.definition.name} connection in Connectors, then ask again.`);
+    }
+    if ((connection.toolsOff || []).includes(tool.key)) {
+        throw refusal('tool_turned_off', `You turned this ${tool.definition.name} tool off for yourself, so it was not used. Turn it back on in AI › Customize › Connectors, then ask again.`);
     }
     return connection;
 };
 
 /* The stored params keep the connection's id, so a later send through any other is refused. */
 const admitWrite = async ({ companyId, userId, key, input = {} }) => {
-    const tool = tools.get(key);
-    if (!tool || tool.kind !== tools.KIND.WRITE || !tools.isOn(tool)) throw refusal('tool_off', `${key} is not available here.`);
+    const generic = tools.get(key);
+    if (!generic || generic.kind !== tools.KIND.WRITE || !tools.isOn(generic)) throw refusal('tool_off', `${key} is not available here.`);
     if (!userId) throw refusal('no_person', 'This write names no person, so no connection can be used.');
-    const { connectionId: asked, ...args } = input || {};
-    const problem = argsSchema.problemIn(tool.input, args);
+    const { connectionId: asked, ...given } = input || {};
+    const problem = argsSchema.problemIn(generic.input, given);
     if (problem) throw refusal('bad_input', `${key}: ${problem}`);
+    const { tool, args } = await tools.bound(generic, { companyId, input: given });
     const connection = await ownConnection(tool, companyId, userId, asked);
     return { tool, args, connection, params: { ...args, connectionId: String(connection.connectionId) } };
 };
@@ -164,7 +211,7 @@ const write = ({ companyId, userId, key, params = {}, beforeSend = async () => {
         await beforeSend();
         const raw = await egressContext.run(
             { companyId: String(companyId), actor: String(userId) },
-            () => tool.run({ input: args, connection: { connectionId: connection.connectionId, request: writeRequesterFor({ tool, companyId, userId, connection, trace }) }, caps: { ...tool.caps } }),
+            () => tool.run({ input: args, connection: handedTo({ tool, companyId, userId, connection, trace }, { write: true }), caps: { ...tool.caps } }),
         );
         const text = plain(raw).slice(0, tool.caps.maxChars);
         trace.chars = text.length;
@@ -172,14 +219,34 @@ const write = ({ companyId, userId, key, params = {}, beforeSend = async () => {
     },
 );
 
-const readAdmitted = async ({ companyId, userId, via, runId, callerId, key, input }, trace) => {
-    const tool = tools.get(key);
-    if (!tool || tool.kind !== tools.KIND.READ || !tools.isOn(tool)) throw refusal('tool_off', `${key} is not available here.`);
+/* The list of a workspace's reviewed custom tools reaches no app, so it takes no connection, quota or run read; it
+ * still marks the run, since the words in it began as a server's own. */
+const localRead = async ({ tool, companyId, userId, via }) => {
+    const whole = plain(await tool.list({ companyId: String(companyId), userId: String(userId) }));
+    const text = whole.slice(0, tool.caps.maxChars);
+    const source = taint.connector(tool.provider, taint.hashed(`${tool.key}:${companyId}`));
+    if (via === VIA.AGENT) egressContext.noteConnectorRead(tool.provider);
+    else taint.note(source);
+    return { text, chars: text.length, truncated: whole.length > text.length, taint: [source] };
+};
+
+/* An agent's read is refused unless the agent has the tool ticked; `agentConnectors` left out ticks nothing. */
+const readAdmitted = async ({ companyId, userId, via, runId, callerId, agentConnectors, key, input }, trace) => {
+    const generic = tools.get(key);
+    if (!generic || generic.kind !== tools.KIND.READ || !tools.isOn(generic)) throw refusal('tool_off', `${key} is not available here.`);
     if (!userId) throw refusal('no_person', 'This read names no person, so no connection can be used.');
-    const { connectionId: asked, ...args } = input || {};
-    const problem = argsSchema.problemIn(tool.input, args);
+    const { connectionId: asked, ...given } = input || {};
+    const problem = argsSchema.problemIn(generic.input, given);
     if (problem) throw refusal('bad_input', `${key}: ${problem}`);
     if (via === VIA.AGENT && !runId) throw refusal('run_required', 'A connected app can be read only while an agent is running.');
+    const notTicked = via === VIA.AGENT ? require('../Agents/agentConnectors').refusalFor(agentConnectors, key) : '';
+    if (notTicked) throw refusal('agent_not_allowed', notTicked);
+    if (generic.local) {
+        const out = await localRead({ tool: generic, companyId, userId, via });
+        trace.chars = out.chars;
+        return out;
+    }
+    const { tool, args } = await tools.bound(generic, { companyId, input: given });
 
     const connection = await ownConnection(tool, companyId, userId, asked);
     trace.connectionId = connection.connectionId;
@@ -200,7 +267,7 @@ const readAdmitted = async ({ companyId, userId, via, runId, callerId, key, inpu
     try {
         raw = await egressContext.run(
             { companyId: String(companyId), actor: String(userId) },
-            () => tool.run({ input: args, connection: { connectionId: connection.connectionId, request: requesterFor({ tool, companyId, userId, connection, trace }) }, caps: { maxItems: tool.caps.maxItems, maxChars } }),
+            () => tool.run({ input: args, connection: handedTo({ tool, companyId, userId, connection, trace }), caps: { maxItems: tool.caps.maxItems, maxChars } }),
         );
     } catch (error) {
         if (claim) await claim.settle({ state: STATE.FAILED, chars: 0 });
@@ -222,10 +289,10 @@ const readAdmitted = async ({ companyId, userId, via, runId, callerId, key, inpu
     return { ...fieldsOf(tool, answered.fields), text, chars: text.length, truncated: whole.length > text.length, taint: [source] };
 };
 
-/* `callerId` is the agent on a run and the AI client over MCP: what the usage row and the audit row name besides the person. */
-const read = ({ companyId, userId, via, runId = null, callerId = '', key, input = {} }) => tracked(
+/* `callerId` is the agent on a run, the AI client over MCP and Ask in the AI chat: what the usage row and the audit row name besides the person. */
+const read = ({ companyId, userId, via, runId = null, callerId = '', agentConnectors, key, input = {} }) => tracked(
     { companyId, userId, via, callerId, runId, key, tool: tools.get(key), phase: callAudit.PHASE.READ, input },
-    (trace) => readAdmitted({ companyId, userId, via, runId, callerId, key, input }, trace),
+    (trace) => readAdmitted({ companyId, userId, via, runId, callerId, agentConnectors, key, input }, trace),
 );
 
-module.exports = { VIA, STATE, read, admitWrite, write, plain };
+module.exports = { VIA, STATE, read, admitWrite, write, plain, connectionOf };

@@ -35,7 +35,6 @@ AlianHub-Project-Management-System/
 │   ├── Changelog/
 │   ├── CheckInstallStep/
 │   ├── Clips/
-│   ├── CloudStorage/
 │   ├── Comments/
 │   ├── common/
 │   ├── Company/

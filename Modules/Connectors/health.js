@@ -38,7 +38,7 @@ const toldToday = async (companyId, userId, provider) => Boolean(await MongoDbCr
 
 const rowOf = (companyId, userId, provider, name) => ({
     key: CONNECTOR_BROKEN, type: NOTICE_SCOPE, changeType: CONNECTOR_BROKEN,
-    message: textHtml(`${name} is no longer accepting your connection. Reconnect it on My connections.`),
+    message: textHtml(`${name} is no longer accepting your connection. Reconnect it on Connectors.`),
     changeData: { provider, name },
     projectId: NOTICE_SCOPE, taskId: '', userId: NOTICE_SCOPE, companyId: String(companyId),
     assigneeUsers: [String(userId)], notSeen: [String(userId)], receiverID: String(userId),

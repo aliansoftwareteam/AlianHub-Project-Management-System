@@ -4,12 +4,15 @@ const logger = require('../../Config/loggerConfig');
 const { getProvider, isAnyProviderConfigured } = require('../AICore/llmProvider');
 const { FEATURES } = require('../AICore/features');
 const { keepStreamOpen } = require('../Agents/engine/timeouts');
+const egressContext = require('../Agents/engine/egressContext');
+const { requestAddress } = require('../../utils/requestAddress');
 const {
     gather, promptFor, tokenProjectIdsOf, aboutOf, SYSTEM, RESEARCH_SYSTEM, MAX_PER_TYPE, ASK_TOKENS, RESEARCH_TOKENS,
 } = require('./ask');
 const threads = require('./askThreads');
 const { askAnswerToken } = require('./shareToken');
 const askContext = require('./askContext');
+const askConnectors = require('./askConnectors');
 
 const FOLLOW_UP = `
 - Earlier turns of this conversation come before the QUESTION. Use them to understand what the
@@ -17,6 +20,10 @@ const FOLLOW_UP = `
   question, so a source an earlier answer used may be gone.`;
 
 const EMPTY = 'Nothing in the projects you can open matches that. Try naming the project or the task.';
+const EMPTY_APPS = Object.freeze({
+    connector_unread: 'Nothing could be read to answer that.',
+    connector_waiting: 'Nothing was read to answer from. What you asked to change waits for your approval in the Inbox.',
+});
 
 const piecesOf = (text) => {
     const words = String(text).match(/\S+\s*/g) || [];
@@ -44,7 +51,7 @@ const openStream = (req, res) => {
  * Refusals and answers that need no model come back as JSON, as /ask sends them. A model answer comes
  * as server-sent events: `token` pieces, then one `done` with the citations, model and turn, or one
  * `error`. A turn is stored only when the answer finished and the asker was still there. */
-const askStream = async (req, res) => {
+const answerStream = async (req, res) => {
     try {
         const caller = threads.callerOf(req, res);
         if (!caller) return undefined;
@@ -82,8 +89,15 @@ const askStream = async (req, res) => {
         if (!isAnyProviderConfigured()) {
             return res.send({ status: true, statusText: 'No model configured.', data: { configured: false, answer: '', sources: gathered.sources, scope, mode: modeName, threadId: threadIdOut, ...found } });
         }
-        if (!gathered.sources.length) {
-            return res.send({ status: true, data: { configured: true, answer: '', sources: [], mode: modeName, empty: EMPTY, emptyCode: 'no_match', scope, threadId: threadIdOut, ...found } });
+
+        const apps = await askConnectors.readStep({
+            companyId, userId: uid, question: asked, previous, apps: askConnectors.appsAsked(context), ip: requestAddress(req), viaToken: Boolean(req.apiToken),
+        });
+        const sources = [...apps.sources, ...gathered.sources];
+        const told = askConnectors.hasAny(apps) ? { connectors: askConnectors.forClient(apps) } : {};
+        if (!sources.length) {
+            const emptyCode = (apps.proposals.length && 'connector_waiting') || (askConnectors.hasAny(apps) && 'connector_unread') || 'no_match';
+            return res.send({ status: true, data: { configured: true, answer: '', sources: [], mode: modeName, empty: EMPTY_APPS[emptyCode] || EMPTY, emptyCode, scope, threadId: threadIdOut, ...found, ...told } });
         }
 
         const about = await aboutOf(req, companyId, uid);
@@ -91,8 +105,8 @@ const askStream = async (req, res) => {
         let streamed = false;
         try {
             const result = await getProvider().chat({
-                systemPrompt: `${research ? RESEARCH_SYSTEM : SYSTEM}${thread ? FOLLOW_UP : ''}${explicit.system}`,
-                messages: [...threads.historyOf(thread), { role: 'user', content: promptFor(asked, gathered.sources, gathered.intent, about) }],
+                systemPrompt: `${research ? RESEARCH_SYSTEM : SYSTEM}${thread ? FOLLOW_UP : ''}${explicit.system}${askConnectors.systemFor(apps)}`,
+                messages: [...threads.historyOf(thread), { role: 'user', content: `${promptFor(asked, sources, gathered.intent, about)}${askConnectors.promptBlock(apps)}` }],
                 maxTokens: research ? RESEARCH_TOKENS : ASK_TOKENS,
                 temperature: 0.2,
                 spend: { feature: FEATURES.ASK, companyId, userId: uid },
@@ -105,7 +119,7 @@ const askStream = async (req, res) => {
             if (!stream.open) return undefined;
             const answer = String(result.content || '').trim();
             if (!streamed) piecesOf(answer).forEach((text) => stream.send({ event: 'token', text }));
-            const cited = gathered.sources.filter((s) => answer.includes(`[${s.ref}]`));
+            const cited = sources.filter((s) => answer.includes(`[${s.ref}]`));
             const turn = {
                 turnId: new mongoose.Types.ObjectId().toString(),
                 question: asked,
@@ -116,7 +130,8 @@ const askStream = async (req, res) => {
                 createdAt: new Date(),
             };
             const savedId = answer ? await threads.appendTurn(companyId, uid, thread, turn) : threadIdOut;
-            const shareToken = askAnswerToken({ companyId, uid, question: asked, answer, cited, sources: gathered.sources });
+            // What was read from the asker's own apps is theirs alone, so an answer built on it is never offered for posting.
+            const shareToken = apps.sources.length ? '' : askAnswerToken({ companyId, uid, question: asked, answer, cited, sources });
             stream.send({
                 event: 'done',
                 configured: true,
@@ -125,11 +140,12 @@ const askStream = async (req, res) => {
                 turnId: answer ? turn.turnId : '',
                 answer,
                 cited,
-                sources: gathered.sources,
+                sources,
                 scope,
                 usage: { tokens: result.totalTokens, model: result.model },
                 ...(shareToken ? { shareToken } : {}),
                 ...found,
+                ...told,
             });
         } catch (error) {
             logger.error(`ai ask stream: ${error.message}`);
@@ -144,5 +160,11 @@ const askStream = async (req, res) => {
         return res.send({ status: false, statusText: error.message });
     }
 };
+
+/* The whole question is one egress context, so once a connected app was read nothing in it fetches the web (FR-59). */
+const askStream = (req, res) => egressContext.run(
+    { companyId: String((req.headers || {}).companyid || ''), actor: String(req.uid || '') },
+    () => answerStream(req, res),
+);
 
 module.exports = { askStream };

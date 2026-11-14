@@ -8,7 +8,6 @@ jest.mock('../Modules/Tasks/helpers/task_class_Mongo', () => ({ taskMongo: { cre
 
 const mongoose = require('mongoose');
 const { SCHEMA_TYPE } = require('../Config/schemaType');
-const cloud = require('../Modules/CloudStorage/controller');
 const emailIn = require('../Modules/EmailIn/controller');
 const integrations = require('../Modules/Integrations/controller');
 
@@ -41,29 +40,6 @@ beforeEach(() => {
         if (method === 'find') return [];
         if (method === 'findOneAndUpdate') return { _id: ROW, type: 'zapier', config: {}, enabled: false };
         return null;
-    });
-});
-
-describe('cloud storage takes the company from the verified request', () => {
-    it('lists providers for the header company', async () => {
-        const r = await call(cloud.listProviders);
-
-        expect(r.body).toMatchObject({ status: true });
-        expect(companiesUsed()).toEqual([C]);
-    });
-
-    it('refuses a query naming another company and reads nothing', async () => {
-        const r = await call(cloud.listProviders, { query: { companyId: OTHER_COMPANY } });
-
-        expect(r.code).toBe(403);
-        expect(mockCrud).not.toHaveBeenCalled();
-    });
-
-    it('refuses a body naming another company and writes nothing', async () => {
-        const r = await call(cloud.clearSettings, { params: { provider: 'google_drive' }, body: { companyId: OTHER_COMPANY } });
-
-        expect(r.code).toBe(403);
-        expect(mockCrud).not.toHaveBeenCalled();
     });
 });
 

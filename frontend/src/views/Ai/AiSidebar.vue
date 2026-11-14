@@ -69,7 +69,7 @@ import { useAccounts } from "./useAccounts";
 import { useCompanyView } from "./useCompanyView";
 import { fetchConnectedAgents } from "./useRunnableAgents";
 import { AGENTS_CHANGED_EVENT, POLICY_CHANGE } from "./agentFeed";
-import { CONNECT_AI_ROUTE } from "@/router/ai/connect";
+import { CUSTOMIZE_ROUTE } from "@/router/ai/customize";
 
 defineOptions({ name: "AiSidebar" });
 
@@ -81,7 +81,7 @@ const route = useRoute();
 const companyId = inject("$companyId");
 const { waiting, spend, pauseAll } = useAgents();
 const { running, refresh: refreshLive } = useLiveAgents();
-const { canManage, canBuild, seesSkills, canAsk, canConnectOwnAi } = useAgentAccess();
+const { canManage, canBuild, seesSkills, canAsk } = useAgentAccess();
 // The same policy the card in AI > Accounts sets (WorkspaceConnectedPause), so the two never disagree.
 const { policy, loadPolicy, saveConnectedPaused } = useAccounts();
 const socket = inject("$socket", null);
@@ -97,8 +97,7 @@ const everyday = computed(() => [
     { name: "AiInbox", label: "Ai.inbox", icon: "inbox", count: waiting.value },
     { name: "AiHub", label: "Ai.agents", icon: "agent" },
     ...(seesSkills.value || canBuild.value ? [{ name: "AiSkills", label: "Ai.skills", icon: "docs" }] : []),
-    { name: "Connections", label: "Parity.nav_connections", icon: "integrations" },
-    ...(canConnectOwnAi.value ? [{ name: CONNECT_AI_ROUTE, label: "ConnectAi.title", icon: "key" }] : [])
+    { name: CUSTOMIZE_ROUTE, label: "Connectors.screen.nav", icon: "integrations" }
 ]);
 
 const setup = computed(() => [

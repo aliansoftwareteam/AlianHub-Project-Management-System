@@ -77,10 +77,9 @@ exports.listCatalog = async (req, res) => {
     try {
         const flag = require('../Agents/connectors/flag');
         const registry = require('../Connectors/registry');
-        const connectors = flag.requested();
-        // Mirrors the connect/members route condition exactly: those routes exist only where a registry provider is named.
-        const registryNamed = registry.list().some((definition) => flag.named().includes(definition.id));
-        return res.send({ status: true, data: R.getCatalog(), ...(connectors.length ? { connectors } : {}), ...(registryNamed ? { registryConnectors: true } : {}), ...(flag.named().length ? { connectorLimits: true } : {}) });
+        // Mirrors the connector route condition exactly: those routes exist only where a registry provider is named.
+        const connectors = registry.list().map((definition) => definition.id).filter((id) => flag.named().includes(id));
+        return res.send({ status: true, data: R.getCatalog(), ...(connectors.length ? { connectors, registryConnectors: true } : {}), ...(flag.named().length ? { connectorLimits: true } : {}) });
     }
     catch (e) { logger.error(`listCatalog: ${e.message}`); return res.send({ status: false, statusText: e.message }); }
 };

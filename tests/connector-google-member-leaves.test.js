@@ -26,14 +26,15 @@ const { SCHEMA_TYPE } = require('../Config/schemaType');
 const { dbCollections } = require('../Config/collections');
 const members = require('../Modules/settings/Members/controller');
 const scim = require('../Modules/Scim/provisioning');
-const google = require('../Modules/Agents/connectors/googleConnection');
+const lifecycle = require('../Modules/Connectors/connection');
+const { resolveConnection } = require('../Modules/Connectors/resolveConnection');
 
 const C = '6f00000000000000000000c1';
 const OWNER = '6f0000000000000000000001';
 const LEAVER = '6f0000000000000000000003';
 const STAYER = '6f0000000000000000000004';
 const SESSION = '6e0000000000000000000001';
-const G = 'google_calendar';
+const G = 'google';
 const T = SCHEMA_TYPE.CONNECTOR_CONNECTIONS;
 const ENV = {
     CONNECTORS: G, SECRETS_STORE: 'true', SECRETS_KEY: crypto.randomBytes(24).toString('hex'), AGENT_TAINT_ROUTING: 'on',
@@ -44,15 +45,22 @@ const ENV = {
 const seat = (userId) => mockDb.store[SCHEMA_TYPE.COMPANY_USERS].find((r) => r.userId === userId);
 const connection = (userId) => (mockDb.store[T] || []).find((r) => r.userId === userId);
 const sealed = () => (mockDb.store[SCHEMA_TYPE.SECRETS] || []).filter((s) => s.ciphertext);
-const handleFor = (userId) => google.usableTokenHandle({ companyId: C, userId, connector: G });
+const usable = async (userId) => {
+    try {
+        return { token: await (await resolveConnection({ companyId: C, userId, provider: G })).getAccessToken(), reason: '' };
+    } catch (error) {
+        return { token: null, reason: error.code };
+    }
+};
+const accessHandle = (userId) => connection(userId).handles.access;
 
 const member = (userId, roleType) => mockDb.seed(SCHEMA_TYPE.COMPANY_USERS, {
     userId, roleType, status: 2, isDelete: false, companyId: C, designation: 0, userEmail: `${userId}@e2e.test`,
 });
 const connect = async (userId, sub) => {
-    const { url } = await google.start({ companyId: C, userId, sessionId: SESSION, connector: G, origin: '' });
+    const { url } = await lifecycle.start({ companyId: C, userId, sessionId: SESSION, provider: G, products: ['calendar'], origin: '' });
     const { state, code } = mockGoogle.consent(url, { email: `${userId}@example.test`, sub });
-    await google.complete({ companyId: C, userId, sessionId: SESSION, connector: G, state, code });
+    await lifecycle.complete({ companyId: C, userId, sessionId: SESSION, provider: G, state, code });
 };
 const update = async (userId, data) => {
     const res = { code: 200 };
@@ -84,18 +92,20 @@ afterAll(() => {
 
 const ended = async () => {
     expect(mockGoogle.endpoints()).toEqual(['revoke:revoke']);
-    expect(connection(LEAVER)).toMatchObject({ status: 'revoked', disconnectedBy: 'member_removed', secretHandles: {}, deletedStatusKey: 1 });
+    expect(connection(LEAVER)).toMatchObject({ status: 'revoked', disconnectedBy: 'member_removed', handles: {}, deletedStatusKey: 1 });
     expect(sealed()).toHaveLength(2);
-    expect(await handleFor(LEAVER)).toEqual({ handle: null, reason: 'no_seat' });
+    expect(await usable(LEAVER)).toEqual({ token: null, reason: 'not_member' });
     expect(connection(STAYER).status).toBe('connected');
-    expect((await handleFor(STAYER)).handle).toBe(connection(STAYER).secretHandles.access_token);
+    expect((await usable(STAYER)).token).toBeTruthy();
     expect(mockGoogle.calls).toHaveLength(1);
 };
 
 describe('a member with a Google connection leaves the workspace', () => {
     it('holds a usable connection while they have a seat', async () => {
-        expect((await handleFor(LEAVER)).handle).toBe(connection(LEAVER).secretHandles.access_token);
+        expect((await usable(LEAVER)).token).toBeTruthy();
+        expect(accessHandle(LEAVER)).toBeTruthy();
         expect(sealed()).toHaveLength(4);
+        expect(mockGoogle.calls).toHaveLength(0);
     });
 
     it.each([
@@ -122,14 +132,14 @@ describe('a member with a Google connection leaves the workspace', () => {
         expect((await update(LEAVER, { roleType: 0 })).code).toBe(200);
         expect(mockGoogle.calls).toHaveLength(0);
         expect(connection(LEAVER).status).toBe('connected');
-        expect(await handleFor(LEAVER)).toEqual({ handle: null, reason: 'no_seat' });
+        expect(await usable(LEAVER)).toEqual({ token: null, reason: 'not_member' });
     });
 
     it('a removal still succeeds when Google cannot be reached', async () => {
         mockGoogle.answers.revoke = new Error('socket hang up');
         expect((await update(LEAVER, { isDelete: true })).code).toBe(200);
         expect(seat(LEAVER).isDelete).toBe(true);
-        expect(connection(LEAVER)).toMatchObject({ status: 'revoked', secretHandles: {} });
+        expect(connection(LEAVER)).toMatchObject({ status: 'revoked', handles: {} });
         expect(sealed()).toHaveLength(2);
     });
 

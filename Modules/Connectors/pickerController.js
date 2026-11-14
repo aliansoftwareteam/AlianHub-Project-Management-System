@@ -3,7 +3,7 @@
  * The person is always the session (`req.uid`), never a field of the request, so no route can get a token, a
  * preview or an import for anyone but the caller (FR-40). An API token holds no personal connection, and a guest
  * or a removed member has no seat. Picking and importing use each person's own module connection; connecting is
- * done once on My connections (072), not here.
+ * done once on Connectors (072), not here.
  *
  * Downloads for "import a copy" go through a controlled axios with the owner's own connection token and an
  * explicit host, not the agent egress path: they stream whole files (up to MAX_IMPORT_BYTES) rather than the
@@ -83,16 +83,16 @@ exports.token = async (req, res) => {
         try {
             connection = await ownConnection(who, meta.provider);
         } catch (e) {
-            return refuse(res, 409, 'Connect Google on My connections and tick Drive first.', { code: (e && e.code) || 'not_connected' });
+            return refuse(res, 409, 'Connect Google on Connectors and tick Drive first.', { code: (e && e.code) || 'not_connected' });
         }
         if (!(connection.scopes || []).includes(meta.scope)) {
-            return refuse(res, 409, 'Tick Drive on your Google connection in My connections first.', { code: 'scope_missing' });
+            return refuse(res, 409, 'Tick Drive on your Google connection in Connectors first.', { code: 'scope_missing' });
         }
         let token;
         try {
             token = await connection.getAccessToken();
         } catch (e) {
-            return refuse(res, 409, 'Reconnect Google on My connections.', { code: (e && e.code) || 'reauth_required' });
+            return refuse(res, 409, 'Reconnect Google on Connectors.', { code: (e && e.code) || 'reauth_required' });
         }
         return res.send({ status: true, statusText: 'Picker ready.', data: { token, config: googlePickerConfig(app) } });
     } catch (e) {
@@ -187,8 +187,8 @@ exports.importFile = async (req, res) => {
                 token = await (await ownConnection(who, meta.provider)).getAccessToken();
             } catch (e) {
                 const statusText = meta.source === 'dropbox'
-                    ? 'Connect Dropbox on My connections, or re-pick the file with "Import a copy".'
-                    : 'Connect Google on My connections and tick Drive first.';
+                    ? 'Connect Dropbox on Connectors, or re-pick the file with "Import a copy".'
+                    : 'Connect Google on Connectors and tick Drive first.';
                 return refuse(res, 409, statusText, { code: (e && e.code) || 'not_connected' });
             }
             authHeader = { Authorization: `Bearer ${token}` };

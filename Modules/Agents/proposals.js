@@ -21,6 +21,7 @@ const planShown = require('./planShown');
 const planFollowUp = require('./planFollowUp');
 const proposalText = require('./proposalText');
 const connectorWrites = require('../Connectors/writes');
+const agentConnectors = require('./agentConnectors');
 
 // AI Inbox proposals (9b). A proposal says what, why and exactly which registry
 // actions it would run. Approving applies them through perform() — so they are
@@ -163,11 +164,16 @@ const mcpActor = async (p) => (p.oauthGrantId
 /* The person whose connection a connector write uses: who filed it over MCP, or whom the run works for. */
 const connectionOwnerOf = (source, requestedBy, connectionOwner) => String((source === SOURCE_MCP ? requestedBy : connectionOwner) || '');
 
+const CALLER_OF_SOURCE = Object.freeze({ [SOURCE_MCP]: 'mcp', [SOURCE_ASK]: 'chat' });
+
 const create = async (companyId, { agent, runId, taskId, taskIds, projectId, what, why, changes, gate, priority, cost, taint: marker, source, requestedBy, tokenId, tokenProjectIds, allowedActions, oauthClientId, oauthGrantId, finding, connectionOwner }) => {
     const check = validateChanges(changes);
     if (!check.valid) throw Object.assign(new Error(check.reason), { status: 400 });
     const owner = connectorWrites.hasWrite(changes) ? connectionOwnerOf(source, requestedBy, connectionOwner) : '';
-    const saved = await connectorWrites.fileChanges(companyId, owner, changes, { via: source === SOURCE_MCP ? 'mcp' : 'agent', id: String(agent._id), runId }, async (prepared) => {
+    // An MCP client, the AI chat or a detached filing acts for a person, not for a workspace agent, so it has no ticks to keep to.
+    const via = CALLER_OF_SOURCE[source] || 'agent';
+    const refusalOf = via !== 'agent' || DETACHED.includes(source) ? null : (action) => agentConnectors.refusalFor(agent.connectors, action);
+    const saved = await connectorWrites.fileChanges(companyId, owner, changes, { via, id: String(agent._id), runId, refusalOf }, async (prepared) => {
         const scopedProjectId = projectId || await projectOfTask(companyId, taskId);
         return MongoDbCrudOpration(companyId, {
             type: SCHEMA_TYPE.AGENT_PROPOSALS,

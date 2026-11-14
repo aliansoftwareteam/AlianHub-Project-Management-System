@@ -1,7 +1,7 @@
 /* Retires the legacy per-person cloud-storage picker (Modules/CloudStorage) in favour of the connectors module
  * (076, FR-39). Each `cloud_storage_connections` row held that person's OWN OAuth app — the client id and, in the
  * clear, the client secret — plus their grant. Under the module the app is the instance's or company's, never a
- * person's, so those grants cannot be carried over: the person reconnects once on My connections (072). This
+ * person's, so those grants cannot be carried over: the person reconnects once on Connectors (072). This
  * migration therefore deletes the stored client secrets (the unsealed `config`) and the tokens, and closes the
  * row. Linked attachments already on tasks keep working (they carry the file id, not a connection), and files
  * imported as copies are ordinary uploads, so nothing of the person's data is lost.
@@ -9,7 +9,7 @@
  * Cutover gate, per provider (the 080 pattern): a row is cleared only once CONNECTORS serves the module provider
  * that replaces it — `google` for `google_drive`, `dropbox` for `dropbox`. Before then the old picker is still the
  * only one a person has, so clearing their credentials would stranded them with no picker; the migration holds and
- * records itself applied, to be re-run after the cutover.
+ * records itself applied; the old picker is gone since 077, and 083 clears the rows this leaves.
  *
  * Idempotent: `status: 'migrated'` both marks a cleared row and excludes it from a second run, so running twice
  * clears nothing the second time. `down` restores no data — the secrets are gone and cannot be un-deleted — it only
@@ -41,10 +41,12 @@ async function clearCompany(ctx, companyId, pairs, counts) {
 module.exports = {
     id: ID,
     scope: 'company',
+    PAIRS,
+    clearCompany,
     async up(ctx) {
         const pairs = served();
         if (!pairs.length) {
-            ctx.logger.info(`[migrations] ${ID}: holding — CONNECTORS serves neither 'google' nor 'dropbox', so the module picker is not yet live; clearing the old per-person credentials would leave people with no picker. Re-run after the cutover: npm run migrate -- down ${ID} && npm run migrate -- up`);
+            ctx.logger.info(`[migrations] ${ID}: holding — CONNECTORS serves neither 'google' nor 'dropbox', so the module picker is not yet live; clearing the old per-person credentials would leave people with no picker. 083 clears the rows this leaves.`);
             return;
         }
         await ctx.forEachCompany(async (companyId) => {

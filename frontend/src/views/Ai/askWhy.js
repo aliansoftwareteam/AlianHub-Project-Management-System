@@ -5,7 +5,8 @@ export const KIND_KEYS = Object.freeze({
     page: "Ask.kind_page",
     project: "Ask.kind_project",
     comment: "Ask.kind_comment",
-    transcript: "Ask.kind_transcript"
+    transcript: "Ask.kind_transcript",
+    connector: "Ask.kind_connector"
 });
 
 export const REASON_KEYS = Object.freeze({
@@ -28,6 +29,8 @@ const MESSAGE_KEYS = Object.freeze({
     question_required: "Ask.error_question_required",
     unauthenticated: "Ask.error_unauthenticated",
     no_match: "Ask.empty_no_match",
+    connector_unread: "Ask.empty_connector_unread",
+    connector_waiting: "Ask.empty_connector_waiting",
     scope: "Ask.note_scope"
 });
 

@@ -1,5 +1,6 @@
 import dailyRunLimit from "@agentDailyRunLimit";
 import { sameValue } from "./revisionDiff";
+import { ticksOf } from "./agentConnectorTicks";
 
 /* The form fills fields the agent never set with display defaults (a missing
  * rate limit reads as the server's default), so a save must not send what the user left alone:
@@ -10,6 +11,7 @@ export const formFromAgent = (agent) => ({
     spendCapUsd: Number(agent.spendCapUsd || 30),
     model: agent.model || "",
     projectIds: (agent.projectIds || []).map(String),
+    connectors: ticksOf(agent.connectors),
     role: agent.role || "",
     // An agent from before sharing has no visibility and is everyone's (Modules/Agents/agentAudience.js).
     visibility: ["private", "shared", "everyone"].includes(agent.visibility) ? agent.visibility : "everyone",
