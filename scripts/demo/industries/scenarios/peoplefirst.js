@@ -394,7 +394,7 @@ module.exports = {
             ],
         },
     ],
-    dashboard: { name: 'People operations', project: 'onb', cards: ['tasks_by_status', 'at_risk', 'due_soon', 'project_pulse'] },
+    dashboard: { name: 'People operations', project: 'onb', cards: ['tasks_by_status', 'at_risk', 'due_soon', 'project_pulse', 'logged_vs_estimate', 'my_time'] },
     guide: {
         project: 'hire',
         intro: 'PeopleFirst runs hiring, onboarding and compliance for a 60-person company. You are signed in as the **Head of People**. **Hiring Pipeline** follows every candidate, **Onboarding** takes each new starter through their first 30 days, and **Compliance and Training** keeps every date that matters. Role agents take notes, draft and watch dates; people decide.',

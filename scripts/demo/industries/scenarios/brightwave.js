@@ -498,7 +498,7 @@ module.exports = {
             ],
         },
     ],
-    dashboard: { name: 'Agency at a glance', project: 'camp', cards: ['tasks_by_status', 'at_risk', 'due_soon', 'project_pulse'] },
+    dashboard: { name: 'Agency at a glance', project: 'camp', cards: ['tasks_by_status', 'at_risk', 'due_soon', 'project_pulse', 'logged_vs_estimate', 'my_time'] },
     guide: {
         project: 'camp',
         intro: 'Brightwave is a digital marketing agency running campaigns, content, SEO and social media for retail and SaaS clients on monthly retainers. You are signed in as the **Managing Director**. Three processes run side by side: **Client Campaigns** (from the signed brief to the results report), **Content Studio** (articles, landing pages and social posts through SEO, brand and client sign-off) and **Accounts and Billing** (retainers, timesheets, invoices and scope changes). Role agents plan, draft, check and chase; people approve and talk to clients.',

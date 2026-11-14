@@ -372,6 +372,37 @@ async function personComment({ companyId, project, taskId, userId, text }) {
     return saved && saved._id ? String(saved._id) : null;
 }
 
+/* Time a person logged on a task, through the manual log-time route itself (Modules/LogTime). */
+async function logTime({ companyId, project, taskId, userId, day, startTime, minutes, description }) {
+    const { manualLogTime } = require('../../../../Modules/LogTime/controllerV2/manualLogtime');
+    const task = await findOne(companyId, SCHEMA_TYPE.TASKS, { _id: oid(taskId) }, { sprintId: 1, TaskName: 1, TaskKey: 1 });
+    const [startHour, startMinute] = startTime.split(':').map(Number);
+    const endTotal = startHour * 60 + startMinute + minutes;
+    const endTime = `${String(Math.min(23, Math.floor(endTotal / 60))).padStart(2, '0')}:${String(Math.min(59, endTotal % 60)).padStart(2, '0')}`;
+    const saved = await viaHandler(manualLogTime, {
+        companyId,
+        uid: userId,
+        body: {
+            logTimeDate: day,
+            description,
+            startLogTime: startTime,
+            endLogTime: endTime,
+            timeDuration: `${Math.floor(minutes / 60)}:${String(minutes % 60).padStart(2, '0')}`,
+            ticketId: String(taskId),
+            taskId: String(taskId),
+            projectId: String(project._id),
+            isEdit: false,
+            dateFormat: 'yyyy-MM-dd',
+            taskName: task.TaskName || task.TaskKey || 'Task',
+            projectName: project.ProjectName,
+            sprintId: String(task.sprintId),
+            timeZone: 'UTC',
+            billable: true,
+        },
+    });
+    return saved && saved._id ? String(saved._id) : null;
+}
+
 /* Agents */
 
 async function createRoleAgents({ companyId, roleKeys, projectIds, ownerId }) {
@@ -639,6 +670,7 @@ module.exports = {
     relate,
     moveTask,
     personComment,
+    logTime,
     createRoleAgents,
     createSkillAgent,
     configureAgent,

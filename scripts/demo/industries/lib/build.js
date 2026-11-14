@@ -12,6 +12,36 @@ const DAY_MS = 24 * 60 * 60 * 1000;
 // A seeded approval outlives the engine's three-day default, so a demo between nightly resets never shows it expired.
 const APPROVAL_DEADLINE_MS = 7 * DAY_MS;
 
+/* A stable number from a string, so the same task key always gets the same made-up estimate across resets. */
+const hashOf = (value) => {
+    let h = 0;
+    const s = String(value);
+    for (let i = 0; i < s.length; i += 1) h = (h * 31 + s.charCodeAt(i)) >>> 0;
+    return h;
+};
+
+/* A scenario rarely bothers to say how long a task should take; most need an estimate anyway, for the
+ * logged-vs-estimate dashboard card to compare real logged time against. 2 to 10 hours, stable per key. */
+const defaultEstimateHours = (key) => 2 + (hashOf(key) % 9);
+
+const TIME_LOG_WORKDAYS = 15;
+
+/* Workdays (Mon-Fri) ending yesterday, oldest first — so a nightly --reset always logs a week that has
+ * already finished, never a half-logged today. Noon avoids a DST edge shifting the calendar day. */
+const workdaysEndingYesterday = (count) => {
+    const days = [];
+    const cursor = new Date();
+    cursor.setHours(12, 0, 0, 0);
+    cursor.setDate(cursor.getDate() - 1);
+    while (days.length < count) {
+        if (cursor.getDay() !== 0 && cursor.getDay() !== 6) {
+            days.unshift(`${cursor.getFullYear()}-${String(cursor.getMonth() + 1).padStart(2, '0')}-${String(cursor.getDate()).padStart(2, '0')}`);
+        }
+        cursor.setDate(cursor.getDate() - 1);
+    }
+    return days;
+};
+
 const playbooks = () => require('../../../../Modules/Agents/rolePlaybooks');
 const roleExists = (key) => {
     const [blueprint, slug] = String(key).split('/');
@@ -138,13 +168,16 @@ async function seedTasks({ made, companyId, owner, people, adapter, report }) {
     const createOne = async (task, parentId, inherited = {}) => {
         const lead = task.lead || inherited.lead || project.lead;
         const assignees = listOf(task.assignees).length ? task.assignees : listOf(inherited.assignees);
+        // A top-level task always gets an effort estimate, made up when the scenario left it out, so the
+        // logged-vs-estimate dashboard card always has something real to compare logged time against.
+        const withEstimate = parentId ? task : { ...task, estimate: Number.isFinite(task.estimate) ? task.estimate : defaultEstimateHours(task.key) };
         return adapter.createTask({
             companyId,
             project: made.record,
             list: made.list,
             actor: actorOf(lead),
             ownerId: owner.userId,
-            task,
+            task: withEstimate,
             status: made.statuses.get(task.status),
             taskType: made.types.get(task.type || inherited.type) || defaultType,
             assigneeIds: assignees.map((key) => people[key].userId),
@@ -171,6 +204,43 @@ async function seedRelations({ scenario, made, byProject, people, adapter }) {
         for (const ref of listOf(task.blockedBy)) {
             const target = taskRef(scenario, ref.includes('.') ? ref : `${made.project.key}.${ref}`);
             await adapter.relate({ companyId: made.record.CompanyId, taskId: made.tasks.get(task.key), blockedById: byProject.get(target.project.key).tasks.get(target.task.key), actor });
+        }
+    }
+}
+
+const FINISHED_STATUS_TYPES = new Set(['done', 'close']);
+
+/* Real time logged on every top-level task past its opening status — nothing on a task that has not
+ * started. A finished task logs about 90% of its estimate, an active one about 45%, split across its
+ * assignees (or its lead, when none) in 2 or 3 entries on different workdays in the trailing window. */
+async function seedTimeLogs({ made, companyId, people, adapter, report }) {
+    const { project } = made;
+    const days = workdaysEndingYesterday(TIME_LOG_WORKDAYS);
+    for (const task of listOf(project.tasks)) {
+        const status = made.statuses.get(task.status);
+        if (!status || status.type === 'default_active') continue;
+        const taskId = made.tasks.get(task.key);
+        const estimateMinutes = Math.round((Number.isFinite(task.estimate) ? task.estimate : defaultEstimateHours(task.key)) * 60);
+        const loggers = listOf(task.assignees).length ? task.assignees : [task.lead || project.lead];
+        const finished = FINISHED_STATUS_TYPES.has(status.type);
+        const entriesPerPerson = finished ? 3 : 2;
+        const perPersonMinutes = Math.round((estimateMinutes * (finished ? 0.9 : 0.45)) / loggers.length);
+        const perEntry = Math.max(30, Math.min(240, Math.round(perPersonMinutes / entriesPerPerson)));
+        for (const personKey of loggers) {
+            for (let entry = 0; entry < entriesPerPerson; entry += 1) {
+                const day = days[hashOf(`${task.key}:${personKey}:${entry}`) % days.length];
+                await adapter.logTime({
+                    companyId,
+                    project: made.record,
+                    taskId,
+                    userId: people[personKey].userId,
+                    day,
+                    startTime: '09:00',
+                    minutes: perEntry,
+                    description: `Work on ${shortName(task)}`,
+                });
+                report.timeLogs += 1;
+            }
         }
     }
 }
@@ -367,7 +437,7 @@ async function buildShowcase({ scenario, owner, adapter, log = () => {} }) {
     assertCoherent(scenario);
     const report = {
         people: 0, projects: 0, tasks: 0, agents: 0, automations: 0, comments: 0, moves: 0, automationRuns: 0, simulatedRuns: 0, proposals: 0,
-        routingRules: 0, suggestions: 0, needsRouting: 0, handOvers: 0, workflows: 0, workflowRuns: 0, simulatedSteps: 0,
+        routingRules: 0, suggestions: 0, needsRouting: 0, handOvers: 0, workflows: 0, workflowRuns: 0, simulatedSteps: 0, timeLogs: 0,
     };
     const marker = { by: MARK, key: scenario.key, industry: scenario.industry, ownerId: owner.userId };
     log(`${scenario.company.name}`);
@@ -383,6 +453,8 @@ async function buildShowcase({ scenario, owner, adapter, log = () => {} }) {
         log(`  ${project.name}: ${listOf(project.tasks).length} tasks`);
     }
     for (const made of byProject.values()) await seedRelations({ scenario, made, byProject, people, adapter });
+    for (const made of byProject.values()) await seedTimeLogs({ made, companyId, people, adapter, report });
+    log(`  ${report.timeLogs} time logs, through yesterday`);
 
     const agents = await seedAgents({ scenario, companyId, owner, byProject, adapter, report, log });
     await seedAutomations({ scenario, companyId, owner, people, byProject, adapter, report });

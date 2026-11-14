@@ -443,7 +443,7 @@ module.exports = {
             ],
         },
     ],
-    dashboard: { name: 'Finance operations', project: 'ap', cards: ['tasks_by_status', 'at_risk', 'due_soon', 'project_pulse'] },
+    dashboard: { name: 'Finance operations', project: 'ap', cards: ['tasks_by_status', 'at_risk', 'due_soon', 'project_pulse', 'logged_vs_estimate', 'my_time'] },
     guide: {
         project: 'ap',
         intro: [
