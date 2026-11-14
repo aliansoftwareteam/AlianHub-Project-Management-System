@@ -27,8 +27,7 @@ Open **AI** in the left bar. The menu holds:
 | **AI Inbox** | Everything agents want to change, waiting for a decision, plus their reports and history |
 | **AI Agents** | The agents in this workspace. Owners and admins make new ones here |
 | **Skill library** | The skills agents use |
-| **Connections** | What this workspace is connected to, and what agents may do through each connection |
-| **Connect your AI** | Connect your own AI app |
+| **Customize** | **Connectors**, your own accounts such as Google or Slack for AI; **Connect your AI**, your own AI app; and, for owners and admins, **Workspace** |
 | **Teammates**, **Routing**, **Team packs** | Agents as members of your team, and which agent takes which task. Under **Setup** |
 | **Workflows** | Multi-step workflows. Owners and admins only. Under **Setup** |
 | **Audit log** | Every change an agent made, proposed or was refused |
@@ -54,6 +53,16 @@ Open **AI** in the left bar. The menu holds:
 | L3 | **Acts, also on a schedule** | Like L2, and may also run on a schedule without anyone starting it. |
 
 A new agent starts low. At L2, moving a task between lists and changing who is assigned still wait in the **AI Inbox**. Destructive actions, such as deleting, are never available to an agent at any level.
+
+## Connected apps
+
+An agent can read from connected apps, such as Google Calendar, Slack or GitHub, only if they are ticked on it. On the agent's page, open its **Connectors** tab and, under **Connected apps this agent may use**, tick the apps and the tools in each one. A new agent has none ticked.
+
+- The agent reads through the connection of the person each run works for: whoever started the run, or the owner of the rule or schedule that started it. It never uses its maker's connection.
+- Every change it proposes in an app, such as a Slack message or a calendar event, waits for that person's approval in their **Inbox**. Nobody else can approve it.
+- A skill step that reads an app the agent may not use is refused, with the reason.
+
+People connect their own apps under [Connectors](./connectors).
 
 ## Make an agent (owners and admins)
 
@@ -137,6 +146,7 @@ Every change, proposal and refusal is written to the [audit log](/ai/audit-log).
 ## Related
 
 - [Ask AlianHub](./ai-ask)
+- [Connectors](./connectors)
 - [Connect your AI](/ai/)
 - [Team packs and role agents](/ai/team-packs)
 - [Approve in the Inbox](/ai/approve-in-the-inbox)

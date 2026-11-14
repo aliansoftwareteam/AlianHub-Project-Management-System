@@ -21,7 +21,7 @@ The bar down the left edge is how you get everywhere. Home, Projects and Inbox a
 | **Inbox** | What needs you: mentions, replies, reminders and approvals. |
 | **Planner** | Block out time for your tasks across the week. |
 | **Chat** | Channels and direct conversations with your team. |
-| **AI** | **Ask** the built-in assistant, or **Connect your AI** app. |
+| **AI** | **Ask** the built-in assistant. Under **Customize**, connect your own accounts for AI, or your own AI app. |
 | **Docs** | Pages of writing: briefs, specs, notes, wiki pages. |
 | **Time** | Your timesheet, logged time and timers. |
 | **More** | Reports, Members, Approvals, Automations, Trash, Settings and the rest. |

@@ -36,9 +36,9 @@ What AlianHub does to protect your data, what you as the operator must do, and t
 | Key | What it protects | Rotating it |
 |---|---|---|
 | `JWT_SECRET` | signs sessions; derives the key that encrypts the secrets saved in the Instance console | logs everyone out, and secrets saved in the console read as "not set" until you enter them again |
-| `SECRETS_KEY` | with `SECRETS_STORE=true`, seals integration and webhook secrets in a per-workspace store (AES-256-GCM); at least 32 characters | move the old value to `SECRETS_KEY_PREVIOUS`, set the new one, restart, run `npm run secrets:reencrypt`; unset the previous key only when the command says no live secret uses it |
+| `SECRETS_KEY` | with `SECRETS_STORE=true`, seals integration and webhook secrets, and members' connector tokens, in a per-workspace store (AES-256-GCM); at least 32 characters | move the old value to `SECRETS_KEY_PREVIOUS`, set the new one, restart, run `npm run secrets:reencrypt`; unset the previous key only when the command says no live secret uses it |
 | `TWO_FACTOR_ENC_KEY` | authenticator secrets at rest | secrets stored under the old key can no longer be read; keep it stable |
-| `CLOUD_STORAGE_ENC_KEY` | people's Google Drive and Dropbox app credentials | credentials stored under the old key can no longer be read; keep it stable |
+| `CLOUD_STORAGE_ENC_KEY` | integration credentials kept in the database while `SECRETS_STORE` is off, and the state of a GitHub App sign-in; without it `JWT_SECRET` is used | values stored under the old key can no longer be read; keep it stable |
 | `AUDIT_CHAIN_KEY` | the audit hash chain (with `AUDIT_CHAIN=true`); at least 32 characters | cannot change once the chain has been on: the server refuses to start with a different key |
 | `INSTANCE_ADMIN_KEY` | lets scripts call `/api/v2/instance/*` with an `adminkey` header | change it and update your scripts |
 

@@ -41,7 +41,7 @@ These always wait:
 - A project set up from one plan, and a new project.
 - A new folder.
 - An automation rule. Only an owner or admin can ask for one, and only an owner or admin can approve it. The rule is saved switched off unless the AI says to switch it on.
-- A message to Slack, if your workspace uses that link. Only an owner or admin can approve it.
+- A change in one of your connected apps, such as a Slack message, a calendar event or a GitHub comment. Only the person whose connection it uses can approve it. See [Connectors](/user-guide/connectors).
 
 These wait in some cases:
 
