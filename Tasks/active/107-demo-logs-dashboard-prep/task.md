@@ -85,11 +85,17 @@ for the "logged vs estimate" chart to compare against. Nothing seeded is dated t
 
 ## Acceptance criteria
 
-- [ ] `npx jest tests/demo-industries.test.js` passes for all 11 scenarios.
-- [ ] Every scenario's dashboard has 1–6 known card keys, including `logged_vs_estimate` and `my_time`.
-- [ ] Every top-level task has a `totalEstimatedTime`; a company built locally shows real `TIMESHEET`
-      rows dated on workdays up to and including yesterday, none today or later.
-- [ ] `npm run i18n:check` and `npm run style:check` pass (no new UI strings or styles expected, but
-      checked since Rule 3/5 are hard rules).
-- [ ] The 8 blueprint companies on the shared demo database show populated dashboards after `--reset`,
-      with the dispatcher and workflow layers intact.
+- [x] `npx jest tests/demo-industries.test.js` passes for all 11 scenarios (65/65, scratch jest config).
+- [x] Every scenario's dashboard has 1–6 known card keys, including `logged_vs_estimate` and `my_time`.
+- [x] Every top-level task has a `totalEstimatedTime`; verified against a real throwaway MongoDB and
+      against the live shared cluster directly: real `TIMESHEET` rows dated on workdays up to and
+      including yesterday, none today or later.
+- [x] `npm run i18n:check` and `npm run style:check` pass.
+- [x] The 8 blueprint companies on the shared demo database were reset and rebuilt, each with its
+      dashboard's 6 cards (including the 2 new ones) and its dispatcher/workflow layers intact —
+      confirmed directly in the database.
+- [ ] **Not yet visible on demo.alianhub.com itself.** The live server process hasn't been restarted
+      since the reset, so it is still serving a cached, now-deleted company and an old 4-card dashboard
+      (this is the same "needs a restart" gotcha the `demo-db-shared-with-live-demo` memory already
+      recorded from 2026-10-17 — it recurred, not a defect in this change). Needs the owner or ops to
+      restart demo.alianhub.com; this session has no access to do that.
