@@ -16,6 +16,18 @@ from [Conventional Commits](https://www.conventionalcommits.org/) on `main`.
 
 ---
 
+## [14.45.0](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/compare/v14.44.1...v14.45.0) (2026-11-14)
+
+
+### 🚀 Features
+
+* **demo:** real time logs, richer dashboards, and an executive overview ([59c8c5c](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/59c8c5cc12cbd50ec7fcc0f54316bdde9e11eebb))
+
+
+### 🐛 Bug Fixes
+
+* **storage:** keep the uploader's id first in a Wasabi profile image name ([c91c4d6](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/c91c4d6c3d6384d5bbf8596642e2395bff986d81))
+
 ## [14.44.1](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/compare/v14.44.0...v14.44.1) (2026-11-14)
 
 
