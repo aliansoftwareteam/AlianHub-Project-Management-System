@@ -9,11 +9,11 @@
 - [x] Unit tests updated (13 pass); style, i18n and ESLint checks pass
 - [x] Checked in light and dark themes, default and orange accent, and at 390 px
 - [ ] Check on a running instance, signed in
-- [ ] PR into `staging`
+- [x] PR into `staging`
 
 ## Last step
 
-Built and checked in an isolated preview page. Not yet checked on a running, signed-in instance. Nothing committed.
+Merged into `staging` as #1785 on 2026-11-12 (build 14.43.0-beta.13); goes to `main` with the promotion #1790. Still to do: check it on a running, signed-in instance.
 
 ## Blockers
 
@@ -32,3 +32,7 @@ None.
 - Checked with a Vite page that mounts `DesktopAppCard` with the app's tokens and `en.js`
   (scenarios: server builds, feed, no builds, loading, plan without tracker). No console errors,
   no horizontal scroll at 390 px.
+
+### 2026-11-13
+
+- Merged into `staging` as #1785, build 14.43.0-beta.13. Beta log updated in the follow-up docs PR; promotion to `main` in #1790.

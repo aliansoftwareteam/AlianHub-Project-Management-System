@@ -90,6 +90,7 @@ const userGuide = [
     text: 'Connect and move',
     items: [
       { text: 'Integrations', link: '/user-guide/integrations' },
+      { text: 'Connectors', link: '/user-guide/connectors' },
       { text: 'Import from ClickUp', link: '/user-guide/import-from-clickup' },
     ],
   },
@@ -144,6 +145,7 @@ const admin = [
       { text: 'Mail', link: '/admin/mail' },
       { text: 'Sign-in: OAuth, SSO and SCIM', link: '/admin/sso-oauth' },
       { text: 'AI providers', link: '/admin/ai-providers' },
+      { text: 'Connectors', link: '/admin/connectors' },
       { text: 'Security', link: '/admin/security' },
     ],
   },

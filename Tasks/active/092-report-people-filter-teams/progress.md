@@ -21,7 +21,7 @@
 
 ## Last step
 
-PR into `staging` opened; two test teams stay in TechNova for now.
+Merged into `staging` as #1783 on 2026-11-12 (build 14.43.0-beta.11); goes to `main` with the promotion #1790. The two TechNova test teams stay until the owner says.
 
 ## Blockers
 
@@ -45,3 +45,7 @@ None.
   Product partly ticked. Project, Tracker, Approvals carried the pick and showed both teams; Variance:
   ticking Product picked 3 people. Mine shows no Teams section.
 - The app has no team delete (no route, no button). Owner chose to keep the two teams for now.
+
+### 2026-11-13
+
+- Merged into `staging` as #1783, build 14.43.0-beta.11. Beta log updated in the follow-up docs PR; promotion to `main` in #1790.

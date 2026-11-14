@@ -87,6 +87,10 @@ It prints each workspace, account and seat state (`none`, `invited`, `removed`) 
 
 Releases that turned on "connect your AI app" by default keep it off on installs that existed before: the upgrade records off for `MCP_OAUTH`, `MCP_TOOLS_DATA`, `MCP_TOOLS_MANAGE` and `MCP_TOOLS_WORK` unless `.env` names them. Turn them on under **Settings › Instance › Settings › AI**. See [AI providers](./ai-providers).
 
+## Upgrade note: connectors
+
+Releases with connectors move members' Google Calendar connections onto the Google connector, remove the per-person Google Drive and Dropbox settings, retire the Slack workspace bot, and move **App connections** into the **GitHub** section of **Integrations**. `CONNECTORS=google_calendar` no longer switches anything on: name `google`. After the upgrade, uninstall the old Slack bot app in Slack. See [Connectors setup](./connectors#upgrading-from-the-older-paths).
+
 ## Version numbers
 
 AlianHub follows semantic versioning. Releases are cut from `main` by release-please and tagged `vMAJOR.MINOR.PATCH`; the changelog lists every change. A new major version (`15.0.0`) can need action from you; minor and patch releases should not.
