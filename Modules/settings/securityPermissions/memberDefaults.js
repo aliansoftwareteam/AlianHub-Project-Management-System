@@ -92,6 +92,7 @@ const GUEST_DEFAULT_PERMISSIONS = Object.freeze({
     ai_skill_risk: null,
     ai_connectors: null,
     ai_external_clients: true,
+    ai_custom_apps: null,
     desktop_tracker: null,
 });
 

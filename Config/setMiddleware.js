@@ -335,10 +335,6 @@ const verifyJWTTokenWithCRoute = [
     // an unauthenticated caller when the rest of the module is protected.
     '/api/v2/automations',
     '/api/v1/integrations',
-    // Cloud storage attachments (AHE-3838). The OAuth callback is NOT under
-    // this prefix — it lives at /api/v1/cloud-oauth/callback because a provider
-    // redirect carries no JWT; its signed `state` authenticates it instead.
-    '/api/v1/cloud-storage',
     // Inbox. Every route reads or writes the CALLER'S OWN notifications, and the
     // controller takes the user from req.uid — which only this middleware sets. Without
     // the prefix listed here no JWT runs, req.uid is empty, and every request is

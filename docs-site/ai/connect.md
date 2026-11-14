@@ -14,9 +14,9 @@ If you have no account, ask your workspace admin to invite you. If your AI app o
 ## Open the page
 
 1. In AlianHub, open **AI** in the left menu.
-2. Choose **Connect your AI**.
+2. Choose **Customize**, then the **Connect your AI** tab.
 
-The first time you join a workspace, or finish the install wizard, this page comes last. It is called "One last step". You can choose **Skip for now** and connect later under **AI**, **Connect your AI**. The setup card on Home offers it again.
+The first time you join a workspace, or finish the install wizard, this page comes last. It is called "One last step". You can choose **Skip for now** and connect later under **AI**, **Customize**, **Connect your AI**. The setup card on Home offers it again.
 
 Pick your app on the page and follow its steps. The page shows an address to paste. Copy it with the **Copy** button.
 
@@ -52,6 +52,8 @@ Tools that connect with a token rather than an address, such as Claude Code, use
 6. Optional: "Let this agent manage tasks", "Let this agent write docs", "Let this agent read chat".
 
 The token is shown once. Copy it then, and paste it where your tool asks for it. The person who sets up the tool can find the exact command in the [MCP server reference](./mcp-server#creating-a-token).
+
+To hand tasks to your own Claude Code so that it writes the code and opens a pull request, follow [Let Claude Code build your tasks](./claude-code-developer).
 
 ## The question AlianHub asks
 

@@ -94,6 +94,14 @@ const checkParam = (rule, value, field, inputs, errors) => {
         if (typeof value === 'number' && Number.isFinite(value) && value >= rule.min && value <= rule.max) return value;
         errors.push(error(field, 'invalid_params', `must be a number between ${rule.min} and ${rule.max}`)); return null;
     }
+    if (rule.type === 'integer') {
+        if (Number.isInteger(value) && value >= rule.min && value <= rule.max) return value;
+        errors.push(error(field, 'invalid_params', `must be a whole number between ${rule.min} and ${rule.max}`)); return null;
+    }
+    if (rule.type === 'string') {
+        if (typeof value === 'string' && value.length <= rule.maxLength) return value;
+        errors.push(error(field, 'invalid_params', `must be text of at most ${rule.maxLength} characters`)); return null;
+    }
     if (rule.type === 'boolean') {
         if (typeof value === 'boolean') return value;
         errors.push(error(field, 'invalid_params', 'must be true or false')); return null;
@@ -165,7 +173,9 @@ const validateGather = (input, inputs, errors) => {
         if (readsConnector(reader)) connectorRead = reader;
         const as = asString(step.as) || reader;
         if (!/^[a-zA-Z][a-zA-Z0-9_]{0,39}$/.test(as)) { errors.push(error(`${at}.as`, 'invalid', 'must be a short name: letters, digits and underscores')); return; }
-        out.push({ reader, as, params: validateReaderParams(reader, step.params, at, new Set(inputs), errors) });
+        if (step.optional !== undefined && typeof step.optional !== 'boolean') errors.push(error(`${at}.optional`, 'invalid', 'must be true or false'));
+        else if (step.optional === true && !readsConnector(reader)) errors.push(error(`${at}.optional`, 'invalid', 'only a read from a connected app can be optional'));
+        out.push({ reader, as, params: validateReaderParams(reader, step.params, at, new Set(inputs), errors), ...(step.optional === true ? { optional: true } : {}) });
     });
     const names = out.map((s) => s.as);
     if (new Set(names).size !== names.length) errors.push(error('gather', 'duplicate', 'each gathered value needs its own name'));

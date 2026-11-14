@@ -1,11 +1,11 @@
 <template>
-    <div class="ah-page ai-page cya" :class="{ 'cya--welcome': welcome }" data-test="connect-ai">
-        <AiSidebar v-if="!welcome" />
-        <div class="ai-page__main">
-            <div class="cya__body ah-scroll">
+    <div :class="embedded ? 'cya cya--embedded' : ['ah-page', 'ai-page', 'cya', { 'cya--welcome': welcome }]" data-test="connect-ai">
+        <AiSidebar v-if="!welcome && !embedded" />
+        <div :class="embedded ? 'cya__frame' : 'ai-page__main'">
+            <div class="cya__body" :class="{ 'ah-scroll': !embedded }">
                 <header class="cya__head">
                     <span v-if="welcome" class="ah-label">{{ $t('ConnectAi.welcome_kicker') }}</span>
-                    <h1 class="ah-h2">{{ $t('ConnectAi.title') }}</h1>
+                    <component :is="embedded ? 'h2' : 'h1'" class="ah-h2">{{ $t('ConnectAi.title') }}</component>
                     <p class="cya__lead">{{ $t('ConnectAi.lead') }}</p>
                 </header>
 
@@ -62,6 +62,10 @@
                             <template v-if="connection.tokens">
                                 <p class="cya__note">{{ $t('ConnectAi.token_body') }}</p>
                                 <router-link class="ah-btn ah-btn--secondary ah-btn--sm cya__link" :to="tokenPage" data-test="connect-ai-token-link">{{ $t('ConnectAi.token_link') }}</router-link>
+                                <p class="cya__note" data-test="connect-ai-developer">
+                                    {{ $t('ClaudeCodeSetup.connect_page_note') }}
+                                    <a class="cya__guide" :href="claudeCodeGuide" target="_blank" rel="noopener">{{ $t('ClaudeCodeSetup.guide_short') }}</a>
+                                </p>
                             </template>
                             <p v-else class="cya__note">{{ $t('ConnectAi.tokens_off') }}</p>
                         </div>
@@ -119,8 +123,13 @@ import { saveOnboarding } from "@/composable/onboardingState";
 import { formatWhen } from "@/views/OAuth/oauthShared";
 import { BLUEPRINT_WELCOME_ROUTE } from "@/router/ai/connect";
 import { fetchTeamPacks } from "@/utils/dispatcher";
+import { GUIDE, useDocsLink } from "@/composable/docsLink";
 
 defineOptions({ name: "ConnectYourAi" });
+
+defineProps({
+    embedded: { type: Boolean, default: false }
+});
 
 const APPS = ["claude", "chatgpt"];
 const TOOL_KEYS = ["data", "manage", "work"];
@@ -140,6 +149,7 @@ const mayAddServerKey = computed(() => aiAvailability.state === AI_STATE.UNCONFI
 
 const inWorkspace = (name, query) => ({ name, params: { cid: unref(companyId) }, ...(query ? { query } : {}) });
 const tokenPage = computed(() => inWorkspace("AiAccounts", { tab: "link" }));
+const claudeCodeGuide = useDocsLink(GUIDE.CLAUDE_CODE_DEVELOPER);
 const serverKeyPage = computed(() => inWorkspace("InstanceSettings", { group: "ai" }));
 
 const copied = ref("");
@@ -175,6 +185,7 @@ onBeforeUnmount(() => stopWatching());
 <style scoped>
 .cya__body { flex: 1; min-height: 0; overflow: auto; padding: 20px 24px 32px; display: flex; flex-direction: column; gap: 16px; max-width: 960px; width: 100%; box-sizing: border-box; }
 .cya--welcome .cya__body { margin: 0 auto; padding-top: 40px; }
+.cya--embedded .cya__body { padding: 0; overflow: visible; }
 .cya__head { display: flex; flex-direction: column; gap: 6px; }
 .cya__lead { margin: 0; font: var(--text-body); color: var(--ink-2); max-width: 720px; }
 .cya__sign { display: flex; align-items: center; gap: 8px; margin: 0; padding: 10px 14px; border-radius: var(--r-card); border: 1px solid var(--border); background: var(--surface); font: var(--text-body); color: var(--ink); }
@@ -190,6 +201,7 @@ onBeforeUnmount(() => stopWatching());
 .cya__note { margin: 0; font: var(--text-small); color: var(--ink-2); }
 .cya__note code, .cya__list code { padding: 1px 5px; border-radius: 4px; background: var(--surface-hover); color: var(--ink); overflow-wrap: anywhere; }
 .cya__link { align-self: flex-start; }
+.cya__guide { color: var(--brand-deep); }
 .cya__inline-link { color: var(--ink); text-decoration: underline; }
 .cya__foot { display: flex; flex-wrap: wrap; align-items: center; gap: 10px 14px; padding-top: 8px; border-top: 1px solid var(--hairline); }
 @media (max-width: 640px) {

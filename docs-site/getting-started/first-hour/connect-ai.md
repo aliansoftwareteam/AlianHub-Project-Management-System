@@ -4,7 +4,7 @@ You can connect the AI app you already use, such as Claude or ChatGPT. Then you 
 
 ## Where to start
 
-Open **AI** in the left bar, then **Connect your AI**. This page also opens after you create a workspace, as **One last step**. You can select **Skip for now** and come back later.
+Open **AI** in the left bar, then **Customize**, and choose the **Connect your AI** tab. This page also opens after you create a workspace, as **One last step**. You can select **Skip for now** and come back later.
 
 ## The rest of the steps
 

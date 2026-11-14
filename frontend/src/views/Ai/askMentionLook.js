@@ -1,4 +1,5 @@
 export const MENTION_KIND_LOOK = Object.freeze({
+    connector: { icon: "integrations", group: "Ask.group_apps", label: "Ask.kind_connector" },
     project: { icon: "projects", group: "Ask.group_projects", label: "Ask.kind_project" },
     list: { icon: "layers", group: "Ask.group_lists", label: "Ask.kind_list" },
     task: { icon: "checkSquare", group: "Ask.group_tasks", label: "Ask.kind_task" },

@@ -62,6 +62,7 @@ To let your own AI app, such as Claude or ChatGPT, work in AlianHub, see [Connec
 | Page | What it covers |
 |---|---|
 | [Integrations](./integrations) | Connect AlianHub to the other tools you use. |
+| [Connectors](./connectors) | Connect your own accounts, such as Google, Slack or GitHub, for AlianHub's AI. |
 | [Import from ClickUp](./import-from-clickup) | Bring your work across from ClickUp. |
 
 ## Related

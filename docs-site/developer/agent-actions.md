@@ -148,7 +148,7 @@ Also run the tests you wrote. After you merge a change that adds a route, follow
 These are the rules in `Tasks/active/047-ai-run/task.md`, as the code keeps them.
 
 1. **Every write is previewed and can be undone.** A write sets `undoable` and leaves an undo on its audit row. A change that waits shows a card built in `intentPreview.js`; a kind of change with no builder there has no card. To check: whether every write that can wait has a builder. With `MCP_TOOLS_V2` on, a write rated not reversible, or workspace-wide, is filed for approval (`isDestructive()` in `Modules/Mcp/annotations.js`).
-2. **Outside writes are propose-only.** A Slack message is `proposeOnly` with `gate: 'owner_admin'` (`Modules/Agents/registry/connectors.js`). An agent never sends it on its own. Mark any new action that sends something outside AlianHub `proposeOnly`.
+2. **Outside writes are propose-only.** A connector write, such as a Slack message, a calendar event or a GitHub comment, is `proposeOnly` with `gate: 'connection_owner'` (`Modules/Agents/registry/connectorTools.js`): only the person whose connection it uses can approve it. An agent never sends it on its own. Mark any new action that sends something outside AlianHub `proposeOnly`.
 3. **The never-list stays absent.** `NEVER` in `registry.js` is: `project.delete`, `task.delete`, `billing.*`, `deploy.production`, `git.merge`, `member.remove`, `permissions.edit`, `status.set("Done")`. Never add a registry key that matches it. `indexActions()` throws if you do. Closing a task exists only as `task.status.change`, for a connection with the manage grant, and a project can still make a person close it.
 4. **An agent never does more than its person.** Every action names a `permission`. `perform()` asks `permissions.holderMay()` for the person behind the agent. Every write names its target so `visibility.js` can check it.
 5. **Every query and every event names the workspace.** Queries go through `MongoDbCrudOpration(companyId, ...)` with the company as the first argument. Take the company from the request header with `tenantOf(req)`, never from the body or query. Every event payload carries `companyId`. `tests/conventions/tenant-scoping.test.js` and `tests/conventions/socket-events-name-company.test.js` check this.
@@ -171,7 +171,7 @@ These are the rules in `Tasks/active/047-ai-run/task.md`, as the code keeps them
 | `MCP_TOOLS_WORK` | `Modules/Mcp/workFlag.js` | Tags, relations, lists, doc comments, goals, setup, project create, automation, queue |
 | `MCP_TOOLS_V2` | `Modules/Mcp/v2Flag.js` | Names beside ids, paged lists, annotations, approval for a write that reaches the whole workspace (a goal's target) |
 | `AGENT_PERFORMANCE_READ` | `Modules/Agents/performanceFlag.js` | `performance.read` |
-| `CONNECTORS` | `Modules/Agents/connectors/flag.js` | Slack and Google Calendar connectors |
+| `CONNECTORS` | `Modules/Agents/connectors/flag.js` | The connectors named in the list (`google`, `slack`, `outlook`, `github`, `notion` and the others in `Modules/Connectors/providers`), as agent and MCP tools |
 | `AGENT_TAINT_ROUTING` | `Modules/Agents/taint.js` | Risky writes after outside content wait for a person |
 | `MCP_OAUTH` | `Modules/OAuthServer/config.js` | Sign-in for outside MCP clients |
 | `EXTERNAL_AGENT_SESSIONS` | `Modules/AgentSessions/config.js` | Hand a task to an approved outside agent |

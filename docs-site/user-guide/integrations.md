@@ -1,6 +1,8 @@
 # Integrations
 
-Integrations connect AlianHub to the tools your team already uses. You can sign in with Google or GitHub, turn emails into tasks, see due dates in your calendar, send task events to Slack or Discord, link GitHub pull requests to tasks, attach files from Google Drive, and connect your own AI app.
+Integrations connect AlianHub to the tools your team already uses. They are set up once for the workspace and run on their own. You can sign in with Google or GitHub, turn emails into tasks, see due dates in your calendar, send task events to Slack or Discord, link GitHub pull requests to tasks, and connect your own AI app.
+
+Your own accounts, which AlianHub's AI reads from when you ask, are connectors, not integrations. They live under **AI**, **Customize**, **Connectors**. See [Connectors](./connectors).
 
 This page lists every integration in AlianHub, where to set it up, and who can do it.
 
@@ -14,11 +16,11 @@ This page lists every integration in AlianHub, where to set it up, and who can d
 | Calendar feed | Your due dates in Google Calendar, Outlook or Apple Calendar | **Integrations**, **Calendar** | Anyone, for themselves |
 | Slack slash commands | Run `/alianhub` commands from Slack | **Integrations**, **Slack** | Owners and admins |
 | Outgoing webhooks | Send task events to Slack, Discord or any web address | **Settings**, **Integrations** | Members, for their own webhooks |
-| GitHub pull requests | Link pull requests to tasks and move tasks on merge | **App connections** | Owners and admins |
+| GitHub pull requests | Link pull requests to tasks and move tasks on merge | **Integrations**, **GitHub** | Owners and admins |
 | Embedded apps | Show an outside tool as a panel inside AlianHub | **Integrations**, **Apps** | Owners and admins |
-| Google Drive and Dropbox | Attach files straight from your cloud storage | **Settings**, **Integrations** | Anyone, for themselves |
-| Slack messages from agents | Let agents propose messages to Slack channels | **AI**, **Connections** | Owners and admins |
-| Your own AI app | Claude, ChatGPT or another AI app works in AlianHub for you | **AI**, **Connect your AI** | Anyone, for themselves |
+| Google Drive and Dropbox | Attach files straight from your cloud storage | **AI**, **Customize**, **Connectors** | Anyone, for themselves |
+| Your own accounts for AI | Google, Slack, Outlook, GitHub, Notion and more, read by AI when you ask | **AI**, **Customize**, **Connectors** | Anyone, for themselves |
+| Your own AI app | Claude, ChatGPT or another AI app works in AlianHub for you | **AI**, **Customize**, **Connect your AI** | Anyone, for themselves |
 | Importers | Bring work in from ClickUp, Jira, Trello, Asana, Monday.com or CSV | **Settings**, **Import & export** | Owners and admins |
 
 **Integrations** opens from **More**, in the **Work** group. Its page is titled **Integrations & Automation**, with a list of categories on the left.
@@ -67,6 +69,8 @@ Subscribe to a live, read-only calendar of task due dates.
 
 The feed updates by itself. If the link leaks, select **Regenerate link**: calendars using the old link stop updating.
 
+The feed only shares due dates. To let AlianHub's AI read and add events in your own Google Calendar, connect Google under [Connectors](./connectors).
+
 ## Slack slash commands
 
 Owners and admins can let people run `/alianhub` commands from your Slack workspace.
@@ -98,8 +102,8 @@ Each webhook shows whether it is **Active** or **Paused**, and **Logs** lists ea
 
 Connect a GitHub repository so pull requests show up on the tasks they are about.
 
-1. Open **App connections** in the left bar.
-2. On GitHub, select **Connect** and sign in to GitHub. If one-click GitHub is not set up on your server, use a personal access token instead.
+1. Open **Integrations**, then **GitHub**.
+2. Select **Connect** and sign in to GitHub. If one-click GitHub is not set up on your server, use a personal access token instead.
 3. Pick the repository it reads.
 4. Select **Link projects** and choose the projects it feeds.
 
@@ -109,6 +113,8 @@ What happens then:
 - When that pull request is merged, the task gets a comment and moves to its project's review status, if it has one and is not already finished.
 
 Only owners and admins can connect, pause or disconnect apps. Each connection shows its last sync, its last error and the projects it feeds. Secrets are never shown.
+
+This sync uses one GitHub account for the whole workspace. To let AlianHub's AI read pull requests and issues with your own GitHub account when you ask, connect GitHub under [Connectors](./connectors) as well.
 
 ## Embedded apps
 
@@ -124,17 +130,16 @@ Only owners and admins can add or remove an app. Only https addresses work, and 
 
 Attach files straight from your own cloud storage instead of uploading them.
 
-1. Open **Settings**, then **Integrations**, and find **Cloud storage for attachments**.
-2. On Google Drive or Dropbox, follow the setup steps, then select **Connect my account**.
-3. When you attach a file to a task, choose the provider and pick the file in its own picker.
+1. Open **AI**, then **Customize**. On **Connectors**, connect Google with **Drive** ticked, or connect Dropbox. See [Connectors](./connectors).
+2. When you attach a file to a task, choose the provider and pick the file in its own picker. Attach it as a link, or import a copy into the project.
 
-Your connection is private to you. Nobody else in the workspace can see or change it, and uploading from your computer works as before. If it says "Your access expired — connect again.", connect again.
+Your connection is private to you. Nobody else in the workspace can see or use it, and uploading from your computer works as before. Google shows AlianHub only the files you pick. For Dropbox, attaching a link works without connecting; importing a copy uses your connection.
 
 ## Agents and Slack
 
-Owners and admins can let AlianHub's agents propose messages to Slack. Open **AI**, then **Connections**, and set up **Slack messages from agents**. You choose which public channels agents may post to and, separately, which they may read.
+Agents reach Slack through the Slack account of the person they work for, not through a workspace bot. Each person connects their own Slack under [Connectors](./connectors), and an agent can use it only when Slack is ticked on that agent.
 
-Nothing is posted until an owner or admin approves the exact channel and text in the **AI Inbox**. Private channels and direct messages are never read. See [Agents in AlianHub](./agents).
+Nothing is posted until that person approves the exact channel and text in their **Inbox**. Direct messages are never read. See [Agents in AlianHub](./agents#connected-apps).
 
 ## Your own AI app
 
@@ -147,12 +152,13 @@ Connect Claude, ChatGPT, Claude Code or any AI app that supports MCP, so it can 
 ## Good to know
 
 - The **Marketplace** in **Integrations** also lists Microsoft Teams, Zapier, GitLab and two-way Google Calendar sync. You can save their details, but they do not send or sync anything yet. Use outgoing webhooks for chat updates, and the calendar feed for due dates.
-- **My connections** (in **AI**, **Connections**) lets you connect your own Google account, but nothing reads or writes your calendar yet.
-- An agent can use a connection only if it is in that agent's allowed actions. Connecting an app does not give agents access.
+- Your own Google, Slack, Outlook or GitHub account for AI is a connector, not an integration. See [Connectors](./connectors).
+- An agent can use a connected app only if that app is ticked on the agent. Connecting an app does not give agents access.
 - The **Automations** category in **Integrations** holds simple bulk rules, such as "bump all low-priority tasks in a project to high". For full rules that run when something happens, see [Rules (automations)](./rules).
 
 ## Related
 
+- [Connectors](./connectors)
 - [Import from ClickUp](./import-from-clickup)
 - [Connect your AI](/ai/)
 - [Your settings](./settings)

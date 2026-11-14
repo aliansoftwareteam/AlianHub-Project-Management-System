@@ -50,7 +50,7 @@ describe('uploads and the plan limits', () => {
 
     it('the writers outside the upload routes assert the plan before storing', () => {
         expect(functionBody(read('common-storage/putLocalFile.js'), 'putLocalFile')).toMatch(/assertUploadAllowed\(/);
-        expect(functionBody(read('Modules/CloudStorage/controller.js'), 'storeImportedFile')).toMatch(/assertUploadAllowed\(/);
+        expect(functionBody(read('Modules/Connectors/pickerController.js'), 'storeImportedFile')).toMatch(/assertUploadAllowed\(/);
     });
 
     it('every upload and capture route carries a guard that reaches the plan', () => {

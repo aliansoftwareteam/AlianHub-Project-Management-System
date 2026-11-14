@@ -6,7 +6,6 @@ const registry = require('../registry');
 const { isBlockedHostname } = require('../engine/safeFetch');
 const workKinds = require('../workKinds');
 const externalReads = require('./externalReads');
-const { SLACK_READ } = require('../connectors/readLimits');
 
 const { MIN_BRIEF_CHARS } = workKinds;
 
@@ -99,10 +98,37 @@ const externalReadParams = (formats, extra = {}) => Object.freeze({
     ...extra,
 });
 
+const CONNECTION_ID_MAX = 64;
+
+const readerParamOf = (schema) => {
+    if (schema.type === 'boolean') return Object.freeze({ type: 'boolean', default: schema.default === true });
+    if (schema.type === 'string') return Object.freeze({ type: 'string', maxLength: schema.maxLength, ...(typeof schema.default === 'string' ? { default: schema.default } : {}) });
+    return Object.freeze({ type: schema.type, min: schema.minimum, max: schema.maximum, default: Number.isFinite(schema.default) ? schema.default : schema.minimum });
+};
+
+// A custom app's tools depend on the workspace and the call, so no skill can declare them.
+const skillTools = (list) => list.filter((tool) => !tool.custom);
+
+const connectorReaders = () => Object.fromEntries(skillTools(require('../../Connectors/tools').reads()).map((tool) => [tool.key, Object.freeze({
+    label: String(tool.input.description).slice(0, 120),
+    description: `${tool.input.description} Reads only the connection of the person the agent acts for, and only for an agent with this tool ticked: at most ${tool.caps.maxChars} characters. What it reads marks the run, which makes no web fetch after it.`,
+    connector: tool.provider,
+    connectorName: tool.definition.name,
+    action: tool.key,
+    params: Object.freeze({
+        ...Object.fromEntries(Object.entries(tool.input.properties || {}).map(([name, schema]) => [name, Object.freeze({ ...readerParamOf(schema), ...((tool.input.required || []).includes(name) ? { required: true } : {}) })])),
+        // Kept so a connectionId naming someone else's connection reaches the runner and is refused, not silently dropped.
+        connectionId: Object.freeze({ type: 'string', maxLength: CONNECTION_ID_MAX }),
+    }),
+    // `failed` and `reason` are set only when an optional step was refused (compile.js).
+    fields: Object.freeze(['text', 'chars', 'truncated', ...(tool.fields || []), 'failed', 'reason']),
+})]));
+
 /* Context a skill may read before the model is asked. Each reader is a call into
  * the companyId-first tool layer (skills/readers.js); `params` is the whole
  * surface a skill can tune. The result is what the template reads as
  * {{gather.<as>.<field>}}. */
+
 const READER_CATALOGUE = Object.freeze({
     task: Object.freeze({
         label: 'The task',
@@ -178,20 +204,7 @@ const READER_CATALOGUE = Object.freeze({
         params: externalReadParams(['json', 'text', 'diff']),
         fields: Object.freeze(['status', 'json', 'text', 'bytes']),
     }),
-    'slack.channel': Object.freeze({
-        label: 'Recent messages of a Slack channel',
-        description: `The latest messages of one public channel an owner or admin allowed agents to read, as plain text with people left as Slack ids: at most ${SLACK_READ.MESSAGES} messages and ${SLACK_READ.CHARS} characters. With no channel named it reads the first allowed one. What it reads marks the run, which makes no web fetch after it.`,
-        connector: 'slack',
-        action: 'slack.channel.read',
-        params: Object.freeze({
-            channel: Object.freeze({ type: 'channel' }),
-            postable: Object.freeze({ type: 'boolean', default: false }),
-            hours: Object.freeze({ type: 'number', min: 1, max: SLACK_READ.HOURS, default: SLACK_READ.DEFAULT_HOURS }),
-            limit: Object.freeze({ type: 'number', min: 1, max: SLACK_READ.MESSAGES, default: SLACK_READ.MESSAGES }),
-            maxChars: Object.freeze({ type: 'number', min: 500, max: SLACK_READ.CHARS, default: SLACK_READ.CHARS }),
-        }),
-        fields: Object.freeze(['channel', 'channelId', 'count', 'text', 'chars', 'truncated']),
-    }),
+    ...connectorReaders(),
 });
 
 /* A connector's reader exists only while its read is a registry action, which is only while the connector is on. */
@@ -244,11 +257,11 @@ const EMIT_REQUIRED = Object.freeze({
 
 /* Connector writes are registered only while their connector is on, so they are offered beside the fixed list
  * rather than in it. Each is propose-only: a skill that emits one files a proposal, never a message. */
-const CONNECTOR_EMIT_REQUIRED = Object.freeze({
-    'slack.message.post': Object.freeze(['channelId', 'text']),
+const connectorEmitRequired = () => ({
+    ...Object.fromEntries(skillTools(require('../../Connectors/tools').writes()).map((tool) => [tool.key, Object.freeze([...(tool.input.required || [])])])),
 });
-const emitActions = () => [...EMIT_ACTIONS, ...Object.keys(CONNECTOR_EMIT_REQUIRED).filter((key) => registry.has(key))];
-const emitRequired = (action) => EMIT_REQUIRED[action] || (registry.has(action) && CONNECTOR_EMIT_REQUIRED[action]) || [];
+const emitActions = () => [...EMIT_ACTIONS, ...Object.keys(connectorEmitRequired()).filter((key) => registry.has(key))];
+const emitRequired = (action) => EMIT_REQUIRED[action] || (registry.has(action) && connectorEmitRequired()[action]) || [];
 
 /* The task fields a template may read directly ({{TaskName}} or {{task.TaskName}}).
  * The view handed to the renderer holds these and nothing else of the task. */
@@ -303,7 +316,7 @@ const MAX_EMIT_EACH = 25;
 const catalogues = () => ({
     version: SKILL_VERSION,
     inputs: Object.entries(INPUT_CATALOGUE).map(([key, v]) => ({ key, label: v.label, description: v.description, needs: v.needs, scope: v.scope })),
-    readers: offeredReaders().map((key) => { const v = READER_CATALOGUE[key]; return { key, label: v.label, description: v.description, ...(v.external ? { external: true } : {}), ...(v.connector ? { connector: v.connector } : {}), params: v.params, fields: [...v.fields] }; }),
+    readers: offeredReaders().map((key) => { const v = READER_CATALOGUE[key]; return { key, label: v.label, description: v.description, ...(v.external ? { external: true } : {}), ...(v.connector ? { connector: v.connector, connectorName: v.connectorName } : {}), params: v.params, fields: [...v.fields] }; }),
     partials: Object.entries(PROMPT_PARTIALS).map(([key, text]) => ({ key, text })),
     actions: emitActions().map((key) => { const a = registry.get(key); return { key, label: a.label, risk: a.risk, undoable: a.undoable, required: [...emitRequired(key)] }; }),
     taskFields: [...TASK_FIELDS],

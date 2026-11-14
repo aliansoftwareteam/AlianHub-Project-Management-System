@@ -1,19 +1,42 @@
 import { computed, nextTick, reactive, ref, unref } from "vue";
 import { apiRequest } from "@/services";
 import * as env from "@/config/env";
-import { MAX_CONTEXT, contextPayload, filterSkills, groupMentions, mentionAt, mentionItems, recentMentions, rememberMention, slashQuery } from "./askComposer";
+import { connectorsOn } from "@/config/connectorsOn";
+import { MAX_CONTEXT, connectorResults, connectorsOf, contextPayload, filterSkills, groupMentions, mentionAt, mentionItems, recentMentions, rememberMention, slashQuery, withNamedChips } from "./askComposer";
 
 const SEARCH_DELAY_MS = 180;
 export const MENU_ID = "ask-menu";
 
 /* The `/` skill and `@` context menus of the Ask box. `question` is the box's model and `box` its element;
- * `skills` is the list the Skills popover shows; `companyId` and `projectId` shape the `@` suggestions. */
-export function useAskComposer({ question, box, skills, companyId = "", projectId = "" }) {
+ * `skills` is the list the Skills popover shows; `companyId` and `projectId` shape the `@` suggestions.
+ * `label` names a connector by its provider id; `onConnect` is called with an app the asker picked but has not connected. */
+export function useAskComposer({ question, box, skills, companyId = "", projectId = "", label = (id) => id, onConnect = () => {} }) {
     const skill = ref(null);
     const chips = ref([]);
+    const connectors = ref([]);
     const menu = reactive({ kind: "", items: [], groups: [], active: 0, mention: null, searching: false });
+    let dismissed = [];
     let timer = null;
     let searchSeq = 0;
+
+    const loadConnectors = async () => {
+        try {
+            if (!(await connectorsOn())) {
+                connectors.value = [];
+                return;
+            }
+            const res = await apiRequest("get", env.CONNECTORS);
+            connectors.value = res?.data?.status ? connectorsOf(res.data.data, label) : [];
+        } catch {
+            connectors.value = [];
+        }
+    };
+
+    const syncNamed = (text) => {
+        const next = withNamedChips(chips.value, text, connectors.value, dismissed);
+        const same = next.length === chips.value.length && next.every((chip, i) => chip === chips.value[i]);
+        if (!same) chips.value = next;
+    };
 
     const activeId = computed(() => (menu.kind && menu.items.length ? `${MENU_ID}-${menu.active}` : ""));
 
@@ -26,12 +49,13 @@ export function useAskComposer({ question, box, skills, companyId = "", projectI
     const show = (kind, items) => Object.assign(menu, { kind, items, groups: [], active: 0, searching: false });
 
     const showMentions = (found, query, searching) => {
-        const grouped = groupMentions(found, { first: recentMentions(unref(companyId)), taken: chips.value, query });
+        const apps = connectorResults(connectors.value, query, chips.value);
+        const grouped = groupMentions(found, { first: recentMentions(unref(companyId)), taken: chips.value, query, apps });
         const active = menu.kind === "mention" && menu.active < grouped.items.length ? menu.active : 0;
         Object.assign(menu, { kind: "mention", items: grouped.items, groups: grouped.groups, active, searching });
     };
 
-    /* A bare `@` shows recent picks at once and the server's suggestions after; a word searches. */
+    /* A bare `@` shows apps and recent picks at once and the server's suggestions after; a word searches. */
     const search = (query) => {
         clearTimeout(timer);
         const seq = ++searchSeq;
@@ -55,12 +79,14 @@ export function useAskComposer({ question, box, skills, companyId = "", projectI
     const onInput = () => {
         const el = unref(box);
         const text = el && typeof el.value === "string" ? el.value : unref(question);
+        const mention = mentionAt(text, el && Number.isInteger(el.selectionStart) ? el.selectionStart : String(text || "").length);
+        // The `@word` still being typed is the menu's to answer, not a name that adds a chip on its own.
+        syncNamed(mention ? text.slice(0, mention.start) + text.slice(mention.end) : text);
         const slash = slashQuery(text);
         if (slash !== null) {
             show("skill", filterSkills(unref(skills), slash));
             return;
         }
-        const mention = mentionAt(text, el && Number.isInteger(el.selectionStart) ? el.selectionStart : String(text || "").length);
         if (mention && chips.value.length < MAX_CONTEXT) {
             menu.mention = mention;
             search(mention.query);
@@ -87,9 +113,19 @@ export function useAskComposer({ question, box, skills, companyId = "", projectI
             return;
         }
         const at = menu.mention;
-        if (!chips.value.some((chip) => chip.kind === item.kind && chip.id === item.id)) chips.value = [...chips.value, { kind: item.kind, id: item.id, title: item.title }];
-        rememberMention(unref(companyId), item);
         const text = String(unref(question) || "");
+        if (item.kind === "connector" && !item.connected) {
+            if (at) question.value = text.slice(0, at.start) + text.slice(at.end);
+            close();
+            onConnect(item);
+            return;
+        }
+        const same = (chip) => chip.kind === item.kind && chip.id === item.id;
+        // A picked chip is the asker's own choice, so it stays when the name that may also have added it is cut.
+        chips.value = chips.value.some(same)
+            ? chips.value.map((chip) => (same(chip) ? { kind: chip.kind, id: chip.id, title: chip.title } : chip))
+            : [...chips.value, { kind: item.kind, id: item.id, title: item.title }];
+        rememberMention(unref(companyId), item);
         const named = at ? `${item.title} ` : "";
         if (at) question.value = text.slice(0, at.start) + named + text.slice(at.end).replace(/^\s+/, "");
         close();
@@ -126,6 +162,7 @@ export function useAskComposer({ question, box, skills, companyId = "", projectI
 
     const removeChip = (chip) => {
         chips.value = chips.value.filter((c) => !(c.kind === chip.kind && c.id === chip.id));
+        if (chip.kind === "connector") dismissed = [...dismissed, chip.id];
         focusAt();
     };
 
@@ -142,8 +179,9 @@ export function useAskComposer({ question, box, skills, companyId = "", projectI
     const reset = () => {
         skill.value = null;
         chips.value = [];
+        dismissed = [];
         close();
     };
 
-    return { skill, chips, menu, activeId, onInput, onKeydown, pick, close, removeChip, clearSkill, body, reset, hover: (i) => { menu.active = i; } };
+    return { skill, chips, connectors, menu, activeId, loadConnectors, onInput, onKeydown, pick, close, removeChip, clearSkill, body, reset, hover: (i) => { menu.active = i; } };
 }

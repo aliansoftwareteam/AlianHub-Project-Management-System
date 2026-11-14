@@ -112,11 +112,11 @@ const refused = (skill, { refused: ticket, model, usage }, started) => ({ status
 
 /* PHASE 1 — gather. A generic skill collects its own input; the page audit
  * needs a public URL in the task. Either declines with `skipped`. */
-async function gather({ skillSlug = 'qa-review', task, companyId, memory, startedBy, runId, actor, allowedActions }) {
+async function gather({ skillSlug = 'qa-review', task, companyId, memory, startedBy, runId, actor, allowedActions, connectors }) {
     const skill = await requireSkill(companyId, skillSlug);
     const started = Date.now();
     if (skill.kind === 'generic') {
-        const context = await egressContext.run({ companyId, actor: startedBy }, () => skill.gather({ task, companyId, memory, startedBy, runId, actor, allowedActions }));
+        const context = await egressContext.run({ companyId, actor: startedBy }, () => skill.gather({ task, companyId, memory, startedBy, runId, actor, allowedActions, connectors }));
         if (!context || context.skip) return skipped(skill, (context && context.skip) || 'nothing to work on', started);
         return { status: GATHERED, skill: skill.slug, context };
     }

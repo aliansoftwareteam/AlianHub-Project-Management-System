@@ -2,7 +2,8 @@ const dotenv = require('dotenv');
 const path = require('path');
 const { NodeHttpHandler } = require("@smithy/node-http-handler");
 
-const appDir = path.dirname(require.main.filename);
+// `node -e` and the REPL have no main module.
+const appDir = require.main ? path.dirname(require.main.filename) : process.cwd();
 dotenv.config({
     path: path.resolve(appDir, `.env`)
 });

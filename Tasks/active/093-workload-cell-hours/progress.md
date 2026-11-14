@@ -19,7 +19,7 @@
 
 ## Last step
 
-PR into `staging` opened.
+Merged into `staging` as #1784 on 2026-11-12 (build 14.43.0-beta.12); goes to `main` with the promotion #1790.
 
 ## Blockers
 
@@ -38,3 +38,7 @@ None.
   written to the demo DB). Light and dark: 9h over capacity red, 0.5h / 0.3h / <0.1h readable with a thin
   bar, empty days blank. Dragging a panel row onto another person's day sent the right move and reloaded
   (9h → 8h, panel 3 → 2 tasks); a drop on a cell behind the panel also landed.
+
+### 2026-11-13
+
+- Merged into `staging` as #1784, build 14.43.0-beta.12. Beta log updated in the follow-up docs PR; promotion to `main` in #1790.

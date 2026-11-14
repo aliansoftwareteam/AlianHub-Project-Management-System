@@ -341,7 +341,9 @@ const handleSubmit = async () => {
 
 const proceedAfterAuth = async (userId, { workspace = "" } = {}) => {
     localStorage.setItem("userId", userId);
-    const [userResponse] = await Promise.all([userCompanyStatusCheck(userId), getAuth(userId, true)]);
+    // Renewing replaces the token a check sent alongside it would carry, and that check then comes back 401.
+    await getAuth(userId, true);
+    const userResponse = await userCompanyStatusCheck(userId);
     if (userResponse?.data?.status === false) { clearSession(); throw new Error("server"); }
     const { userData: uData, companyId: companyID, isCompanyFind, companies } = userResponse.data.data;
     userData.value = uData;

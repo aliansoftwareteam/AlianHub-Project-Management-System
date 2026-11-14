@@ -408,6 +408,27 @@ const egressAllowlistsSchema = new Schema(schema.egressAllowlists, {strict: true
 const connectorConnectionsSchema = new Schema(schema.connectorConnections, {strict: true, timestamps: true});
 connectorConnectionsSchema.index({ connector: 1, deletedStatusKey: 1 });
 connectorConnectionsSchema.index({ userId: 1, connector: 1, deletedStatusKey: 1 });
+// A person may connect several accounts of one provider, each once. Live module rows only: a disconnected row,
+// an older row without `provider` and a pending row (no account id yet) never block a connect. A row missing
+// `companyId` stays out too, so it cannot be taken for another workspace's null.
+connectorConnectionsSchema.index(
+    { companyId: 1, userId: 1, provider: 1, 'account.id': 1 },
+    { unique: true, name: 'one_live_per_account', partialFilterExpression: { companyId: { $type: 'string' }, provider: { $type: 'string' }, 'account.id': { $type: 'string' }, deletedStatusKey: { $eq: 0 } } },
+);
+const connectorAppsSchema = new Schema(schema.connectorApps, {strict: true, timestamps: false});
+connectorAppsSchema.index({ companyId: 1, provider: 1 }, { unique: true, name: 'one_per_provider' });
+const connectorUsageSchema = new Schema(schema.connectorUsage, {strict: true, timestamps: false});
+connectorUsageSchema.index({ connectionId: 1, 'actor.type': 1, 'actor.id': 1, day: 1 }, { unique: true, name: 'one_per_caller_day' });
+connectorUsageSchema.index({ companyId: 1, userId: 1, day: 1 });
+connectorUsageSchema.index({ 'actor.type': 1, 'actor.id': 1, day: 1 });
+const connectorRegistrationsSchema = new Schema(schema.connectorRegistrations, {strict: true, timestamps: false});
+connectorRegistrationsSchema.index({ companyId: 1, provider: 1 }, { unique: true, name: 'one_per_provider' });
+const connectorToolsSchema = new Schema(schema.connectorTools, {strict: true, timestamps: false});
+connectorToolsSchema.index({ companyId: 1, provider: 1, tool: 1 }, { unique: true, name: 'one_per_tool' });
+const connectorServersSchema = new Schema(schema.connectorServers, {strict: true, timestamps: false});
+connectorServersSchema.index({ companyId: 1, url: 1 }, { unique: true, name: 'one_per_address' });
+const connectorQuotasSchema = new Schema(schema.connectorQuotas, {strict: true, timestamps: false});
+connectorQuotasSchema.index({ scope: 1, targetId: 1 }, { unique: true, name: 'one_per_target' });
 const instructionPatternsSchema = new Schema(schema.instructionPatterns, {strict: true, timestamps: false});
 const agentSessionsSchema = new Schema(schema.agentSessions, {strict: true, timestamps: false});
 agentSessionsSchema.index({ taskId: 1, createdAt: -1 });
@@ -639,6 +660,12 @@ module.exports = {
     auditChainKeySchema,
     egressAllowlistsSchema,
     connectorConnectionsSchema,
+    connectorAppsSchema,
+    connectorUsageSchema,
+    connectorQuotasSchema,
+    connectorRegistrationsSchema,
+    connectorToolsSchema,
+    connectorServersSchema,
     instructionPatternsSchema,
     agentSessionsSchema,
     agentSessionEndpointsSchema,

@@ -1,6 +1,8 @@
 import { createApp } from 'vue'
 import App from './App.vue'
 import router from './router'
+import { startSignInLanding } from './router/sessionCheck'
+import { useAuth } from '@/services'
 import { initTheme } from '@/components/organisms/Shell/shellState'
 import { readRememberedEmail } from '@/utils/rememberedLogin'
 initTheme()
@@ -42,6 +44,11 @@ import { installUnlessHosted } from '@/config/hostedPlugins';
 import "@/assets/css/index.css";
 import "@/assets/css/alerts.css";
 import "@/assets/css/driver.css";
+
+startSignInLanding(router.resolve(router.options.history.location), {
+  storage: localStorage,
+  forgetAccount: () => useAuth().removeLocalValue({ withOutRefresh: true }),
+});
 
 const app = createApp(App).use(store).use(router)
 

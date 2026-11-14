@@ -22,6 +22,31 @@ export const isExternalReader = (catalogues, key) => Boolean(readerOf(catalogues
 
 export const offersExternalReads = (catalogues) => (catalogues?.readers || []).some((r) => r.external);
 
+export const isConnectorReader = (catalogues, key) => Boolean(readerOf(catalogues, key)?.connector);
+
+/* The reader picker in groups: the workspace's own readers, reads from the web, then one group per connected app. */
+export const readerGroups = (catalogues) => {
+    const readers = catalogues?.readers || [];
+    const apps = new Map();
+    readers.filter((r) => r.connector).forEach((r) => {
+        const group = apps.get(r.connector) || { key: `app:${r.connector}`, app: r.connectorName || r.connector, readers: [] };
+        group.readers.push(r);
+        apps.set(r.connector, group);
+    });
+    return [
+        { key: "workspace", readers: readers.filter((r) => !r.external && !r.connector) },
+        { key: "outside", readers: readers.filter((r) => r.external) },
+        ...apps.values()
+    ].filter((group) => group.readers.length);
+};
+
+// connectionId is kept in the catalogue so the server can refuse someone else's connection; nobody types one in.
+const HIDDEN_CONNECTOR_PARAMS = Object.freeze(["connectionId"]);
+
+export const connectorParamsOf = (reader) => Object.entries(reader?.params || {})
+    .filter(([name]) => !HIDDEN_CONNECTOR_PARAMS.includes(name))
+    .map(([name, rule]) => ({ name, ...rule }));
+
 const hostPort = (text) => {
     const { entry } = parseEntry(String(text || ""));
     return entry && !entry.suffix ? { host: entry.host, port: entry.port || HTTPS_PORT } : null;

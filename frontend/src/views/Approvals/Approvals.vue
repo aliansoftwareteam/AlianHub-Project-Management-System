@@ -140,7 +140,8 @@
                         </div>
                     </div>
                     <div v-else class="tv-row-actions">
-                        <button v-if="!card.row.locked" type="button" class="ah-btn ah-btn--primary ah-btn--grow" :disabled="!!busy" @click="approve(card)">
+                        <button v-if="card.row.outside && !card.row.locked" type="button" class="ah-btn ah-btn--primary ah-btn--grow" data-test="proposal-review-inbox" @click="reviewInInbox">{{ $t('Connectors.approval.review_in_inbox') }}</button>
+                        <button v-else-if="!card.row.locked" type="button" class="ah-btn ah-btn--primary ah-btn--grow" :disabled="!!busy" @click="approve(card)">
                             {{ busy === card.key ? $t('Time.approving') : $t('Time.approve') }}
                         </button>
                         <button v-if="card.kind === 'timesheet'" type="button" class="ah-btn ah-btn--secondary" @click="openDetail(card.row)">{{ $t('Time.detail') }}</button>
@@ -212,6 +213,7 @@ import { useReportExport } from '@/views/Timesheet/report/useReportExport';
 import { PRESETS, ANY_TIME } from '@/views/Timesheet/report/reportRange';
 import { hoursOf } from '@/views/Timesheet/report/reportTable';
 import { fetchPendingProposals, sendProposalDecision } from '@/composable/agentProposals';
+import { hasOutsideWrite } from '@/views/Inbox/approvalQueue';
 import { showProjects } from '@/composable/approvedProjects';
 import { madeProjectIds } from '@/composable/approvedProjectIds';
 import ProposalWhyDialog from './ProposalWhyDialog.vue';
@@ -351,8 +353,11 @@ const toAgentProposal = (p) => {
         changes: changes.filter(Boolean).map((c) => ({ label: changeLabel(t, c) || c.action || '', reversible: Boolean(c.reversible) })),
         plan: !p.batch && hasParts(changes) ? changes : null,
         locked: p.locked === true,
+        outside: hasOutsideWrite(changes),
     };
 };
+// What leaves for a connected app is approved from its card, which only the Inbox draws.
+const reviewInInbox = () => router.push({ name: 'inbox', params: { cid: cid.value }, query: { tab: 'approval' } }).catch(() => {});
 const loadProposals = async () => {
     proposalsFailed.value = false;
     try {

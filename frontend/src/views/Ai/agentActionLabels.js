@@ -13,5 +13,5 @@ export const agentActionLabel = (t, action, fallback = "") => {
 /* The server marks a change that was filed with no words of its own (Modules/Agents/changeLabels.js). */
 export const changeLabel = (t, change) => {
     const filed = String(change?.label || "");
-    return change?.stockLabel ? agentActionLabel(t, change.action, filed) : filed;
+    return change?.stockLabel || filed === change?.action ? agentActionLabel(t, change.action, filed) : filed;
 };

@@ -1,4 +1,4 @@
-# Task Index
+| active |  |  | active/099-connectors-outlook-built || active |  |  | active/098-connectors-for-agents || active |  |  | active/097-connectors-in-ai-chat |# Task Index
 
 Auto-maintained registry of all tasks. Reflects YAML frontmatter from each `task.md`.
 
@@ -61,39 +61,50 @@ Auto-maintained registry of all tasks. Reflects YAML frontmatter from each `task
 | 053 | Industry demos — the dispatcher, the Company view and workflow runs | done | high | 052 | done/053-industry-demo-agentic-layers |
 | 054 | Industry demos for every blueprint, named by industry | done | high | 053 | done/054-industry-demos-every-blueprint |
 | 055 | Create Project modal — Member, Skills, Source and Due date pickers open above the modal | active | high | — | active/055-create-project-field-popovers |
-| 056 | Personal app connectors for AI and agents — one reusable module, then connectors one by one | backlog | high | 061–079 | backlog/056-personal-app-connectors |
+| 056 | App connectors for AI and agents — MCP first, built connectors where needed, one Connectors screen | backlog | high | 061–079, 092–101, 106 | backlog/056-personal-app-connectors |
 | 057 | Projects settings — Open, Archived and Closed tabs; every undo returns the exact previous state | active | high | — | active/057-project-lifecycle-tabs |
 | 058 | Tracker timesheet — every screenshot card shows its image box and a loading state from the first paint | active | medium | — | active/058-tracker-screenshot-loading-placeholder |
 | 059 | Agent settings page — tabs, a searchable project picker and one sticky Save bar | active | high | — | active/059-agent-settings-tabs |
 | 060 | AI access by role — per-role AI rights in Security & Permissions, owner/admin approval for agents and skills | active | high | — | active/060-ai-access-by-role |
-| 061 | Connectors research — confirm Google and Dropbox before the build | backlog | high | — | backlog/061-connectors-research-pilot-providers |
-| 062 | Connectors research — matrix and ranking for the new connectors and Gmail | backlog | medium | — | backlog/062-connectors-research-new-providers |
-| 063 | Connectors — the two-track contract, provider definition format, registry and the Google provider file | backlog | high | — | backlog/063-connectors-provider-definition |
-| 064 | Connectors — data model: evolve connector_connections, add connector_apps and connector_usage | backlog | high | 063 | backlog/064-connectors-data-model |
-| 065 | Connectors — OAuth app lookup (instance default, company override) and the secrets-store guard | backlog | high | 063, 064 | backlog/065-connectors-oauth-apps-secrets-guard |
-| 066 | Connectors — generic connect, products, reconnect and disconnect handlers | backlog | high | 065 | backlog/066-connectors-connect-lifecycle |
-| 067 | Connectors — end a member's connections on removal, deactivation or SCIM, plus a daily sweep | backlog | high | 066 | backlog/067-connectors-member-removal-sweep |
-| 068 | Connectors — tool framework: one definition registered for agents and MCP | backlog | high | 063 | backlog/068-connectors-tool-framework |
-| 069 | Connectors — every outside write is a proposal only the connection owner approves | backlog | high | 068 | backlog/069-connectors-write-approvals |
-| 070 | Connectors — audit, health, usage counts, quotas and provider backoff | backlog | high | 063, 068 | backlog/070-connectors-tracking-quotas |
-| 071 | Connectors — Google pilot tools: Calendar, Meet and Drive (no Gmail) | backlog | high | 068, 069 | backlog/071-connectors-google-pilot-tools |
+| 061 | Connectors research — confirm Google and Dropbox before the build | active | high | — | active/061-connectors-research-pilot-providers |
+| 062 | Connectors research — matrix and ranking for the new connectors and Gmail | active | medium | — | active/062-connectors-research-new-providers |
+| 063 | Connectors — the two-track contract, provider definition format, registry and the Google provider file | active | high | — | active/063-connectors-provider-definition |
+| 064 | Connectors — data model: evolve connector_connections, add connector_apps and connector_usage | active | high | 063 | active/064-connectors-data-model |
+| 065 | Connectors — OAuth app lookup (instance default, company override) and the secrets-store guard | active | high | 063, 064 | active/065-connectors-oauth-apps-secrets-guard |
+| 066 | Connectors — generic connect, products, reconnect and disconnect handlers | active | high | 065 | active/066-connectors-connect-lifecycle |
+| 067 | Connectors — end a member's connections on removal, deactivation or SCIM, plus a daily sweep | active | high | 066 | active/067-connectors-member-removal-sweep |
+| 068 | Connectors — tool framework: one definition registered for agents and MCP | active | high | 063 | active/068-connectors-tool-framework |
+| 069 | Connectors — every outside write is a proposal only the connection owner approves | active | high | 068 | active/069-connectors-write-approvals |
+| 070 | Connectors — audit, health, usage counts, quotas and provider backoff | active | high | 063, 068 | active/070-connectors-tracking-quotas |
+| 071 | Connectors — Google pilot tools: Calendar, Meet and Drive (no Gmail) | active | high | 068, 069 | active/071-connectors-google-pilot-tools |
 | 072 | Connectors — My connections, admin overview and company apps screens | backlog | high | 066 | backlog/072-connectors-connection-screens |
-| 073 | Connectors — migrate Google Calendar connections onto the Google provider | backlog | medium | 064, 066 | backlog/073-connectors-migrate-google-calendar |
+| 073 | Connectors — migrate Google Calendar connections onto the Google provider | active | medium | 064, 066 | active/073-connectors-migrate-google-calendar |
 | 074 | Connectors — Slack as a personal OAuth provider; retire the workspace bot | backlog | medium | 069, 070, 078 | backlog/074-connectors-slack-personal |
-| 075 | Connectors — GitHub as a personal, on-demand provider; retire the task 049 sync | backlog | medium | 069, 070, 078 | backlog/075-connectors-github-personal |
-| 076 | Connectors — Drive/Dropbox attachment picker on the module | backlog | medium | 066, 072 | backlog/076-connectors-attachment-picker |
-| 077 | Connectors — remove the old Google Calendar and CloudStorage paths; Google and Dropbox setup pages | backlog | medium | 073, 076 | backlog/077-connectors-remove-calendar-picker-paths |
-| 078 | Connectors — Inbox approval cards and quota settings screens | backlog | high | 069, 070 | backlog/078-connectors-approval-quota-screens |
-| 079 | Connectors — remove the old Slack bot and GitHub sync paths | backlog | medium | 074, 075 | backlog/079-connectors-remove-slack-github-paths |
+| 075 | Connectors — GitHub through its MCP server, the first registered MCP app | active | high | 092, 093, 100 | active/075-connectors-github-personal |
+| 076 | Connectors — Drive/Dropbox attachment picker on the module | active | medium | 066, 072 | active/076-connectors-attachment-picker |
+| 077 | Connectors — remove the old Google Calendar and CloudStorage paths; Google and Dropbox setup pages | active | medium | 073, 076 | active/077-connectors-remove-calendar-picker-paths |
+| 078 | Connectors — Inbox approval cards and quota settings screens | active | high | 069, 070 | active/078-connectors-approval-quota-screens |
+| 079 | Connectors — remove the old Slack bot and GitHub sync paths | active | medium | 074, 075 | active/079-connectors-remove-slack-github-paths |
 | 086 | Time reports — one header, deep filters and export on every tab, workload day panel | active | high | — | active/086-reports-consistent-filters-export |
 | 087 | Ask knows a project — grounded project, list, task and person answers, and a better @ picker | active | high | — | active/087-ask-project-context-mentions |
 | 088 | Documentation site — in-depth user, admin, developer and API docs to replace help.alianhub.com | active | high | — | active/088-documentation-site |
 | 089 | Quick UI/UX review — fix small UI issues with before/after screenshots | active | medium | — | active/089-quick-ui-review |
 | 090 | Optional Google Analytics — page-view traffic from one env variable | active | medium | — | active/090-google-analytics-env |
 | 091 | Tracker sign-in finds the workspace — one Sign in button, no address typing for hosted users | backlog | high | — | backlog/091-tracker-finds-workspace |
+| 092 | Connectors — MCP client and MCP provider definitions: call apps' MCP servers as the member, reviewed tools only | active | high | 063, 068 | active/092-connectors-mcp-client |
 | 092 | Time reports — pick a whole team in the People filter | active | medium | 086 | active/092-report-people-filter-teams |
+| 093 | Connectors — shared sign-in for hosted instances: the instance side | active | high | 065, 066 | active/093-connectors-hosted-sign-in |
 | 093 | Workload — cells show the hours, readable at any size | active | medium | 086 | active/093-workload-cell-hours |
+| 094 | Connectors — Notion, the first app that registers itself | active | high | 092, 100 | active/094-connectors-notion-pilot |
+| 095 | Connectors — Supabase, Upwork, Wispr Flow, Dropbox, HubSpot and Canva through their MCP servers | active | medium | 075, 093, 094 | active/095-connectors-mcp-apps |
+| 096 | Connectors — custom MCP servers: added by address with a right, every tool reviewed | active | medium | 092, 100, 101 | active/096-connectors-custom-mcp-servers |
+| 097 | Connectors in the AI chat — @mention or name an app, read with the asker's own account | active | high | 075, 087, 092 | active/097-connectors-in-ai-chat |
+| 098 | Connectors — agents use connectors: ticked on the agent, declared as reads in skills | active | medium | 068 | active/098-connectors-for-agents |
+| 099 | Connectors — Outlook built connector on Microsoft Graph: mail and calendar | active | medium | 068, 069, 093 | active/099-connectors-outlook-built |
+| 100 | Connectors — sign-in for MCP apps: discovery, self-registration once per workspace, personal tokens | active | high | 066, 092 | active/100-connectors-mcp-sign-in |
+| 101 | Connectors — screen redesign: AI → Customize → Connectors, like Claude's | active | high | 072 | active/101-connectors-screen-redesign |
 | 102 | Chat message alerts and unread badge — the other person hears about a message, and the Chat icon shows a red count | active | high | — | active/102-chat-message-alerts-badge |
 | 103 | Time tracking settings redesign — a quiet settings page instead of a marketing banner | active | medium | — | active/103-time-tracking-settings-redesign |
 | 104 | Time tracker access by role — a role switch, on by default, with seats only on plans that have a limit | active | high | — | active/104-time-tracker-by-role |
 | 105 | Docs site SEO, AEO and GEO — descriptions, canonical, social tags, structured data, robots.txt, llms.txt | active | medium | 088 | active/105-docs-seo-aeo-geo |
+| 106 | Integrations and Connectors — two places, each saying what it holds; App connections moves into Integrations | active | high | 101 | active/106-integrations-and-connectors |

@@ -140,6 +140,12 @@ const {
     auditChainKeySchema,
     egressAllowlistsSchema,
     connectorConnectionsSchema,
+    connectorAppsSchema,
+    connectorUsageSchema,
+    connectorQuotasSchema,
+    connectorRegistrationsSchema,
+    connectorToolsSchema,
+    connectorServersSchema,
     instructionPatternsSchema,
     agentSessionsSchema,
     agentSessionEndpointsSchema,
@@ -438,6 +444,18 @@ exports.checkType = (type) => {
             return egressAllowlistsSchema
         case SCHEMA_TYPE.CONNECTOR_CONNECTIONS:
             return connectorConnectionsSchema
+        case SCHEMA_TYPE.CONNECTOR_APPS:
+            return connectorAppsSchema
+        case SCHEMA_TYPE.CONNECTOR_USAGE:
+            return connectorUsageSchema
+        case SCHEMA_TYPE.CONNECTOR_QUOTAS:
+            return connectorQuotasSchema
+        case SCHEMA_TYPE.CONNECTOR_REGISTRATIONS:
+            return connectorRegistrationsSchema
+        case SCHEMA_TYPE.CONNECTOR_TOOLS:
+            return connectorToolsSchema
+        case SCHEMA_TYPE.CONNECTOR_SERVERS:
+            return connectorServersSchema
         case SCHEMA_TYPE.INSTRUCTION_PATTERNS:
             return instructionPatternsSchema
         case SCHEMA_TYPE.AGENT_SESSIONS:
@@ -760,6 +778,18 @@ exports.tableType = (type) => {
                 return `${dbCollections.EGRESS_ALLOWLISTS}`
         case SCHEMA_TYPE.CONNECTOR_CONNECTIONS:
                 return `${dbCollections.CONNECTOR_CONNECTIONS}`
+        case SCHEMA_TYPE.CONNECTOR_APPS:
+                return `${dbCollections.CONNECTOR_APPS}`
+        case SCHEMA_TYPE.CONNECTOR_USAGE:
+                return `${dbCollections.CONNECTOR_USAGE}`
+        case SCHEMA_TYPE.CONNECTOR_QUOTAS:
+                return `${dbCollections.CONNECTOR_QUOTAS}`
+        case SCHEMA_TYPE.CONNECTOR_REGISTRATIONS:
+                return `${dbCollections.CONNECTOR_REGISTRATIONS}`
+        case SCHEMA_TYPE.CONNECTOR_TOOLS:
+                return `${dbCollections.CONNECTOR_TOOLS}`
+        case SCHEMA_TYPE.CONNECTOR_SERVERS:
+                return `${dbCollections.CONNECTOR_SERVERS}`
         case SCHEMA_TYPE.INSTRUCTION_PATTERNS:
                 return `${dbCollections.INSTRUCTION_PATTERNS}`
         case SCHEMA_TYPE.AGENT_SESSIONS:

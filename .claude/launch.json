@@ -8,6 +8,12 @@
       "port": 4000
     },
     {
+      "name": "alianhub-web",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": ["--prefix", "frontend", "run", "serve"],
+      "port": 8080
+    },
+    {
       "name": "docs-site",
       "runtimeExecutable": "npm",
       "runtimeArgs": ["--prefix", "docs-site", "run", "docs:preview", "--", "--port", "4173"],

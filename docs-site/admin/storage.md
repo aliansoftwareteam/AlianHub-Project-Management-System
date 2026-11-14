@@ -115,10 +115,11 @@ Behind nginx, also raise `client_max_body_size`; see [HTTPS and reverse proxy](.
 
 ## Google Drive and Dropbox attachments
 
-Separate from where uploads are stored, people can attach files from Google Drive or Dropbox. Each person sets up their own app credentials under **Settings › Integrations** in the **Cloud storage for attachments** section; nothing is shared between members. For Google Drive, register the redirect address `<APIURL>/api/v1/cloud-oauth/callback` in the Google Cloud console. Set `CLOUD_STORAGE_ENC_KEY` so those credentials are encrypted at rest, and `CLOUD_STORAGE_MAX_IMPORT_BYTES` to cap what is copied into a project.
+Separate from where uploads are stored, people can attach files from Google Drive or Dropbox. Each person connects their own Google account (with Drive ticked) or Dropbox account under **AI › Customize › Connectors**, so nothing is shared between members. The server needs the `google` or `dropbox` connector switched on and its app registered; see [Connectors setup](./connectors). `CLOUD_STORAGE_MAX_IMPORT_BYTES` caps what "Import a copy" copies into a project (100 MB by default).
 
 ## Related
 
 - [Backup and restore](./backups)
+- [Connectors setup](./connectors)
 - [The Instance console](./instance-console)
 - [Environment variables](./env-reference#storage)

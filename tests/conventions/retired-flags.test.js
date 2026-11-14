@@ -2,7 +2,8 @@ const fs = require('fs');
 const path = require('path');
 
 const ROOT = path.join(__dirname, '..', '..');
-const SELF = path.relative(ROOT, __filename);
+const rel = (file) => path.relative(ROOT, file).split(path.sep).join('/');
+const SELF = rel(__filename);
 
 /* Flags that were removed. The task history under Tasks/ keeps their story, so it is not scanned. */
 const RETIRED = ['PR_SUMMARY_AS_DATA'];
@@ -27,7 +28,7 @@ const walk = (dir, out) => {
 const scanned = () => [
     ...ROOTS.flatMap((dir) => walk(path.join(ROOT, dir), [])),
     ...FILES.map((file) => path.join(ROOT, file)).filter((file) => fs.existsSync(file)),
-].map((file) => path.relative(ROOT, file)).filter((file) => file !== SELF);
+].map(rel).filter((file) => file !== SELF);
 
 describe('retired flags', () => {
     const files = scanned();

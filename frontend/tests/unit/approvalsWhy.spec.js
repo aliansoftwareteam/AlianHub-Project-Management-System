@@ -32,8 +32,9 @@ const proposal = {
     createdAt: '2026-09-22T10:00:00.000Z'
 };
 
+let served = proposal;
 const respond = (type, url) => {
-    if (String(url).startsWith(PROPOSALS)) return Promise.resolve({ data: { status: true, data: [proposal] } });
+    if (String(url).startsWith(PROPOSALS)) return Promise.resolve({ data: { status: true, data: [served] } });
     return Promise.resolve({ data: { status: true, data: [] } });
 };
 
@@ -54,8 +55,15 @@ const whyButton = () => wrapper.find('[data-test="proposal-why"]');
 const dialog = () => document.body.querySelector('[role="dialog"]');
 
 describe('Approvals — Why explains an agent proposal', () => {
-    beforeEach(() => { apiRequest.mockReset(); });
+    beforeEach(() => { apiRequest.mockReset(); served = proposal; });
     afterEach(() => { wrapper?.unmount(); document.body.innerHTML = ''; });
+
+    it('sends a write to a connected app to the Inbox instead of approving it unread', async () => {
+        served = { ...proposal, changes: [{ action: 'google.calendar.events.create', label: 'Board review', reversible: false, card: { title: 'Board review' } }] };
+        await open();
+        expect(wrapper.find('[data-test="proposal-review-inbox"]').exists()).toBe(true);
+        expect(wrapper.findAll('button').some((b) => b.text() === 'Time.approve')).toBe(false);
+    });
 
     it('the Why button says it opens a dialog', async () => {
         await open();

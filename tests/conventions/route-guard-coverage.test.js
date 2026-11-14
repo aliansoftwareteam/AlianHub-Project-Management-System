@@ -85,10 +85,9 @@ const PUBLIC_ROUTES = [
     // Serves a file only for a signed download token or from a bucket marked public.
     'GET /api/v1/download/:bucketId/*',
     // A provider redirect carries no session; the signed state authenticates it.
-    'GET /api/v1/cloud-oauth/callback',
     'GET /api/v1/github-connect/callback',
-    // Google's redirect for a person's connector: it exchanges nothing, and the signed-in page completes it.
-    'GET /api/v1/connector-oauth/google/callback',
+    // The redirect for every registry provider's person connection: it exchanges nothing, and the signed-in page completes it.
+    'GET /api/v1/connector-oauth/:provider/callback',
     // Slack slash command: checked against the workspace's Slack verification token.
     'POST /api/v1/slack/command/:companyId',
     // Progress streams: EventSource cannot send a token, and they carry only step numbers.

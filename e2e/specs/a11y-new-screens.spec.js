@@ -55,7 +55,9 @@ const SCREENS = [
         name: 'Connect your AI',
         async open(page, { state }) {
             await page.goto(`/#/${state.companyId}/ai/connect`);
-            await expect(page.getByRole('heading', { level: 1, name: 'Connect your AI' })).toBeVisible();
+            await expect(page.getByRole('heading', { level: 1, name: 'Customize' })).toBeVisible();
+            await expect(page.getByRole('tab', { name: 'Connect your AI', selected: true })).toBeVisible();
+            await expect(page.getByRole('heading', { level: 2, name: 'Connect your AI' })).toBeVisible();
             await expect(page.locator('[data-test="connect-ai-sign"]')).toBeVisible();
         },
     },

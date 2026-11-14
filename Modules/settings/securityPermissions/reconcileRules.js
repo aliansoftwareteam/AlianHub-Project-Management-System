@@ -17,6 +17,7 @@ const SENTINEL_KEYS = [
     'ai_skill_risk',
     'ai_connectors',
     'ai_external_clients',
+    'ai_custom_apps',
     'time_tracking',
     'desktop_tracker',
 ];

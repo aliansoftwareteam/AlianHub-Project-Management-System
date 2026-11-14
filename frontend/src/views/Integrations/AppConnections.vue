@@ -1,18 +1,13 @@
 <template>
-    <div class="ah-page apc">
-        <div class="ah-toolbar">
-            <div class="ah-toolbar__title">{{ $t('AppConnections.title') }}</div>
-        </div>
-
-        <div class="apc__body ah-scroll">
-            <p class="ah-small">{{ $t('AppConnections.lead') }}</p>
+    <div class="apc">
+        <div class="apc__body">
             <p v-if="enabled && !canManage" class="ah-small">{{ $t('AppConnections.read_only') }}</p>
             <p v-if="error" class="ah-field__error" role="alert">{{ error }}</p>
             <p v-if="notice" class="ah-small" role="status" data-notice>{{ notice }}</p>
             <p v-if="loaded && !enabled" class="ah-card apc__off">{{ $t('AppConnections.off') }}</p>
 
-            <div v-if="enabled" class="apc__list">
-                <article v-for="app in apps" :key="app.key" class="ah-card apc__card" :data-app="app.key">
+            <div v-if="enabled" class="apc__list" :class="{ 'apc__list--one': shownApps.length === 1 }">
+                <article v-for="app in shownApps" :key="app.key" class="ah-card apc__card" :data-app="app.key">
                     <header class="apc__top">
                         <span class="apc__icon" aria-hidden="true">{{ app.icon }}</span>
                         <div class="apc__id">
@@ -127,7 +122,7 @@
 </template>
 
 <script setup>
-import { onMounted, ref } from "vue";
+import { computed, onMounted, ref } from "vue";
 import { useI18n } from "vue-i18n";
 import { useRoute, useRouter } from "vue-router";
 import { withoutGithubReturn } from "./githubReturn";
@@ -138,6 +133,8 @@ import GithubRepoTable from "./github/GithubRepoTable.vue";
 import { EGRESS_BLOCKED } from "./github/githubEgress";
 
 defineOptions({ name: "AppConnections" });
+
+const props = defineProps({ only: { type: Array, default: () => [] } });
 
 const { t } = useI18n();
 
@@ -159,6 +156,8 @@ const copied = ref("");
 const blockedHosts = ref({});
 const allowedHosts = ref([]);
 const tables = {};
+
+const shownApps = computed(() => (props.only.length ? apps.value.filter((app) => props.only.includes(app.key)) : apps.value));
 
 const GITHUB_OUTCOMES = ["expired", "denied", "rights", "off", "failed"];
 const GITHUB_REFUSALS = { 400: "github_expired", 403: "github_rights", 409: "github_off" };

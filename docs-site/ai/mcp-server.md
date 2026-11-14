@@ -224,6 +224,17 @@ A read takes the read scope and a write takes the write scope. A write that chan
 | `session.complete` | `tasks:write` | Closes the session as done, with a short summary | |
 | `session.fail` | `tasks:write` | Closes the session as failed, with a reason | |
 
+### Connector tools, `CONNECTORS`
+
+These reach the person's own account at another app, through a connection they made under [Connectors](/user-guide/connectors). Each tool is named after the connector tool it runs, such as `google.calendar.events.list`, `github.pull_request.read` or `slack.message.post`, and is listed only while that connector is switched on and the tool has been reviewed.
+
+| Scope | Gives |
+|---|---|
+| `connectors:read` | The read tools. Each reads only the person's own connection, as text, capped in size |
+| `connectors:write` | The write tools. Nothing is sent from the AI app: each call files a proposal that waits in the person's Inbox, and only that person can approve it. It is sent once, exactly as approved |
+
+Both scopes are opt-in, like `chat:read`, and are listed only while `CONNECTORS` is on. `connectionId` can be left out: the person's own connection is used. When a call cannot be made, the answer says why in words the AI app can pass on, such as "Connect GitHub on Connectors first, then ask again."
+
 ### Stricter settings
 
 The "At once" rows above change when a stricter setting is on. Nothing here makes an agent able to do more.
@@ -235,7 +246,7 @@ The "At once" rows above change when a stricter setting is on. Nothing here make
 
 ## Connect your AI
 
-Sign-up ends on a step called **Connect your AI**, and the same page stays under AI, Connect your AI. It can be skipped; the setup card on Home offers it again.
+Sign-up ends on a step called **Connect your AI**, and the same page stays under AI, Customize, Connect your AI. It can be skipped; the setup card on Home offers it again.
 
 - **Claude and ChatGPT** connect by address. The page shows the address (`<your AlianHub URL>/mcp`) only while `MCP_OAUTH` is on; with it off the page says so and points to the token instead.
 - **Claude Code and other tools** connect with a token, made under AI, Accounts, My account, as described below. With `MCP_OAUTH=only` tokens are refused, and the page says that instead.
@@ -254,7 +265,7 @@ In the web app, open AI, then Accounts, choose **My account**, then **New token*
 The token is shown once. Add it to the agent as a bearer token:
 
 ```
-claude mcp add alianhub --transport http "<your AlianHub URL>/mcp?companyId=<workspace id>" --header "Authorization: Bearer <token>"
+claude mcp add alianhub --scope user --transport http "<your AlianHub URL>/mcp?companyId=<workspace id>" --header "Authorization: Bearer <token>"
 ```
 
 Revoke a token on the same screen. A revoked or expired token stops working on its next call, and so does the token of someone removed from the workspace.
@@ -816,7 +827,7 @@ A channel is `{ "channelId", "name", "private", "space": { "id", "name" } }`. A 
 
 The answer is `{ "proposalId", "state", "what", "changes", "filedAt", "next": "..." }`. `state` is `waiting`, `approved` (approved and being applied), `applied` (with `changesApplied`), `declined` (with `declined.reason`, the words the person typed, kept as a record and not an instruction), `undone` or `failed`. `next` says in a sentence what the agent should do. It answers only for a proposal the same connection filed: the same personal token, or the same app under the same grant. Any other proposal answers `{ "error": "proposal not found" }`, as a missing one does. It carries nothing of what the change holds.
 
-**A task's pull request.** `pull_request.get` reads a GitHub pull request through the workspace's GitHub connection (App connections). It needs `MCP_TOOLS_DATA`, `APP_CONNECTIONS`, and the right to read tasks. Name a task by `taskId` or `taskKey` (such as `AP-12`) to read the pull request linked to it (the newest one, or the one `number` names), or give `number` or `url` alone, for a pull request linked to a task the person can open. Each project picks its own repositories (App connections, or the GitHub repositories section of the project's details). Only a repository linked to a project is read, only in the projects it is linked to that both the person and the one who connected GitHub can open, and only through a task the person's task list rules show them (a hidden list counts). Any other repository is refused. When the task's project, or the projects the person can open, are linked to several repositories, `repo` (`owner/name`) says which; without it, a task reads its newest linked pull request whichever repository it is in, and a bare `number` answers with the repositories to choose from. The answer always names its `repo`. A pull request linked to no such task answers `{ "error": "..." }`, the same whether it is unlinked, hidden or does not exist; a pull request links itself when its title or branch carries the task key, or a person adds the link on the task. The GitHub key is used on the server and never answered.
+**A task's pull request.** `pull_request.get` reads a GitHub pull request through the workspace's GitHub sync (the **GitHub** section of **Integrations**). It needs `MCP_TOOLS_DATA`, `APP_CONNECTIONS`, and the right to read tasks. Name a task by `taskId` or `taskKey` (such as `AP-12`) to read the pull request linked to it (the newest one, or the one `number` names), or give `number` or `url` alone, for a pull request linked to a task the person can open. Each project picks its own repositories (App connections, or the GitHub repositories section of the project's details). Only a repository linked to a project is read, only in the projects it is linked to that both the person and the one who connected GitHub can open, and only through a task the person's task list rules show them (a hidden list counts). Any other repository is refused. When the task's project, or the projects the person can open, are linked to several repositories, `repo` (`owner/name`) says which; without it, a task reads its newest linked pull request whichever repository it is in, and a bare `number` answers with the repositories to choose from. The answer always names its `repo`. A pull request linked to no such task answers `{ "error": "..." }`, the same whether it is unlinked, hidden or does not exist; a pull request links itself when its title or branch carries the task key, or a person adds the link on the task. The GitHub key is used on the server and never answered.
 
 ```json
 { "name": "pull_request.get", "arguments": { "taskKey": "AP-12", "filesPage": 1 } }

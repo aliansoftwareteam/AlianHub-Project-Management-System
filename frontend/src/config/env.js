@@ -238,6 +238,7 @@ module.exports.AGENT_SESSIONS = '/api/v2/agent-sessions';
 module.exports.TIMESHEET_HOURS_BY_SOURCE = '/api/v1/timesheet/hours-by-source';
 module.exports.AGENT_PROPOSALS = '/api/v2/agents/proposals';
 module.exports.AGENT_REGISTRY = '/api/v2/agents/registry';
+module.exports.AGENT_CONNECTORS = '/api/v2/agents/connectors';
 module.exports.AGENT_SKILLS = '/api/v2/agents/skills';
 module.exports.AGENT_ROLES = '/api/v2/agents/roles';
 module.exports.AGENT_SKILL_CATALOGUES = '/api/v2/agents/skills/catalogues';
@@ -327,8 +328,6 @@ module.exports.CALENDAR_FEED = '/api/v1/calendar';
 module.exports.AUTOMATIONS = '/api/v1/automations';
 module.exports.AUTOMATIONS_V2 = '/api/v2/automations';
 module.exports.INTEGRATIONS = '/api/v1/integrations';
-// AHE-3838 — cloud storage attachments (Google Drive / Dropbox).
-module.exports.CLOUD_STORAGE = '/api/v1/cloud-storage';
 module.exports.EXPORT_CSV = '/api/v1/export/csv';
 module.exports.EXPORT_XLSX = '/api/v1/export/xlsx';
 module.exports.MAIN_CHATS = '/api/v1/main-chats'

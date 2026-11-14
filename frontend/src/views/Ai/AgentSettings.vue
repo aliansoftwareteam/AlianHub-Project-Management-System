@@ -95,6 +95,10 @@
                         </section>
                     </div>
 
+                    <div v-if="tabs.includes('connectors')" v-show="activeTab === 'connectors'" id="agent-panel-connectors" role="tabpanel" aria-labelledby="agent-tab-connectors" class="ai-panel">
+                        <AgentConnectors v-model="form.connectors" :offered="offeredConnectors" :used="usedBySkills" :disabled="!editable" :hint="editable && !canManage ? $t('AgentAccess.widen_waits') : ''" />
+                    </div>
+
                     <div v-show="activeTab === 'projects'" id="agent-panel-projects" role="tabpanel" aria-labelledby="agent-tab-projects" class="ai-panel">
                         <section v-if="roles.length" class="ah-card ai-agent" data-test="role">
                             <div class="ah-field">
@@ -217,7 +221,7 @@
                         />
                     </div>
 
-                    <div v-if="editable && SETTINGS_TABS.includes(activeTab)" class="ai-savebar" data-test="savebar">
+                    <div v-if="editable && shownSettingsTabs.includes(activeTab)" class="ai-savebar" data-test="savebar">
                         <span v-if="error" class="ah-field__error ai-savebar__note">{{ error }}</span>
                         <span v-else-if="dirty" class="ai-savebar__note ai-savebar__note--dirty" data-test="unsaved">{{ $t('Ai.unsaved_changes') }}</span>
                         <span v-else class="ai-savebar__note">{{ $t('Ai.all_saved') }}</span>
@@ -286,6 +290,8 @@ import AgentRevisionHistory from "./AgentRevisionHistory.vue";
 import AgentSchedules from "./AgentSchedules.vue";
 import AgentAudience from "./AgentAudience.vue";
 import AgentApprovalPanel from "./AgentApprovalPanel.vue";
+import AgentConnectors from "./AgentConnectors.vue";
+import { tickCount } from "./agentConnectorTicks";
 import { useAgents, refusalCount } from "./useAgents";
 import { splitPreview } from "./policyPreview";
 import { changedFields, formFromAgent, skillsPayload } from "./agentSavePatch";
@@ -318,6 +324,7 @@ const saved = ref({});
 const projects = computed(() => (getters["projectData/projects"]?.data || []).filter((p) => !p.deletedStatusKey));
 const pinnableModels = ref([]);
 const roles = ref([]);
+const offeredConnectors = ref([]);
 const openRunCount = computed(() => (activeRuns.value[String(route.params.id)] || []).length);
 const editable = computed(() => mayEdit(agent.value));
 
@@ -329,9 +336,12 @@ const expandedRun = ref("");
 const revisionsKey = ref(0);
 const highlightRevision = computed(() => { const n = Number(route.query.rev); return Number.isInteger(n) && n > 0 ? n : null; });
 
-const TAB_FIELDS = { skills: ["skills"], projects: ["projectIds", "role", "visibility", "sharedWith"], autonomy: ["autonomy"], limits: ["rateLimitPerDay", "spendCapUsd", "model"] };
+const TAB_FIELDS = { skills: ["skills"], connectors: ["connectors"], projects: ["projectIds", "role", "visibility", "sharedWith"], autonomy: ["autonomy"], limits: ["rateLimitPerDay", "spendCapUsd", "model"] };
 const SETTINGS_TABS = Object.keys(TAB_FIELDS);
-const tabs = computed(() => [...SETTINGS_TABS, "runs", ...(canManage.value ? ["history"] : []), ...(editable.value ? ["delete"] : [])]);
+// Where no app is offered and the agent has nothing ticked there is nothing to choose, so the tab stays away.
+const hasConnectorsTab = computed(() => offeredConnectors.value.length > 0 || tickCount(form.connectors) > 0 || tickCount(saved.value.connectors) > 0);
+const shownSettingsTabs = computed(() => SETTINGS_TABS.filter((key) => key !== "connectors" || hasConnectorsTab.value));
+const tabs = computed(() => [...shownSettingsTabs.value, "runs", ...(canManage.value ? ["history"] : []), ...(editable.value ? ["delete"] : [])]);
 // A run's detail links here with ?rev=N to show that revision.
 const tab = ref(String(route.query.tab || (route.query.rev ? "history" : "skills")));
 const activeTab = computed(() => (tabs.value.includes(tab.value) ? tab.value : "skills"));
@@ -374,7 +384,12 @@ const shownProjects = computed(() => {
 });
 const chooseShown = () => { form.projectIds = [...new Set([...form.projectIds, ...shownProjects.value.map((p) => String(p._id))])]; };
 
-const tabCount = (key) => (key === "skills" ? skills.value.filter((s) => s.enabled).length : key === "projects" ? chosenCount.value : null);
+const TAB_COUNTS = {
+    skills: () => skills.value.filter((s) => s.enabled).length,
+    connectors: () => tickCount(form.connectors),
+    projects: () => chosenCount.value,
+};
+const tabCount = (key) => (TAB_COUNTS[key] ? TAB_COUNTS[key]() : null);
 
 /* What this agent would actually let the skill do: the skill's emits cut to the
  * agent's allowed actions. An agent with no allowed actions is un-narrowed. */
@@ -393,6 +408,12 @@ const allowedKeys = computed(() => {
 });
 const preview = computed(() => splitPreview(allowedKeys.value, registryManifest.value.actions));
 
+// What the ticked skills read or propose, so the Connectors tab can point at the tools they need.
+const usedBySkills = computed(() => {
+    const manifest = new Map((skillManifest.value || []).map((s) => [s.key, s]));
+    return [...new Set(skills.value.filter((s) => s.enabled).flatMap((s) => [...(manifest.get(s.key)?.reads || []), ...(s.emits || [])]))];
+});
+
 const time = clockText;
 const runStatus = (run) => (te(`Ai.run_status_${run.status}`) ? t(`Ai.run_status_${run.status}`) : run.status);
 const runChip = (run) => (run.status === "failed" ? "ah-chip--danger" : run.status === "running" ? "ah-chip--brand" : run.status === "skipped" ? "ah-chip--warn" : "ah-chip--ok");
@@ -401,6 +422,12 @@ const toggleRun = (id) => { expandedRun.value = expandedRun.value === id ? "" : 
 const loadPinnableModels = async () => {
     const res = await apiRequest("get", `${env.AGENT_MODELS}?configured=true`).catch(() => null);
     pinnableModels.value = res?.data?.status ? (res.data.data?.models || []) : [];
+};
+
+const loadConnectors = async () => {
+    const res = await apiRequest("get", env.AGENT_CONNECTORS).catch(() => null);
+    const providers = res?.data?.status ? res.data.data?.providers : null;
+    offeredConnectors.value = Array.isArray(providers) ? providers : [];
 };
 
 const loadRoles = async () => {
@@ -445,7 +472,7 @@ const load = async () => {
     skillsOnAtLoad.value = new Set(chosen.filter((s) => s.enabled).map((s) => s.key));
     saved.value = currentSettings();
 
-    await Promise.all([reloadRuns(), loadPinnableModels(), loadRoles()]);
+    await Promise.all([reloadRuns(), loadPinnableModels(), loadRoles(), loadConnectors()]);
     loadingAgent.value = false;
 };
 
