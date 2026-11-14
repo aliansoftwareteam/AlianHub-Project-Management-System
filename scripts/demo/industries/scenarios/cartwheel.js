@@ -501,7 +501,7 @@ module.exports = {
             targets: [{ name: 'Summer sale work done', kind: 'tasks', tasks: ['cat.kt204', 'cat.ck118', 'cat.summer-sale', 'stk.pn280', 'stk.po-3301', 'stk.po-3298'] }],
         },
     ],
-    dashboard: { name: 'Store operations', project: 'ord', cards: ['tasks_by_status', 'at_risk', 'due_soon', 'project_pulse'] },
+    dashboard: { name: 'Store operations', project: 'ord', cards: ['tasks_by_status', 'at_risk', 'due_soon', 'project_pulse', 'logged_vs_estimate', 'my_time'] },
     guide: {
         project: 'ord',
         intro: 'Cartwheel sells home and kitchen goods online, through its own store and two marketplaces, Shopora and Bazely. You are signed in as the **Head of E-commerce**. Three processes run side by side: **Orders and Customer Service** (late, damaged and wrong orders, returns and refunds), **Catalogue and Promotions** (new listings, fixes and the summer sale) and **Stock and Suppliers** (low stock and purchase orders). Role agents sort, draft and check; people decide.',

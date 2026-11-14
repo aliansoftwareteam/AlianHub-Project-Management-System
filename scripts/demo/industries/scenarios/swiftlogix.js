@@ -423,7 +423,7 @@ module.exports = {
             targets: [{ name: 'Outbound orders complete', kind: 'tasks', tasks: ['wh.wo-5517', 'wh.wo-5520', 'wh.wo-5512', 'wh.wo-5509', 'wh.wo-5506', 'wh.wo-5523'] }],
         },
     ],
-    dashboard: { name: 'Control tower', project: 'ship', cards: ['tasks_by_status', 'at_risk', 'due_soon', 'project_pulse'] },
+    dashboard: { name: 'Control tower', project: 'ship', cards: ['tasks_by_status', 'at_risk', 'due_soon', 'project_pulse', 'logged_vs_estimate', 'my_time'] },
     guide: {
         project: 'ship',
         intro: 'SwiftLogix moves freight for retailers, manufacturers and clinics by road, ocean and air, and runs a distribution centre in Dallas. You are signed in as the **Head of Operations**. **Shipments and Exceptions** is the control tower, **Warehouse Operations** picks and loads, and **Suppliers and Purchasing** keeps stock coming in. Role agents watch and draft; people decide and send.',

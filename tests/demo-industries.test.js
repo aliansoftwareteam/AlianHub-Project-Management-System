@@ -1,5 +1,6 @@
 const { SCENARIOS } = require('../scripts/demo/industries/scenarios');
-const { validateScenario, guideMarkdown, ruleFor, statusAfterStory } = require('../scripts/demo/industries/lib/scenario');
+const { validateScenario, guideMarkdown, ruleFor, statusAfterStory, CARDS } = require('../scripts/demo/industries/lib/scenario');
+const { CARDS: REAL_CARDS } = require('../Modules/Agents/dashboardRequests');
 const { targetProblem, isShowcaseCompany, isShowcasePerson, emailFor, MARK } = require('../scripts/demo/industries/lib/guard');
 const { buildShowcase, roleExists, roleName, templateExists, templateName } = require('../scripts/demo/industries/lib/build');
 const { dropShowcase } = require('../scripts/demo/industries/lib/drop');
@@ -56,6 +57,19 @@ describe('industry demo scenarios', () => {
     test('no seeded text names a calendar month, so a reset never reads stale', () => {
         const MONTHS = /\b(January|February|March|April|May|June|July|August|September|October|November|December)\b/;
         SCENARIOS.forEach((scenario) => expect(JSON.stringify(scenario)).not.toMatch(MONTHS));
+    });
+
+    test('every card a scenario may ask for is one the dashboard picker actually builds', () => {
+        expect([...CARDS].sort()).toEqual(Object.keys(REAL_CARDS).sort());
+    });
+
+    test('every scenario\'s dashboard has 1 to 6 cards and shows real logged time, not just task counts', () => {
+        SCENARIOS.forEach((scenario) => {
+            expect(scenario.dashboard.cards.length).toBeGreaterThan(0);
+            expect(scenario.dashboard.cards.length).toBeLessThanOrEqual(6);
+            expect(scenario.dashboard.cards).toContain('logged_vs_estimate');
+            expect(scenario.dashboard.cards).toContain('my_time');
+        });
     });
 
     test('the validator names what is wrong', () => {
@@ -208,7 +222,7 @@ function fakeAdapter({ dispatcher = true, workflows = true } = {}) {
         getProject: record('getProject', () => ({ _id: id(), CompanyId: 'c', ProjectName: 'p' })),
         listOf: record('listOf', () => ({ _id: id() })),
         fieldValues: (made, values) => values || {},
-        createTask: record('createTask', () => id()),
+        createTask: (args) => { const result = id(); calls.push({ name: 'createTask', args, result }); return result; },
         relate: record('relate'),
         createRoleAgents: record('createRoleAgents', () => [{ agentId: id() }]),
         configureAgent: record('configureAgent'),
@@ -230,11 +244,13 @@ function fakeAdapter({ dispatcher = true, workflows = true } = {}) {
         waitingApproval: record('waitingApproval', { status: 'pending' }),
         personComment: record('personComment', () => id()),
         moveTask: record('moveTask'),
+        logTime: record('logTime', () => id()),
         simulatedRun: record('simulatedRun', () => ({ _id: id() })),
         agentComment: record('agentComment', () => id()),
         simulatedProposal: record('simulatedProposal', () => id()),
         createGoal: record('createGoal'),
         createDashboard: record('createDashboard'),
+        createWorkspaceDashboard: record('createWorkspaceDashboard', () => id()),
         createGuidePage: record('createGuidePage', () => id()),
         updateCompanyMarker: record('updateCompanyMarker'),
     };
@@ -258,13 +274,40 @@ describe('building an industry company', () => {
         expect(adapter.named('simulatedProposal')).toHaveLength(scenario.story.filter((event) => event.proposal).length);
         expect(report.simulatedRuns + report.proposals).toBe(adapter.named('simulatedRun').length);
 
+        // Every top-level task gets a real effort estimate, made up when the scenario left it out.
+        adapter.named('createTask').forEach(({ args }) => { if (!args.parentId) expect(Number.isFinite(args.task.estimate)).toBe(true); });
+
+        // Real time logged, through yesterday, never today, on at least one task.
+        const today = new Date().toISOString().slice(0, 10);
+        expect(report.timeLogs).toBe(adapter.named('logTime').length);
+        expect(adapter.named('logTime').length).toBeGreaterThan(0);
+        adapter.named('logTime').forEach(({ args }) => expect(args.day < today).toBe(true));
+
         const order = adapter.calls.map((call) => call.name);
         const last = (name) => order.lastIndexOf(name);
+        expect(last('createTask')).toBeLessThan(order.indexOf('logTime'));
+        expect(last('logTime')).toBeLessThan(order.indexOf('startAutomations'));
         expect(last('createRule')).toBeLessThan(order.indexOf('startAutomations'));
         expect(order.indexOf('startAutomations')).toBeLessThan(order.indexOf('moveTask'));
         expect(last('moveTask')).toBeLessThan(order.indexOf('stopAutomations'));
         expect(last('createGuidePage')).toBeLessThan(order.indexOf('updateCompanyMarker'));
         expect(adapter.named('updateCompanyMarker')[0].args).toMatchObject({ marker: { guidePageId: expect.any(String) } });
+
+        // One company-wide "Executive overview" dashboard, never a "mine" card on it.
+        expect(adapter.named('createWorkspaceDashboard')).toHaveLength(1);
+        const execDashboard = adapter.named('createWorkspaceDashboard')[0].args;
+        expect(execDashboard.name).toBe('Executive overview');
+        const MINE_CARDS = new Set(['DueSoonCard', 'MyTimeCard']);
+        execDashboard.cards.forEach((card) => expect(MINE_CARDS.has(card.key)).toBe(false));
+    });
+
+    test('nothing logs time on a task that is still in its opening ("default_active") status', async () => {
+        const adapter = fakeAdapter();
+        await buildShowcase({ scenario: finedge(), owner, adapter });
+        const statusTypeOf = new Map(adapter.named('createTask').map((call) => [call.result, call.args.status.type]));
+        const loggedTaskIds = adapter.named('logTime').map(({ args }) => args.taskId);
+        expect(loggedTaskIds.length).toBeGreaterThan(0);
+        loggedTaskIds.forEach((taskId) => expect(statusTypeOf.get(taskId)).not.toBe('default_active'));
     });
 
     test('a rule fires on the status the scenario names, in its own project', async () => {
