@@ -117,7 +117,12 @@ jobs:
           CSC_LINK: ${{ secrets.WIN_CSC_LINK }}
           CSC_KEY_PASSWORD: ${{ secrets.WIN_CSC_KEY_PASSWORD }}
           CSC_IDENTITY_AUTO_DISCOVERY: ${{ steps.signing.outputs.signed }}
-        run: npx electron-builder --win --x64 --publish never -c.publish.url="$FEED_URL"
+        # electron-builder resolves an empty (but defined) CSC_LINK as a local file path and fails
+        # ("... not a file") instead of treating it as absent, so an unsigned build must unset it.
+        run: |
+          if [ -z "$CSC_LINK" ]; then unset CSC_LINK; fi
+          if [ -z "$CSC_KEY_PASSWORD" ]; then unset CSC_KEY_PASSWORD; fi
+          npx electron-builder --win --x64 --publish never -c.publish.url="$FEED_URL"
 
       - name: Package for macOS
         if: matrix.platform == 'mac'
@@ -129,6 +134,8 @@ jobs:
           APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}
           APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
         run: |
+          if [ -z "$CSC_LINK" ]; then unset CSC_LINK; fi
+          if [ -z "$CSC_KEY_PASSWORD" ]; then unset CSC_KEY_PASSWORD; fi
           if [ "${{ steps.signing.outputs.signed }}" = true ]; then
             notarize="-c.mac.notarize.teamId=$APPLE_TEAM_ID"
           else

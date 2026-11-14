@@ -62,7 +62,7 @@ tracker release (PR 4) reaches people.
 - [x] `NEXT_PUBLIC_WORKSPACE_FINDER_URL` default + README "How it connects" section updated.
 - [x] Tests (repository jest): pendingSignIn (match, expiry, reuse, wrong state, legacy), callback workspace
       normalisation (http refused), deepLink parsing of `state`/`workspace`.
-- [ ] Tag `tracker-v6.1.0-beta.1` → beta channel.
+- [x] Tag `tracker-v6.1.0-beta.2` → beta channel (`6.1.0-beta.1`'s release build failed, see Log; never published).
 
 ### Verification (after PR 1 is on staging, PR 2 deployed, PR 4 beta installed)
 - [ ] Run every acceptance criterion in `task.md` on Windows; spot-check macOS and Ubuntu (deep link + sign-in).
@@ -133,3 +133,14 @@ rule: no push without approval). Windows end-to-end: tracker half verified, brow
   so a workspace served under a path reached the tracker without it. Fixed in #1778 (build 14.43.0-beta.9) with
   `workspaceAddressOf` in `frontend/src/utils/trackerDeepLink.js`; the same PR keeps workspace and project ids
   out of Google Analytics (#1773).
+
+### 2026-11-14
+- Tagged `tracker-v6.1.0-beta.1` to ship the beta release; its CI run failed `Build for win` and `Build for mac`
+  with `... not a file`. Cause: GitHub sets an unset secret to an empty string rather than leaving it unset, and
+  electron-builder resolves a defined-but-empty `CSC_LINK` as a local path instead of treating it as absent.
+  Fixed in PR #1801 (merged to `staging`) by unsetting `CSC_LINK`/`CSC_KEY_PASSWORD` in `tracker-release.yml`
+  when empty, before calling electron-builder. `tracker-v6.1.0-beta.1` was left as a failed, unpublished tag
+  (no artifacts ever uploaded) rather than moved; `tracker-v6.1.0-beta.2` carries the fix and built clean on
+  Windows, macOS and Linux (unsigned, beta channel; no signing secrets configured in this repo yet).
+- Not done: installing and running the beta build (Windows/macOS/Ubuntu), the deep-link and auto-update
+  checks in the Verification section below, and the `BETA-LOG.md`/`version:log` docs follow-up for this merge.
