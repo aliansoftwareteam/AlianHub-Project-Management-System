@@ -60,9 +60,12 @@
       after), signed in, opened "Executive overview" — all 6 cards render real data (9 tasks/3 projects,
       8 at risk, -48% logged vs estimate, 40h free capacity across 5 people, $0.00 of $12 agent spend,
       each agent correctly "Paused"). Screenshot sent to the owner.
-- [ ] Not yet reseeded on the live/shared 8 companies — this addition landed after that reseed; needs
-      another `--reset` run (same command as before) to appear there, and demo.alianhub.com still needs
-      its separate restart regardless (see above) before any of this is visible live.
+- [x] Reseeded the live/shared 8 companies (2026-11-14, owner's go-ahead): same command, same flags,
+      new DNS-fix require. All 8 dropped and rebuilt cleanly (exit 0); verified directly against the
+      database — every one of the 8 now has a `visibility: 'workspace'` "Executive overview" dashboard
+      with exactly the 6 intended cards. demo.alianhub.com still needs its own restart (see above)
+      before any of this — the logs, the per-project dashboard's new cards, or this one — is visible
+      live; that remains outside this session's reach.
 
 ## Notes
 
