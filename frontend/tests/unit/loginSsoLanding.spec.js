@@ -30,7 +30,7 @@ vi.mock('@/plugins/oauth/ProviderButton.vue', () => ({ default: { name: 'Provide
 vi.mock('@/components/templates/AuthShell/AuthShell.vue', () => ({ default: { name: 'AuthShell', template: '<div><slot /></div>' } }));
 
 import * as env from '@/config/env';
-import { isSignInLanding } from '@/router/sessionCheck';
+import { isSignInLanding, startSignInLanding } from '@/router/sessionCheck';
 import Login from '@/views/Authentication/Login/Login.vue';
 
 const landFromSso = async (query) => {
@@ -120,6 +120,20 @@ describe('landing on the sign-in page after single sign-on', () => {
         expect(reload).not.toHaveBeenCalled();
     });
 
+    it('reads the account only once the session is renewed, so the read never carries the token being replaced', async () => {
+        let renewed;
+        mocks.getAuth.mockReturnValue(new Promise((resolve) => { renewed = resolve; }));
+        const checks = () => mocks.apiRequestWithoutCompnay.mock.calls.filter(([, url]) => url === env.USER_AND_COMAPNY_CHECK);
+
+        await landFromSso({ sso: 'ok', uid: USER_ID, workspace: SSO_COMPANY });
+        expect(checks()).toHaveLength(0);
+
+        renewed({ status: true });
+        await flushPromises();
+        expect(checks()).toHaveLength(1);
+        expect(mocks.replace).toHaveBeenCalledWith(`/${SSO_COMPANY}`);
+    });
+
     it('says single sign-on failed when the session cannot be read', async () => {
         mocks.apiRequestWithoutCompnay.mockRejectedValue(new Error('forbidden'));
 
@@ -163,5 +177,55 @@ describe('the router on a sign-in landing', () => {
 
         expect(landing).toBeGreaterThan(-1);
         expect(landing).toBeLessThan(guard.indexOf('readSessionUser(localUserId'));
+    });
+});
+
+describe('opening the app on a sign-in landing', () => {
+    const OTHER_USER = '6f0000000000000000000008';
+    const landing = { name: 'Log-in', query: { sso: 'ok', uid: USER_ID, workspace: SSO_COMPANY } };
+    let forgetAccount;
+
+    beforeEach(() => {
+        localStorage.clear();
+        forgetAccount = vi.fn(() => localStorage.clear());
+    });
+
+    it('forgets the account this browser remembered when someone else signed in', () => {
+        localStorage.setItem('userId', OTHER_USER);
+        localStorage.setItem('selectedCompany', OTHER_COMPANY);
+
+        startSignInLanding(landing, { storage: localStorage, forgetAccount });
+
+        expect(forgetAccount).toHaveBeenCalledTimes(1);
+        expect(localStorage.getItem('userId')).toBeNull();
+    });
+
+    it('leaves booting the same person to the landing, keeping the workspace they had open', () => {
+        localStorage.setItem('userId', USER_ID);
+        localStorage.setItem('selectedCompany', OTHER_COMPANY);
+
+        startSignInLanding({ name: 'Log-in', query: { magic: 'ok', uid: USER_ID } }, { storage: localStorage, forgetAccount });
+
+        expect(forgetAccount).not.toHaveBeenCalled();
+        expect(localStorage.getItem('userId')).toBeNull();
+        expect(localStorage.getItem('selectedCompany')).toBe(OTHER_COMPANY);
+    });
+
+    it('changes nothing on any other page', () => {
+        localStorage.setItem('userId', OTHER_USER);
+
+        startSignInLanding({ name: 'Log-in', query: {} }, { storage: localStorage, forgetAccount });
+        startSignInLanding({ name: 'Home', query: { sso: 'ok', uid: USER_ID } }, { storage: localStorage, forgetAccount });
+
+        expect(forgetAccount).not.toHaveBeenCalled();
+        expect(localStorage.getItem('userId')).toBe(OTHER_USER);
+    });
+
+    it('runs before the app boots', () => {
+        const main = fs.readFileSync(path.resolve(__dirname, '../../src/main.js'), 'utf8');
+        const landingStart = main.indexOf('startSignInLanding(');
+
+        expect(landingStart).toBeGreaterThan(-1);
+        expect(landingStart).toBeLessThan(main.indexOf('createApp(App)'));
     });
 });

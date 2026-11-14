@@ -6,6 +6,17 @@ export const isSignInLanding = (route) => route?.name === 'Log-in'
     && Boolean(route.query?.uid)
     && (route.query.sso === 'ok' || route.query.magic === 'ok');
 
+/* Runs before the app boots. Booting whoever this browser remembers would race the landing: its requests renew the
+ * session the landing is renewing, and its redirects and reloads cut the landing off mid-renewal. So a landing starts
+ * like a signed-out sign-in page, and someone else's remembered state goes with them. */
+export const startSignInLanding = (route, { storage, forgetAccount }) => {
+    if (!isSignInLanding(route)) return;
+    const remembered = storage.getItem('userId');
+    if (!remembered) return;
+    if (remembered === String(route.query.uid)) storage.removeItem('userId');
+    else forgetAccount();
+};
+
 /* `unreachable` means the server gave no answer at all, which says nothing about the session: the
  * person may still be signed in, so the caller must not treat it as signed out. */
 export const readSessionUser = async (userId, fetchUser) => {

@@ -2,7 +2,7 @@ const crypto = require('node:crypto');
 const http = require('node:http');
 const jose = require('jose');
 const { MongoClient } = require('mongodb');
-const { test, expect, skipConsoleGuard } = require('../support/test');
+const { test, expect } = require('../support/test');
 const { resolveMongoUrl } = require('../support/env');
 const { assertOk, createWorkspace, inviteMember, loginAs, readState, uniqueSuffix } = require('../support/fixtures');
 
@@ -68,8 +68,10 @@ async function startIdp() {
     return idp;
 }
 
+// The landing reloads once it has the workspace's address, and only the reloaded page boots the workspace.
 const landedIn = async (page, path) => {
     await page.waitForURL(new RegExp(`#${escapeRegex(path)}(/|\\?|$)`), { timeout: 60000 });
+    await expect(page.getByRole('navigation', { name: 'Primary' })).toBeVisible({ timeout: 60000 });
     await page.waitForFunction("window.localStorage.getItem('isLogging') === 'true'");
 };
 
@@ -146,15 +148,17 @@ test.describe('single sign-on through a company identity provider', () => {
     });
 
     test('finishes signing in even when the browser still remembers someone else', async ({ page }) => {
-        skipConsoleGuard('The browser holds the other account\'s id until the landing replaces it, so what the app asks for that id meanwhile is refused.');
         idp.signInAs = person.email;
         await page.goto('/#/login');
         await page.evaluate(`window.localStorage.setItem('userId', ${JSON.stringify(owner.uid)})`);
+        const askedAboutOwner = [];
+        page.on('request', (request) => { if (request.url().includes(owner.uid)) askedAboutOwner.push(request.url()); });
 
         await page.goto(`/api/v2/sso/oidc/initiate?companyId=${state.companyId}`);
 
         await landedIn(page, `/${state.companyId}`);
         expect(await remembered(page)).toEqual({ userId: person.userId, workspace: state.companyId });
+        expect(askedAboutOwner).toEqual([]);
     });
 
     test('says why the workspace refused someone it does not know', async ({ page }) => {
