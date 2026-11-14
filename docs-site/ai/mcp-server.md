@@ -265,7 +265,7 @@ In the web app, open AI, then Accounts, choose **My account**, then **New token*
 The token is shown once. Add it to the agent as a bearer token:
 
 ```
-claude mcp add alianhub --transport http "<your AlianHub URL>/mcp?companyId=<workspace id>" --header "Authorization: Bearer <token>"
+claude mcp add alianhub --scope user --transport http "<your AlianHub URL>/mcp?companyId=<workspace id>" --header "Authorization: Bearer <token>"
 ```
 
 Revoke a token on the same screen. A revoked or expired token stops working on its next call, and so does the token of someone removed from the workspace.

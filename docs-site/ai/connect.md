@@ -53,6 +53,8 @@ Tools that connect with a token rather than an address, such as Claude Code, use
 
 The token is shown once. Copy it then, and paste it where your tool asks for it. The person who sets up the tool can find the exact command in the [MCP server reference](./mcp-server#creating-a-token).
 
+To hand tasks to your own Claude Code so that it writes the code and opens a pull request, follow [Let Claude Code build your tasks](./claude-code-developer).
+
 ## The question AlianHub asks
 
 You see "Allow (the app) to act for you?" and a list under "It asks to:". Then you choose the one workspace it may use. Choose **Approve** or **Deny**.

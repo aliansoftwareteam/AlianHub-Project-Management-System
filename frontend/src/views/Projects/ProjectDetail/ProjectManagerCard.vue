@@ -2,6 +2,10 @@
     <section class="pmc" data-test="project-manager" :aria-labelledby="ids.heading">
         <h5 :id="ids.heading" class="pmc__title">{{ $t('ProjectManager.title') }}</h5>
         <p class="pmc__hint">{{ $t('ProjectManager.lead') }}</p>
+        <p class="pmc__hint" data-test="own-ai-hint">
+            {{ $t('ProjectManager.own_ai_hint', { at: '@' }) }}
+            <a class="pmc__guide" :href="claudeCodeGuide" target="_blank" rel="noopener">{{ $t('ClaudeCodeSetup.guide_short') }}</a>
+        </p>
         <p v-if="loading" class="pmc__hint" data-test="loading">{{ $t('ProjectManager.loading') }}</p>
         <template v-else-if="loaded">
             <div class="pmc__row">
@@ -69,6 +73,7 @@ import { useGetterFunctions } from "@/composable";
 import * as env from "@/config/env";
 import AhSwitch from "@/components/molecules/Setting/AhSwitch.vue";
 import { findingOffer, findingReasons } from "./findingText";
+import { GUIDE, useDocsLink } from "@/composable/docsLink";
 
 defineOptions({ name: "ProjectManagerCard" });
 
@@ -77,6 +82,7 @@ const props = defineProps({
 });
 
 const { t } = useI18n();
+const claudeCodeGuide = useDocsLink(GUIDE.CLAUDE_CODE_DEVELOPER);
 const route = useRoute();
 const $toast = useToast();
 const { getUser } = useGetterFunctions();
@@ -176,6 +182,7 @@ async function takeBack(finding) {
 .pmc__subtitle { margin: 4px 0 0; font: 600 12.5px/1.3 var(--font-ui); color: var(--ink); }
 .pmc__hint { margin: 0; color: var(--ink-2); font-size: 12px; overflow-wrap: anywhere; }
 .pmc__label { color: var(--ink); font-weight: 600; }
+.pmc__guide { color: var(--brand-deep); }
 .pmc__error { margin: 0; color: var(--danger); font-size: 12px; }
 .pmc__row { display: flex; align-items: center; gap: 8px; min-width: 0; }
 .pmc__name { color: var(--ink); font: 500 12.5px/1.35 var(--font-ui); min-width: 0; overflow-wrap: anywhere; }
