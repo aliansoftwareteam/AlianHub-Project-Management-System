@@ -1,6 +1,7 @@
 process.env.JWT_SECRET = 'sso-account-linking-secret';
 process.env.JWT_ALGORITHM = 'HS256';
 process.env.JWT_EXP = '24h';
+process.env.WEBURL = 'https://app.example.test/';
 
 const mockDbs = {};
 const mockDbFor = (companyId) => { mockDbs[companyId] = mockDbs[companyId] || require('./fixtures/fakeMongo').create(); return mockDbs[companyId]; };
@@ -85,7 +86,8 @@ const SIGN_IN = {
     },
 };
 
-const REFUSED = '/login?ssoError=not_allowed';
+const REFUSED = 'https://app.example.test/#/login?ssoError=not_allowed';
+const SIGNED_IN_TO_A = expect.stringMatching(new RegExp(`^https://app\\.example\\.test/#/login\\?sso=ok&uid=[0-9a-f]{24}&workspace=${A}$`));
 
 beforeEach(() => {
     Object.keys(mockDbs).forEach((k) => { delete mockDbs[k]; });
@@ -119,12 +121,12 @@ describe.each(['oidc', 'saml'])('%s sign-in to company A', (provider) => {
     });
 
     it('signs in an account that already holds a seat in A, whatever its domain', async () => {
-        expect(await signIn('max@member.test')).toBe(`/${A}`);
+        expect(await signIn('max@member.test')).toEqual(SIGNED_IN_TO_A);
         expect(sessionsOf(MEMBER)).toHaveLength(1);
     });
 
     it('links an existing account whose domain A has verified', async () => {
-        expect(await signIn('ann@acme.test')).toBe(`/${A}`);
+        expect(await signIn('ann@acme.test')).toEqual(SIGNED_IN_TO_A);
 
         expect(sessionsOf(ACME_USER)).toHaveLength(1);
         expect(userRow(ACME_USER).AssignCompany).toEqual([B, A]);
@@ -137,7 +139,7 @@ describe.each(['oidc', 'saml'])('%s sign-in to company A', (provider) => {
         expect(authByEmail('new@outside.test')).toBeUndefined();
         expect(seatsIn(A).find((s) => s.userEmail === 'new@outside.test')).toBeUndefined();
 
-        expect(await signIn('new@acme.test')).toBe(`/${A}`);
+        expect(await signIn('new@acme.test')).toEqual(SIGNED_IN_TO_A);
         const created = userByEmail('new@acme.test');
         expect(created.AssignCompany).toEqual([A]);
         expect(sessionsOf(String(created._id))).toHaveLength(1);
@@ -167,7 +169,7 @@ describe.each(['oidc', 'saml'])('%s sign-in to company A', (provider) => {
 describe('a company with no verified domain', () => {
     it('signs in its existing members and refuses everyone else', async () => {
         seedConfig('oidc', { domains: [], verifiedDomains: [] });
-        expect(await SIGN_IN.oidc('max@member.test')).toBe(`/${A}`);
+        expect(await SIGN_IN.oidc('max@member.test')).toEqual(SIGNED_IN_TO_A);
         expect(await SIGN_IN.oidc('pat@outside.test')).toBe(REFUSED);
         expect(await SIGN_IN.oidc('new@acme.test')).toBe(REFUSED);
         expect(authByEmail('new@acme.test')).toBeUndefined();
@@ -187,6 +189,6 @@ describe('a company that turned automatic provisioning off', () => {
         expect(userRow(ACME_USER).AssignCompany).toEqual([B]);
         expect(await SIGN_IN.oidc('new@acme.test')).toBe(REFUSED);
         expect(authByEmail('new@acme.test')).toBeUndefined();
-        expect(await SIGN_IN.oidc('max@member.test')).toBe(`/${A}`);
+        expect(await SIGN_IN.oidc('max@member.test')).toEqual(SIGNED_IN_TO_A);
     });
 });

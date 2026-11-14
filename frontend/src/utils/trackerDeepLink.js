@@ -35,22 +35,61 @@ export const openInTracker = (params = {}, opts = {}) => {
     // happen within the timeout, the tracker is either NOT INSTALLED or too OLD
     // to register the myapp:// handler — indistinguishable from the web, so the
     // caller shows ONE generic "install / update the tracker" toast for both.
-    const onNotOpened = typeof opts.onNotOpened === 'function' ? opts.onNotOpened : null;
-    if (onNotOpened && typeof window !== 'undefined' && typeof document !== 'undefined') {
-      let opened = false;
-      const markOpened = () => { opened = true; };
-      const onVisibility = () => { if (document.hidden) opened = true; };
-      window.addEventListener('blur', markOpened, { once: true });
-      document.addEventListener('visibilitychange', onVisibility);
-      setTimeout(() => {
-        window.removeEventListener('blur', markOpened);
-        document.removeEventListener('visibilitychange', onVisibility);
-        if (!opened) onNotOpened();
-      }, 1500);
-    }
+    watchHandoff(opts.onNotOpened);
     window.location.href = buildTrackerDeepLink(params);
     return { ok: true };
   } catch (e) {
     return { ok: false, reason: 'launch-failed' };
   }
+};
+
+function watchHandoff(onNotOpened) {
+  if (typeof onNotOpened !== 'function' || typeof window === 'undefined' || typeof document === 'undefined') return;
+  let opened = false;
+  const markOpened = () => { opened = true; };
+  const onVisibility = () => { if (document.hidden) opened = true; };
+  window.addEventListener('blur', markOpened, { once: true });
+  document.addEventListener('visibilitychange', onVisibility);
+  setTimeout(() => {
+    window.removeEventListener('blur', markOpened);
+    document.removeEventListener('visibilitychange', onVisibility);
+    if (!opened) onNotOpened();
+  }, 1500);
+}
+
+// The workspace address is its origin plus the path the app is served under; hash routing keeps the
+// route out of the path, so a workspace served from /team stays /team.
+export const workspaceAddressOf = (location) => {
+    if (!location || !location.origin) return '';
+    const base = String(location.pathname || '/').replace(/\/index\.html?$/i, '').replace(/\/+$/, '');
+    return `${location.origin}${base}`;
+};
+
+// Only tracker 6 and later understand this link; it adds the workspace and starts the sign-in.
+export const buildTrackerConnectLink = (workspaceUrl) => `alianhub-tracker://connect?url=${encodeURIComponent(workspaceUrl)}`;
+
+export const openTrackerConnect = (workspaceUrl, opts = {}) => {
+  if (!workspaceUrl) return { ok: false, reason: 'missing' };
+  if (!isTrackerCapableDevice()) return { ok: false, reason: 'unsupported' };
+  try {
+    watchHandoff(opts.onNotOpened);
+    window.location.href = buildTrackerConnectLink(workspaceUrl);
+    return { ok: true };
+  } catch (e) {
+    return { ok: false, reason: 'launch-failed' };
+  }
+};
+
+const SIGN_IN_STATE = /^[A-Za-z0-9_-]{16,128}$/;
+
+export const isSignInState = (value) => typeof value === 'string' && SIGN_IN_STATE.test(value);
+
+// A tracker that sent a state learns its workspace from this link, so the workspace is added only then.
+export const buildTrackerAuthorizeLink = ({ scheme, userId, code, state, workspace }) => {
+    const params = [`client_id=${encodeURIComponent(userId || '')}`, `code=${encodeURIComponent(code)}`];
+    if (isSignInState(state)) {
+        params.push(`state=${encodeURIComponent(state)}`);
+        if (workspace) params.push(`workspace=${encodeURIComponent(workspace)}`);
+    }
+    return `${scheme}://authorize?${params.join('&')}`;
 };

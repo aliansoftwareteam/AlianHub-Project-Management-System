@@ -1,0 +1,191 @@
+name: Tracker release
+
+# Builds the desktop tracker (time-tracker-app/) for Windows, macOS and Linux on a tracker-v* tag,
+# signs it, and uploads it to the update feed the trackers and the web app read:
+#   tracker-v6.1.0         -> https://downloads.alianhub.com/tracker/stable/
+#   tracker-v6.1.0-beta.2  -> https://downloads.alianhub.com/tracker/beta/
+# The tag must equal the version in time-tracker-app/package.json.
+#
+# Secrets. Without a system's signing secrets a beta builds unsigned and a stable release stops:
+#   WIN_CSC_LINK, WIN_CSC_KEY_PASSWORD                      Windows code-signing certificate (.pfx, base64) and password
+#   MAC_CSC_LINK, MAC_CSC_KEY_PASSWORD                      Developer ID Application certificate (.p12, base64) and password
+#   APPLE_ID, APPLE_APP_SPECIFIC_PASSWORD, APPLE_TEAM_ID    notarisation with notarytool
+#   TRACKER_GPG_PRIVATE_KEY, TRACKER_GPG_PASSPHRASE         signs the Linux SHA256SUMS
+#   TRACKER_S3_BUCKET, TRACKER_S3_ENDPOINT, TRACKER_S3_REGION,
+#   TRACKER_S3_ACCESS_KEY_ID, TRACKER_S3_SECRET_ACCESS_KEY  the downloads bucket; without them the files stay on the run
+
+on:
+  push:
+    tags:
+      - 'tracker-v*'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: tracker-release-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  prepare:
+    name: Read the tag
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.tag.outputs.version }}
+      channel: ${{ steps.tag.outputs.channel }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Match the tag to the tracker version
+        id: tag
+        run: |
+          version="${GITHUB_REF_NAME#tracker-v}"
+          package_version="$(node -p "require('./time-tracker-app/package.json').version")"
+          if [ "$version" != "$package_version" ]; then
+            echo "::error::Tag $GITHUB_REF_NAME does not match time-tracker-app/package.json version $package_version."
+            exit 1
+          fi
+          case "$version" in
+            *-*) channel=beta ;;
+            *) channel=stable ;;
+          esac
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+          echo "channel=$channel" >> "$GITHUB_OUTPUT"
+
+  build:
+    name: Build for ${{ matrix.platform }}
+    needs: prepare
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: windows-latest
+            platform: win
+          - os: macos-latest
+            platform: mac
+          - os: ubuntu-latest
+            platform: linux
+    defaults:
+      run:
+        shell: bash
+        working-directory: time-tracker-app
+    env:
+      CHANNEL: ${{ needs.prepare.outputs.channel }}
+      FEED_URL: https://downloads.alianhub.com/tracker/${{ needs.prepare.outputs.channel }}/
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: time-tracker-app/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Check signing
+        id: signing
+        env:
+          WIN_CSC_LINK: ${{ secrets.WIN_CSC_LINK }}
+          MAC_CSC_LINK: ${{ secrets.MAC_CSC_LINK }}
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+          GPG_KEY: ${{ secrets.TRACKER_GPG_PRIVATE_KEY }}
+        run: |
+          case "${{ matrix.platform }}" in
+            win) [ -n "$WIN_CSC_LINK" ] && signed=true || signed=false ;;
+            mac) [ -n "$MAC_CSC_LINK" ] && [ -n "$APPLE_ID" ] && [ -n "$APPLE_TEAM_ID" ] && signed=true || signed=false ;;
+            linux) [ -n "$GPG_KEY" ] && signed=true || signed=false ;;
+          esac
+          if [ "$signed" != true ] && [ "$CHANNEL" = stable ]; then
+            echo "::error::No signing secrets for ${{ matrix.platform }}; a stable tracker is never published unsigned."
+            exit 1
+          fi
+          [ "$signed" = true ] || echo "::warning::Building ${{ matrix.platform }} unsigned for the beta channel."
+          echo "signed=$signed" >> "$GITHUB_OUTPUT"
+
+      - name: Build the renderer and main process
+        env:
+          NODE_ENV: production
+          NEXT_TELEMETRY_DISABLED: 1
+        run: npx nextron build --no-pack
+
+      - name: Package for Windows
+        if: matrix.platform == 'win'
+        env:
+          CSC_LINK: ${{ secrets.WIN_CSC_LINK }}
+          CSC_KEY_PASSWORD: ${{ secrets.WIN_CSC_KEY_PASSWORD }}
+          CSC_IDENTITY_AUTO_DISCOVERY: ${{ steps.signing.outputs.signed }}
+        run: npx electron-builder --win --x64 --publish never -c.publish.url="$FEED_URL"
+
+      - name: Package for macOS
+        if: matrix.platform == 'mac'
+        env:
+          CSC_LINK: ${{ secrets.MAC_CSC_LINK }}
+          CSC_KEY_PASSWORD: ${{ secrets.MAC_CSC_KEY_PASSWORD }}
+          CSC_IDENTITY_AUTO_DISCOVERY: ${{ steps.signing.outputs.signed }}
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+        run: |
+          if [ "${{ steps.signing.outputs.signed }}" = true ]; then
+            notarize="-c.mac.notarize.teamId=$APPLE_TEAM_ID"
+          else
+            notarize="-c.mac.notarize=false"
+          fi
+          npx electron-builder --mac --publish never -c.publish.url="$FEED_URL" $notarize
+
+      - name: Package for Linux
+        if: matrix.platform == 'linux'
+        run: npx electron-builder --linux --x64 --publish never -c.publish.url="$FEED_URL"
+
+      - name: Sign the Linux checksums
+        if: matrix.platform == 'linux'
+        env:
+          GPG_KEY: ${{ secrets.TRACKER_GPG_PRIVATE_KEY }}
+          GPG_PASSPHRASE: ${{ secrets.TRACKER_GPG_PASSPHRASE }}
+        working-directory: time-tracker-app/dist
+        run: |
+          sha256sum *.AppImage *.deb > SHA256SUMS
+          if [ "${{ steps.signing.outputs.signed }}" = true ]; then
+            echo "$GPG_KEY" | gpg --batch --import
+            gpg --batch --yes --pinentry-mode loopback --passphrase "$GPG_PASSPHRASE" --armor --detach-sign --output SHA256SUMS.asc SHA256SUMS
+          fi
+
+      - name: Keep the files on the run
+        uses: actions/upload-artifact@v4
+        with:
+          name: tracker-${{ needs.prepare.outputs.version }}-${{ matrix.platform }}
+          path: |
+            time-tracker-app/dist/*.exe
+            time-tracker-app/dist/*.blockmap
+            time-tracker-app/dist/*.dmg
+            time-tracker-app/dist/*.zip
+            time-tracker-app/dist/*.AppImage
+            time-tracker-app/dist/*.deb
+            time-tracker-app/dist/latest*.yml
+            time-tracker-app/dist/SHA256SUMS*
+          if-no-files-found: error
+
+      # Installers first and the latest*.yml manifests last, so no tracker ever reads a manifest
+      # that names a file not uploaded yet.
+      - name: Upload to the update feed
+        env:
+          AWS_ACCESS_KEY_ID: ${{ secrets.TRACKER_S3_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.TRACKER_S3_SECRET_ACCESS_KEY }}
+          AWS_DEFAULT_REGION: ${{ secrets.TRACKER_S3_REGION }}
+          BUCKET: ${{ secrets.TRACKER_S3_BUCKET }}
+          ENDPOINT: ${{ secrets.TRACKER_S3_ENDPOINT }}
+        working-directory: time-tracker-app/dist
+        run: |
+          if [ -z "$BUCKET" ] || [ -z "$AWS_ACCESS_KEY_ID" ]; then
+            echo "::warning::No downloads bucket configured; the files are kept on this run only."
+            exit 0
+          fi
+          target="s3://$BUCKET/tracker/$CHANNEL/"
+          endpoint=${ENDPOINT:+--endpoint-url "$ENDPOINT"}
+          aws s3 cp . "$target" $endpoint --recursive --exclude "*" \
+            --include "*.exe" --include "*.blockmap" --include "*.dmg" --include "*.zip" \
+            --include "*.AppImage" --include "*.deb" --include "SHA256SUMS*"
+          aws s3 cp . "$target" $endpoint --recursive --exclude "*" --include "latest*.yml" --cache-control "no-cache"

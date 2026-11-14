@@ -6,6 +6,7 @@ const meetingNotes = require('./meetingNotes');
 const askController = require('./ask');
 const askStream = require('./askStream');
 const askThreads = require('./askThreads');
+const askMentions = require('./askMentions');
 const askCard = require('./askCard');
 const askPost = require('./askPost');
 const taskValues = require('./taskValues');
@@ -59,6 +60,7 @@ exports.init = (app) => {
     // Ask (handoff 13i). Retrieval is scoped to the projects the caller can
     // already open, so this endpoint can never widen anyone's permissions.
     app.get('/api/v1/ai/ask/sources', askController.sources);
+    app.get('/api/v1/ai/ask/mentions', assistant, askMentions.mentions);
     app.post('/api/v1/ai/ask', askedByPeople, assistant, askController.ask);
     app.post('/api/v1/ai/ask/stream', askedByPeople, assistant, askStream.askStream);
     app.post('/api/v1/ai/ask/plan', askedByPeople, assistant, askPlan.plan);

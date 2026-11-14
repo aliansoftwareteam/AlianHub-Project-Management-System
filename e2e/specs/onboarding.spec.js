@@ -70,8 +70,8 @@ test.describe('a brand-new account', () => {
 
     const SIMPLE = ['Home', 'My work', 'Projects', 'Inbox', 'Ask', 'App connections'];
 
-    // A member made for this test: the saved role sessions are shared by every other spec and stay on the full rail.
-    test('starts on six places, still reaches the rest, and switches to Full in one click', async ({ page, state, loginAs }) => {
+    // A member made for this test, so switching it to Simple leaves the shared role sessions alone.
+    test('starts on the full rail, switches to six places in one click, and still reaches the rest', async ({ page, state, loginAs }) => {
         const owner = await loginAs('owner');
         const suffix = uniqueSuffix();
         const email = emailFor('member', suffix);
@@ -79,6 +79,18 @@ test.describe('a brand-new account', () => {
         await signInThroughForm(page, { email, password: state.password, companyId: state.companyId });
 
         const rail = page.getByRole('navigation', { name: 'Primary' });
+        await expect(rail.getByRole('link', { name: 'Everything' })).toBeVisible();
+        await expect(rail.getByRole('link', { name: 'Chat' })).toBeVisible();
+        await expect(rail.getByRole('link', { name: 'Planner' })).toBeVisible();
+
+        await page.goto(`/#/${state.companyId}/settings/my-profile`);
+        const choice = page.locator('[data-test="nav-mode"]');
+        await expect(choice.getByRole('radio', { name: /Full/ })).toBeChecked();
+        await choice.getByRole('radio', { name: /Simple/ }).check();
+        await expect(rail.getByRole('link', { name: 'Chat' })).toHaveCount(0);
+
+        await page.reload();
+        await expect(page.locator('[data-test="nav-mode"]').getByRole('radio', { name: /Simple/ })).toBeChecked();
         const places = rail.locator('.ah-rail__items > a.ah-rail__item .ah-rail__label');
         await expect(places.first()).toHaveText('Home');
         const shown = await places.allTextContents();
@@ -95,17 +107,6 @@ test.describe('a brand-new account', () => {
         await page.goto(`/#/${state.companyId}/goals`);
         await expect(page).toHaveURL(/\/goals/);
         await expect(rail.getByRole('link', { name: 'Goals' })).toBeVisible();
-
-        await page.goto(`/#/${state.companyId}/settings/my-profile`);
-        const choice = page.locator('[data-test="nav-mode"]');
-        await expect(choice.getByRole('radio', { name: /Simple/ })).toBeChecked();
-        await choice.getByRole('radio', { name: /Full/ }).check();
-        await expect(rail.getByRole('link', { name: 'Chat' })).toBeVisible();
-        await expect(rail.getByRole('link', { name: 'Everything' })).toBeVisible();
-
-        await page.reload();
-        await expect(page.locator('[data-test="nav-mode"]').getByRole('radio', { name: /Full/ })).toBeChecked();
-        await expect(rail.getByRole('link', { name: 'Everything' })).toBeVisible();
     });
 
     test('skips Connect your AI in one click and lands in the app', async ({ page, state, loginAs }) => {

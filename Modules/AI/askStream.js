@@ -13,6 +13,7 @@ const threads = require('./askThreads');
 const { askAnswerToken } = require('./shareToken');
 const askContext = require('./askContext');
 const askConnectors = require('./askConnectors');
+const { BRIEFING_TOKENS } = require('./askBriefing');
 
 const FOLLOW_UP = `
 - Earlier turns of this conversation come before the QUESTION. Use them to understand what the
@@ -107,7 +108,7 @@ const answerStream = async (req, res) => {
             const result = await getProvider().chat({
                 systemPrompt: `${research ? RESEARCH_SYSTEM : SYSTEM}${thread ? FOLLOW_UP : ''}${explicit.system}${askConnectors.systemFor(apps)}`,
                 messages: [...threads.historyOf(thread), { role: 'user', content: `${promptFor(asked, sources, gathered.intent, about)}${askConnectors.promptBlock(apps)}` }],
-                maxTokens: research ? RESEARCH_TOKENS : ASK_TOKENS,
+                maxTokens: research ? RESEARCH_TOKENS : (explicit.briefed ? BRIEFING_TOKENS : ASK_TOKENS),
                 temperature: 0.2,
                 spend: { feature: FEATURES.ASK, companyId, userId: uid },
                 onText: (text) => {

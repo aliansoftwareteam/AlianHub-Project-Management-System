@@ -96,6 +96,8 @@ const storePageImage = async ({ companyId, pageId, file }) => {
             tmpPath: file.path,
             filename: `image.${ext}`,
             size: Number(file.size) || 0,
+        }).catch((error) => {
+            throw error && error.planLimit ? new PageImageError(error.message, error.statusCode) : error;
         });
         consumed = stored.consumedSource;
         return stored.key;

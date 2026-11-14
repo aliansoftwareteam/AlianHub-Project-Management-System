@@ -25,11 +25,11 @@
                 :class="{ 'is-active': isActive(item) }"
                 :aria-current="isActive(item) ? 'page' : null"
                 :tabindex="focusIndex(item.key)"
-                :aria-label="item.key === 'inbox' && unread ? $t('Shell.inbox_unread', { n: unread }) : null"
+                :aria-label="counterOf(item.key) ? $t(counterOf(item.key).label, { n: counterOf(item.key).n }) : null"
             >
                 <span class="ah-rail__tile">
                     <ShellIcon :name="item.icon" :size="17" />
-                    <span v-if="item.key === 'inbox' && unread" class="ah-unread-badge" aria-hidden="true">{{ badge }}</span>
+                    <span v-if="counterOf(item.key)" class="ah-unread-badge" aria-hidden="true">{{ counterOf(item.key).badge }}</span>
                 </span>
                 <span class="ah-rail__label">{{ $t(item.label) }}</span>
             </router-link>
@@ -55,10 +55,14 @@
                     :class="{ 'is-active': moreActive || shellState.moreOpen }"
                     :aria-expanded="shellState.moreOpen"
                     aria-haspopup="menu"
+                    :aria-label="tucked ? $t('Shell.more_unread', { n: tucked.n }) : null"
                     :tabindex="focusIndex('more')"
                     @click.stop="toggle('moreOpen')"
                 >
-                    <span class="ah-rail__tile"><ShellIcon name="more" :size="17" /></span>
+                    <span class="ah-rail__tile">
+                        <ShellIcon name="more" :size="17" />
+                        <span v-if="tucked" class="ah-unread-badge" aria-hidden="true">{{ tucked.badge }}</span>
+                    </span>
                     <span class="ah-rail__label">{{ $t('Shell.more') }}</span>
                 </button>
                 <transition name="ah-fade">
@@ -77,6 +81,7 @@
                                 </a>
                                 <router-link v-else class="ah-pop__item" :class="{ 'is-active': isActive(item) }" :to="item.to" role="menuitem" @click="closePopovers()">
                                     <ShellIcon :name="item.icon" :size="15" /><span>{{ $t(item.label) }}</span>
+                                    <span v-if="counterOf(item.key)" class="ah-unread-badge ah-unread-badge--inline">{{ counterOf(item.key).badge }}</span>
                                 </router-link>
                             </template>
                         </template>
@@ -138,6 +143,9 @@
                         <button type="button" class="ah-pop__item" role="menuitem" @click="logout()">
                             <ShellIcon name="logout" :size="15" /><span>{{ $t('Shell.logout') }}</span>
                         </button>
+                        <a class="ah-pop__item" :href="sourceUrl" target="_blank" rel="noopener" role="menuitem" data-test="rail-source-code" @click="closePopovers()">
+                            <ShellIcon name="github" :size="15" /><span>{{ $t('Shell.source_code') }}</span>
+                        </a>
                         <div class="ah-rail__version ah-mono" @click="openInNewTab({ name: 'Changelog', params: { cid: companyId } })">v{{ version }}</div>
                     </div>
                 </transition>
@@ -163,7 +171,7 @@ import { openQuickCreate } from "@/components/organisms/QuickCreateTask/quickCre
 import { useI18n } from "vue-i18n";
 import KeyHint from "@/components/atom/KeyHint/KeyHint.vue";
 import { ariaKeyShortcuts, openShortcutSheet, shortcutHint } from "@/composable/shortcuts";
-import { useInboxUnread } from "./inboxUnread";
+import { useNavUnread } from "./navUnread";
 import { useDemoIndustry } from "@/composable/useDemoIndustry";
 
 const emit = defineEmits(["change"]);
@@ -171,11 +179,12 @@ const companyId = inject("$companyId");
 const userId = inject("$userId");
 const { getters } = useStore();
 const { getUser } = useGetterFunctions();
-const { version } = useAppVersion();
+const { version, sourceUrl } = useAppVersion();
 const { logOut } = useAuth();
 const router = useRouter();
 const { rail, more, isActive, moreActive } = useNavItems(companyId);
-const { unread, badge } = useInboxUnread();
+const { counterOf, tuckedCount } = useNavUnread();
+const tucked = computed(() => tuckedCount(more.value.flatMap((group) => group.items)));
 
 const { t } = useI18n();
 const { industryOf } = useDemoIndustry();

@@ -69,6 +69,58 @@ describe('TrackerLogin', () => {
         expect(window.location.href).toBe(`myapp://authorize?client_id=user-1&code=${CODE}`);
     });
 
+    it('sends the code back on the link the tracker named', async () => {
+        apiRequestWithoutCompnay.mockResolvedValue({ data: { status: true, data: { code: CODE } } });
+        const wrapper = await open({ code_challenge: CHALLENGE, scheme: 'alianhub-tracker' });
+        await wrapper.find('button').trigger('click');
+        await flushPromises();
+
+        expect(window.location.href).toBe(`alianhub-tracker://authorize?client_id=user-1&code=${CODE}`);
+    });
+
+    it('hands back the state and this workspace to a tracker that sent a state', async () => {
+        const state = 'k3V9xQ2mT7pL1sW8nB4yR6';
+        Object.defineProperty(window, 'location', { configurable: true, value: { href: '', origin: 'https://abb.alianhub.com' } });
+        apiRequestWithoutCompnay.mockResolvedValue({ data: { status: true, data: { code: CODE } } });
+        const wrapper = await open({ code_challenge: CHALLENGE, scheme: 'alianhub-tracker', state });
+        await wrapper.find('button').trigger('click');
+        await flushPromises();
+
+        expect(window.location.href).toBe(
+            `alianhub-tracker://authorize?client_id=user-1&code=${CODE}&state=${state}&workspace=${encodeURIComponent('https://abb.alianhub.com')}`
+        );
+    });
+
+    it('names a workspace served under a path with that path', async () => {
+        const state = 'k3V9xQ2mT7pL1sW8nB4yR6';
+        Object.defineProperty(window, 'location', { configurable: true, value: { href: '', origin: 'https://example.com', pathname: '/team/' } });
+        apiRequestWithoutCompnay.mockResolvedValue({ data: { status: true, data: { code: CODE } } });
+        const wrapper = await open({ code_challenge: CHALLENGE, scheme: 'alianhub-tracker', state });
+        await wrapper.find('button').trigger('click');
+        await flushPromises();
+
+        expect(window.location.href).toContain(`&workspace=${encodeURIComponent('https://example.com/team')}`);
+    });
+
+    it('drops a malformed state and names no workspace', async () => {
+        Object.defineProperty(window, 'location', { configurable: true, value: { href: '', origin: 'https://abb.alianhub.com' } });
+        apiRequestWithoutCompnay.mockResolvedValue({ data: { status: true, data: { code: CODE } } });
+        const wrapper = await open({ code_challenge: CHALLENGE, scheme: 'alianhub-tracker', state: 'short&x=1' });
+        await wrapper.find('button').trigger('click');
+        await flushPromises();
+
+        expect(window.location.href).toBe(`alianhub-tracker://authorize?client_id=user-1&code=${CODE}`);
+    });
+
+    it('never sends the code to a link outside the tracker\'s own', async () => {
+        apiRequestWithoutCompnay.mockResolvedValue({ data: { status: true, data: { code: CODE } } });
+        const wrapper = await open({ code_challenge: CHALLENGE, scheme: 'https' });
+        await wrapper.find('button').trigger('click');
+        await flushPromises();
+
+        expect(window.location.href).toBe(`myapp://authorize?client_id=user-1&code=${CODE}`);
+    });
+
     it('asks for a fresh code each time Continue is clicked', async () => {
         apiRequestWithoutCompnay.mockResolvedValue({ data: { status: true, data: { code: CODE } } });
         const wrapper = await open();

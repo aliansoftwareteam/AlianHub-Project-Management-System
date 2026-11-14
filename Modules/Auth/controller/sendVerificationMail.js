@@ -49,7 +49,7 @@ exports.mailVerificationLink = (userId, email, token) => new Promise((resolve, r
                     statusText: result.error
                 });
             }
-        });
+        }, { accountMail: true });
     } catch (error) {
         reject(failure(userId, error));
     }

@@ -85,8 +85,16 @@ Auto-maintained registry of all tasks. Reflects YAML frontmatter from each `task
 | 077 | Connectors — remove the old Google Calendar and CloudStorage paths; Google and Dropbox setup pages | active | medium | 073, 076 | active/077-connectors-remove-calendar-picker-paths |
 | 078 | Connectors — Inbox approval cards and quota settings screens | active | high | 069, 070 | active/078-connectors-approval-quota-screens |
 | 079 | Connectors — remove the old Slack bot and GitHub sync paths | active | medium | 074, 075 | active/079-connectors-remove-slack-github-paths |
+| 086 | Time reports — one header, deep filters and export on every tab, workload day panel | active | high | — | active/086-reports-consistent-filters-export |
+| 087 | Ask knows a project — grounded project, list, task and person answers, and a better @ picker | active | high | — | active/087-ask-project-context-mentions |
+| 088 | Documentation site — in-depth user, admin, developer and API docs to replace help.alianhub.com | active | high | — | active/088-documentation-site |
+| 089 | Quick UI/UX review — fix small UI issues with before/after screenshots | active | medium | — | active/089-quick-ui-review |
+| 090 | Optional Google Analytics — page-view traffic from one env variable | active | medium | — | active/090-google-analytics-env |
+| 091 | Tracker sign-in finds the workspace — one Sign in button, no address typing for hosted users | backlog | high | — | backlog/091-tracker-finds-workspace |
 | 092 | Connectors — MCP client and MCP provider definitions: call apps' MCP servers as the member, reviewed tools only | active | high | 063, 068 | active/092-connectors-mcp-client |
+| 092 | Time reports — pick a whole team in the People filter | active | medium | 086 | active/092-report-people-filter-teams |
 | 093 | Connectors — shared sign-in for hosted instances: the instance side | active | high | 065, 066 | active/093-connectors-hosted-sign-in |
+| 093 | Workload — cells show the hours, readable at any size | active | medium | 086 | active/093-workload-cell-hours |
 | 094 | Connectors — Notion, the first app that registers itself | active | high | 092, 100 | active/094-connectors-notion-pilot |
 | 095 | Connectors — Supabase, Upwork, Wispr Flow, Dropbox, HubSpot and Canva through their MCP servers | active | medium | 075, 093, 094 | active/095-connectors-mcp-apps |
 | 096 | Connectors — custom MCP servers: added by address with a right, every tool reviewed | active | medium | 092, 100, 101 | active/096-connectors-custom-mcp-servers |
@@ -95,4 +103,8 @@ Auto-maintained registry of all tasks. Reflects YAML frontmatter from each `task
 | 099 | Connectors — Outlook built connector on Microsoft Graph: mail and calendar | active | medium | 068, 069, 093 | active/099-connectors-outlook-built |
 | 100 | Connectors — sign-in for MCP apps: discovery, self-registration once per workspace, personal tokens | active | high | 066, 092 | active/100-connectors-mcp-sign-in |
 | 101 | Connectors — screen redesign: AI → Customize → Connectors, like Claude's | active | high | 072 | active/101-connectors-screen-redesign |
+| 102 | Chat message alerts and unread badge — the other person hears about a message, and the Chat icon shows a red count | active | high | — | active/102-chat-message-alerts-badge |
+| 103 | Time tracking settings redesign — a quiet settings page instead of a marketing banner | active | medium | — | active/103-time-tracking-settings-redesign |
+| 104 | Time tracker access by role — a role switch, on by default, with seats only on plans that have a limit | active | high | — | active/104-time-tracker-by-role |
+| 105 | Docs site SEO, AEO and GEO — descriptions, canonical, social tags, structured data, robots.txt, llms.txt | active | medium | 088 | active/105-docs-seo-aeo-geo |
 | 106 | Integrations and Connectors — two places, each saying what it holds; App connections moves into Integrations | active | high | 101 | active/106-integrations-and-connectors |

@@ -1,4 +1,5 @@
 const { SCHEMA_TYPE } = require("../../Config/schemaType.js");
+const { scheduleCompanyFilesRemoval } = require("../../common-storage/companyFiles");
 const { removeCache } = require("../../utils/commonFunctions.js");
 const { MongoDbCrudOpration, dropCompanyDatabase } = require("../../utils/mongo-handler/mongoQueries.js");
 const iCtr = require('../ImportSettings/controller.js');
@@ -748,6 +749,7 @@ exports.deleteCompany = async (req, res) => {
             data: [{ _id: new mongoose.Types.ObjectId(companyId) }],
         };
         await updateCompanyFun(SCHEMA_TYPE.GOLBAL, delObj, "deleteOne", companyId);
+        await scheduleCompanyFilesRemoval(companyId);
 
         const findObj = {
             type: dbCollections.USERS,

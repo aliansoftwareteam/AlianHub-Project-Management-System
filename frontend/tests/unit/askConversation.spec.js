@@ -2,7 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { flushPromises, mount } from '@vue/test-utils';
 import { defineComponent, h, ref } from 'vue';
 
-const { apiRequest, routeQuery } = vi.hoisted(() => ({ apiRequest: vi.fn(), routeQuery: {} }));
+const { apiRequest, routeQuery, loadSkills, access } = vi.hoisted(() => ({ apiRequest: vi.fn(), routeQuery: {}, loadSkills: vi.fn(async () => []), access: {} }));
 
 vi.mock('@/services', () => ({ apiRequest }));
 vi.mock('vue-router', () => ({ useRoute: () => ({ query: routeQuery, params: {} }), useRouter: () => null }));
@@ -10,11 +10,11 @@ vi.mock('@/components/organisms/Shell/ShellIcon.vue', () => ({ default: { name: 
 vi.mock('@/components/molecules/AiUnavailable/AiModelNotice.vue', () => ({ default: { name: 'AiModelNotice', render: () => null } }));
 vi.mock('@/components/organisms/MainChat/MainChatRecorder.vue', () => ({ default: { name: 'MainChatRecorder', render: () => null } }));
 vi.mock('@/views/Ai/AiSidebar.vue', () => ({ default: { name: 'AiSidebar', render: () => null } }));
-vi.mock('@/views/Ai/agentAccess', () => ({ useAgentAccess: () => ({ canManage: ref(false) }) }));
+vi.mock('@/views/Ai/agentAccess', () => ({ useAgentAccess: () => ({ canManage: ref(false), canBuild: ref(false), seesSkills: access.seesSkills || ref(true) }) }));
 vi.mock('@/views/Ai/useAgents', () => ({
     reasonOf: (error, key) => key,
     autonomyOf: () => ({ key: 'suggest' }),
-    useAgents: () => ({ spend: ref({}), skillManifest: ref([]), loadSkills: vi.fn(), loadSpend: vi.fn() })
+    useAgents: () => ({ spend: ref({}), skillManifest: ref([]), loadSkills, loadSpend: vi.fn() })
 }));
 vi.mock('@/views/Ai/useParity', () => ({
     useParity: () => ({
@@ -96,6 +96,8 @@ beforeEach(() => {
     closeQuickCreate();
     sessionStorage.clear();
     Object.keys(routeQuery).forEach((key) => { delete routeQuery[key]; });
+    loadSkills.mockClear();
+    access.seesSkills = null;
 });
 afterEach(() => {
     if (wrapper) wrapper.unmount();
@@ -285,6 +287,26 @@ describe('my threads', () => {
         await flushPromises();
         expect(apiRequest).toHaveBeenCalledWith('delete', `${env.AI_ASK_THREADS}/th9`);
         expect(wrapper.findAll('[data-test="ask-history-open"]')).toHaveLength(0);
+    });
+});
+
+describe('the skill list', () => {
+    it('is never asked for by someone the server would refuse it to', async () => {
+        access.seesSkills = ref(false);
+        wrapper = await mountPage();
+        expect(loadSkills).not.toHaveBeenCalled();
+    });
+
+    it('is asked for once, when the rights arrive after the page opened', async () => {
+        access.seesSkills = ref(false);
+        wrapper = await mountPage();
+        access.seesSkills.value = true;
+        await flushPromises();
+        access.seesSkills.value = false;
+        await flushPromises();
+        access.seesSkills.value = true;
+        await flushPromises();
+        expect(loadSkills).toHaveBeenCalledTimes(1);
     });
 });
 

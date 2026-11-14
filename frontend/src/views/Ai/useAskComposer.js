@@ -1,19 +1,19 @@
 import { computed, nextTick, reactive, ref, unref } from "vue";
 import { apiRequest } from "@/services";
 import * as env from "@/config/env";
-import { MAX_CONTEXT, MENTION_MIN, connectorResults, connectorsOf, filterSkills, mentionAt, mentionResults, slashQuery, withNamedChips } from "./askComposer";
+import { MAX_CONTEXT, connectorResults, connectorsOf, contextPayload, filterSkills, groupMentions, mentionAt, mentionItems, recentMentions, rememberMention, slashQuery, withNamedChips } from "./askComposer";
 
 const SEARCH_DELAY_MS = 180;
 export const MENU_ID = "ask-menu";
 
 /* The `/` skill and `@` context menus of the Ask box. `question` is the box's model and `box` its element;
- * `skills` is the list the Skills popover shows. `label` names a connector by its provider id; `onConnect` is
- * called with an app the asker picked but has not connected. */
-export function useAskComposer({ question, box, skills, label = (id) => id, onConnect = () => {} }) {
+ * `skills` is the list the Skills popover shows; `companyId` and `projectId` shape the `@` suggestions.
+ * `label` names a connector by its provider id; `onConnect` is called with an app the asker picked but has not connected. */
+export function useAskComposer({ question, box, skills, companyId = "", projectId = "", label = (id) => id, onConnect = () => {} }) {
     const skill = ref(null);
     const chips = ref([]);
     const connectors = ref([]);
-    const menu = reactive({ kind: "", items: [], active: 0, mention: null, searching: false, short: false });
+    const menu = reactive({ kind: "", items: [], groups: [], active: 0, mention: null, searching: false });
     let dismissed = [];
     let timer = null;
     let searchSeq = 0;
@@ -38,31 +38,37 @@ export function useAskComposer({ question, box, skills, label = (id) => id, onCo
     const close = () => {
         clearTimeout(timer);
         searchSeq += 1;
-        Object.assign(menu, { kind: "", items: [], active: 0, mention: null, searching: false, short: false });
+        Object.assign(menu, { kind: "", items: [], groups: [], active: 0, mention: null, searching: false });
     };
 
-    const show = (kind, items) => Object.assign(menu, { kind, items, active: 0, searching: false });
+    const show = (kind, items) => Object.assign(menu, { kind, items, groups: [], active: 0, searching: false });
 
+    const showMentions = (found, query, searching) => {
+        const apps = connectorResults(connectors.value, query, chips.value);
+        const grouped = groupMentions(found, { first: recentMentions(unref(companyId)), taken: chips.value, query, apps });
+        const active = menu.kind === "mention" && menu.active < grouped.items.length ? menu.active : 0;
+        Object.assign(menu, { kind: "mention", items: grouped.items, groups: grouped.groups, active, searching });
+    };
+
+    /* A bare `@` shows apps and recent picks at once and the server's suggestions after; a word searches. */
     const search = (query) => {
         clearTimeout(timer);
         const seq = ++searchSeq;
-        const apps = connectorResults(connectors.value, query, chips.value);
-        if (query.length < MENTION_MIN) {
-            Object.assign(menu, { kind: "mention", items: apps, active: 0, searching: false, short: true });
-            return;
-        }
-        Object.assign(menu, { kind: "mention", items: apps, active: 0, searching: true, short: false });
+        showMentions([], query, true);
         timer = setTimeout(async () => {
-            let items = [];
+            let found = [];
             try {
-                const res = await apiRequest("post", env.GLOBAL_SEARCH, { query });
-                items = res?.data?.status ? mentionResults(res.data.data) : [];
+                const params = new URLSearchParams({ q: query });
+                const scoped = unref(projectId);
+                if (scoped) params.set("projectId", scoped);
+                const res = await apiRequest("get", `${env.AI_ASK_MENTIONS}?${params.toString()}`);
+                found = res?.data?.status ? mentionItems(res.data.data) : [];
             } catch {
-                items = [];
+                found = [];
             }
-            if (seq !== searchSeq) return;
-            show("mention", [...apps, ...items.filter((item) => !chips.value.some((chip) => chip.kind === item.kind && chip.id === item.id))]);
-        }, SEARCH_DELAY_MS);
+            if (seq !== searchSeq || menu.kind !== "mention") return;
+            showMentions(found, query, false);
+        }, query ? SEARCH_DELAY_MS : 0);
     };
 
     const onInput = () => {
@@ -91,6 +97,7 @@ export function useAskComposer({ question, box, skills, label = (id) => id, onCo
         if (Number.isInteger(caret) && typeof el.setSelectionRange === "function") el.setSelectionRange(caret, caret);
     });
 
+    /* The picked name takes the `@word`'s place so the question still reads as a sentence; the chip carries the id. */
     const pick = (item) => {
         if (!item) return;
         if (menu.kind === "skill") {
@@ -102,10 +109,9 @@ export function useAskComposer({ question, box, skills, label = (id) => id, onCo
         }
         const at = menu.mention;
         const text = String(unref(question) || "");
-        const caret = at ? at.start : text.length;
-        if (at) question.value = text.slice(0, at.start) + text.slice(at.end);
-        close();
         if (item.kind === "connector" && !item.connected) {
+            if (at) question.value = text.slice(0, at.start) + text.slice(at.end);
+            close();
             onConnect(item);
             return;
         }
@@ -114,7 +120,11 @@ export function useAskComposer({ question, box, skills, label = (id) => id, onCo
         chips.value = chips.value.some(same)
             ? chips.value.map((chip) => (same(chip) ? { kind: chip.kind, id: chip.id, title: chip.title } : chip))
             : [...chips.value, { kind: item.kind, id: item.id, title: item.title }];
-        focusAt(caret);
+        rememberMention(unref(companyId), item);
+        const named = at ? `${item.title} ` : "";
+        if (at) question.value = text.slice(0, at.start) + named + text.slice(at.end).replace(/^\s+/, "");
+        close();
+        focusAt(at ? at.start + named.length : text.length);
     };
 
     const move = (step) => {
@@ -158,7 +168,7 @@ export function useAskComposer({ question, box, skills, label = (id) => id, onCo
 
     const body = () => ({
         ...(skill.value ? { skill: skill.value.key } : {}),
-        ...(chips.value.length ? { context: chips.value.map(({ kind, id }) => ({ kind, id })) } : {})
+        ...(chips.value.length ? { context: contextPayload(chips.value) } : {})
     });
 
     const reset = () => {

@@ -29,6 +29,7 @@ function start() {
     }
     job = schedule.scheduleJob({ rule: '* * * * *', tz: CRON_TZ }, async () => {
         try {
+            if (!require('../Entitlements/lifecycleGuard').writable()) return;
             await helper.runGeneralRemindersForAllCompanies();
         } catch (err) {
             logger.error(`${LOG_PREFIX} scheduled run failed: ${err && err.message ? err.message : err}`);

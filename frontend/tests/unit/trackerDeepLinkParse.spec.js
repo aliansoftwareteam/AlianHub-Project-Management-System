@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { buildTrackerDeepLink, isTrackerCapableDevice, openInTracker } from '@/utils/trackerDeepLink';
+import { buildTrackerConnectLink, buildTrackerDeepLink, isTrackerCapableDevice, openInTracker, openTrackerConnect, workspaceAddressOf } from '@/utils/trackerDeepLink';
 
 const DESKTOP_UA = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/120 Safari/537.36';
 const originalLocation = window.location;
@@ -71,6 +71,21 @@ describe('trackerDeepLink', () => {
 
         it('still produces a typed link when called with nothing', () => {
             expect(buildTrackerDeepLink()).toBe('myapp://open?type=trackerStart');
+        });
+    });
+
+    describe('openTrackerConnect', () => {
+        it('opens alianhub-tracker://connect with the workspace address', () => {
+            expect(buildTrackerConnectLink('https://acme.alianhub.com')).toBe('alianhub-tracker://connect?url=https%3A%2F%2Facme.alianhub.com');
+            expect(openTrackerConnect('https://acme.alianhub.com')).toEqual({ ok: true });
+            expect(window.location.href).toBe('alianhub-tracker://connect?url=https%3A%2F%2Facme.alianhub.com');
+        });
+
+        it('refuses without an address or on a phone, and does not navigate', () => {
+            expect(openTrackerConnect('')).toEqual({ ok: false, reason: 'missing' });
+            setUserAgent('Mozilla/5.0 (iPhone; CPU iPhone OS 17_0)');
+            expect(openTrackerConnect('https://acme.alianhub.com')).toEqual({ ok: false, reason: 'unsupported' });
+            expect(window.location.href).toBe('https://app.test/');
         });
     });
 
@@ -164,5 +179,16 @@ describe('trackerDeepLink', () => {
                 expect(onNotOpened).not.toHaveBeenCalled();
             });
         });
+    });
+
+    it.each([
+        [{ origin: 'https://acme.alianhub.com', pathname: '/' }, 'https://acme.alianhub.com'],
+        [{ origin: 'https://acme.alianhub.com' }, 'https://acme.alianhub.com'],
+        [{ origin: 'https://example.com', pathname: '/team/' }, 'https://example.com/team'],
+        [{ origin: 'https://example.com', pathname: '/team/index.html' }, 'https://example.com/team'],
+        [{ origin: 'http://localhost:4000', pathname: '/' }, 'http://localhost:4000'],
+        [{}, ''],
+    ])('names the workspace %o as %s', (location, address) => {
+        expect(workspaceAddressOf(location)).toBe(address);
     });
 });

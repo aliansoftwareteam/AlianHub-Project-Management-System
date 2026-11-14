@@ -1,100 +1,34 @@
 const logger = require("../../Config/loggerConfig");
 const { SCHEMA_TYPE } = require("../../Config/schemaType");
 const { MongoDbCrudOpration } = require("../../utils/mongo-handler/mongoQueries");
-const mongoose = require("mongoose");
-const { updateCompanyFun } = require("../Company/controller/updateCompany");
-const { updateMemberFunction } = require('../settings/Members/controller.js');
 const { getRoleType, isPrivileged } = require('../../Config/permissionGuard');
 const { pinSessionTenant } = require('../../Config/tenant');
+const { releaseTrackerSeat } = require('../DesktopTracker/trackerSeats');
 
-exports.handleTrackerUserPermission = (req,res) => {
+const OBJECT_ID = /^[a-f0-9]{24}$/i;
+const GRANT_MOVED = 'Tracker access now comes from the role: turn on "Desktop time tracker" for it in Security & Permissions.';
+
+/* Access comes from the role (Security & Permissions); on a plan with tracker seats this only gives a seat back. */
+exports.handleTrackerUserPermission = async (req, res) => {
     try {
-        if(!req.body && !Object.keys(req.body)?.length){
-            res.send({status: false, message: 'req body is requried'});
-            return;
-        }
         const companyId = pinSessionTenant(req, res);
-        if (!companyId) return;
-        if(!req.body.DataObj){
-            res.send({status: false, message: 'DataObj is requried'});
-            return;
+        if (!companyId) return undefined;
+        const dataObj = req.body && req.body.DataObj;
+        if (!dataObj || typeof dataObj !== 'object') return res.send({ status: false, message: 'DataObj is required' });
+        if (!isPrivileged(await getRoleType(companyId, req.uid))) {
+            return res.status(403).send({ status: false, message: 'Only an owner or admin can change tracker access' });
         }
-        getRoleType(companyId, req.uid).then((roleType) => {
-            if (!isPrivileged(roleType)) {
-                res.status(403).send({status: false, message: 'Only an owner or admin can change tracker access'});
-                return undefined;
-            }
-            return exports.updateTrackerUsersAndUser(req.body.DataObj, companyId).then((res1)=>{
-                res.send(res1);
-            });
-        })
-        .catch((err)=>{
-            logger.error(`ERROR in update handleTrackerUserPermission: ${err.message}`)
-            res.send(err);
-        })
+        if (dataObj.ops !== false) return res.send({ status: false, message: GRANT_MOVED, statusText: GRANT_MOVED });
+
+        const userId = String((dataObj.data && dataObj.data.userId) || '');
+        if (!OBJECT_ID.test(userId)) return res.send({ status: false, message: 'userId is required' });
+        const member = await MongoDbCrudOpration(companyId, { type: SCHEMA_TYPE.COMPANY_USERS, data: [{ userId }, { _id: 1 }] }, 'findOne');
+        if (!member) return res.send({ status: false, message: 'That member is not part of this workspace.' });
+
+        await releaseTrackerSeat(companyId, userId);
+        return res.send({ status: true, message: 'Tracker_user_removed_successfully' });
     } catch (error) {
-        logger.error(`ERROR in update handleTrackerUserPermission: ${error.message}`)
-        res.send({status : false,message: 'Something went wrong.'});
+        logger.error(`ERROR in update handleTrackerUserPermission: ${error.message}`);
+        return res.send({ status: false, message: 'Something went wrong.' });
     }
-}
-
-exports.updateTrackerUsersAndUser = async (dataObj, companyId) => {
-    return new Promise((resolve, reject) => {
-        try {
-            const incValue = 1;
-            const decValue = -1;
-            const handleError = (err) => {
-                logger.error(`ERROR in update updateTrackerUsersAndUser: ${err.message}`)
-                reject({ status: false, message: 'Something went wrong.' });
-            };
-            const updateCompanyQuery = {
-                type: SCHEMA_TYPE.COMPANIES,
-                data: [
-                    { _id: new mongoose.Types.ObjectId(companyId) },
-                    { $inc: { trackerUsers: dataObj.ops ? incValue : decValue } },
-                    { new: true, useFindAndModify: false }
-                ]
-            };
-
-            updateCompanyFun(SCHEMA_TYPE.GOLBAL,updateCompanyQuery,"findOneAndUpdate",companyId,true)
-            .then((companyData) => {
-                if (!dataObj.ops && companyData && companyData?.data?.planFeature?.timeTrackerUser > 0 && companyData?.data?.trackerUsers > companyData?.data?.planFeature.timeTrackerUser) {
-                    rollbackTrackerCount();
-                } else {
-                    const memberObject = [
-                        { [dataObj.data.status === 2 ? 'userId' : '_id']: dataObj.data.status === 2 ? dataObj.data.userId : new mongoose.Types.ObjectId(dataObj.data._id) },
-                        { $set: { isTrackerUser: dataObj.ops } },
-                    ]
-                    updateMemberFunction(companyId, memberObject, "findOneAndUpdate").then(() => {
-                        resolve({ status: true, message: dataObj.ops ? 'Tracker_user_added_successfully' : 'Tracker_user_removed_successfully' })
-                    }).catch(()=>{
-                        rollbackTrackerCount(true);
-                    });
-                }
-            }).catch(handleError);
-
-            const rollbackTrackerCount = (fromError=false) => {
-                const rollbackCompanyQuery = {
-                    type: SCHEMA_TYPE.COMPANIES,
-                    data: [
-                        { _id: new mongoose.Types.ObjectId(companyId) },
-                        { $inc: { trackerUsers: decValue } },
-                        { new: true, useFindAndModify: false }
-                    ]
-                };
-                updateCompanyFun(SCHEMA_TYPE.GOLBAL,rollbackCompanyQuery,"findOneAndUpdate",companyId,true)
-                .then(() => {
-                    if(!fromError) {
-                        resolve({ status: true, message: 'Please upgrade your plan to add more Time Tracker Users.' })
-                    } else {
-                        resolve({ status: false, message: 'Something went wronge' })
-                    }
-                }).catch(handleError);
-            };
-
-        } catch (error) {
-            logger.error(`ERROR in update updateTrackerUsersAndUser: ${error.message}`)
-            reject({ status: false, message: 'Something went wrong.' });
-        }
-    })
 };

@@ -11,7 +11,7 @@ const mongoose = require("mongoose");
 const { removeCache } = require("../../../utils/commonFunctions.js");
 const { updateUserFun } = require("../../Users/controller.js");
 
-const { ACCOUNT_MAIL_ANSWER } = require("../helpers/accountMail");
+const { ACCOUNT_MAIL_ANSWER, refusesPasswordMail } = require("../helpers/accountMail");
 const { PASSWORD_RULE_MESSAGE, meetsPasswordRule } = require("../helpers/passwordRule");
 const { hashPassword, verifyPassword } = require("../helpers/passwordHash");
 const { signedInPersonOnly } = require("../helpers/accountSecurity");
@@ -91,6 +91,7 @@ exports.changePassword = async (req, res) => {
 };
 
 const sendResetLink = async (email, isAdmin) => {
+    if (await refusesPasswordMail(email)) return;
     const token = generateToken(600);
     const account = await mongoC.MongoDbCrudOpration(dbCollections.GLOBAL, {
         type: dbCollections.USER_AUTH,
@@ -101,7 +102,7 @@ const sendResetLink = async (email, isAdmin) => {
     const mail = require("../../Template/forgotPassword")(email, link);
     sendMail.SendEmail(mail.subject, mail.mail, email, true, (result) => {
         if (!result.status) logger.error(`Forgot password email: ${result.error}`);
-    });
+    }, { accountMail: true });
 };
 
 /* The same answer whether or not the address has an account; the answer does not wait for the mail. */

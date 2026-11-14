@@ -1,6 +1,8 @@
 const roundImage = require("./roundImage")
-const { APIURL, USERPROFILEBUCKET } = require('../../../Config/config');
-const awsRef = require('../../../Config/aws.js');
+const { APIURL } = require('../../../Config/config');
+const { currentLayout } = require('../../../common-storage/s3Layout');
+
+const publicAsset = (name) => currentLayout().publicUrl(`public_assets/${name}`);
 const { textHtml, commentHtml, messageHtml, cssColor, imageSrc } = require('../emailText');
 const imageUrl = APIURL + "api/v1/getlogo?key=logo&type=emailTemplateLogo" || 'https://firebasestorage.googleapis.com/v0/b/alianerphubdev.appspot.com/o/beta_logo.png?alt=media&token=7f601008-28eb-4fd9-a62a-3ef577fa4bd0';
 exports.titleAndValueWithText = (key = "", value = "") => {
@@ -163,7 +165,7 @@ exports.updateView = ({ value = "Status", oldValue = { backColor: "", color: "",
                 <div style="display:flex;align-items: center;">
                  ${oldValue?.name==""?"":manageRender(type, oldValue)}
                     ${oldValue?.name==""?"":`<p style="display:inline-block;margin: 0px 10px;"> 
-                        <img src="https://s3.${awsRef.region}.wasabisys.com/${USERPROFILEBUCKET}/public_assets/email_arrow_right_alt.png" alt="right-arrow">
+                        <img src="${publicAsset('email_arrow_right_alt.png')}" alt="right-arrow">
                     </p>`}
                     ${manageRender(type, newValue)}
                 </div>
@@ -254,7 +256,7 @@ exports.notificationCommonTemplate = (message) => {
                             </div>
                           <!-- table for top LOGO End -->
                             <!-- Table for Top Title  -->
-                            <div style="padding-right: 30px;padding-left: 30px;padding-bottom: 30px;padding-top: 30px; background-color: #F6F7FB;background-image: url('https://s3.${awsRef.region}.wasabisys.com/${USERPROFILEBUCKET}/public_assets/email_banner_icon.png');background-size: 100%;">
+                            <div style="padding-right: 30px;padding-left: 30px;padding-bottom: 30px;padding-top: 30px; background-color: #F6F7FB;background-image: url('${publicAsset('email_banner_icon.png')}');background-size: 100%;">
                             ${messageHtml(message)}
                             </div>
                             <!-- Table for Top Title End  -->

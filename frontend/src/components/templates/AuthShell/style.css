@@ -1,5 +1,6 @@
 .auth {
     display: grid;
+    width: 100%;
     grid-template-columns: 46fr 54fr;
     min-height: 100dvh;
     background: var(--surface);

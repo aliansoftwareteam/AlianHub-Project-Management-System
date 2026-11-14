@@ -1,3 +1,5 @@
+const googleAnalytics = require('./googleAnalytics');
+
 const OFF = 'off';
 const REPORT = 'report';
 const ENFORCE = 'enforce';
@@ -129,9 +131,11 @@ const urlOf = (value) => {
  * a bucket whose name cannot be a host label stays on the endpoint itself. */
 const storageSources = (env) => {
     if ((env.STORAGE_TYPE || 'wasabi') === 'server') return [];
-    const url = urlOf(env.WASABIENDPOINT) || new URL(DEFAULT_STORAGE_ENDPOINT);
+    const url = urlOf(env.S3_ENDPOINT || env.WASABIENDPOINT) || new URL(DEFAULT_STORAGE_ENDPOINT);
     const origin = `${url.protocol}//${url.host}`;
-    return IPV4.test(url.host) ? [origin] : [origin, `${url.protocol}//*.${url.host}`];
+    const endpoint = IPV4.test(url.host) ? [origin] : [origin, `${url.protocol}//*.${url.host}`];
+    const publicBase = urlOf(env.S3_PUBLIC_BASE_URL);
+    return publicBase ? [...new Set([...endpoint, `${publicBase.protocol}//${publicBase.host}`])] : endpoint;
 };
 
 /* 'self' covers ws: and wss: in current browsers only, so the configured origins are named as well. */
@@ -158,7 +162,8 @@ const buildDirectives = (env = process.env, { reportingApi = false } = {}) => {
         'form-action': [SELF],
         'object-src': [NONE],
     };
-    for (const [directive, sources] of Object.entries(extrasOf(env))) directives[directive] = [...new Set([...directives[directive], ...sources])];
+    const additions = [googleAnalytics.cspSourcesOf(env), extrasOf(env)];
+    for (const [directive, sources] of additions.flatMap(Object.entries)) directives[directive] = [...new Set([...directives[directive], ...sources])];
     return { ...directives, 'report-uri': [REPORT_PATH], ...(reportingApi ? { 'report-to': [REPORT_GROUP] } : {}) };
 };
 
@@ -197,10 +202,10 @@ const yieldToRoutePolicy = (res) => {
     };
 };
 
-/* The restart-only settings (storage, push, extras) are read on the first request, not at registration: index.js
- * registers this before it applies the instance settings saved in the database. WEBURL and APIURL change from the
- * console without a restart, so the cached policy is rebuilt when they do. */
-const LIVE_KEYS = ['WEBURL', 'APIURL'];
+/* The restart-only settings (storage driver, push, extras) are read on the first request, not at registration:
+ * index.js registers this before it applies the instance settings saved in the database. The URLs and the storage
+ * addresses change from the console or the platform without a restart, so the cached policy is rebuilt when they do. */
+const LIVE_KEYS = ['WEBURL', 'APIURL', 'S3_ENDPOINT', 'WASABIENDPOINT', 'S3_PUBLIC_BASE_URL'];
 
 const policySource = (env) => {
     let frozen = null;

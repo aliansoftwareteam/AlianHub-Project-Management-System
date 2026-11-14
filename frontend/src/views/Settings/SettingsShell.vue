@@ -85,6 +85,7 @@ import CreateProjectSidebar from "@/components/organisms/CreateProject/CreatePro
 import { customField } from "@/plugins/customFieldView/helper.js";
 import chargebeeRouter from "@/plugins/chargebee/router";
 import paddleRouter from "@/plugins/paddle/router.js";
+import { isManagedHosting } from "@/config/publicConfig";
 import { apiRequestWithoutCompnay } from "@/services";
 import * as env from "@/config/env";
 import { ROLE_OWNER, isOwnerOrAdmin as isOwnerOrAdminRole } from "@/utils/roles";
@@ -126,7 +127,7 @@ const membersVisible = () => checkPermission("settings.settings_role_management"
     && checkPermission("settings.settings_designation") !== null
     && checkPermission("settings.settings_member_list") === true;
 
-const hasBilling = computed(() => !!(chargebeeRouter.upgradeTab || paddleRouter.upgradeTab) && isOwner.value && router.hasRoute("Upgrade"));
+const hasBilling = computed(() => !isManagedHosting() && !!(chargebeeRouter.upgradeTab || paddleRouter.upgradeTab) && isOwner.value && router.hasRoute("Upgrade"));
 
 // The Instance group belongs to the account that set the instance up (users.isProductOwner),
 // which the server decides; a member never sees it. null = answer not in yet.
@@ -174,7 +175,8 @@ const rawGroups = computed(() => [
             { key: "timetracking", text: label("settingslider.Time Tracking"), icon: "time", to: to("Time Tracking"), names: ["Time Tracking"], show: true },
             { key: "audit", text: label("settingslider.Audit Log"), icon: "audit", to: to("AuditLog"), names: ["AuditLog"], show: isOwnerOrAdmin.value },
             { key: "import-export", text: t("ImportExport.nav"), icon: "download", to: to("ImportExport"), names: ["ImportExport"], show: isOwnerOrAdmin.value },
-            { key: "billing", text: t("Settings.nav_billing"), icon: "billing", to: to("Upgrade"), names: ["Upgrade"], show: hasBilling.value }
+            { key: "billing", text: t("Settings.nav_billing"), icon: "billing", to: to("Upgrade"), names: ["Upgrade"], show: hasBilling.value },
+            { key: "plan", text: t("Plan.nav"), icon: "billing", to: to("PlanUsage"), names: ["PlanUsage"], show: isManagedHosting() }
         ]
     },
     {

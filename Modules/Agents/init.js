@@ -40,7 +40,7 @@ exports.init = (app) => {
     reapStaleRuns().catch((e) => logger.error(`[agents] reap failed: ${e.message}`));
     engine.defineRecurring(REAP_PROPOSALS_JOB, REAP_PROPOSALS_EVERY_MS, reapStuckProposals).catch((e) => logger.error(`[agents] ${REAP_PROPOSALS_JOB}: ${e.message}`));
     engine.defineRecurring(alerts.JOB_NAME, alerts.intervalMs(), () => alerts.evaluateAll()).catch((e) => logger.error(`[agents] ${alerts.JOB_NAME}: ${e.message}`));
-    engine.defineRecurring(schedules.JOB_NAME, schedules.intervalMs(), () => schedules.tickAll()).catch((e) => logger.error(`[agents] ${schedules.JOB_NAME}: ${e.message}`));
+    engine.defineRecurring(schedules.JOB_NAME, schedules.intervalMs(), require('../Entitlements/lifecycleGuard').whenWritable(schedules.JOB_NAME, () => schedules.tickAll())).catch((e) => logger.error(`[agents] ${schedules.JOB_NAME}: ${e.message}`));
 };
 
 exports.reapStaleRuns = reapStaleRuns;

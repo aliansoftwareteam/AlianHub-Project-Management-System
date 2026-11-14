@@ -24,7 +24,7 @@ exports.init = (app) => {
      * @swagger
      *  /api/v1/manageTrackerUserPermission:
      *    post: 
-     *      description: This API is used for Updating Tracker user count in company collection and also update status in company users.
+     *      description: Gives back a member's desktop tracker seat (DataObj.ops false, DataObj.data.userId). Access itself comes from the role's Desktop time tracker permission.
      *      tags: [Plan Permissions APIs]
      *      summary: Manage Tracker Users API
      *      requestBody:

@@ -23,7 +23,7 @@ const { handshakeToken } = require('../Config/cookies');
 const { resolveAccessSession } = require('../Config/jwt');
 const logger = require('../Config/loggerConfig');
 const { corsOriginDelegate } = require('../utils/cors.js');
-const { removeRoom, removeBySocket } = require('./helper');
+const { removeRoom, removeBySocket, keepPersonalRoomsOnly } = require('./helper');
 const { identityOf } = require('./roomAccess');
 exports.changeStreams = [];
 const EventEmitter = require('events');
@@ -100,6 +100,7 @@ exports.initSocket = (server) => {
         },
     });
     const userNamespace = io.of(/^\/userid_\w+$/);
+    require('./controller/instanceSocket').attach(userNamespace);
     userNamespace.use(async (socket, next) => {
         const token = handshakeToken(socket.handshake);
         if (!token) {
@@ -136,6 +137,14 @@ exports.initSocket = (server) => {
         socket.customData = {userRole};
         const namespace = socket.nsp;
 
+        // Suspended (064): the socket stays open so the lifecycle broadcast still reaches it, but no event it sends runs.
+        socket.use(([event], next) => {
+            const refusal = require('../Modules/Entitlements/lifecycleGuard').socketEventRefusal(event);
+            if (!refusal) return next();
+            socket.emit('INSTANCE_LOCKED', { code: refusal });
+            return undefined;
+        });
+
         // A handshake only proves the session was live when the socket opened. Every event
         // re-checks it, so a socket whose session has since ended is closed on its next one.
         socket.use((_event, next) => {
@@ -162,6 +171,11 @@ exports.initSocket = (server) => {
             if (id !== socket.id) return;
             socket.rooms.forEach((roomName) => removeRoom(roomName));
             socket.disconnect(true);
+        });
+
+        socket.on('goIdle', (id) => {
+            if (id !== socket.id) return;
+            keepPersonalRoomsOnly(socket);
         });
 
         socket.on('getRoomList', (socketId, callback) => {

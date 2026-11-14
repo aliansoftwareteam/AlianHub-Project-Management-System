@@ -1,3 +1,4 @@
+jest.mock('../Modules/DesktopTracker/trackerSeats', () => ({ ...jest.requireActual('../Modules/DesktopTracker/trackerSeats'), trackerAccessFor: async () => ({ allowed: true }) }));
 /* Task 040 phase 2: a time log's and a time plan's ProjectId are stored as ObjectIds, whichever form
    the writer passed. Every stored form here is read from what Mongoose hands the driver under the
    real timesheet and estimated_time schemas; the handlers' own database calls are only recorded. */

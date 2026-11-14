@@ -32,6 +32,7 @@ const STORAGE_ROOT = path.join(__dirname, '..', 'storage');
  *                            given.
  */
 const putLocalFile = async ({ companyId, storagePath, tmpPath, filename, size }) => {
+    await require('../Modules/Entitlements/uploads').assertUploadAllowed(companyId, Number(size) || fs.statSync(tmpPath).size);
     const storageType = String(process.env.STORAGE_TYPE || 'wasabi');
 
     if (storageType === 'server') {

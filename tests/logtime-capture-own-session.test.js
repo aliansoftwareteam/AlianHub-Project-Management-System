@@ -1,3 +1,4 @@
+jest.mock('../Modules/DesktopTracker/trackerSeats', () => ({ ...jest.requireActual('../Modules/DesktopTracker/trackerSeats'), trackerAccessFor: async () => ({ allowed: true }) }));
 process.env.STORAGE_TYPE = 'server';
 
 const mockDb = { sessions: {}, seats: {}, updates: [], audits: [] };

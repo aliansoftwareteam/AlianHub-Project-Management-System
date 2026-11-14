@@ -19,7 +19,7 @@ Task 074, FR-36 of the 056 PRD. Each member connects their own Slack account wit
   - `auth.revokeWith: 'access'` (`auth.revoke` takes the access token).
 
   A dead token on a tool call marks the connection broken.
-- **Migration `081-retire-slack-bot`**: in every workspace that had the bot, it asks Slack to revoke the bot token, retires the bot secrets, closes the bot row, declines Inbox posts still waiting on the bot, and tells owners and admins in the bell. It goes on if Slack cannot be reached, and a second run changes nothing.
+- **Migration `082-retire-slack-bot`**: in every workspace that had the bot, it asks Slack to revoke the bot token, retires the bot secrets, closes the bot row, declines Inbox posts still waiting on the bot, and tells owners and admins in the bell. It goes on if Slack cannot be reached, and a second run changes nothing.
 - **Screens**: the bot form is gone. Integrations › Slack points to My connections, and the bell notice opens the Connections page.
 - **Docs**: the Slack row in the research matrix, `docs/connectors/slack.md` (app setup, token rotation, the tunnel for local development), and env docs for `CONNECTOR_SLACK_CLIENT_ID` / `_SECRET`.
 
@@ -29,7 +29,7 @@ This branch already merges the base, so the PR merges cleanly. The merge resolve
 
 - **`tests/connector-slack-post.test.js`**: deleted here (it tested the retired bot) and changed in 072, which added three tests of the catalogue's `registryConnectors` flag. The delete stays, and those tests moved to `tests/connector-catalogue-flags.test.js` with one change: `CONNECTORS=slack` now names a registry provider, so it sets `registryConnectors: true`.
 - **A break git does not flag:** 074 dropped the `flag` require from `Modules/Connectors/controller.js` (only the bot used it), while 072's `appCatalog` there calls `flag.named()`. Without the require, `GET /api/v2/connectors/apps` answers 500 and the Company OAuth apps section does not load. The require is back.
-- **Migration number:** 073 took 080 (`080-connectors-google-calendar-to-google`), so the bot retirement is now `081-retire-slack-bot`.
+- **Migration number:** 073 took 080 (`081-connectors-google-calendar-to-google`), so the bot retirement is now `082-retire-slack-bot`.
 
 On My connections, 072's screen lists Slack from the registry, with the labels "Slack" and "Messages" humanised from the ids.
 

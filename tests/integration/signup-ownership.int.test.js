@@ -75,7 +75,7 @@ describe('the setup wizard still creates the instance owner', () => {
 
         const access = await api.get('/api/v2/instance/access');
         expect(access.status).toBe(200);
-        expect(access.body.data).toEqual({ allowed: true, via: 'owner' });
+        expect(access.body.data).toEqual({ allowed: true, via: 'owner', managed: false });
 
         const check = await api.post('/api/v1/userAndCompanyCheck', {});
         expect(check.body.data.userData.isProductOwner).toBe(true);

@@ -479,6 +479,16 @@ exports.importCompanyRules = async(companyName,type,projectId) => {
             createAt: new Date(),
             updateAt: new Date()
         },
+        {
+            name: "Time Tracking",
+            key: "time_tracking",
+            desc: "",
+            isParent: true,
+            parentId: "",
+            roles: [],
+            createAt: new Date(),
+            updateAt: new Date()
+        },
     ];
 
     let obj = {
@@ -1003,6 +1013,10 @@ exports.importCompanyRules = async(companyName,type,projectId) => {
         }
     ]
 
+    let timeTrackingRules = [
+        { name: "Desktop Time Tracker", key: "desktop_tracker", dependency: "time_tracking", desc: "", switchOnly: true },
+    ]
+
     let toggleRules = {
         name: "Toggle",
         isParent: true,
@@ -1102,6 +1116,11 @@ exports.importCompanyRules = async(companyName,type,projectId) => {
                                                 ind = chat_settings.findIndex((x) => x.key === doc.key);
                                                 if(ind > -1) {
                                                     chat_settings[ind].roles = doc.roles;
+                                                } else {
+                                                    ind = timeTrackingRules.findIndex((x) => x.key === doc.key);
+                                                    if(ind > -1) {
+                                                        timeTrackingRules[ind].roles = doc.roles;
+                                                    }
                                                 }
                                             }
                                         }
@@ -1292,6 +1311,17 @@ exports.importCompanyRules = async(companyName,type,projectId) => {
                                 ]
                             }
                             promises.push(MongoDbCrudOpration(companyName, chatRuleObj, "findOneAndUpdate"));
+                        })
+                        timeTrackingRules.forEach((rule, index) => {
+                            rule.roles = applyDefaultRoles(rule);
+                            promises.push(MongoDbCrudOpration(companyName, {
+                                type : dbType,
+                                data : [
+                                    {key : rule.key},
+                                    {$set: {...obj, ...rule, priorityIndex: index, parentId: dbRules[0].filter((x) => x.key === "time_tracking")[0]?._id}},
+                                    { upsert: true }
+                                ]
+                            }, "findOneAndUpdate"));
                         })
                         const toggleObj = {
                             type : dbType,

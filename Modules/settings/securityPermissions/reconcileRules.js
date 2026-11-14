@@ -18,6 +18,8 @@ const SENTINEL_KEYS = [
     'ai_connectors',
     'ai_external_clients',
     'ai_custom_apps',
+    'time_tracking',
+    'desktop_tracker',
 ];
 
 function findMissingSentinels(rules) {

@@ -25,13 +25,13 @@ describe('SPA fallback — deep links and hard refreshes', () => {
         expect(wantsSpa(req('/x', { html: false }))).toBe(false);
     });
 
-    it('as middleware, sends the file or passes through', () => {
-        const mw = spaFallback('/dist/index.html');
-        const res = { sendFile: jest.fn() }; const next = jest.fn();
-        mw(req('/cid/planner'), res, next);
-        expect(res.sendFile).toHaveBeenCalledWith('/dist/index.html');
-        expect(next).not.toHaveBeenCalled();
+    it('as middleware, passes through what is not a page and when the build is missing', () => {
+        const mw = spaFallback('/no/such/dist/index.html');
+        const res = { type: jest.fn(), send: jest.fn() }; const next = jest.fn();
         mw(req('/api/v2/x'), res, next);
         expect(next).toHaveBeenCalledTimes(1);
+        mw(req('/cid/planner'), res, next);
+        expect(next).toHaveBeenCalledTimes(2);
+        expect(res.send).not.toHaveBeenCalled();
     });
 });

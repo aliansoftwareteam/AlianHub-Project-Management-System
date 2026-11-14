@@ -7,19 +7,25 @@ const logger = require("../../Config/loggerConfig");
 const { SEAT_ACTIVE } = require('../../Config/seatStatus');
 const { domainOfEmail, isVerifiedDomain } = require('./helpers/ssoRules');
 const { newAccountNavPreferences } = require('../Users/helpers/navPreferencesRules');
+const { acceptanceRefusal } = require('../Entitlements/guards');
+const { refusalError } = require('../Entitlements/answers');
 
 const SSO_NOT_ALLOWED = 'SSO_NOT_ALLOWED';
 
 // SEC-02 — Just-In-Time provision (or link) an SSO user into a company. Mirrors
 // the OAuth signup path (createUser.googleSignup): global userAuth + users,
 // then per-company company_users membership + notification defaults. Returns uid.
-const jitProvisionUser = async ({ companyId, email, firstName, lastName, externalId, defaultRoleType = 3, autoProvision = true }) => {
+const jitProvisionUser = async ({ companyId, email, firstName, lastName, externalId, defaultRoleType = 3, autoProvision = true, takesSeat = true }) => {
     const normEmail = String(email || '').trim().toLowerCase();
     if (!companyId || !normEmail) throw new Error('companyId and email are required');
 
     let userAuth = await MongoDbCrudOpration(dbCollections.GLOBAL, {
         type: dbCollections.USER_AUTH, data: [{ email: normEmail }],
     }, 'findOne');
+    if (takesSeat) {
+        const noSeat = await acceptanceRefusal({ userId: userAuth && userAuth._id, email: normEmail, roleType: defaultRoleType });
+        if (noSeat) throw refusalError(noSeat);
+    }
 
     let uid;
     if (userAuth) {

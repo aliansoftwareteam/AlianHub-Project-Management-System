@@ -1,10 +1,10 @@
-/* Task 064's connector_connections index and migration 079 against a real MongoDB, so the partial-index rules
+/* Task 064's connector_connections index and migration 080 against a real MongoDB, so the partial-index rules
  * the unit test models in JS are Mongo's own. Uses a throwaway database of its own, dropped after. */
 const mongoose = require('mongoose');
 const { resolveMongoUrl } = require('../../e2e/support/env');
 const { SCHEMA_TYPE } = require('../../Config/schemaType');
 const { connectorConnectionsSchema, connectorAppsSchema, connectorUsageSchema } = require('../../utils/mongo-handler/createSchema');
-const migration = require('../../migrations/079-connector-indexes');
+const migration = require('../../migrations/080-connector-indexes');
 
 const DB = `it_connector_indexes_${process.pid}_${Date.now()}`;
 const SCHEMAS = {
@@ -95,7 +95,7 @@ describe('connector_connections in MongoDB', () => {
     });
 });
 
-describe('migration 079 on a database that built the first indexes', () => {
+describe('migration 080 on a database that built the first indexes', () => {
     beforeEach(async () => {
         await Connections().collection.drop().catch(() => {});
         await Connections().collection.createIndex(

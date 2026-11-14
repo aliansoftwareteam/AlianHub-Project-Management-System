@@ -122,11 +122,12 @@ export function useAskConversation({ t }) {
         return live.error;
     };
 
-    const send = async ({ question, mode = "ask", projectId = "", skill = "", context = [] }) => {
+    const send = async ({ question, mode = "ask", projectId = "", skill = "", context = [], mentions = [] }) => {
         const asked = String(question || "").trim();
         if (!asked || streaming.value) return false;
         seq += 1;
-        turns.value.push({ key: `local-${seq}`, question: asked, answer: "", mode, cited: [], sources: [], status: "streaming", error: "" });
+        const about = (Array.isArray(mentions) ? mentions : []).map(({ kind, id, title }) => ({ kind, id, title }));
+        turns.value.push({ key: `local-${seq}`, question: asked, answer: "", mode, cited: [], sources: [], mentions: about, status: "streaming", error: "" });
         const live = turns.value[turns.value.length - 1];
         const body = { question: asked, mode };
         if (projectId) body.projectId = projectId;

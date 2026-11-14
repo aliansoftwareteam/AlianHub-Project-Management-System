@@ -1,12 +1,13 @@
 const { SCHEMA_TYPE } = require("../../../Config/schemaType");
 const { MongoDbCrudOpration } = require("../../../utils/mongo-handler/mongoQueries");
 const { resolveSheetScope, scopedTimeMatch, asList, safeTimeZone, SHEET_PERMISSION } = require("../helpers/timeScope");
+const { normalizeReportFilters, reportTimeClauses, narrowMatch } = require("../helpers/reportFilters");
 
 exports.getProjectTimeSheet = async(req,res) => {
     try {
-        const { filterProjectIds, filterUserIds, projectIds, startNumber, endNumber, timeZone } = req.body;
+        const { filterProjectIds, filterUserIds, projectIds, startNumber, endNumber, timeZone, filters } = req.body;
         const scope = await resolveSheetScope(req.headers['companyid'], req.uid, SHEET_PERMISSION.project);
-        const timeQuery = {
+        const scoped = {
             ...scopedTimeMatch(scope, {
                 userIds: asList(filterUserIds).length ? filterUserIds : null,
                 projectIds: scope.companyWide && !asList(filterProjectIds).length ? null : asList(projectIds),
@@ -16,6 +17,7 @@ exports.getProjectTimeSheet = async(req,res) => {
                 $lte: endNumber/1000
             }
         };
+        const timeQuery = narrowMatch(scoped, (await reportTimeClauses(req.headers['companyid'], scope, normalizeReportFilters(filters), { baseMatch: scoped })).clauses);
         const query = [
             {
                 $match: timeQuery

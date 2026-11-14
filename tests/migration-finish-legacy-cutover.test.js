@@ -16,10 +16,10 @@ const { buildContext, listMigrations, validateMigration } = require('../migratio
 const { SCHEMA_TYPE } = require('../Config/schemaType');
 const store = require('../Config/secrets');
 
-const ID = '085-connectors-finish-legacy-cutover';
+const ID = '087-connectors-finish-legacy-cutover';
 const migration = require(`../migrations/${ID}`);
-const calendar = require('../migrations/080-connectors-google-calendar-to-google');
-const cloud = require('../migrations/082-cloud-storage-to-connectors');
+const calendar = require('../migrations/081-connectors-google-calendar-to-google');
+const cloud = require('../migrations/084-cloud-storage-to-connectors');
 const T = SCHEMA_TYPE.CONNECTOR_CONNECTIONS;
 const CLOUD = SCHEMA_TYPE.CLOUD_STORAGE_CONNECTIONS;
 const C1 = '6f0000000000000000000c01';
@@ -66,16 +66,16 @@ afterAll(() => {
 });
 
 describe(ID, () => {
-    it('is a forward-only company migration, listed after the 080 and 082 it finishes', () => {
+    it('is a forward-only company migration, listed after the 081 and 084 it finishes', () => {
         const ids = listMigrations().map((m) => m.id);
-        expect(ids.filter((id) => id.startsWith('085-'))).toEqual([ID]);
+        expect(ids.filter((id) => id.startsWith('087-'))).toEqual([ID]);
         expect(ids.indexOf(ID)).toBeGreaterThan(ids.indexOf(calendar.id));
         expect(ids.indexOf(ID)).toBeGreaterThan(ids.indexOf(cloud.id));
         expect(() => validateMigration(migration, ID)).not.toThrow();
         expect(migration.down).toBeUndefined();
     });
 
-    it('moves a Calendar row that 080 held back onto the Google provider, grant untouched', async () => {
+    it('moves a Calendar row that 081 held back onto the Google provider, grant untouched', async () => {
         const handles = { access_token: await secret('g-access'), refresh_token: await secret('g-refresh') };
         const seeded = calendarRow({ secretHandles: handles });
         await calendar.up(contextFor([C1]));
@@ -137,7 +137,7 @@ describe(ID, () => {
         expect(await store.resolve({ companyId: C1, handle: handles.refresh_token })).toBe('kept-refresh');
     });
 
-    it('clears every cloud-storage row 082 held back, whatever CONNECTORS says, and leaves a cleared one alone', async () => {
+    it('clears every cloud-storage row 084 held back, whatever CONNECTORS says, and leaves a cleared one alone', async () => {
         delete process.env.CONNECTORS;
         const drive = cloudRow();
         const drop = cloudRow({ userId: RUBEN, provider: 'dropbox', config: { app_key: 'k', app_secret: 's' } });

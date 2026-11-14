@@ -2,6 +2,7 @@
     <div>
         <div v-if="error" class="in-banner in-banner--danger"><ShellIcon name="alert" :size="15" /><span>{{ error }}</span></div>
         <div v-else-if="!health" class="ah-empty">{{ $t('Instance.loading') }}</div>
+        <InstanceHealthHosted v-else-if="health.managed" :health="health" :busy="busy" @refresh="load()" />
         <template v-else>
             <SetupChecklist class="in-readiness" :company-name="$t('Instance.this_instance')" :steps="readinessSteps" @action="onReadiness" @dismiss="hideReadiness = true" v-if="!hideReadiness && readinessSteps.some((s) => !s.done)" />
 
@@ -100,6 +101,7 @@ import { useToast } from "vue-toast-notification";
 import ShellIcon from "@/components/organisms/Shell/ShellIcon.vue";
 import SetupChecklist from "@/components/molecules/Home/SetupChecklist.vue";
 import { useInstanceApi, formatBytes, formatWhen } from "./useInstanceApi";
+import InstanceHealthHosted from "./InstanceHealthHosted.vue";
 
 defineOptions({ name: "InstanceHealth" });
 

@@ -16,7 +16,7 @@
             <div v-if="providers.length" class="auth__providers">
                 <ProviderButton v-for="p in providers" :key="p" :provider="p" mode="login" />
             </div>
-            <button v-if="ssoAvailable" type="button" class="ah-btn ah-btn--outline ah-btn--block" @click="$router.push({ name: 'Sso_Login' })">
+            <button v-if="ssoAvailable" type="button" class="ah-btn ah-btn--outline ah-btn--block" @click="openSso">
                 {{ $t('Auth.continue_with_sso') }}
             </button>
             <div v-if="providers.length || ssoAvailable" class="auth__or">{{ $t('Auth.or_with_email') }}</div>
@@ -183,6 +183,8 @@ import { forgetRememberedEmail, readRememberedEmail, saveRememberedEmail } from 
 import { away } from "@/offline";
 import { useDemoIndustry } from "@/composable/useDemoIndustry";
 
+const SSO_ERRORS = { not_allowed: "Auth.sso_not_allowed", seat_limit: "Plan.refused.seat_limit", config: "Auth.sso_not_configured" };
+
 const { t } = useI18n();
 const { industryOf } = useDemoIndustry();
 const $toast = useToast();
@@ -215,6 +217,11 @@ const demo = computed(() => (brand.value.demoMode === true
 const canTryDemo = computed(() => Boolean(demo.value?.email && demo.value.password));
 // Brand settings usually arrive after this page mounts; whatever is already in the fields wins.
 let demoFilled = false;
+/* A suspended hosted workspace says so before anyone types a password (064). */
+watch(() => publicConfig.hosting?.lifecycle, (state) => {
+    if (state === "suspended") router.replace({ name: "Suspended" });
+}, { immediate: true });
+
 watch(demo, (account) => {
     if (demoFilled || !account) return;
     demoFilled = true;
@@ -251,12 +258,13 @@ onMounted(() => {
     if (route.query.reason === "expired") banner.value = { kind: "warn", text: t("Auth.two_factor_session_expired") };
     if (route.query.magic === "invalid") banner.value = { kind: "danger", text: t("Auth.magic_invalid") };
     if (route.query.magic === "disabled") banner.value = { kind: "warn", text: t("Auth.magic_unavailable") };
-    if (route.query.ssoError) banner.value = { kind: "danger", text: t(route.query.ssoError === "not_allowed" ? "Auth.sso_not_allowed" : "Auth.sso_failed") };
-    if (route.query.magic === "ok" && route.query.uid) {
+    if (route.query.ssoError) banner.value = { kind: "danger", text: t(SSO_ERRORS[route.query.ssoError] || "Auth.sso_failed") };
+    const landingFailure = route.query.magic === "ok" ? "Auth.magic_invalid" : route.query.sso === "ok" ? "Auth.sso_failed" : "";
+    if (landingFailure && route.query.uid) {
         busy.value = true;
-        proceedAfterAuth(String(route.query.uid)).catch(() => {
+        proceedAfterAuth(String(route.query.uid), { workspace: String(route.query.workspace || "") }).catch(() => {
             busy.value = false;
-            banner.value = { kind: "danger", text: t("Auth.magic_invalid") };
+            banner.value = { kind: "danger", text: t(landingFailure) };
         });
         return;
     }
@@ -270,6 +278,11 @@ onUnmounted(() => clearInterval(tick));
 const countdown = (at) => fmtSeconds(Math.max(0, Math.round((at - now.value) / 1000)));
 const fmtSeconds = (s) => `${Math.floor(s / 60)}:${String(s % 60).padStart(2, "0")}`;
 const resendWait = ref(0);
+
+const openSso = () => router.push({
+    name: "Sso_Login",
+    query: { ...(form.email ? { email: form.email } : {}), ...(route.query.redirect_url ? { redirect_url: route.query.redirect_url } : {}) },
+});
 
 const updateUserStatus = (uid) => apiRequestWithoutCompnay("put", env.USER_UPATE, { userId: uid, updateObject: { isOnline: true, lastActive: new Date() } }).catch(() => {});
 const userCompanyStatusCheck = (uid) => apiRequestWithoutCompnay("post", env.USER_AND_COMAPNY_CHECK, { userId: uid });
@@ -326,7 +339,7 @@ const handleSubmit = async () => {
     }
 };
 
-const proceedAfterAuth = async (userId) => {
+const proceedAfterAuth = async (userId, { workspace = "" } = {}) => {
     localStorage.setItem("userId", userId);
     const [userResponse] = await Promise.all([userCompanyStatusCheck(userId), getAuth(userId, true)]);
     if (userResponse?.data?.status === false) { clearSession(); throw new Error("server"); }
@@ -343,6 +356,8 @@ const proceedAfterAuth = async (userId) => {
         else router.push({ name: "Create_Company" });
         return;
     }
+    // Single sign-on already chose the workspace: the one whose identity provider signed the person in.
+    if (workspace && uData.AssignCompany.includes(workspace)) { finishLogin(workspace, route.query.redirect_url || "/"); return; }
     const cid = localStorage.getItem("selectedCompany") ?? companyID;
     if (cid && isCompanyFind === false) { router.push({ name: "Create_Company" }); return; }
 
@@ -362,11 +377,10 @@ const backToInvitation = async () => {
     window.location.reload();
 };
 
-const finishLogin = async (cid) => {
+const finishLogin = async (cid, redirect = route.query.redirect_url) => {
     localStorage.setItem("selectedCompany", cid);
     localStorage.setItem("isLogging", "true");
     localStorage.removeItem("ForgotEmail");
-    const redirect = route.query.redirect_url;
     if (redirect && redirect !== "/login") {
         if (redirect === "/") await router.replace(`/${cid}`);
         else {

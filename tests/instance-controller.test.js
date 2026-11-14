@@ -16,6 +16,7 @@ jest.mock('../Config/instanceSettings', () => ({
     describe: jest.fn(() => ({ mail: {} })),
     isLoaded: jest.fn(() => true),
     saveInstanceSettings: jest.fn(),
+    refusedKeys: jest.fn(() => ({})),
     publicConfig: jest.fn(),
 }));
 jest.mock('../Modules/Instance/settingsCatalog', () => ({ GROUPS: [{ key: 'mail' }], validateSettings: jest.fn() }));
@@ -107,7 +108,7 @@ afterEach(() => {
 describe('access and settings', () => {
     it('access reports how the caller got in', async () => {
         const res = await run(ctrl.access, { instanceAdmin: 'key' });
-        expect(res.body).toEqual({ status: true, statusText: 'Instance admin.', data: { allowed: true, via: 'key' } });
+        expect(res.body).toEqual({ status: true, statusText: 'Instance admin.', data: { allowed: true, via: 'key', managed: false } });
     });
 
     it('getSettings lists the groups, the described settings and whether they are loaded', async () => {
@@ -123,6 +124,24 @@ describe('access and settings', () => {
         expect(res.body).toEqual({ status: false, statusText: 'Some settings are not valid.', data: { errors: { port: 'must be a number' } } });
         expect(settings.saveInstanceSettings).not.toHaveBeenCalled();
         expect(validateSettings).toHaveBeenCalledWith({ port: 'x' });
+    });
+
+    it('putSettings refuses a managed key by name with 400 and saves nothing', async () => {
+        settings.refusedKeys.mockReturnValueOnce({ NODEMAILER_HOST: 'managed' });
+        const res = await run(ctrl.putSettings, { instanceAdmin: 'owner', body: { NODEMAILER_HOST: 'smtp.example.com', APP_NAME: 'Acme' } });
+        expect(res.statusCode).toBe(400);
+        expect(res.body).toEqual({ status: false, statusText: 'Some settings are managed by AlianHub Cloud.', data: { errors: { NODEMAILER_HOST: 'managed' } } });
+        expect(settings.saveInstanceSettings).not.toHaveBeenCalled();
+        expect(validateSettings).not.toHaveBeenCalled();
+    });
+
+    it('putSettings refuses a key set in the environment instead of reporting a save that never applied', async () => {
+        settings.refusedKeys.mockReturnValueOnce({ NODEMAILER_HOST: 'locked' });
+        const res = await run(ctrl.putSettings, { body: { NODEMAILER_HOST: 'smtp.example.com' } });
+        expect(res.statusCode).toBe(400);
+        expect(res.body.statusText).toBe('Some settings are set in the environment and cannot be changed here.');
+        expect(res.body.data.errors).toEqual({ NODEMAILER_HOST: 'locked' });
+        expect(settings.saveInstanceSettings).not.toHaveBeenCalled();
     });
 
     it('putSettings validates an empty body rather than failing', async () => {
@@ -318,6 +337,62 @@ describe('health', () => {
         process.env.CRON_TZ = 'Asia/Kolkata';
         const res = await run(ctrl.health);
         expect(res.body.data.cron).toMatchObject({ enabled: false, tz: 'Asia/Kolkata' });
+    });
+
+    describe('on a hosted instance', () => {
+        const hostingMode = require('../Config/hostingMode');
+        const saved = { mode: process.env.HOSTING_MODE, platform: process.env.PLATFORM_URL };
+        beforeEach(() => {
+            hostingMode._resetForTests();
+            process.env.HOSTING_MODE = 'managed';
+            process.env.PLATFORM_URL = 'https://account.alianhub.com';
+            PROBES.storage.mockResolvedValue({ status: true, statusText: 'Bucket tenant-bucket-7 is reachable.' });
+            state.cron = { reminders: { lastRunAt: new Date('2026-10-28T02:00:00Z'), ok: false, error: 'connect ECONNREFUSED 10.0.0.7:27017' } };
+        });
+        afterEach(() => {
+            for (const [key, value] of [['HOSTING_MODE', saved.mode], ['PLATFORM_URL', saved.platform]]) {
+                if (value === undefined) delete process.env[key]; else process.env[key] = value;
+            }
+            state.cron = {};
+            hostingMode._resetForTests();
+        });
+
+        it('shows the owner green or red per part and nothing that names our side of the stack', async () => {
+            process.env.NODEMAILER_HOST = 'smtp.internal.alianhub';
+            PROBES.mail.mockResolvedValue({ status: true, statusText: 'SMTP login to smtp.internal.alianhub:587 succeeded.' });
+            const { data } = (await run(ctrl.health, { instanceAdmin: 'owner', query: { probe: 'mail' } })).body;
+            expect(data).toEqual({
+                managed: true,
+                status: 'ok',
+                version: '14.36.0-beta.9',
+                maintenance: false,
+                db: { ok: true },
+                storage: { ok: true },
+                mail: { configured: true, ok: true },
+                agenda: { pending: undefined, failed: undefined },
+                cron: { enabled: true, tz: 'UTC', jobs: { reminders: { lastRunAt: new Date('2026-10-28T02:00:00Z'), ok: false } } },
+                portalUrl: 'https://account.alianhub.com',
+            });
+            expect(JSON.stringify(data)).not.toMatch(/tenant-bucket|smtp\.internal|10\.0\.0\.7|nodeVersion|memoryRss/);
+        });
+
+        it('keeps the full answer for the platform', async () => {
+            const { data } = (await run(ctrl.health, { instanceAdmin: 'platform' })).body;
+            expect(data.storage.detail).toBe('Bucket tenant-bucket-7 is reachable.');
+            expect(data.nodeVersion).toBe(process.version);
+        });
+
+        it('trims host details from the stats for the owner but keeps the counts', async () => {
+            MongoDbCrudOpration.mockResolvedValueOnce(2).mockResolvedValueOnce(9);
+            const { data } = (await run(ctrl.stats, { instanceAdmin: 'owner' })).body;
+            expect(data).toMatchObject({ companies: 2, users: 9, version: '14.36.0-beta.9' });
+            expect(data).not.toHaveProperty('nodeVersion');
+            expect(data).not.toHaveProperty('uptimeSeconds');
+        });
+
+        it('says so in the access check, so the console can hide what it closed', async () => {
+            expect((await run(ctrl.access, { instanceAdmin: 'owner' })).body.data).toEqual({ allowed: true, via: 'owner', managed: true });
+        });
     });
 });
 
