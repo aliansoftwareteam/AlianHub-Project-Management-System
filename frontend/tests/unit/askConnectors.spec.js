@@ -7,6 +7,7 @@ vi.mock('@/services', () => ({ apiRequest }));
 vi.mock('@/components/organisms/Shell/ShellIcon.vue', () => ({ default: { name: 'ShellIcon', render: () => null } }));
 
 import * as env from '@/config/env';
+import { publicConfig } from '@/config/publicConfig';
 import { connectorsOf, connectorResults, contextPayload, groupMentions, namedConnectors, withNamedChips, connectorNoteKey } from '@/views/Ai/askComposer';
 import { useAskComposer } from '@/views/Ai/useAskComposer';
 import AskComposerMenu from '@/views/Ai/AskComposerMenu.vue';
@@ -87,6 +88,7 @@ describe('the composer', () => {
     };
 
     beforeEach(() => {
+        Object.assign(publicConfig, { loaded: true, connectors: true });
         apiRequest.mockReset();
         apiRequest.mockImplementation((type, url) => (type === 'get' && url === env.CONNECTORS
             ? Promise.resolve({ data: { status: true, data: LIST } })
@@ -121,6 +123,15 @@ describe('the composer', () => {
         composer.pick(composer.menu.items.find((item) => item.id === 'notion'));
         expect(onConnect).toHaveBeenCalledWith(expect.objectContaining({ id: 'notion', connected: false }));
         expect(composer.chips.value).toEqual([]);
+    });
+
+    it('asks nothing where the server has no connector switched on', async () => {
+        publicConfig.connectors = false;
+        const { composer, type } = await composerWith();
+        type('GitHub');
+        expect(apiRequest).not.toHaveBeenCalled();
+        expect(composer.connectors.value).toEqual([]);
+        expect(composer.body()).toEqual({});
     });
 
     it('works without connectors where the route is not there', async () => {

@@ -25,6 +25,7 @@ export const publicConfig = reactive({
     analytics: { gaMeasurementId: "" },
     demoMode: false,
     mcpOAuth: false,
+    connectors: false,
     hosting: { mode: "self", portalUrl: "" },
 });
 

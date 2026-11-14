@@ -15,6 +15,7 @@
 //               the stored refresh token. It runs in its own popup page.
 import { apiRequest } from '@/services';
 import * as env from '@/config/env';
+import { connectorsOn } from '@/config/connectorsOn';
 
 // ── script loading ──────────────────────────────────────────────────────────
 // One in-flight promise per URL, so opening a picker twice never injects the
@@ -57,6 +58,7 @@ const loadScript = (url, attrs = {}) => {
  */
 export const fetchCloudProviders = async () => {
     try {
+        if (!(await connectorsOn())) return [];
         const res = await apiRequest('get', env.CONNECTORS);
         if (!(res && res.data && res.data.status)) return [];
         const data = res.data.data || {};

@@ -1,6 +1,7 @@
 import { computed, nextTick, reactive, ref, unref } from "vue";
 import { apiRequest } from "@/services";
 import * as env from "@/config/env";
+import { connectorsOn } from "@/config/connectorsOn";
 import { MAX_CONTEXT, connectorResults, connectorsOf, contextPayload, filterSkills, groupMentions, mentionAt, mentionItems, recentMentions, rememberMention, slashQuery, withNamedChips } from "./askComposer";
 
 const SEARCH_DELAY_MS = 180;
@@ -20,6 +21,10 @@ export function useAskComposer({ question, box, skills, companyId = "", projectI
 
     const loadConnectors = async () => {
         try {
+            if (!(await connectorsOn())) {
+                connectors.value = [];
+                return;
+            }
             const res = await apiRequest("get", env.CONNECTORS);
             connectors.value = res?.data?.status ? connectorsOf(res.data.data, label) : [];
         } catch {

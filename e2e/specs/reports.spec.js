@@ -38,10 +38,12 @@ test.describe('reports screens as the owner', () => {
         expect(errors).toEqual([]);
     });
 
-    test('the connections page renders', async ({ page, state }) => {
+    test('the old connections address opens Connectors under AI › Customize', async ({ page, state }) => {
         const errors = trackConsoleErrors(page);
         await page.goto(`/#/${state.companyId}/connections`);
-        await expect(page.getByText('Connect', { exact: true }).first()).toBeVisible();
+        await expect(page.getByRole('heading', { level: 1, name: 'Customize' })).toBeVisible();
+        await expect(page.getByRole('tab', { name: 'Connectors', selected: true })).toBeVisible();
+        await expect(page.locator('[data-test="cx-off"]')).toBeVisible();
         expect(errors).toEqual([]);
     });
 
