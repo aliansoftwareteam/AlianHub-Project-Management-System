@@ -10,6 +10,8 @@ name: Release
 #   3. When the Release PR is merged, automatically:
 #      - Create the git tag (e.g. v14.1.0)
 #      - Create the matching GitHub Release with changelog as the body
+#      - Dispatch docker.yml, since GitHub won't auto-trigger it from a
+#        release that this workflow's own GITHUB_TOKEN just published
 #
 # Workflow → maintainer relationship:
 #   • You merge feature PRs to staging (everyday work)
@@ -33,6 +35,7 @@ permissions:
   contents: write       # create tags, releases, branches, commits
   pull-requests: write  # open and update the Release PR
   issues: write         # comment on closed issues referenced by the release
+  actions: write        # dispatch the Docker workflow after cutting a release
 
 concurrency:
   group: release-please
@@ -44,8 +47,20 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Run release-please
+        id: release
         uses: googleapis/release-please-action@v4
         with:
           config-file: release-please-config.json
           manifest-file: .release-please-manifest.json
           token: ${{ secrets.GITHUB_TOKEN }}
+
+      # release-please publishes the GitHub Release as github-actions[bot]
+      # using this job's own GITHUB_TOKEN. GitHub suppresses workflow runs
+      # that would otherwise be chained from a GITHUB_TOKEN-authored event,
+      # so docker.yml's `on: release: published` trigger never fires for it.
+      # Dispatch it explicitly instead.
+      - name: Trigger Docker build
+        if: steps.release.outputs.release_created == 'true'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: gh workflow run docker.yml --ref main
