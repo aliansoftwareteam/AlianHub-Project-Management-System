@@ -234,6 +234,7 @@
                                     </div>
                                     <p class="acct-note" style="margin-top:8px">{{ minted ? $t('Accounts.cli_url_minted') : $t('Accounts.cli_url_guess') }}</p>
                                     <p class="acct-note">{{ $t('Accounts.cli_others_note') }}</p>
+                                    <a class="acct-note acct-guide-link" :href="claudeCodeGuide" target="_blank" rel="noopener" data-test="cli-guide-link">{{ $t('ClaudeCodeSetup.guide_short') }}</a>
                                 </div>
                             </section>
 
@@ -256,6 +257,7 @@
                                             </button>
                                             <button type="button" class="ah-btn ah-btn--ghost ah-btn--sm" @click="minted = null">{{ $t('Accounts.hide_token') }}</button>
                                         </div>
+                                        <ClaudeCodeNextSteps v-if="mintedFor === 'claude-code'" />
                                     </div>
 
                                     <template v-if="minting">
@@ -547,6 +549,8 @@ import { CHAT_GRANT, DOCS_GRANT, EXPIRY_OVER_MAX, TASKS_GRANT, TOKEN_SCOPES, can
 import { reasonOf } from "./useAgents";
 import { skillLabel } from "./plainLabels";
 import { mcpUrlFor } from "./mcpUrl";
+import ClaudeCodeNextSteps from "./ClaudeCodeNextSteps.vue";
+import { GUIDE, useDocsLink } from "@/composable/docsLink";
 import { isOwnerOrAdmin } from "@/utils/roles";
 import { AI_RIGHT, useAiRights } from "@/composable/aiRights";
 
@@ -598,6 +602,8 @@ const mintError = ref("");
 const expiryError = ref("");
 const scopeError = ref("");
 const minted = ref(null);
+const mintedFor = ref("");
+const claudeCodeGuide = useDocsLink(GUIDE.CLAUDE_CODE_DEVELOPER);
 const revoking = ref("");
 const revokeError = ref("");
 const renewing = ref("");
@@ -627,12 +633,12 @@ const accountMeta = computed(() => {
 
 const mcpUrl = computed(() => mcpUrlFor(companyId.value));
 const tokenForCommand = computed(() => (minted.value ? minted.value.token : "ah_pat_••••••••"));
-const setupCommand = computed(() => `claude mcp add --transport http alianhub "${mcpUrl.value}" --header "Authorization: Bearer ${tokenForCommand.value}"`);
+const setupCommand = computed(() => `claude mcp add --transport http alianhub --scope user "${mcpUrl.value}" --header "Authorization: Bearer ${tokenForCommand.value}"`);
 
 const cliLines = computed(() => {
     const lines = [
         { kind: "comment", text: `# ${t("Accounts.cli_comment_add")}` },
-        { kind: "cmd", text: "claude mcp add --transport http alianhub \\" },
+        { kind: "cmd", text: "claude mcp add --transport http alianhub --scope user \\" },
         { kind: "indent", text: `"${mcpUrl.value}" \\` },
         { kind: "indent", text: `--header "Authorization: Bearer ${tokenForCommand.value}"` }
     ];
@@ -833,6 +839,7 @@ const onMint = async () => {
     mintBusy.value = true;
     try {
         minted.value = await mintToken(body);
+        mintedFor.value = body.provider;
         minting.value = false;
         tokenForm.name = "";
         tokenForm.expiresInDays = defaultExpiryFor(tokenPolicy.value);
@@ -867,6 +874,7 @@ const onRenew = async (tk) => {
     renewError.value = "";
     try {
         minted.value = await renewToken(tk._id);
+        mintedFor.value = tk.provider || "";
     } catch (error) {
         renewError.value = error.message || t("Accounts.renew_failed");
     } finally {

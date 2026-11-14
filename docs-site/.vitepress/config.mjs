@@ -110,6 +110,7 @@ const ai = [
       { text: 'Audit log', link: '/ai/audit-log' },
       { text: 'Things to say', link: '/ai/things-to-say' },
       { text: 'Team packs and role agents', link: '/ai/team-packs' },
+      { text: 'Let Claude Code build your tasks', link: '/ai/claude-code-developer' },
     ],
   },
   {

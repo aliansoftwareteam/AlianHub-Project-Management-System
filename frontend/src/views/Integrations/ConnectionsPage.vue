@@ -187,7 +187,7 @@ const availableNames = computed(() => catalog.value
 
 const apiBase = computed(() => String(env.API_URI || "").replace(/\/$/, ""));
 const mcpUrl = computed(() => `${apiBase.value}/mcp?companyId=${cid.value || ""}`);
-const mcpCommand = computed(() => `claude mcp add alianhub --transport http ${mcpUrl.value} --header "Authorization: Bearer <token>"`);
+const mcpCommand = computed(() => `claude mcp add alianhub --scope user --transport http ${mcpUrl.value} --header "Authorization: Bearer <token>"`);
 
 const canConnectOwnAi = useAiRights().mayUse(AI_RIGHT.EXTERNAL_CLIENTS);
 
