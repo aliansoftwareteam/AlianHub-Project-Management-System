@@ -36,6 +36,14 @@
   demo.alianhub.com process since the reseed; this session has no server/ops access to do that (same
   limitation as the missing nightly cron, see task.md). The seeded data itself is correct and verified;
   only the live page needs that restart to show it.
+- **Proved it with a real local server against the same shared database** (not just raw queries): safety
+  check first (`Modules/Agents/init.js` reaps every "running" agent run across every company at startup —
+  confirmed 0 running runs across all 8 before starting anything). Added a temporary `.claude/launch.json`
+  entry (`node -r <dns-fix> index.js`, reverted after), started it, signed in with "Try the demo"
+  ("You belong to 8" — the correct, fresh count), and opened TechNova's and CareWell's dashboards:
+  **Logged vs estimate** showed real aggregates (-48%, -59%), **My time** correctly showed "No hours...
+  yet" on TechNova (the owner isn't assigned any task there) and real "2h 29m logged" on CareWell. This
+  is the exact page demo.alianhub.com will show once its own process restarts.
 
 ## Notes
 
