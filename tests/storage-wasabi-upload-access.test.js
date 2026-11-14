@@ -29,6 +29,7 @@ const express = require('express');
 const { __send: s3Send } = require('@aws-sdk/client-s3');
 const { verifyCompanyMembership } = require('../Config/jwt');
 const { MongoDbCrudOpration } = require('../utils/mongo-handler/mongoQueries');
+const { mayWriteProfileImage } = require('../Modules/storage/bucketAccess');
 
 const hex = () => crypto.randomBytes(12).toString('hex');
 const USER = hex();
@@ -137,6 +138,15 @@ describe('POST /api/v1/wasabi/uploadFile_64', () => {
         const res = await base64({ isUserProfile: true, path: `${USER}_1_a.png`, base64String: PNG });
         expect(res.status).toBe(200);
         expect(s3Send).toHaveBeenCalled();
+    });
+
+    // A timestamp once landed in front of the user id, so the name PUT /api/v1/user later
+    // checked with mayWriteProfileImage could never match its own uploader again.
+    it('stores the profile image under a name its own uploader may still point their profile at', async () => {
+        const res = await base64({ isUserProfile: true, path: `${USER}_1_a.png`, base64String: PNG });
+        expect(res.status).toBe(200);
+        const stored = s3Send.mock.calls.find(([command]) => command.name === 'PutObject')[0].input.Key;
+        expect(mayWriteProfileImage(USER, stored)).toBe(true);
     });
 });
 
