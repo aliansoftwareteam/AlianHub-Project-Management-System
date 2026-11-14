@@ -86,6 +86,7 @@
                                 <p v-if="turn.status === 'stopped'" class="ah-small" data-test="ask-stopped">{{ $t('Ask.stopped') }}</p>
                                 <p v-else-if="turn.status === 'error'" class="ah-field__error" data-test="ask-turn-error">{{ turn.error }}</p>
                                 <p v-else-if="turn.status === 'empty' || turn.status === 'unconfigured'" class="ah-empty">{{ turn.error }}</p>
+                                <AskConnectorNotes v-if="turn.connectors" :connectors="turn.connectors" />
                             </li>
                         </ol>
 
@@ -352,9 +353,9 @@
 
 <script setup>
 import AiModelNotice from '@/components/molecules/AiUnavailable/AiModelNotice.vue';
-import { computed, inject, nextTick, onBeforeUnmount, onMounted, ref, watch } from "vue";
+import { computed, inject, nextTick, onBeforeUnmount, onMounted, ref, unref, watch } from "vue";
 import { useI18n } from "vue-i18n";
-import { useRoute } from "vue-router";
+import { useRoute, useRouter } from "vue-router";
 import { useToast } from "vue-toast-notification";
 import { apiRequest } from "@/services";
 import * as env from "@/config/env";
@@ -375,6 +376,8 @@ import { useAskConversation } from "./useAskConversation";
 import { MENU_ID, useAskComposer } from "./useAskComposer";
 import { MENTION_KIND_LOOK, mentionIcon } from "./askMentionLook";
 import AskComposerMenu from "./AskComposerMenu.vue";
+import AskConnectorNotes from "./AskConnectorNotes.vue";
+import { providerLabel } from "@/views/Integrations/connectorLabels";
 import AskStarters from "./AskStarters.vue";
 import AskPlanCard from "./AskPlanCard.vue";
 
@@ -388,7 +391,7 @@ const BACKLOG_LIMIT = 100;
 const THREAD_LIMIT = 50;
 const TURN_LIMIT = 30;
 
-const { t } = useI18n();
+const { t, te } = useI18n();
 const $toast = useToast();
 const companyId = inject("$companyId");
 const { agents, registryManifest, runs, routable, loadAgents, loadRegistry, loadRuns, loadRoutable, startRun } = useParity();
@@ -405,6 +408,7 @@ watch(maySeeSkills, (allowed) => {
 const { turns, threadId, threads, threadsLoading, streaming, announcement, send, plan, decidePlan, stop, newQuestion, loadThreads, openThread, removeThread, seed } = useAskConversation({ t });
 
 const route = useRoute();
+const router = useRouter();
 const tab = ref("ask");
 const question = ref(typeof route?.query?.q === "string" ? route.query.q : "");
 const mode = ref("ask");
@@ -432,7 +436,8 @@ const recorder = ref(null);
 
 const read = computed(() => backlogRead(routable.value));
 const reach = computed(() => skillReach(skillManifest.value, routable.value));
-const composer = useAskComposer({ question, box: questionBox, skills: reach, companyId, projectId });
+const openConnections = () => router && router.push({ name: "Connections", params: { cid: unref(companyId) } });
+const composer = useAskComposer({ question, box: questionBox, skills: reach, companyId, projectId, label: (id) => providerLabel(t, te, id), onConnect: openConnections });
 const scopedProjectName = computed(() => ((sources.value.projects || []).find((p) => p.id === projectId.value) || {}).name || "");
 
 const providerReady = computed(() => sources.value.configured !== false);
@@ -631,6 +636,7 @@ onBeforeUnmount(stop);
 
 onMounted(async () => {
     loadThreads();
+    composer.loadConnectors();
     const [sourceRes, modelRes] = await Promise.all([
         apiRequest("get", env.AI_ASK_SOURCES).catch(() => null),
         apiRequest("get", `${env.AGENT_MODELS}?configured=true`).catch(() => null)

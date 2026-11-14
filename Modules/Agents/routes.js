@@ -23,6 +23,7 @@ exports.init = (app) => {
     // JWT + companyId: setMiddleware lists the /api/v2/agents prefix. Literal paths
     // come before /:id so they are never swallowed by the param route.
     app.get('/api/v2/agents/registry', ctrl.getRegistry);
+    app.get('/api/v2/agents/connectors', ctrl.getConnectors);
     app.get('/api/v2/agents/manifest', skillsCtrl.agentManifest);
     app.get('/api/v2/agents/spend', ctrl.spend);
     app.get('/api/v2/agents/team', ctrl.teamBoard);

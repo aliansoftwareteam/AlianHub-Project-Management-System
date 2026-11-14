@@ -51,7 +51,7 @@ const paramsFor = (reader, given = {}) => {
     const out = {};
     Object.entries(spec).forEach(([name, rule]) => {
         const raw = given[name];
-        if (rule.type === 'number') {
+        if (rule.type === 'number' || rule.type === 'integer') {
             const n = Number(raw);
             out[name] = Number.isFinite(n) ? Math.min(rule.max, Math.max(rule.min, Math.round(n))) : rule.default;
         } else if (rule.type === 'boolean') {
@@ -132,6 +132,13 @@ const declaredRead = (reader) => async (companyId, { task, input, declaredHosts,
         return { skip: `the read of ${host} did not answer JSON` };
     }
 };
+
+/* `connectors` is what the run's agent has ticked; the runner refuses a tool missing from it. */
+const connectorReaders = () => Object.fromEntries(require('../../Connectors/tools').reads().filter((tool) => !tool.custom).map((tool) => [tool.key, async (companyId, { runId, actor, allowedActions, connectors }, params) => {
+    await require('../actions').authorizeRead({ companyId, actor, action: tool.key, params: {}, allowedActions });
+    const runner = require('../../Connectors/toolRunner');
+    return runner.read({ companyId, userId: actor && actor.userId, via: runner.VIA.AGENT, runId, callerId: String((actor && actor.agentId) || ''), agentConnectors: connectors, key: tool.key, input: params });
+}]));
 
 const READERS = Object.freeze({
     async task(companyId, { task }, params) {
@@ -279,13 +286,11 @@ const READERS = Object.freeze({
         };
     },
 
-    'slack.channel'(companyId, { runId, actor, allowedActions }, params) {
-        return require('../connectors/slackRead').read({ companyId, runId, actor, allowedActions, params });
-    },
-
     url: declaredRead('url'),
 
     api: declaredRead('api'),
+
+    ...connectorReaders(),
 });
 
 const read = (reader, companyId, scope, params) => {

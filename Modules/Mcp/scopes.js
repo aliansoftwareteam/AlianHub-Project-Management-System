@@ -35,6 +35,8 @@ const scopeForTool = (name) => {
     if (enabled() && Object.prototype.hasOwnProperty.call(manageTools.SCOPES, name)) return manageTools.SCOPES[name];
     const workTools = require('./workTools');
     if (workFlag.enabled() && Object.prototype.hasOwnProperty.call(workTools.SCOPES, name)) return workTools.SCOPES[name];
+    const connectorTools = require('./connectorTools');
+    if (Object.prototype.hasOwnProperty.call(connectorTools.SCOPES, name)) return connectorTools.SCOPES[name];
     const sessionTools = require('./sessionTools');
     return sessionTools.owns(name) ? sessionTools.SCOPES[name] : null;
 };

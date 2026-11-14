@@ -62,7 +62,7 @@ const logger = require('../Config/loggerConfig');
 const { ROLE_OWNER, ROLE_ADMIN, ROLE_MEMBER, isPrivileged } = require('../Config/roleTypes');
 
 const { RULES } = require('../Modules/storage/changeScope');
-const cloud = require('../Modules/CloudStorage/controller');
+const picker = require('../Modules/Connectors/pickerController');
 
 const CID = crypto.randomBytes(12).toString('hex');
 const OTHER_COMPANY = crypto.randomBytes(12).toString('hex');
@@ -673,11 +673,11 @@ describe('importing a cloud file', () => {
         process.env.STORAGE_TYPE = SERVER;
         const answers = [];
         const res = { status: () => res, send: (body) => { answers.push(body); return res; } };
-        await cloud.importFile({
+        await picker.importFile({
             uid,
             aud: CID,
             headers: { companyid: CID },
-            params: { provider: 'dropbox' },
+            params: { source: 'dropbox' },
             body: { fileId: 'file-1', filename: 'handover.pdf', path: filePath, downloadUrl: 'https://dl.dropboxusercontent.com/s/abc/handover.pdf' },
         }, res);
         return answers[0];

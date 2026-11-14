@@ -64,8 +64,10 @@
                         <span class="ah-field__label">{{ $t('Ai.skill_gather') }}</span>
                         <span class="ah-field__hint">{{ $t('Ai.skill_gather_hint') }}</span>
                         <div v-for="(step, i) in form.gather" :key="`g${i}`" class="sk-editor__step">
-                            <select v-model="step.reader" class="ah-input ah-mono" :aria-label="$t('Ai.skill_reader')" @change="keepParams(step)">
-                                <option v-for="reader in catalogues.readers || []" :key="reader.key" :value="reader.key">{{ reader.key }}</option>
+                            <select v-model="step.reader" class="ah-input ah-mono" :aria-label="$t('Ai.skill_reader')" data-test="gather-reader" @change="keepParams(step)">
+                                <optgroup v-for="group in readerGroups(catalogues)" :key="group.key" :label="groupLabel(group)">
+                                    <option v-for="reader in group.readers" :key="reader.key" :value="reader.key">{{ reader.key }}</option>
+                                </optgroup>
                             </select>
                             <input v-model.trim="step.as" type="text" class="ah-input ah-mono" :aria-label="$t('Ai.skill_gather_as')" :placeholder="step.reader" />
                             <button type="button" class="ah-btn ah-btn--ghost ah-btn--sm" :aria-label="$t('Ai.remove')" @click="form.gather.splice(i, 1)">
@@ -84,6 +86,17 @@
                                 :inputs="form.inputs"
                                 :error-for="errorFor"
                                 @set="(name, value) => (step.params[name] = value)"
+                            />
+                            <SkillConnectorRead
+                                v-else-if="isConnectorReader(catalogues, step.reader)"
+                                :index="i"
+                                :reader="readerOf(catalogues, step.reader)"
+                                :params="step.params"
+                                :optional="step.optional"
+                                :as="step.as || step.reader"
+                                :error-for="errorFor"
+                                @set="(name, value) => (step.params[name] = value)"
+                                @optional="(value) => (step.optional = value)"
                             />
                         </div>
                         <button type="button" class="ah-btn ah-btn--secondary ah-btn--sm" @click="addGather">{{ $t('Ai.skill_add_reader') }}</button>
@@ -198,7 +211,8 @@ import { apiRequest, apiRequestWithoutCompnay } from "@/services";
 import * as env from "@/config/env";
 import { useAgents, reasonOf } from "./useAgents";
 import SkillDeclaredRead from "./SkillDeclaredRead.vue";
-import { isExternalReader, offersExternalReads, paramsKeptFor, paramsToSave, readErrorText, readerOf } from "./declaredReads";
+import SkillConnectorRead from "./SkillConnectorRead.vue";
+import { isConnectorReader, isExternalReader, offersExternalReads, paramsKeptFor, paramsToSave, readErrorText, readerGroups, readerOf } from "./declaredReads";
 
 defineOptions({ name: "SkillEditor" });
 
@@ -229,7 +243,7 @@ const form = reactive({
     risk: props.skill?.risk || "",
     enabled: props.skill?.enabled !== false,
     inputs: [...(props.skill?.inputs || [])],
-    gather: (props.skill?.gather || []).map((s) => ({ reader: s.reader, as: s.as || s.reader, params: { ...(s.params || {}) } })),
+    gather: (props.skill?.gather || []).map((s) => ({ reader: s.reader, as: s.as || s.reader, params: { ...(s.params || {}) }, optional: s.optional === true })),
     partials: [...(props.skill?.prompt?.partials || [])],
     instructions: props.skill?.prompt?.instructions || "",
     template: props.skill?.prompt?.template || "",
@@ -255,6 +269,7 @@ const computedRisk = computed(() => form.emit.reduce((worst, m) => {
 }, "low"));
 
 const fieldsOf = (reader) => ((props.catalogues.readers || []).find((r) => r.key === reader)?.fields || []).join(", ");
+const groupLabel = (group) => (group.app ? t("Ai.skill_readers_app", { app: group.app }) : t(`Ai.skill_readers_${group.key}`));
 const errorFor = (field) => readErrorText(errors.value.find((e) => e.field === field), t, { catalogues: props.catalogues, gather: form.gather });
 
 const placeholders = computed(() => [...form.inputs.map((key) => `input.${key}`), ...(props.catalogues.taskFields || []).map((field) => `task.${field}`)]);
@@ -288,7 +303,7 @@ const togglePartial = (key) => {
 
 const addGather = () => {
     const first = (props.catalogues.readers || [])[0];
-    if (first) form.gather.push({ reader: first.key, as: first.key.replace(/\W/g, "_"), params: {} });
+    if (first) form.gather.push({ reader: first.key, as: first.key.replace(/\W/g, "_"), params: {}, optional: false });
 };
 
 const addEmit = () => {
@@ -316,7 +331,12 @@ const body = () => ({
     model: form.model || null,
     ...(form.risk ? { risk: form.risk } : {}),
     inputs: [...form.inputs],
-    gather: form.gather.map((s) => ({ reader: s.reader, as: s.as || s.reader, params: paramsToSave(props.catalogues, s.reader, s.params) })),
+    gather: form.gather.map((s) => ({
+        reader: s.reader,
+        as: s.as || s.reader,
+        params: paramsToSave(props.catalogues, s.reader, s.params),
+        ...(s.optional && isConnectorReader(props.catalogues, s.reader) ? { optional: true } : {})
+    })),
     prompt: { partials: [...form.partials], instructions: form.instructions, template: form.template, output: form.output, maxTokens: props.skill?.prompt?.maxTokens || undefined },
     emit: form.emit.map((m) => ({ action: m.action, ...(m.each ? { each: m.each } : {}), params: { ...m.params } })),
     ...(form.summary ? { summary: form.summary } : {}),

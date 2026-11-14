@@ -27,20 +27,26 @@ const mediaBlocks = (css, query) => {
 
 const phone = (css) => mediaBlocks(css, '@media (max-width: 767px)');
 
-describe('Connections on a phone', () => {
-    const css = read('views/Integrations/connections.css');
-    const vue = read('views/Integrations/ConnectionsPage.vue');
+describe('Connectors on a phone', () => {
+    const tab = read('views/Integrations/ConnectorsTab.vue');
+    const page = read('views/Ai/CustomizePage.vue');
+    const drawer = read('views/Integrations/ConnectorDetail.vue');
 
-    test('the single column cannot be widened by the one-line CLI command', () => {
-        expect(ruleBody(mediaBlocks(css, '@media (max-width: 900px)'), '.conn__grid')).toMatch(/grid-template-columns:\s*minmax\(0,\s*1fr\)/);
+    test('a card column is never wider than the screen', () => {
+        expect(ruleBody(tab, '.cx-grid')).toMatch(/minmax\(min\(240px,\s*100%\),\s*1fr\)/);
     });
 
-    test('the toolbar wraps, with the tabs on a row of their own', () => {
-        expect(ruleBody(phone(css), '.ah-page.conn .ah-toolbar')).toMatch(/flex-wrap:\s*wrap/);
-        expect(ruleBody(phone(css), '.ah-page.conn .ah-toolbar')).toMatch(/height:\s*auto/);
-        expect(ruleBody(phone(css), '.conn__tabs')).toMatch(/order:\s*1/);
-        expect(vue).toMatch(/class="ah-tabs conn__tabs"/);
-        expect(vue).not.toMatch(/class="ah-tabs"\s+style=/);
+    test('the search and the category take the whole row', () => {
+        expect(ruleBody(mediaBlocks(tab, '@media (max-width: 640px)'), '.cx-search__input')).toMatch(/width:\s*100%/);
+    });
+
+    test('the tabs scroll on their own row rather than widen the page', () => {
+        expect(ruleBody(page, '.cz__tabs')).toMatch(/max-width:\s*100%/);
+        expect(ruleBody(page, '.cz__tabs')).toMatch(/overflow-x:\s*auto/);
+    });
+
+    test('the detail panel fits the screen', () => {
+        expect(ruleBody(drawer, '.cx-drawer')).toMatch(/max-width:\s*100%/);
     });
 });
 

@@ -305,11 +305,11 @@ describe('signing in from a project', () => {
         expect((await call(github.authorize, MEMBER, { query: { projectId: P1 } })).code).toBe(403);
     });
 
-    it('without a project still comes back to App connections', async () => {
+    it('without a project comes back to the GitHub section of Integrations', async () => {
         const r = await call(github.authorize, OWNER, { headers: { origin: 'http://localhost:8080' } });
         const back = res();
         github.callback({ query: { state: stateFrom(r), code: 'code-1' }, headers: {} }, back);
-        expect(back.location).toContain(`/#/${COMPANY}/app-connections?github=complete`);
+        expect(back.location).toContain(`/#/${COMPANY}/integrations?section=github&github=complete`);
     });
 });
 

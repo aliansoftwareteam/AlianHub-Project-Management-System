@@ -4,6 +4,7 @@ const { MongoDbCrudOpration } = require('../../utils/mongo-handler/mongoQueries'
 const logger = require('../../Config/loggerConfig');
 const socketEmitter = require('../../event/socketEventEmitter');
 const registry = require('./registry');
+const agentConnectors = require('./agentConnectors');
 const runs = require('./runs');
 const { TYPE_LIST: PROVIDER_ERROR_TYPES } = require('../AICore/providerError');
 const proposals = require('./proposals');
@@ -165,6 +166,7 @@ const agentPatchFields = (body) => {
     if (body.description !== undefined) set.description = String(body.description).slice(0, 1000);
     if (body.skills !== undefined && Array.isArray(body.skills)) set.skills = body.skills.slice(0, 20).map(normaliseSkill).filter(Boolean);
     if (body.allowedActions !== undefined && Array.isArray(body.allowedActions)) set.allowedActions = registry.allowedActionsToStore(body.allowedActions);
+    if (body.connectors !== undefined) set.connectors = agentConnectors.toStore(body.connectors);
     if (body.projectIds !== undefined && Array.isArray(body.projectIds)) set.projectIds = body.projectIds.filter((id) => OBJECT_ID.test(String(id))).map(String);
     if (body.autonomy !== undefined) set.autonomy = autonomyOf(body.autonomy);
     if (body.spendCapUsd !== undefined) set.spendCapUsd = Math.max(0, Number(body.spendCapUsd) || 0);
@@ -190,6 +192,17 @@ const refuseBuiltInEdit = (res, agent, set) => {
 
 /* GET /api/v2/agents/registry */
 exports.getRegistry = (req, res) => res.send({ status: true, statusText: 'Registry fetched.', data: require('./actions').manifest() });
+
+/* GET /api/v2/agents/connectors — the connected apps this workspace offers, each with the tools an agent can be given */
+exports.getConnectors = async (req, res) => {
+    try {
+        const companyId = companyOf(req);
+        if (!companyId) return fail(res, 'companyId is required.');
+        const caller = await callerOf(req, companyId);
+        if (!caller.human) return fail(res, 'Agents cannot read which apps agents may use.', 403);
+        return res.send({ status: true, statusText: 'Connectors fetched.', data: { providers: await agentConnectors.offered(companyId) } });
+    } catch (e) { logger.error(`getConnectors: ${e.message}`); return fail(res, 'Something went wrong.', 500); }
+};
 
 /* GET /api/v2/agents */
 exports.listAgents = async (req, res) => {
@@ -242,7 +255,7 @@ exports.createAgent = async (req, res) => {
         const saved = await MongoDbCrudOpration(companyId, {
             type: SCHEMA_TYPE.AGENTS,
             data: {
-                autonomy: 1, spendCapUsd: 30, rateLimitPerDay: DEFAULT_RATE_LIMIT_PER_DAY, paused: false, account: 'workspace', deletedStatusKey: 0, projectIds: [],
+                autonomy: 1, spendCapUsd: 30, rateLimitPerDay: DEFAULT_RATE_LIMIT_PER_DAY, paused: false, account: 'workspace', deletedStatusKey: 0, projectIds: [], connectors: [],
                 visibility: audience.VISIBILITY.PRIVATE, ...set, ownerId: actor.userId, ...(asks ? { approval: agentApproval.requested(actor) } : {}),
             },
         }, 'save');
@@ -854,7 +867,8 @@ exports.createProposal = async (req, res) => {
         const agent = await runs.getAgent(companyId, agentId);
         if (!agent) return fail(res, 'Agent not found.', 404);
         if (!proposalText.words(b.what)) return fail(res, 'what is required: say in one sentence what the proposal does.');
-        if (actor.tokenId && require('./connectors/slackPost').hasSlackChange(b.changes)) return fail(res, 'A Slack message is proposed only by a workspace agent\'s own run, not through a token.', 403);
+        const connectorWrites = require('../Connectors/writes');
+        if (connectorWrites.hasWrite(b.changes)) return fail(res, connectorWrites.REFUSAL.TOKEN_FILED, 403);
         const runId = b.runId || actor.runId;
         const open = await proposalFiling.namesOnlyOpenThings(companyId, actor.userId, b) && (!runId || await proposalFiling.ownRun(companyId, actor.userId, agentId, runId));
         if (!open) return fail(res, NAMED_NOT_FOUND, 404);
@@ -892,7 +906,7 @@ const decide = (action, fn, heldTo = null) => async (req, res) => {
         if (!decidesProposals(caller)) return fail(res, REFUSAL.DECIDE_MEMBER, 403, refusalOf({ reason: 'not_permitted' }));
         const held = heldTo ? await heldTo(companyId, caller, proposal) : null;
         if (held) return fail(res, held.error, held.status, refusalOf(held));
-        const out = await fn(companyId, req.params.id, { decider: caller.actor, isPrivileged: caller.privileged, changes: req.body && req.body.changes, parts: req.body && req.body.parts, reason: req.body && req.body.reason, ip: req.ip || '', always: Boolean(req.body) && req.body.always === true, viaToken: Boolean(req.apiToken) });
+        const out = await fn(companyId, req.params.id, { decider: caller.actor, isPrivileged: caller.privileged, changes: req.body && req.body.changes, parts: req.body && req.body.parts, revision: req.body ? req.body.revision : undefined, reason: req.body && req.body.reason, ip: req.ip || '', always: Boolean(req.body) && req.body.always === true, viaToken: Boolean(req.apiToken) });
         if (out.error) return fail(res, out.error, out.status || 400, refusalOf(out));
         return res.send({ status: true, statusText: action === 'proposal.approve' ? approvalText(out) : 'Done.', data: out });
     } catch (e) { logger.error(`proposal decision: ${e.message}`); return fail(res, e.message, 500); }

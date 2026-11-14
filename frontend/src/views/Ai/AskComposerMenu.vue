@@ -40,6 +40,7 @@
                     <ShellIcon :name="KINDS[item.kind].icon" :size="13" class="ask-menu__icon" />
                     <span class="ask-menu__title">{{ item.title }}</span>
                     <span v-if="item.sub" class="ask-menu__sub">{{ item.sub }}</span>
+                    <span v-if="item.kind === 'connector' && !item.connected" class="ask-menu__connect" data-test="ask-menu-connect">{{ $t('Ask.connector_connect') }}</span>
                 </li>
             </ul>
         </div>
@@ -89,5 +90,6 @@ const emptyText = computed(() => {
 .ask-menu__title { font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
 .ask-menu__sub { flex: 1; min-width: 0; color: var(--ink-2); font: var(--text-small); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .ask-menu__empty { margin: 0; padding: 4px; color: var(--ink-2); font: var(--text-small); }
+.ask-menu__connect { margin-left: auto; color: var(--brand); font: var(--text-small); font-weight: 600; white-space: nowrap; }
 .ask-menu__keys { margin: 0; padding: 4px 4px 0; color: var(--ink-2); font: var(--text-small); }
 </style>

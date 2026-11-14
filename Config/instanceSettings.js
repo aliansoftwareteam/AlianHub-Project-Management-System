@@ -236,6 +236,7 @@ function publicConfig() {
         analytics: { gaMeasurementId: require('./googleAnalytics').measurementIdOf(process.env) },
         demoMode: env('DEMO_MODE') === 'true',
         mcpOAuth: require('../Modules/OAuthServer/config').isOn(process.env),
+        connectors: require('../Modules/Connectors/registry').switchedOn().length > 0,
         hosting: { mode: hostingMode.mode(), portalUrl: hostingMode.portalUrl(), ...(hostingMode.isManaged() ? hostedLifecycle() : {}) },
     };
 }

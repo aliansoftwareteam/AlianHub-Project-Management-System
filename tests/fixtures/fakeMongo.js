@@ -142,8 +142,8 @@ const isOperatorObject = (v) => v && typeof v === 'object' && !(v instanceof Dat
 
 /* An upsert inserts the filter's plain equality fields, then $setOnInsert, then the update. */
 const upserted = (filter = {}, update = {}) => {
-    const equalities = Object.entries(filter).filter(([key, value]) => !key.startsWith('$') && !key.includes('.') && !isOperatorObject(value));
-    const doc = { _id: nextId(), ...Object.fromEntries(equalities) };
+    const equalities = Object.entries(filter).filter(([key, value]) => !key.startsWith('$') && !isOperatorObject(value));
+    const doc = apply({ _id: nextId() }, { $set: Object.fromEntries(equalities) });
     return apply(apply(doc, { $set: update.$setOnInsert || {} }), update);
 };
 

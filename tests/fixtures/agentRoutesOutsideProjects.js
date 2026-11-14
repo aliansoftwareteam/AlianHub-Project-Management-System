@@ -39,7 +39,7 @@ const OUTSIDE_EVERY_PROJECT = {
         'POST /api/v1/deleteUserChat', 'PUT /api/v1/ai/ask/threads/:id', 'PUT /api/v1/ai/feedback', 'POST /api/v1/removeCache',
         'PUT /api/v1/timesheet/workload-capacity', 'PUT /api/v1/user', 'POST /api/v2/recent-visits',
         'PUT /api/v2/users/favourites', 'PUT /api/v2/users/favourites/order', 'PUT /api/v2/users/home-cards', 'PUT /api/v2/users/nav-preferences', 'PUT /api/v2/users/onboarding',
-        'PUT /api/v1/cloud-storage/settings/:provider', 'POST /api/v1/github/access-token', 'POST /api/v1/gitlab/access-token', 'POST /api/v1/google/access-token',
+        'POST /api/v1/github/access-token', 'POST /api/v1/gitlab/access-token', 'POST /api/v1/google/access-token',
     ],
     'signs a person in or out, or takes a public link, a form or a webhook: no token is read': [
         'POST /api/v1/auth/loginAuthTracker', 'POST /api/v1/verifyToken', 'POST /api/v2/auth/2fa/validate', 'POST /api/v2/auth/forgot-password',
@@ -76,7 +76,7 @@ const OUTSIDE_EVERY_PROJECT = {
     'stores or reads a file under the bucket\'s own rule; a task route attaches it': [
         'PATCH /api/v1/updateBucket/:bucketId', 'POST /api/v1/createBucket', 'POST /api/v1/getTaskTypeImage', 'POST /api/v1/getUserProfile',
         'POST /api/v1/storage/uploadFile', 'POST /api/v1/storage/uploadFileBase64', 'POST /api/v1/admin/wasabi/retriveObject', 'POST /api/v1/wasabi/retriveObject',
-        'POST /api/v1/wasabi/uploadFile', 'POST /api/v1/wasabi/uploadFile_64', 'POST /api/v1/cloud-storage/:provider/import',
+        'POST /api/v1/wasabi/uploadFile', 'POST /api/v1/wasabi/uploadFile_64',
     ],
 };
 

@@ -12,9 +12,8 @@ const path = require('path');
 // and without throwing — a caller would store a record pointing at a file that
 // was never created.
 //
-// The shape below mirrors Modules/CloudStorage/controller.js's storeImportedFile,
-// which solved the same problem first; that copy is left in place rather than
-// rewired, since it works and this is additive.
+// The shape below mirrors storeImportedFile in Modules/Connectors/pickerController.js,
+// which solves the same problem for the attachment picker's imports.
 
 const STORAGE_ROOT = path.join(__dirname, '..', 'storage');
 

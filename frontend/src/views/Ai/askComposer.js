@@ -53,8 +53,9 @@ export function mentionItems(data) {
 const sameItem = (a, b) => a.kind === b.kind && a.id === b.id;
 
 /* Rows grouped by kind in picker order, without repeats or what is already attached; `first` (recent picks)
- * lead their group when they match the query. Each row keeps its place in the flat list for the keyboard. */
-export function groupMentions(items, { first = [], taken = [], query = "" } = {}) {
+ * lead their group when they match the query, and `apps` (from connectorResults) come before every group.
+ * Each row keeps its place in the flat list for the keyboard. */
+export function groupMentions(items, { first = [], taken = [], query = "", apps = [] } = {}) {
     const q = String(query || "").toLowerCase();
     const leading = (first || []).filter((item) => !q || String(item.title || "").toLowerCase().includes(q));
     const flat = [];
@@ -63,16 +64,18 @@ export function groupMentions(items, { first = [], taken = [], query = "" } = {}
         if (flat.some((kept) => sameItem(kept, item)) || (taken || []).some((chip) => sameItem(chip, item))) return;
         flat.push(item);
     });
-    const ordered = MENTION_KINDS.flatMap((kind) => flat.filter((item) => item.kind === kind));
-    const groups = MENTION_KINDS
+    const ordered = [...(apps || []).filter((app) => app && app.kind === "connector"), ...MENTION_KINDS.flatMap((kind) => flat.filter((item) => item.kind === kind))];
+    const groups = ["connector", ...MENTION_KINDS]
         .map((kind) => ({ kind, items: ordered.map((item, index) => ({ item, index })).filter(({ item }) => item.kind === kind) }))
         .filter((group) => group.items.length);
     return { items: ordered, groups };
 }
 
+const CONTEXT_KINDS = Object.freeze([...MENTION_KINDS, "connector"]);
+
 /* What the stream route takes for the attached chips: kind and id only. */
 export function contextPayload(chips) {
-    return (chips || []).filter((chip) => chip && MENTION_KINDS.includes(chip.kind) && chip.id).slice(0, MAX_CONTEXT).map(({ kind, id }) => ({ kind, id: String(id) }));
+    return (chips || []).filter((chip) => chip && CONTEXT_KINDS.includes(chip.kind) && chip.id).slice(0, MAX_CONTEXT).map(({ kind, id }) => ({ kind, id: String(id) }));
 }
 
 const storeOf = (storage) => {
@@ -109,6 +112,72 @@ export function rememberMention(companyId, item, storage) {
     } catch {
         /* a full or blocked storage only loses the recent list */
     }
+}
+
+export const CONNECTOR_LIMIT = 6;
+const NAME_MIN = 2;
+const WORD_EDGE = "[\\p{L}\\p{N}_]";
+/* A reference only one app owns names that app as its name would (decision 25 of task 056). */
+const OWNED_REFS = Object.freeze({
+    github: [/github\.com\/[\w.-]+\/[\w.-]+\/pull\/\d+/i, /(?:^|[^\w./-])[\w-]+\/[\w.-]+#\d+(?!\d)/]
+});
+
+const escapeRx = (text) => text.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+const sameChip = (a, b) => a.kind === b.kind && a.id === b.id;
+
+export function connectorsOf(data, label = (id) => id) {
+    const found = data || {};
+    const held = new Set((Array.isArray(found.connections) ? found.connections : []).filter((c) => c && c.connected).map((c) => c.provider));
+    return (Array.isArray(found.providers) ? found.providers : [])
+        .filter((p) => p && typeof p.provider === "string" && p.provider)
+        .map((p) => ({ id: p.provider, name: String(label(p.provider) || p.provider), connected: held.has(p.provider) }));
+}
+
+export function connectorResults(connectors, query, taken = []) {
+    const q = String(query || "").toLowerCase();
+    const listed = (connectors || [])
+        .filter((c) => c && c.id && c.name && !taken.some((chip) => sameChip(chip, { kind: "connector", id: c.id })))
+        .filter((c) => !q || c.name.toLowerCase().includes(q) || c.id.includes(q));
+    return [...listed.filter((c) => c.connected), ...listed.filter((c) => !c.connected)]
+        .slice(0, CONNECTOR_LIMIT)
+        .map((c) => ({ kind: "connector", id: c.id, title: c.name, connected: Boolean(c.connected) }));
+}
+
+export function namedConnectors(text, connectors) {
+    const value = String(text == null ? "" : text);
+    return (connectors || [])
+        .filter((c) => c && c.connected && c.id)
+        .filter((c) => (String(c.name || "").trim().length >= NAME_MIN && new RegExp(`(?<!${WORD_EDGE})${escapeRx(c.name.trim())}(?!${WORD_EDGE})`, "iu").test(value))
+            || (OWNED_REFS[c.id] || []).some((rx) => rx.test(value)))
+        .map((c) => c.id);
+}
+
+const NOTE_KEYS = Object.freeze({
+    not_connected: "Ask.connector_not_connected",
+    broken: "Ask.connector_broken",
+    provider_off: "Ask.connector_off",
+    scope_missing: "Ask.connector_scope_missing",
+    session_only: "Ask.connector_session_only",
+    unknown_tool: "Ask.connector_unknown_tool",
+    bad_input: "Ask.connector_bad_input",
+    too_many: "Ask.connector_too_many",
+    char_cap: "Ask.connector_char_cap",
+    pick_failed: "Ask.connector_pick_failed",
+    nothing_read: "Ask.connector_nothing_read",
+    not_allowed: "Ask.connector_not_allowed",
+    failed: "Ask.connector_failed"
+});
+
+export const connectorNoteKey = (code) => (Object.prototype.hasOwnProperty.call(NOTE_KEYS, code) ? NOTE_KEYS[code] : "");
+
+/* A chip added by typing goes when the name is no longer typed; one the asker removed stays removed until the box is reset. */
+export function withNamedChips(chips, text, connectors, dismissed = []) {
+    const named = namedConnectors(text, connectors);
+    const kept = (chips || []).filter((chip) => !(chip.auto && !named.includes(chip.id)));
+    const added = named
+        .filter((id) => !dismissed.includes(id) && !kept.some((chip) => sameChip(chip, { kind: "connector", id })))
+        .map((id) => ({ kind: "connector", id, title: connectors.find((c) => c.id === id).name, auto: true }));
+    return [...kept, ...added.slice(0, Math.max(0, MAX_CONTEXT - kept.length))];
 }
 
 const CITE = /\[([^\]\n]{1,80})\](?!\()/g;

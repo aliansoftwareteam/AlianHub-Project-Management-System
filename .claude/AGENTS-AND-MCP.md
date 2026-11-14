@@ -53,6 +53,7 @@ A change that waits is a proposal (`Modules/Agents/proposals.js`). It says what,
 - **Daily look** (`Modules/Agents/manager/`): rules find slipping, blocked, stale and unowned work and file proposals. It changes nothing itself.
 - **Triage of new tasks** (`Modules/Agents/managerTriage.js`, kept apart from the daily look so the look stays model-free): on a switched-on project's working day, one call to the server's configured, priced model for a batch of new tasks suggests a priority, an estimate and a likely duplicate. Each is a finding and a proposal a person accepts; the manager is at Suggest. It skips with AI off, no priced provider or the spend cap reached, and its calls are booked under `project_triage`. Task text and the model's answer are data.
 - **Per-project limits and pause**: `Modules/Agents/projectLimits.js`.
+- **Connector ticks** (`Modules/Agents/agentConnectors.js`, task 098): a built-in agent reads from or proposes to a connected app only with that tool ticked on its `connectors`; none ticked means none. `toolRunner.read` refuses an unticked read, `narrowChanges` drops an unticked write, and `proposals.create` refuses one that slipped past. The connection used is always the run's `startedBy`, never the agent's maker.
 
 ---
 
@@ -183,7 +184,7 @@ These are the rules in `Tasks/active/047-ai-run/task.md`, as the code keeps them
 | `MCP_TOOLS_WORK` | `Modules/Mcp/workFlag.js` | Tags, relations, lists, doc comments, goals, setup, project create, automation, queue |
 | `MCP_TOOLS_V2` | `Modules/Mcp/v2Flag.js` | Names beside ids, paged lists, annotations, approval for a write that reaches the whole workspace (a goal's target) |
 | `AGENT_PERFORMANCE_READ` | `Modules/Agents/performanceFlag.js` | `performance.read` |
-| `CONNECTORS` | `Modules/Agents/connectors/flag.js` | Slack and Google Calendar connectors |
+| `CONNECTORS` | `Modules/Agents/connectors/flag.js` | The connector providers members connect their own accounts to (`google`, `slack`, `dropbox`, `github` and the MCP apps), with their tools; see `docs/connectors/` |
 | `AGENT_TAINT_ROUTING` | `Modules/Agents/taint.js` | Risky writes after outside content wait for a person |
 | `MCP_OAUTH` | `Modules/OAuthServer/config.js` | Sign-in for outside MCP clients |
 | `EXTERNAL_AGENT_SESSIONS` | `Modules/AgentSessions/config.js` | Hand a task to an approved outside agent |

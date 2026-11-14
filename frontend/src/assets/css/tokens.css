@@ -114,6 +114,8 @@
     /* A project's letter tile sits on a colour the person picked, in either theme; the scrim keeps white letters
        readable on every colour the app offers (#6473e8 goes from 4.07:1 to 6.5:1). */
     --tile-ink: #ffffff;
+    /* Brand logos are drawn for a light ground, so their plate stays light in every theme. */
+    --logo-plate: #ffffff;
     --tile-scrim: rgba(0, 0, 0, .25);
     --chip-h: 20px;
     --chip-font: 11px;

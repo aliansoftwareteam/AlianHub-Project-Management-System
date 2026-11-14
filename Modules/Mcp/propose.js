@@ -33,6 +33,8 @@ const filedBy = (ctx) => (ctx.oauth
  * a manage grant the caller holds. */
 const outsideMayFile = (ctx, tool) => {
     const { grantOfAction } = require('./manageTools');
+    // Approval asks the grant again for connectors:write (./approval.js), so a client that holds it may file.
+    if (tool.alwaysProposed && tool.optIn) return require('./scopes').grantedScopes(ctx.token).includes(tool.optIn);
     if (tool.grant) return grantOfAction(tool.action) === tool.grant && manageFlag.mayUse(ctx, tool.grant);
     const under = require('./workTools').filedUnder(tool.action);
     return Boolean(under) && tool.filedUnder === under && manageFlag.mayUse(ctx, under);
@@ -107,7 +109,7 @@ const propose = async (ctx, tool, params, reason, held = '') => {
         why: held ? `${reason} (${held})` : reason,
         changes,
     });
-    return { ...filed, message: PENDING_MESSAGE };
+    return { ...filed, message: tool.pendingMessage || PENDING_MESSAGE };
 };
 
 /* What the answer of a filed change adds when it waits because of how many tasks the connection has changed. */

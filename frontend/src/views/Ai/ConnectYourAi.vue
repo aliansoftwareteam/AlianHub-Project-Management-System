@@ -1,11 +1,11 @@
 <template>
-    <div class="ah-page ai-page cya" :class="{ 'cya--welcome': welcome }" data-test="connect-ai">
-        <AiSidebar v-if="!welcome" />
-        <div class="ai-page__main">
-            <div class="cya__body ah-scroll">
+    <div :class="embedded ? 'cya cya--embedded' : ['ah-page', 'ai-page', 'cya', { 'cya--welcome': welcome }]" data-test="connect-ai">
+        <AiSidebar v-if="!welcome && !embedded" />
+        <div :class="embedded ? 'cya__frame' : 'ai-page__main'">
+            <div class="cya__body" :class="{ 'ah-scroll': !embedded }">
                 <header class="cya__head">
                     <span v-if="welcome" class="ah-label">{{ $t('ConnectAi.welcome_kicker') }}</span>
-                    <h1 class="ah-h2">{{ $t('ConnectAi.title') }}</h1>
+                    <component :is="embedded ? 'h2' : 'h1'" class="ah-h2">{{ $t('ConnectAi.title') }}</component>
                     <p class="cya__lead">{{ $t('ConnectAi.lead') }}</p>
                 </header>
 
@@ -127,6 +127,10 @@ import { GUIDE, useDocsLink } from "@/composable/docsLink";
 
 defineOptions({ name: "ConnectYourAi" });
 
+defineProps({
+    embedded: { type: Boolean, default: false }
+});
+
 const APPS = ["claude", "chatgpt"];
 const TOOL_KEYS = ["data", "manage", "work"];
 const SETTING = Object.freeze({ apps: "MCP_OAUTH", data: "MCP_TOOLS_DATA", manage: "MCP_TOOLS_MANAGE", work: "MCP_TOOLS_WORK" });
@@ -181,6 +185,7 @@ onBeforeUnmount(() => stopWatching());
 <style scoped>
 .cya__body { flex: 1; min-height: 0; overflow: auto; padding: 20px 24px 32px; display: flex; flex-direction: column; gap: 16px; max-width: 960px; width: 100%; box-sizing: border-box; }
 .cya--welcome .cya__body { margin: 0 auto; padding-top: 40px; }
+.cya--embedded .cya__body { padding: 0; overflow: visible; }
 .cya__head { display: flex; flex-direction: column; gap: 6px; }
 .cya__lead { margin: 0; font: var(--text-body); color: var(--ink-2); max-width: 720px; }
 .cya__sign { display: flex; align-items: center; gap: 8px; margin: 0; padding: 10px 14px; border-radius: var(--r-card); border: 1px solid var(--border); background: var(--surface); font: var(--text-body); color: var(--ink); }

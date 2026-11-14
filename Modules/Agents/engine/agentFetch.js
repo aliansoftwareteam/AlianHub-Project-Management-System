@@ -90,9 +90,57 @@ const callProvider = async (url, { form = {}, token, timeoutMs, maxBytes } = {})
         timeoutMs,
         maxBytes,
         maxRedirects: 0,
-        headers: { 'User-Agent': UA, 'Content-Type': 'application/x-www-form-urlencoded', ...(token ? { Authorization: `Bearer ${token}` } : {}) },
+        // GitHub answers a token call as a form unless JSON is asked for; the other providers answer JSON either way.
+        headers: { 'User-Agent': UA, Accept: 'application/json', 'Content-Type': 'application/x-www-form-urlencoded', ...(token ? { Authorization: `Bearer ${token}` } : {}) },
     });
     return { status: res.status, headers: res.headers || {}, body: res.body };
 };
 
-module.exports = { audit: inWorkspace('audit'), postJson: inWorkspace('postJson'), readDeclared, callProvider };
+/* Only a host the provider's definition names is reached, and no redirect is followed, so a tool cannot carry the
+ * token anywhere else. */
+const declaredTarget = (url, hosts) => {
+    if (!(egressContext.get() || {}).companyId) {
+        throw Object.assign(new Error('a connector call names no workspace, so it was refused'), { code: 'no_workspace' });
+    }
+    const target = new URL(String(url));
+    if (target.protocol !== 'https:' || !hosts.includes(target.hostname)) {
+        throw Object.assign(new Error(`${target.hostname || 'that address'} is not a host of this connector, so it was not contacted`), { code: 'host_not_declared', deterministic: true });
+    }
+    return target;
+};
+
+const callApi = async (url, { method = 'get', query = {}, json, token, hosts = [], timeoutMs, maxBytes } = {}) => {
+    const target = declaredTarget(url, hosts);
+    Object.entries(query).forEach(([name, value]) => target.searchParams.set(name, String(value)));
+    const res = await fetcher.safeFetch(target.href, {
+        method,
+        data: json === undefined ? undefined : JSON.stringify(json),
+        timeoutMs,
+        maxBytes,
+        maxRedirects: 0,
+        headers: { 'User-Agent': UA, Accept: 'application/json', ...(json === undefined ? {} : { 'Content-Type': 'application/json' }), ...(token ? { Authorization: `Bearer ${token}` } : {}) },
+        sensitiveHeaders: ['Authorization'],
+    });
+    return { status: res.status, headers: res.headers || {}, body: res.body };
+};
+
+const MCP_HEADERS = /^(accept|content-type|mcp-session-id|mcp-protocol-version|last-event-id)$/i;
+
+/* One request of an app's MCP server, sent as the MCP client built it. Only its protocol headers pass, so the token is
+ * the one set here, and it goes only to the connector's own hosts, with no redirect. */
+const callMcp = async (url, { method = 'post', body, headers = {}, token, hosts = [], timeoutMs, maxBytes } = {}) => {
+    const target = declaredTarget(url, hosts);
+    const passed = Object.fromEntries(Object.entries(headers).filter(([name]) => MCP_HEADERS.test(name)));
+    const res = await fetcher.safeFetch(target.href, {
+        method,
+        data: body,
+        timeoutMs,
+        maxBytes,
+        maxRedirects: 0,
+        headers: { 'User-Agent': UA, ...passed, ...(token ? { Authorization: `Bearer ${token}` } : {}) },
+        sensitiveHeaders: ['Authorization'],
+    });
+    return { status: res.status, headers: res.headers || {}, body: res.body };
+};
+
+module.exports = { audit: inWorkspace('audit'), postJson: inWorkspace('postJson'), readDeclared, callProvider, callApi, callMcp };

@@ -57,6 +57,14 @@ describe('Waiting on you (Home card)', () => {
         serverApprovals = [];
     });
 
+    it('never approves a write to a connected app from here, since its card is read in the Inbox', async () => {
+        serverProposals = [proposal('p1', { changes: [{ action: 'google.calendar.events.create', label: 'Board review', card: { title: 'Board review' } }] })];
+        const { wrapper } = await open();
+        expect(wrapper.find('[data-test="waiting-approve"]').exists()).toBe(false);
+        expect(wrapper.find('[data-test="waiting-review"]').exists()).toBe(false);
+        expect(wrapper.find('[data-test="waiting-open"]').exists()).toBe(true);
+    });
+
     it('shows the count and the three most recent things to decide, with a way to the Inbox tab that holds the proposals', async () => {
         serverProposals = [proposal('p1'), proposal('p2'), proposal('p3')];
         serverApprovals = [approval('a1'), approval('a2')];

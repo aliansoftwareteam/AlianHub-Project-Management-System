@@ -1201,6 +1201,12 @@ const schema = {
         skills: { type: Array, default: [], required: false },
         // Subset of Modules/Agents/registry.js keys this agent may use. Empty = every registry action.
         allowedActions: { type: Array, default: [], required: false },
+        // The connected apps and their tools this agent may use (Modules/Agents/agentConnectors.js). Empty = none, unlike allowedActions.
+        connectors: {
+            type: [{ _id: false, provider: { type: String, required: true }, tools: { type: [String], default: [] } }],
+            default: [],
+            required: false,
+        },
         // The role it plays ('blueprint/slug' of Modules/Agents/roles), so the dispatcher can give a role's task to the least loaded of its agents.
         role: { type: String, required: false },
         // 'team-pack:<blueprint>' on an agent a team pack made, so undoing the pack can find it again.
@@ -1299,7 +1305,7 @@ const schema = {
         tainted: { type: Boolean, required: false },
         // [{ kind: fetch | email | form | webhook | file | passage | client | instruction | connector, ref, at }] — where it came from, never the content
         taintSources: { type: Array, default: undefined, required: false },
-        // [{ action, connector, channelId, state: applied | failed | refused, messages, chars, truncated, reason, error, at }] — one per
+        // [{ action, connector, channelId, connectionId, slot, state: pending | applied | failed | refused, messages, chars, truncated, reason, error, at }] — one per
         // connector read the run tried; the per-run caps are counted from it, and it never holds what was read
         connectorReads: { type: Array, default: undefined, required: false },
         // 'report' for a scheduled report run (no task); absent on a task run
@@ -1532,6 +1538,12 @@ const schema = {
         auditIds: { type: Array, default: [], required: false },
         // [{ action, ok, channelId, channelName, ts, error, at }] — what the provider answered for each connector change
         delivery: { type: Array, required: false },
+        // The one person who may approve a connector write (Connectors/writes.js).
+        connectionOwner: { type: String, required: false },
+        editedAt: { type: Date, required: false },
+        revision: { type: Number, required: false },
+        // Each write of an approval claimed before it is sent, so it is sent once.
+        sendAttempts: { type: Array, required: false },
         cost: { type: Object, required: false },
         // a canned Inbox key (too_many_changes | wrong_tone | needs_person | not_now) or free text, ≤ 200 chars
         declineReason: { type: String, required: false },
@@ -1806,19 +1818,11 @@ const schema = {
         connectionId: { type: String, required: false },
         taskId: { type: String, required: false },
     },
-    // AHE-3838 — one row per (user, cloud storage provider). Distinct from
-    // integrationConnections above, which holds the COMPANY's app registration:
-    // every person has their own Drive, so the OAuth grant has to be per-user.
-    // Tokens are AES-256-GCM ciphertext (Modules/CloudStorage/helpers/cloudCrypto),
-    // never plaintext, and are never returned to the browser.
+    // The retired per-person attachment picker (AHE-3838), replaced by the connectors module (076). Nothing reads
+    // these rows; they stay declared so migrations 084 and 087 can clear their stored client secrets and tokens.
     cloudStorageConnections: {
         provider: { type: String, required: true },      // google_drive | dropbox
         userId: { type: String, required: true },
-        // The user's OWN app registration for this provider (client id/secret,
-        // api key, app id / app key). Per-user, not per-company: one member must
-        // never see or overwrite another's credentials, and two people may point
-        // at the same drive account independently.
-        //
         // MUST stay declared — this sub-schema is strict: true, so an undeclared
         // path is silently dropped on save and only shows up as data that
         // vanishes after a reload.
@@ -2148,8 +2152,17 @@ const schema = {
     },
     // One row per workspace and connector, or per person and connector when the connection is a person's own
     // (Modules/Agents/connectors). Tokens live in `secrets` by handle, never here.
+    // Rows from before the connector module (task 056) have `connector` and `secretHandles`; module rows have
+    // `provider`, `handles` and the rest of 063's contract section 6. Task 073 migrates the old rows.
     connectorConnections: {
-        connector: { type: String, required: true },
+        connector: { type: String, required: false },
+        companyId: { type: String, required() { return typeof this.provider === 'string'; } },
+        provider: { type: String, required: false },
+        products: { type: [String], default: undefined, required: false },
+        // api | mcp: how the provider is reached
+        kind: { type: String, required: false },
+        // registered_app | self_register | personal_token: how the person signed in
+        signIn: { type: String, required: false },
         // The person a personal connection belongs to; absent on a workspace connection.
         userId: { type: String, required: false },
         // { bot_token: 'sec_…', signing_secret: 'sec_…' } or { refresh_token: 'sec_…', access_token: 'sec_…' }
@@ -2162,13 +2175,21 @@ const schema = {
         // [{ id, name, read, post }] the channels an owner or admin chose and what agents may do in each; a row
         // without the two ticks is from before reading existed and means post only
         allowedChannels: { type: Array, default: [], required: false },
-        // connected | broken, and for a person's connection also pending | revoked
+        // connected | broken, and for a person's connection also pending | reauth_required | revoked
         status: { type: String, default: 'connected', required: false },
         brokenReason: { type: String, required: false },
+        lastError: { type: String, required: false },
         brokenAt: { type: Date, required: false },
-        // What the provider granted, and { email, sub } of the account the person connected
+        // What the provider granted, and the account the person connected: { id, label } on module rows,
+        // { email, sub } on older ones
         scopes: { type: [String], default: undefined, required: false },
         account: { type: Object, required: false },
+        toolsOff: { type: [String], default: undefined, required: false },
+        // { source: 'instance' | 'company', appId }: appId is the connector_apps id, null for the instance app
+        app: { type: Object, required: false },
+        // { access: 'sec_…', refresh: 'sec_…' } secrets store handles of a module row
+        handles: { type: Object, required: false },
+        backoffUntil: { type: Date, required: false },
         accessExpiresAt: { type: Date, required: false },
         connectedAt: { type: Date, required: false },
         lastUsedAt: { type: Date, required: false },
@@ -2183,6 +2204,101 @@ const schema = {
         createdBy: { type: String, required: false },
         updatedBy: { type: String, required: false },
         deletedStatusKey: { type: Number, default: 0, required: false },
+    },
+    // A workspace's own OAuth app for one provider; it wins over the instance's CONNECTOR_<ID>_* app (FR-5).
+    connectorApps: {
+        companyId: { type: String, required: true },
+        provider: { type: String, required: true },
+        clientId: { type: String, required: true },
+        secretHandle: { type: String, required: true },
+        // Browser-safe values a provider also needs, such as Google Picker's { apiKey, appId }
+        extra: { type: Object, required: false },
+        setBy: { type: String, required: true },
+        createdAt: { type: Date, required: true },
+        updatedAt: { type: Date, required: true },
+    },
+    // One document per connection, caller and day, incremented in place (FR-28, FR-29).
+    connectorUsage: {
+        companyId: { type: String, required: true },
+        connectionId: { type: String, required: true },
+        userId: { type: String, required: true },
+        // { type: 'agent' | 'mcp' | 'chat', id }
+        actor: { type: Object, required: true },
+        day: { type: String, required: true },
+        reads: { type: Number, default: 0, required: false },
+        writeProposals: { type: Number, default: 0, required: false },
+    },
+    // The client an MCP server registered for this workspace when it signs clients up itself, reused by every member (FR-41).
+    connectorRegistrations: {
+        companyId: { type: String, required: true },
+        provider: { type: String, required: true },
+        clientId: { type: String, required: true },
+        // Empty for a public client, which proves itself with PKCE alone
+        secretHandle: { type: String, default: '', required: false },
+        // dcr: dynamic client registration
+        method: { type: String, required: true },
+        // A different APIURL needs a new registration, since the server checks the callback against it
+        redirectUri: { type: String, required: true },
+        registeredBy: { type: String, required: true },
+        registeredAt: { type: Date, required: true },
+    },
+    // A workspace's review of an MCP server's tool: what it looked like when reviewed and whether it is on (FR-44, FR-54).
+    connectorTools: {
+        companyId: { type: String, required: true },
+        provider: { type: String, required: true },
+        // The server's own tool name
+        tool: { type: String, required: true },
+        // The shape the server describes now, and the one a person last reviewed
+        shape: { type: String, required: true },
+        reviewedShape: { type: String, default: '', required: false },
+        // new | changed | reviewed
+        state: { type: String, required: true },
+        // read | write, decided by the reviewer
+        access: { type: String, default: 'write', required: false },
+        enabled: { type: Boolean, default: false, required: false },
+        // A custom server's tool as its reviewer accepted it: the words a model is shown and the arguments it takes
+        label: { type: String, required: false },
+        description: { type: String, required: false },
+        inputSchema: { type: Object, required: false },
+        reviewedBy: { type: String, default: '', required: false },
+        reviewedAt: { type: Date, required: false },
+        seenAt: { type: Date, required: true },
+    },
+    // A workspace's own MCP server, added by its address (task 096); members connect to it as `custom_<_id>`.
+    connectorServers: {
+        companyId: { type: String, required: true },
+        name: { type: String, required: true },
+        url: { type: String, required: true },
+        // self_register | registered_app | personal_token
+        signIn: { type: String, required: true },
+        // The sign-in addresses its metadata named: authorizeUrl, tokenUrl, revokeUrl, pkce, registration, registrationUrl
+        auth: { type: Object, required: false },
+        scopes: { type: [String], default: undefined, required: false },
+        hosts: { type: [String], required: true },
+        // The hosts this server put on the workspace egress list, taken off again when it is removed
+        egressAdded: { type: [String], default: undefined, required: false },
+        // A registered app's client; its secret is in the secrets store by handle
+        clientId: { type: String, default: '', required: false },
+        secretHandle: { type: String, default: '', required: false },
+        // active | needs_app
+        status: { type: String, required: true },
+        addedBy: { type: String, required: true },
+        updatedBy: { type: String, required: false },
+        createdAt: { type: Date, required: true },
+        updatedAt: { type: Date, required: true },
+    },
+    // An owner or admin's daily limit for the workspace, a member or an agent; a field left out falls to the wider
+    // limit, then to the default in Modules/Connectors/quotas.js (FR-29).
+    connectorQuotas: {
+        companyId: { type: String, required: true },
+        // workspace | member | agent
+        scope: { type: String, required: true },
+        targetId: { type: String, default: '', required: false },
+        reads: { type: Number, required: false },
+        writeProposals: { type: Number, required: false },
+        agentReads: { type: Number, required: false },
+        setBy: { type: String, required: true },
+        updatedAt: { type: Date, required: true },
     },
     // Instance-wide, in the global database: patterns the owner added to the instruction guard on top of
     // the built-in list (Modules/AICore/instructionPatterns.js).

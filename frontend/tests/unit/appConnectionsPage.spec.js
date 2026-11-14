@@ -8,7 +8,6 @@ vi.mock('vue-router', async (importOriginal) => ({ ...(await importOriginal()), 
 
 import AppConnections from '@/views/Integrations/AppConnections.vue';
 import en from '@/locales/en.js';
-import integrationRoutes from '@/router/integrations';
 import { loginReturnPath } from '@/views/Integrations/githubReturn';
 
 const i18n = config.global.plugins[0];
@@ -24,15 +23,15 @@ const github = {
 };
 const gitlab = { ...github, key: 'gitlab', name: 'GitLab', syncs: false, connections: [], fields: [{ key: 'token', label: 'Server', secret: true }, { key: 'project', label: 'Server' }] };
 
-const open = async (canManage) => {
+const open = async (canManage, props = {}) => {
     apiRequest.mockResolvedValue({ data: { status: true, data: { enabled: true, canManage, apps: [github, gitlab], projects: [{ id: 'p1', name: 'Web' }] } } });
-    const wrapper = mount(AppConnections, { global: { mocks: { $t: i18n.global.t } } });
+    const wrapper = mount(AppConnections, { props, global: { mocks: { $t: i18n.global.t } } });
     await flushPromises();
     return wrapper;
 };
 const buttons = (wrapper) => wrapper.findAll('button').map((b) => b.text());
 
-describe('the App connections page', () => {
+describe('the workspace apps section', () => {
     beforeEach(() => { apiRequest.mockReset(); replace.mockReset(); route.query = {}; });
 
     it('shows a member the status alone, with no button that changes a connection', async () => {
@@ -335,9 +334,9 @@ describe('the App connections page', () => {
         expect(loginReturnPath({ path: '/c1/home', fullPath: '/c1/home?a=1', query: { a: '1' } })).toBe('/c1/home?a=1');
     });
 
-    it('has a title that goes through the locale', () => {
-        const route = integrationRoutes.find((r) => r.name === 'AppConnections');
-        expect(route.meta.titleKey).toBe('AppConnections.title');
-        expect(route.meta.title).toBeUndefined();
+    it('shows only the apps it is given, as Integrations does for GitHub', async () => {
+        const wrapper = await open(true, { only: ['github'] });
+        expect(wrapper.findAll('[data-app]').map((card) => card.attributes('data-app'))).toEqual(['github']);
+        expect(wrapper.find('.apc__list--one').exists()).toBe(true);
     });
 });

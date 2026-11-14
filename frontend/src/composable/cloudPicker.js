@@ -15,6 +15,7 @@
 //               the stored refresh token. It runs in its own popup page.
 import { apiRequest } from '@/services';
 import * as env from '@/config/env';
+import { connectorsOn } from '@/config/connectorsOn';
 
 // ── script loading ──────────────────────────────────────────────────────────
 // One in-flight promise per URL, so opening a picker twice never injects the
@@ -46,14 +47,43 @@ const loadScript = (url, attrs = {}) => {
     return promise;
 };
 
-// ── server helpers ──────────────────────────────────────────────────────────
+// ── server helpers (connectors module, 076) ─────────────────────────────────
 
-/** Which providers this workspace has set up, and which this user has connected. */
+/**
+ * Which providers this workspace has set up on the connectors module, and which
+ * this user has connected. Shaped for the attach menu, keyed by the attachment's
+ * stable `source`: `google_drive` needs the Google connection with Drive ticked;
+ * `dropbox` needs only the workspace app key (the Chooser signs the user in
+ * itself), so it is usable as soon as the provider is offered.
+ */
 export const fetchCloudProviders = async () => {
     try {
-        const res = await apiRequest('get', `${env.CLOUD_STORAGE}/providers`);
-        if (res && res.data && res.data.status) return res.data.data || [];
-        return [];
+        if (!(await connectorsOn())) return [];
+        const res = await apiRequest('get', env.CONNECTORS);
+        if (!(res && res.data && res.data.status)) return [];
+        const data = res.data.data || {};
+        const offered = new Set((data.providers || []).map((p) => p.provider));
+        const byProvider = Object.fromEntries((data.connections || []).map((c) => [c.provider, c]));
+        const out = [];
+        if (offered.has('google')) {
+            const c = byProvider.google || {};
+            out.push({
+                provider: 'google_drive', name: 'Google Drive', requiresConnect: true, configured: true,
+                connected: !!(c.connected && (c.products || []).includes('drive')),
+                status: c.status || 'available',
+                accountEmail: (c.account && c.account.label) || '', config: {},
+            });
+        }
+        if (offered.has('dropbox')) {
+            const c = byProvider.dropbox || {};
+            out.push({
+                provider: 'dropbox', name: 'Dropbox', requiresConnect: false, configured: true,
+                // The Chooser needs only the app key, so Dropbox is pickable once offered.
+                connected: true, status: c.connected ? (c.status || 'connected') : 'available',
+                accountEmail: (c.account && c.account.label) || '', config: {},
+            });
+        }
+        return out;
     } catch (e) {
         // The attach menu must still open with "Upload from computer" if this
         // fails, so an error here is not fatal.
@@ -62,43 +92,9 @@ export const fetchCloudProviders = async () => {
     }
 };
 
-// ── workspace settings (Settings → Integrations) ────────────────────────────
-
-/**
- * Field definitions + stored values for every provider, plus whether the caller
- * may edit them. Secret values are never returned — only a flag saying
- * one is stored.
- */
-export const fetchCloudSettings = async () => {
-    const res = await apiRequest('get', `${env.CLOUD_STORAGE}/settings`);
-    const payload = res && res.data;
-    if (!payload || !payload.status) {
-        throw new Error((payload && payload.statusText) || 'Could not load cloud storage settings.');
-    }
-    return payload.data || { canManage: false, providers: [] };
-};
-
-export const saveCloudSettings = async (provider, config) => {
-    const res = await apiRequest('put', `${env.CLOUD_STORAGE}/settings/${provider}`, { config });
-    const payload = res && res.data;
-    if (!payload || !payload.status) {
-        throw new Error((payload && payload.statusText) || 'Could not save.');
-    }
-    return payload.data || {};
-};
-
-export const clearCloudSettings = async (provider) => {
-    const res = await apiRequest('delete', `${env.CLOUD_STORAGE}/settings/${provider}`);
-    const payload = res && res.data;
-    if (!payload || !payload.status) {
-        throw new Error((payload && payload.statusText) || 'Could not remove.');
-    }
-    return true;
-};
-
-/** Short-lived access token (+ browser-safe config) for one provider. */
-const fetchPickerToken = async (provider) => {
-    const res = await apiRequest('get', `${env.CLOUD_STORAGE}/${provider}/token`);
+/** Short-lived access token (+ browser-safe config) for one provider's picker. */
+const fetchPickerToken = async (source) => {
+    const res = await apiRequest('get', `${env.CONNECTORS}/picker/${source}/token`);
     const payload = res && res.data;
     if (!payload || !payload.status) {
         const err = new Error((payload && payload.statusText) || 'Could not authorise the picker.');
@@ -108,30 +104,12 @@ const fetchPickerToken = async (provider) => {
     return payload.data || {};
 };
 
-/** Start the OAuth consent redirect for a provider. */
-export const connectCloudProvider = async (provider, returnTo) => {
-    // Query string built into the URL: apiRequest's 5th argument is spread into
-    // the axios config, so it is not a params bag.
-    //
-    // `origin` is sent explicitly because the dev server proxies /api, making this
-    // a SAME-origin request — browsers omit the Origin header on those, so the
-    // server would otherwise have to guess. It only honours allow-listed values.
-    const target = returnTo || (window.location.pathname + window.location.search);
-    const query = `?returnTo=${encodeURIComponent(target)}&origin=${encodeURIComponent(window.location.origin)}`;
-    const res = await apiRequest('get', `${env.CLOUD_STORAGE}/${provider}/auth-url${query}`);
-    const payload = res && res.data;
-    if (!payload || !payload.status || !payload.data || !payload.data.url) {
-        throw new Error((payload && payload.statusText) || 'Could not start sign-in.');
-    }
-    // Full-page redirect, not a popup: provider consent screens refuse to render
-    // inside one in several configurations.
-    window.location.assign(payload.data.url);
+/* Connecting a cloud account now lives on Connectors (072): Google needs its Drive product ticked there, and
+ * Dropbox is a connection there too. The attach menu sends the person there rather than starting consent inline. */
+export const connectCloudProvider = async () => {
+    const company = localStorage.getItem('selectedCompany') || '';
+    window.location.assign(company ? `#/${company}/connections` : '#/');
     return true;
-};
-
-export const disconnectCloudProvider = async (provider) => {
-    const res = await apiRequest('delete', `${env.CLOUD_STORAGE}/${provider}`);
-    return !!(res && res.data && res.data.status);
 };
 
 // ── Dropbox ─────────────────────────────────────────────────────────────────
@@ -327,7 +305,7 @@ export const resolveCloudThumbnail = (provider, fileId) => {
     const key = `${provider}:${fileId}`;
     if (thumbnailCache.has(key)) return thumbnailCache.get(key);
 
-    const promise = apiRequest('get', `${env.CLOUD_STORAGE}/${provider}/thumbnail?fileId=${encodeURIComponent(fileId)}`)
+    const promise = apiRequest('get', `${env.CONNECTORS}/picker/${provider}/thumbnail?fileId=${encodeURIComponent(fileId)}`)
         .then((res) => (res && res.data && res.data.status && res.data.data && res.data.data.url) || '')
         .catch(() => {
             // Don't cache a transient failure — let the next mount retry.
@@ -340,7 +318,7 @@ export const resolveCloudThumbnail = (provider, fileId) => {
 
 /** Ask the server to copy a picked file into our own storage. */
 export const importCloudFile = async ({ provider, fileId, filename, path, downloadUrl }) => {
-    const res = await apiRequest('post', `${env.CLOUD_STORAGE}/${provider}/import`, { fileId, filename, path, downloadUrl });
+    const res = await apiRequest('post', `${env.CONNECTORS}/picker/${provider}/import`, { fileId, filename, path, downloadUrl });
     const payload = res && res.data;
     if (!payload || !payload.status) {
         const err = new Error((payload && payload.statusText) || 'Import failed.');
@@ -355,7 +333,6 @@ export function cloudPicker() {
         fetchCloudProviders,
         pickCloudFiles,
         connectCloudProvider,
-        disconnectCloudProvider,
         importCloudFile,
     };
 }

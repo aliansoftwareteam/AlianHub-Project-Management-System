@@ -433,10 +433,6 @@ const executors = {
         return { result: { pageId: String(saved._id) }, undo: { kind: 'page', pageId: String(saved._id) }, entityType: 'page', entityId: saved._id, entityName: title };
     },
 
-    async 'slack.message.post'({ companyId, actor, params }) {
-        return require('./connectors/slackPost').post({ companyId, actor, params });
-    },
-
     /* For the person behind the agent, on the task named: the reminder the task screen sets. */
     async 'reminder.create'({ companyId, actor, params }) {
         const task = await tools.getTask(companyId, params.taskId);
@@ -585,7 +581,7 @@ const perform = async ({ companyId, actor, action, params = {}, reason = '', cos
     }
     if (!check.action.write) return { result: null, auditId: null, undo: null };
     if (!require('../Entitlements/lifecycleGuard').writable()) throw await refusal(companyId, actor, { action, params, reason: INSTANCE_LOCKED, ip, taint });
-    const exec = executors[action];
+    const exec = executors[action] || require('../Connectors/writes').executorFor(action);
     if (!exec) throw new tools.DeterministicError(`${action} is not ready to be used yet, so nothing was changed.`);
 
     const turn = await taskReads.turnFor({ companyId, actor, action, params, approved, edited: Boolean(proposal && proposal.edited) });

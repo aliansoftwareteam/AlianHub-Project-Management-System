@@ -228,7 +228,6 @@
     "frontend/src/views/Changelog/Changelog.vue": { "colours": 1, "legacyClasses": 0 },
     "frontend/src/views/Dashboards/CardPicker.vue": { "colours": 1, "legacyClasses": 0 },
     "frontend/src/views/Dashboards/style.css": { "colours": 1, "legacyClasses": 0 },
-    "frontend/src/views/Integrations/connections.css": { "colours": 5, "legacyClasses": 0 },
     "frontend/src/views/MilestoneReport/MilestoneReport.vue": { "colours": 0, "legacyClasses": 1 },
     "frontend/src/views/People/PeopleDirectory.vue": { "colours": 2, "legacyClasses": 0 },
     "frontend/src/views/Portfolio/Portfolio.vue": { "colours": 1, "legacyClasses": 0 },

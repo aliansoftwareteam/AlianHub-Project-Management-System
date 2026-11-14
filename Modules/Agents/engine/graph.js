@@ -89,7 +89,7 @@ async function gather(state, config) {
     const block = wantsMemory(slugOf(run))
         ? (await quietly(run._id, 'memory unavailable', () => memory.contextFor({ companyId, projectId: task.ProjectID, userId: run.startedBy, agentId: run.agentId }))) || ''
         : '';
-    const { out: gathered, found } = await taint.collect(() => orchestrator.gather({ skillSlug: slugOf(run), task, companyId, memory: block, startedBy: run.startedBy, runId: String(run._id), actor: deps && deps.actor, allowedActions: agent && agent.allowedActions }));
+    const { out: gathered, found } = await taint.collect(() => orchestrator.gather({ skillSlug: slugOf(run), task, companyId, memory: block, startedBy: run.startedBy, runId: String(run._id), actor: deps && deps.actor, allowedActions: agent && agent.allowedActions, connectors: agent && agent.connectors }));
     if (gathered.status === 'skipped') return { result: gathered };
     const marked = await taint.mark(companyId, run, [
         ...taint.fromTask({ origin: await taint.originOf(companyId, task) }),
@@ -233,6 +233,7 @@ async function propose(state, config) {
         what,
         why: [result.summary, dropped].filter(Boolean).join('\n\n'),
         changes: toPropose,
+        connectionOwner: deps.actor && deps.actor.userId ? String(deps.actor.userId) : '',
         cost: { tokens: result.usage && result.usage.totalTokens, model: result.model, usd: spend && spend.usd },
         ...(taint.isTainted(run) ? { taint: taint.forProposal(run) } : {}),
     });
