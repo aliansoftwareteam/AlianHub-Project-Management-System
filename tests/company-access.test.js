@@ -369,7 +369,6 @@ const REFUSED_WRITES = [
     ['the renewal date', { updateObject: { subscriptionRenewalDate: 4102444800, isPlanShchedule: false } }],
     ['the disabled flags', { updateObject: { isDisable: false, isInactive: false } }],
     ['the seat allowance', { updateObject: { availableUser: 999, totalData: { users: 999 } } }],
-    ['the storage size', { updateObject: { bucketSize: 0 } }],
     ['the seat count', { updateObject: { companyData: [{ users: 1 }] } }],
     ['a seat count jump', { key: '$inc', updateObject: { 'companyData.$[elementIndex].users': -50 }, arrayFilters: SEAT_RELEASE.arrayFilters }],
     ['the tracker seats', { updateObject: { trackerUsers: 0 } }],

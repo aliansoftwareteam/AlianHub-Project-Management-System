@@ -800,20 +800,18 @@ exports.deleteFileWasabi = async (req, res) => {
     }
 };
 
-const bucketSizes = async (owner) => {
-    let totalSize = 0;
+const screenshotSizeOf = async (owner) => {
     let screenshotSize = 0;
     for await (const object of storage.list(owner)) {
-        totalSize += object.size;
         if (isScreenshotStorageKey(object.key)) screenshotSize += object.size;
     }
-    return { totalSize, screenshotSize };
+    return screenshotSize;
 };
 
 exports.getBucketSizeCompanyWise = async(companyId) => {
     try {
-        await bucketSizes(JSON.parse(JSON.stringify(companyId)))
-        .then(async({ totalSize, screenshotSize }) => {
+        await screenshotSizeOf(JSON.parse(JSON.stringify(companyId)))
+        .then(async(screenshotSize) => {
             let mongoObj = {
                 type: SCHEMA_TYPE.COMPANIES,
                 data: [
@@ -822,7 +820,6 @@ exports.getBucketSizeCompanyWise = async(companyId) => {
                     },
                     {
                         $set: {
-                            bucketSize: `${totalSize / (1024 * 1024)}`,
                             trackshotSize: screenshotSize / (1024 * 1024)
                         }
                     }

@@ -326,7 +326,6 @@ exports.getBucketSizeCompanyWiseStorage = (bucketId,unit,isUpdate=false) => {
                                 },
                                 {
                                     $set: {
-                                        bucketSize: `${dataSize / (1024 * 1024)}`,
                                         trackshotSize: this.getDirectorySize(bucketDir, isScreenshotStorageKey) / (1024 * 1024)
                                     }
                                 }
