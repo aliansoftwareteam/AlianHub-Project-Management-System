@@ -88,7 +88,7 @@ function chooseShown() {
 .pp__count { color: var(--ink-2); }
 .pp__muted { color: var(--ink-2); }
 .pp__tools { display: flex; align-items: center; gap: 6px; }
-.pp__search { flex: 1; min-width: 0; }
+.ah-input.pp__search { flex: 1; min-width: 0; }
 .pp__list { max-height: 264px; overflow: auto; border: 1px solid var(--hairline); border-radius: var(--r-card); background: var(--surface); padding: 4px; display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 2px; align-content: start; }
 .pp__row { display: flex; align-items: flex-start; gap: 10px; padding: 7px 8px; border-radius: var(--r-sm); cursor: pointer; color: var(--ink); min-width: 0; transition: background var(--t-state) var(--ease); }
 .pp__row:hover { background: var(--surface-hover); }
@@ -102,6 +102,6 @@ function chooseShown() {
 @media (max-width: 480px) {
     .pp__list { grid-template-columns: 1fr; }
     .pp__tools { flex-wrap: wrap; }
-    .pp__search { flex-basis: 100%; }
+    .ah-input.pp__search { flex-basis: 100%; }
 }
 </style>
