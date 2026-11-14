@@ -42,16 +42,20 @@ jobs:
           # Dependabot / Renovate auto-update branches are exempt
           BOT='^(dependabot|renovate)\/.+$'
 
+          # release-please Release PR branches are exempt (e.g. release-please--branches--main)
+          RELEASE_PLEASE='^release-please--.+$'
+
           # Long-running branches (used as source of promotion PRs:
           # staging -> main, or hotfix flows branching from main).
           # Per BRANCHING.md these are the only branches with no type
           # prefix that are allowed.
           LONG_RUNNING='^(staging|main|demo)$'
 
-          if [[ "$BRANCH" =~ $STANDARD ]]     || \
-             [[ "$BRANCH" =~ $RELEASE ]]      || \
-             [[ "$BRANCH" =~ $BACKPORT ]]     || \
-             [[ "$BRANCH" =~ $BOT ]]          || \
+          if [[ "$BRANCH" =~ $STANDARD ]]        || \
+             [[ "$BRANCH" =~ $RELEASE ]]         || \
+             [[ "$BRANCH" =~ $BACKPORT ]]        || \
+             [[ "$BRANCH" =~ $BOT ]]             || \
+             [[ "$BRANCH" =~ $RELEASE_PLEASE ]]  || \
              [[ "$BRANCH" =~ $LONG_RUNNING ]]; then
             echo "✅ Branch name '$BRANCH' is valid."
             exit 0
@@ -70,6 +74,7 @@ jobs:
           echo "  hotfix-backport/<description>     (backporting hotfixes to staging)"
           echo "  staging  |  main                  (long-running branches — promotion PRs)"
           echo "  dependabot/...  renovate/...      (bot-generated, auto-exempt)"
+          echo "  release-please--...               (release-please Release PRs, auto-exempt)"
           echo ""
           echo "Examples:"
           echo "  feat/employee-workload-report"
