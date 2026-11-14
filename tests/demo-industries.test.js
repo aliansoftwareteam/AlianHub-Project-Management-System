@@ -250,6 +250,7 @@ function fakeAdapter({ dispatcher = true, workflows = true } = {}) {
         simulatedProposal: record('simulatedProposal', () => id()),
         createGoal: record('createGoal'),
         createDashboard: record('createDashboard'),
+        createWorkspaceDashboard: record('createWorkspaceDashboard', () => id()),
         createGuidePage: record('createGuidePage', () => id()),
         updateCompanyMarker: record('updateCompanyMarker'),
     };
@@ -291,6 +292,13 @@ describe('building an industry company', () => {
         expect(last('moveTask')).toBeLessThan(order.indexOf('stopAutomations'));
         expect(last('createGuidePage')).toBeLessThan(order.indexOf('updateCompanyMarker'));
         expect(adapter.named('updateCompanyMarker')[0].args).toMatchObject({ marker: { guidePageId: expect.any(String) } });
+
+        // One company-wide "Executive overview" dashboard, never a "mine" card on it.
+        expect(adapter.named('createWorkspaceDashboard')).toHaveLength(1);
+        const execDashboard = adapter.named('createWorkspaceDashboard')[0].args;
+        expect(execDashboard.name).toBe('Executive overview');
+        const MINE_CARDS = new Set(['DueSoonCard', 'MyTimeCard']);
+        execDashboard.cards.forEach((card) => expect(MINE_CARDS.has(card.key)).toBe(false));
     });
 
     test('nothing logs time on a task that is still in its opening ("default_active") status', async () => {

@@ -208,6 +208,18 @@ async function seedRelations({ scenario, made, byProject, people, adapter }) {
     }
 }
 
+/* The company-wide cards (never a "mine" card: an executive views everyone's work, not their own
+ * task list) the dashboard picker already builds, with the same sizes and default periods it gives
+ * them (frontend/src/plugins/dashboard/cardCatalog.js). Period 1 is "today", 3 is "this week". */
+const EXECUTIVE_CARDS = [
+    { key: 'TasksByStatusCard', period: 3, size: { w: 6, h: 9, minW: 4, maxW: 12, minH: 6, maxH: 22 } },
+    { key: 'AtRiskTodayCard', period: null, size: { w: 6, h: 10, minW: 4, maxW: 12, minH: 7, maxH: 22 } },
+    { key: 'ProjectPulseCard', period: 1, size: { w: 6, h: 9, minW: 4, maxW: 12, minH: 7, maxH: 22 } },
+    { key: 'TeamLoggedVsEtaCard', period: 3, size: { w: 6, h: 10, minW: 4, maxW: 12, minH: 7, maxH: 22 } },
+    { key: 'FreeResourcesCard', period: null, size: { w: 6, h: 9, minW: 4, maxW: 12, minH: 6, maxH: 22 } },
+    { key: 'AgentSpendCard', period: null, size: { w: 6, h: 9, minW: 4, maxW: 12, minH: 6, maxH: 22 } },
+];
+
 const FINISHED_STATUS_TYPES = new Set(['done', 'close']);
 
 /* Real time logged on every top-level task past its opening status — nothing on a task that has not
@@ -477,6 +489,13 @@ async function buildShowcase({ scenario, owner, adapter, log = () => {} }) {
     if (scenario.dashboard) {
         await adapter.createDashboard({ companyId, ownerId: owner.userId, projectId: byProject.get(scenario.dashboard.project).projectId, dashboard: { name: scenario.dashboard.name, cards: scenario.dashboard.cards } });
     }
+    await adapter.createWorkspaceDashboard({
+        companyId,
+        ownerId: owner.userId,
+        name: 'Executive overview',
+        description: `${scenario.company.name}, across every project.`,
+        cards: EXECUTIVE_CARDS,
+    });
 
     const features = adapter.features();
     const layers = { dispatcher: features.dispatcher, workflows: features.dispatcher && features.workflows && Boolean(scenario.workflows) };

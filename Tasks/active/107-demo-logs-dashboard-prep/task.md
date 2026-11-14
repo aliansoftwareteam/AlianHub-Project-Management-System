@@ -59,6 +59,23 @@ for the "logged vs estimate" chart to compare against. Nothing seeded is dated t
   cluster (`--only technova,forgeline,brightwave,cartwheel,northgate,maplegrove,carewell,hartleymoss`),
   with `DISPATCHER=on WORKFLOW_ENGINE=on` so the existing agentic layers are kept, not dropped.
 
+## Addendum (2026-11-14, same session): an executive dashboard
+
+The owner asked separately for "an executive level dashboard... proper organized and proper working".
+AlianHub has no dedicated executive-dashboard feature, but it does support a dashboard scoped to the
+whole company (`visibility: 'workspace'`) rather than one project — the AI-plan path the per-project
+dashboard above uses (`Modules/AIProjectGenerator/planDashboard.js`) can only make a project or private
+one, so this calls `Modules/UserDashboard/controller.js`'s `createSharedDashboard` route directly.
+
+Every company now also gets a second dashboard, **"Executive overview"**, workspace-visible (shows up
+to everyone, not just project members), with six cards — every one company-wide/team-scoped, never a
+"mine" card (an executive looks at everyone's work, not their own task list): Tasks by status, At risk
+today, Project pulse, Logged vs estimate, Free capacity, Agent spend. Verified in a real running local
+server (not just the seed's own report) that every card renders real, non-empty data off the existing
+seed — including Free capacity (defaults to 8h/day per person, no separate capacity-planning seed
+needed) and Agent spend ($0 of the $12 cap, correctly "Paused" — real, not broken: agents cost nothing
+until switched on with a model, per the demo's existing "real but switched off" convention).
+
 ## Scope
 
 1. `scripts/demo/industries/lib/build.js`: a `defaultEstimateHours(key)` helper; `seedTasks` fills in

@@ -45,6 +45,25 @@
   yet" on TechNova (the owner isn't assigned any task there) and real "2h 29m logged" on CareWell. This
   is the exact page demo.alianhub.com will show once its own process restarts.
 
+## Executive dashboard (2026-11-14, later the same session)
+
+- [x] `adapter.js`: `createWorkspaceDashboard` — calls `Modules/UserDashboard/controller.createSharedDashboard`
+      via `viaHandler`, `visibility: 'workspace'`, up to 60 cards (not the AI-plan path's 6-card cap)
+- [x] `build.js`: `EXECUTIVE_CARDS` (6 company-wide cards, no "mine" cards), `buildShowcase` now also
+      calls `createWorkspaceDashboard` for every company — no scenario file edits needed (bypasses the
+      `scenario.dashboard`/`CARDS` validation entirely, since it's a different route, not the AI planner)
+- [x] `tests/demo-industries.test.js`: fake adapter `createWorkspaceDashboard`; asserts exactly one
+      per company, named "Executive overview", and that it never includes `DueSoonCard`/`MyTimeCard`
+- [x] `npx jest` 65/65; `npm run i18n:check` / `npm run style:check` clean
+- [x] Verified for real: rebuilt TechNova on the throwaway local mongod, ran the actual app server
+      (temporary `local-preview-wrapper.js` + `.claude/launch.json` entry, both reverted/scratchpad-only
+      after), signed in, opened "Executive overview" — all 6 cards render real data (9 tasks/3 projects,
+      8 at risk, -48% logged vs estimate, 40h free capacity across 5 people, $0.00 of $12 agent spend,
+      each agent correctly "Paused"). Screenshot sent to the owner.
+- [ ] Not yet reseeded on the live/shared 8 companies — this addition landed after that reseed; needs
+      another `--reset` run (same command as before) to appear there, and demo.alianhub.com still needs
+      its separate restart regardless (see above) before any of this is visible live.
+
 ## Notes
 
 - Jest in this `.claude/worktrees/...` path finds no tests without a scratch config (see memory

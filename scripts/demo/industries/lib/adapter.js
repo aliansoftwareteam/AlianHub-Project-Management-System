@@ -622,6 +622,39 @@ async function createDashboard({ companyId, ownerId, projectId, dashboard }) {
     return makeDashboard({ companyId, uid: String(ownerId), projectId: String(projectId), dashboard });
 }
 
+/* A dashboard scoped to the whole company, not one project — the AI planner above can only make a
+ * project or private one, so this calls the shared-dashboard route itself (Modules/UserDashboard). */
+async function createWorkspaceDashboard({ companyId, ownerId, name, description, cards }) {
+    const controller = require('../../../../Modules/UserDashboard/controller');
+    let y = 0;
+    const rows = [];
+    for (let i = 0; i < cards.length; i += 2) rows.push(cards.slice(i, i + 2));
+    const positioned = rows.flatMap((row) => {
+        const h = Math.max(...row.map((card) => card.size.h));
+        const placed = row.map((card, index) => ({ ...card, y, x: index * 6 }));
+        y += h;
+        return placed;
+    });
+    const body = {
+        title: name,
+        description: description || '',
+        visibility: 'workspace',
+        cards: positioned.map((card) => ({
+            componentId: card.key,
+            cardId: '',
+            uid: String(Math.floor(Math.random() * 900000000) + 100000000),
+            config: {
+                cardData: card.period ? { timerange: card.period } : {},
+                filterData: [],
+                position: { x: card.x, y: card.y, ...card.size },
+            },
+        })),
+    };
+    const saved = await viaHandler(controller.createSharedDashboard, { companyId, uid: String(ownerId), body });
+    if (!saved || !saved._id) throw new Error(`"${name}" dashboard was not created.`);
+    return String(saved._id);
+}
+
 async function createGuidePage({ companyId, ownerId, projectId, title, markdown }) {
     const { savePage } = require('../../../../Modules/Pages/controller');
     const saved = await savePage(companyId, String(ownerId), {
@@ -694,6 +727,7 @@ module.exports = {
     waitingApproval,
     createGoal,
     createDashboard,
+    createWorkspaceDashboard,
     createGuidePage,
     dropCompany,
     globalWrite,
