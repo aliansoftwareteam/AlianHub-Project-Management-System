@@ -27,9 +27,9 @@ const { updateCompanyFun, getCompanyDataFun } = require('../Modules/Company/cont
 
 const COMPANY = '64b1f0c2a1b2c3d4e5f60718';
 const MB = 1024 * 1024;
-const bucketSizeUpdate = (size, trackshotSize) => [
+const trackshotSizeUpdate = (trackshotSize) => [
     'global',
-    { type: 'companies', data: [{ _id: expect.anything() }, { $set: { bucketSize: size, trackshotSize } }] },
+    { type: 'companies', data: [{ _id: expect.anything() }, { $set: { trackshotSize } }] },
     'findOneAndUpdate',
     COMPANY,
 ];
@@ -82,7 +82,7 @@ describe('bucket size cron on server storage', () => {
         expect(await outcome(run)).toBe('fulfilled');
 
         expect(getCompanyDataFun).toHaveBeenCalledWith([], true);
-        expect(updateCompanyFun).toHaveBeenCalledWith(...bucketSizeUpdate('3', 1));
+        expect(updateCompanyFun).toHaveBeenCalledWith(...trackshotSizeUpdate(1));
         const perCompanyOutcomes = await Promise.all(perCompany.mock.results.map((result) => outcome(result.value)));
         expect(perCompanyOutcomes).toEqual(['fulfilled']);
     });
@@ -112,7 +112,7 @@ describe('bucket size cron on Wasabi storage', () => {
         const { handleBucketSizeUpdateCron } = require('../common-storage/common-wasabi');
         await handleBucketSizeUpdateCron();
         expect(s3Send).toHaveBeenCalledWith(expect.objectContaining({ name: 'ListObjectsV2', input: expect.objectContaining({ Bucket: COMPANY }) }));
-        expect(updateCompanyFun).toHaveBeenCalledWith(...bucketSizeUpdate('4', 3));
+        expect(updateCompanyFun).toHaveBeenCalledWith(...trackshotSizeUpdate(3));
     });
 
     it('rejects when the company list cannot be read', async () => {

@@ -442,7 +442,7 @@ module.exports = {
             ],
         },
     ],
-    dashboard: { name: 'Engineering and support', project: 'eng', cards: ['tasks_by_status', 'at_risk', 'project_pulse', 'due_soon'] },
+    dashboard: { name: 'Engineering and support', project: 'eng', cards: ['tasks_by_status', 'at_risk', 'project_pulse', 'due_soon', 'logged_vs_estimate', 'my_time'] },
     guide: {
         project: 'sup',
         intro: 'TechNova builds a B2B software platform. You are signed in as the **VP of Engineering**. Work flows across three projects: **Customer Support** sorts and answers requests, **Platform Engineering** builds the release, and **IT Operations** runs incidents and changes. Role agents triage, plan and write things up; people decide.',

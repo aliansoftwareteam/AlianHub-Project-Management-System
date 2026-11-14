@@ -3320,10 +3320,6 @@ const schema = {
         isPlanShchedule: {
             type: Boolean,
         },
-        bucketSize: {
-            type : Number,
-            required : false
-        },
         trackshotSize: {
             type: Number,
             required: false,

@@ -516,7 +516,7 @@ module.exports = {
             ],
         },
     ],
-    dashboard: { name: 'Riverside site overview', project: 'site', cards: ['tasks_by_status', 'at_risk', 'due_soon', 'project_pulse'] },
+    dashboard: { name: 'Riverside site overview', project: 'site', cards: ['tasks_by_status', 'at_risk', 'due_soon', 'project_pulse', 'logged_vs_estimate', 'my_time'] },
     guide: {
         project: 'site',
         intro: 'Northgate is a building contractor, and this workspace follows its live site, Riverside Apartments: six storeys and 48 flats, from frame to handover. You are signed in as the **Project Director**. Three processes run side by side: **Site Works** (work packages by floor and trade), **RFIs and Variations** (questions to the architect and the changes they cause) and **Quality, Safety and Handover** (snags, inspections, safety checks and the handover pack). Role agents record, chase and prepare; people decide.',

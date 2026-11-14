@@ -500,7 +500,7 @@ module.exports = {
             targets: [{ name: 'Quality problems closed', kind: 'tasks', tasks: ['qa.ncr-112', 'qa.ncr-118', 'qa.ncr-119', 'qa.ncr-120', 'qa.ncr-121', 'qa.cc-027', 'qa.ca-040', 'qa.ca-042'] }],
         },
     ],
-    dashboard: { name: 'Plant overview', project: 'ord', cards: ['tasks_by_status', 'at_risk', 'due_soon', 'project_pulse'] },
+    dashboard: { name: 'Plant overview', project: 'ord', cards: ['tasks_by_status', 'at_risk', 'due_soon', 'project_pulse', 'logged_vs_estimate', 'my_time'] },
     guide: {
         project: 'ord',
         intro: 'Forgeline machines precision metal parts (brackets, housings and shafts) for makers of agricultural and automotive machinery, on one site with three CNC cells. You are signed in as the **Plant Manager**. Three processes run side by side: **Customer Orders** (from purchase order to delivery), **Quality** (non-conformances, complaints and corrective actions) and **Maintenance** (breakdowns, planned work and calibration). Role agents record, check and plan; people decide.',

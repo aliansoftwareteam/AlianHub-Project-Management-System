@@ -514,7 +514,7 @@ module.exports = {
             targets: [{ name: 'Attendance concerns resolved', kind: 'tasks', tasks: ['pas.att-022', 'pas.att-027', 'pas.att-029', 'pas.att-031', 'pas.att-034'] }],
         },
     ],
-    dashboard: { name: 'School at a glance', project: 'pas', cards: ['tasks_by_status', 'at_risk', 'due_soon', 'project_pulse'] },
+    dashboard: { name: 'School at a glance', project: 'pas', cards: ['tasks_by_status', 'at_risk', 'due_soon', 'project_pulse', 'logged_vs_estimate', 'my_time'] },
     guide: {
         project: 'pas',
         intro: 'Maple Grove is a secondary school for ages 11 to 18, with about 900 pupils. You are signed in as the **Headteacher**. Three processes run side by side: **Curriculum and Exams** (course plans, mock exams, coursework and exam entries), **Pastoral and Attendance** (attendance concerns, parent updates and cover for absent staff) and **Admissions and Events** (applications, the open evening and trips). Role agents plan, check and draft; staff decide and send.',

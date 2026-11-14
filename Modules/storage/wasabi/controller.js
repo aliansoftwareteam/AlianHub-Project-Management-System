@@ -239,7 +239,10 @@ exports.uploadThumbnailFileFromBase64 = (base64,path,name,width,height,companyId
  */
 exports.uploadMainFileForbase64Thumbnail = (companyId, path, base64String, replaceFile, thumbanilKey, isUserProfile = false) => {
     return new Promise((resolve, reject) => {
-        const updatedFilePath = timestamped(path, isUserProfile ? '' : '/');
+        // A profile image's owner id must stay the first thing in the name (bucketAccess's
+        // mayWriteProfileImage requires it), and the caller's own random suffix already makes
+        // it unique — same as uploadFileWasabiPromise does for the non-base64 upload route.
+        const updatedFilePath = isUserProfile ? path : timestamped(path, '/');
 
         let thumInd = thumbnailArray.findIndex((data)=>{
             return data.key === thumbanilKey
@@ -800,20 +803,18 @@ exports.deleteFileWasabi = async (req, res) => {
     }
 };
 
-const bucketSizes = async (owner) => {
-    let totalSize = 0;
+const screenshotSizeOf = async (owner) => {
     let screenshotSize = 0;
     for await (const object of storage.list(owner)) {
-        totalSize += object.size;
         if (isScreenshotStorageKey(object.key)) screenshotSize += object.size;
     }
-    return { totalSize, screenshotSize };
+    return screenshotSize;
 };
 
 exports.getBucketSizeCompanyWise = async(companyId) => {
     try {
-        await bucketSizes(JSON.parse(JSON.stringify(companyId)))
-        .then(async({ totalSize, screenshotSize }) => {
+        await screenshotSizeOf(JSON.parse(JSON.stringify(companyId)))
+        .then(async(screenshotSize) => {
             let mongoObj = {
                 type: SCHEMA_TYPE.COMPANIES,
                 data: [
@@ -822,7 +823,6 @@ exports.getBucketSizeCompanyWise = async(companyId) => {
                     },
                     {
                         $set: {
-                            bucketSize: `${totalSize / (1024 * 1024)}`,
                             trackshotSize: screenshotSize / (1024 * 1024)
                         }
                     }

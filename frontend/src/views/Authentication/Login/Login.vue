@@ -1,5 +1,5 @@
 <template>
-    <AuthShell :proof="step === 'login'">
+    <AuthShell :proof="step === 'login'" :source-link="false">
         <template #top-right>
             <span v-if="step === 'login' && showRegister">{{ $t('Auth.new_here') }} <router-link to="/signup">{{ $t('Auth.create_account') }}</router-link></span>
         </template>
@@ -159,9 +159,6 @@
             <router-link to="/business" class="auth__field-link">+ {{ $t('Auth.create_workspace') }}</router-link>
         </div>
 
-        <template #foot-right>
-            <a v-if="step === 'login' && brand.helpLink" :href="brand.helpLink" target="_blank" rel="noopener">{{ $t('Auth.locked_out') }}</a>
-        </template>
     </AuthShell>
 </template>
 
