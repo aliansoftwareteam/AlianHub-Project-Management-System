@@ -16,6 +16,77 @@ from [Conventional Commits](https://www.conventionalcommits.org/) on `main`.
 
 ---
 
+## [14.44.0](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/compare/v14.43.0...v14.44.0) (2026-11-14)
+
+
+### 🚀 Features
+
+* **agents:** agents use only the connectors ticked on them ([7ba310a](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/7ba310a0aafc3bd6e44d77b6f07561843e6c7397))
+* **ai:** connectors in the AI chat ([3395c59](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/3395c5932f6a2891207c5856383b9be69ac8c9ca))
+* **ai:** guide people through handing tasks to their own Claude Code ([e0721bc](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/e0721bc8541f0203d97689f9fb67077e217b1882))
+* **ai:** guide people through handing tasks to their own Claude Code ([4e897f3](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/4e897f339d298db899c0458fea0f42771776bdd5))
+* **ai:** redesign the Team packs page ([db00946](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/db0094644d025d659bc3b328d2478ec7f21733f0))
+* **ai:** redesign the Team packs page ([184d2fb](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/184d2fb38d615ef66e45b1db76a3988f3e5da9af))
+* **chat:** alert people to new messages and show an unread count on Chat ([c2c6f05](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/c2c6f056edf46e3be96f2e47df282529f74e6708))
+* **chat:** alert people to new messages and show an unread count on Chat ([a8530b4](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/a8530b4bb2154a14ee3db9d857dee98aba1cc7e7))
+* **connectors:** build the Outlook connector on Microsoft Graph ([bac8791](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/bac87914b83e49eaceae6b9654fd6bac2a14224e))
+* **connectors:** connectors v2 with app MCP servers, Ask, agent ticks and one Connectors screen ([914bab1](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/914bab1002047d12a5f93d4311da21b451f4963d))
+* **connectors:** custom MCP servers added by address, every tool reviewed ([9ed5d93](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/9ed5d937515f83bd4f15fc9132b67adbab98e3eb))
+* **connectors:** hosted instances sign in through one shared address ([2265374](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/2265374be61ecec296935e6b1aae06e093a028cd))
+* **connectors:** one Connectors screen under AI › Customize ([d05b5b8](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/d05b5b8a048432aa711481c38d3165771a8bad91))
+* **connectors:** owners and admins look again at a tool an app changed ([48fd937](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/48fd937cf494f13833a8527314639a44498e6502))
+* **connectors:** per-user connectors with app MCP servers, Ask, agent ticks and one Connectors screen ([f5cbb05](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/f5cbb052c139329be13bff6c3b305be0f41aafcb))
+* **connectors:** reach apps through their own MCP servers ([02cd81e](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/02cd81e8f35cd2c33d046bfe604dc262abe020ca))
+* **connectors:** reach Notion, GitHub and six more apps through their MCP servers ([6d4e2ea](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/6d4e2eace0e7425b9c241326b11021a0d53c779a))
+* **connectors:** show each app's official logo on the Connectors screen ([20cb41c](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/20cb41c68d01a6729303cdb41b9e99e51158346f))
+* **connectors:** sign in to apps that register themselves, or with a personal token ([643a77c](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/643a77c5d77e0c2f30aa873bed8b4a2d3ac84dcf))
+* **integrations:** move the GitHub sync into Integrations, apart from Connectors (task 106) ([3b3d422](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/3b3d42251da883492e470c098c0c6a02e8b69983))
+* **reports:** pick a whole team in the People filter ([bbc7a78](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/bbc7a78ebb830848fc81e7a9c1d76d2f8920a041))
+* **reports:** pick a whole team in the People filter ([8171b06](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/8171b0680d5ef715f9efa4c5e454a2d4e7025e76))
+* **tracker:** desktop tracker access by role, with seats only on plans that limit them ([c954e81](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/c954e811fec23b000f6cde369da425ac6be923ff))
+* **tracker:** desktop tracker access by role, with seats only on plans that limit them ([8f069c7](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/8f069c723b8fcb0f73055cf278300c76a9b5fd0d))
+* **tracker:** redesign Settings &gt; Time tracking as plain cards ([92d7749](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/92d77496755384b494bf35cdd1f4e6cf6e0b0e27))
+* **tracker:** redesign Settings &gt; Time tracking as plain cards ([bfd354a](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/bfd354a7ae0336061a2dfd14ab059439e3b05ac1))
+* **workload:** cells show the hours, tasks move from the side panel ([e449805](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/e44980522ba73f94aa3653282506c02ce3ba001d))
+* **workload:** cells show the hours, tasks move from the side panel ([9c181b1](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/9c181b18b7fbf0e5e4a8704f650da7c5ffe662f4))
+
+
+### 🐛 Bug Fixes
+
+* **ai:** scope the project search width so it does not depend on stylesheet order ([f40edd3](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/f40edd34bf4c603b540314da141087500526e19d))
+* **connectors:** ask for connectors only where the server switched one on ([256882d](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/256882db2b81d4abec72582eb82c74270be97bc0))
+* **connectors:** point people to Connectors, not the old My connections page ([9136432](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/913643242dda8b8c888cb11b76b7f9dd31f070c8))
+* **connectors:** register only the MCP tools that were reviewed ([e01086f](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/e01086f77a45f1b07585669c9fea2d89d959294a))
+* **integrations:** open the section the address names on an open page (task 106) ([7c47809](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/7c478093050193bd608e7441a87cc087b1602f92))
+* **sso:** keep the return path and finish every SSO landing ([3874747](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/3874747d9da0e60cec2bf270be884e816673b253))
+* **sso:** land OIDC and SAML sign-ins in the workspace ([64b315e](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/64b315ec2d14c5d73c365841eaa85f2e36b8582b))
+* **sso:** land SSO sign-ins in the workspace and keep the return path ([156ae4c](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/156ae4c1f54de49bd89f20d124a49b65356d9142))
+* **sso:** stop a remembered account booting under the SSO landing ([09c4c0e](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/09c4c0efd8cf66c25021778f4a0158369daa6c78))
+* **sso:** stop a remembered account booting under the SSO landing ([d51dac8](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/d51dac8d7fc29af1c78fc98a1b981a8534e09371))
+* **ui:** size the Team packs project search with two classes ([18cc91d](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/18cc91dd32b8a259beccf72cc0243698d10949fb))
+* **workload:** draw the panel's drag grip in --ink-2 ([d609a3a](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/d609a3a5cd9a3cecfbbd7b5fde48d1d359ce2dab))
+
+
+### ♻️ Refactors
+
+* **connectors:** remove the old google calendar and cloud storage paths ([d850ef7](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/d850ef760a2735294d52a46e0849755e25399bdc))
+* **connectors:** remove the old slack bot paths ([22a20df](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/22a20df16181935efaaf6bb77ffc815a8c7d1e8c))
+
+
+### 📘 Documentation
+
+* add SEO, AEO and GEO metadata, robots.txt and llms.txt to the docs site (task 105) ([61e1afe](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/61e1afe880c2d782eccb6d710fb88a8dc8651a20))
+* add SEO, AEO and GEO metadata, robots.txt and llms.txt to the docs site (task 105) ([abcad05](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/abcad059e3ea9615b69eee6648e18bc7643c52bf))
+* beta log to build 17, api doc, task progress for 092, 093, 102-105 ([89f9e5e](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/89f9e5ec77e6ea1064a461731dcfd91bfa11e37a))
+* beta log to build 17, api doc, task progress for 092, 093, 102-105 ([90b56f8](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/90b56f8df8eeef6fcdc850ce7fcd36543ba7b771))
+* **connectors:** document connectors and the integrations split on the docs site ([4a2dd57](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/4a2dd57693499b804a0014de7489d7e3eae3ca32))
+* **connectors:** document connectors and the integrations split on the docs site ([ea72766](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/ea727660a1c27e5f6b8859e21ee8e8e4955b06aa))
+* **tasks:** 097, 098 and 099 are active ([eef5783](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/eef5783ed69edc4edb64bbbabf1a0d913249ac41))
+* **tasks:** connector plan v2 on the built module ([45c64e0](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/45c64e0b13476735b04d3747400148a41d0a2f23))
+* **tasks:** connector v2 tasks built on the transport branch ([e633948](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/e633948f2943a8cfb895d0501934c0c87db0a802))
+* **tasks:** official connector logos replace the initials (101) ([1097db6](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/1097db61fb32010693bbedaa9d1883140188e001))
+* **tasks:** tell connectors and integrations apart (056 v2.1, task 106) ([b943517](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/b94351797355241a9cc1988c268f03b7810ab1ed))
+
 ## [14.43.0](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/compare/v14.42.0...v14.43.0) (2026-11-06)
 
 
