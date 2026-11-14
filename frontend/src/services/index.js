@@ -390,5 +390,5 @@ export function useAuth() {
         }
     }
 
-    return { logOut };
+    return { logOut, removeLocalValue };
 }
