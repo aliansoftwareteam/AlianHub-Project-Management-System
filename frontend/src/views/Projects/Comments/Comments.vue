@@ -118,6 +118,8 @@
                                 :showAll="mainChat && !projectData?.default"
                                 :userIds="users.map((x) => x.id)"
                                 :agents="mentionAgents"
+                                :agentsNote="ownAiNote"
+                                :agentsNoteHref="ownAiNote ? claudeCodeGuide : ''"
                                 :aiMention="threadsOn"
                                 @enter="sendFromComposer()"
                                 :sendMessageAllowed="messageAllowed"
@@ -257,6 +259,7 @@ import { applyCommentEvent, isTaskThread } from "@/composable/commentThreads";
 import { placeOfIncoming } from "./incomingComment";
 import { readsOnOpen, dividerAfterCount } from "./unreadOnOpen";
 import { fetchOwnAi, fetchRunnableAgents } from "@/views/Ai/useRunnableAgents";
+import { GUIDE, useDocsLink } from "@/composable/docsLink";
 import { maskOf } from "@/utils/iconMask";
 
 const { t } = useI18n();
@@ -461,11 +464,15 @@ const snapshotListener = ref(null);
 const initalUser = ref(null);
 const users = ref([]);
 const mentionAgents = ref([]);
+const ownAiNote = ref("");
+const claudeCodeGuide = useDocsLink(GUIDE.CLAUDE_CODE_DEVELOPER);
 /* Only a task's own thread gives an agent something to work on; chat and project threads do not. */
 watch(() => [props.taskId, props.mainChat, props.newChat], async ([taskId]) => {
     const onTask = !props.mainChat && !props.newChat && /^[0-9a-fA-F]{24}$/.test(String(taskId || ""));
-    const agents = onTask ? (await Promise.all([fetchRunnableAgents(taskId), fetchOwnAi(taskId)])).flat() : [];
-    if (taskId === props.taskId) mentionAgents.value = agents;
+    const [runnable, own] = onTask ? await Promise.all([fetchRunnableAgents(taskId), fetchOwnAi(taskId)]) : [[], []];
+    if (taskId !== props.taskId) return;
+    mentionAgents.value = [...runnable, ...own];
+    ownAiNote.value = onTask && !own.length ? t("ClaudeCodeSetup.mention_no_own_ai") : "";
 }, { immediate: true });
 const unreadMessages = ref(0);
 const unreadDivider = ref(0);
