@@ -11,7 +11,7 @@ name: Tracker release
 #   MAC_CSC_LINK, MAC_CSC_KEY_PASSWORD                      Developer ID Application certificate (.p12, base64) and password
 #   APPLE_ID, APPLE_APP_SPECIFIC_PASSWORD, APPLE_TEAM_ID    notarisation with notarytool
 #   TRACKER_GPG_PRIVATE_KEY, TRACKER_GPG_PASSPHRASE         signs the Linux SHA256SUMS
-#   DO_HOST, DO_USER, DO_SSH_KEY                            the control-plane VPS that serves downloads.alianhub.com
+#   DO_HOST, DO_USER, DO_SSH_KEY                            the AlianHub VPS that serves downloads.alianhub.com
 #                                                           (shared with main.yml); without them the files stay on the run
 
 on:
@@ -176,7 +176,7 @@ jobs:
 
   # One job uploads every platform: installers first, then the latest*.yml manifests, so no tracker
   # ever reads a manifest that names a file not uploaded yet; then it prunes the channel once.
-  # The feed is a folder on the control-plane VPS (DO_HOST), served as
+  # The feed is a folder on the AlianHub VPS (DO_HOST, the staging deploy's server), served as
   # https://downloads.alianhub.com/tracker/ by its web server, which must send latest*.yml with
   # Cache-Control: no-cache. A platform whose build failed keeps its previous release in the feed.
   publish:
