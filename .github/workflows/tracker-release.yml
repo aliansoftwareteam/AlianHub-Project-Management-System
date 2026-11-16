@@ -6,7 +6,7 @@ name: Tracker release
 #   tracker-v6.1.0-beta.2  -> https://downloads.alianhub.com/tracker/beta/
 # The tag must equal the version in time-tracker-app/package.json.
 #
-# Secrets. Without a system's signing secrets a beta builds unsigned and a stable release stops:
+# Secrets. All optional: without a system's signing secrets it builds unsigned, beta and stable alike:
 #   WIN_CSC_LINK, WIN_CSC_KEY_PASSWORD                      Windows code-signing certificate (.pfx, base64) and password
 #   MAC_CSC_LINK, MAC_CSC_KEY_PASSWORD                      Developer ID Application certificate (.p12, base64) and password
 #   APPLE_ID, APPLE_APP_SPECIFIC_PASSWORD, APPLE_TEAM_ID    notarisation with notarytool
@@ -98,11 +98,10 @@ jobs:
             mac) [ -n "$MAC_CSC_LINK" ] && [ -n "$APPLE_ID" ] && [ -n "$APPLE_TEAM_ID" ] && signed=true || signed=false ;;
             linux) [ -n "$GPG_KEY" ] && signed=true || signed=false ;;
           esac
-          if [ "$signed" != true ] && [ "$CHANNEL" = stable ]; then
-            echo "::error::No signing secrets for ${{ matrix.platform }}; a stable tracker is never published unsigned."
-            exit 1
-          fi
-          [ "$signed" = true ] || echo "::warning::Building ${{ matrix.platform }} unsigned for the beta channel."
+          # Signing is optional until the certificates exist: without a system's secrets it builds
+          # unsigned on every channel, stable included (Windows SmartScreen warns, macOS Gatekeeper
+          # needs right-click → Open, and macOS cannot auto-update an unsigned app).
+          [ "$signed" = true ] || echo "::warning::Building ${{ matrix.platform }} unsigned for the $CHANNEL channel: no signing secrets."
           echo "signed=$signed" >> "$GITHUB_OUTPUT"
 
       - name: Build the renderer and main process
