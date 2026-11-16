@@ -192,7 +192,9 @@ jobs:
           fi
           target="s3://$BUCKET/tracker/$CHANNEL/"
           endpoint=${ENDPOINT:+--endpoint-url "$ENDPOINT"}
-          aws s3 cp . "$target" $endpoint --recursive --exclude "*" \
+          # Public: the updater, the web app and the downloads CDN fetch these without credentials,
+          # and S3-compatible stores (DigitalOcean Spaces, Wasabi) make uploads private by default.
+          aws s3 cp . "$target" $endpoint --recursive --acl public-read --exclude "*" \
             --include "*.exe" --include "*.blockmap" --include "*.dmg" --include "*.zip" \
             --include "*.AppImage" --include "*.deb" --include "SHA256SUMS*"
-          aws s3 cp . "$target" $endpoint --recursive --exclude "*" --include "latest*.yml" --cache-control "no-cache"
+          aws s3 cp . "$target" $endpoint --recursive --acl public-read --exclude "*" --include "latest*.yml" --cache-control "no-cache"
