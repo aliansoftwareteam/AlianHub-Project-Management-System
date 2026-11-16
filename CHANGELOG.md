@@ -16,6 +16,14 @@ from [Conventional Commits](https://www.conventionalcommits.org/) on `main`.
 
 ---
 
+## [14.45.1](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/compare/v14.45.0...v14.45.1) (2026-11-16)
+
+
+### 🐛 Bug Fixes
+
+* **deps:** install @modelcontextprotocol/sdk in the production image ([8f4ac5f](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/8f4ac5f98fa47bb34fff1a61ff579e5e8a60eb77))
+* **deps:** install @modelcontextprotocol/sdk in the production image ([19820e2](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/19820e2fcae86dd0c896929626fc09f998a78e61))
+
 ## [14.45.0](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/compare/v14.44.1...v14.45.0) (2026-11-14)
 
 
