@@ -58,9 +58,12 @@ jobs:
       # using this job's own GITHUB_TOKEN. GitHub suppresses workflow runs
       # that would otherwise be chained from a GITHUB_TOKEN-authored event,
       # so docker.yml's `on: release: published` trigger never fires for it.
-      # Dispatch it explicitly instead.
+      # Dispatch it explicitly instead, on the new tag: docker.yml applies the
+      # version tags, signature check and release index only to refs/tags/v*.
+      # The job has no checkout, so gh is told the repository.
       - name: Trigger Docker build
         if: steps.release.outputs.release_created == 'true'
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: gh workflow run docker.yml --ref main
+          TAG: ${{ steps.release.outputs.tag_name }}
+        run: gh workflow run docker.yml --repo "$GITHUB_REPOSITORY" --ref "$TAG"
