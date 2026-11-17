@@ -34,6 +34,7 @@ import { isSignInLanding, startSignInLanding } from '@/router/sessionCheck';
 import Login from '@/views/Authentication/Login/Login.vue';
 
 const landFromSso = async (query) => {
+    mocks.route.name = 'Log-in';
     mocks.route.query = query;
     const wrapper = mount(Login, {
         global: {
@@ -132,6 +133,23 @@ describe('landing on the sign-in page after single sign-on', () => {
         // Reloading on /login?magic=ok&uid=… would sign in again and reload again, for ever.
         expect(mocks.replace).toHaveBeenCalledWith(`/${SSO_COMPANY}`);
         expect(mocks.replace.mock.invocationCallOrder[0]).toBeLessThan(reload.mock.invocationCallOrder[0]);
+    });
+
+    it('reloads a password sign-in in place, as before, so the reload comes before the workspace address', async () => {
+        mocks.apiRequestWithoutCompnay.mockImplementation(async (type, url) => (url === env.USER_AND_COMAPNY_CHECK
+            ? { data: { status: true, data: { userData: { _id: USER_ID, isEmailVerified: true, AssignCompany: [SSO_COMPANY] }, companyId: SSO_COMPANY, isCompanyFind: true, companies: [{ _id: SSO_COMPANY, Cst_CompanyName: 'Acme' }] } } }
+            : { status: 200, data: {} }));
+        mocks.apiRequestWithoutSecure.mockResolvedValue({ status: 200, data: { uid: USER_ID } });
+        const wrapper = await landFromSso({});
+        await wrapper.find('#email').setValue('owner@example.test');
+        await wrapper.find('#password').setValue('Str0ng!pass');
+
+        await wrapper.find('form').trigger('submit');
+        await flushPromises();
+
+        expect(localStorage.getItem('selectedCompany')).toBe(SSO_COMPANY);
+        expect(mocks.replace).not.toHaveBeenCalled();
+        expect(reload).toHaveBeenCalled();
     });
 
     it('still leaves the sign-in page and reloads when the router refuses the navigation', async () => {
