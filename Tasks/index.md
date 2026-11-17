@@ -96,3 +96,11 @@ Auto-maintained registry of all tasks. Reflects YAML frontmatter from each `task
 | 100 | Connectors — sign-in for MCP apps: discovery, self-registration once per workspace, personal tokens | active | high | 066, 092 | active/100-connectors-mcp-sign-in |
 | 101 | Connectors — screen redesign: AI → Customize → Connectors, like Claude's | active | high | 072 | active/101-connectors-screen-redesign |
 | 106 | Integrations and Connectors — two places, each saying what it holds; App connections moves into Integrations | active | high | 101 | active/106-integrations-and-connectors |
+| 107 | Connectors — MCP first: live tool lists per connection, per-tool permissions like Claude's, one tool lookup for AI | backlog | high | 092, 096, 100, 101 | backlog/107-connectors-mcp-first-live-tools |
+| 108 | Connectors — exceptions doc for apps not on MCP, and FR-44/FR-45 rewritten | backlog | high | 107 | backlog/108-connectors-mcp-exceptions-doc |
+| 109 | Connectors — live tool lists and stored tool state per connection | backlog | high | 108 | backlog/109-connectors-live-tool-lists |
+| 110 | Connectors — per-tool permissions, workspace app switch and the tools screen | backlog | high | 109 | backlog/110-connectors-tool-permissions-screen |
+| 111 | Connectors — one tool lookup for Ask and agents, with missing ticks shown | backlog | high | 109, 110 | backlog/111-connectors-ai-tool-lookup |
+| 112 | Connectors — ask which app when tools from several apps fit a request | backlog | medium | 111 | backlog/112-connectors-ask-which-app |
+| 113 | Connectors — custom MCP servers on the per-connection tools model | backlog | medium | 109, 110 | backlog/113-connectors-custom-servers-per-connection |
+| 114 | Connectors — Slack on its official MCP server, or listed as an exception | backlog | medium | 109, 110 | backlog/114-connectors-slack-mcp |
