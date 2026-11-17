@@ -127,7 +127,33 @@ describe('landing on the sign-in page after single sign-on', () => {
         expect(rows).toHaveLength(2);
         rows.forEach((row) => expect(row.attributes('disabled')).toBeUndefined());
         await rows[1].trigger('click');
+        await flushPromises();
         expect(localStorage.getItem('selectedCompany')).toBe(SSO_COMPANY);
+        // Reloading on /login?magic=ok&uid=… would sign in again and reload again, for ever.
+        expect(mocks.replace).toHaveBeenCalledWith(`/${SSO_COMPANY}`);
+        expect(mocks.replace.mock.invocationCallOrder[0]).toBeLessThan(reload.mock.invocationCallOrder[0]);
+    });
+
+    it('still leaves the sign-in page and reloads when the router refuses the navigation', async () => {
+        const location = { ...window.location, reload, hash: '#/login?magic=ok' };
+        vi.spyOn(window, 'location', 'get').mockReturnValue(location);
+        const wrapper = await landFromSso({ magic: 'ok', uid: USER_ID });
+        mocks.replace.mockRejectedValue(new Error('guard failed'));
+
+        await wrapper.findAll('.auth__ws-item')[1].trigger('click');
+        await flushPromises();
+
+        expect(location.hash).toBe(`#/${SSO_COMPANY}`);
+        expect(reload).toHaveBeenCalled();
+    });
+
+    it('leaves the sign-in page before reloading when a sign-in link opens the only workspace', async () => {
+        mocks.apiRequestWithoutCompnay.mockImplementation(async (type, url) => (url === env.USER_AND_COMAPNY_CHECK
+            ? { data: { status: true, data: { userData: { _id: USER_ID, isEmailVerified: true, AssignCompany: [SSO_COMPANY] }, companyId: SSO_COMPANY, isCompanyFind: true, companies: [{ _id: SSO_COMPANY, Cst_CompanyName: 'Acme' }] } } }
+            : { status: 200, data: {} }));
+        await landFromSso({ magic: 'ok', uid: USER_ID });
+
+        expect(mocks.replace).toHaveBeenCalledWith(`/${SSO_COMPANY}`);
         expect(reload).toHaveBeenCalled();
     });
 

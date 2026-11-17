@@ -387,14 +387,17 @@ const finishLogin = async (cid, redirect = route.query.redirect_url) => {
     localStorage.setItem("selectedCompany", cid);
     localStorage.setItem("isLogging", "true");
     localStorage.removeItem("ForgotEmail");
-    if (redirect && redirect !== "/login") {
-        if (redirect === "/") await router.replace(`/${cid}`);
-        else {
-            const tmpcid = redirect.split("/")[1];
-            const ok = (tmpcid && userData.value?.AssignCompany?.includes(tmpcid)) || tmpcid === "oauth2" || redirect === "/oauth/consent" || INVITATION_REDIRECT.test(redirect);
-            await router.replace(ok ? redirect : `/${cid}`);
-        }
+    // Always leave the sign-in page before reloading: reloading /login?magic=ok&uid=… (or sso=ok) starts the
+    // landing again, which signs in and reloads again, for ever.
+    let target = `/${cid}`;
+    if (redirect && redirect !== "/" && redirect !== "/login") {
+        const tmpcid = redirect.split("/")[1];
+        const ok = (tmpcid && userData.value?.AssignCompany?.includes(tmpcid)) || tmpcid === "oauth2" || redirect === "/oauth/consent" || INVITATION_REDIRECT.test(redirect);
+        if (ok) target = redirect;
     }
+    // A route guard that fails (its user lookup answering 500, say) rejects the navigation; the reload still has
+    // to happen, and still somewhere other than the sign-in page.
+    await router.replace(target).catch(() => { window.location.hash = `#${target}`; });
     window.location.reload();
 };
 const chooseWorkspace = (w) => { busy.value = true; finishLogin(w._id); };
