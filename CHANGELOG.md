@@ -16,6 +16,14 @@ from [Conventional Commits](https://www.conventionalcommits.org/) on `main`.
 
 ---
 
+## [14.46.1](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/compare/v14.46.0...v14.46.1) (2026-11-17)
+
+
+### 🐛 Bug Fixes
+
+* **auth:** clickable workspace choice after a sign-in link; a way in for hosted owners ([9e0f3b5](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/9e0f3b562a4dc1d9f8b115860072fc1202daf929))
+* **auth:** clickable workspace choice after a sign-in link; a way in for hosted owners ([e688855](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/e68885520ef1c859fab4397dc674eaf536a02570))
+
 ## [14.46.0](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/compare/v14.45.1...v14.46.0) (2026-11-17)
 
 
