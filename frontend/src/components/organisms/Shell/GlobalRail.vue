@@ -139,6 +139,10 @@
                                 </span>
                             </button>
                         </template>
+                        <div v-else class="ah-pop__sep"></div>
+                        <button type="button" class="ah-pop__item" role="menuitem" data-test="rail-new-workspace" @click="openNewWorkspace()">
+                            <ShellIcon name="plus" :size="15" /><span>{{ $t('Shell.new_workspace') }}</span>
+                        </button>
                         <div class="ah-pop__sep"></div>
                         <button type="button" class="ah-pop__item" role="menuitem" @click="logout()">
                             <ShellIcon name="logout" :size="15" /><span>{{ $t('Shell.logout') }}</span>
@@ -151,11 +155,12 @@
                 </transition>
             </div>
         </div>
+        <CreateWorkspaceSidebar v-if="newWorkspaceOpen" v-model:visible="newWorkspaceOpen" />
     </nav>
 </template>
 
 <script setup>
-import { computed, defineEmits, inject, onMounted, onUnmounted, ref, watch } from "vue";
+import { computed, defineAsyncComponent, defineEmits, inject, onMounted, onUnmounted, ref, watch } from "vue";
 import { useRouter } from "vue-router";
 import { useStore } from "vuex";
 import ShellIcon from "./ShellIcon.vue";
@@ -173,6 +178,9 @@ import KeyHint from "@/components/atom/KeyHint/KeyHint.vue";
 import { ariaKeyShortcuts, openShortcutSheet, shortcutHint } from "@/composable/shortcuts";
 import { useNavUnread } from "./navUnread";
 import { useDemoIndustry } from "@/composable/useDemoIndustry";
+
+// Loaded on first open: the rail is on every page, creating a workspace is rare.
+const CreateWorkspaceSidebar = defineAsyncComponent(() => import("@/components/organisms/CreateWorkspaceSidebar/CreateWorkspaceSidebar.vue"));
 
 const emit = defineEmits(["change"]);
 const companyId = inject("$companyId");
@@ -250,6 +258,11 @@ const switchCompany = (company) => {
     emit("change", company._id);
 };
 const logout = () => logOut({ islogOut: true });
+const newWorkspaceOpen = ref(false);
+const openNewWorkspace = () => {
+    closePopovers();
+    newWorkspaceOpen.value = true;
+};
 const profileBtn = ref(null);
 // The menu row is gone by the time the sheet closes, so focus is parked on the button that will get it back.
 const showShortcuts = () => {
