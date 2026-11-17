@@ -16,6 +16,19 @@ from [Conventional Commits](https://www.conventionalcommits.org/) on `main`.
 
 ---
 
+## [14.46.0](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/compare/v14.45.1...v14.46.0) (2026-11-17)
+
+
+### 🚀 Features
+
+* **workspaces:** create a workspace from inside the app ([62fcb90](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/62fcb90252a555e0b63877169fd529b274b2620c))
+* **workspaces:** create a workspace from inside the app ([6d98674](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/6d98674ea4db29382a721d9f97fa57ae02b4651b))
+
+
+### 📘 Documentation
+
+* **ci:** name the AlianHub VPS as the tracker downloads server ([24a9362](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/24a9362f6ea0a3d195565850827b775601bf158e))
+
 ## [14.45.1](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/compare/v14.45.0...v14.45.1) (2026-11-16)
 
 
