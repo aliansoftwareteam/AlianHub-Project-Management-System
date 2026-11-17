@@ -175,7 +175,7 @@ import ProviderButton from "@/plugins/oauth/ProviderButton.vue";
 import ShellIcon from "@/components/organisms/Shell/ShellIcon.vue";
 import { apiRequestWithoutCompnay, apiRequestWithoutSecure, getAuth, SESSION_EXPIRED_KEY } from "@/services";
 import * as env from "@/config/env";
-import { publicConfig, enabledProviders } from "@/config/publicConfig";
+import { publicConfig, enabledProviders, isManagedHosting } from "@/config/publicConfig";
 import { forgetRememberedEmail, readRememberedEmail, saveRememberedEmail } from "@/utils/rememberedLogin";
 import { away } from "@/offline";
 import { useDemoIndustry } from "@/composable/useDemoIndustry";
@@ -319,7 +319,12 @@ const handleSubmit = async () => {
             userData.value = data.userData || null;
             step.value = "verify";
         } else if (msg === "The email or password is incorrect." || error.error_code === "InvalidPassword" || error.error === "invalid username/password") {
-            errors.password = t("Auth.credentials_mismatch") + (Number.isFinite(data.attemptsLeft) ? " " + t("Auth.attempts_left", { n: data.attemptsLeft }) : "");
+            // Hosted: the owner's portal password is a different account, and theirs here starts unset.
+            errors.password = [
+                t("Auth.credentials_mismatch"),
+                Number.isFinite(data.attemptsLeft) ? t("Auth.attempts_left", { n: data.attemptsLeft }) : "",
+                isManagedHosting() ? t("Auth.no_password_yet_hint") : "",
+            ].filter(Boolean).join(" ");
         } else if (msg === "Your email has been blocked. Please contact the administrator.") {
             banner.value = { kind: "danger", text: t("Auth.account_blocked") };
         } else if (msg === "Auth.too_many_request" || error?.response?.status === 429) {
@@ -364,6 +369,8 @@ const proceedAfterAuth = async (userId, { workspace = "" } = {}) => {
         workspaces.value = companies;
         pendingUserId.value = userId;
         step.value = "workspace";
+        // A link or SSO landing set busy while it checked the session; the choice is the person's now.
+        busy.value = false;
         return;
     }
     finishLogin(cid);

@@ -37,7 +37,7 @@ const DAY = 24 * 60 * 60 * 1000;
 const hostingMode = require('../Config/hostingMode');
 const { recordAudit } = require('../Modules/Audit/recorder');
 const { createFirstCompany } = require('../Modules/Setup/createCompany');
-const { refusesPasswordMail } = require('../Modules/Auth/helpers/accountMail');
+const { refusesPasswordMail, mailOwnerActivation } = require('../Modules/Auth/helpers/accountMail');
 const { APP_LOCALES } = require('../Modules/Platform/provision');
 const platformAudit = require('../Modules/Platform/platformAudit');
 
@@ -106,6 +106,21 @@ describe('headless provisioning', () => {
 
     it('keeps an activation-pending owner out of every password mail', async () => {
         expect(await refusesPasswordMail('maya@acme.com')).toBe(true);
+    });
+
+    it('sends that owner the activation link instead when they ask for a reset, and nobody else', async () => {
+        const { SendEmail } = require('../Modules/service.js');
+        SendEmail.mockClear();
+        expect(await mailOwnerActivation('someone@else.com')).toBe(false);
+        expect(SendEmail).not.toHaveBeenCalled();
+
+        expect(await mailOwnerActivation(' Maya@Acme.com ')).toBe(true);
+        const [subject, html, to] = SendEmail.mock.calls[0];
+        expect(to).toBe('maya@acme.com');
+        expect(subject).toMatch(/Set New Password/);
+        expect(html).toContain('no password yet');
+        const link = html.match(/https:\/\/acme\.example\.test\/#\/activate\?token=[\w-]+/)[0];
+        expect((await call('POST', '/api/v2/auth/activation/verify', { token: tokenOf(link) })).status).toBe(200);
     });
 
     it('answers the same order again with the same ids and a fresh link that revokes the last', async () => {

@@ -120,6 +120,17 @@ describe('landing on the sign-in page after single sign-on', () => {
         expect(reload).not.toHaveBeenCalled();
     });
 
+    it('leaves the workspace choice clickable after a sign-in link, and opens the one picked', async () => {
+        const wrapper = await landFromSso({ magic: 'ok', uid: USER_ID });
+
+        const rows = wrapper.findAll('.auth__ws-item');
+        expect(rows).toHaveLength(2);
+        rows.forEach((row) => expect(row.attributes('disabled')).toBeUndefined());
+        await rows[1].trigger('click');
+        expect(localStorage.getItem('selectedCompany')).toBe(SSO_COMPANY);
+        expect(reload).toHaveBeenCalled();
+    });
+
     it('reads the account only once the session is renewed, so the read never carries the token being replaced', async () => {
         let renewed;
         mocks.getAuth.mockReturnValue(new Promise((resolve) => { renewed = resolve; }));
