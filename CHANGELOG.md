@@ -16,6 +16,17 @@ from [Conventional Commits](https://www.conventionalcommits.org/) on `main`.
 
 ---
 
+## [14.46.2](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/compare/v14.46.1...v14.46.2) (2026-11-17)
+
+
+### 🐛 Bug Fixes
+
+* **auth:** leave the sign-in page before reloading after a sign-in link ([92f62dd](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/92f62dd4654a7c8480547f5d82622eb0a5997bf8))
+* **auth:** leave the sign-in page before reloading after a sign-in link ([32f1887](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/32f18877befbeea708574c95049de70006843ae0))
+* **auth:** leave the sign-in page first only after a sign-in link ([256471d](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/256471d1e4c3af98d2ea37f6c12aece3a30b2314))
+* **auth:** leave the sign-in page first only after a sign-in link ([2747b31](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/2747b316e9db2ae416e153452e5da248aee8ea0c))
+* **auth:** reload off the sign-in page even when the router refuses ([0c4e47c](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/0c4e47c115bb6cde0233e6ce23a929a2cbab2d12))
+
 ## [14.46.1](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/compare/v14.46.0...v14.46.1) (2026-11-17)
 
 

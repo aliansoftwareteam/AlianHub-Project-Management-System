@@ -179,6 +179,7 @@ import { publicConfig, enabledProviders, isManagedHosting } from "@/config/publi
 import { forgetRememberedEmail, readRememberedEmail, saveRememberedEmail } from "@/utils/rememberedLogin";
 import { away } from "@/offline";
 import { useDemoIndustry } from "@/composable/useDemoIndustry";
+import { isSignInLanding } from "@/router/sessionCheck";
 
 const SSO_ERRORS = { not_allowed: "Auth.sso_not_allowed", seat_limit: "Plan.refused.seat_limit", config: "Auth.sso_not_configured" };
 
@@ -387,14 +388,17 @@ const finishLogin = async (cid, redirect = route.query.redirect_url) => {
     localStorage.setItem("selectedCompany", cid);
     localStorage.setItem("isLogging", "true");
     localStorage.removeItem("ForgotEmail");
+    // A plain /login reloads in place and the router then opens Home. A sign-in landing (/login?magic=ok&uid=…,
+    // or sso=ok) must be left first: reloading it signs in again and reloads again, for ever.
+    let target = isSignInLanding(route) ? `/${cid}` : "";
     if (redirect && redirect !== "/login") {
-        if (redirect === "/") await router.replace(`/${cid}`);
-        else {
-            const tmpcid = redirect.split("/")[1];
-            const ok = (tmpcid && userData.value?.AssignCompany?.includes(tmpcid)) || tmpcid === "oauth2" || redirect === "/oauth/consent" || INVITATION_REDIRECT.test(redirect);
-            await router.replace(ok ? redirect : `/${cid}`);
-        }
+        const tmpcid = redirect.split("/")[1];
+        const ok = (tmpcid && userData.value?.AssignCompany?.includes(tmpcid)) || tmpcid === "oauth2" || redirect === "/oauth/consent" || INVITATION_REDIRECT.test(redirect);
+        target = redirect !== "/" && ok ? redirect : `/${cid}`;
     }
+    // A route guard that fails (its user lookup answering 500, say) rejects the navigation; the reload still has
+    // to happen, and still somewhere other than the sign-in page.
+    if (target) await router.replace(target).catch(() => { window.location.hash = `#${target}`; });
     window.location.reload();
 };
 const chooseWorkspace = (w) => { busy.value = true; finishLogin(w._id); };
