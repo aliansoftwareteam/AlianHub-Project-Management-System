@@ -387,13 +387,13 @@ const finishLogin = async (cid, redirect = route.query.redirect_url) => {
     localStorage.setItem("selectedCompany", cid);
     localStorage.setItem("isLogging", "true");
     localStorage.removeItem("ForgotEmail");
-    if (redirect && redirect !== "/login") {
-        if (redirect === "/") await router.replace(`/${cid}`);
-        else {
-            const tmpcid = redirect.split("/")[1];
-            const ok = (tmpcid && userData.value?.AssignCompany?.includes(tmpcid)) || tmpcid === "oauth2" || redirect === "/oauth/consent" || INVITATION_REDIRECT.test(redirect);
-            await router.replace(ok ? redirect : `/${cid}`);
-        }
+    // Always leave the sign-in page before reloading: reloading /login?magic=ok&uid=… (or sso=ok) starts the
+    // landing again, which signs in and reloads again, for ever.
+    if (!redirect || redirect === "/" || redirect === "/login") await router.replace(`/${cid}`);
+    else {
+        const tmpcid = redirect.split("/")[1];
+        const ok = (tmpcid && userData.value?.AssignCompany?.includes(tmpcid)) || tmpcid === "oauth2" || redirect === "/oauth/consent" || INVITATION_REDIRECT.test(redirect);
+        await router.replace(ok ? redirect : `/${cid}`);
     }
     window.location.reload();
 };
