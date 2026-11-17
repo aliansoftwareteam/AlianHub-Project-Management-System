@@ -48,7 +48,15 @@ const WASABI_TEMP = path.resolve('wasabiUploads');
 const SCREENSHOT = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==', 'base64');
 const PROFILE_IMAGE = `${USER}_${hex()}.png`;
 
-const tempFiles = () => (fs.existsSync(WASABI_TEMP) ? fs.readdirSync(WASABI_TEMP).sort() : []);
+/* Each capture carries bytes no other test sends: wasabiUploads is shared with test files running
+ * in parallel (and one of them removes it), so "nothing written" means no temp file holds these
+ * bytes, not that the folder's listing stayed the same. Trailing bytes after IEND leave a valid PNG. */
+const uniqueShot = () => Buffer.concat([SCREENSHOT, crypto.randomBytes(16)]);
+const readOrNull = (file) => { try { return fs.readFileSync(file); } catch { return null; } };
+// One read, not an exists check then a read: the folder can go between the two. Only "missing" means empty.
+const listOrEmpty = (dir) => { try { return fs.readdirSync(dir); } catch (err) { if (err.code === 'ENOENT') return []; throw err; } };
+const tempHolds = (bytes) => listOrEmpty(WASABI_TEMP)
+    .some((name) => { const held = readOrNull(path.join(WASABI_TEMP, name)); return Boolean(held && held.equals(bytes)); });
 const TIMER = hex();
 const PROJECT = hex();
 const trackerPath = () => `Project/${PROJECT}/Sprint/${hex()}/TimeLog/${TIMER}/${Date.now()}.png`;
@@ -66,9 +74,9 @@ beforeEach(() => {
 });
 
 /* Same fields, in the same order, as TrackerController.ScreenShotCapture in time-tracker-app. */
-function trackerForm({ companyId, filePath, fileFirst = false }) {
+function trackerForm({ companyId, filePath, fileFirst = false, shot = SCREENSHOT }) {
     const form = new FormData();
-    const appendFile = () => form.append('file', new Blob([SCREENSHOT], { type: 'image/png' }), 'screenshot.png');
+    const appendFile = () => form.append('file', new Blob([shot], { type: 'image/png' }), 'screenshot.png');
     if (fileFirst) appendFile();
     form.append('strokes', '[]');
     form.append('companyId', companyId);
@@ -117,40 +125,40 @@ describe.each(['server', 'wasabi'])('time tracker captures on %s storage', (stor
         headers: { companyid: companyHeader },
         body: trackerForm(fields),
     });
-    const nothingWritten = (bucket, filePath, tempBefore) => (storageType === 'server'
+    const nothingWritten = (bucket, filePath, shot) => (storageType === 'server'
         ? !fs.existsSync(path.join(STORAGE_ROOT, bucket, filePath))
-        : JSON.stringify(tempFiles()) === JSON.stringify(tempBefore));
+        : !tempHolds(shot));
 
     it.each(['v2', 'v3', 'v4'])('refuses a %s capture whose body names another company than the header, before writing', async (version) => {
         const filePath = trackerPath();
-        const before = tempFiles();
-        const res = await capture(COMPANY_A, { companyId: COMPANY_B, filePath }, version);
+        const shot = uniqueShot();
+        const res = await capture(COMPANY_A, { companyId: COMPANY_B, filePath, shot }, version);
         expect(res.status).toBe(403);
-        expect(nothingWritten(COMPANY_B, filePath, before)).toBe(true);
+        expect(nothingWritten(COMPANY_B, filePath, shot)).toBe(true);
     });
 
     it('refuses the USER_PROFILES bucket, even for a name carrying the caller\'s id', async () => {
-        const before = tempFiles();
-        const res = await capture(COMPANY_A, { companyId: 'USER_PROFILES', filePath: PROFILE_IMAGE });
+        const shot = uniqueShot();
+        const res = await capture(COMPANY_A, { companyId: 'USER_PROFILES', filePath: PROFILE_IMAGE, shot });
         expect(res.status).toBe(403);
-        expect(nothingWritten('USER_PROFILES', PROFILE_IMAGE, before)).toBe(true);
+        expect(nothingWritten('USER_PROFILES', PROFILE_IMAGE, shot)).toBe(true);
     });
 
     it('refuses a member whose company seat is gone', async () => {
         mockAccess.seats[COMPANY_A] = [];
         const filePath = trackerPath();
-        const before = tempFiles();
-        const res = await capture(COMPANY_A, { companyId: COMPANY_A, filePath });
+        const shot = uniqueShot();
+        const res = await capture(COMPANY_A, { companyId: COMPANY_A, filePath, shot });
         expect(res.status).toBe(403);
-        expect(nothingWritten(COMPANY_A, filePath, before)).toBe(true);
+        expect(nothingWritten(COMPANY_A, filePath, shot)).toBe(true);
     });
 
     it('refuses company and path fields sent after the file', async () => {
         const filePath = trackerPath();
-        const before = tempFiles();
-        const res = await capture(COMPANY_A, { companyId: COMPANY_A, filePath, fileFirst: true });
+        const shot = uniqueShot();
+        const res = await capture(COMPANY_A, { companyId: COMPANY_A, filePath, fileFirst: true, shot });
         expect(res.status).toBe(403);
-        expect(nothingWritten(COMPANY_A, filePath, before)).toBe(true);
+        expect(nothingWritten(COMPANY_A, filePath, shot)).toBe(true);
     });
 
     it('refuses a base64 capture into another company', async () => {
@@ -165,14 +173,17 @@ describe.each(['server', 'wasabi'])('time tracker captures on %s storage', (stor
 
     it('accepts the tracker\'s capture form from an active member of the header company', async () => {
         const filePath = trackerPath();
-        const res = await capture(COMPANY_A, { companyId: COMPANY_A, filePath });
+        const shot = uniqueShot();
+        const res = await capture(COMPANY_A, { companyId: COMPANY_A, filePath, shot });
         expect(res.status).toBe(200);
         const body = await res.json();
         expect(body.reached).toBe(true);
+        // The same check the refusals rely on sees a file that was written.
+        expect(nothingWritten(COMPANY_A, filePath, shot)).toBe(false);
         if (storageType === 'server') {
-            expect(fs.readFileSync(path.join(STORAGE_ROOT, COMPANY_A, filePath))).toEqual(SCREENSHOT);
+            expect(fs.readFileSync(path.join(STORAGE_ROOT, COMPANY_A, filePath))).toEqual(shot);
         } else {
-            expect(fs.readFileSync(body.file)).toEqual(SCREENSHOT);
+            expect(fs.readFileSync(body.file)).toEqual(shot);
             fs.rmSync(body.file, { force: true });
         }
     });
