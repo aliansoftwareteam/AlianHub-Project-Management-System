@@ -53,7 +53,9 @@ const PROFILE_IMAGE = `${USER}_${hex()}.png`;
  * bytes, not that the folder's listing stayed the same. Trailing bytes after IEND leave a valid PNG. */
 const uniqueShot = () => Buffer.concat([SCREENSHOT, crypto.randomBytes(16)]);
 const readOrNull = (file) => { try { return fs.readFileSync(file); } catch { return null; } };
-const tempHolds = (bytes) => (fs.existsSync(WASABI_TEMP) ? fs.readdirSync(WASABI_TEMP) : [])
+// One read, not an exists check then a read: the folder can go between the two. Only "missing" means empty.
+const listOrEmpty = (dir) => { try { return fs.readdirSync(dir); } catch (err) { if (err.code === 'ENOENT') return []; throw err; } };
+const tempHolds = (bytes) => listOrEmpty(WASABI_TEMP)
     .some((name) => { const held = readOrNull(path.join(WASABI_TEMP, name)); return Boolean(held && held.equals(bytes)); });
 const TIMER = hex();
 const PROJECT = hex();
