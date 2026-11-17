@@ -303,6 +303,7 @@ export default {
         "password_required": "Enter your password.",
         "password_mismatch": "That password doesn't match this email.",
         "credentials_mismatch": "That email and password don't match. Check both, or reset your password.",
+        "no_password_yet_hint": "First time signing in here? Your AlianHub account password doesn't work on this workspace: use Forgot password to set one.",
         "account_blocked": "This account is blocked. Ask your administrator to unblock it.",
         "attempts_left": "{n} attempts left.",
         "account_unknown": "No account with that email. Check the spelling, or create one.",
