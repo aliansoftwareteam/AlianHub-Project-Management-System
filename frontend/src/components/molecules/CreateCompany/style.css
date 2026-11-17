@@ -115,6 +115,13 @@ ul.imageUplaod li span {
 
 .companyWrapper .company-name { color: var(--ink); overflow-wrap: anywhere; }
 
+/* Same size and shape as a workspace tile, drawn as an empty slot. */
+.add-workspace { display: flex; flex-direction: column; align-items: center; width: 100%; padding: 0; border: 0; background: none; color: var(--ink-2); font: inherit; }
+ul.imageUplaod li .add-workspace .add-workspace__ring { box-sizing: border-box; width: 180px; height: 180px; padding: 0; border-radius: 50%; border: 2px dashed var(--border); background: var(--surface-2); color: var(--ink-2); transition: border-color .15s, color .15s; }
+.add-workspace:hover .add-workspace__ring, .add-workspace:focus-visible .add-workspace__ring { border-color: var(--brand); color: var(--brand); }
+.add-workspace:focus-visible { outline: none; }
+.add-workspace:focus-visible .add-workspace__ring { box-shadow: var(--focus); }
+
 span:has(img.companyimg) {
     height: 180px;
     width: 180px;

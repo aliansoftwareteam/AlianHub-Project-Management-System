@@ -15,21 +15,32 @@
                         </div>
                         <span class="company-name">{{ item.Cst_CompanyName }}</span>
                     </li>
+                    <li>
+                        <button type="button" class="add-workspace" data-test="settings-new-workspace" @click="newWorkspaceOpen = true">
+                            <span class="add-workspace__ring"><ShellIcon name="plus" :size="48" /></span>
+                            <span class="company-name">{{ $t('Shell.new_workspace') }}</span>
+                        </button>
+                    </li>
                 </ul>
             </div>
         </div>
+        <CreateWorkspaceSidebar v-if="newWorkspaceOpen" v-model:visible="newWorkspaceOpen" />
     </div>
 </template>
 
 <script setup>
-import { computed } from "vue";
+import { computed, defineAsyncComponent, ref } from "vue";
 import { useStore } from "vuex";
 import WasabiIamgeCompp from "@/components/atom/WasabiIamgeCompp/WasabiIamgeCompp.vue";
+import ShellIcon from "@/components/organisms/Shell/ShellIcon.vue";
 
 defineOptions({ name: "CompanyComponent" });
 
+const CreateWorkspaceSidebar = defineAsyncComponent(() => import("@/components/organisms/CreateWorkspaceSidebar/CreateWorkspaceSidebar.vue"));
+
 const { getters } = useStore();
 const companies = computed(() => getters["settings/companies"]);
+const newWorkspaceOpen = ref(false);
 </script>
 
 <style scoped>
