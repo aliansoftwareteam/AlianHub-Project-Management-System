@@ -3089,6 +3089,7 @@
     "Auth.new_password_title": "Choose a new password",
     "Auth.new_project": "New project",
     "Auth.no_account_ask_admin": "Log in to your workspace. No account yet? Ask your workspace admin to invite you.",
+    "Auth.no_password_yet_hint": "First time signing in here? Your AlianHub account password doesn't work on this workspace: use Forgot password to set one.",
     "Auth.no_sample": "Starts empty. Add your first task after creating.",
     "Auth.no_templates_match": "No template matches. Try another word, or start blank.",
     "Auth.not_you": "Not {email}?",
