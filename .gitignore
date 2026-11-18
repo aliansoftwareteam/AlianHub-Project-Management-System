@@ -11,6 +11,8 @@ jspm_packages
 .env.*.local
 .env.*
 
+/frontend/.env.*
+
 # Log files
 npm-debug.log*
 yarn-debug.log*
