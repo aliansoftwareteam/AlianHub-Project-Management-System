@@ -11,3 +11,4 @@ Auto-maintained registry of all tasks. Reflects YAML frontmatter from each `task
 | 005 | First-run experience — close the 13 gaps | active | high | — | active/005-first-run-experience |
 | 006 | Remove auto-assignee from task creation | done | medium | — | done/006-remove-task-auto-assignee |
 | 007 | Fix "Invalid URL" on member invitation links | done | high | — | done/007-fix-invite-link-invalid-url |
+| 008 | Demo site lead-capture popup (Email, Name, Find from → Google Sheets) | active | medium | — | active/008-demo-lead-capture-popup |

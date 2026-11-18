@@ -155,6 +155,7 @@
             </div>
         </div>
     </Template>
+    <DemoLeadPopup v-if="isDemoMode" />
 </template>
 
 <script setup>
@@ -166,6 +167,7 @@ import { useStore } from "vuex";
 // COMPONENTS
 import AuthTemplate from "@/components/templates/Authentication/index.vue";
 import InputText from "@/components/atom/InputText/InputText.vue";
+import DemoLeadPopup from "@/components/atom/DemoLeadPopup/DemoLeadPopup.vue";
 import { useRouter , useRoute} from 'vue-router'
 import { useValidation } from "@/composable/Validation.js";
 import { isAuthDeviderShow } from "@/composable/commonFunction.js";
