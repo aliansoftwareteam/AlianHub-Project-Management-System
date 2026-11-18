@@ -12236,8 +12236,6 @@ export default {
         star: "Star on GitHub",
         deploy: "Deploy your own",
         try_demo: "Try the demo",
-        login_as_owner: "Log in as Owner/Admin",
-        login_as_member: "Log in as Member",
         lead_title: "Welcome to the AlianHub demo",
         lead_subtitle: "Tell us a little about yourself before you explore.",
         lead_name: "Name",

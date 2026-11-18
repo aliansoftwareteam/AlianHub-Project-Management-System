@@ -74,10 +74,6 @@
             <div v-if="canTryDemo" class="auth__actions">
                 <button type="button" class="ah-btn ah-btn--secondary" data-test="try-demo" :disabled="busy" @click="tryDemo">{{ $t('Demo.try_demo') }}</button>
             </div>
-            <div v-if="brand.demoMode === true" class="auth__actions">
-                <button type="button" class="ah-btn ah-btn--secondary" :disabled="busy" @click="seededDemoLogin(DEMO_OWNER_EMAIL)">{{ $t('Demo.login_as_owner') }}</button>
-                <button type="button" class="ah-btn ah-btn--secondary" :disabled="busy" @click="seededDemoLogin(DEMO_MEMBER_EMAIL)">{{ $t('Demo.login_as_member') }}</button>
-            </div>
 
             <div class="auth__remember">
                 <label><input v-model="rememberMe" type="checkbox" class="ah-check" :disabled="busy" />{{ $t('Auth.keep_signed_in') }}</label>
@@ -294,16 +290,6 @@ const userCompanyStatusCheck = (uid) => apiRequestWithoutCompnay("post", env.USE
 const tryDemo = () => {
     form.email = demo.value.email;
     form.password = demo.value.password;
-    handleSubmit();
-};
-
-// The accounts the demo DB-reset cron reseeds.
-const DEMO_OWNER_EMAIL = "owner@example.com";
-const DEMO_MEMBER_EMAIL = "member@example.com";
-const DEMO_SEEDED_PASSWORD = "Abc@1234";
-const seededDemoLogin = (email) => {
-    form.email = email;
-    form.password = DEMO_SEEDED_PASSWORD;
     handleSubmit();
 };
 

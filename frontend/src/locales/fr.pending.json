@@ -4726,8 +4726,6 @@
     "Demo.lead_subtitle": "Tell us a little about yourself before you explore.",
     "Demo.lead_thanks": "Thanks! Enjoy the demo.",
     "Demo.lead_title": "Welcome to the AlianHub demo",
-    "Demo.login_as_member": "Log in as Member",
-    "Demo.login_as_owner": "Log in as Owner/Admin",
     "Demo.login_with": "Log in with",
     "Demo.simulated": "Simulated",
     "Demo.simulated_hint": "Written for this demo to show how the agent works. No AI model ran.",
