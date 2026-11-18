@@ -1,6 +1,7 @@
 process.env.JWT_SECRET = 'session-cookie-flags-test-secret';
 process.env.JWT_ALGORITHM = 'HS256';
 process.env.JWT_EXP = '24h';
+process.env.WEBURL = 'https://app.example.test';
 
 const mockDb = require('./fixtures/fakeMongo').create();
 
@@ -23,6 +24,7 @@ const { finalizeSession, generateTokenV2 } = require('../Modules/Auth/controller
 const { finalizeSsoSession } = require('../Modules/SSO/ssoSession');
 
 const UID = '6f0000000000000000000001';
+const COMPANY = '6f00000000000000000000c1';
 const FLAG = 'SESSION_COOKIE_HTTPONLY';
 const savedFlag = process.env[FLAG];
 
@@ -88,9 +90,9 @@ describe('session cookie flags', () => {
         await new Promise((resolve) => {
             const original = out.redirect.bind(out);
             out.redirect = (url) => { original(url); resolve(url); };
-            finalizeSsoSession(req(), out, UID, '/home');
+            finalizeSsoSession(req(), out, UID, COMPANY);
         });
-        expect(out.redirected).toBe('/home');
+        expect(out.redirected).toBe(`https://app.example.test/#/login?sso=ok&uid=${UID}&workspace=${COMPANY}`);
         expect(out.cookies.map(([name]) => name).sort()).toEqual(['accessToken', 'refreshToken']);
         expect(out.cookies.every(([, options]) => options.httpOnly === true)).toBe(true);
     });

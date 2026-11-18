@@ -152,7 +152,7 @@ exports.sendTooManyRequestMail = (ip, data) => {
                 } else {
                     logger.error(`Send Too Many Request Email Send Error: ${result.error}`);
                 }
-            });
+            }, { accountMail: true });
         }).catch((error) => {
             logger.error(`Send Too Many Request Mongo Error: ${serviceCtr.mongoErrorMessage(error)}`);
         })

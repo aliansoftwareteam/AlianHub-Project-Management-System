@@ -77,6 +77,8 @@ const createRegistry = ({ dir = PROVIDERS_DIR } = {}) => {
     };
     const isOffered = (id, options) => !!get(id) && named().includes(id) && signIns(id, options).length > 0;
     const offered = (options) => list().filter((definition) => isOffered(definition.id, options));
+    /* The providers CONNECTORS names; the connector routes exist only while there is one. */
+    const switchedOn = () => list().map((definition) => definition.id).filter((id) => named().includes(id));
 
     const scopesFor = (id, products = []) => {
         const definition = get(id);
@@ -84,7 +86,7 @@ const createRegistry = ({ dir = PROVIDERS_DIR } = {}) => {
         return scopesIn(definition, products);
     };
 
-    return { list, get, isOffered, offered, scopesFor, scopesIn, signIns, SIGN_IN };
+    return { list, get, isOffered, offered, switchedOn, scopesFor, scopesIn, signIns, SIGN_IN };
 };
 
 module.exports = { ...createRegistry(), createRegistry, scopesIn, SIGN_IN };

@@ -9,144 +9,33 @@
     />
 </div>
 <div v-else>
-    <div class="ah-page timesheet_view Usertimesheet_view project-timesheet-contain" v-if="error404">
-        <div class="row">
-            <div class="col-md-12">
-                <div class="page_title_row d-flex">
-                    <div class="page-title d-flex">
-                        <ul class="breadcrumb title_strip">
-                            <li>
-                                <button type="button" class="ts-home" :aria-label="$t('Milestone.home_link')" @click="goHome()">
-                                    <span class="ah-mask-icon" :style="maskOf(home_icon)" aria-hidden="true"></span>
-                                </button>
-                            </li>
-                            <li class="pro_route_link">
-                                <router-link :to="`/${companyId}/project`" class="ts-crumb">{{$t('UserTimesheet.back_projects')}}</router-link>
-                            </li>
-                            <li>
-                                <span class="workload_title ts-crumb">{{$t('UserTimesheet.project_timesheet')}}</span>
-                            </li>
-                        </ul>
-                        <TimesheetTabs active="project" class="ts-legacy-tabs" />
-                    </div>
-                </div>
-            </div>
-        </div>
-        <div class="timesheet__wrapper page-content" :class="{'pointer-event-none': isManinSpinner}">
-            <div class="page_top_data d-flex align-items-center justify-content-between" :class="clientWidth <= 1200 ? 'flex-wrap flex-column align-items-start' : ''">
-                <div class="d-flex" :style="[{width : clientWidth <=1200 ? '100%' : 'calc(100% - 253px)'}]" :class="clientWidth <=767 ? 'flex-column' : ''"> 
-                <RangePickerComp 
-                        class="range-picker rangeComp"
-                        @SelectedDate="handleDate"
-                        preSelectType="week"
-                    />
-                    <div class="wf_filter" @click.stop="$refs.filter_pt_click.click()">
-                        <span class="timesheet_user_filter">
-                            <DropDown mode="listbox" id="" themed class="status_change_dropdown" :bodyClass="{'timesheetDropdown_wrapper' : true}">
-                                <template #button="{ triggerAttrs }">
-                                    <button type="button" class="dot-btn" v-bind="triggerAttrs" ref="filter_pt_click">
-                                        <span class="link_disable_css">{{$t('Filters.filter_by')}}</span>
-                                    </button>
-                                </template>
-                                <template #options>
-                                <DropDownOption v-if="filterType=='' && projectTimesheetPermission" @click="handleFilterType('select','Users')">
-                                    {{$t('UserTimesheet.Users')}}
-                                </DropDownOption>
-                                <DropDownOption v-if="filterType=='' && projectTimesheetPermission" @click="handleFilterType('select','Teams')">
-                                    {{$t('UserTimesheet.Teams')}}
-                                </DropDownOption>
-                                <DropDownOption v-if="filterType==''" @click="handleFilterType('select','Projects')">
-                                    {{$t('UserTimesheet.Projects')}}
-                                </DropDownOption>
-                                <div v-if="filterType!=''">
-                                    <div class="wf_header">
-                                        <a @click="handleFilterType('back','')">
-                                            <span class="ah-mask-icon ts-back" :style="maskOf(backIcon)" aria-hidden="true"></span>&nbsp;
-                                            {{ $t('UserTimesheet.back') }}
-                                        </a>
-                                        <span>{{ $t(`UserTimesheet.${filterType}`) }}</span>
-                                    </div>
-                                    <span class="filter_search_block">
-                                        <input type="search" class="ah-input" ref="filter_dd_search" :placeHolder="$t('PlaceHolder.search')" v-model="filterSearch"/>
-                                    </span>
-                                    <div class="wf_body filter_body_scroll checklist-main" :class="{'filter_body_scroll': optionFilter.length >= 5}">
-                                        <span
-                                        v-for="(item,index) in optionFilter"
-                                        class="wf_listItem users_filter_items"
-                                        :key="index"
-                                        v-show="filterType.toLowerCase()=='users' && projectTimesheetPermission">
-                                            <a class="vs-dropdown-users d-flex align-items-center">
-                                                <input type="checkbox" class="ah-check" v-show="filterType.toLowerCase() == 'users'" @click="handleFilterItem(item,'checkEvent',true)" :value="item.id" v-model="checkedFilter">&nbsp;
-                                                <UserProfile decorative
-                                                    v-if="filterType.toLowerCase() == 'users'"
-                                                    :showDot="false"
-                                                    class="timesheet_user_profile mr-10px"
-                                                    :data="{
-                                                        id: item.id,
-                                                        title: item.name,
-                                                        image: item.profile || ''
-                                                    }"
-                                                    width="22px"
-                                                    :thumbnail="'22x22'"
-                                                    @click="handleFilterItem(item,'checkEvent',true)"
-                                                />
-                                                <!-- <img v-if="filterType.toLowerCase() == 'users'" :src="item.profile ? item.profile : defaultImage" :alt="item.name" class="timesheet_user_profile" @click="handleFilterItem(item,'add')"/> -->
-                                                <span class="filter_list_item cursor-pointer" @click="handleFilterItem(item,'checkEvent',true)">{{ item.name }}</span>
-                                            </a>
-                                        </span>
-                                        <span
-                                        v-for="item in optionFilter"
-                                        class="wf_listItem users_filter_items"
-                                        :key="item.id"
-                                        v-show="filterType.toLowerCase()=='teams' && projectTimesheetPermission">
-                                            <span class="filter_list_item cursor-pointer" @click="handleFilterItem(item,'add'),$refs.filter_pt_click.click()">&nbsp;&nbsp;{{ item.name }}</span>
-                                        </span>
-                                        <span
-                                        v-for="(item,index) in optionFilter"
-                                        class="wf_listItem users_filter_items"
-                                        :key="index"
-                                        v-show="filterType.toLowerCase()=='projects'">
-                                            <a class="vs-dropdown-users d-flex align-items-center">
-                                                <input type="checkbox" class="ah-check" v-show="filterType.toLowerCase() == 'users'" @click="handleFilterItem(item,'checkEvent')" :value="item.id" v-model="checkedFilter">&nbsp;
-                                                <span v-if="item?.projectIcon && item?.projectIcon.type === 'color'" class="ah-letter-tile d-flex align-items-center justify-content-center inital-box" :style="[{'background-color': item?.projectIcon.data}]">{{ item?.name.charAt(0).toUpperCase()}}</span>
-                                                <img v-if="item?.projectIcon && item?.projectIcon.type === 'image' && validateURL(item?.projectIcon.data)" class="profile-sm-square inital-box" :src="item?.projectIcon.data" alt=""/>
-                                                <WasabiImage 
-                                                    v-if="item?.projectIcon && item?.projectIcon.type === 'image' && !validateURL(item?.projectIcon.data)"
-                                                    class="profile-sm-square inital-box"
-                                                    :data="{url: item?.projectIcon.data}"
-                                                />
-                                                <span class="filter_list_item cursor-pointer" @click="handleFilterItem(item,'add'),$refs.filter_pt_click.click()">{{ item.name }}</span>
-                                            </a>
-                                        </span>
-                                        <span v-if="!optionFilter || optionFilter.length == 0" class="invalid-feedback">{{$t('UserTimesheet.no_records_found')}}.</span>
-                                    </div>
-                                </div>
-                                </template>
-                            </DropDown>
-                        </span>
-                        <div class="chipusername_main">
-                            <span class="chipusername_wrapper" v-for="(chip,chipKey) in selectedFilters" :key="chipKey">
-                                <span class="user_name" :title="chip.name" >
-                                    {{  `${$t(`general.${chip.type.slice(0,-1)}`)} : ${chip.name}` }}
-                                        <!-- {{ `${chip.type=='Users' ? 'User' : 'Teams' ? 'Team' : 'Projects' ? 'Projects' : 'Projects'}  ${chip.name}` }} -->
-                                </span>
-                                <button @click="handleFilterItem(chip,'remove')" type="button" class="ts-chip-x" :aria-label="$t('Reports.remove_filter')">×</button>
-                            </span>
-                        </div>
-                        <span class="ah-mask-icon wf_filter__icon" :style="maskOf(filterIcon)" aria-hidden="true"></span>
-                    </div>
-                </div>
-                <div class="d-flex align-items-center">
-                    <span class="d-flex align-items-center" :class=" clientWidth <= 1200 ? 'm-0 pt-10px' : 'ml-1 '">
-                        <div class="circlegreen mr-6px"></div>
-                        <span class="ts-legend">{{$t('UserTimesheet.tracked_time')}}</span>
-                    </span>
-                    <span class="d-flex align-items-center" :class=" clientWidth <=1200 ? 'm-0 pt-10px ml-1' : 'ml-1'">
-                        <div class="circlePurple mr-6px"></div>
-                        <span class="ts-legend">{{ $t('UserTimesheet.manual_time') }}</span>
-                    </span>
-                </div>
-            </div>
+    <div class="ah-page rpt timesheet_view Usertimesheet_view project-timesheet-contain" v-if="error404">
+        <ReportToolbar
+            :title="$t('Time.project_timesheet_title')"
+            tab="project"
+            :exporting="exporting"
+            :canExport="finalProjectData.length > 0"
+            @export="onExport"
+        />
+        <ReportFilterBar
+            :filters="filters"
+            :presets="PRESETS"
+            :fields="filterFields"
+            :options="filterOptions"
+            @apply="apply"
+            @step="step"
+            @clear="clear"
+            @need-lists="options.loadListsFor(filters.projects)"
+        >
+            <template #end>
+                <span class="tv-legend">
+                    <span><i class="pt-key pt-key--tracked"></i>{{ $t('UserTimesheet.tracked_time') }}</span>
+                    <span><i class="pt-key pt-key--manual"></i>{{ $t('UserTimesheet.manual_time') }}</span>
+                </span>
+            </template>
+        </ReportFilterBar>
+        <div class="timesheet__wrapper rpt__body" :class="{'pointer-event-none': isManinSpinner}">
+            <p v-if="exportFailed" class="tv-error">{{ $t('Time.action_failed') }}</p>
             <ProjectTimesheetView
                 v-if="!isManinSpinner"
                 v-model="dateColumns"
@@ -171,30 +60,29 @@
 </div>
 </template>
 <script setup>
-    import TimesheetTabs from '@/views/Timesheet/TimesheetTabs.vue';
     import '@/views/Timesheet/timeV2.css';
+    import ReportToolbar from '@/views/Timesheet/report/ReportToolbar.vue';
+    import ReportFilterBar from '@/views/Timesheet/report/ReportFilterBar.vue';
+    import { useReportFilters } from '@/views/Timesheet/report/useReportFilters';
+    import { useReportOptions } from '@/views/Timesheet/report/useReportOptions';
+    import { useReportExport } from '@/views/Timesheet/report/useReportExport';
+    import { PRESETS } from '@/views/Timesheet/report/reportRange';
+    import { hoursOf } from '@/views/Timesheet/report/reportTable';
+    import { useI18n } from 'vue-i18n';
     import { useCustomComposable, useGetterFunctions } from '@/composable';
     import { useStore } from "vuex";
-    import { ref, inject, watch, computed, defineComponent, onMounted } from "vue";
+    import { ref, inject, watch, computed, onMounted } from "vue";
     import moment from 'moment';
     import SpinnerComp from '@/components/atom/SpinnerComp/SpinnerComp.vue';
     import ProjectTimesheetView from '@/components/atom/TimesheetView/ProjectTimeSheetView/ProjectTimesheetView.vue'
-    import RangePickerComp from '@/components/molecules/RangePickerComp/RangePickerComp.vue';
-    import UserProfile from "@/components/atom/UserProfile/UserProfile.vue";
-    import '@vuepic/vue-datepicker/dist/main.css';
-    import DropDown from '@/components/molecules/DropDown/DropDown.vue'
-    import WasabiImage from "@/components/atom/WasabiIamgeCompp/WasabiIamgeCompp.vue";
-    import DropDownOption from '@/components/molecules/DropDownOption/DropDownOption.vue';
     import UpgradePlan from '@/components/atom/UpgradYourPlanComponent/UpgradYourPlanComponent.vue';
     import * as helper from '@/views/Timesheet/helper';
     import AppState from '@/components/molecules/AppState/AppState.vue';
-    import { useRouter } from "vue-router"
     import { apiRequest } from '../../../services';
     import * as env from '@/config/env';
     import { isOwnerOrAdmin } from "@/utils/roles";
-    import { maskOf } from '@/utils/iconMask';
-    const router = useRouter()
-    const {checkPermission,debouncerWithPromise} = useCustomComposable();
+    const {checkPermission} = useCustomComposable();
+    const { t } = useI18n();
     const { getters , dispatch} = useStore();
     const { getUser } = useGetterFunctions()
     const projectsGetter = computed(() => getters["projectData/allProjects"]);
@@ -202,43 +90,30 @@
     const finalProjectData = ref([]);
     const fullLoggedData = ref([]);
     const fullEstimatedData = ref([]);
-    const home_icon = require("@/assets/images/home_icon.png");
-    const backIcon = require("@/assets/images/svg/filter_back_icon.svg");
-    const filterIcon = require("@/assets/images/svg/filter_icon.svg");
     const companyId = inject('$companyId');
-    const clientWidth = inject("$clientWidth");
-    const users = computed(() => getters["users/users"]);
     const companyUserDetail = computed(() => getters["settings/companyUserDetail"]);
     const currentCompany = computed(() => getters["settings/selectedCompany"]);
-    const teams = computed(() => getters["settings/teams"]);
-    const dateRange = ref({});
+    const { filters, range, serverFilters, apply, step, clear } = useReportFilters({ defaultPreset: 'this_week' });
+    const options = useReportOptions(companyId);
+    const { exporting, failed: exportFailed, exportReport } = useReportExport((field, value) => options.labelOf(field, value));
+    const filterFields = computed(() => [...(projectTimesheetPermission.value ? ['people'] : []), 'projects', 'lists', 'status', 'billable', 'tags']);
+    const filterOptions = options.narrowed(filters, range);
+    const localDate = (iso) => moment(iso, 'YYYY-MM-DD').toDate();
+    const dateRange = computed(() => ({ startDate: localDate(range.value.start), endDate: localDate(range.value.end) }));
     const dateColumns = ref([]);
     const userArray = ref([]);
     const projectArray = ref([]);
     const timesheetDocArray = ref([]);
-    const filterType = ref("");
     let isSpinner = ref(false);
     let isManinSpinner = ref(true);
-    const filterSearch = ref("");
-    const finalFilter = ref([]);
-    const selectedFilters = ref([]);
-    const checkedFilter = ref([]);
     const activeWeekObj = ref({ isWeeked: false, isOneday: false, isTwoday: false, isThreeday: false, isFourday: false, isFiveday: false, isSixday: false})
     const tableStyle = ref({'colspanCount':  "27",'tableWidth': "1888px"});
     const projectTimesheetPermission = ref(false);
     const error404 = ref(true);
-    const filter_pt_click = ref(null);
     const loading = ref(true);
 
     const userId = inject("$userId")
 
-    defineComponent({
-        name: "UserTimesheet",
-        components: {
-            DropDown,
-            DropDownOption,
-        }
-    })
 
     function getTaskDataFunction(status) {
         isSpinner.value = status;
@@ -315,9 +190,6 @@
         }
     })
 
-    const goHome = () => {
-        router.push({path: `/${companyId.value}`});
-    }
 
     function getProjectTimesheetData(startDate, endDate) {
         try {
@@ -476,7 +348,8 @@
                         companyUserDetail: companyUserDetail.value,
                         projectTimesheetPermission: projectTimesheetPermission.value,
                         timeZone: getUser(userId.value).timeZone ? getUser(userId.value).timeZone : "Asia/Kolkata",
-                        userId: userId.value
+                        userId: userId.value,
+                        filters: serverFilters.value
                     }
                     let queryeta = [
                         {
@@ -513,7 +386,7 @@
                     apiRequest("post", `${env.TIMESHEET}/project`,axiosObj)
                     .then((data) => {
                         const timeSheetData = data.data;
-                        apiRequest("post", `${env.ESTIMATED_TIME}`,{queryeta: queryeta})
+                        apiRequest("post", `${env.ESTIMATED_TIME}`,{queryeta: queryeta, filters: serverFilters.value})
                         .then((etaData) => {
                             const etaDataRes = etaData.data;
                             finalProjectData.value = [];
@@ -648,250 +521,46 @@
     watch(() => getters["settings/companyUserDetail"],(val) => {
         companyUserDetail.value = val;
     })
-    watch(() => getters["settings/teams"],(val) => {
-        teams.value = val;
-    })
-    const handleDate = (modelData) => {
-        dateRange.value.startDate = modelData.dateVal[0] ? modelData.dateVal[0] : '';
-        dateRange.value.endDate = modelData.dateVal[1] ? modelData.dateVal[1] : '';
-        if((projectList.value && projectList.value.length) || (!loading.value)){
-            getProjectTimesheetData(modelData.dateVal[0] ? modelData.dateVal[0] : '',modelData.dateVal[1] ? modelData.dateVal[1]: '');
+    const reload = () => {
+        userArray.value = projectTimesheetPermission.value ? [...filters.value.people] : [];
+        projectArray.value = [...filters.value.projects];
+        if ((projectList.value && projectList.value.length) || !loading.value) {
+            getProjectTimesheetData(dateRange.value.startDate, dateRange.value.endDate);
         }
-    }
-    function handleFilterType(type,item){
-        if(type != 'back'){
-            setTimeout(()=>{ filterType.value =item; openFilterMenu() },100);
-        }else{
-            setTimeout(()=>{ filterType.value ='' },100);
-        }
-    }
-    function manageFilterData(cb) {
-        userArray.value = [];
-        projectArray.value = [];
-        let filterIds = selectedFilters.value.filter((x)=>{return x.type == 'Users'});
-        if (filterIds.length) {
-            filterIds.forEach((element) => {
-                userArray.value.push(element.id)
-            });
-        }
-        let teamsIds = selectedFilters.value.filter((x)=>{return x.type == 'Teams'});
-        if (teamsIds.length) {
-            teamsIds.forEach((element)=>{
-                let ind = teams.value.findIndex((x)=>{return x._id == element.id});
-                teams.value[ind].assigneeUsersArray.forEach((dt)=>{
-                    userArray.value.push(dt)
-                })
-            })
-        }
-        let filterProject = selectedFilters.value.filter((x)=>{return x.type == "Projects"});
-        if (filterProject.length) {
-            filterProject.forEach((element) => {
-                projectArray.value.push(element.id)
-            })
-        }
-        cb(userArray.value, projectArray.value);
-    }
-    function openFilterMenu(){
-        try{
-            filterSearch.value ='';
-            helper.getFinalFilter(filterType.value,users.value,teams.value,projectList.value).then((filterRes)=>{
-                if(filterRes.status){
-                    finalFilter.value = filterRes.data.finalFilter;
-                }
-            })
-        }catch(error){
-            console.error(error);
-        }
-    }
-    function handleFilterItem(selectedItem, type, isUser=false){
-        debouncerWithPromise(400).then(()=>{
-            helper.handleFilterItem(selectedItem,type,selectedFilters.value, checkedFilter.value, filterType.value).then((filterRes)=>{
-                if(filterRes.status){
-                    let userFilter = filterRes.data.selectedFilters.filter((x) => x.type == "Users");
-                    if (isUser && userFilter.length == 0) {
-                        filter_pt_click.value.click()
-                    }
-                    selectedFilters.value = filterRes.data.selectedFilters;
-                    checkedFilter.value = filterRes.data.checkedFilter;
-                    manageFilterData(() => {
-                        getProjectTimesheetData(dateRange.value.startDate, dateRange.value.endDate);
-                    });
-                }
-            })
-        })
-    }
-    const optionFilter = computed(()=>{
-        const searchArray = [];
-        if(filterSearch.value && filterSearch.value.length > 0) {
-            const filterTypeLower = filterType.value.toLowerCase();
-            if(filterTypeLower == "users") {
-                users.value.forEach(rawData => {
-                    if (rawData.Employee_Name.trim().toLowerCase().includes(filterSearch.value.trim().toLowerCase())) {
-                        searchArray.push({
-                            "id": rawData._id,
-                            'name': rawData.Employee_Name,
-                            'profile': rawData.Employee_profileImageURL || ''
-                        });
-                    }
-                });
-            } else if (filterTypeLower == "teams") {
-                teams.value.forEach(val => {
-                    if (val.name.trim().toLowerCase().includes(filterSearch.value.trim().toLowerCase())) {
-                        searchArray.push({
-                        "id": val._id,
-                        'name': val.name
-                        });
-                    }
-                });
-            } else if (filterTypeLower == "projects") {
-                projectList.value.forEach(ele => {
-                    if (ele.ProjectName.trim().toLowerCase().includes(filterSearch.value.trim().toLowerCase())) {
-                        searchArray.push({
-                            "id": ele._id,
-                            'name': ele.ProjectName,
-                            'AssigneeUserId': ele.AssigneeUserId,
-                            'ProjectCode': ele.ProjectCode,
-                            "projectIcon": ele.projectIcon
-                        });
-                    }
-                });
-            }
-        }
-        return filterSearch.value ? searchArray : finalFilter.value;
-    })
-    const validateURL = (str) => {
-        var tarea = str;
-        if (tarea.indexOf("http://") == 0 || tarea.indexOf("https://") == 0) {
-            return true;
-        }
-    }
+    };
+    watch(() => [range.value.start, range.value.end, filters.value.people.join(','), filters.value.projects.join(','), JSON.stringify(serverFilters.value)], reload);
+
+    const onExport = async (format) => {
+        const days = dateColumns.value;
+        const sumOf = (byProject) => Object.values(byProject || {}).reduce((a, b) => a + b, 0);
+        const logOf = (row, day) => (row.isTotal ? sumOf(day.totalProjectLogs) : (day.totalProjectLogs || {})[String(row.id)] || 0);
+        const estOf = (row, day) => (row.isTotal ? sumOf(day.totalProjectETALogs) : (day.totalProjectETALogs || {})[String(row.id)] || 0);
+        const head = [
+            { key: 'project', label: t('Reports.col_project'), value: (row) => row.projectName || '' },
+            { key: 'code', label: t('Time.col_code'), value: (row) => row.projectCode || '' },
+            { key: 'logged', label: t('Reports.col_logged_hours'), value: (row) => hoursOf(row.projectLoggedHours) },
+            { key: 'estimated', label: t('Reports.col_estimated_hours'), value: (row) => hoursOf(row.projectEstimatedHours) },
+            ...days.map((day) => ({ key: day.fullDate, label: `${day.fullDate} (${t('Reports.col_logged_short')})`, value: (row) => hoursOf(logOf(row, day)) })),
+            ...days.map((day) => ({ key: `${day.fullDate}-est`, label: `${day.fullDate} (${t('Reports.col_estimated_short')})`, value: (row) => hoursOf(estOf(row, day)) })),
+        ];
+        const rows = finalProjectData.value;
+        await exportReport(format, {
+            name: 'project-timesheet',
+            title: t('Time.project_timesheet_title'),
+            filters: filters.value,
+            columns: head,
+            rows,
+            total: {
+                isTotal: true, projectName: t('Time.col_total'), projectCode: '',
+                projectLoggedHours: rows.reduce((a, r) => a + (r.projectLoggedHours || 0), 0),
+                projectEstimatedHours: rows.reduce((a, r) => a + (r.projectEstimatedHours || 0), 0),
+            },
+        });
+    };
 </script>
 <style src="../style.css"></style>
 <style scoped>
-    .page-content {
-        padding: 15px;
-    }
-    /* The legacy title strip carries the shared timesheet tabs, so it follows the theme. */
-    .page-title {
-        width: 100%;
-        background-color: var(--surface);
-        border-bottom: 1px solid var(--hairline);
-        color: var(--ink);
-    }
-    .pro_route_link a { color: var(--ink); }
-    .ts-legacy-tabs { align-self: stretch; margin: 0 16px 0 0; }
-    .ts-legacy-tabs :deep(.tv-tab) { display: flex; align-items: center; }
-    @media (max-width: 767px) {
-        .page-title { flex-wrap: wrap; }
-        .ts-legacy-tabs { margin: 0; padding: 0 8px; }
-        .ts-legacy-tabs :deep(.tv-tab) { min-height: 40px; }
-    }
-    ul.breadcrumb.title_strip {
-        margin: 0;
-        padding: 0;
-        display: flex;
-        align-items: center;
-        height: 61px;
-        background-color: transparent;
-        width: 100%;
-        padding-left: 15px;
-    }
-    ul.breadcrumb.title_strip li:first-child {
-        border-left: 0;
-        padding-left: 0px;
-    }
-    ul.breadcrumb.title_strip li {
-        list-style: none;
-        padding-right:15px;
-        border-left: 1px solid var(--border);
-        font-family: var(--font-ui);
-        font-weight:700;
-        padding-left: 15px;
-    }
-    .dp__main.dp__theme_light {
-        max-width: 100%;
-        width: 260px;
-        margin-right: 15px;
-    }
-    span.chipusername_wrapper {
-        display: flex;
-        background-color: var(--fill);
-        color: var(--ink);
-        border-radius: 10px;
-        margin-right: 10px;
-        padding: 2px 4px 2px 8px;
-        font-family: var(--font-ui);
-        font-weight: 500;
-        align-items: center;
-        min-width: fit-content;
-    }
-    .link_disable_css {
-        color: var(--ink);
-        text-decoration: none;
-        font-size: 16px;
-    }
-
-    span.chipusername_wrapper button {
-        padding: 0;
-        border: 0;
-        margin-left: 4px;
-        min-width: 17px;
-        width: 17px;
-        height: 17px;
-        background: transparent !important;
-        color: var(--ink-2);
-        font: 400 var(--fs-lg, 16px)/1 var(--font-ui);
-        cursor: pointer;
-    }
-    span.timesheet_user_filter {
-        position: sticky;
-        left: 0;
-        background-color: var(--surface);
-        padding: 3px 10px 3px 10px;
-        min-width: 75px;
-    }
-    .wf_filter::-webkit-scrollbar-thumb {
-        border-radius: 10px;
-        -webkit-box-shadow: inset 0 0 6px var(--shadow-ink);
-        background-color: var(--border);
-    }
-    .wf_filter::-webkit-scrollbar {
-        width: 5px;
-        height: 5px;
-        background-color: var(--fill);
-    }
-    .chipusername_main {
-        display: flex;
-    }
-    span.chipusername_wrapper span.user_name {
-        font-size: 13px;
-        line-height: 18px;
-        min-width: max-content;
-    }
-    .circlegreen {
-        width: 10px;
-        height: 10px;
-        background-color: var(--ok);
-        border-radius: 50%;
-    }
-    .circlePurple {
-        width: 10px;
-        height: 10px;
-        background-color: var(--agent);
-        border-radius: 50%;
-    }
-    @media(max-width: 1599px){
-    span.timesheet_user_filter{
-        min-width: 85px;
-    }
-}
-    @media(max-width: 767px){
-    .pro_route_link a, ul.breadcrumb.title_strip li span{
-        font-size: 14px!important;
-    }
-    ul.breadcrumb.title_strip li{
-        padding-right: 10px;
-        padding-left: 10px;
-    }
-}
+    .pt-key { border-radius: 50%; }
+    .pt-key--tracked { background: var(--ok); }
+    .pt-key--manual { background: var(--agent); }
 </style>

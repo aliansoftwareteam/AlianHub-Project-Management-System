@@ -43,7 +43,7 @@ These go beyond or differ from the scope as first written; each is named in the 
   - The old entries for these keys in `Modules/Agents/registry/connectors.js` and `actions.js` give way to the connector tools.
   - Channel type is checked at every call with `conversations.info`; a DM or group DM is refused.
 - **Agent wiring**: the `slack.channel` reader and the Slack summary seed use the new tools on the run owner's connection; with no connection they refuse with "Connect Slack on My connections".
-- **Retire the bot** — migration `081-retire-slack-bot`: asks Slack to revoke the bot token, retires the bot token and signing secret in the secrets store, closes the workspace `connector: 'slack'` row, expires pending old-path posts (decision 4), tells owners and admins (decision 3), audits `connector.revoke`. Safe to run twice.
+- **Retire the bot** — migration `082-retire-slack-bot`: asks Slack to revoke the bot token, retires the bot token and signing secret in the secrets store, closes the workspace `connector: 'slack'` row, expires pending old-path posts (decision 4), tells owners and admins (decision 3), audits `connector.revoke`. Safe to run twice.
 - **Screens**: the workspace bot form (`SlackConnector.vue`) is removed and the Integrations › Slack section points to My connections; the bot-retired notice opens the Connections page. The connect, reconnect and disconnect screen for every registry provider, Slack included, is 072's. All strings through i18n, colours from tokens.
 - **Setup doc** — `docs/connectors/slack.md`: create the Slack app, add the user scopes, turn on token rotation, Redirect URL `<APIURL>/api/v1/connector-oauth/slack/callback`, `CONNECTOR_SLACK_CLIENT_ID/SECRET`, `CONNECTORS=…,slack`, and a tunnel for local development (HTTPS only).
 
@@ -67,4 +67,4 @@ These go beyond or differ from the scope as first written; each is named in the 
 - Depends on: 069, 070, 078
 - Replaces `slackConnection.js`, `slackApi.js`, `slackRead.js`, `slackPost.js` on the agent path; 079 deletes them.
 - Slack's Redirect URL must be HTTPS and the `redirect_uri` must match it or be a subdirectory of it; localhost is not allowed, so local development uses a tunnel (`APIURL` set to the tunnel's https URL).
-- Migration 080 was taken by 073 (`080-connectors-google-calendar-to-google`), so the bot retirement is 081.
+- Migration 080 was taken by 073 (`081-connectors-google-calendar-to-google`), so the bot retirement is 081.

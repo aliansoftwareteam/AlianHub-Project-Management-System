@@ -66,3 +66,4 @@
     white-space: nowrap;
     opacity: 0.75;
 }
+.comment-input__note-link { color: var(--brand-deep); }

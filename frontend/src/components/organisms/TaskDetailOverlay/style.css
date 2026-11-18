@@ -351,12 +351,13 @@
 .ah-detail__relation-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .ah-detail__foot { margin-top: auto; font-size: var(--fs-xs, 11px); color: var(--ink-2); padding-top: 12px; }
 
-/* TaskDetailRightSide rows, rendered as label · value like the mock. */
-.ah-detail__props .task-detail-right-side { padding: 0; background: transparent; border-left: 0; }
-.ah-detail__props .task-detail-right-side > div { display: flex; flex-direction: column; gap: var(--gap-row, 9px); }
+/* TaskDetailRightSide rows, rendered as label · value like the mock. The extra .ah-detail__body outranks that
+   component's scoped stylesheet, which loads later at the same specificity. */
+.ah-detail__body .ah-detail__props .task-detail-right-side { box-sizing: border-box; padding: 0; background: transparent; border-left: 0; }
+.ah-detail__body .ah-detail__props .task-detail-right-side > div { display: flex; flex-direction: column; gap: var(--gap-row, 9px); }
 .ah-detail__props .details-heading { display: none; }
-.ah-detail__props .task-detail-right-side-label { display: flex; align-items: center; gap: 6px; margin: 0; padding: 0; min-height: 24px; }
-.ah-detail__props .task-detail-right-side-label > .task-detail-field-name { width: 82px; flex: none; margin: 0; font: 400 var(--row-font) var(--font-ui); color: var(--ink-2); }
+.ah-detail__body .ah-detail__props .task-detail-right-side-label { display: flex; align-items: center; gap: 6px; margin: 0; padding: 0; min-height: 24px; }
+.ah-detail__body .ah-detail__props .task-detail-right-side-label > .task-detail-field-name { width: 82px; flex: none; margin: 0; font: 400 var(--row-font) var(--font-ui); color: var(--ink-2); }
 .ah-detail__props .task-detail-right-side-label .taskdetail-label { margin: 0 !important; }
 /* The legacy row gave these values side padding for a hover pill; an outline keeps the pill without moving the text off the value column.
    The vertical padding stays: shorter rows put the next control half under the open story-points menu, which axe reports as target-size. */

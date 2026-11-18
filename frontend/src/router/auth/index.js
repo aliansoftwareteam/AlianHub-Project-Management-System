@@ -48,6 +48,34 @@ export default [
         }
     },
     {
+        path: '/activate',
+        name: 'Activate',
+        component: () => import(/* webpackChunkName: "Activate" */ '@/views/Authentication/Activate/Activate.vue'),
+        meta: {
+            title: 'Activate',
+            requiresAuth: false,
+            withoutWorkspace: true
+        }
+    },
+    {
+        path: '/suspended',
+        name: 'Suspended',
+        component: () => import(/* webpackChunkName: "Suspended" */ '@/views/Authentication/Suspended/Suspended.vue'),
+        meta: {
+            title: 'Suspended',
+            requiresAuth: false
+        }
+    },
+    {
+        path: '/platform-login',
+        name: 'Platform_Login',
+        component: () => import(/* webpackChunkName: "Platform_Login" */ '@/views/Authentication/PlatformLogin/PlatformLogin.vue'),
+        meta: {
+            title: 'Login',
+            requiresAuth: false
+        }
+    },
+    {
         path: '/set-new-password/:token',
         name: 'Set_New_Password',
         component: () => import(/* webpackChunkName: "Set_New_Password */ '@/views/Authentication/ResetPassword/SetNewPassword.vue'),

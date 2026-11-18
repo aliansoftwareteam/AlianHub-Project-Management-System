@@ -83,3 +83,26 @@ describe('the setup wizard, once the first workspace is made', () => {
         expect(replace).toHaveBeenCalledWith({ name: 'Log-in' });
     });
 });
+
+describe('the setup page of a hosted instance not provisioned yet', () => {
+    it('says the workspace is being prepared, offers no form, and sends the visitor to sign in once it is', async () => {
+        vi.useFakeTimers();
+        try {
+            readSetupStatus.mockResolvedValue({ installed: false, dbOk: true, managed: true });
+            const wrapper = mount(SetupWizard, { global: { mocks: { $t: (key) => key } } });
+            await flushPromises();
+            expect(wrapper.find('[data-test="setup-preparing"]').text()).toContain('Setup.preparing_title');
+            expect(wrapper.find('form').exists()).toBe(false);
+
+            await vi.advanceTimersByTimeAsync(5000);
+            expect(replace).not.toHaveBeenCalled();
+
+            readSetupStatus.mockResolvedValue({ installed: true, dbOk: true, managed: true });
+            await vi.advanceTimersByTimeAsync(5000);
+            expect(replace).toHaveBeenCalledWith({ name: 'Log-in' });
+            wrapper.unmount();
+        } finally {
+            vi.useRealTimers();
+        }
+    });
+});

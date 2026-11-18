@@ -12,34 +12,37 @@
 # Build the image from local source instead of pulling the registry image:
 #   docker compose build
 #   docker compose up -d
+#
+# Containers, volumes and the network are named after the Compose project
+# (the folder name, or -p), so a second copy on the same host only needs its
+# own project name and port:
+#   APP_PORT=4001 docker compose -p staging up -d
+#
+# Installed before names followed the project? Keep the old names, and the
+# data in them, with docker-compose.legacy.yml (docs/ADMIN-GUIDE.md#upgrade).
 # ─────────────────────────────────────────────────────────────────────
 
 services:
-  # ── AlianHub backend + bundled frontend ────────────────────────────
   app:
     image: ghcr.io/aliansoftwareteam/alianhub:${ALIANHUB_VERSION:-latest}
     build:
       context: .
       dockerfile: Dockerfile
-    container_name: ${ALIANHUB_APP_CONTAINER:-alianhub}
     restart: unless-stopped
     ports:
       - "${APP_PORT:-4000}:4000"
     environment:
-      # Required — the app derives one database per company from this base URL,
-      # so give the server address only, never a database name.
+      # The app derives one database per company from this base URL, so give
+      # the server address only, never a database name.
       MONGODB_URL: mongodb://mongo:27017
-      # Required — generate a random string for each new install
       JWT_SECRET: ${JWT_SECRET:?JWT_SECRET is required — set it in .env}
-      # Optional — public URL clients use to reach the API
       APIURL: ${APIURL:-http://localhost:4000/}
       WEBURL: ${WEBURL:-http://localhost:4000}
-      # Optional — "server" (local filesystem) or "wasabi" (S3-compatible)
+      # "server" (local filesystem) or "wasabi" (S3-compatible)
       STORAGE_TYPE: ${STORAGE_TYPE:-server}
-      # Optional — override port (uncommon)
       PORT: 4000
     env_file:
-      # Picks up any additional env vars defined in .env (e.g. SMTP, OAuth)
+      # Any other variable in .env (mail, OAuth, …) reaches the app too.
       - path: .env
         required: false
     volumes:
@@ -55,15 +58,13 @@ services:
     networks:
       - alianhub
 
-  # ── MongoDB ───────────────────────────────────────────────────────
   mongo:
     image: mongo:7
-    container_name: ${ALIANHUB_MONGO_CONTAINER:-alianhub-mongo}
     restart: unless-stopped
     volumes:
       - alianhub_mongo_data:/data/db
-    # Don't expose Mongo on the host by default — the app talks to it
-    # over the internal network only. Uncomment to access from host:
+    # Not published on the host: the app reaches it over the project network.
+    # Uncomment to connect from the host:
     # ports:
     #   - "27017:27017"
     healthcheck:
@@ -75,7 +76,7 @@ services:
     networks:
       - alianhub
 
-  # ── TURN relay for audio/video calling (optional) ──────────────────
+  # TURN relay for audio/video calling (optional).
   #
   # Calls are peer-to-peer, so most connect browser-to-browser with no help.
   # A minority cannot — symmetric NAT and strict corporate firewalls, roughly
@@ -90,16 +91,15 @@ services:
   #   TURN_URLS="turn:<your-public-host>:3478"
   #   TURN_STATIC_AUTH_SECRET="<the same secret as below>"
   #
-  # NOTE: host networking is used because a relay has to hand out addresses
-  # that are reachable from the outside; behind Docker's NAT it would
-  # advertise an address only the container can reach.
+  # Host networking is used because a relay has to hand out addresses that are
+  # reachable from the outside; behind Docker's NAT it would advertise an
+  # address only the container can reach.
   #
   # The two required values are checked inside the container rather than with
   # `${VAR:?}`: compose interpolates the whole file even for inactive profiles,
   # so a `:?` here would break `docker compose up` for everyone.
   coturn:
     image: coturn/coturn:4.6-alpine
-    container_name: ${ALIANHUB_COTURN_CONTAINER:-alianhub-coturn}
     restart: unless-stopped
     profiles: ["calling"]
     network_mode: host
@@ -126,16 +126,11 @@ services:
         --no-tlsv1_1
 
 volumes:
-  alianhub_mongo_data:
-    name: alianhub_mongo_data
-  alianhub_storage:
-    name: alianhub_storage
-  alianhub_logs:
-    name: alianhub_logs
-  alianhub_backups:
-    name: alianhub_backups
+  alianhub_mongo_data: {}
+  alianhub_storage: {}
+  alianhub_logs: {}
+  alianhub_backups: {}
 
 networks:
   alianhub:
-    name: alianhub
     driver: bridge

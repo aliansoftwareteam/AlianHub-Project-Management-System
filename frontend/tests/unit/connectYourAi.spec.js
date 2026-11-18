@@ -217,7 +217,8 @@ describe('the step at the end of sign-up', () => {
     });
 
     it.each([
-        'views/Company/CreateCompany.vue',
+        // Sign-up (/business) and the in-app New workspace sidebar both create through this composable.
+        'composable/useCreateWorkspace.js',
         'views/Authentication/Invitation/Invitation.vue',
         'views/Setup/SetupWizard.vue'
     ])('%s ends on it', (file) => {

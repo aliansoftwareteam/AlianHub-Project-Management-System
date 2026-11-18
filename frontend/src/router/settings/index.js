@@ -31,6 +31,15 @@ export default [
                 component: () => import(/* webpackChunkName: LanguageRegion */ '@/views/Settings/Language/Language.vue')
             },
             {
+                path: "plan",
+                name: "PlanUsage",
+                meta: {
+                    title: "Plan & usage",
+                    requiresAuth: true
+                },
+                component: () => import(/* webpackChunkName: "PlanUsage" */ '@/views/Settings/Plan/PlanUsage.vue')
+            },
+            {
                 path: "members",
                 name: "Members",
                 meta: {

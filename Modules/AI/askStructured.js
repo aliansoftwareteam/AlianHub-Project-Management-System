@@ -210,4 +210,4 @@ const structuredTasks = async (companyId, uid, { question, projects, now = new D
     };
 };
 
-module.exports = { structuredTasks, taskClauses, STRUCTURED_LIMIT };
+module.exports = { structuredTasks, taskClauses, askerZone, STRUCTURED_LIMIT };

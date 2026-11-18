@@ -20,20 +20,20 @@ None.
 ## What was kept or moved, and why
 - `accountOf` moved from `googleApi.js` into `Modules/Connectors/providers/google/index.js`, its only remaining caller.
 - `cloudCrypto.js` still encrypts integration secrets through `utils/secretField.js` (GitHub sign-in state, integration configs while the secrets store is off), so its cipher moved into `secretField.js` byte for byte, with the `CLOUD_STORAGE_ENC_KEY` name and salt unchanged. Checked: a value written by the old helper decrypts with the new one, and the reverse.
-- The `cloudStorageConnections` schema and the `CLOUD_STORAGE_CONNECTIONS` collection stay, so migrations 082 and 085 can clear the old rows; the collection stays on the gateway's credential list.
+- The `cloudStorageConnections` schema and the `CLOUD_STORAGE_CONNECTIONS` collection stay, so migrations 084 and 087 can clear the old rows; the collection stays on the gateway's credential list.
 - `CLOUD_STORAGE_MAX_IMPORT_BYTES` stays: the module picker's import reads it.
 - The `google_calendar` entry of the `integration_connections` catalogue and its strings are FR-38, not this connector, and stay.
-- Migration 080 no longer calls `requestedGoogle`; it reads the legacy name from `CONNECTORS` itself, so it behaves as before and its tests pass unchanged. 080 exports its reshape and 082 its clear, for 085.
+- Migration 081 no longer calls `requestedGoogle`; it reads the legacy name from `CONNECTORS` itself, so it behaves as before and its tests pass unchanged. 081 exports its reshape and 084 its clear, for 087.
 
 ## Behaviour changed on purpose
 - **Company OAuth app routes** (`/api/v2/connectors/apps`) were mounted only while `CONNECTORS` named `slack` or `google_calendar`. With `google_calendar` gone, a `CONNECTORS=google,dropbox` install would have had no way to set a company app, so they now mount with the other connector routes whenever a registry provider is named. The catalogue's `connectors` list is now the named registry providers for the same reason, which is what shows the Company OAuth apps card.
 - **Boot log**: the unknown-name error now lists every known provider, and the server says once at startup when `google` is named with no instance app, as the old `google_client_missing` problem did. Reading the two Google variables by name there also keeps them in `.env.example` and `docs/ENV.md`.
 
-## Migration 085
-`migrations/085-connectors-finish-legacy-cutover.js`, numbered 083 on its branch and renumbered 085 when merged, after 098's 083 and 096's 084. 080 and 082 hold while `CONNECTORS` still serves the old paths and record themselves applied, so they can leave rows behind; with the old code gone nothing would ever read those rows again. 085 runs with no gate:
-- every remaining `connector: 'google_calendar'` row is reshaped as 080 does, so its grant works once `google` is named and nobody reconnects (FR-35);
+## Migration 087
+`migrations/087-connectors-finish-legacy-cutover.js`, numbered 083 on its branch, renumbered 085 when merged and 087 on the way to staging, after 098's 085 and 096's 086. 081 and 084 hold while `CONNECTORS` still serves the old paths and record themselves applied, so they can leave rows behind; with the old code gone nothing would ever read those rows again. 087 runs with no gate:
+- every remaining `connector: 'google_calendar'` row is reshaped as 081 does, so its grant works once `google` is named and nobody reconnects (FR-35);
 - a row whose account the person already holds on the module trips the unique index: its tokens are retired in the secrets store (never revoked at Google, which would end the live grant too) and it is reshaped closed; any other write error fails the company and retires nothing;
-- every `cloud_storage_connections` row 082 did not clear loses its stored client secret and tokens and is closed (FR-39).
+- every `cloud_storage_connections` row 084 did not clear loses its stored client secret and tokens and is closed (FR-39).
 Both halves select only what they have not handled, so a second run changes nothing. No `down`: retired tokens and deleted secrets cannot come back.
 
 ## Setup pages
@@ -57,7 +57,7 @@ Both halves select only what they have not handled, so a second run changes noth
 - Assigned to track A in the two-track split; depends only on its own track and the 063 contract.
 
 ### 2026-11-12
-- Removed the old Google Calendar and CloudStorage paths, added migration 085 and the Google and Dropbox setup pages (details above).
+- Removed the old Google Calendar and CloudStorage paths, added migration 087 and the Google and Dropbox setup pages (details above).
 
 ### 2026-11-12 — merged into `feat/connectors-mcp-transport`
 - The Connections page was already gone (101), so the old Google card came off the Connectors tab instead: no `legacyGoogle` prop, no `LEGACY_GOOGLE_CONNECTOR`, and a `google_calendar` return is no longer skipped.

@@ -3,7 +3,7 @@
 
 const spProviderConfig = (baseUrl) => ({
     schemas: ['urn:ietf:params:scim:schemas:core:2.0:ServiceProviderConfig'],
-    documentationUri: 'https://help.alianhub.com',
+    documentationUri: 'https://docs.alianhub.com/',
     patch: { supported: true },
     bulk: { supported: false, maxOperations: 0, maxPayloadSize: 0 },
     filter: { supported: true, maxResults: 200 },

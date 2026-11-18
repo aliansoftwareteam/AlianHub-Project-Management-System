@@ -1,0 +1,55 @@
+/* Time reports (task 086): one toolbar, one controls row, one body, on top of the shared ah- classes and Everything's filter chips. */
+.rpt { display: flex; flex-direction: column; min-height: 100%; color: var(--ink); font: var(--text-small); }
+.ah-toolbar.rpt__toolbar { gap: 12px; }
+.rpt__meta { display: inline-flex; align-items: center; gap: 8px; min-width: 0; }
+.rpt__actions { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+
+.ah-tabs.rpt__tabs { flex: none; }
+.ah-tab.rpt__tab { display: inline-flex; align-items: center; text-decoration: none; white-space: nowrap; }
+.ah-tab.rpt__tab:hover { color: var(--ink); text-decoration: none; }
+
+.rpt__controls {
+    display: flex; flex-wrap: wrap; align-items: center; gap: 8px; flex: none;
+    padding: 10px var(--page-pad-x, 22px);
+    border-bottom: 1px solid var(--hairline);
+    background: var(--surface);
+}
+.rpt__controls-end { margin-inline-start: auto; display: flex; align-items: center; gap: 8px; }
+.rpt__clear { color: var(--ink-2); }
+
+.rpt__date { display: inline-flex; align-items: center; gap: 4px; }
+.rpt__step {
+    width: 28px; height: var(--control-h, 30px); flex: none;
+    display: inline-grid; place-items: center;
+    border: 1px solid var(--border); border-radius: var(--r-md, 9px);
+    background: var(--surface); color: var(--ink-2); cursor: pointer;
+}
+.rpt__step:hover { background: var(--surface-hover); color: var(--ink); }
+.rpt__step:focus-visible { outline: none; box-shadow: var(--focus); }
+.rpt__range-text { font: var(--text-data); color: var(--ink-2); white-space: nowrap; }
+.evr__chip-anchor > .evr__pop.rpt__date-pop { width: max-content; max-width: calc(100vw - 32px); display: flex; align-items: stretch; gap: 6px; padding: 6px; }
+.rpt__presets { display: flex; flex-direction: column; gap: 1px; min-width: 132px; padding-inline-end: 6px; border-inline-end: 1px solid var(--hairline); }
+.rpt__presets .ah-pop__item { padding: 6px 10px; font-size: var(--fs-sm, 12.5px); white-space: nowrap; }
+.rpt__custom { display: flex; flex-direction: column; gap: 6px; padding: 4px 2px 2px; }
+.rpt__custom-hint { padding: 0 6px; font: var(--text-small); color: var(--ink-2); }
+.rpt__custom .dp__main, .rpt__custom .dp__menu { border: 0; box-shadow: none; }
+
+.rpt__export { position: relative; }
+.rpt__export-pop { position: absolute; top: calc(100% + 6px); inset-inline-end: 0; z-index: 40; min-width: 190px; }
+.rpt__export-pop .ah-pop__item small { margin-inline-start: auto; color: var(--ink-2); font: var(--text-data); }
+
+.rpt__body { flex: 1; min-height: 0; padding: 16px var(--page-pad-x, 22px) 24px; display: flex; flex-direction: column; gap: 12px; }
+.ah-input.rpt__select { height: var(--control-h, 30px); width: auto; max-width: 220px; padding: 0 28px 0 10px; font-size: var(--fs-sm, 12.5px); border-width: 1px; }
+
+@media (max-width: 767px) {
+    .ah-toolbar.rpt__toolbar { flex-wrap: wrap; padding: 8px 12px; row-gap: 8px; }
+    .ah-tabs.rpt__tabs { order: 5; width: 100%; overflow-x: auto; }
+    .rpt__actions { width: 100%; }
+    .rpt__controls { padding: 10px 12px; }
+    .rpt__controls-end { margin-inline-start: 0; width: 100%; }
+    .rpt__body { padding: 12px 12px 24px; }
+    .rpt__step { width: 36px; height: 36px; }
+    .evr__chip-anchor > .evr__pop.rpt__date-pop { position: fixed; inset-inline: 12px; top: auto; bottom: calc(var(--tabbar-h, 56px) + 12px); width: auto; z-index: 60; flex-direction: column; max-height: 80dvh; overflow-y: auto; }
+    .rpt__presets { flex-direction: row; flex-wrap: wrap; border-inline-end: 0; border-bottom: 1px solid var(--hairline); padding: 0 0 6px; }
+}
+.ah-tabs.rpt__match { flex: none; margin-inline-start: -4px; }

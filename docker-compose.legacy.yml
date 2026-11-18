@@ -1,0 +1,30 @@
+# Fixed container, volume and network names, as docker-compose.yml had them
+# before names followed the Compose project. An install created then keeps its
+# containers and its data by loading this file on top, from .env:
+#
+#   COMPOSE_FILE=docker-compose.yml:docker-compose.legacy.yml
+#
+# (on Windows separate the two files with ";"). Only one install per host can
+# use it: a second copy with these names would share the first one's data.
+
+services:
+  app:
+    container_name: ${ALIANHUB_APP_CONTAINER:-alianhub}
+  mongo:
+    container_name: ${ALIANHUB_MONGO_CONTAINER:-alianhub-mongo}
+  coturn:
+    container_name: ${ALIANHUB_COTURN_CONTAINER:-alianhub-coturn}
+
+volumes:
+  alianhub_mongo_data:
+    name: alianhub_mongo_data
+  alianhub_storage:
+    name: alianhub_storage
+  alianhub_logs:
+    name: alianhub_logs
+  alianhub_backups:
+    name: alianhub_backups
+
+networks:
+  alianhub:
+    name: alianhub

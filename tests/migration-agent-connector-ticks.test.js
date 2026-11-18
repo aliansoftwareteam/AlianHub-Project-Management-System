@@ -10,7 +10,7 @@ const { buildContext, validateMigration, listMigrations } = require('../migratio
 const { SCHEMA_TYPE } = require('../Config/schemaType');
 const { settingsCollectionDocs } = require('../Config/collections');
 const { MongoDbCrudOpration } = require('../utils/mongo-handler/mongoQueries');
-const migration = require('../migrations/083-agent-connector-ticks');
+const migration = require('../migrations/085-agent-connector-ticks');
 
 /* Agents saved before ticks existed keep the connected apps their skills already use, so none stops working; one
  * saved since, with its own ticks or none, is left alone, and a second run changes nothing. */
@@ -48,11 +48,11 @@ beforeEach(() => {
     jest.clearAllMocks();
 });
 
-describe('083-agent-connector-ticks', () => {
+describe('085-agent-connector-ticks', () => {
     test('is a valid company-scoped migration listed after 082', () => {
-        expect(() => validateMigration(migration, '083-agent-connector-ticks')).not.toThrow();
+        expect(() => validateMigration(migration, '085-agent-connector-ticks')).not.toThrow();
         const ids = listMigrations().map((m) => m.id);
-        expect(ids.indexOf('083-agent-connector-ticks')).toBeGreaterThan(ids.indexOf('082-cloud-storage-to-connectors'));
+        expect(ids.indexOf('085-agent-connector-ticks')).toBeGreaterThan(ids.indexOf('084-cloud-storage-to-connectors'));
     });
 
     test('ticks what each agent\'s skills read and propose through a connected app', async () => {

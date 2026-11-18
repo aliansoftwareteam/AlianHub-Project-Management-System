@@ -9,6 +9,7 @@ import { storageQueryBuilder } from "@/utils/storageQueryBuild";
 import { i18n } from "@/locales/main";
 import { isBundledPriorityImage } from "@/composable/commonFunction";
 import { isOwnerOrAdmin } from "@/utils/roles";
+import { isUnlimited, planState } from "@/composable/planUsage";
 const t = i18n.global.t;
 const urlRegex = ref(/(https?|ftp):\/\/[^\s/$.?#].[^\s]*/g)
 
@@ -319,16 +320,15 @@ export function useCustomComposable() {
                 $toast.error(t(`Toast.Please_select_valid_file`), { position: 'top-right' });
                 return false;
             }else{
-                const totalSizeInMB = fileSizes.reduce((acc, current) => acc + current / (1024 * 1024), 0); // total size of selected images in mb
-                let wasabiBucketStorage = currentCompany.value.planFeature.bucketStorage; // file storage according to plan feature in mb
-                let usedSpace = currentCompany.value.bucketSize; // used space in wasabi buckets in mb
+                const totalSizeInBytes = fileSizes.reduce((acc, current) => acc + current, 0); // total size of selected files in bytes
+                const storage = planState.data?.storage; // live usage, the same figures the Plan & Usage page shows
 
-                if(wasabiBucketStorage === null){
+                if(!storage || isUnlimited(storage.limit)){
                     return checkFileSize(fileSizes,currentCompany.value,defineFileSize);
                 }else{
-                    const totalAvailableSpace = wasabiBucketStorage - usedSpace; // total available space in wasabi buckets
+                    const totalAvailableBytes = storage.limit - storage.bytes; // total available space on the instance
 
-                    if (totalAvailableSpace > totalSizeInMB) {
+                    if (totalAvailableBytes > totalSizeInBytes) {
                         return checkFileSize(fileSizes,currentCompany.value,defineFileSize);
                     }else{
                         $toast.error(t(`Toast.Storage_exceeded_Upgrade_your_plan`), { position: 'top-right' });

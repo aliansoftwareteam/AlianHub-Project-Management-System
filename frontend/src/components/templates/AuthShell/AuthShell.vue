@@ -17,6 +17,7 @@
                     <a v-if="brand.termsLink" :href="brand.termsLink" target="_blank" rel="noopener">{{ $t('Auth.tearm') }}</a>
                     <a v-if="brand.privacyLink" :href="brand.privacyLink" target="_blank" rel="noopener">{{ $t('Auth.Privacy_Policy') }}</a>
                     <a v-if="brand.helpLink" :href="brand.helpLink" target="_blank" rel="noopener">{{ $t('Shell.help') }}</a>
+                    <a v-if="sourceLink" :href="sourceUrl" target="_blank" rel="noopener" data-test="auth-source-code">{{ $t('Shell.source_code') }}</a>
                 </div>
                 <slot name="foot-right" />
             </footer>
@@ -56,10 +57,10 @@ import { useStore } from "vuex";
 import moment from "moment";
 import { useAppVersion } from "@/composable/useAppVersion";
 
-defineProps({ proof: { type: Boolean, default: true } });
+defineProps({ proof: { type: Boolean, default: true }, sourceLink: { type: Boolean, default: true } });
 
 const { getters } = useStore();
-const { version } = useAppVersion();
+const { version, sourceUrl } = useAppVersion();
 const brand = computed(() => getters["brandSettingTab/brandSettings"] || {});
 const productName = computed(() => brand.value.productName || "AlianHub");
 const initial = computed(() => productName.value.charAt(0).toUpperCase());

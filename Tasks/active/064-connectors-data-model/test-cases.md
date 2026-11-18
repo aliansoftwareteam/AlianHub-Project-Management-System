@@ -4,7 +4,7 @@ Run 2026-10-30 on `feat/task-064-connectors-data-model` after the review fix (se
 
 Two kinds of case:
 - **Auto**: covered by Jest. Run `node node_modules/jest/bin/jest.js --selectProjects unit --runTestsByPath tests/connector-data-model.test.js tests/migration-connector-indexes.test.js --no-watchman`. The data model test checks the declared indexes against Mongo's partial-index rule, not a live database. Through `npx jest` on Windows the run can hang on watchman.
-- **Mongo**: `tests/integration/connector-indexes.int.test.js` builds the indexes through migration 079 in a throwaway database and inserts against real MongoDB, so it catches what the JS model of the rule would miss. Runs with the integration project (`E2E_MONGODB_URL`).
+- **Mongo**: `tests/integration/connector-indexes.int.test.js` builds the indexes through migration 080 in a throwaway database and inserts against real MongoDB, so it catches what the JS model of the rule would miss. Runs with the integration project (`E2E_MONGODB_URL`).
 - **Manual**: run against a real MongoDB with `mongosh`. These prove what the Jest test cannot: that Mongo itself refuses the duplicate.
 
 Write the result in the **Result** column: `pass`, `fail` (with what happened), or `blocked`.
@@ -13,7 +13,7 @@ Write the result in the **Result** column: `pass`, `fail` (with what happened), 
 
 1. Root `.env` with a working `MONGODB_URL`.
 2. Start the server once (`npm run nodemon`) and open the app with a company, so the company database exists.
-3. Run the migration: `npm run migrate`, so migration 079 builds the indexes. Without it they are built only in the background on first use.
+3. Run the migration: `npm run migrate`, so migration 080 builds the indexes. Without it they are built only in the background on first use.
 4. In `mongosh`, `use <the company's database>`.
 5. Run I-01 first. If the two new indexes are missing, the rest of section B cannot be trusted; record I-01 as `fail` and stop.
 6. Clean up after: `db.connector_connections.deleteMany({ userId: /^tc-/ })`, `db.connector_apps.deleteMany({ companyId: /^tc-/ })`, `db.connector_usage.deleteMany({ companyId: 'tc-co' })`.
@@ -68,11 +68,11 @@ Write the result in the **Result** column: `pass`, `fail` (with what happened), 
 | U-05 | Manual | Counter goes up in place | `updateOne({connectionId:'cn1', 'actor.type':'agent', 'actor.id':'ag1', day:'2026-10-30'}, {$inc:{reads:1}}, {upsert:true})` twice | One row, `reads: 2` | pass |
 | U-06 | Auto | Counters start at zero | Jest | `reads` and `writeProposals` default 0 | pass |
 
-## E. Migration 079
+## E. Migration 080
 
 | ID | Kind | Case | Steps | Expected | Result |
 |---|---|---|---|---|---|
-| M-01 | Auto | Listed once, after 078 | Jest | `079-connector-indexes`, company scope | pass |
+| M-01 | Auto | Listed once, after 078 | Jest | `080-connector-indexes`, company scope | pass |
 | M-02 | Auto | Builds what the schemas declare | Jest | Its unique index names match each schema's unique indexes | pass |
 | M-03 | Auto | Every workspace, all three collections, `createIndexes` only | Jest | 3 calls per workspace; never `syncIndexes`, so no index is dropped | pass |
 | M-04 | Auto | Second run is harmless | Jest | Resolves, nothing else changes | pass |
@@ -93,12 +93,12 @@ Write the result in the **Result** column: `pass`, `fail` (with what happened), 
 
 | Finding | Risk | Change | Covered by |
 |---|---|---|---|
-| No migration built the new indexes | Mongoose builds a declared index only in the background, the first time a workspace uses the collection. On a workspace that already has `connector_connections`, two connects close together could both save a live row before `one_live_per_provider` exists, and the build would then fail on the duplicate. Migration 077 fixed the same gap for agents | Added `migrations/079-connector-indexes.js`: `createIndexes` on the three collections in every workspace | M-01 to M-06, `tests/migration-connector-indexes.test.js` |
+| No migration built the new indexes | Mongoose builds a declared index only in the background, the first time a workspace uses the collection. On a workspace that already has `connector_connections`, two connects close together could both save a live row before `one_live_per_provider` exists, and the build would then fail on the duplicate. Migration 077 fixed the same gap for agents | Added `migrations/080-connector-indexes.js`: `createIndexes` on the three collections in every workspace | M-01 to M-06, `tests/migration-connector-indexes.test.js` |
 
 Noted, not changed:
 - `one_live_per_account` refuses nothing that `one_live_per_provider` does not already refuse, since both are partial on live rows and the second has fewer keys. It costs one index write per change. It is in the signed contract (section 6), so removing it needs track B's agreement.
 - Schema validators do not run on updates or upserts here (no `runValidators`), so a check on `connector_usage.day` (`YYYY-MM-DD`) or `actor.type` (`agent` | `mcp`) in the schema would not reach the `$inc` upsert that writes usage. The writer in 070 has to build those values itself.
-- Migration number 079 and task 079 (which migrates old rows) are different things that share a number.
+- Migration number 080 (079 before it reached staging) and task 079 are different things.
 
 ## H. PR #1738 review (Shiv)
 
@@ -107,7 +107,7 @@ Noted, not changed:
 | `one_live_per_account` never fired: `one_live_per_provider` has fewer keys and tripped first, so a person could hold one account per provider, against the "more than one account" note in #1741 | Decided: several accounts per provider. `one_live_per_provider` removed; 079 drops it, and the old `one_live_per_account`, on a database that built them | I-01, I-02, M-08 |
 | A `pending` row blocked the next connect | Follows from the above: the remaining index needs `account.id`, which a pending row does not have yet. 066 still has to clear or reuse abandoned pending rows so they do not pile up | I-09 |
 | `companyId` optional but part of the unique key, so a row without it collided across workspaces | Required whenever `provider` is set, and the index is partial on `companyId` being a string | I-13, I-14 |
-| Schema comment said "073 and 079 migrate the old rows" | Now names task 073 only; migration 079 builds indexes | - |
+| Schema comment said "073 and 079 migrate the old rows" | Now names task 073 only; migration 080 builds indexes | - |
 | Index tests re-implement Mongo's rule in JS | Added `tests/integration/connector-indexes.int.test.js` against real MongoDB | I-01, I-02, I-09, I-13, I-14, M-08 |
 
 Run on a throwaway MongoDB 8.0.4: unit 29/29, Mongo 10/10. Connector, migration and schema suites 828/829; the one failure is `style-check`'s baseline form check, which fails on this Windows checkout because `core.autocrlf` gives the file CRLF line endings, and this branch does not touch it.

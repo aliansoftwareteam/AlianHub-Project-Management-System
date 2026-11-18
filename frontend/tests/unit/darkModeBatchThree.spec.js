@@ -311,6 +311,7 @@ describe('a picture beside a written name is not read out as well', () => {
         'components/organisms/OnLeaveCard/OnLeaveCard.vue': [true],
         'components/organisms/ProjectDetailRightSide/ProjectDetailRightSide.vue': [true],
         'components/organisms/ProjectWatcher/ProjectWatcher.vue': [true],
+        'components/organisms/Shell/ChatAlerts.vue': [true],
         'components/organisms/Shell/GlobalRail.vue': [false, true],
         'components/organisms/Shell/MobileTabBar.vue': [true],
         'components/organisms/TaskDetailRightSide/TaskDetailRightSide.vue': [true],
@@ -318,9 +319,7 @@ describe('a picture beside a written name is not read out as well', () => {
         'components/organisms/UsersByCategoryCard/UsersByCategoryCard.vue': [true],
         'components/templates/Dashboard/DropDownListComponent.vue': [false, false, true],
         'plugins/customFieldView/component/atom/settingCustomField/customFieldList.vue': [true],
-        'views/Inbox/Inbox.vue': [false],
-        'views/Timesheet/ProjectTimesheet/ProjectTimesheet.vue': [true],
-        'views/Timesheet/TrackerTimeSheet/TrackerTimesheet.vue': [true]
+        'views/Inbox/Inbox.vue': [false]
     };
 
     test('the table covers every place a picture is drawn', () => {

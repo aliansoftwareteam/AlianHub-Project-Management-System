@@ -1,6 +1,6 @@
 # Industry demos
 
-`npm run demo:industries` builds one demo company per industry, each running its business in AlianHub: process projects with their own pipelines and fields, named people, role agents made from the real role playbooks, automations that fire, approvals waiting, exceptions, goals, a dashboard and a **Start here** page. One demo account belongs to every demo company, so the workspace picker at sign-in is the industry picker; each company's name starts with its industry (`<Industry> · <Brand>`). There is a company for each of the eight company blueprints the role agents come from (IT, manufacturing, agency, e-commerce, professional services, construction, schools, clinics), plus finance, logistics and HR.
+`npm run demo:industries` builds one demo company per industry, each running its business in AlianHub: process projects with their own pipelines and fields, named people, role agents made from the real role playbooks, automations that fire, approvals waiting, exceptions, goals, real logged time, a dashboard and a **Start here** page. One demo account belongs to every demo company, so the workspace picker at sign-in is the industry picker; each company's name starts with its industry (`<Industry> · <Brand>`). There is a company for each of the eight company blueprints the role agents come from (IT, manufacturing, agency, e-commerce, professional services, construction, schools, clinics), plus finance, logistics and HR.
 
 | Company | Industry | Projects |
 | --- | --- | --- |
@@ -45,7 +45,7 @@ Every company is a database of its own with about 44 collections. A shared-tier 
 1. Set `DEMO_MODE="true"`, `DEMO_EMAIL` and `DEMO_PASSWORD` (already the case on demo.alianhub.com).
 2. Run `npm run demo:industries` on the server. With `DEMO_MODE="true"` it accepts the instance's database; anywhere else it only runs against `localhost`.
 3. A first-time visitor clicks **Try the demo**, picks an industry in the workspace picker, and lands on Home. The banner then shows the industry, a **Guide** link to the company's Start-here page and **Switch industry** (the profile menu, where each company shows its industry).
-4. Reset on a schedule, for example nightly: `0 3 * * * cd /app && npm run demo:industries -- --reset`, with the same `--only` list the database was seeded with when it cannot hold all eleven (see above).
+4. Reset on a schedule, for example nightly: `0 3 * * * cd /app && npm run demo:industries -- --reset`, with the same `--only` list the database was seeded with when it cannot hold all eleven (see above). **Not installed on demo.alianhub.com yet** — every build is correct whenever it runs (logged time is always computed relative to the day it runs, see below), but nothing currently triggers it nightly; add the crontab line above to the server.
 
 The instance's own placeholder workspace stays as it is; remove it from Settings if visitors should only see the industries.
 
@@ -78,14 +78,33 @@ Approving the gate is real: the run resumes and hands the task to the next role'
 
 Restart a server after switching a flag; the dispatcher reads it on every call, but the workflow engine registers the hand-over step at start.
 
+## Time logged and the dashboard
+
+Every company's dashboard (**Dashboards**, or the link in the guide) carries six cards: `tasks_by_status`,
+`at_risk`, `due_soon`, `project_pulse`, `logged_vs_estimate` and `my_time`. The last two need real
+`TIMESHEET` rows and a real effort estimate on each task to show anything — both are seeded:
+
+- Every top-level task gets an effort estimate (`totalEstimatedTime`), made up from its key when the
+  scenario does not set one (2 to 10 hours, stable across resets).
+- Every top-level task past its opening status gets real logged time, written through the same
+  **manual log time** route a person uses: a task still "not started" (its project's opening status)
+  gets none, an active task gets about 45% of its estimate logged, a done or closed one about 90%, split
+  across its assignees (or its lead, with none named) over 2 or 3 entries on different workdays.
+- **Entries land on workdays up to and including yesterday, never today.** A reset always computes this
+  relative to the day it runs, so a nightly `--reset` (see above) keeps the log a week that just
+  finished, never a half-logged "today". The trade-off: `logged_vs_estimate` and `my_time` default to
+  "this week", which reads empty on a Monday (this week has not reached a logged day yet) — switch the
+  card's period to "last week" or "last 30 days" to see the history regardless of the day.
+- Subtasks are not logged against (their ids are not tracked after creation); only top-level tasks are.
+
 ## What is real, simulated and illustrative
 
 | | In the demo |
 | --- | --- |
-| **Real** | Projects, pipelines, task types, fields, tags, dependencies, checklists, history. Automations: the seed fires them through real status changes, so their run history is genuine, and a visitor moving a card fires them again. Approving a proposal applies its changes (priority, comment, assignee, subtask, due date), with Undo for 15 minutes; declining drops it. Goals with task targets, the dashboard and project health are counted from the tasks. Each company's digest agent (`digest.ceo`) really runs without an AI model: **AI → Agents → Run now** on its digest task posts the counts from the board. The dispatcher's settings, its suggestions (from the rules, no model) and the hand-overs the leads accepted; the workflow definitions, the engine's run, its hand-overs to each role's queue and the approval, and everything that follows a visitor's decision. |
+| **Real** | Projects, pipelines, task types, fields, tags, dependencies, checklists, history. Automations: the seed fires them through real status changes, so their run history is genuine, and a visitor moving a card fires them again. Approving a proposal applies its changes (priority, comment, assignee, subtask, due date), with Undo for 15 minutes; declining drops it. Goals with task targets, the dashboard and project health are counted from the tasks. Logged time is real `TIMESHEET` data, written through the manual log-time route (see above), and every task's effort estimate is real. Each company's digest agent (`digest.ceo`) really runs without an AI model: **AI → Agents → Run now** on its digest task posts the counts from the board in well under a minute — the only live-triggerable agent action in the demo, deliberately small and fast for a visitor to watch. The dispatcher's settings, its suggestions (from the rules, no model) and the hand-overs the leads accepted; the workflow definitions, the engine's run, its hand-overs to each role's queue and the approval, and everything that follows a visitor's decision. |
 | **Simulated** | Earlier role-agent runs, the comments they left and the proposals waiting for approval were written by the seed. They carry `simulated: true` and show a **Simulated** chip on the comment, the Inbox and AI proposal cards and the run page. Their spend is zero. In each workflow run, the roles finishing their steps before the approval: the seed makes the write a finished hand-over makes (`leftQueue.simulated` on the queue row) and marks the step and the run `simulated: true`; the run page, its steps, the approval in the AI Inbox and on Home show the chip. |
 | **Real but switched off** | Each role agent's skill is its real playbook. It is paused, as every team-pack agent is, with a $2 spend cap. With an AI model connected, switching it on makes it run for real. |
-| **Illustrative** | The companies, people, customers, suppliers and amounts are fictional. Seeded text uses no calendar month, so a reset never reads stale; due dates are relative to the day of seeding. |
+| **Illustrative** | The companies, people, customers, suppliers and amounts are fictional. Seeded text uses no calendar month, so a reset never reads stale; due dates are relative to the day of seeding, and logged time is relative to the day of seeding too (through yesterday, see above). |
 
 ## Presenting
 

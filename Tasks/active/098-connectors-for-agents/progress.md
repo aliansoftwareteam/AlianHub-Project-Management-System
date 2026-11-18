@@ -2,7 +2,7 @@
 
 ## Checklist
 - [x] Connectors on the agent record, saved and validated through the agent routes
-- [x] Existing agents keep working (migration 083)
+- [x] Existing agents keep working (migration 085)
 - [x] Enforced on the server: reads, write proposals, and the filing guard
 - [x] Connectors section in agent settings
 - [x] Connector read step in skills and the skill editor
@@ -27,7 +27,7 @@ None.
   - Refusal words: "This agent is not allowed to use <App>. Tick it in the agent's settings.", or "This agent may use <App>, but not this tool. …" when the app is ticked without that tool.
 - Skill step: a refused connector read (not ticked, not connected, broken, product not ticked, a cap) fails its step. A gather step may say `optional: true` (connector reads only; the validator refuses it elsewhere): the run goes on and the template sees `{{gather.<name>.failed}}` and `.reason`. Without it the run is skipped with the reason as its outcome. Any other error still fails the run.
 - Scheduled runs, checked: an agent schedule (`schedules/reportRun.js`) starts as the schedule's owner and reads no connector; a skill run started by a rule, on a timer or not, acts as the rule's owner (`runAgent` → `ruleOwner`), a workflow step as the run's starter. The connector call takes `actor.userId`, which is always the run's `startedBy` and never `agent.ownerId`. `tests/agent-scheduled-connector-owner.test.js` fires a timed rule for an agent made by someone else: the read, the token and the write proposal are all the schedule owner's; with no connection of theirs the run stops with "Connect …", though the creator has one.
-- Migration `083-agent-connector-ticks`: for every agent without the field, ticks the connector tools its named skills read in gather steps or propose in emits. A skill is resolved as a run resolves it (the workspace's live copy, else the built-in seed or code skill), so an agent on the Slack summary keeps `slack.channel.read` and `slack.message.post`. The write is conditioned on the field still being absent, so a second run, or an agent saved meanwhile, is left alone.
+- Migration `085-agent-connector-ticks`: for every agent without the field, ticks the connector tools its named skills read in gather steps or propose in emits. A skill is resolved as a run resolves it (the workspace's live copy, else the built-in seed or code skill), so an agent on the Slack summary keeps `slack.channel.read` and `slack.message.post`. The write is conditioned on the field still being absent, so a second run, or an agent saved meanwhile, is left alone.
 - Settings: a Connectors tab (`AgentConnectors.vue`, logic in `agentConnectorTicks.js`), shown when the workspace offers an app or the agent has ticks. Each offered app with its turned-on tools from the new `GET /api/v2/agents/connectors`; ticking an app ticks its reads, writes are ticked one by one and labelled "each one approved first"; tools the agent's skills use are marked; ticks on an app not offered now are kept and listed with Clear. Read-only for anyone who may not edit the agent; a member's save goes for approval. Revision history shows the ticks as words.
 - Skill editor: the reader list is grouped (this workspace, the web, one group per connected app); a connector step gets `SkillConnectorRead.vue` for its own settings (never `connectionId`) and the "Carry on without it" switch.
 - Shared connector files changed: `Modules/Connectors/toolRunner.js` (the `agentConnectors` check in `read`), `Modules/Connectors/writes.js` (`refusalOf` in `fileChanges`), `Modules/Connectors/tools.js` (`failed` and `reason` reserved as read field names). `connection.js`, `apps.js`, `registry.js` and `providerApi.js` are untouched.
@@ -44,6 +44,6 @@ None.
 - The migration ticks every skill named on the agent, on or off, since its owner already chose them; only tools this server loads are ticked.
 
 ## Open
-- Skills an automation rule or workflow step names for an agent without the agent listing the skill are not seen by migration 083; such a run is skipped with "Tick it in the agent's settings" until someone ticks it.
+- Skills an automation rule or workflow step names for an agent without the agent listing the skill are not seen by migration 085; such a run is skipped with "Tick it in the agent's settings" until someone ticks it.
 - `docs/API.md` and `docs/api/openapi.json` gain `GET /api/v2/agents/connectors` in the docs PR after merge (Rule 4).
 - Migration number 083 is the next free one on this base; renumber if another branch takes it first.

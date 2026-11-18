@@ -62,6 +62,10 @@
                             <template v-if="connection.tokens">
                                 <p class="cya__note">{{ $t('ConnectAi.token_body') }}</p>
                                 <router-link class="ah-btn ah-btn--secondary ah-btn--sm cya__link" :to="tokenPage" data-test="connect-ai-token-link">{{ $t('ConnectAi.token_link') }}</router-link>
+                                <p class="cya__note" data-test="connect-ai-developer">
+                                    {{ $t('ClaudeCodeSetup.connect_page_note') }}
+                                    <a class="cya__guide" :href="claudeCodeGuide" target="_blank" rel="noopener">{{ $t('ClaudeCodeSetup.guide_short') }}</a>
+                                </p>
                             </template>
                             <p v-else class="cya__note">{{ $t('ConnectAi.tokens_off') }}</p>
                         </div>
@@ -119,6 +123,7 @@ import { saveOnboarding } from "@/composable/onboardingState";
 import { formatWhen } from "@/views/OAuth/oauthShared";
 import { BLUEPRINT_WELCOME_ROUTE } from "@/router/ai/connect";
 import { fetchTeamPacks } from "@/utils/dispatcher";
+import { GUIDE, useDocsLink } from "@/composable/docsLink";
 
 defineOptions({ name: "ConnectYourAi" });
 
@@ -144,6 +149,7 @@ const mayAddServerKey = computed(() => aiAvailability.state === AI_STATE.UNCONFI
 
 const inWorkspace = (name, query) => ({ name, params: { cid: unref(companyId) }, ...(query ? { query } : {}) });
 const tokenPage = computed(() => inWorkspace("AiAccounts", { tab: "link" }));
+const claudeCodeGuide = useDocsLink(GUIDE.CLAUDE_CODE_DEVELOPER);
 const serverKeyPage = computed(() => inWorkspace("InstanceSettings", { group: "ai" }));
 
 const copied = ref("");
@@ -195,6 +201,7 @@ onBeforeUnmount(() => stopWatching());
 .cya__note { margin: 0; font: var(--text-small); color: var(--ink-2); }
 .cya__note code, .cya__list code { padding: 1px 5px; border-radius: 4px; background: var(--surface-hover); color: var(--ink); overflow-wrap: anywhere; }
 .cya__link { align-self: flex-start; }
+.cya__guide { color: var(--brand-deep); }
 .cya__inline-link { color: var(--ink); text-decoration: underline; }
 .cya__foot { display: flex; flex-wrap: wrap; align-items: center; gap: 10px 14px; padding-top: 8px; border-top: 1px solid var(--hairline); }
 @media (max-width: 640px) {

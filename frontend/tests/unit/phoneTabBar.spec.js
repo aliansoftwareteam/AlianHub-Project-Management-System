@@ -8,7 +8,10 @@ vi.mock('@/composable', () => ({
     useGetterFunctions: () => ({ getUser: () => ({ Employee_Name: 'Pat', Employee_Email: 'pat@example.test' }) })
 }));
 vi.mock('@/composable/aiAvailability', () => ({ aiUsable: ref(true), aiReachable: ref(true), canUseAi: () => true }));
-vi.mock('@/services', () => ({ useAuth: () => ({ logOut: vi.fn() }) }));
+vi.mock('@/services', () => ({
+    useAuth: () => ({ logOut: vi.fn() }),
+    apiRequest: vi.fn(async () => ({ data: { data: { spaces: ['s1', 's2'], direct: ['task_s1_l1_dm1_comments'], channels: ['task_s2_l2_default_comments'] } } }))
+}));
 vi.mock('vue-router', () => ({
     useRoute: () => ({ name: 'Home', fullPath: '/', path: '/' }),
     useRouter: () => ({ hasRoute: () => true, resolve: () => ({ href: '#/' }) })
@@ -65,6 +68,13 @@ describe('the phone tab bar', () => {
         await mountTabBar({ notification_counts: 0, mention_counts: -1 });
         expect(wrapper.find('[data-test="tab-inbox"] .ah-unread-badge').exists()).toBe(false);
         expect(wrapper.find('[data-test="tab-inbox"]').attributes('aria-label')).toBeUndefined();
+    });
+
+    it('shows the unread count on the Chat tab for the conversations Chat lists, and nothing left from a closed one', async () => {
+        await mountTabBar({ task_s1_l1_dm1_comments: 2, task_s2_l2_default_comments: 1, task_s2_l9_default_comments: 7, task_p1_l1_t1_comments: 4 });
+        const chat = wrapper.find('[data-test="tab-chat"]');
+        expect(chat.find('.ah-unread-badge').text()).toBe('3');
+        expect(chat.attributes('aria-label')).toBe('Shell.chat_unread');
     });
 
     it('still reaches Planner from the More sheet', async () => {

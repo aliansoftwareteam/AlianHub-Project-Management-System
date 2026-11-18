@@ -37,4 +37,4 @@ A workspace owner or admin can set the company's own Dropbox app under **Connect
 
 ## 4. Moving from the per-person Dropbox settings
 
-The old Dropbox settings under Settings › Integrations, where each person typed their own app key and secret, are gone. Migrations `082-cloud-storage-to-connectors` and `085-connectors-finish-legacy-cutover` delete those stored secrets and close the old grants. Each person connects Dropbox once under AI › Customize › Connectors. Files already attached as links keep opening, and imported copies are ordinary uploads.
+The old Dropbox settings under Settings › Integrations, where each person typed their own app key and secret, are gone. Migrations `084-cloud-storage-to-connectors` and `087-connectors-finish-legacy-cutover` delete those stored secrets and close the old grants. Each person connects Dropbox once under AI › Customize › Connectors. Files already attached as links keep opening, and imported copies are ordinary uploads.

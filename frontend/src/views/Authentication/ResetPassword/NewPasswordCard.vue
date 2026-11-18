@@ -6,7 +6,8 @@
         </div>
 
         <form v-else-if="stage === 'form'" class="av2-auth-card" novalidate @submit.prevent="submit">
-            <h2 class="auth__h">{{ title }}</h2>
+            <h2 class="auth__h">{{ activation && intro.workspace ? $t('Auth.activate_welcome', { workspace: intro.workspace }) : title }}</h2>
+            <p v-if="activation && intro.email" class="auth__p">{{ $t('Auth.activate_for', { email: intro.email }) }}</p>
             <p class="auth__p">{{ $t('Auth.new_password_rule_range', { min: MIN_PASSWORD_LENGTH, max: MAX_PASSWORD_LENGTH }) }}</p>
             <div class="auth__fields">
                 <div class="ah-field">
@@ -49,14 +50,15 @@
                     <span v-if="busy" class="ah-spin"></span>{{ busy ? $t('Auth.loading') : submitLabel }}
                 </button>
             </div>
-            <div class="auth__links" style="margin-top:28px"><router-link :to="{ name: 'Log-in' }">{{ $t('Auth.back_to_login') }}</router-link></div>
+            <div v-if="!activation" class="auth__links" style="margin-top:28px"><router-link :to="{ name: 'Log-in' }">{{ $t('Auth.back_to_login') }}</router-link></div>
         </form>
 
         <div v-else class="av2-auth-card">
             <div class="auth__glyph auth__glyph--warn">!</div>
             <h2 class="auth__h">{{ $t('Auth.link_expired_title') }}</h2>
-            <p class="auth__p">{{ expiredMessage || $t('Auth.link_expired_body') }}</p>
-            <router-link :to="{ name: 'Forgot_Password' }" class="ah-btn ah-btn--secondary ah-btn--block ah-btn--lg">{{ $t('Auth.request_new_link') }}</router-link>
+            <p class="auth__p">{{ expiredMessage || (activation ? $t('Auth.activation_expired_body') : $t('Auth.link_expired_body')) }}</p>
+            <a v-if="activation && portalUrl" :href="portalUrl" target="_blank" rel="noopener" class="ah-btn ah-btn--secondary ah-btn--block ah-btn--lg">{{ $t('Auth.activation_open_account') }}</a>
+            <router-link v-else-if="!activation" :to="{ name: 'Forgot_Password' }" class="ah-btn ah-btn--secondary ah-btn--block ah-btn--lg">{{ $t('Auth.request_new_link') }}</router-link>
             <div class="auth__links" style="margin-top:28px"><router-link :to="{ name: 'Log-in' }">{{ $t('Auth.back_to_login') }}</router-link></div>
         </div>
     </AuthShell>
@@ -78,7 +80,10 @@ import { MAX_PASSWORD_LENGTH, MIN_PASSWORD_LENGTH, PASSWORD_RULE_MESSAGE, meetsP
 const props = defineProps({
     title: { type: String, required: true },
     submitLabel: { type: String, required: true },
-    successToast: { type: String, required: true }
+    successToast: { type: String, required: true },
+    // The hosted owner's first password (Modules/Platform): a token in the query, and a session at the end.
+    activation: { type: Boolean, default: false },
+    portalUrl: { type: String, default: "" }
 });
 
 const { t } = useI18n();
@@ -95,11 +100,18 @@ const busy = ref(false);
 const expiredMessage = ref("");
 const errors = reactive({ password: "", confirm: "" });
 const passwordInput = ref(null);
+const intro = reactive({ email: "", workspace: "" });
+const linkToken = () => String((props.activation ? route.query.token : route.params.token) || "");
 
 onMounted(async () => {
     try {
-        const result = await apiRequestWithoutSecure("post", env.TOKEN_VERIFY_FORGOTPASSWORD, { token: route.params.token });
-        userId.value = result.data.data._id;
+        if (props.activation) {
+            const result = await apiRequestWithoutSecure("post", env.ACTIVATION_VERIFY, { token: linkToken() });
+            Object.assign(intro, { email: result.data.data.email || "", workspace: result.data.data.workspace || "" });
+        } else {
+            const result = await apiRequestWithoutSecure("post", env.TOKEN_VERIFY_FORGOTPASSWORD, { token: linkToken() });
+            userId.value = result.data.data._id;
+        }
         stage.value = "form";
         await nextTick();
         passwordInput.value?.focus();
@@ -123,7 +135,13 @@ const submit = async () => {
     if (!validate() || busy.value) return;
     busy.value = true;
     try {
-        await apiRequestWithoutSecure("post", env.RESETPASSWORD, { id: userId.value, password: password.value, token: route.params.token });
+        if (props.activation) {
+            const result = await apiRequestWithoutSecure("post", env.ACTIVATE, { token: linkToken(), password: password.value });
+            $toast.success(t(props.successToast), { position: "top-right" });
+            router.replace({ name: "Log-in", query: { magic: "ok", uid: result.data.data.uid } });
+            return;
+        }
+        await apiRequestWithoutSecure("post", env.RESETPASSWORD, { id: userId.value, password: password.value, token: linkToken() });
         $toast.success(t(props.successToast), { position: "top-right" });
         router.replace({ name: "Log-in" });
     } catch (err) {

@@ -22,7 +22,7 @@ const { SCHEMA_TYPE } = require('../Config/schemaType');
 const store = require('../Config/secrets');
 const { resolveConnection } = require('../Modules/Connectors/resolveConnection');
 
-const ID = '080-connectors-google-calendar-to-google';
+const ID = '081-connectors-google-calendar-to-google';
 const migration = require(`../migrations/${ID}`);
 const T = SCHEMA_TYPE.CONNECTOR_CONNECTIONS;
 const C1 = '6f0000000000000000000c01';
@@ -63,8 +63,8 @@ afterAll(() => {
 describe(ID, () => {
     it('is a company migration, listed once after 079, with a re-trigger down', () => {
         const ids = listMigrations().map((m) => m.id);
-        expect(ids.filter((id) => id.startsWith('080-'))).toEqual([ID]);
-        expect(ids.indexOf(ID)).toBeGreaterThan(ids.indexOf('079-connector-indexes'));
+        expect(ids.filter((id) => id.startsWith('081-'))).toEqual([ID]);
+        expect(ids.indexOf(ID)).toBeGreaterThan(ids.indexOf('080-connector-indexes'));
         expect(() => validateMigration(migration, ID)).not.toThrow();
         expect(migration).toMatchObject({ id: ID, scope: 'company' });
         expect(typeof migration.down).toBe('function');

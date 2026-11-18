@@ -1,4 +1,4 @@
-/* Migration 081 retires the Slack workspace bot (task 074): the bot token at Slack, its secrets, its row, the posts
+/* Migration 082 retires the Slack workspace bot (task 074): the bot token at Slack, its secrets, its row, the posts
    still waiting on it, and one bell notice to owners and admins. A person's own Slack connection is left alone, and a second run changes nothing. */
 const mockDb = require('./fixtures/fakeMongo').create();
 
@@ -15,7 +15,7 @@ const store = require('../Config/secrets');
 const { recordAudit } = require('../Modules/Audit/recorder');
 const { sendNotice } = require('../Modules/Inbox/helpers/workspaceNotice');
 const providerApi = require('../Modules/Connectors/providerApi');
-const migration = require('../migrations/081-retire-slack-bot');
+const migration = require('../migrations/082-retire-slack-bot');
 
 const C = '6f00000000000000000000c1';
 const T = SCHEMA_TYPE.CONNECTOR_CONNECTIONS;
@@ -34,7 +34,7 @@ beforeEach(() => {
     mockDb.seed(P, { _id: 'other', status: 'pending', changes: [{ action: 'task.comment', params: { text: 'x' } }] });
 });
 
-describe('081-retire-slack-bot', () => {
+describe('082-retire-slack-bot', () => {
     it('asks Slack to revoke the bot token, and never sends it the signing secret', async () => {
         await migration.retireCompany(ctx(), C);
         expect(providerApi.revoke).toHaveBeenCalledTimes(1);

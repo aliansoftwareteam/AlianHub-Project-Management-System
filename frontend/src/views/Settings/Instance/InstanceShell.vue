@@ -22,6 +22,7 @@
 import { computed, inject, nextTick, onMounted, ref, watch } from "vue";
 import { useRoute } from "vue-router";
 import ShellIcon from "@/components/organisms/Shell/ShellIcon.vue";
+import { isManagedHosting } from "@/config/publicConfig";
 import { useInstanceApi } from "./useInstanceApi";
 
 defineOptions({ name: "InstanceShell" });
@@ -30,7 +31,8 @@ const route = useRoute();
 const cid = inject("$companyId");
 const { guide } = useInstanceApi();
 
-const tabs = [
+const HOSTED_CLOSED = ["InstanceBackups", "InstanceUpgrade", "InstanceLogs"];
+const allTabs = [
     { name: "InstanceHealth", label: "Instance.nav_health", anchor: "troubleshooting" },
     { name: "InstanceSettings", label: "Instance.nav_settings", anchor: "configure" },
     { name: "InstanceEnforcement", label: "Enforcement.nav", anchor: "configure" },
@@ -43,7 +45,8 @@ const tabs = [
     { name: "InstanceProviders", label: "Providers.nav", anchor: "configure" },
     { name: "InstanceStats", label: "Instance.nav_stats", anchor: "reference" },
 ];
-const anchor = computed(() => tabs.find((t) => t.name === route.name)?.anchor || "install");
+const tabs = computed(() => (isManagedHosting() ? allTabs.filter((t) => !HOSTED_CLOSED.includes(t.name)) : allTabs));
+const anchor = computed(() => tabs.value.find((t) => t.name === route.name)?.anchor || "install");
 
 const strip = ref(null);
 const revealActiveTab = () => nextTick(() => strip.value?.querySelector(".is-active")?.scrollIntoView?.({ block: "nearest", inline: "nearest" }));

@@ -26,14 +26,14 @@
 }
 
 .chipDiv-wrapper {
-    width: 250px;
     display: flex;
-    padding: 0px 5px 0px;
-    /* gap: 5px; */
     flex-wrap: wrap;
+    gap: 4px;
+    padding: 0 10px;
 }
-.chipDiv-wrapper .tagList{
-    margin-bottom: 2px;
+.chipDiv-wrapper > .tagList{
+    padding: 0;
+    min-width: 0;
 }
 .project-tag-list-detail-wrapper {
     padding: 10px;

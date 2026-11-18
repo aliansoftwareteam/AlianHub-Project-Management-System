@@ -372,6 +372,37 @@ async function personComment({ companyId, project, taskId, userId, text }) {
     return saved && saved._id ? String(saved._id) : null;
 }
 
+/* Time a person logged on a task, through the manual log-time route itself (Modules/LogTime). */
+async function logTime({ companyId, project, taskId, userId, day, startTime, minutes, description }) {
+    const { manualLogTime } = require('../../../../Modules/LogTime/controllerV2/manualLogtime');
+    const task = await findOne(companyId, SCHEMA_TYPE.TASKS, { _id: oid(taskId) }, { sprintId: 1, TaskName: 1, TaskKey: 1 });
+    const [startHour, startMinute] = startTime.split(':').map(Number);
+    const endTotal = startHour * 60 + startMinute + minutes;
+    const endTime = `${String(Math.min(23, Math.floor(endTotal / 60))).padStart(2, '0')}:${String(Math.min(59, endTotal % 60)).padStart(2, '0')}`;
+    const saved = await viaHandler(manualLogTime, {
+        companyId,
+        uid: userId,
+        body: {
+            logTimeDate: day,
+            description,
+            startLogTime: startTime,
+            endLogTime: endTime,
+            timeDuration: `${Math.floor(minutes / 60)}:${String(minutes % 60).padStart(2, '0')}`,
+            ticketId: String(taskId),
+            taskId: String(taskId),
+            projectId: String(project._id),
+            isEdit: false,
+            dateFormat: 'yyyy-MM-dd',
+            taskName: task.TaskName || task.TaskKey || 'Task',
+            projectName: project.ProjectName,
+            sprintId: String(task.sprintId),
+            timeZone: 'UTC',
+            billable: true,
+        },
+    });
+    return saved && saved._id ? String(saved._id) : null;
+}
+
 /* Agents */
 
 async function createRoleAgents({ companyId, roleKeys, projectIds, ownerId }) {
@@ -591,6 +622,39 @@ async function createDashboard({ companyId, ownerId, projectId, dashboard }) {
     return makeDashboard({ companyId, uid: String(ownerId), projectId: String(projectId), dashboard });
 }
 
+/* A dashboard scoped to the whole company, not one project — the AI planner above can only make a
+ * project or private one, so this calls the shared-dashboard route itself (Modules/UserDashboard). */
+async function createWorkspaceDashboard({ companyId, ownerId, name, description, cards }) {
+    const controller = require('../../../../Modules/UserDashboard/controller');
+    let y = 0;
+    const rows = [];
+    for (let i = 0; i < cards.length; i += 2) rows.push(cards.slice(i, i + 2));
+    const positioned = rows.flatMap((row) => {
+        const h = Math.max(...row.map((card) => card.size.h));
+        const placed = row.map((card, index) => ({ ...card, y, x: index * 6 }));
+        y += h;
+        return placed;
+    });
+    const body = {
+        title: name,
+        description: description || '',
+        visibility: 'workspace',
+        cards: positioned.map((card) => ({
+            componentId: card.key,
+            cardId: '',
+            uid: String(Math.floor(Math.random() * 900000000) + 100000000),
+            config: {
+                cardData: card.period ? { timerange: card.period } : {},
+                filterData: [],
+                position: { x: card.x, y: card.y, ...card.size },
+            },
+        })),
+    };
+    const saved = await viaHandler(controller.createSharedDashboard, { companyId, uid: String(ownerId), body });
+    if (!saved || !saved._id) throw new Error(`"${name}" dashboard was not created.`);
+    return String(saved._id);
+}
+
 async function createGuidePage({ companyId, ownerId, projectId, title, markdown }) {
     const { savePage } = require('../../../../Modules/Pages/controller');
     const saved = await savePage(companyId, String(ownerId), {
@@ -639,6 +703,7 @@ module.exports = {
     relate,
     moveTask,
     personComment,
+    logTime,
     createRoleAgents,
     createSkillAgent,
     configureAgent,
@@ -662,6 +727,7 @@ module.exports = {
     waitingApproval,
     createGoal,
     createDashboard,
+    createWorkspaceDashboard,
     createGuidePage,
     dropCompany,
     globalWrite,

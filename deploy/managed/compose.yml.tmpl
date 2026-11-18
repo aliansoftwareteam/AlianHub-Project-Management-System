@@ -1,0 +1,70 @@
+# Rendered per tenant by deploy/managed/render.js into
+# /srv/alianhub/tenants/<instanceId>/compose.yml. Placeholders are filled from
+# meta.json and tiers.json; nothing here is interpolated by docker compose.
+name: t_${INSTANCE_ID}
+services:
+  app:
+    image: ${IMAGE}@${IMAGE_DIGEST}
+    restart: unless-stopped
+    env_file: [.env]
+    environment:
+      ALIANHUB_DOCKER: "true"
+      # Below the memory limit, so V8 collects before the kernel OOM-kills.
+      NODE_OPTIONS: --max-old-space-size=${NODE_HEAP_MB}
+    deploy:
+      resources:
+        limits: { cpus: "${APP_CPUS}", memory: "${APP_MEM}", pids: 512 }
+    read_only: true
+    # Scratch that is small and short-lived stays in memory, capped so it
+    # counts against the tenant's own limit and cannot fill the host.
+    tmpfs:
+      - /tmp:size=256m,mode=1777
+      - /app/thumbnails:size=64m,mode=1777
+    volumes:
+      - logs:/app/log
+      - backups:/app/backups
+      - exports:/app/wasabiUploadsLocal/exports
+      # Uploads are staged on disk before they go to S3; up to 100 MB each is
+      # too much to hold in a 1 GB container.
+      - uploads:/app/wasabiUploads
+    security_opt: ["no-new-privileges:true"]
+    cap_drop: [ALL]
+    networks: [internal, edge]
+    depends_on: { mongo: { condition: service_healthy } }
+    stop_grace_period: 20s
+    healthcheck:
+      test: ["CMD", "node", "-e", "require('http').get('http://localhost:4000/health', r => process.exit(r.statusCode === 200 ? 0 : 1)).on('error', () => process.exit(1))"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 90s
+      start_interval: 2s
+    logging: { driver: local, options: { max-size: "10m", max-file: "5" } }
+    labels:
+      traefik.enable: "true"
+      traefik.docker.network: edge
+      traefik.http.routers.t_${INSTANCE_ID}.rule: Host(`${TENANT_HOST}`)
+      traefik.http.routers.t_${INSTANCE_ID}.entrypoints: websecure
+      traefik.http.routers.t_${INSTANCE_ID}.middlewares: platform-deny@file,security-headers@file
+      traefik.http.services.t_${INSTANCE_ID}.loadbalancer.server.port: "4000"
+      com.alianhub.instance: ${INSTANCE_ID}
+      com.alianhub.tier: ${TIER}
+      com.alianhub.version: ${VERSION}
+  mongo:
+    image: mongo:7.0.${MONGO_PATCH}
+    restart: unless-stopped
+    command: ["--wiredTigerCacheSizeGB", "${MONGO_CACHE_GB}", "--quiet"]
+    deploy:
+      resources:
+        limits: { cpus: "${MONGO_CPUS}", memory: "${MONGO_MEM}", pids: 512 }
+    volumes: [mongo:/data/db]
+    networks: [internal]
+    security_opt: ["no-new-privileges:true"]
+    healthcheck: { test: [CMD, mongosh, --quiet, --eval, "db.adminCommand('ping').ok"], interval: 10s, timeout: 5s, retries: 6, start_period: 30s, start_interval: 2s }
+    logging: { driver: local, options: { max-size: "10m", max-file: "3" } }
+    labels:
+      com.alianhub.instance: ${INSTANCE_ID}
+volumes: { mongo: {}, logs: {}, backups: {}, exports: {}, uploads: {} }
+networks:
+  internal: { internal: true }
+  edge: { external: true }

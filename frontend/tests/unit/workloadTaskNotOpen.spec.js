@@ -61,13 +61,14 @@ describe('a planned task the answer does not name', () => {
         expect(openTask).not.toHaveBeenCalled();
     });
 
-    it('keeps its place in the company grid and reads as a task the person cannot open', async () => {
+    it('keeps its place in the company grid\'s panel, reads as a task the person cannot open, and is not dragged', async () => {
         const wrapper = mount(WorkloadTimesheet, { global });
         await flushPromises();
         await flushPromises();
-        const shown = wrapper.findAll('.wl__chip');
+        await wrapper.findAll('[data-test="workload-cell"]')[0].trigger('click');
+        const shown = wrapper.findAll('[data-test="workload-panel-task"]');
 
-        expect(shown.map((chip) => chip.text())).toEqual(['Write the brief', 'Time.task_not_open']);
-        expect(shown.map((chip) => chip.attributes('draggable'))).toEqual(['true', 'false']);
+        expect(shown.map((row) => row.find('.wcp__task-name').text())).toEqual(['Time.task_not_open', 'Write the brief']);
+        expect(shown.map((row) => row.attributes('draggable'))).toEqual(['false', 'true']);
     });
 });

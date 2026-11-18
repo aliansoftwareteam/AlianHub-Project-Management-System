@@ -290,7 +290,8 @@
     const watcherUsers = ref([]);
     const search = ref('');
     const userId = inject('$userId')
-    const canOpenTracker = computed(() => (props.task?.AssigneeUserId || []).includes(userId.value) && (props.task?.status?.type || props.task?.statusType) !== 'close');
+    const trackerInPlan = computed(() => getters["settings/selectedCompany"]?.planFeature?.trackerTimesheet !== false);
+    const canOpenTracker = computed(() => trackerInPlan.value && (props.task?.AssigneeUserId || []).includes(userId.value) && (props.task?.status?.type || props.task?.statusType) !== 'close');
     const companyId = inject('$companyId')
     const GoalLinkPicker = defineAsyncComponent(() => import('@/views/Goals/GoalLinkPicker.vue'));
     const linkingGoal = ref(false);

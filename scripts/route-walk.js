@@ -83,15 +83,17 @@ const mountPathOf = (layer) => {
     return mounted;
 };
 
-const GUARD = Object.freeze({ COMPANY: 'company', USER: 'user', INSTANCE_ADMIN: 'instance-admin' });
+const GUARD = Object.freeze({ COMPANY: 'company', USER: 'user', INSTANCE_ADMIN: 'instance-admin', PLATFORM: 'platform' });
 
 function guardNames() {
     const jwt = require('../Config/jwt');
     const { requireInstanceAdmin } = require('../Modules/Instance/guard');
+    const { requirePlatform } = require('../Modules/Platform/guard');
     return new Map([
         [jwt.verifyJWTTokenWithCV2, GUARD.COMPANY],
         [jwt.verifyJWTTokenV2, GUARD.USER],
         [requireInstanceAdmin, GUARD.INSTANCE_ADMIN],
+        [requirePlatform, GUARD.PLATFORM],
     ]);
 }
 

@@ -41,6 +41,6 @@ const sanitizeNavPreferences = (body) => {
 
 /* Only a new account is given a mode. An account made before the choice existed has none, and
  * the app reads that as Full, so nobody's rail changes on upgrade and no migration is needed. */
-const newAccountNavPreferences = () => ({ mode: 'simple' });
+const newAccountNavPreferences = () => ({ mode: 'full' });
 
 module.exports = { NAV_ITEM_IDS, MAX_PINNED, NAV_MODES, sanitizeNavPreferences, newAccountNavPreferences };

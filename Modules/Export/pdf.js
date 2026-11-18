@@ -90,7 +90,7 @@ function streamPdf(res, docDefinition, filename) {
 }
 
 /* POST /api/v1/export/pdf  body: { type, params }  (companyId from header)
- * params: { title, subtitle?, filename?, meta?: string[], image?|images?: base64 dataURI,
+ * params: { title, subtitle?, filename?, meta?: string[], landscape?, image?|images?: base64 dataURI,
  *           tableHead?: string[], tableRows?: any[][], totalRow?: any[] } */
 exports.exportPdf = (req, res) => {
     try {
@@ -120,6 +120,7 @@ exports.exportPdf = (req, res) => {
 
         const docDefinition = {
             pageSize: 'A4',
+            pageOrientation: params.landscape === true || (Array.isArray(params.tableHead) && params.tableHead.length > 8) ? 'landscape' : 'portrait',
             pageMargins: [40, 40, 40, 50],
             defaultStyle: { font: 'Helvetica', fontSize: 10 },
             styles: STYLES,

@@ -7,7 +7,8 @@ vi.mock('@/services', () => ({ apiRequest }));
 vi.mock('@/components/organisms/Shell/ShellIcon.vue', () => ({ default: { name: 'ShellIcon', render: () => null } }));
 
 import * as env from '@/config/env';
-import { connectorsOf, connectorResults, namedConnectors, withNamedChips, connectorNoteKey } from '@/views/Ai/askComposer';
+import { publicConfig } from '@/config/publicConfig';
+import { connectorsOf, connectorResults, contextPayload, groupMentions, namedConnectors, withNamedChips, connectorNoteKey } from '@/views/Ai/askComposer';
 import { useAskComposer } from '@/views/Ai/useAskComposer';
 import AskComposerMenu from '@/views/Ai/AskComposerMenu.vue';
 import AskConnectorNotes from '@/views/Ai/AskConnectorNotes.vue';
@@ -87,6 +88,7 @@ describe('the composer', () => {
     };
 
     beforeEach(() => {
+        Object.assign(publicConfig, { loaded: true, connectors: true });
         apiRequest.mockReset();
         apiRequest.mockImplementation((type, url) => (type === 'get' && url === env.CONNECTORS
             ? Promise.resolve({ data: { status: true, data: LIST } })
@@ -111,7 +113,7 @@ describe('the composer', () => {
         expect(composer.menu.items).toEqual([{ kind: 'connector', id: 'github', title: 'GitHub', connected: true }]);
         expect(composer.chips.value).toEqual([]);
         composer.pick(composer.menu.items[0]);
-        expect(question.value).toBe('status ');
+        expect(question.value).toBe('status GitHub ');
         expect(composer.body()).toEqual({ context: [{ kind: 'connector', id: 'github' }] });
     });
 
@@ -121,6 +123,15 @@ describe('the composer', () => {
         composer.pick(composer.menu.items.find((item) => item.id === 'notion'));
         expect(onConnect).toHaveBeenCalledWith(expect.objectContaining({ id: 'notion', connected: false }));
         expect(composer.chips.value).toEqual([]);
+    });
+
+    it('asks nothing where the server has no connector switched on', async () => {
+        publicConfig.connectors = false;
+        const { composer, type } = await composerWith();
+        type('GitHub');
+        expect(apiRequest).not.toHaveBeenCalled();
+        expect(composer.connectors.value).toEqual([]);
+        expect(composer.body()).toEqual({});
     });
 
     it('works without connectors where the route is not there', async () => {
@@ -133,11 +144,21 @@ describe('the composer', () => {
 });
 
 describe('the @ menu', () => {
+    it('puts apps first in a group of their own and keeps their chips in what is sent', () => {
+        const apps = connectorResults(APPS, '');
+        const { items, groups } = groupMentions([{ kind: 'task', id: 't1', title: 'Fix login' }], { apps });
+        expect(groups.map((group) => group.kind)).toEqual(['connector', 'task']);
+        expect(groups[1].items[0].index).toBe(apps.length);
+        expect(items[apps.length]).toMatchObject({ kind: 'task', id: 't1' });
+        expect(contextPayload([{ kind: 'connector', id: 'github', title: 'GitHub' }, { kind: 'task', id: 't1' }])).toEqual([{ kind: 'connector', id: 'github' }, { kind: 'task', id: 't1' }]);
+    });
+
     it('labels an app and offers Connect for one the asker has not connected', () => {
-        const wrapper = mount(AskComposerMenu, { props: { id: 'm', kind: 'mention', items: connectorResults(APPS, ''), short: true } });
+        const { items, groups } = groupMentions([], { apps: connectorResults(APPS, '') });
+        const wrapper = mount(AskComposerMenu, { props: { id: 'm', kind: 'mention', items, groups } });
         const rows = wrapper.findAll('[data-test="ask-menu-item"]');
         expect(rows.map((row) => row.attributes('data-kind'))).toEqual(['connector', 'connector', 'connector']);
-        expect(rows[0].text()).toContain('Ask.kind_connector');
+        expect(wrapper.find('[data-test="ask-menu-group"]').text()).toContain('Ask.group_apps');
         expect(rows.map((row) => row.find('[data-test="ask-menu-connect"]').exists())).toEqual([false, false, true]);
     });
 });

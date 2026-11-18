@@ -1,4 +1,5 @@
 const path = require('path');
+const { sendShell } = require('./shellPage');
 
 /* Prefixes the server owns. Anything else that a browser asks for as a page is
  * a client route, so a hard refresh or a shared link gets the SPA instead of
@@ -11,6 +12,6 @@ const wantsSpa = (req) => req.method === 'GET'
     && !path.extname(req.path)
     && Boolean(req.accepts && req.accepts('html'));
 
-const spaFallback = (indexFile) => (req, res, next) => (wantsSpa(req) ? res.sendFile(indexFile) : next());
+const spaFallback = (indexFile) => (req, res, next) => (wantsSpa(req) ? sendShell(req, res, indexFile, next) : next());
 
 module.exports = { RESERVED, wantsSpa, spaFallback };

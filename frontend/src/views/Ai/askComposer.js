@@ -9,7 +9,9 @@ export const STARTERS = Object.freeze([
 
 export const MAX_CONTEXT = 8;
 export const MENU_LIMIT = 8;
-export const MENTION_MIN = 2;
+export const MENTION_KINDS = Object.freeze(["project", "list", "task", "page", "person"]);
+export const RECENT_LIMIT = 8;
+const RECENT_KEY = "ask.recentMentions";
 
 export function starterPrompt(key, { t, projectName = "" }) {
     if (key === "status") return projectName ? t("Ask.starter_status_prompt", { project: projectName }) : t("Ask.starter_status_prompt_all");
@@ -40,14 +42,76 @@ export function filterSkills(skills, query) {
         .map((skill) => ({ kind: "skill", id: String(skill.key), title: skill.name || skill.key, sub: skill.description || "" }));
 }
 
-export function mentionResults(data) {
-    const found = data || {};
-    const rows = (list, limit, pick) => (Array.isArray(list) ? list : []).slice(0, limit).map(pick);
-    return [
-        ...rows(found.projects, 3, (p) => ({ kind: "project", id: String(p._id || ""), title: p.ProjectName || "" })),
-        ...rows(found.tasks, 4, (task) => ({ kind: "task", id: String(task._id || ""), title: task.TaskName || "", sub: task.TaskKey || "" })),
-        ...rows(found.pages, 3, (page) => ({ kind: "page", id: String(page._id || ""), title: page.title || "" }))
-    ].filter((item) => item.id && item.title);
+/* The server's picker rows, kept to the kinds the box knows. */
+export function mentionItems(data) {
+    const rows = Array.isArray(data && data.items) ? data.items : [];
+    return rows
+        .filter((row) => row && MENTION_KINDS.includes(row.kind) && row.id && row.title)
+        .map((row) => ({ kind: row.kind, id: String(row.id), title: String(row.title), sub: String(row.sub || "") }));
+}
+
+const sameItem = (a, b) => a.kind === b.kind && a.id === b.id;
+
+/* Rows grouped by kind in picker order, without repeats or what is already attached; `first` (recent picks)
+ * lead their group when they match the query, and `apps` (from connectorResults) come before every group.
+ * Each row keeps its place in the flat list for the keyboard. */
+export function groupMentions(items, { first = [], taken = [], query = "", apps = [] } = {}) {
+    const q = String(query || "").toLowerCase();
+    const leading = (first || []).filter((item) => !q || String(item.title || "").toLowerCase().includes(q));
+    const flat = [];
+    [...leading, ...(items || [])].forEach((item) => {
+        if (!item || !MENTION_KINDS.includes(item.kind)) return;
+        if (flat.some((kept) => sameItem(kept, item)) || (taken || []).some((chip) => sameItem(chip, item))) return;
+        flat.push(item);
+    });
+    const ordered = [...(apps || []).filter((app) => app && app.kind === "connector"), ...MENTION_KINDS.flatMap((kind) => flat.filter((item) => item.kind === kind))];
+    const groups = ["connector", ...MENTION_KINDS]
+        .map((kind) => ({ kind, items: ordered.map((item, index) => ({ item, index })).filter(({ item }) => item.kind === kind) }))
+        .filter((group) => group.items.length);
+    return { items: ordered, groups };
+}
+
+const CONTEXT_KINDS = Object.freeze([...MENTION_KINDS, "connector"]);
+
+/* What the stream route takes for the attached chips: kind and id only. */
+export function contextPayload(chips) {
+    return (chips || []).filter((chip) => chip && CONTEXT_KINDS.includes(chip.kind) && chip.id).slice(0, MAX_CONTEXT).map(({ kind, id }) => ({ kind, id: String(id) }));
+}
+
+const storeOf = (storage) => {
+    if (storage !== undefined) return storage;
+    try {
+        return typeof localStorage === "undefined" ? null : localStorage;
+    } catch {
+        return null;
+    }
+};
+
+/* Picks kept in this browser, per company: a convenience, so a storage that fails reads as empty. */
+export function recentMentions(companyId, storage) {
+    const store = storeOf(storage);
+    if (!store || !companyId) return [];
+    try {
+        const all = JSON.parse(store.getItem(RECENT_KEY) || "{}");
+        const list = Array.isArray(all[companyId]) ? all[companyId] : [];
+        return list.filter((item) => item && MENTION_KINDS.includes(item.kind) && item.id && item.title).slice(0, RECENT_LIMIT);
+    } catch {
+        return [];
+    }
+}
+
+export function rememberMention(companyId, item, storage) {
+    const store = storeOf(storage);
+    if (!store || !companyId || !item || !MENTION_KINDS.includes(item.kind)) return;
+    try {
+        const all = JSON.parse(store.getItem(RECENT_KEY) || "{}");
+        const kept = { kind: item.kind, id: String(item.id), title: String(item.title || ""), sub: String(item.sub || "") };
+        const list = Array.isArray(all[companyId]) ? all[companyId] : [];
+        all[companyId] = [kept, ...list.filter((other) => !(other && sameItem(other, kept)))].slice(0, RECENT_LIMIT);
+        store.setItem(RECENT_KEY, JSON.stringify(all));
+    } catch {
+        /* a full or blocked storage only loses the recent list */
+    }
 }
 
 export const CONNECTOR_LIMIT = 6;

@@ -83,24 +83,24 @@ describe('a route that names a company nobody has', () => {
         expect(touchedUnknown()).toEqual([]);
     });
 
-    it('GET /api/v2/sso/oidc/initiate answers 404 without reaching that database', async () => {
+    it('GET /api/v2/sso/oidc/initiate sends the browser back to the login page without reaching that database', async () => {
         const res = response();
         await oidc.oidcInitiate({ headers: {}, query: { companyId: UNKNOWN } }, res);
-        expect(res.statusCode).toBe(404);
+        expect(res.redirectedTo).toMatch(/\/#\/login\?ssoError=config$/);
         expect(touchedUnknown()).toEqual([]);
     });
 
-    it('GET /api/v2/sso/saml/initiate answers 404 without reaching that database', async () => {
+    it('GET /api/v2/sso/saml/initiate sends the browser back to the login page without reaching that database', async () => {
         const res = response();
         await saml.samlInitiate({ headers: {}, query: { companyId: UNKNOWN } }, res);
-        expect(res.statusCode).toBe(404);
+        expect(res.redirectedTo).toMatch(/\/#\/login\?ssoError=config$/);
         expect(touchedUnknown()).toEqual([]);
     });
 
     it('POST /api/v2/sso/saml/acs sends the browser back to the login page without reaching that database', async () => {
         const res = response();
         await saml.samlAcs({ headers: {}, query: { companyId: UNKNOWN }, body: {} }, res);
-        expect(res.redirectedTo).toBe('/login?ssoError=config');
+        expect(res.redirectedTo).toMatch(/\/#\/login\?ssoError=config$/);
         expect(touchedUnknown()).toEqual([]);
     });
 
@@ -154,7 +154,7 @@ describe('the same routes for a company that exists', () => {
     ])('GET /api/v2/sso/%s/initiate still reads its SSO settings', async (_name, handler) => {
         const res = response();
         await handler()({ headers: {}, query: { companyId: KNOWN } }, res);
-        expect(res.statusCode).toBe(404);
+        expect(res.redirectedTo).toMatch(/\/#\/login\?ssoError=config$/);
         expect(mockOpened).toContain(KNOWN);
     });
 

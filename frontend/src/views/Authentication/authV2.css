@@ -7,7 +7,7 @@
     font: 500 12.5px/1.2 var(--font-ui); color: var(--ink); cursor: pointer;
     transition: border-color var(--t-state) var(--ease), background var(--t-state) var(--ease), color var(--t-state) var(--ease), box-shadow var(--t-state) var(--ease);
 }
-.av2-chip:hover:not(:disabled) { border-color: rgba(0, 0, 0, .28); }
+.av2-chip:hover:not(:disabled) { border-color: var(--ink-3); }
 .av2-chip:focus-visible { outline: none; border-color: var(--brand); box-shadow: var(--focus); }
 .av2-chip:disabled { opacity: .55; cursor: not-allowed; }
 .av2-chip.is-on { border: 1.5px solid var(--brand); background: var(--brand-tint); color: var(--brand); padding: 7.5px 9.5px; }

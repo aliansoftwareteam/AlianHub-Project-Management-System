@@ -11,10 +11,12 @@ jest.mock('../utils/mongo-handler/mongoQueries', () => ({
 }));
 jest.mock('@aws-sdk/client-s3', () => {
     const send = jest.fn(async () => ({}));
+    const command = (name) => class { constructor(input) { this.name = name; this.input = input; } };
     return {
         __send: send,
-        S3Client: class { send(command) { return send(command); } },
-        DeleteObjectCommand: class { constructor(input) { this.input = input; } },
+        S3Client: class { send(sent) { return send(sent); } },
+        DeleteObjectCommand: command('DeleteObject'),
+        HeadObjectCommand: command('HeadObject'),
     };
 });
 
@@ -32,7 +34,7 @@ const LONG_AGO = Date.now() - 400 * 24 * 60 * 60 * 1000;
 
 const capture = (timerId, name) => `Project/${PROJECT}/Sprint/${SPRINT}/TimeLog/${timerId}/${name}`;
 const shot = (image) => ({ image, screenShotTime: String(LONG_AGO) });
-const removedKeys = () => s3Send.mock.calls.map(([command]) => command.input.Key);
+const removedKeys = () => s3Send.mock.calls.filter(([command]) => command.name === 'DeleteObject').map(([command]) => command.input.Key);
 const run = () => runRetentionForCompany({ _id: COMPANY, screenshotRetention: { enabled: true, maxAgeMonths: 3 } });
 
 beforeEach(() => {

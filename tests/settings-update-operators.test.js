@@ -1,6 +1,7 @@
 const mockCrud = jest.fn(async () => ({ acknowledged: true, modifiedCount: 1 }));
 jest.mock('../utils/mongo-handler/mongoQueries', () => ({ MongoDbCrudOpration: (...a) => mockCrud(...a) }));
 jest.mock('../utils/commonFunctions', () => ({ removeCache: jest.fn() }));
+jest.mock('../Modules/DesktopTracker/trackerSeats', () => ({ releaseSeatsLater: jest.fn(), grantTrackerToNewRoles: jest.fn(async () => 0) }));
 jest.mock('../Config/loggerConfig', () => ({ info: jest.fn(), error: jest.fn(), warn: jest.fn() }));
 
 const { dbCollections, settingsCollectionDocs } = require('../Config/collections');

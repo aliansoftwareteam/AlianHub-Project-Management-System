@@ -21,7 +21,7 @@ Built on `feat/connectors-custom-servers` (from `6d4e2eace`), not pushed. Waits 
 - Task created from PRD v2.0 of 056 (decision 23). Track A.
 
 ### 2026-11-12 — built
-- Right: `ai_custom_apps` ("Add custom apps") in `Config/aiRights.js`, the catalogue in `utils/data.js` and its repair list; owners and admins hold it, members and guests start without it. Migration `084-ai-custom-apps-right` adds the row to existing workspaces without granting it.
+- Right: `ai_custom_apps` ("Add custom apps") in `Config/aiRights.js`, the catalogue in `utils/data.js` and its repair list; owners and admins hold it, members and guests start without it. Migration `086-ai-custom-apps-right` adds the row to existing workspaces without granting it.
 - Data: `connector_servers` declared in every schema file with a unique (`companyId`, `url`) index; `connector_tools` gains `label`, `description` and `inputSchema` for a custom server's reviewed tools.
 - A custom server is the provider `custom_<row id>`, built from its row (`Modules/Connectors/customServers.js`). `connection.definitionFor(companyId, provider)` gives the lifecycle its definition; catalog providers behave as before. `apps.resolveApp` answers its own app: the client it registered for the workspace, or the client id and secret its adder entered (secret by handle).
 - Routes under `/api/v2/connectors/servers` (`customController.js`): list (any member, with their own connection), add (the right), change name or app, remove, list tools for review and review one (an owner or admin, or the adder while they hold the right). Write routes are `agentsRefused` and rate-limited; every change is audited.
@@ -37,4 +37,4 @@ Built on `feat/connectors-custom-servers` (from `6d4e2eace`), not pushed. Waits 
 - The Connections page is gone (101), so the custom apps card sits at the foot of AI › Customize › Connectors, where members connect. The page header's "Add custom connector" shows for whoever holds "Add custom apps" (the servers list answers `mayAdd`) and opens the same add dialog; the card hides its own Add button there, and hides itself for a member while there is no custom app.
 - Custom providers are left off the catalog rows (`connectorRows`), since the card lists them.
 - An agent must have `custom.*` ticked like any other connector tool (098); a person's turned-off tools (101) apply to catalog tools only.
-- Migration renumbered to `084-ai-custom-apps-right`, after 098's `083-agent-connector-ticks`.
+- Migration renumbered to `086-ai-custom-apps-right`, after 098's `085-agent-connector-ticks`.

@@ -9,137 +9,25 @@
         />
     </div>
     <div v-else>
-        <div class="ah-page timesheet_view Usertimesheet_view timesheet_view_latest time_tracker__timesheet" v-if="error404">
-            <div class="row">
-                <div class="col-md-12">
-                    <div class="page_title_row d-flex">
-                        <div class="page-title d-flex">
-                            <ul class="breadcrumb title_strip">
-                                <li>
-                                    <button type="button" class="ts-home" :aria-label="$t('Milestone.home_link')" @click="goHome()">
-                                        <span class="ah-mask-icon" :style="maskOf(homeIcon)" aria-hidden="true"></span>
-                                    </button>
-                                </li>
-                                <li class="pro_route_link">
-                                    <router-link :to="`/${companyId}/project`" class="ts-crumb">{{$t('UserTimesheet.back_projects')}}</router-link>
-                                </li>
-                                <li>
-                                    <span class="workload_title ts-crumb">{{$t('UserTimesheet.tracker_timesheet')}}</span>
-                                </li>
-                            </ul>
-                        <TimesheetTabs active="tracker" class="ts-legacy-tabs" />
-                        </div>
-                    </div>
-                </div>
-            </div>
-            <div class="timesheet__wrapper page-content h-100">
-                <div class="page_top_data  d-flex align-items-center justify-content-between flex-wrap">
-                    <div class="d-flex" :class="[{'flex-wrap' : clientWidth <=767}]" :style="[{width : clientWidth > 768 ? 'calc(100% - 233px)' : '100%'}]"> 
-                    <button type="button" class="ts-day-nav ts-day-nav--prev" :aria-label="$t('Projects.previous')" @click="dateChange('left')"><span class="ah-mask-icon" :style="maskOf(chevronIcon)" aria-hidden="true"></span></button>
-                        <span class="tracker-timesheet-calender-wrapper">
-                            <CalenderCompo
-                                class="tracker-timesheet-calender"
-                                v-model:model-value="dateValue"
-                                :isShowDateAndicon="true"
-                                @update:model-value="($event) => {dateUpdate($event)}"
-                            />
-                        </span>
-                        <button type="button" class="ts-day-nav" :aria-label="$t('Home.Next')" @click="dateChange('right')"><span class="ah-mask-icon" :style="maskOf(chevronIcon)" aria-hidden="true"></span></button>
-                        <div class="wf_filter cursor-pointer" @click.stop="$refs.filter_tt_click.click()"  :style="[{marginTop : clientWidth <= 767 ? '15px' : '0px', marginLeft : clientWidth <=767 ? '0' : '17px' }]">
-                            <span class="timesheet_user_filter">
-                                <DropDown mode="listbox" id="" themed class="status_change_dropdown" :bodyClass="{'timesheetDropdown_wrapper' : true}">
-                                    <template #button="{ triggerAttrs }">
-                                        <button type="button" ref="filter_tt_click" class="dot-btn" v-bind="triggerAttrs">
-                                            <span class="link_disable_css">{{$t('Filters.filter_by')}}</span>
-                                        </button>
-                                    </template>
-                                    <template #options>
-                                    <DropDownOption v-if="filterType=='' && isEveryOne" @click="handleFilterType('select','Users')">
-                                        {{$t('UserTimesheet.Users')}}
-                                    </DropDownOption>
-                                    <DropDownOption v-if="filterType=='' && isEveryOne" @click="handleFilterType('select','Teams')">
-                                        {{$t('UserTimesheet.Teams')}}
-                                    </DropDownOption>
-                                    <DropDownOption v-if="filterType==''" @click="handleFilterType('select','Projects')">
-                                        {{$t('UserTimesheet.Projects')}}
-                                    </DropDownOption>
-                                    <div v-if="filterType!=''">
-                                        <div class="wf_header">
-                                            <a @click="handleFilterType('back','')">
-                                                <span class="ah-mask-icon ts-back" :style="maskOf(backIcon)" aria-hidden="true"></span>&nbsp;
-                                                {{$t('UserTimesheet.back')}}
-                                            </a>
-                                            <span>{{$t(`UserTimesheet.${filterType}`)}}</span>
-                                        </div>
-                                        <span class="filter_search_block">
-                                            <input type="search" class="ah-input" ref="filter_dd_search" :placeHolder="$t('PlaceHolder.search')" v-model="filterSearch"/>
-                                        </span>
-                                        <div class="wf_body filter_body_scroll checklist-main" :class="{'filter_body_scroll': optionFilter.length >= 5}">
-                                            <span
-                                            v-for="(item,index) in optionFilter"
-                                            class="wf_listItem users_filter_items"
-                                            :key="index"
-                                            v-show="filterType.toLowerCase()=='users' && isEveryOne">
-                                                <a class="vs-dropdown-users d-flex align-items-center">
-                                                    <input type="checkbox" class="ah-check" v-show="filterType.toLowerCase() == 'users'" @click="handleFilterItem(item,'checkEvent',true)" :value="item.id" v-model="checkedFilter">&nbsp;
-                                                    <UserProfile decorative
-                                                        v-if="filterType.toLowerCase() == 'users'"
-                                                        :showDot="false"
-                                                        class="timesheet_user_profile mr-10px"
-                                                        :data="{
-                                                            id: item.id,
-                                                            title: item.name,
-                                                            image: item.profile || ''
-                                                        }"
-                                                        width="22px"
-                                                        :thumbnail="'22x22'"
-                                                        @click="handleFilterItem(item,'checkEvent',true)"
-                                                    />
-                                                    <span class="filter_list_item cursor-pointer" @click="handleFilterItem(item,'checkEvent',true)">{{ item.name }}</span>
-                                                </a>
-                                            </span>
-                                            <span
-                                            v-for="item in optionFilter"
-                                            class="wf_listItem users_filter_items"
-                                            :key="item.id"
-                                            v-show="filterType.toLowerCase()=='teams' && isEveryOne">
-                                                <span class="filter_list_item cursor-pointer" @click="handleFilterItem(item,'add'),$refs.filter_tt_click.click()">&nbsp;&nbsp;{{ item.name }}</span>
-                                            </span>
-                                            <span
-                                            v-for="(item,index) in optionFilter"
-                                            class="wf_listItem users_filter_items"
-                                            :key="index"
-                                            v-show="filterType.toLowerCase()=='projects'">
-                                                <a class="vs-dropdown-users d-flex align-items-center">
-                                                    <input type="checkbox" class="ah-check" v-show="filterType.toLowerCase() == 'users'" @click="handleFilterItem(item,'checkEvent')" :value="item.id" v-model="checkedFilter">&nbsp;
-                                                    <span v-if="item?.projectIcon && item?.projectIcon.type === 'color'" class="ah-letter-tile d-flex align-items-center justify-content-center inital-box" :style="[{'background-color': item?.projectIcon.data}]">{{ item?.name.charAt(0).toUpperCase()}}</span>
-                                                    <img v-if="item?.projectIcon && item?.projectIcon.type === 'image' && validateURL(item?.projectIcon.data)" class="profile-sm-square inital-box" :src="item?.projectIcon.data" alt=""/>
-                                                    <WasabiImage 
-                                                        v-if="item?.projectIcon && item?.projectIcon.type === 'image' && !validateURL(item?.projectIcon.data)"
-                                                        class="profile-sm-square inital-box"
-                                                        :data="{url: item?.projectIcon.data}"
-                                                    />
-                                                    <span class="filter_list_item cursor-pointer" @click="handleFilterItem(item,'add'),$refs.filter_tt_click.click()">{{ item.name }}</span>
-                                                </a>
-                                            </span>
-                                            <span v-if="!optionFilter || optionFilter.length == 0" class="invalid-feedback d-block p-5px">{{$t('UserTimesheet.no_records_found')}}</span>
-                                        </div>
-                                    </div>
-                                    </template>
-                                </DropDown>
-                            </span>
-                            <div class="chipusername_main d-flex">
-                                <span class="chipusername_wrapper" v-for="(chip,chipKey) in selectedFilters" :key="chipKey">
-                                    <span class="user_name" :title="chip.name" >
-                                            {{  `${$t(`general.${chip.type.slice(0,-1)}`)} : ${chip.name}` }}
-                                        </span>
-                                        <button @click="handleFilterItem(chip,'remove')" type="button" class="ts-chip-x" :aria-label="$t('Reports.remove_filter')">×</button>
-                                </span>
-                            </div>
-                            <span class="ah-mask-icon wf_filter__icon" :style="maskOf(filterIcon)" aria-hidden="true"></span>
-                        </div>
-                    </div>
-                </div>
+        <div class="ah-page rpt timesheet_view Usertimesheet_view timesheet_view_latest time_tracker__timesheet" v-if="error404">
+            <ReportToolbar
+                :title="$t('Time.tracker_title')"
+                tab="tracker"
+                :exporting="exporting"
+                :canExport="dayLogs.length > 0"
+                @export="onExport"
+            />
+            <ReportFilterBar
+                :filters="filters"
+                :presets="DAY_PRESETS"
+                :fields="filterFields"
+                :options="filterOptions"
+                @apply="apply"
+                @step="step"
+                @clear="clear"
+            />
+            <div class="timesheet__wrapper rpt__body">
+                <p v-if="exportFailed" class="tv-error">{{ $t('Time.action_failed') }}</p>
                 <div class="trackerTimeSheet">
                     <div class="timebarWrapper">
                         <TimebarComponent :logRangeValue="logRange" :selectedSlot="selectedSlot" @toggle="selectedSlot = $event"/>
@@ -170,71 +58,59 @@
 </template>
 
 <script setup>
-    import TimesheetTabs from '@/views/Timesheet/TimesheetTabs.vue';
     import '@/views/Timesheet/timeV2.css';
+    import ReportToolbar from '@/views/Timesheet/report/ReportToolbar.vue';
+    import ReportFilterBar from '@/views/Timesheet/report/ReportFilterBar.vue';
+    import { useReportFilters } from '@/views/Timesheet/report/useReportFilters';
+    import { useReportOptions } from '@/views/Timesheet/report/useReportOptions';
+    import { useReportExport } from '@/views/Timesheet/report/useReportExport';
+    import { DAY_PRESETS } from '@/views/Timesheet/report/reportRange';
+    import { hoursOf } from '@/views/Timesheet/report/reportTable';
+    import moment from 'moment';
+    import { useI18n } from 'vue-i18n';
     import { useCustomComposable ,useGetterFunctions } from '@/composable';
     import TimebarComponent from '@/components/atom/TimesheetView/TrackerTimeSheetView/TimebarComponent.vue'
-    import { defineComponent , onMounted ,ref , computed , inject ,watch } from "vue";
-    import CalenderCompo from '@/components/atom/CalenderCompo/CalenderCompo.vue';
+    import { onMounted ,ref , computed , inject ,watch } from "vue";
     import { useStore } from "vuex";
-    import { useRouter } from "vue-router"
-    import DropDown from '@/components/molecules/DropDown/DropDown.vue'
-    import DropDownOption from '@/components/molecules/DropDownOption/DropDownOption.vue';
     import SpinnerComp from '@/components/atom/SpinnerComp/SpinnerComp.vue';
-    import * as helper from '@/views/Timesheet/helper';
     import ScreenshotTime from '@/components/atom/TimesheetView/TrackerTimeSheetView/ScreenshotTime'
     import AppState from '@/components/molecules/AppState/AppState.vue'
-    import UserProfile from "@/components/atom/UserProfile/UserProfile.vue";
-    import WasabiImage from "@/components/atom/WasabiIamgeCompp/WasabiIamgeCompp.vue";
     import Skelaton from '@/components/atom/Skelaton/Skelaton.vue';
     import UpgradePlan from '@/components/atom/UpgradYourPlanComponent/UpgradYourPlanComponent.vue';
     import { apiRequest } from '../../../services';
     import * as env from '@/config/env';
     import { isOwnerOrAdmin } from "@/utils/roles";
-    import { maskOf } from '@/utils/iconMask';
     import { dayRange, hourSlots, hoursWithLogs, logsOf, shotsIn } from './trackerDay';
-    const homeIcon = require('@/assets/images/home_icon.png');
-    const backIcon = require('@/assets/images/svg/filter_back_icon.svg');
-    const filterIcon = require('@/assets/images/svg/filter_icon.svg');
-    const chevronIcon = require('@/assets/images/table_arrow.png');
     const {getUser} = useGetterFunctions();
-    defineComponent({
-        name: "UserTimesheet",
-        components: {
-            DropDown,
-            DropDownOption,
-        }
-    })
+    const { t } = useI18n();
     const skelatonArray = ref([1,2,3,4,5])
     const timeSlots = ref([]);
     const selectedSlot = ref(null);
     const timeSlotObj = ref([]);
     const logRange = ref([]);
     const finalRange = ref([]);
-    const router = useRouter()
     const { getters , dispatch} = useStore();
-    const {checkPermission,debouncerWithPromise} = useCustomComposable();
-    const selectedFilters = ref([]);
+    const {checkPermission} = useCustomComposable();
     const isSpinner = ref(false);
     const subSpinner = ref(true);
     const users = ref();
-    const dateValue = ref(new Date());
-    const checkedFilter = ref([]);
-    const filterType = ref("");
-    const filterSearch = ref("");
     const companyId = inject('$companyId');
-    const clientWidth = inject("$clientWidth");
+    const { filters, range, apply, step, clear } = useReportFilters({ defaultPreset: 'today', presets: DAY_PRESETS });
+    const options = useReportOptions(companyId);
+    const { exporting, failed: exportFailed, exportReport } = useReportExport((field, value) => options.labelOf(field, value));
+    const dateValue = computed(() => moment(range.value.start, 'YYYY-MM-DD').toDate());
+    const filterFields = computed(() => [...(isEveryOne.value ? ['people'] : []), 'projects']);
+    const filterOptions = options.narrowed(filters, range);
+    /* The tracker route still takes the filter chips of the old screen. */
+    const selectedFilters = computed(() => [
+        ...(isEveryOne.value ? filters.value.people.map((id) => ({ type: 'Users', id })) : []),
+        ...filters.value.projects.map((id) => ({ type: 'Projects', id })),
+    ]);
     const userId = inject('$userId')
-    const teams = computed(() => getters["settings/teams"]);
     const taskArray = ref([]);
-    const filter_tt_click = ref(null);
-    const timer = ref(null);
 
     const currentCompany = computed(() => getters["settings/selectedCompany"])
 
-    watch(() => getters["settings/teams"],(val) => {
-        teams.value = val;
-    })
     function getDBData() {
         return new Promise((resolve, reject) => {
             try {
@@ -270,7 +146,6 @@
             })
         }
     })
-    const finalFilter = ref([]);
     const companyUserDetail = computed(() => getters["settings/companyUserDetail"]);
     const projects = ref([]);
     const projectsGetter = computed(() => getters["projectData/projects"]);
@@ -281,6 +156,7 @@
 
     onMounted(async () => {
         if(checkPermission('sheet_settings.tracker_timesheet') !== null){
+            options.ready();
             if(!projectsGetter.value || !Object.keys(projectsGetter.value).length) {
                 getTeamsData().then((response) => {
                     const uid = companyUserDetail.value.userId;
@@ -344,12 +220,6 @@
             error404.value = false;
         }
     })
-    const dateUpdate = (val) => {
-        dateValue.value = val;
-        getTimeSlot();
-        getTrackerTimesheetData();
-        selectedSlot.value = null;
-    }
     const resetLogRange = () => {
         finalRange.value = [];
         logRange.value.forEach((ele)=>{
@@ -361,29 +231,6 @@
         resetLogRange();
         timeSlots.value = hourSlots(dateValue.value);
     }
-    function debouncer(timeout = 1000) {
-        return new Promise((resolve) => {
-            if (timer.value) {
-            clearTimeout(timer.value);
-            }
-            timer.value = setTimeout(() => {
-            resolve();
-            }, timeout);
-        });
-    }
-    const dateChange = (type) => {
-        if (type == 'left') {
-            dateValue.value =  new Date(new Date(dateValue.value).setDate(dateValue.value.getDate() - 1));
-        } else {
-            dateValue.value =  new Date(new Date(dateValue.value).setDate(dateValue.value.getDate() + 1));
-            selectedSlot.value = null;
-        }
-        debouncer(300).then(() => {
-            getTimeSlot();
-            getTrackerTimesheetData();
-            selectedSlot.value = null;
-        })
-    }
     const getUserData = async () => {
         if (checkPermission('sheet_settings.tracker_timesheet') === true || checkPermission('sheet_settings.tracker_timesheet') === 2) {
             isEveryOne.value = true;
@@ -394,28 +241,14 @@
             users.value = [getUser(userId.value,true)]
         }
     }
-    const goHome = () => {
-        router.push({path: `/${companyId.value}`});
-    }
-    function handleFilterType(type,item){
-        if(type != 'back'){
-            setTimeout(()=>{ filterType.value =item;openFilterMenu() },100);
-        }else{
-            setTimeout(()=>{ filterType.value ='' },100);
-        }
-    }
-    function openFilterMenu(){
-        try{
-            filterSearch.value ='';
-            helper.getFinalFilter(filterType.value,users.value,teams.value,projects.value).then((filterRes)=>{
-                if(filterRes.status){
-                    finalFilter.value = filterRes.data.finalFilter;
-                }
-            })
-        }catch(error){
-            console.error(error);
-        }
-    }
+    const reloadDay = () => {
+        selectedSlot.value = null;
+        getTimeSlot();
+        getTrackerTimesheetData();
+    };
+    watch(() => [range.value.start, filters.value.people.join(','), filters.value.projects.join(',')], () => {
+        if (users.value) reloadDay();
+    });
     const dayLogs = ref([]);
     let dayReads = 0;
     /* One request for the whole day (./trackerDay.js). A later date or filter asks again, and the earlier answer is dropped. */
@@ -461,24 +294,6 @@
         timeSlotObj.value = slot;
         return slot.trackShot;
     }
-    function handleFilterItem(selectedItem, type, isUser=false){
-        debouncerWithPromise(400).then(()=>{
-            helper.handleFilterItem(selectedItem,type,selectedFilters.value, checkedFilter.value, filterType.value).then((filterRes)=>{
-                if(filterRes.status){
-                    let userFilter = filterRes.data.selectedFilters.filter((x) => x.type == "Users");
-                    if (isUser && userFilter.length == 0) {
-                        filter_tt_click.value.click()
-                    }
-                    selectedFilters.value = filterRes.data.selectedFilters;
-                    checkedFilter.value = filterRes.data.checkedFilter; // call inint function here
-                    selectedSlot.value = null;
-                    resetLogRange();
-                    getTimeSlot();
-                    getTrackerTimesheetData();
-                }
-            })
-        })
-    }
     const queryFunction = () => {
         return new Promise((resolve, reject) => {
             try {
@@ -489,16 +304,7 @@
                         userArray.push(element.id)
                     });
                 }
-                let teamsIds = selectedFilters.value.filter((x) => { return x.type == 'Teams' });
-                if (teamsIds.length) {
-                    teamsIds.forEach((element)=>{
-                        let ind = teams.value.findIndex((x)=>{return x._id == element.id});
-                        teams.value[ind].assigneeUsersArray.forEach((dt) => {
-                            userArray.push(dt)
-                        })
-                    })
-                }
-                if (filterIds.length === 0 && teamsIds.length === 0) {
+                if (filterIds.length === 0) {
                     users.value.forEach((element) => {
                         userArray.push(element._id)
                     });
@@ -570,52 +376,25 @@
             })
         })
     }
-    const optionFilter = computed(()=>{
-        const searchArray = [];
-        if (filterSearch.value && filterSearch.value.length > 0) {
-            const filterTypeLower = filterType.value.toLowerCase();
-            if (filterTypeLower === "users") {
-                users.value.forEach(rawData => {
-                if (rawData.Employee_Name.trim().toLowerCase().includes(filterSearch.value.trim().toLowerCase())) {
-                    searchArray.push({
-                    "id": rawData._id,
-                    'name': rawData.Employee_Name,
-                    'profile': rawData.Employee_profileImageURL || ''
-                    });
-                }
-                });
-            } else if (filterTypeLower === "teams") {
-                    teams.value.forEach(val => {
-                    if (val.name.trim().toLowerCase().includes(filterSearch.value.trim().toLowerCase())) {
-                        searchArray.push({
-                        "id": val._id,
-                        'name': val.name
-                        });
-                    }
-                    });
-            } else if (filterTypeLower === "projects") {
-                projects.value.forEach(ele => {
-                if (ele.ProjectName.trim().toLowerCase().includes(filterSearch.value.trim().toLowerCase())) {
-                    searchArray.push({
-                    "id": ele._id,
-                    'name': ele.ProjectName,
-                    'AssigneeUserId': ele.AssigneeUserId,
-                    'ProjectCode': ele.ProjectCode,
-                    "projectIcon": ele.projectIcon
-                    });
-                }
-                });
-            }
-        }
-        return searchArray.length > 0 ? searchArray : filterSearch.value ? searchArray : finalFilter.value;
-    })
-
-    const validateURL = (str) => {
-        var tarea = str;
-        if (tarea.indexOf("http://") == 0 || tarea.indexOf("https://") == 0) {
-            return true;
-        }
-    }
+    const clockOf = (seconds) => (seconds ? moment.unix(Number(seconds)).format('HH:mm') : '');
+    const onExport = async (format) => {
+        const projectName = (id) => (options.projectById.value[String(id)] || {}).ProjectName || '';
+        await exportReport(format, {
+            name: 'tracker',
+            title: t('Time.tracker_title'),
+            filters: filters.value,
+            columns: [
+                { key: 'start', label: t('Reports.col_start'), value: (log) => clockOf(log.LogStartTime) },
+                { key: 'end', label: t('Reports.col_end'), value: (log) => clockOf(log.LogEndTime) },
+                { key: 'person', label: t('Reports.col_person'), value: (log) => (getUser(log.Loggeduser) || {}).Employee_Name || '' },
+                { key: 'project', label: t('Reports.col_project'), value: (log) => projectName(log.ProjectId) },
+                { key: 'note', label: t('Reports.col_note'), value: (log) => log.LogDescription || '' },
+                { key: 'shots', label: t('Reports.col_screenshots'), value: (log) => (log.trackShots || []).length },
+                { key: 'hours', label: t('Reports.col_hours'), value: (log) => hoursOf(log.LogTimeDuration) },
+            ],
+            rows: [...dayLogs.value].sort((a, b) => Number(a.LogStartTime) - Number(b.LogStartTime)),
+        });
+    };
 </script>
 <style src="../style.css"></style>
 <style scoped>
@@ -634,195 +413,13 @@
     border-radius: 12px;
     margin-bottom: 20px;
 }
-.ts-day-nav{
-    display: inline-grid;
-    place-content: center;
-    flex: none;
-    width: 32px;
-    height: 30px;
-    margin-left: -1px;
-    padding: 0;
-    border: 1px solid var(--border);
-    border-radius: 0 var(--r-chip) var(--r-chip) 0;
-    background: var(--surface);
-    color: var(--ink-2);
-    cursor: pointer;
-}
-.ts-day-nav:hover{
-    background: var(--surface-hover);
-    color: var(--ink);
-}
-.ts-day-nav .ah-mask-icon{
-    width: 9px;
-    height: 9px;
-}
-.ts-day-nav--prev{
-    margin: 0 -1px 0 0;
-    border-radius: var(--r-chip) 0 0 var(--r-chip);
-}
-.ts-day-nav--prev .ah-mask-icon{
-    transform: rotate(180deg);
-}
-.page-content {
-    padding: 15px;
-}
-/* The legacy title strip carries the shared timesheet tabs, so it follows the theme. */
-.page-title {
-    width: 100%;
-    background-color: var(--surface);
-    border-bottom: 1px solid var(--hairline);
-    color: var(--ink);
-}
-.pro_route_link a { color: var(--ink); }
-.ts-legacy-tabs { align-self: stretch; margin: 0 16px 0 0; }
-.ts-legacy-tabs :deep(.tv-tab) { display: flex; align-items: center; }
-@media (max-width: 767px) {
-    .page-title { flex-wrap: wrap; }
-    .ts-legacy-tabs { margin: 0; padding: 0 8px; }
-    .ts-legacy-tabs :deep(.tv-tab) { min-height: 40px; }
-}
-ul.breadcrumb.title_strip {
-    margin: 0;
-    padding: 0;
-    display: flex;
-    align-items: center;
-    height: 61px;
-    background-color: transparent;
-    width: 100%;
-    padding-left: 15px;
-}
-ul.breadcrumb.title_strip li:first-child {
-    border-left: 0;
-    padding-left: 0px;
-}
-ul.breadcrumb.title_strip li {
-    list-style: none;
-    padding: 0px 20px;
-    border-left: 1px solid var(--border);
-    font-family: var(--font-ui);
-    font-weight:700;
-}
-.dp__main.dp__theme_light {
-    max-width: 100%;
-    width: 260px;
-    margin-right: 15px;
-}
-span.chipusername_wrapper {
-    display: flex;
-    background-color: var(--fill);
-    border-radius: 10px;
-    margin-right: 10px;
-    padding: 1px 4px 0.77px 8px;
-    font-weight: 500;
-    align-items: center;
-    min-width: fit-content;
-}
-.link_disable_css {
-    color: var(--ink);
-    text-decoration: none;
-    font-size: 16px;
-}
-
-span.chipusername_wrapper button {
-    padding: 0;
-    border: 0;
-    margin-left: 4px;
-    min-width: 17px;
-    width: 17px;
-    height: 17px;
-    background: transparent !important;
-    color: var(--ink-2);
-    font: 400 var(--fs-lg, 16px)/1 var(--font-ui);
-    cursor: pointer;
-}
-.timesheet__wrapper .wf_filter {
-    height: 30px;
-    padding: 0 !important;
-    width: 100% !important;
-    max-width: 100% !important;
-}
-.timesheet_user_filter {
-    position: sticky;
-    left: 0;
-    padding: 0px 0px 0px 10px;
-    min-width: 69px;
-    margin-right: 10px;
-}
-.checklist-main input{
-    margin-right: 5px;
-}
-    
-/* .timesheet__wrapper .wf_filter::-webkit-scrollbar{
-    display: none;
-} */
-.wf__filter-wrapper {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    height: 21px;
-}
-.wf_filter::-webkit-scrollbar-thumb {
-    border-radius: 10px;
-    -webkit-box-shadow: inset 0 0 6px var(--shadow-ink);
-    background-color: var(--border);
-}
-.wf_filter::-webkit-scrollbar {
-    width: 5px;
-    height: 5px;
-    background-color: var(--fill);
-}
-.wf_filter{
-    overflow-x: auto !important;
-    overflow-y: hidden !important;
-}
-.chipusername_main {
-    padding-right: 25px;
-}
-span.chipusername_wrapper span.user_name {
-    font-size: 13px;
-    font-weight: 500;
-    color: var(--ink-2);
-    line-height: 19.24px;
-    min-width: max-content;
-}
-.circlegreen {
-  width: 10px;
-  height: 10px;
-  background-color: var(--ok);
-  border-radius: 50%;
-}
-.circlePurple {
-  width: 10px;
-  height: 10px;
-  background-color: var(--agent);
-  border-radius: 50%;
-}
-.timesheet_user_filter button.dot-btn {
-  min-width: 60px;
-  height: 28px;
-}
-.tracker-timesheet-calender-wrapper{
-    border:1px solid var(--border);
-    height: 30px;
-    background-color: var(--surface);
-    width: 143px;
-    min-width: 143px;
-}
-.tracker-timesheet-calender {
-    margin: 2px 10px 0;
-}
-.tracker-timesheet-calender .date_format_cal.calendar-comp::placeholder{font-size: 16px !important;color: var(--ink) !important;}
-.tracker-timesheet-calender .date_format_cal.calendar-comp{font-size: 16px !important;color: var(--ink) !important;}
-
 .timebarWrapper{
     margin-top: 16px;
 }
-.calendar-comp{display: none !important;}
 .screenShotTime{
     max-height: calc(100vh - 274px);
     overflow: auto;
 }
-
 .screenShotTime::-webkit-scrollbar {
     width: 6px;
     height: 6px;
@@ -837,47 +434,7 @@ span.chipusername_wrapper span.user_name {
     background-color: var(--fill) !important;
     border-radius: 6px;
 }
-.timesheetDropdown_wrapper {
-    padding: 10px !important;
+@media (max-width: 767px) {
+    .screenShotTime { max-height: calc(100vh - 335px); }
 }
-.timesheetDropdown_wrapper{
-  border: 0 !important;
-  margin-top: 9px;
-  margin-left: -11px;
-  filter: drop-shadow(0px 2px 12px var(--shadow-ink)) !important;
-}
-.timesheet__wrapper .range-picker.rangeComp{
-    min-width: 251px !important;
-}
-@media(max-width: 767px){
-    .pro_route_link a, ul.breadcrumb.title_strip li span{
-        font-size: 14px!important;
-    }
-    ul.breadcrumb.title_strip li {
-    padding: 0px 10px;
-
-}
-.screenShotTime {
-    max-height: calc(100vh - 335px);
-    overflow: auto;
-}
-.timesheetDropdown_wrapper span.filter_search_block .ah-input {padding: 15.5px 10px !important;}
-.timesheetDropdown_wrapper .wf_header span{font-size: 18px;}
-.timesheetDropdown_wrapper span.filter_search_block{padding: 20px 0 20px;}
-.timesheetDropdown_wrapper span.filter_list_item{font-size: 16px !important; line-height: 21px;}
-.timesheetDropdown_wrapper .wf_header{margin-bottom: 0;padding-top: 0;}
-.timesheetDropdown_wrapper .wf_body.filter_body_scroll{margin: 0;}
-.wf_body.checklist-main.filter_body_scroll.filter_body_scroll .wf_listItem{padding: 10px;}
-.timesheet__wrapper .wf_filter{height: 50px;}
-.timesheetDropdown_wrapper{margin-top: 0;margin-left: 0;}
- .wf_body.filter_body_scroll {height: 50px; padding: 10px !important;}
- .wf_body.filter_body_scroll .invalid-feedback{ font-size: 16px;}
-
-
-
-   .wf_header span,  .wf_header a{font-size: 18px;}
-   span.filter_list_item{font-size: 16px;}
-   .wf_header {padding: 0 0 5px 0;border-bottom: 0;}
-}
-
 </style>

@@ -53,11 +53,17 @@ logs
 /log
 /backups
 
-# Documentation is not shipped, except what the Instance console serves.
+# Documentation is not shipped, except the changelog the Instance console reads.
 *.md
 !CHANGELOG.md
-!docs/*.md
+docs
 .claude
+Tasks
+
+# Not part of the server image
+deploy
+e2e
+time-tracker-app
 
 # Docker files themselves (the Dockerfile is already loaded by Docker)
 Dockerfile

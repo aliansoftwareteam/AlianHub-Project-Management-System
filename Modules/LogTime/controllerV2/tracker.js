@@ -30,6 +30,7 @@ const { trackerUser, trackedTask, refuse } = require('./sessionUser');
 const { escapeHtml } = require('../../../utils/escapeHtml');
 const { isPeriodLocked, PERIOD_LOCKED } = require('../../TimesheetApproval/helpers/lockGuard');
 const { START_LOCKED } = require('./timerRules');
+const { trackerAccessFor, answerTrackerRefusal } = require('../../DesktopTracker/trackerSeats');
 
 /* A running timer belongs to the day it started, so stopping one that started in an approved
  * period is refused like any other change to that period, as trimming it already is. */
@@ -68,6 +69,8 @@ exports.timeTrackerStart = async (req, res) => {
     if (await startsInLockedPeriod(companyId, actor.id, timeStamp)) {
         return res.send({ status: false, statusText: START_LOCKED, code: PERIOD_LOCKED });
     }
+    const access = await trackerAccessFor(companyId, actor.id, { claim: true });
+    if (!access.allowed) return answerTrackerRefusal(res, access.refusal);
     let data = {
         CreatedAt: utcDateTime.ts,
         UpdatedAt: utcDateTime.ts,
@@ -152,55 +155,21 @@ exports.timeTrackerStart2 = async (req, res) => {
         trackShots: [],
         startTimeTracker: req.body.considerActionTime ? req.body.actionTime : timeStamp,
     }
-    let object = {
-        type: SCHEMA_TYPE.COMPANY_USERS,
-        data: [
-            {
-                userId: actor.id
-            },
-            {
-                isTrackerUser: 1,
-                _id: 0
-            }
-        ]
-    }
-    MongoDbCrudOpration(companyId, object,"findOne").then(async (cUser)=>{
-        if (cUser.isTrackerUser) {
-            if (await startsInLockedPeriod(companyId, actor.id, data.LogStartTime)) {
-                return res.send({ status: false, statusText: START_LOCKED, code: PERIOD_LOCKED });
-            }
-            let obj = {
-                type: SCHEMA_TYPE.TIMESHEET,
-                data: data
-            }
-            MongoDbCrudOpration(companyId, obj, "save")
-                .then((response) => {
-                    updateProjectForTimelog(companyId, req.body.projectId, false, timeStamp, actor.id, req.body.taskId, response.id, true)
-                    findAndUpdateProjectOrTaskStartDate({companyId,userId:actor.id,projectId:req.body.projectId,taskId:req.body.taskId,startDateForProjectOrTask:new Date()});
-                    updateRemainingTime(companyId,req.body.taskId);
-                    res.send({
-                        status: true,
-                        statusText: response.id
-                    })
-                    // res.send(response)
-                })
-                .catch((err) => {
-                    logger.error(`TimeSheet===========>Error ${err.message}`);
-                    res.send({ status: false, message: err.message })
-                });
-        } else {
-            res.send({
-                status: false,
-                isPermissionDenied: true,
-                message: 'Permisson Denied'
-            })
+    try {
+        if (await startsInLockedPeriod(companyId, actor.id, data.LogStartTime)) {
+            return res.send({ status: false, statusText: START_LOCKED, code: PERIOD_LOCKED });
         }
-    }).catch((error)=>{
-        res.send({
-            status: false,
-            message: error.message ? error.message : error
-        })
-    })
+        const access = await trackerAccessFor(companyId, actor.id, { claim: true });
+        if (!access.allowed) return answerTrackerRefusal(res, access.refusal);
+        const response = await MongoDbCrudOpration(companyId, { type: SCHEMA_TYPE.TIMESHEET, data }, "save");
+        updateProjectForTimelog(companyId, req.body.projectId, false, timeStamp, actor.id, req.body.taskId, response.id, true)
+        findAndUpdateProjectOrTaskStartDate({companyId,userId:actor.id,projectId:req.body.projectId,taskId:req.body.taskId,startDateForProjectOrTask:new Date()});
+        updateRemainingTime(companyId,req.body.taskId);
+        return res.send({ status: true, statusText: response.id });
+    } catch (error) {
+        logger.error(`TimeSheet===========>Error ${error.message}`);
+        return res.send({ status: false, message: error.message ? error.message : error });
+    }
 }
 
 /**

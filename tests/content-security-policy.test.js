@@ -222,13 +222,25 @@ describe('hosts that come from configuration', () => {
         const get = await serve(env);
         Object.assign(env, WASABI);
         expect((await get('/'))[REPORT_ONLY]).toContain('https://*.s3.eu-central-1.wasabisys.com');
-        env.WASABIENDPOINT = 'https://later.example.com';
+        env.STORAGE_TYPE = 'server';
         env.APIKEY = 'AIza-later';
         env.WEBURL = 'https://moved.example.com';
         const later = (await get('/'))[REPORT_ONLY];
         expect(later).toContain('wss://moved.example.com');
-        expect(later).not.toContain('later.example.com');
+        expect(later).toContain('https://*.s3.eu-central-1.wasabisys.com');
         expect(later).not.toContain('firebaseinstallations');
+    });
+
+    it('follows a storage address pushed while the server runs, as a rotated or moved bucket needs no restart', async () => {
+        const env = { CSP_MODE: 'report', ...WASABI };
+        const get = await serve(env);
+        expect((await get('/'))[REPORT_ONLY]).toContain('https://*.s3.eu-central-1.wasabisys.com');
+        env.S3_ENDPOINT = 'https://blr1.digitaloceanspaces.com';
+        env.S3_PUBLIC_BASE_URL = 'https://cdn.example.com/ins_01';
+        const later = (await get('/'))[REPORT_ONLY];
+        expect(later).toContain('https://*.blr1.digitaloceanspaces.com');
+        expect(later).toContain('https://cdn.example.com');
+        expect(later).not.toContain('eu-central-1');
     });
 
     it('follows WEBURL and APIURL when the console changes them, without a restart', async () => {

@@ -11,15 +11,20 @@
 
                 <p v-if="loading" class="ah-empty">{{ $t('TeamPacks.loading') }}</p>
                 <EmptyState v-else-if="loadError" :title="$t('TeamPacks.load_failed')" :message="loadError" :action-label="$t('TeamPacks.retry')" @action="load" />
-                <template v-else>
+                <div v-else class="tp-wrap">
                     <p v-if="!dispatcherOn" class="ah-small tp-note" data-test="tp-off" role="status">{{ $t('TeamPacks.dispatcher_off') }}</p>
                     <p v-if="needsKey" class="ah-small tp-note" data-test="tp-needs-key">{{ $t('AgentCatalogue.role_needs_key') }}</p>
 
-                    <BlueprintPicker :team-packs="teamPacks" />
+                    <BlueprintPicker :team-packs="teamPacks" :show-off-note="false" />
 
                     <section class="ah-card tp-card">
                         <div class="ah-card__body tp-form">
-                            <div class="tp-field">
+                            <header class="tp-head">
+                                <h2 class="ah-h3 tp-title">{{ $t('TeamPacks.pack_title') }}</h2>
+                                <p class="ah-small tp-muted">{{ $t('TeamPacks.pack_lead') }}</p>
+                            </header>
+
+                            <div class="tp-field tp-field--narrow">
                                 <label class="ah-field__label" for="tp-blueprint">{{ $t('TeamPacks.blueprint_label') }}</label>
                                 <select id="tp-blueprint" v-model="blueprint" class="ah-input" data-test="tp-blueprint">
                                     <option v-for="pack in packs" :key="pack.blueprint" :value="pack.blueprint">{{ blueprintName(t, te, pack.blueprint) }}</option>
@@ -28,54 +33,44 @@
 
                             <fieldset class="tp-field tp-set">
                                 <legend class="ah-field__label">{{ $t('TeamPacks.teams_label') }}</legend>
-                                <label v-for="team in teamsOfPack" :key="team.team" class="tp-row" data-test="tp-team">
-                                    <input v-model="teams" class="ah-check" type="checkbox" :value="team.team" />
-                                    <span class="tp-row__name">{{ teamName(t, te, team.team) }}</span>
-                                    <span class="ah-small tp-row__roles">{{ team.roles.map((role) => role.name).join(' · ') }}</span>
-                                </label>
-                            </fieldset>
-
-                            <fieldset class="tp-field tp-set">
-                                <legend class="ah-field__label">{{ $t('TeamPacks.projects_label') }}</legend>
-                                <p v-if="!projects.length" class="ah-small">{{ $t('TeamPacks.no_projects') }}</p>
-                                <div class="tp-projects">
-                                    <label
-                                        v-for="project in projects"
-                                        :key="project._id"
-                                        class="tp-row"
-                                        :class="{ 'tp-row--off': project.why }"
-                                        data-test="tp-project"
-                                        :data-why="project.why || null"
-                                    >
-                                        <input
-                                            v-model="projectIds"
-                                            class="ah-check"
-                                            type="checkbox"
-                                            :value="project.id"
-                                            :disabled="Boolean(project.why) || (atCap && !projectIds.includes(project.id))"
-                                        />
-                                        <span class="tp-row__name">{{ project.name }}</span>
-                                        <span v-if="project.why" class="ah-small tp-row__roles">{{ $t(`TeamPacks.why_${project.why}`) }}</span>
+                                <div class="tp-teams">
+                                    <label v-for="team in teamsOfPack" :key="team.team" class="tp-team" :class="{ 'tp-team--on': teams.includes(team.team) }" data-test="tp-team">
+                                        <input v-model="teams" class="ah-check" type="checkbox" :value="team.team" />
+                                        <span class="tp-team__text">
+                                            <span class="tp-team__name">{{ teamName(t, te, team.team) }}</span>
+                                            <span class="ah-small tp-muted">{{ team.roles.map((role) => role.name).join(' · ') }}</span>
+                                        </span>
                                     </label>
                                 </div>
-                                <span class="ah-field__hint" data-test="tp-projects-hint">{{ atCap ? $t('TeamPacks.projects_cap', { n: MAX_PROJECTS }) : $t('TeamPacks.projects_hint') }}</span>
                             </fieldset>
 
-                            <div v-if="starterRuleCount" class="tp-field">
-                                <label class="tp-row">
-                                    <input v-model="withStarterRules" class="ah-check" type="checkbox" data-test="tp-starter-rules" />
-                                    <span class="tp-row__name">{{ $t('TeamPacks.starter_rules') }}</span>
-                                </label>
-                                <span class="ah-field__hint" data-test="tp-starter-rules-hint">{{ $t('TeamPacks.starter_rules_hint', { n: starterRuleCount }, starterRuleCount) }}<template v-if="hasTypeRule"> {{ $t('TeamPacks.starter_rules_type_hint') }}</template></span>
-                            </div>
-                            <p v-if="tagNames.length" class="ah-small tp-muted" data-test="tp-tags-hint">{{ $t('TeamPacks.tags_hint', { names: tagNames.join(', ') }) }}</p>
-                            <p v-if="fieldNames.length" class="ah-small tp-muted" data-test="tp-fields-hint">{{ $t('TeamPacks.fields_hint', { names: fieldNames.join(', ') }) }}</p>
+                            <PackProjectPicker
+                                v-model="projectIds"
+                                :projects="projects"
+                                :max="MAX_PROJECTS"
+                                test-id="tp-project"
+                                :empty-text="$t('TeamPacks.no_projects')"
+                                :hint="$t('TeamPacks.projects_hint')"
+                            />
 
-                            <label v-if="managesAgents" class="tp-row" data-test="tp-create-agents">
-                                <input v-model="createAgents" class="ah-check" type="checkbox" />
-                                <span class="tp-row__name">{{ $t('TeamPacks.create_agents') }}</span>
-                                <span class="ah-small tp-row__roles">{{ $t('TeamPacks.create_agents_paused_hint') }}</span>
-                            </label>
+                            <div v-if="starterRuleCount || managesAgents || tagNames.length || fieldNames.length" class="tp-options">
+                                <label v-if="starterRuleCount" class="tp-option">
+                                    <input v-model="withStarterRules" class="ah-check" type="checkbox" data-test="tp-starter-rules" />
+                                    <span class="tp-option__text">
+                                        <span class="tp-option__name">{{ $t('TeamPacks.starter_rules') }}</span>
+                                        <span class="ah-small tp-muted" data-test="tp-starter-rules-hint">{{ $t('TeamPacks.starter_rules_hint', { n: starterRuleCount }, starterRuleCount) }}<template v-if="hasTypeRule"> {{ $t('TeamPacks.starter_rules_type_hint') }}</template></span>
+                                    </span>
+                                </label>
+                                <label v-if="managesAgents" class="tp-option" data-test="tp-create-agents">
+                                    <input v-model="createAgents" class="ah-check" type="checkbox" />
+                                    <span class="tp-option__text">
+                                        <span class="tp-option__name">{{ $t('TeamPacks.create_agents') }}</span>
+                                        <span class="ah-small tp-muted">{{ $t('TeamPacks.create_agents_paused_hint') }}</span>
+                                    </span>
+                                </label>
+                                <p v-if="tagNames.length" class="ah-small tp-muted tp-option__note" data-test="tp-tags-hint">{{ $t('TeamPacks.tags_hint', { names: tagNames.join(', ') }) }}</p>
+                                <p v-if="fieldNames.length" class="ah-small tp-muted tp-option__note" data-test="tp-fields-hint">{{ $t('TeamPacks.fields_hint', { names: fieldNames.join(', ') }) }}</p>
+                            </div>
 
                             <div class="tp-actions">
                                 <button
@@ -110,7 +105,7 @@
                             </div>
                         </div>
                     </section>
-                </template>
+                </div>
             </div>
         </div>
     </div>
@@ -123,6 +118,7 @@ import { useRoute } from "vue-router";
 import { useStore } from "vuex";
 import AiSidebar from "./AiSidebar.vue";
 import BlueprintPicker from "./BlueprintPicker.vue";
+import PackProjectPicker from "./PackProjectPicker.vue";
 import EmptyState from "@/components/atom/EmptyState/EmptyState.vue";
 import { aiAvailability, AI_STATE } from "@/composable/aiAvailability";
 import { refusalText } from "@/utils/assignmentRules";
@@ -171,7 +167,6 @@ const whyNot = (project) => {
 const projects = computed(() => (getters["projectData/projects"]?.data || [])
     .filter((p) => !p.deletedStatusKey && p.isPersonal !== true)
     .map((p) => ({ id: String(p._id), name: p.ProjectName, why: whyNot(p) })));
-const atCap = computed(() => projectIds.value.length >= MAX_PROJECTS);
 const teamsOfPack = computed(() => (packs.value.find((pack) => pack.blueprint === blueprint.value) || { teams: [] }).teams);
 const roleCount = computed(() => teamsOfPack.value.filter((team) => teams.value.includes(team.team)).reduce((sum, team) => sum + team.roles.length, 0));
 const chosenRoles = computed(() => teamsOfPack.value.filter((team) => teams.value.includes(team.team)).flatMap((team) => team.roles));
@@ -281,22 +276,31 @@ onMounted(load);
 
 <style>
 @import "./style.css";
-.tp-note { margin: 0 0 12px; padding: 8px 12px; border: 1px solid var(--hairline); border-radius: var(--r-card); background: var(--surface-2); color: var(--ink-2); }
-.tp-card { margin-bottom: 14px; }
-.tp-form { display: flex; flex-direction: column; gap: 14px; }
+.tp-note { margin: 0 0 14px; padding: 10px 12px; border: 1px solid var(--warn); border-radius: var(--r-card); background: var(--warn-bg); color: var(--warn-ink); }
+.tp-card { margin-bottom: 16px; }
+.tp-wrap { max-width: 960px; }
+.tp-form { display: flex; flex-direction: column; gap: 18px; }
+.tp-head { display: flex; flex-direction: column; gap: 4px; padding-bottom: 14px; border-bottom: 1px solid var(--hairline); }
+.tp-title { margin: 0; }
 .tp-field { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
+.tp-field--narrow { max-width: 280px; }
 .tp-set { margin: 0; padding: 0; border: 0; }
-.tp-row { display: flex; align-items: baseline; gap: 8px; flex-wrap: wrap; cursor: pointer; color: var(--ink); }
-.tp-row__name { font-weight: 600; }
-.tp-row--off { cursor: default; color: var(--ink-2); }
-.tp-row__roles { flex-basis: 100%; padding-left: 24px; color: var(--ink-2); }
-.tp-projects { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 6px; }
-.tp-actions { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.tp-teams { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 8px; }
+.tp-team { display: flex; align-items: flex-start; gap: 10px; padding: 10px 12px; border: 1px solid var(--hairline); border-radius: var(--r-card); background: var(--surface); cursor: pointer; color: var(--ink); min-width: 0; transition: border-color var(--t-state) var(--ease), background var(--t-state) var(--ease); }
+.tp-team:hover { border-color: var(--brand-border); }
+.tp-team--on { border-color: var(--brand); background: var(--brand-tint); }
+.tp-team .ah-check, .tp-option .ah-check { flex: none; margin-top: 2px; }
+.tp-team__text, .tp-option__text { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.tp-team__name, .tp-option__name { font-weight: 600; }
+.tp-options { display: flex; flex-direction: column; gap: 12px; padding: 14px 16px; border-radius: var(--r-card); background: var(--surface-2); }
+.tp-option { display: flex; align-items: flex-start; gap: 10px; cursor: pointer; color: var(--ink); }
+.tp-option__note { margin: 0; }
+.tp-actions { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; padding-top: 14px; border-top: 1px solid var(--hairline); }
 .tp-muted { color: var(--ink-2); }
 .tp-result__head { margin: 0; font-weight: 600; color: var(--ink); }
 .tp-list { margin: 0; padding-left: 18px; display: flex; flex-direction: column; gap: 4px; color: var(--ink-2); }
 @media (max-width: 480px) {
-    .tp-projects { grid-template-columns: 1fr; }
+    .tp-field--narrow { max-width: none; }
     .tp-actions .ah-btn { width: 100%; }
 }
 </style>

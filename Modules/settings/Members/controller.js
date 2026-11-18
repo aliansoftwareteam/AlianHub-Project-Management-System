@@ -16,6 +16,9 @@ const { revokeMemberTokens } = require('../../ApiTokens/memberTokens');
 const { endMemberConnections } = require('../../Agents/connectors/memberDeparted');
 const logger = require('../../../Config/loggerConfig');
 const { releaseMemberSeat } = require('../../Company/helpers/companyCounters');
+const { acceptanceRefusal } = require('../../Entitlements/guards');
+const { answerRefusal } = require('../../Entitlements/answers');
+const { trackerAccessFor, releaseSeatsLater } = require('../../DesktopTracker/trackerSeats');
 
 const OBJECT_ID_PATTERN = /^[a-f0-9]{24}$/i;
 const ACTIVE = 2;
@@ -81,6 +84,8 @@ exports.getMembers = async (req, res) => {
         const companyId = req.headers['companyid'];
         const cacheKey = `company_users:${companyId}`;
         const rowView = memberRowFor(await viewerOf(companyId, req.uid));
+        // The AlianHub Support seat is not a member: only that account itself sees its own row.
+        const listed = (rows) => rows.filter((row) => !row.isSupportUser || String(row.userId) === String(req.uid)).map(rowView);
 
         const cached = cachedMemberRows(companyId);
         if (cached) {
@@ -88,14 +93,14 @@ exports.getMembers = async (req, res) => {
                 'FromCache': 'true',
                 'cacheExpireTime': myCache.getTtl(cacheKey)
             });
-            return res.status(200).json({ status: true, data: cached.map(rowView) });
+            return res.status(200).json({ status: true, data: listed(cached) });
         }
 
         const response = await MongoDbCrudOpration(companyId, { type: SCHEMA_TYPE.COMPANY_USERS, data: [] }, 'find');
         myCache.set(cacheKey, JSON.stringify(response), 604800);
 
         if (response) {
-            return res.status(200).json({ status: true, data: response.map(rowView) });
+            return res.status(200).json({ status: true, data: listed(response) });
         } else {
             return res.status(404).json({ status: false });
         }
@@ -107,6 +112,13 @@ exports.getMembers = async (req, res) => {
         });
     }
 }
+
+/* The desktop tracker reads isTrackerUser on its person's own row as "may track now", which the role and the plan's seats decide. */
+const withOwnTrackerAccess = async (companyId, uid, row) => {
+    if (!row || typeof row !== 'object' || String(row.userId || '') !== String(uid || '')) return row;
+    const access = await trackerAccessFor(companyId, uid).catch(() => ({ allowed: false }));
+    return { ...row, isTrackerUser: access.allowed };
+};
 
 exports.getMembersById = async (req, res) => {
     try {
@@ -120,13 +132,13 @@ exports.getMembersById = async (req, res) => {
                 'FromCache': 'true',
                 'cacheExpireTime': myCache.getTtl(cacheKey)
             });
-            return res.status(200).json(wanted.view(member));
+            return res.status(200).json(await withOwnTrackerAccess(companyId, req.uid, wanted.view(member)));
         }
         const response = await MongoDbCrudOpration(companyId, {
             type: SCHEMA_TYPE.COMPANY_USERS,
             data: [wanted.filter]
         }, 'findOne');
-        return res.status(200).json(wanted.view(response));
+        return res.status(200).json(await withOwnTrackerAccess(companyId, req.uid, wanted.view(response)));
     } catch (error) {
         return res.status(500).json({
             message: "An error occurred while get the company user",
@@ -320,6 +332,11 @@ exports.updateMember = async (req, res) => {
         if (!verdict.ok) {
             return refuse(res, verdict.code, verdict.statusText);
         }
+        const nextSeat = { ...subject, ...data };
+        if (!holdsSeat(subject) && holdsSeat(nextSeat) && subject.userId) {
+            const noSeat = await acceptanceRefusal({ userId: subject.userId, email: subject.userEmail, roleType: nextSeat.roleType });
+            if (noSeat) return answerRefusal(res, noSeat);
+        }
 
         // Losing the seat, the invite or the member role all strand whoever reports here.
         const becomesGuest = data.roleType !== undefined && data.roleType !== null && Number(data.roleType) === reportingLine.GUEST_ROLE;
@@ -376,6 +393,7 @@ exports.updateMember = async (req, res) => {
         if (MEMBERSHIP_FIELDS.some((field) => Object.prototype.hasOwnProperty.call(data, field))) {
             forgetMembership(companyId, subject.userId);
         }
+        if (Object.prototype.hasOwnProperty.call(data, 'roleType') && response.isTrackerUser === true) releaseSeatsLater(companyId);
         socketEmitter.emit('update', {
             type: 'update',
             data: { data: memberRowFor(COLLEAGUE)(response) },
@@ -455,6 +473,9 @@ exports.rootUpdateMember = async (req, res) => {
         if (!verdict.ok) {
             return refuse(res, verdict.code, verdict.statusText);
         }
+
+        const noSeat = await acceptanceRefusal({ userId: req.uid, email: invite.userEmail, roleType: invite.roleType });
+        if (noSeat) return answerRefusal(res, noSeat);
 
         const accepted = { userId: String(req.uid), status: ACTIVE };
         const response = await MongoDbCrudOpration(companyId, {

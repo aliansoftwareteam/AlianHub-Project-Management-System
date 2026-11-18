@@ -1,6 +1,8 @@
 import { createApp } from 'vue'
 import App from './App.vue'
 import router from './router'
+import { startSignInLanding } from './router/sessionCheck'
+import { useAuth } from '@/services'
 import { initTheme } from '@/components/organisms/Shell/shellState'
 import { readRememberedEmail } from '@/utils/rememberedLogin'
 initTheme()
@@ -32,6 +34,7 @@ import exportTasksPlugin from './plugins/exportTasksPlugin/exportTasksPlugin';
 import tasklistDashboardPlugin from './plugins/tasklistDashboard/tasklistDashboardPlugin';
 import importUsersPlugin from './plugins/importUsers/importUsersPlugin';
 import oAuthPlugin from './plugins/oauth/oAuthPlugin';
+import { installUnlessHosted } from '@/config/hostedPlugins';
 
 
 /**
@@ -42,14 +45,17 @@ import "@/assets/css/index.css";
 import "@/assets/css/alerts.css";
 import "@/assets/css/driver.css";
 
+startSignInLanding(router.resolve(router.options.history.location), {
+  storage: localStorage,
+  forgetAccount: () => useAuth().removeLocalValue({ withOutRefresh: true }),
+});
+
 const app = createApp(App).use(store).use(router)
 
 // Plugin Setup
 const pluginArray = [
   registerPlugin,
   createcompanyinsidePlugin,
-  chargebeePlugin,
-  paddlePlugin,
   customfieldPlugin,
   dashboardPlugin,
   importTasksPlugin,
@@ -61,6 +67,7 @@ const pluginArray = [
 for (let index = 0; index < pluginArray.length; index++) {
   app.use(pluginArray[index]);
 }
+installUnlessHosted(app, [chargebeePlugin, paddlePlugin]);
 
 app.use(ToastPlugin,{position: 'top-right'});
 bindFormKitApp(app);

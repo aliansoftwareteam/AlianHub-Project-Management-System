@@ -77,6 +77,10 @@
                         <ol v-if="turns.length" class="ask-thread" :aria-label="$t('Ask.conversation_label')">
                             <li v-for="turn in turns" :key="turn.key" class="ask-thread__turn" data-test="ask-turn">
                                 <p class="ask-thread__q"><span class="ah-sr-only">{{ $t('Ask.you_asked') }}</span>{{ turn.question }}</p>
+                                <p v-if="turn.mentions && turn.mentions.length" class="ask-thread__about" data-test="ask-turn-mentions">
+                                    <span class="ah-sr-only">{{ $t('Ask.asked_about') }}</span>
+                                    <span v-for="chip in turn.mentions" :key="`${chip.kind}-${chip.id}`" class="ah-chip ah-chip--sm ask-chip"><ShellIcon :name="mentionIcon(chip.kind)" :size="11" />{{ chip.title }}</span>
+                                </p>
                                 <AskAnswer v-if="showsAnswer(turn)" :answer="turn" :streaming="turn.status === 'streaming'" :projects="sources.projects || []" :project-id="projectId" />
                                 <AskPlanCard v-if="turn.mode === 'plan'" :turn="turn" @decide="decidePlan(turn, $event)" />
                                 <p v-if="turn.status === 'stopped'" class="ah-small" data-test="ask-stopped">{{ $t('Ask.stopped') }}</p>
@@ -92,8 +96,8 @@
                                     <ShellIcon name="docs" :size="12" />{{ composer.skill.value.name }}
                                     <button type="button" class="ask-chip__x" :aria-label="$t('Ask.chip_remove', { name: composer.skill.value.name })" @click="composer.clearSkill()"><ShellIcon name="x" :size="11" /></button>
                                 </span>
-                                <span v-for="chip in composer.chips.value" :key="`${chip.kind}-${chip.id}`" class="ah-chip ask-chip" data-test="ask-context-chip">
-                                    <ShellIcon :name="chip.kind === 'connector' ? 'integrations' : 'at'" :size="12" />{{ chip.title }}
+                                <span v-for="chip in composer.chips.value" :key="`${chip.kind}-${chip.id}`" class="ah-chip ask-chip" :title="$t(MENTION_KIND_LOOK[chip.kind].label)" data-test="ask-context-chip">
+                                    <ShellIcon :name="mentionIcon(chip.kind)" :size="12" />{{ chip.title }}
                                     <button type="button" class="ask-chip__x" :aria-label="$t('Ask.chip_remove', { name: chip.title })" data-test="ask-context-remove" @click="composer.removeChip(chip)"><ShellIcon name="x" :size="11" /></button>
                                 </span>
                             </div>
@@ -116,9 +120,9 @@
                                 :id="MENU_ID"
                                 :kind="composer.menu.kind"
                                 :items="composer.menu.items"
+                                :groups="composer.menu.groups"
                                 :active="composer.menu.active"
                                 :searching="composer.menu.searching"
-                                :short="composer.menu.short"
                                 @pick="composer.pick"
                                 @hover="composer.hover"
                             />
@@ -349,7 +353,7 @@
 
 <script setup>
 import AiModelNotice from '@/components/molecules/AiUnavailable/AiModelNotice.vue';
-import { computed, inject, nextTick, onBeforeUnmount, onMounted, ref, unref } from "vue";
+import { computed, inject, nextTick, onBeforeUnmount, onMounted, ref, unref, watch } from "vue";
 import { useI18n } from "vue-i18n";
 import { useRoute, useRouter } from "vue-router";
 import { useToast } from "vue-toast-notification";
@@ -370,6 +374,7 @@ import { messageKey } from "./askWhy";
 import { takeAskHandoff } from "@/components/molecules/AdvanceSearch/askHandoff";
 import { useAskConversation } from "./useAskConversation";
 import { MENU_ID, useAskComposer } from "./useAskComposer";
+import { MENTION_KIND_LOOK, mentionIcon } from "./askMentionLook";
 import AskComposerMenu from "./AskComposerMenu.vue";
 import AskConnectorNotes from "./AskConnectorNotes.vue";
 import { providerLabel } from "@/views/Integrations/connectorLabels";
@@ -391,7 +396,15 @@ const $toast = useToast();
 const companyId = inject("$companyId");
 const { agents, registryManifest, runs, routable, loadAgents, loadRegistry, loadRuns, loadRoutable, startRun } = useParity();
 const { spend, skillManifest, loadSkills, loadSpend } = useAgents();
-const { canManage } = useAgentAccess();
+const { canManage, canBuild, seesSkills } = useAgentAccess();
+// The server refuses the skill list to anyone without either right; the rights can arrive after mount.
+const maySeeSkills = computed(() => seesSkills.value || canBuild.value);
+let skillsRequested = false;
+watch(maySeeSkills, (allowed) => {
+    if (!allowed || skillsRequested) return;
+    skillsRequested = true;
+    loadSkills().catch(() => []);
+}, { immediate: true });
 const { turns, threadId, threads, threadsLoading, streaming, announcement, send, plan, decidePlan, stop, newQuestion, loadThreads, openThread, removeThread, seed } = useAskConversation({ t });
 
 const route = useRoute();
@@ -424,7 +437,7 @@ const recorder = ref(null);
 const read = computed(() => backlogRead(routable.value));
 const reach = computed(() => skillReach(skillManifest.value, routable.value));
 const openConnections = () => router && router.push({ name: "Connections", params: { cid: unref(companyId) } });
-const composer = useAskComposer({ question, box: questionBox, skills: reach, label: (id) => providerLabel(t, te, id), onConnect: openConnections });
+const composer = useAskComposer({ question, box: questionBox, skills: reach, companyId, projectId, label: (id) => providerLabel(t, te, id), onConnect: openConnections });
 const scopedProjectName = computed(() => ((sources.value.projects || []).find((p) => p.id === projectId.value) || {}).name || "");
 
 const providerReady = computed(() => sources.value.configured !== false);
@@ -527,9 +540,10 @@ const submit = async () => {
     error.value = "";
     question.value = "";
     const explicit = composer.body();
+    const mentions = composer.chips.value.slice();
     composer.reset();
     if (mode.value === "plan") await plan({ sentence: asked, projectId: projectId.value });
-    else await send({ question: asked, mode: mode.value, projectId: projectId.value, ...explicit });
+    else await send({ question: asked, mode: mode.value, projectId: projectId.value, mentions, ...explicit });
 };
 
 const onEnter = (event) => {
@@ -630,7 +644,7 @@ onMounted(async () => {
     if (sourceRes?.data?.status) sources.value = sourceRes.data.data || {};
     if (modelRes?.data?.status) models.value = modelRes.data.data?.models || [];
     try {
-        await Promise.all([loadRoutable("", { limit: BACKLOG_LIMIT }), loadAgents(), loadRegistry(), loadRuns(), loadSkills(), loadSpend()]);
+        await Promise.all([loadRoutable("", { limit: BACKLOG_LIMIT }), loadAgents(), loadRegistry(), loadRuns(), loadSpend()]);
     } catch (e) {
         error.value = reasonOf(e, "Ai.load_failed");
     } finally {
@@ -654,6 +668,7 @@ onMounted(async () => {
 .ask-history__note { margin-top: var(--sp-3); }
 .ask-thread { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: var(--sp-7); }
 .ask-thread__turn { display: flex; flex-direction: column; gap: var(--sp-3); }
+.ask-thread__about { align-self: flex-end; display: flex; flex-wrap: wrap; justify-content: flex-end; gap: var(--sp-2); max-width: 85%; margin: 0; }
 .ask-thread__q { align-self: flex-end; max-width: 85%; margin: 0; padding: var(--sp-3) var(--sp-5); border-radius: var(--r-card); background: var(--brand-tint); color: var(--ink); white-space: pre-wrap; overflow-wrap: anywhere; }
 .ask-chips { display: flex; flex-wrap: wrap; gap: var(--sp-2); }
 .ask-chip { display: inline-flex; align-items: center; gap: 4px; max-width: 100%; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }

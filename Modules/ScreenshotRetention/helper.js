@@ -28,14 +28,13 @@
  *     nightly schedule fires). Stale locks (>4h old) are treated as crashed
  *     and reclaimed.
  *
- * This module is intentionally storage-aware: it imports the Wasabi delete
- * primitive directly. The local-filesystem `STORAGE_TYPE=server` path is
+ * This module is intentionally storage-aware: it deletes through
+ * common-storage/s3Store directly. The local-filesystem `STORAGE_TYPE=server` path is
  * out of scope for retention today — companies on local storage simply
  * never enable the toggle.
  */
 
 const { default: mongoose } = require('mongoose');
-const { DeleteObjectCommand } = require('@aws-sdk/client-s3');
 const { MongoDbCrudOpration } = require('../../utils/mongo-handler/mongoQueries');
 const { SCHEMA_TYPE } = require('../../Config/schemaType');
 const logger = require('../../Config/loggerConfig');
@@ -65,29 +64,8 @@ const STALE_LOCK_THRESHOLD_MS = 4 * 60 * 60 * 1000; // 4h — assume crashed
 const COMPANY_CONCURRENCY = 5;                  // how many tenants to process in parallel
 const TENANT_BATCH_SIZE = 100;                  // TimeSheet docs per page
 
-// ----- S3 client (lazy) --------------------------------------------------
-// Modules/storage/wasabi/controller.js declares its S3Client with `let`
-// (not `exports.`) so we can't reuse the singleton; we build our own from
-// `awsRef` and memoise it for the life of the process. Credentials baked
-// into the client at construction — if `awsRef` gets refreshed at runtime
-// for some reason, restart the process to pick up the new values.
-let _s3 = null;
-function getS3Client() {
-    if (_s3) return _s3;
-    // eslint-disable-next-line global-require
-    const { S3Client } = require('@aws-sdk/client-s3');
-    // eslint-disable-next-line global-require
-    const awsRef = require('../../Config/aws.js');
-    _s3 = new S3Client({
-        region: awsRef.region,
-        endpoint: awsRef.wasabiEndPoint,
-        credentials: {
-            accessKeyId: awsRef.wasabiAccessKey,
-            secretAccessKey: awsRef.wasabiSecretAccessKey
-        }
-    });
-    return _s3;
-}
+// Lazy, so a server-storage install never loads the S3 SDK.
+const objectStore = () => require('../../common-storage/s3Store');
 
 // ----- Policy read / write ----------------------------------------------
 
@@ -248,7 +226,7 @@ async function countOldTrackshots(companyId, cutoff) {
  * as thrown exceptions and we treat the main delete as failed.
  */
 async function deleteTrackshotObjects(companyId, rowId, trackshot) {
-    const s3 = getS3Client();
+    const store = objectStore();
     const mainKey = extractKey(trackshot && trackshot.image);
     // The key on a row is whatever the capture named, so only one in the row's own tracker folder is removed.
     if (mainKey && !isRowTrackshotKey(rowId, mainKey)) {
@@ -268,7 +246,7 @@ async function deleteTrackshotObjects(companyId, rowId, trackshot) {
     const errors = [];
 
     try {
-        await s3.send(new DeleteObjectCommand({ Bucket: companyId, Key: mainKey }));
+        await store.remove(companyId, mainKey);
         mainDeleted = true;
     } catch (err) {
         errors.push(`main:${mainKey}:${err && err.message ? err.message : err}`);
@@ -281,7 +259,7 @@ async function deleteTrackshotObjects(companyId, rowId, trackshot) {
     for (const key of thumbKeys) {
         try {
             // eslint-disable-next-line no-await-in-loop
-            await s3.send(new DeleteObjectCommand({ Bucket: companyId, Key: key }));
+            await store.remove(companyId, key);
             thumbsDeleted += 1;
         } catch (err) {
             thumbsFailed += 1;

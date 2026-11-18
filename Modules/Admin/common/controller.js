@@ -45,7 +45,7 @@ exports.makeDefaultBrandSettings = () => {
                 // "productDescription": "Welcome to User Guide of all-in-one project management system - Alian Hub. You will find detailed instructions, steps and helpful hints for your queries here. From getting started by creating your first project to ensuring that your team has access to all of the resources they need, checking the status of the project and successfully completing the tasks. This user guide will lead you across anything you need to learn and understand. You can view the details of every query through the sections of this user guide.",
                 "termsOfService": "https://alianhub.com/terms-and-conditions/",
                 "privacyPolicy": "https://alianhub.com/privacy-policy/",
-                "helpLink":"https://help.alianhub.com/"
+                "helpLink":"https://docs.alianhub.com/"
             };
             const filePath = path.join(__dirname, '/../../../' , 'brandSettings.json');
             if (!fs.existsSync(filePath)) {

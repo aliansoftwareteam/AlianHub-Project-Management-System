@@ -134,6 +134,7 @@ exports.thumbnail = async (req, res) => {
 /* Put an imported file where a normal upload would, honouring STORAGE_TYPE, by calling the same storage
  * primitives the upload routes use rather than reimplementing either backend. */
 const storeImportedFile = async ({ companyId, storagePath, tmpPath, filename, size }) => {
+    await require('../Entitlements/uploads').assertUploadAllowed(companyId, size);
     const storageType = String(process.env.STORAGE_TYPE || 'wasabi');
     if (storageType === 'server') {
         const dest = path.join(__dirname, '../../storage', String(companyId), storagePath);
@@ -225,6 +226,8 @@ exports.importFile = async (req, res) => {
         logger.info(`${LOG} imported ${filename} (${buffer.length} bytes) from ${meta.source} for user ${who.userId}`);
         return res.send({ status: true, statusText: 'Imported.', data: { url: storedPath, size: buffer.length, filename } });
     } catch (e) {
+        const entitlements = require('../Entitlements/answers');
+        if (entitlements.isRefusalError(e)) return res.status(e.statusCode).send(entitlements.refusalBody(e.refusal));
         // arraybuffer means an error body arrives as bytes, not JSON — decode it or the reason is lost.
         let payload = e.response && e.response.data;
         if (payload && (Buffer.isBuffer(payload) || payload instanceof ArrayBuffer)) {

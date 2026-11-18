@@ -13,6 +13,9 @@ const { sharedRecordVisible } = require('./helpers/scimRules');
 const { revokeMemberTokens } = require('../ApiTokens/memberTokens');
 const { endMemberConnections } = require('../Agents/connectors/memberDeparted');
 const { invalidateMembershipCache } = require('../../Config/jwt');
+const { seatRefusal } = require('../Entitlements/seats');
+const { acceptanceRefusal, isGuestRole } = require('../Entitlements/guards');
+const { refusalError } = require('../Entitlements/answers');
 
 // scimRules.isActive reads this back as "not active"; isDelete is what keeps the seat out of the guards.
 const SCIM_DEACTIVATED = 0;
@@ -109,7 +112,7 @@ const provision = async (companyId, { email, firstName, lastName, externalId, ac
     const existing = await getCompanyUserByEmail(companyId, email);
     const uid = await jitProvisionUser({
         companyId, email, firstName, lastName, externalId,
-        defaultRoleType: defaultRoleType || 3, autoProvision: true,
+        defaultRoleType: defaultRoleType || 3, autoProvision: true, takesSeat: active !== false,
     });
     const set = {
         status: active === false ? SCIM_DEACTIVATED : SEAT_ACTIVE,
@@ -132,6 +135,8 @@ const provision = async (companyId, { email, firstName, lastName, externalId, ac
 
 const invite = async (companyId, { email, firstName, lastName, externalId, defaultRoleType }) => {
     const { sendInvitationEmailFun } = require('../Auth/controller/sendInvitation');
+    const noSeat = await seatRefusal([{ email, guest: isGuestRole(defaultRoleType) }], { includePending: true });
+    if (noSeat) throw refusalError(noSeat);
     const company = await MongoDbCrudOpration(dbCollections.GLOBAL, {
         type: SCHEMA_TYPE.COMPANIES, data: [{ _id: new mongoose.Types.ObjectId(String(companyId)) }],
     }, 'findOne');
@@ -168,6 +173,10 @@ const setActive = async (companyId, id, active) => {
         return getCompanyUser(companyId, cu._id);
     }
     if (active && !(await mayReactivate(companyId, cu))) return cu;
+    if (active && !holdsSeat(cu)) {
+        const noSeat = await acceptanceRefusal({ userId: cu.userId, email: cu.userEmail, roleType: cu.roleType });
+        if (noSeat) throw refusalError(noSeat);
+    }
     await updateRow(companyId, cu, {
         status: active ? SEAT_ACTIVE : SCIM_DEACTIVATED,
         isDelete: !active,

@@ -153,7 +153,7 @@ So each company slowly drifts away from the product, and the settings screen sho
 
 No "?" button, no link to the documentation, no tutorial videos. Competitors all keep help one click away in the top bar.
 
-**What we should do:** a "?" in the header linking to help.alianhub.com, plus a "Learn more" link on each empty screen.
+**What we should do:** a "?" in the header linking to docs.alianhub.com, plus a "Learn more" link on each empty screen.
 
 ---
 

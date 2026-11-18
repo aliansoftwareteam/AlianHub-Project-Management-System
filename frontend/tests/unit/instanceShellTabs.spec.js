@@ -9,6 +9,7 @@ vi.mock('vue-router', () => ({ useRoute: () => route }));
 vi.mock('@/views/Settings/Instance/useInstanceApi', () => ({ useInstanceApi: () => ({ guide: (a) => `#${a}` }) }));
 
 import InstanceShell from '@/views/Settings/Instance/InstanceShell.vue';
+import { publicConfig } from '@/config/publicConfig';
 
 const source = fs.readFileSync(path.join(__dirname, '../../src/views/Settings/Instance/InstanceShell.vue'), 'utf8');
 const rule = (selector) => {
@@ -45,5 +46,33 @@ describe('the instance tab strip fits a narrow toolbar', () => {
         expect(reveal).toHaveBeenCalledWith(expect.stringContaining('is-active'), { block: 'nearest', inline: 'nearest' });
         expect(wrapper.find('.is-active').text()).toBe('Egress.nav');
         wrapper.unmount();
+    });
+});
+
+describe('the instance tabs per hosting mode', () => {
+    const tabsIn = async (mode) => {
+        publicConfig.hosting = { mode, portalUrl: '' };
+        const wrapper = mount(InstanceShell, {
+            global: {
+                provide: { $companyId: ref('c1') },
+                stubs: { RouterLink: { ...RouterLinkStub, template: '<a :class="$attrs.class"><slot /></a>' }, RouterView: true, ShellIcon: true },
+                mocks: { $t: (k) => k }
+            }
+        });
+        await flushPromises();
+        const labels = wrapper.findAll('.ah-tab').map((tab) => tab.text());
+        wrapper.unmount();
+        publicConfig.hosting = { mode: 'self', portalUrl: '' };
+        return labels;
+    };
+
+    it('shows every tab on a self-hosted instance', async () => {
+        expect(await tabsIn('self')).toEqual(expect.arrayContaining(['Instance.nav_backups', 'Instance.nav_upgrade', 'Instance.nav_logs', 'Instance.nav_health']));
+    });
+
+    it('hides Backups, Upgrade and Logs on a hosted instance', async () => {
+        const tabs = await tabsIn('managed');
+        for (const closed of ['Instance.nav_backups', 'Instance.nav_upgrade', 'Instance.nav_logs']) expect(tabs).not.toContain(closed);
+        expect(tabs).toEqual(expect.arrayContaining(['Instance.nav_health', 'Instance.nav_settings', 'Instance.nav_stats']));
     });
 });

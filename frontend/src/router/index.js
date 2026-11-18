@@ -25,12 +25,15 @@ import trash from './trash';
 import { useCustomComposable } from '@/composable'
 import { i18n } from '@/locales/main'
 import dashboard from "../plugins/dashboard/router";
-import { apiRequestWithoutCompnay } from '@/services'
+import { apiRequestWithoutCompnay, apiRequestWithoutSecure } from '@/services'
+import { applyPublicConfig, isManagedHosting, publicConfig } from '@/config/publicConfig'
+import { trackPageView } from '@/utils/analytics'
+import { isBillingRoute, upgradeTarget } from '@/composable/upgradeLink'
 import * as env from '@/config/env';
 import Cookies from 'js-cookie'
 import { loginReturnPath } from '@/views/Integrations/githubReturn'
 import { readSetupStatus, isKnownInstalled } from './setupStatus';
-import { readSessionUser } from './sessionCheck';
+import { isSignInLanding, readSessionUser } from './sessionCheck';
 import { markAway } from '@/offline';
 import { opensWithoutWorkspace } from './withoutWorkspace';
 
@@ -134,6 +137,7 @@ const router = createRouter({
 // const authInst = getAuth();
 const jsonData = require('../../../brandSettings.json');
 const {setTitle} = useCustomComposable()
+const showTitleOf = (to) => setTitle({title: to.meta.titleKey ? i18n.global.t(to.meta.titleKey) : to.meta.title, prefix: jsonData?.productName ? `${jsonData.productName} | ` : ''});
 router.beforeEach(async(to, _, next) => {
 	// A fresh instance has nowhere to go but the setup page, and a set-up one must never show it.
 	if (!isKnownInstalled()) {
@@ -141,6 +145,10 @@ router.beforeEach(async(to, _, next) => {
 		if (setup && !setup.installed && to.name !== 'Setup') { next({ name: 'Setup' }); return; }
 	}
 	if (to.name === 'Setup' && isKnownInstalled()) { next({ name: 'Log-in' }); return; }
+	if (isBillingRoute(to) && await hostedInstance()) {
+		next(upgradeTarget(router, to.params.cid) || { name: 'Home', params: { cid: to.params.cid } });
+		return;
+	}
 
 	let query = to.query;
 	let fullPath = to.fullPath;
@@ -151,11 +159,16 @@ router.beforeEach(async(to, _, next) => {
 		query = coded;
 		fullPath = removeCodeParam(to.fullPath);
 	}
+	if (isSignInLanding(to)) {
+		showTitleOf(to);
+		next();
+		return;
+	}
 	const localUserId = localStorage.getItem("userId");
 	const { user, unreachable } = await readSessionUser(localUserId, (id) => apiRequestWithoutCompnay('get',`${env.USER_UPATE}/${id}`));
 	// Opened with no connection: App.vue draws the offline screen, or the sign-in page says it is offline.
 	if (unreachable) {
-		setTitle({title: to.meta.titleKey ? i18n.global.t(to.meta.titleKey) : to.meta.title, prefix: jsonData?.productName ? `${jsonData.productName} | ` : ''});
+		showTitleOf(to);
 		markAway();
 		next();
 		return;
@@ -165,8 +178,7 @@ router.beforeEach(async(to, _, next) => {
 		// CHECK META FOR AUTH REQUIRED
 		// const requiresAuth = to.matched.some(record => record.meta.requiresAuth);
 		const requiresAuth = to.meta.requiresAuth;
-		// SET PAGE TITLE
-		setTitle({title: to.meta.titleKey ? i18n.global.t(to.meta.titleKey) : to.meta.title, prefix: jsonData?.productName ? `${jsonData.productName} | ` : ''});
+		showTitleOf(to);
 
 		if(user === null && requiresAuth === true) {
 			// IF USER IS NOT LOGGED IN AND REQUESTS AUTH REQUIRED PAGE
@@ -190,6 +202,18 @@ router.beforeEach(async(to, _, next) => {
 		}
 	// })
 })
+
+router.afterEach((to, _, failure) => {
+	if (!failure) trackPageView(to);
+})
+
+/* A deep link can arrive before App.vue has asked for the public config. */
+async function hostedInstance() {
+	if (!publicConfig.loaded) {
+		await apiRequestWithoutSecure('get', env.INSTANCE_PUBLIC_CONFIG).then((res) => applyPublicConfig(res?.data?.data || {})).catch(() => {});
+	}
+	return isManagedHosting();
+}
 
 function removeCodeParam(url) {
     const [path, queryString] = url.split("?");

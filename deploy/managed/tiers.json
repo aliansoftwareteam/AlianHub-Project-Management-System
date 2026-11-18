@@ -1,0 +1,24 @@
+{
+    "$comment": "Placeholder sizes, to be tuned in load tests (task 065 T2, Q6). Limits are ceilings, not reservations: hosts are packed by measured memory (070). units is the share of a shared host a stack counts for (069); a dedicated tier gets a host of its own.",
+    "mongo": { "patch": "45" },
+    "tiers": {
+        "starter": {
+            "units": 1,
+            "dedicated": false,
+            "app": { "cpus": "1.0", "memory": "1g" },
+            "mongo": { "cpus": "0.5", "memory": "512m", "cacheGb": "0.25" }
+        },
+        "pro": {
+            "units": 2,
+            "dedicated": false,
+            "app": { "cpus": "2.0", "memory": "2g" },
+            "mongo": { "cpus": "1.0", "memory": "1g", "cacheGb": "0.5" }
+        },
+        "business": {
+            "units": null,
+            "dedicated": true,
+            "app": { "cpus": "3.0", "memory": "5g" },
+            "mongo": { "cpus": "1.0", "memory": "3g", "cacheGb": "1.5" }
+        }
+    }
+}

@@ -122,13 +122,13 @@ describe('no other write reaches the choice', () => {
     });
 });
 
-describe('a new account starts in Simple; one that exists keeps Full', () => {
+describe('every account starts in Full', () => {
     beforeEach(() => {
         MongoDbCrudOpration.mockReset();
     });
 
-    it('gives a new account the Simple choice and nothing else', () => {
-        expect(newAccountNavPreferences()).toEqual({ mode: 'simple' });
+    it('gives a new account the Full choice and nothing else', () => {
+        expect(newAccountNavPreferences()).toEqual({ mode: 'full' });
         expect(newAccountNavPreferences()).not.toBe(newAccountNavPreferences());
     });
 
@@ -140,7 +140,7 @@ describe('a new account starts in Simple; one that exists keeps Full', () => {
         await jitProvisionUser({ companyId: COMPANY, email: 'new@example.test', firstName: 'New' });
         const saved = MongoDbCrudOpration.mock.calls.filter(([, query, method]) => method === 'save' && query.type === 'users').map(([, query]) => query.data);
         expect(saved).toHaveLength(1);
-        expect(saved[0].navPreferences).toEqual({ mode: 'simple' });
+        expect(saved[0].navPreferences).toEqual({ mode: 'full' });
     });
 
     it('leaves an account that signs in again through single sign-on as it was', async () => {

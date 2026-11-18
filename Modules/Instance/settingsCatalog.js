@@ -1,11 +1,18 @@
 /* Every setting the Instance console can hold. `restart` marks a value read at
  * module load (storage driver, security middleware, cron zone); everything else
  * takes effect on save. Labels and help are English on purpose: the page
- * translates group and field names through InstanceV2.*, these are the fallback. */
+ * translates group and field names through InstanceV2.*, these are the fallback.
+ * `legacy` fields are shown only while they hold a value: an older name a newer field replaces. */
 const { allowlistError } = require('../Webhooks/helpers/privateHostAllowlist');
 const { baseUrlError } = require('../AICore/llmProvider/compatibleClient');
+const { prefixProblem } = require('../../common-storage/s3Config');
 
 const GROUPS = ['general', 'mail', 'storage', 'ai', 'auth', 'calling', 'security'];
+
+/* Who sets a group on a hosted instance (HOSTING_MODE=managed); a field's own `owner` overrides
+ * its group. Self-hosted, the owner sets everything and this is not consulted. */
+const GROUP_OWNER = Object.freeze({ general: 'platform', mail: 'platform', storage: 'platform', ai: 'customer', auth: 'customer', calling: 'customer', security: 'platform' });
+const OWNERS = ['platform', 'customer'];
 
 const taintDefaultOn = (env) => {
     const { anyToolOn } = require('../Mcp/defaultOn');
@@ -16,11 +23,20 @@ const onOff = (value) => (require('../Mcp/defaultOn').isOn(value) ? 'true' : 'fa
 
 const field = (key, group, type, extra = {}) => ({ key, group, type, secret: type === 'secret', default: '', ...extra });
 
+const timeZoneError = (value) => {
+    try {
+        new Intl.DateTimeFormat('en-US', { timeZone: value });
+        return null;
+    } catch {
+        return 'timezone';
+    }
+};
+
 const CATALOG = [
-    field('APP_NAME', 'general', 'text', { default: 'AlianHub', label: 'Product name' }),
+    field('APP_NAME', 'general', 'text', { default: 'AlianHub', label: 'Product name', owner: 'customer' }),
     field('WEBURL', 'general', 'text', { label: 'Public web URL', help: 'The address people open in the browser; used in emails and OAuth callbacks.' }),
     field('APIURL', 'general', 'text', { label: 'Public API URL', help: 'Usually the web URL with a trailing slash.' }),
-    field('CRON_TZ', 'general', 'text', { default: 'UTC', label: 'Scheduler time zone', restart: true }),
+    field('CRON_TZ', 'general', 'timezone', { default: 'UTC', label: 'Scheduler time zone', restart: true, owner: 'customer', validate: timeZoneError }),
 
     field('NODEMAILER_HOST', 'mail', 'text', { label: 'SMTP host' }),
     field('NODEMAILER_PORT', 'mail', 'number', { default: '587', label: 'SMTP port', help: '587 (STARTTLS) or 465 (TLS).' }),
@@ -29,15 +45,27 @@ const CATALOG = [
     field('NODEMAILER_EMAIL_PASSWORD', 'mail', 'secret', { label: 'SMTP password' }),
     field('RESEND_API_KEY', 'mail', 'secret', { label: 'Resend API key', help: 'When set, Resend is used instead of SMTP.' }),
     field('RESEND_FROM_EMAIL', 'mail', 'text', { label: 'Resend from address' }),
+    field('AWS_SES_REGION', 'mail', 'text', { label: 'Amazon SES region', help: 'The AWS region your SES account sends from, e.g. us-east-1.' }),
+    field('AWS_SES_KEY', 'mail', 'secret', { label: 'Amazon SES access key ID' }),
+    field('AWS_SES_SECRET', 'mail', 'secret', { label: 'Amazon SES secret access key' }),
+    field('AWS_SES_FROM_DEFAULT', 'mail', 'text', { label: 'Amazon SES from address', help: 'An address on a domain verified in SES, e.g. noreply@example.com.' }),
 
-    field('STORAGE_TYPE', 'storage', 'select', { default: 'server', options: ['server', 'wasabi'], label: 'Storage driver', restart: true }),
-    field('WASABI_ACCESS_KEY', 'storage', 'text', { label: 'Wasabi access key', restart: true }),
-    field('WASABI_SECRET_ACCESS_KEY', 'storage', 'secret', { label: 'Wasabi secret key', restart: true }),
-    field('WASABI_USERID', 'storage', 'text', { label: 'Wasabi user id', restart: true }),
-    field('WASABIENDPOINT', 'storage', 'text', { default: 'https://s3.wasabisys.com', label: 'S3 endpoint', restart: true }),
-    field('WASABI_REGION', 'storage', 'text', { default: 'us-east-1', label: 'Region', restart: true }),
-    field('IAM_ENDPOINT', 'storage', 'text', { default: 'https://iam.wasabisys.com', label: 'IAM endpoint', restart: true }),
-    field('USERPROFILEBUCKET', 'storage', 'text', { label: 'Public assets bucket', restart: true }),
+    field('STORAGE_TYPE', 'storage', 'select', { default: 'server', options: ['server', 's3', 'wasabi'], label: 'Storage driver', restart: true }),
+    field('S3_ENDPOINT', 'storage', 'text', { label: 'Storage address', help: 'e.g. https://blr1.digitaloceanspaces.com or https://s3.ap-southeast-1.wasabisys.com. Empty uses Amazon S3.' }),
+    field('S3_REGION', 'storage', 'text', { label: 'Region', help: 'e.g. blr1 or us-east-1.' }),
+    field('S3_BUCKET', 'storage', 'text', { label: 'Bucket', help: 'One bucket for everything. Leave empty to keep a bucket per workspace.' }),
+    field('S3_PREFIX', 'storage', 'text', { label: 'Key prefix', help: 'Optional, e.g. prod/. Every file is stored under it, inside the bucket above.', validate: prefixProblem }),
+    field('S3_ACCESS_KEY', 'storage', 'text', { label: 'Access key' }),
+    field('S3_SECRET_KEY', 'storage', 'secret', { label: 'Secret key' }),
+    field('S3_FORCE_PATH_STYLE', 'storage', 'boolean', { default: 'false', label: 'Bucket in the path', help: 'On for MinIO and other servers that cannot take the bucket name in the host name.' }),
+    field('S3_PUBLIC_BASE_URL', 'storage', 'text', { label: 'Public files address', help: 'Optional address (a CDN) that serves public files such as email images.' }),
+    field('USERPROFILEBUCKET', 'storage', 'text', { label: 'Public assets bucket', help: 'With a bucket per workspace only: the bucket for avatars and public files.' }),
+    field('WASABI_ACCESS_KEY', 'storage', 'text', { label: 'Wasabi access key', legacy: true }),
+    field('WASABI_SECRET_ACCESS_KEY', 'storage', 'secret', { label: 'Wasabi secret key', legacy: true }),
+    field('WASABI_USERID', 'storage', 'text', { label: 'Wasabi user id', legacy: true }),
+    field('WASABIENDPOINT', 'storage', 'text', { default: 'https://s3.wasabisys.com', label: 'Wasabi endpoint', legacy: true }),
+    field('WASABI_REGION', 'storage', 'text', { default: 'us-east-1', label: 'Wasabi region', legacy: true }),
+    field('IAM_ENDPOINT', 'storage', 'text', { default: 'https://iam.wasabisys.com', label: 'IAM endpoint', legacy: true }),
 
     field('AI_ENABLED', 'ai', 'boolean', {
         default: 'true',
@@ -72,6 +100,13 @@ const CATALOG = [
     field('ANTHROPIC_MODEL', 'ai', 'text', { default: 'claude-sonnet-4-5-20250929', label: 'Anthropic model' }),
     field('DEEPSEEK_API_KEY', 'ai', 'secret', { label: 'DeepSeek API key' }),
     field('DEEPSEEK_MODEL', 'ai', 'text', { default: 'deepseek-v4-flash', label: 'DeepSeek model' }),
+    field('AI_FIELD_DAILY_LIMIT', 'ai', 'number', { default: '500', label: 'AI field fills per workspace per day', help: 'Counted per UTC day; a bulk fill stops when the limit is reached.' }),
+    field('AI_REPLAY', 'ai', 'select', {
+        default: 'agent',
+        options: ['off', 'agent', 'all'],
+        label: 'Keep replay records of model calls',
+        help: 'A redacted record of the prompt and answer, for reviewing what an AI did: off, agent runs only, or every model call.',
+    }),
     field('LLM_PRICING', 'ai', 'text', {
         label: 'Model prices (USD per 1M tokens)',
         help: 'JSON keyed by model id, e.g. {"gpt-4.1":{"input":2,"output":8}}. Overrides the built-in list; a model with no price refuses to run. Use 0/0 for a free or self-hosted model.',
@@ -103,7 +138,10 @@ const CATALOG = [
     field('GITLAB_CLIENT_ID', 'auth', 'text', { label: 'GitLab client id', public: true }),
     field('GITLAB_CLIENT_SECRET', 'auth', 'secret', { label: 'GitLab client secret' }),
     field('GITLAB_BASE_OAUTH_URL', 'auth', 'text', { default: 'https://gitlab.com/oauth', label: 'GitLab OAuth base URL', public: true }),
+    field('GITLAB_BASE_API_URL', 'auth', 'text', { default: 'https://gitlab.com/api/v4', label: 'GitLab API URL', help: 'Change it with the OAuth base URL for a self-managed GitLab.' }),
     field('SSO_LOGIN_ENABLED', 'auth', 'boolean', { default: 'true', label: 'Show "Continue with SSO" on the login page' }),
+    field('MAGIC_LINK_ENABLED', 'auth', 'boolean', { default: 'true', label: 'Sign in with an emailed link' }),
+    field('TWO_FACTOR_ISSUER', 'auth', 'text', { default: 'AlianHub', label: 'Name in authenticator apps' }),
 
     field('STUN_URLS', 'calling', 'text', { default: 'stun:stun.l.google.com:19302', label: 'STUN servers' }),
     field('TURN_URLS', 'calling', 'text', { label: 'TURN servers', help: 'Comma-separated, e.g. turn:turn.example.com:3478' }),
@@ -123,18 +161,35 @@ const CATALOG = [
         default: (env) => (taintDefaultOn(env) ? 'true' : 'false'),
         normalise: onOff,
         readOnly: true,
+        owner: 'customer',
         label: 'Hold risky AI writes for approval',
         help: 'A risky write by an agent that read outside content, or by an outside AI app, waits for a person to approve it. On by default while the MCP tools or MCP_OAUTH are on. Shown here only: set AGENT_TAINT_ROUTING in .env and restart to change it.',
     }),
     field('PERMISSION_ENFORCEMENT_MODE', 'security', 'select', {
         default: 'off',
+        owner: 'customer',
         options: ['off', 'report', 'enforce'],
         label: 'Permission checks for browser sessions',
         help: 'The default for every workspace; a workspace can set its own. Off lets browser sessions through as before, report lets them through and records what would be refused, enforce refuses. API tokens stay enforced on the keys they always were; on other task writes they follow this mode like browser sessions.',
     }),
+    field('AUDIT_RETENTION_DAYS', 'security', 'number', {
+        label: 'Keep audit log entries (days)',
+        help: 'Older entries are pruned each night. Empty keeps the built-in window.',
+        owner: 'customer',
+    }),
 ];
 
 const byKey = new Map(CATALOG.map((f) => [f.key, f]));
+
+/* A key override beats a group override, which beats the field's own owner, which beats its
+ * group's: `{ mail: 'customer' }` hands the whole mail group to a Business plan with its own SMTP. */
+function ownerOf(key, overrides = {}) {
+    const def = byKey.get(key);
+    if (!def) return null;
+    return overrides[key] || overrides[def.group] || def.owner || GROUP_OWNER[def.group];
+}
+
+const platformOwnedKeys = (overrides = {}) => CATALOG.filter((def) => ownerOf(def.key, overrides) === 'platform').map((def) => def.key);
 
 const isBooleanString = (v) => ['true', 'false'].includes(String(v));
 
@@ -162,26 +217,35 @@ function validateSettings(patch = {}) {
     return { values, errors, valid: Object.keys(errors).length === 0 };
 }
 
-/* Pure: what the page shows. A secret never leaves the server; the page learns
- * only whether one is set and where the effective value comes from. */
-function describeSettings({ saved = {}, env = {}, locked = [] }) {
+const filled = (value) => value !== undefined && value !== null && value !== '';
+
+/* Pure: what the page shows, resolved env > platform > saved > default. A secret never leaves
+ * the server; a `managed` row (hosted, ours to set) shows no value at all, so a customer cannot
+ * read our relay, bucket or proxy settings. */
+function describeSettings({ saved = {}, env = {}, locked = [], platform = {}, managed = [] }) {
     const lockedSet = new Set(locked);
+    const managedSet = new Set(managed);
     return CATALOG.map((def) => {
+        const isManaged = managedSet.has(def.key);
         const fromEnv = lockedSet.has(def.key) ? env[def.key] : undefined;
-        const fromSaved = saved[def.key];
+        const fromPlatform = platform[def.key];
+        const fromSaved = isManaged ? undefined : saved[def.key];
         const fallback = typeof def.default === 'function' ? def.default(env) : def.default;
-        const source = fromEnv !== undefined && fromEnv !== '' ? 'env'
-            : fromSaved !== undefined && fromSaved !== '' ? 'saved'
-                : fallback !== '' ? 'default' : 'unset';
-        const raw = source === 'env' ? fromEnv : source === 'saved' ? fromSaved : fallback;
+        const source = filled(fromEnv) ? 'env'
+            : filled(fromPlatform) ? 'platform'
+                : filled(fromSaved) ? 'saved'
+                    : fallback !== '' ? 'default' : 'unset';
+        const raw = { env: fromEnv, platform: fromPlatform, saved: fromSaved }[source] ?? fallback;
         const effective = def.normalise && source !== 'unset' ? def.normalise(raw) : raw;
-        const value = def.secret ? (source === 'unset' ? { set: false } : { set: true }) : effective;
+        const value = isManaged ? null : def.secret ? { set: source !== 'unset' } : effective;
         return {
             key: def.key, group: def.group, type: def.type, secret: def.secret, label: def.label, help: def.help || '',
-            options: def.options || null, default: fallback, restart: Boolean(def.restart), public: Boolean(def.public),
-            value, source, locked: source === 'env' || Boolean(def.readOnly), readOnly: Boolean(def.readOnly),
+            options: def.options || null, default: isManaged ? null : fallback, restart: Boolean(def.restart), public: Boolean(def.public),
+            value, source, locked: isManaged || source === 'env' || source === 'platform' || Boolean(def.readOnly), readOnly: Boolean(def.readOnly),
+            managed: isManaged,
+            hidden: Boolean(def.legacy) && source !== 'env' && source !== 'saved' && source !== 'platform',
         };
     });
 }
 
-module.exports = { GROUPS, CATALOG, byKey, validateSettings, describeSettings };
+module.exports = { GROUPS, GROUP_OWNER, OWNERS, CATALOG, byKey, ownerOf, platformOwnedKeys, validateSettings, describeSettings };

@@ -326,7 +326,7 @@ See [.claude/SECURITY-PATTERNS.md](.claude/SECURITY-PATTERNS.md) for detailed pr
 | **Security Policy** | See [SECURITY.md](SECURITY.md) |
 | **GitHub** | https://github.com/aliansoftwareteam/AlianHub-Project-Management-System |
 | **Issues** | https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/issues |
-| **Docs** | https://help.alianhub.com |
+| **Docs** | https://docs.alianhub.com/ |
 
 ---
 

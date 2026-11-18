@@ -14,7 +14,7 @@ const { settingsCollectionDocs } = require('../Config/collections');
 const { MongoDbCrudOpration } = require('../utils/mongo-handler/mongoQueries');
 const { importCompanyRules } = require('../utils/data');
 const aiRights = require('../Config/aiRights');
-const migration = require('../migrations/084-ai-custom-apps-right');
+const migration = require('../migrations/086-ai-custom-apps-right');
 
 const OLD = '6f0000000000000000000c71';
 const PEOPLE = { owner: '6f0000000000000000000a71', member: '6f0000000000000000000a73', guest: '6f0000000000000000000a70' };
@@ -40,11 +40,11 @@ beforeEach(() => {
     jest.clearAllMocks();
 });
 
-describe('084-ai-custom-apps-right', () => {
+describe('086-ai-custom-apps-right', () => {
     test('is a valid company-scoped migration listed after 082', () => {
-        expect(() => validateMigration(migration, '084-ai-custom-apps-right')).not.toThrow();
+        expect(() => validateMigration(migration, '086-ai-custom-apps-right')).not.toThrow();
         const ids = listMigrations().map((m) => m.id);
-        expect(ids.indexOf('084-ai-custom-apps-right')).toBeGreaterThan(ids.indexOf('083-agent-connector-ticks'));
+        expect(ids.indexOf('086-ai-custom-apps-right')).toBeGreaterThan(ids.indexOf('085-agent-connector-ticks'));
     });
 
     test('adds the row to a workspace that lacks it and grants it to nobody', async () => {

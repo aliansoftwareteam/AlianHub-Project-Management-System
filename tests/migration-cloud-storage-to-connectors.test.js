@@ -7,7 +7,7 @@ jest.mock('../Config/loggerConfig', () => ({ info: jest.fn(), error: jest.fn(), 
 const { buildContext, listMigrations, validateMigration } = require('../migrations');
 const { SCHEMA_TYPE } = require('../Config/schemaType');
 
-const ID = '082-cloud-storage-to-connectors';
+const ID = '084-cloud-storage-to-connectors';
 const migration = require(`../migrations/${ID}`);
 const T = SCHEMA_TYPE.CLOUD_STORAGE_CONNECTIONS;
 const C1 = '6f0000000000000000000c01';
@@ -40,7 +40,7 @@ afterAll(() => {
 describe(ID, () => {
     it('is a company migration, listed after 080, forward-only with a re-trigger down', () => {
         const ids = listMigrations().map((m) => m.id);
-        expect(ids.indexOf(ID)).toBeGreaterThan(ids.indexOf('080-connectors-google-calendar-to-google'));
+        expect(ids.indexOf(ID)).toBeGreaterThan(ids.indexOf('081-connectors-google-calendar-to-google'));
         expect(() => validateMigration(migration, ID)).not.toThrow();
         expect(migration).toMatchObject({ id: ID, scope: 'company' });
         expect(typeof migration.down).toBe('function');

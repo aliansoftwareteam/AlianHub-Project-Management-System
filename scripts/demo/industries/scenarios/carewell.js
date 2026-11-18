@@ -516,7 +516,7 @@ module.exports = {
             targets: [{ name: 'Billing queries and claims settled', kind: 'tasks', tasks: ['bill.bq-1151', 'bill.bq-1160', 'bill.bq-1169', 'bill.bq-1175', 'bill.bq-1182', 'bill.bq-1186', 'bill.bq-1190'] }],
         },
     ],
-    dashboard: { name: 'Practice operations', project: 'desk', cards: ['tasks_by_status', 'at_risk', 'due_soon', 'project_pulse'] },
+    dashboard: { name: 'Practice operations', project: 'desk', cards: ['tasks_by_status', 'at_risk', 'due_soon', 'project_pulse', 'logged_vs_estimate', 'my_time'] },
     guide: {
         project: 'desk',
         intro: 'CareWell is a family medical practice with two sites, Northside and Riverside. This demo shows how the practice is run, not patient care: patients appear only by their initials. You are signed in as the **Practice Manager**. Three processes run side by side: **Front Desk and Appointments** (requests from the phone, the website and the desk), **Billing and Insurance** (billing queries, insurer rejections and refunds) and **Compliance and Facilities** (staff credentials, equipment servicing, supplies, inspections and rota gaps). Role agents sort, check and watch dates; people decide.',

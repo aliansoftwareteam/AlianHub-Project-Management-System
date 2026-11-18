@@ -9,7 +9,7 @@
                 <div v-if="error" class="ah-field__error"><ShellIcon name="x" :size="12" />{{ error }}</div>
             </div>
             <button type="submit" class="ah-btn ah-btn--primary ah-btn--block ah-btn--lg" :disabled="busy">{{ busy ? $t('Auth.loading') : $t('Auth.continue') }}</button>
-            <div class="auth__links" style="margin-top:28px"><router-link to="/login">{{ $t('Auth.back_to_options') }}</router-link></div>
+            <div class="auth__links" style="margin-top:28px"><router-link :to="{ name: 'Log-in', query: backQuery }">{{ $t('Auth.back_to_options') }}</router-link></div>
         </form>
 
         <div v-else-if="stage === 'org'">
@@ -62,6 +62,7 @@ const error = ref("");
 const busy = ref(false);
 const emailInput = ref(null);
 const org = ref({});
+const backQuery = computed(() => (route.query.redirect_url ? { redirect_url: route.query.redirect_url } : {}));
 onMounted(() => emailInput.value?.focus());
 
 const EMAIL_RE = /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+[.][a-zA-Z]{2,}$/;

@@ -75,7 +75,7 @@ exports.init = (app) => {
         app.get('/api/v2/connectors/admin/quotas', ctrl.getQuotas);
         app.put('/api/v2/connectors/admin/quotas', ctrl.setQuotas);
     }
-    if (registry.list().some((definition) => flag.named().includes(definition.id))) {
+    if (registry.switchedOn().length) {
         genericRoutes(app);
         pickerRoutes(app);
         appRoutes(app);

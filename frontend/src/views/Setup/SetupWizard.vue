@@ -1,12 +1,18 @@
 <template>
     <AuthShell :proof="false">
         <template #top-right>
-            <a :href="guide('first-run')" target="_blank" rel="noopener">{{ $t('Setup.guide_link') }}</a>
+            <a v-if="step !== 'preparing'" :href="guide('first-run')" target="_blank" rel="noopener">{{ $t('Setup.guide_link') }}</a>
         </template>
 
         <div v-if="step === 'checking'" class="setup__center">
             <span class="ah-spin"></span>
             <p class="auth__p">{{ $t('Setup.checking') }}</p>
+        </div>
+
+        <div v-else-if="step === 'preparing'" class="setup__center" data-test="setup-preparing" aria-live="polite">
+            <h1 class="auth__title">{{ $t('Setup.preparing_title') }}</h1>
+            <p class="auth__lead">{{ $t('Setup.preparing_lead') }}</p>
+            <p class="auth__p setup__checking"><span class="ah-spin ah-spin--sm"></span>{{ $t('Setup.preparing_checking') }}</p>
         </div>
 
         <div v-else-if="step === 'blocked'">
@@ -149,6 +155,7 @@ const { t } = useI18n();
 const router = useRouter();
 
 const PROGRESS_KEYS = ["seeds", "account", "company", "settings", "sample"];
+const PREPARING_POLL_MS = 5000;
 
 const step = ref("checking");
 const status = ref({});
@@ -159,6 +166,7 @@ const reached = ref("");
 const form = reactive({ firstName: "", lastName: "", email: "", password: "", companyName: "", teamFocus: "", sampleData: true });
 const errors = reactive({ firstName: "", lastName: "", email: "", password: "", companyName: "" });
 let events = null;
+let preparingTimer = null;
 
 const guide = (anchor) => `${env.ADMIN_GUIDE_URL}#${anchor}`;
 
@@ -177,7 +185,18 @@ async function loadStatus() {
     status.value = s || {};
     if (!s) { status.value = { dbError: t("Setup.server_unreachable") }; step.value = "blocked"; return; }
     if (s.installed) { router.replace({ name: "Log-in" }); return; }
+    if (s.managed) { step.value = "preparing"; waitForProvisioning(); return; }
     step.value = s.dbOk ? "form" : "blocked";
+}
+
+/* Hosted, the platform creates the owner; the page waits for it instead of offering the form. */
+function waitForProvisioning() {
+    clearTimeout(preparingTimer);
+    preparingTimer = setTimeout(async () => {
+        const s = await readSetupStatus({ force: true });
+        if (s?.installed) router.replace({ name: "Log-in" });
+        else waitForProvisioning();
+    }, PREPARING_POLL_MS);
 }
 
 const serverError = (key) => ({
@@ -253,7 +272,10 @@ async function enter({ userId, companyId, session }) {
 }
 
 onMounted(loadStatus);
-onUnmounted(closeEvents);
+onUnmounted(() => {
+    closeEvents();
+    clearTimeout(preparingTimer);
+});
 </script>
 
 <style scoped>
@@ -269,5 +291,6 @@ onUnmounted(closeEvents);
 .setup__progress li.is-done { color: var(--ok-ink); }
 .setup__dot { width: 14px; height: 14px; border-radius: 50%; border: 1.5px solid var(--border); flex: none; }
 .ah-spin--sm { width: 14px; height: 14px; }
+.setup__checking { display: inline-flex; align-items: center; gap: 8px; }
 @media (max-width: 520px) { .setup__row { grid-template-columns: 1fr; } }
 </style>

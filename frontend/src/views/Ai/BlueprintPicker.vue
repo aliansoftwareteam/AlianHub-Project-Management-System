@@ -1,65 +1,72 @@
 <template>
     <section class="ah-card bp" data-test="blueprint-picker">
         <div class="ah-card__body bp__body">
-            <div>
-                <h2 class="ah-h3">{{ $t('CompanyBlueprint.title') }}</h2>
+            <header class="bp__head">
+                <h2 class="ah-h3 bp__title">{{ $t('CompanyBlueprint.title') }}</h2>
                 <p class="ah-small bp__muted">{{ $t('CompanyBlueprint.lead') }}</p>
-            </div>
+            </header>
 
             <p v-if="loading" class="ah-empty">{{ $t('CompanyBlueprint.loading') }}</p>
             <p v-else-if="loadError" class="ah-field__error" role="alert" data-test="bp-load-error">{{ loadError }}</p>
             <template v-else-if="industries.length">
-                <p v-if="!dispatcherOn" class="ah-small bp__note" data-test="bp-off" role="status">{{ $t('TeamPacks.dispatcher_off') }}</p>
+                <p v-if="!dispatcherOn && showOffNote" class="ah-small bp__note" data-test="bp-off" role="status">{{ $t('TeamPacks.dispatcher_off') }}</p>
 
-                <div class="bp__field">
-                    <label class="ah-field__label" for="bp-industry">{{ $t('CompanyBlueprint.industry_label') }}</label>
-                    <select id="bp-industry" v-model="industryId" class="ah-input" data-test="bp-industry">
-                        <option v-for="one in industries" :key="one.id" :value="one.id">{{ blueprintName(t, te, one.id) }}</option>
-                    </select>
-                </div>
-
-                <fieldset class="bp__field bp__set">
-                    <legend class="ah-field__label">{{ $t('CompanyBlueprint.size_label') }}</legend>
-                    <div class="bp__sizes" role="radiogroup">
-                        <label v-for="one in COMPANY_SIZES" :key="one" class="bp__size" :class="{ 'bp__size--on': size === one }" data-test="bp-size">
-                            <input v-model="size" class="bp__radio" type="radio" name="bp-size" :value="one" />
-                            <span class="bp__size-name">{{ $t(`CompanyBlueprint.size_${one}`) }}</span>
-                            <span class="ah-small bp__muted">{{ $t('CompanyBlueprint.people', { from: peopleOf(one)[0], to: peopleOf(one)[1] }) }}</span>
-                        </label>
+                <div class="bp__choose">
+                    <div class="bp__field">
+                        <label class="ah-field__label" for="bp-industry">{{ $t('CompanyBlueprint.industry_label') }}</label>
+                        <select id="bp-industry" v-model="industryId" class="ah-input" data-test="bp-industry">
+                            <option v-for="one in industries" :key="one.id" :value="one.id">{{ blueprintName(t, te, one.id) }}</option>
+                        </select>
                     </div>
-                </fieldset>
+
+                    <fieldset class="bp__field bp__set">
+                        <legend class="ah-field__label">{{ $t('CompanyBlueprint.size_label') }}</legend>
+                        <div class="bp__sizes" role="radiogroup">
+                            <label v-for="one in COMPANY_SIZES" :key="one" class="bp__size" :class="{ 'bp__size--on': size === one }" data-test="bp-size">
+                                <input v-model="size" class="bp__radio" type="radio" name="bp-size" :value="one" />
+                                <span class="bp__size-name">{{ $t(`CompanyBlueprint.size_${one}`) }}</span>
+                                <span class="ah-small bp__muted">{{ $t('CompanyBlueprint.people', { from: peopleOf(one)[0], to: peopleOf(one)[1] }) }}</span>
+                            </label>
+                        </div>
+                    </fieldset>
+                </div>
 
                 <div v-if="current" class="bp__plan" data-test="bp-plan">
-                    <p class="bp__line" data-test="bp-seats">{{ $t('CompanyBlueprint.counts', { roles: current.roles.length, from: current.seats[0], to: current.seats[1] }) }}</p>
-                    <p class="ah-small bp__muted">{{ $t('CompanyBlueprint.seats_hint') }}</p>
-
-                    <h3 class="ah-label">{{ $t('CompanyBlueprint.teams_title') }}</h3>
-                    <div class="bp__chips" data-test="bp-teams">
-                        <span v-for="team in current.teams" :key="team" class="ah-chip ah-chip--sm">{{ teamName(t, te, team) }}</span>
+                    <div class="bp__summary">
+                        <p class="bp__line" data-test="bp-seats">{{ $t('CompanyBlueprint.counts', { roles: current.roles.length, from: current.seats[0], to: current.seats[1] }) }}</p>
+                        <p class="ah-small bp__muted">{{ $t('CompanyBlueprint.seats_hint') }}</p>
                     </div>
 
-                    <h3 class="ah-label">{{ $t('CompanyBlueprint.roles_title') }}</h3>
-                    <ol class="bp__roles">
-                        <li v-for="(role, index) in current.roles" :key="role.name" class="bp__role" :class="{ 'bp__role--start': index < STARTER }" data-test="bp-role">
-                            <span class="bp__role-name">{{ role.name }}</span>
-                            <span class="ah-small bp__muted">{{ teamName(t, te, role.team) }}</span>
-                            <span v-if="index < STARTER" class="ah-chip ah-chip--sm ah-chip--brand">{{ $t('CompanyBlueprint.starter') }}</span>
-                            <span v-if="!role.key" class="ah-small bp__muted">{{ $t('CompanyBlueprint.not_written') }}</span>
-                        </li>
-                    </ol>
+                    <div class="bp__group">
+                        <h3 class="ah-label">{{ $t('CompanyBlueprint.teams_title') }}</h3>
+                        <div class="bp__chips" data-test="bp-teams">
+                            <span v-for="team in current.teams" :key="team" class="ah-chip ah-chip--sm">{{ teamName(t, te, team) }}</span>
+                        </div>
+                    </div>
+
+                    <div class="bp__group">
+                        <h3 class="ah-label">{{ $t('CompanyBlueprint.roles_title') }}</h3>
+                        <ol class="bp__roles">
+                            <li v-for="(role, index) in current.roles" :key="role.name" class="bp__role" :class="{ 'bp__role--start': index < STARTER }" data-test="bp-role">
+                                <span class="bp__role-index">{{ index + 1 }}</span>
+                                <span class="bp__role-text">
+                                    <span class="bp__role-name">{{ role.name }}</span>
+                                    <span class="ah-small bp__muted">{{ teamName(t, te, role.team) }}<template v-if="!role.key"> · {{ $t('CompanyBlueprint.not_written') }}</template></span>
+                                </span>
+                                <span v-if="index < STARTER" class="ah-chip ah-chip--sm ah-chip--brand">{{ $t('CompanyBlueprint.starter') }}</span>
+                            </li>
+                        </ol>
+                    </div>
                 </div>
 
-                <fieldset class="bp__field bp__set">
-                    <legend class="ah-field__label">{{ $t('TeamPacks.projects_label') }}</legend>
-                    <p v-if="!projects.length" class="ah-small bp__muted" data-test="bp-no-projects">{{ $t('CompanyBlueprint.no_projects') }}</p>
-                    <div class="bp__projects">
-                        <label v-for="project in projects" :key="project.id" class="bp__project" :class="{ 'bp__project--off': project.why }" data-test="bp-project">
-                            <input v-model="projectIds" class="ah-check" type="checkbox" :value="project.id" :disabled="Boolean(project.why) || (atCap && !projectIds.includes(project.id))" />
-                            <span class="bp__role-name">{{ project.name }}</span>
-                            <span v-if="project.why" class="ah-small bp__muted">{{ $t(`TeamPacks.why_${project.why}`) }}</span>
-                        </label>
-                    </div>
-                </fieldset>
+                <PackProjectPicker
+                    v-model="projectIds"
+                    :projects="projects"
+                    :max="MAX_PROJECTS"
+                    test-id="bp-project"
+                    empty-test-id="bp-no-projects"
+                    :empty-text="$t('CompanyBlueprint.no_projects')"
+                />
 
                 <p v-if="current && !startCount" class="ah-small bp__note" data-test="bp-none-written" role="status">{{ $t('CompanyBlueprint.none_written') }}</p>
                 <p v-else-if="current && startCount < STARTER" class="ah-small bp__muted" data-test="bp-some-written">{{ $t('CompanyBlueprint.some_written', { n: startCount, total: STARTER }) }}</p>
@@ -94,11 +101,12 @@ import { useStore } from "vuex";
 import { refusalText } from "@/utils/assignmentRules";
 import { useCustomComposable } from "@/composable";
 import { isOwnerOrAdmin } from "@/utils/roles";
+import PackProjectPicker from "./PackProjectPicker.vue";
 import { applyStarterRoles, blueprintName, COMPANY_SIZES, fetchTeamPacks, fieldsKeptAfterUndo, packProjectLine, roleNamesOf, teamName, undoStarterRoles } from "@/utils/dispatcher";
 
 defineOptions({ name: "BlueprintPicker" });
 
-const props = defineProps({ teamPacks: { type: Object, default: null } });
+const props = defineProps({ teamPacks: { type: Object, default: null }, showOffNote: { type: Boolean, default: true } });
 const emit = defineEmits(["loaded"]);
 
 const OFF = 409;
@@ -132,7 +140,6 @@ const whyNot = (project) => {
 const projects = computed(() => (getters["projectData/projects"]?.data || [])
     .filter((p) => !p.deletedStatusKey && p.isPersonal !== true)
     .map((p) => ({ id: String(p._id), name: p.ProjectName, why: whyNot(p) })));
-const atCap = computed(() => projectIds.value.length >= MAX_PROJECTS);
 const current = computed(() => industries.value.find((one) => one.id === industryId.value)?.sizes[size.value] || null);
 const peopleOf = (one) => industries.value.find((it) => it.id === industryId.value)?.sizes[one]?.people || [0, 0];
 const groups = computed(() => current.value?.packs || []);
@@ -201,35 +208,43 @@ onMounted(load);
 </script>
 
 <style>
-.bp { margin-bottom: 14px; }
-.bp__body { display: flex; flex-direction: column; gap: 14px; }
+.bp { margin-bottom: 16px; }
+.bp__body { display: flex; flex-direction: column; gap: 18px; }
+.bp__head { display: flex; flex-direction: column; gap: 4px; padding-bottom: 14px; border-bottom: 1px solid var(--hairline); }
+.bp__title { margin: 0; }
 .bp__muted { color: var(--ink-2); }
-.bp__note { margin: 0; padding: 8px 12px; border: 1px solid var(--hairline); border-radius: var(--r-card); background: var(--surface-2); color: var(--ink-2); }
+.bp__note { margin: 0; padding: 10px 12px; border: 1px solid var(--warn); border-radius: var(--r-card); background: var(--warn-bg); color: var(--warn-ink); }
+.bp__choose { display: grid; grid-template-columns: minmax(200px, 280px) 1fr; gap: 16px; align-items: start; }
 .bp__field { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
 .bp__set { margin: 0; padding: 0; border: 0; }
 .bp__sizes { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
-.bp__size { display: flex; flex-direction: column; gap: 2px; padding: 8px 10px; border: 1px solid var(--hairline); border-radius: var(--r-card); background: var(--surface); color: var(--ink); cursor: pointer; min-width: 0; }
-.bp__size--on { border-color: var(--brand); background: var(--surface-2); }
+.bp__size { position: relative; display: flex; flex-direction: column; gap: 2px; padding: 8px 12px; border: 1px solid var(--hairline); border-radius: var(--r-card); background: var(--surface); color: var(--ink); cursor: pointer; min-width: 0; transition: border-color var(--t-state) var(--ease), background var(--t-state) var(--ease); }
+.bp__size:hover { border-color: var(--brand-border); }
+.bp__size--on { border-color: var(--brand); background: var(--brand-tint); box-shadow: 0 0 0 1px var(--brand) inset; }
 .bp__size-name { font-weight: 600; }
-.bp__size { position: relative; }
-.bp__size:focus-within { outline: 2px solid var(--brand); outline-offset: 2px; }
+.bp__size:focus-within { outline: 2px solid var(--focus); outline-offset: 2px; }
 .bp__radio { position: absolute; opacity: 0; pointer-events: none; }
-.bp__plan { display: flex; flex-direction: column; gap: 8px; }
+.bp__plan { display: flex; flex-direction: column; gap: 14px; padding: 14px 16px; border-radius: var(--r-card); background: var(--surface-2); }
+.bp__summary { display: flex; flex-direction: column; gap: 2px; }
+.bp__group { display: flex; flex-direction: column; gap: 8px; }
+.bp__group .ah-label { margin: 0; }
 .bp__line { margin: 0; font-weight: 600; color: var(--ink); }
 .bp__chips { display: flex; flex-wrap: wrap; gap: 6px; }
-.bp__roles { margin: 0; padding-left: 20px; display: flex; flex-direction: column; gap: 4px; color: var(--ink); }
-.bp__role { display: list-item; }
-.bp__role--start .bp__role-name { font-weight: 600; }
-.bp__role-name { font-weight: 600; }
-.bp__projects { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 6px; }
-.bp__project { display: flex; align-items: baseline; gap: 8px; flex-wrap: wrap; cursor: pointer; color: var(--ink); }
-.bp__project--off { cursor: default; color: var(--ink-2); }
-.bp__actions { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
-.bp__result { display: flex; flex-direction: column; gap: 8px; }
+.bp__roles { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 6px; }
+.bp__role { display: flex; align-items: center; gap: 10px; padding: 8px 10px; border: 1px solid var(--hairline); border-radius: var(--r-sm); background: var(--surface); color: var(--ink); min-width: 0; }
+.bp__role--start { border-color: var(--brand-border); }
+.bp__role-index { flex: none; width: 22px; height: 22px; display: grid; place-items: center; border-radius: 50%; background: var(--fill); color: var(--ink-2); font: var(--text-data); }
+.bp__role--start .bp__role-index { background: var(--brand); color: var(--on-brand); }
+.bp__role-text { flex: 1; display: flex; flex-direction: column; min-width: 0; }
+.bp__role-name { font-weight: 600; overflow-wrap: anywhere; }
+.bp__actions { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; padding-top: 14px; border-top: 1px solid var(--hairline); }
+.bp__result { display: flex; flex-direction: column; gap: 8px; padding: 12px 14px; border-radius: var(--r-card); background: var(--ok-bg); }
 .bp__list { margin: 0; padding-left: 18px; display: flex; flex-direction: column; gap: 4px; color: var(--ink-2); }
+@media (max-width: 720px) {
+    .bp__choose { grid-template-columns: 1fr; }
+}
 @media (max-width: 480px) {
     .bp__sizes { grid-template-columns: 1fr; }
-    .bp__projects { grid-template-columns: 1fr; }
     .bp__actions .ah-btn { width: 100%; }
 }
 </style>

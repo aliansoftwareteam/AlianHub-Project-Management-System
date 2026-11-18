@@ -1,4 +1,4 @@
-/* Migration 079 builds task 064's connector indexes in every workspace, so the live-only unique indexes hold on
+/* Migration 080 builds task 064's connector indexes in every workspace, so the live-only unique indexes hold on
    a workspace whose connector_connections existed before they were declared. */
 const mockBuilt = [];
 const mockDropped = [];
@@ -31,9 +31,9 @@ const { formatDryRun } = require('../migrations/report');
 const { SCHEMA_TYPE } = require('../Config/schemaType');
 const { MongoDbCrudOpration } = require('../utils/mongo-handler/mongoQueries');
 const { connectorConnectionsSchema, connectorAppsSchema, connectorUsageSchema } = require('../utils/mongo-handler/createSchema');
-const migration = require('../migrations/079-connector-indexes');
+const migration = require('../migrations/080-connector-indexes');
 
-const ID = '079-connector-indexes';
+const ID = '080-connector-indexes';
 const C1 = '6f00000000000000000000c1';
 const C2 = '6f00000000000000000000c2';
 const TYPES = [SCHEMA_TYPE.CONNECTOR_CONNECTIONS, SCHEMA_TYPE.CONNECTOR_APPS, SCHEMA_TYPE.CONNECTOR_USAGE];
@@ -50,7 +50,7 @@ beforeEach(() => {
 describe(ID, () => {
     test('is a company migration, the only one of its number, listed after the ones before it', () => {
         const ids = listMigrations().map((m) => m.id);
-        expect(ids.filter((id) => id.startsWith('079-'))).toEqual([ID]);
+        expect(ids.filter((id) => id.startsWith('080-'))).toEqual([ID]);
         expect(ids.indexOf(ID)).toBeGreaterThan(ids.indexOf('078-ai-access-rules'));
         expect(migration).toMatchObject({ id: ID, scope: 'company' });
     });

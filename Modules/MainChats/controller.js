@@ -4,6 +4,7 @@ const { myCache } = require('../../Config/config');
 const { removeCache } = require("../../utils/commonFunctions");
 const { replaceObjectKey } = require("../Auth/helper");
 const logger = require('../../Config/loggerConfig.js');
+const { chatUnreadKeys } = require('./unreadKeys');
 
 // BUG-020 / #74 fix: the cache writer in `getChats` used
 //   `mainChat:${req.headers['companyid']}`
@@ -108,3 +109,12 @@ exports.setChats = async (req, res) => {
         res.status(400).json({ error: 'Internal Server Error', message: error.message });
     }
 }
+
+exports.unreadKeys = async (req, res) => {
+    try {
+        res.status(200).json({ status: true, data: await chatUnreadKeys(req.headers['companyid'], req.uid) });
+    } catch (error) {
+        logger.error(`chat unread keys: ${error && error.message ? error.message : error}`);
+        res.status(500).json({ status: false, statusText: 'Could not read the chat unread counts.' });
+    }
+};

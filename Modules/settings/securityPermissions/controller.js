@@ -53,6 +53,8 @@ exports.updateSecurityPermissions = async (req, res) => {
         removeCache(`rules:${companyId}`);
         // The project list is built from these rules.
         removeCache(`UserProjectData:${companyId}:`, true);
+        // Required here: the tracker seats read the permission guard, which reads this module.
+        require("../../DesktopTracker/trackerSeats").releaseSeatsLater(companyId);
         return res.status(200).json(response);
     } catch (error) {
         console.error(`Error updating or inserting security & permissions:`, error);

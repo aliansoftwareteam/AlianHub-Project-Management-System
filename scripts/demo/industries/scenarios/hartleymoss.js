@@ -476,7 +476,7 @@ module.exports = {
             ],
         },
     ],
-    dashboard: { name: 'Practice overview', project: 'engage', cards: ['tasks_by_status', 'at_risk', 'due_soon', 'project_pulse'] },
+    dashboard: { name: 'Practice overview', project: 'engage', cards: ['tasks_by_status', 'at_risk', 'due_soon', 'project_pulse', 'logged_vs_estimate', 'my_time'] },
     guide: {
         project: 'intake',
         intro: 'Hartley & Moss is a management consulting firm that runs operations reviews, cost programmes and due diligence for mid-sized companies. You are signed in as the **Managing Partner**. Three processes run side by side: **Client Intake** takes each enquiry through the conflict check to a signed engagement letter, **Engagements** delivers the work, and **Billing and Close-out** turns time into invoices and closes finished engagements. Role agents prepare, draft and check; partners decide.',

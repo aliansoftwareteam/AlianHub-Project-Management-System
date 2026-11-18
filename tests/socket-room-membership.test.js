@@ -499,6 +499,66 @@ describe('a person\'s own rooms', () => {
     });
 });
 
+describe('a hidden tab', () => {
+    const idle = (socket) => new Promise((resolve) => {
+        socket.emit('goIdle', socket.id);
+        setTimeout(resolve, 150);
+    });
+
+    it('keeps hearing its own counts and chat notices, and nothing from the lists it had open', async () => {
+        const member = await connect({ uid: MEMBER });
+        expect(await listRoom(member, home.project, home.openList)).toBe(true);
+        expect(await ownRooms(member, MEMBER)).toBe(true);
+        await idle(member);
+
+        expect(await roomsOf(member)).toEqual([`userIdNotification_${MEMBER}**${member.id}`]);
+        const [events] = await heard([member], [...TASK_EVENTS, 'userIdNoticationUpdate', 'chatMessageNotice'], () => {
+            taskChanged(home.openTask);
+            countChanged(HOME, MEMBER);
+            socketEmitter.emit('chatNotice', { companyId: HOME, deliveries: [{ userId: MEMBER, notice: { commentId: NOTHING } }] });
+        });
+        expect(events.sort()).toEqual(['chatMessageNotice', 'userIdNoticationUpdate']);
+    });
+
+    it('is not put to sleep by another socket', async () => {
+        const member = await connect({ uid: MEMBER });
+        const other = await connect({ uid: OWNER });
+        expect(await listRoom(member, home.project, home.openList)).toBe(true);
+        other.emit('goIdle', member.id);
+        await new Promise((resolve) => setTimeout(resolve, 150));
+        expect(await roomsOf(member)).toContain(`project_sprint_${idOf(home.project)}_${idOf(home.openList)}**${member.id}`);
+    });
+});
+
+describe('a chat notice', () => {
+    const noticed = (sockets, deliveries, companyId = HOME) => heard(sockets, ['chatMessageNotice'], () => socketEmitter.emit('chatNotice', { companyId, deliveries }));
+
+    it('reaches only the person it is for, in the workspace it was written in', async () => {
+        const member = await connect({ uid: MEMBER });
+        const owner = await connect({ uid: OWNER });
+        const neighbour = await connect({ uid: NEIGHBOUR, companyId: ELSEWHERE });
+        await ownRooms(member, MEMBER);
+        await ownRooms(owner, OWNER);
+        await ownRooms(neighbour, NEIGHBOUR);
+
+        const [forMember, forOwner, forNeighbour] = await noticed([member, owner, neighbour], [
+            { userId: MEMBER, notice: { commentId: NOTHING } },
+            { userId: NEIGHBOUR, notice: { commentId: NOTHING } },
+        ]);
+        expect(forMember).toEqual(['chatMessageNotice']);
+        expect(forOwner).toEqual([]);
+        expect(forNeighbour).toEqual([]);
+    });
+
+    it('stops when the person loses their seat', async () => {
+        const member = await connect({ uid: MEMBER });
+        await ownRooms(member, MEMBER);
+        loseSeat(home.db, MEMBER);
+        const [events] = await noticed([member], [{ userId: MEMBER, notice: { commentId: NOTHING } }]);
+        expect(events).toEqual([]);
+    });
+});
+
 describe('a room that is already open', () => {
     const stillHears = async (socket, row) => (await heard([socket], TASK_EVENTS, () => taskChanged(row)))[0].length > 0;
 

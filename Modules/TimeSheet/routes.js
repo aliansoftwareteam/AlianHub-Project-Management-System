@@ -14,6 +14,7 @@ const weekctrl = require('./controller/weekTimesheet');
 const gridctrl = require('./controller/workloadGrid');
 const hoursctrl = require('./controller/hoursBySource');
 const taskentriesctrl = require('./controller/taskEntries');
+const facetsctrl = require('./controller/reportFacets');
 const { SCHEMA_TYPE } = require('../../Config/schemaType');
 const { READ, requireProjectAccess, projectIdsFrom } = require('../../Config/projectAccess');
 const { requireMovedTaskFields } = require('./helpers/planMoveAccess');
@@ -29,6 +30,7 @@ exports.init = (app) => {
     app.get('/api/v1/timesheet/hours-by-source', hoursctrl.getHoursBySource);
     app.put('/api/v1/timesheet/entries/billable', agentsRefused('billing.entries'), weekctrl.setEntriesBillable);
     app.post('/api/v1/timesheet/workload-grid', gridctrl.getWorkloadGrid);
+    app.post('/api/v1/timesheet/report-facets', facetsctrl.getReportFacets);
     app.post('/api/v1/timesheet/workload-move', agentsRefused('workload.move'), requireMovedTaskFields, gridctrl.moveWorkloadChip);
     app.put('/api/v1/timesheet/workload-capacity', gridctrl.saveWorkloadCapacity);
     app.post('/api/v1/timesheet/billable-summary', billablectrl.getBillableSummary);

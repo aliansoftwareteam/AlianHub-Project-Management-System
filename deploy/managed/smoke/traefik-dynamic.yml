@@ -1,0 +1,33 @@
+# Traefik file-provider config for the managed smoke test: what the tenant labels in
+# compose.yml.tmpl expect from the edge (platform-deny@file, security-headers@file). Task 070
+# ships the production version.
+http:
+  routers:
+    # A middleware cannot answer 403 for one path only, so the refusal is a router that outranks
+    # every tenant's Host router. Case-insensitive and tolerant of repeated slashes because Express
+    # routes /API/V2/PLATFORM/status to the same handler.
+    platform-deny:
+      rule: "PathRegexp(`(?i)^/+api/+v2/+platform`)"
+      priority: 1000000
+      entryPoints: [websecure]
+      service: noop@internal
+      middlewares: [deny-all]
+
+  middlewares:
+    deny-all:
+      ipAllowList:
+        sourceRange: ["255.255.255.255/32"]
+
+    # Second lock on every tenant router: a platform key sent from outside never reaches the app
+    # (the instance routes accept that key too).
+    platform-deny:
+      headers:
+        customRequestHeaders:
+          X-Platform-Key: ""
+
+    security-headers:
+      headers:
+        stsSeconds: 31536000
+        stsIncludeSubdomains: true
+        contentTypeNosniff: true
+        referrerPolicy: strict-origin-when-cross-origin

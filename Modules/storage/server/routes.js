@@ -4,7 +4,7 @@ const { upload, validatePath } = require('./helpers/bucket.helper');
 const { requireInstanceAdmin } = require('../../Instance/guard');
 const { requireStoredFileRead } = require('../downloadScope');
 const { REMOVE, UPLOAD, requireStoredFileChange } = require('../changeScope');
-const { USER_PROFILES_BUCKET, requireOwnBucket, requireBucketWrite, requireBucketRemoval, requireBucketRead, requireProfileImageRead, requireSafeObjectPath, bucketIdParam, bodyField, queryField } = require('../bucketAccess');
+const { USER_PROFILES_BUCKET, requirePlanRoom, requireOwnBucket, requireBucketWrite, requireBucketRemoval, requireBucketRead, requireProfileImageRead, requireSafeObjectPath, bucketIdParam, bodyField, queryField } = require('../bucketAccess');
 
 exports.init = (app) => {
     const ownBucket = requireOwnBucket(bucketIdParam);
@@ -23,5 +23,5 @@ exports.init = (app) => {
 
     app.post("/api/v1/getUserProfile", requireSafeObjectPath(bodyField('path')), requireProfileImageRead(bodyField('path')), handleProfileGetForUser);
     app.post("/api/v1/getTaskTypeImage", requireOwnBucket(bodyField('companyId')), requireSafeObjectPath(bodyField('path')), requireStoredFileRead(bodyField('companyId'), bodyField('path'), { storage: 'server' }), handleTaskTypeImageGet);
-    app.post('/api/v1/storage/uploadFileBase64', requireBucketWrite(bodyField('companyId'), bodyField('path')), requireSafeObjectPath(bodyField('path')), requireStoredFileChange(UPLOAD, bodyField('path'), { storage: 'server' }), ctrl.uploadBase64FileOnServerStorage);
+    app.post('/api/v1/storage/uploadFileBase64', requireBucketWrite(bodyField('companyId'), bodyField('path')), requireSafeObjectPath(bodyField('path')), requireStoredFileChange(UPLOAD, bodyField('path'), { storage: 'server' }), requirePlanRoom(bodyField('companyId')), ctrl.uploadBase64FileOnServerStorage);
 }

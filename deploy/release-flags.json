@@ -1,0 +1,11 @@
+{
+    "$comment": "Read by scripts/release-index.js when a release is published, into the release's index.json. selfHostUpgrades: a step self-hosters must take; it is attributed to the first release that ships it, and the index remembers that, so entries can stay here. breakingMigrations: migration ids after which the previous release can no longer run on the database (rolling back means restoring a backup). minTrackerVersion: the oldest time-tracker app that still works with this server, or null.",
+    "minTrackerVersion": null,
+    "breakingMigrations": [],
+    "selfHostUpgrades": [
+        {
+            "id": "compose-project-names",
+            "note": "docker-compose.yml no longer fixes container, volume and network names. An install created with an earlier docker-compose.yml that replaces the file keeps its data by adding COMPOSE_FILE=docker-compose.yml:docker-compose.legacy.yml to .env (docs/ADMIN-GUIDE.md#upgrade). Pulling the new image with the old file needs nothing."
+        }
+    ]
+}

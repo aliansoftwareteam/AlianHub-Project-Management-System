@@ -10,6 +10,8 @@ const { updateMemberFunction } = require('../../settings/Members/controller');
 const { importUserNotifications } = require("../../../utils/data");
 const { recordInvitedOwner } = require("../../Company/helpers/recordInvitedOwner");
 const { linkTokenAccepted } = require("./invitationPreview");
+const { acceptanceRefusal } = require("../../Entitlements/guards");
+const { answerRefusal } = require("../../Entitlements/answers");
 
 /* Only these keys are read from the link; anything else in it is ignored. */
 const ALLOWED_INVITE_KEYS = new Set(['userId', 'companyId', 'linkId', 'docId']);
@@ -141,6 +143,8 @@ exports.checkPermission = async (req, res) => {
         if (new Date(invitation.sendInvitationTime).getTime() + INVITATION_TTL_MS < Date.now()) {
             return res.json({ status: false, key: 4, statusText: 'Link is Expired.' });
         }
+        const noSeat = await acceptanceRefusal({ userId: account._id, email: invitation.userEmail, roleType: invitation.roleType });
+        if (noSeat) return answerRefusal(res, noSeat);
         if (!(await claimInvitation(invite.companyId, invitation, account))) return refuse(res);
         res.json({ status: true, key: 5, companyId: invite.companyId });
     } catch (error) {
@@ -163,6 +167,8 @@ exports.acceptSignedIn = async (req, res) => {
         }
         const [invitation, account] = await Promise.all([findInvitation(companyId, memberId), findAccount(req.uid)]);
         if (!acceptable(invitation, linkId, account)) return refuseSignedIn(res);
+        const noSeat = await acceptanceRefusal({ userId: account._id, email: invitation.userEmail, roleType: invitation.roleType });
+        if (noSeat) return answerRefusal(res, noSeat);
         if (!(await claimInvitation(companyId, invitation, account))) return refuseSignedIn(res);
         return res.json({ status: true, statusText: 'Invitation accepted.', companyId });
     } catch (error) {

@@ -10,6 +10,11 @@
         <form v-if="stage === 'name'" class="av2-auth-card" novalidate @submit.prevent="toFocus">
             <h2 class="auth__h">{{ $t('Auth.name_workspace') }}</h2>
             <p class="auth__p">{{ $t('Auth.name_workspace_lead') }}</p>
+            <p v-if="room && room.limit !== null" class="ah-small" data-test="workspace-count">{{ $t('Plan.workspaces_count', { count: room.count, limit: room.limit }) }}</p>
+            <div v-if="room && !room.canCreate" class="cc-limit" role="alert" data-test="workspace-limit">
+                <span>{{ $t('Plan.workspace_limit_reached', { limit: room.limit }) }}</span>
+                <a v-if="room.portalUrl" :href="room.portalUrl" target="_blank" rel="noopener" class="cc-limit__link">{{ $t('Plan.banner.add_workspaces') }}</a>
+            </div>
             <div class="av2-ws">
                 <span class="av2-ws-mark">{{ initial }}</span>
                 <div class="ah-field">
@@ -62,7 +67,7 @@
                 <div v-if="errors.referral" class="ah-field__error"><ShellIcon name="x" :size="12" />{{ errors.referral }}</div>
             </div>
 
-            <button type="submit" class="ah-btn ah-btn--primary ah-btn--block ah-btn--lg">{{ $t('Auth.continue') }}</button>
+            <button type="submit" class="ah-btn ah-btn--primary ah-btn--block ah-btn--lg" :disabled="room && !room.canCreate">{{ $t('Auth.continue') }}</button>
             <div class="auth__links" style="margin-top:28px">
                 <span class="ah-small">{{ $t('Auth.joining_team') }} <button type="button" class="av2-link-btn" @click="logOut()">{{ $t('Auth.use_invite_link') }}</button></span>
                 <button type="button" class="av2-link-btn av2-link-btn--muted" @click="logOut()">{{ $t('Auth.backlogin') }}</button>
@@ -112,18 +117,19 @@ import Cookies from "js-cookie";
 import AuthShell from "@/components/templates/AuthShell/AuthShell.vue";
 import ShellIcon from "@/components/organisms/Shell/ShellIcon.vue";
 import { useCustomComposable, useGetterFunctions } from "@/composable";
-import { apiRequestWithoutCompnay, getAuth, useAuth } from "@/services";
+import { useCreateWorkspace } from "@/composable/useCreateWorkspace";
+import { apiRequestWithoutCompnay, useAuth } from "@/services";
 import * as env from "@/config/env";
-import { connectAiWelcomePath } from "@/router/ai/connect";
 
-const { t, te } = useI18n();
+const { t } = useI18n();
 const router = useRouter();
 const { getters, commit } = useStore();
 const { logOut } = useAuth();
-const { makeUniqueId, debounce } = useCustomComposable();
+const { debounce } = useCustomComposable();
 const { getUser } = useGetterFunctions();
 const userId = inject("$userId");
 const companyId = inject("$companyId");
+const { room, progress, statusText, banner, loadRoom, nameError, create: createWorkspace } = useCreateWorkspace(userId);
 
 const TEAM_SIZES = [
     { value: "1", label: t("Auth.size_just_me") },
@@ -136,9 +142,6 @@ const affiliateOn = env.AFFILITAION_ON == "true";
 
 const stage = ref("name");
 const mainSpinner = ref(true);
-const banner = ref("");
-const progress = ref(0);
-const statusText = ref("");
 const userEmail = ref("");
 const nameInput = ref(null);
 const form = reactive({ name: "", teamSize: "2-15", focus: "", referral: affiliateOn ? Cookies.get("refferCode") || "" : "" });
@@ -164,6 +167,7 @@ onMounted(async () => {
         if (companyId.value && localUserId && openExistingCompany(companyId.value)) return;
         if (!localUserId) { router.push({ name: "Log-in" }); return; }
         userId.value = localUserId;
+        loadRoom();
         const result = await apiRequestWithoutCompnay("get", `${env.USER_UPATE}/${userId.value}`).catch(() => null);
         userEmail.value = result?.data?.Employee_Email || "";
     } finally {
@@ -183,103 +187,30 @@ const checkReferral = debounce(async () => {
 }, 500);
 
 const toFocus = () => {
-    const name = form.name.trim();
-    errors.name = !name ? t("Auth.workspace_required")
-        : name.length < 3 ? t("Auth.workspace_short")
-        : companies.value.some((x) => (x.Cst_CompanyName || "").toLowerCase().trim() === name.toLowerCase()) ? t("Auth.workspace_taken")
-        : "";
+    errors.name = nameError(form.name);
     if (errors.name || errors.referral) return;
     stage.value = "focus";
 };
 
-const fail = (message) => {
-    banner.value = message;
-    stage.value = "focus";
-    progress.value = 0;
-};
-
-// The server names its reason by a code; its own sentence is English and stands in only for a code this build does not know.
-const reasonInWords = ({ code, reason }) => {
-    const key = `Auth.workspace_reason_${code}`;
-    if (typeof code === "string" && te(key)) return t(key);
-    return typeof reason === "string" ? reason : "";
-};
-
-const failureMessage = ({ freeLimit, code, reason } = {}) => {
-    if (freeLimit) return t("Auth.free_limit");
-    const why = reasonInWords({ code, reason });
-    return why ? t("Auth.workspace_failed_reason", { reason: why }) : t("Auth.workspace_failed");
-};
-
-const create = (withSample) => {
-    banner.value = "";
+const create = async (withSample) => {
     stage.value = "creating";
-    progress.value = 8;
-    statusText.value = t("Auth.creating_workspace");
-    const evId = `ev_${makeUniqueId(12)}`;
-    const source = new EventSource(`${env.API_URI}/company-create/events/${evId}`);
-    let settled = false;
-    const settle = (outcome) => {
-        source.close();
-        if (settled) return;
-        settled = true;
-        outcome();
-    };
-    const refuse = (why) => settle(() => fail(failureMessage(why)));
-    const openWorkspace = (newCompanyId) => settle(() => {
-        progress.value = 100;
-        statusText.value = t("Auth.workspace_ready");
-        localStorage.setItem("selectedCompany", newCompanyId || "");
-        localStorage.removeItem("isLogging");
-        Cookies.remove("refferCode");
-        // The session was issued before this workspace existed: without a new one its first requests are refused.
-        const sessionRenewed = getAuth(userId.value).catch(() => null);
-        setTimeout(() => {
-            sessionRenewed.then(() => router.push(connectAiWelcomePath(newCompanyId))).then(() => window.location.reload());
-        }, 600);
-    });
-    source.onmessage = (event) => {
-        const data = JSON.parse(event.data)?.data;
-        if (data?.step === 1) { progress.value = 35; statusText.value = t("Auth.creating_workspace"); return; }
-        if (data?.step === 2) { progress.value = 70; statusText.value = t("Auth.seeding_sample"); return; }
-        if (data?.error) refuse({ freeLimit: data.freeCompanyLimitReached, code: data.code, reason: data.error });
-        else openWorkspace(data?.companyId);
-    };
-    // The stream only reports progress: the workspace may still be made, and the reply below says whether it was.
-    source.onerror = () => source.close();
-
-    apiRequestWithoutCompnay("post", env.CREATE_COMPANY, {
-        userId: userId.value,
-        email: userEmail.value,
-        companyName: form.name.trim(),
+    const opened = await createWorkspace({
+        name: form.name,
         teamSize: form.teamSize,
-        teamFocus: withSample ? form.focus : "",
-        seedSampleProject: withSample,
-        refferalCode: errors.referral ? "" : form.referral,
-        phoneNumber: "",
-        country: "",
-        city: "",
-        state: "",
-        countryCodeObj: {},
-        logtimeDays: 8,
-        totalProjects: 0,
-        isInactive: false,
-        isFree: true,
-        subscriptionData: { storage: 0, trackers: 0, users: 5 },
-        totalData: { storage: 0, trackers: 0, users: 1 },
-        eventId: evId,
-        Cst_countryCode: "",
-        Cst_stateCode: ""
-    }).then((res) => {
-        if (res.data?.status === true) openWorkspace(res.data.companyId);
-        else refuse({ freeLimit: res.data?.freeCompanyLimitReached, code: res.data?.code, reason: res.data?.statusText });
-    }).catch((err) => {
-        console.error("ERROR IN CREATE COMPANY", err);
-        refuse();
+        teamFocus: form.focus,
+        withSample,
+        referral: errors.referral ? "" : form.referral,
+        email: userEmail.value
     });
+    if (!opened) stage.value = "focus";
 };
 </script>
 
 <style>
 @import "../Authentication/authV2.css";
+</style>
+
+<style scoped>
+.cc-limit { display: flex; flex-wrap: wrap; gap: 8px; margin: 0 0 16px; padding: 10px 12px; border-radius: var(--r-input); background: var(--warn-bg); color: var(--warn-ink); font: var(--text-small); }
+.cc-limit__link { color: inherit; font-weight: 600; text-decoration: underline; }
 </style>

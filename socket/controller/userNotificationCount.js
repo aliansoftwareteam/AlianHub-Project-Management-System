@@ -5,6 +5,9 @@ const {
 } = require('../helper');
 const socketEmitter = require('../../event/socketEventEmitter');
 const { onJoin, roomFor, isSelf, toSeated } = require('../roomAccess');
+const { CHAT_NOTICE_EVENT } = require('../../Modules/Comments/helpers/chatNotices');
+
+const personalRooms = (userId) => findRoomsByPrefix(`userIdNotification_${userId}`);
 
 const handleUserNotificationChange = (changeData) => {
     if (changeData.module !== 'userIdNotification') return undefined;
@@ -14,9 +17,17 @@ const handleUserNotificationChange = (changeData) => {
     const emitData = { fullDocument: changeData.data };
 
     // The room is named by the user alone, and a person in two companies has one in each.
-    return toSeated(findRoomsByPrefix(`userIdNotification_${changeData.data.userId}`), changeData.companyId,
+    return toSeated(personalRooms(changeData.data.userId), changeData.companyId,
         (data) => data.namespace.to(data.roomName).emit('userIdNoticationUpdate', emitData));
 };
+
+/* Each person is told only of their own notice, in the company the message was written in. */
+const relayChatNotice = ({ companyId, deliveries } = {}) => {
+    if (!companyId || !Array.isArray(deliveries)) return undefined;
+    return Promise.all(deliveries.map(({ userId, notice }) => toSeated(personalRooms(userId), companyId,
+        (room) => room.namespace.to(room.roomName).emit('chatMessageNotice', notice))));
+};
+exports.relayChatNotice = relayChatNotice;
 
 exports.userNotificationCountHandler = ({ socket, namespace }) => {
     onJoin(socket, 'joinUserIdNotification', (data, identity) => isSelf(identity, data.uid), (data) => {
@@ -35,3 +46,4 @@ exports.userNotificationCountHandler = ({ socket, namespace }) => {
 
 socketEmitter.on('userIdNotification:update', changeData => handleUserNotificationChange(changeData, true));
 socketEmitter.on('userIdNotification:insert', changeData => handleUserNotificationChange(changeData, false));
+socketEmitter.on(CHAT_NOTICE_EVENT, relayChatNotice);

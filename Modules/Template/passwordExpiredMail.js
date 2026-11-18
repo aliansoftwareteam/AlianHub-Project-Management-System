@@ -5,7 +5,8 @@ const { APIURL } = require('../../Config/config');
 const { escapeHtml, textHtml, subjectText } = require('./emailText');
 const filePath = path.join(__dirname, '../../brandSettings.json');
 
-const sendEmailPasswordExpiredMail = function(email, link, brandName=''){
+/* `lead` replaces the opening sentence; without it the mail says the password expired. */
+const sendEmailPasswordExpiredMail = function(email, link, brandName='', { lead = 'Your password has expired, and your account requires a new password to continue.' } = {}){
     if (fs.existsSync(filePath)) {
         const fileContent = fs.readFileSync(filePath, 'utf-8');
         brandSettings = fileContent ? JSON.parse(fileContent) : null;
@@ -80,7 +81,7 @@ const sendEmailPasswordExpiredMail = function(email, link, brandName=''){
                             <tbody>
                                 <tr>
                                     <td align="left" valign="top" style="border-collapse:collapse!important;word-break:break-word;padding:30px 40px">
-                                        <p>Your password has expired, and your account requires a new password to continue. </p>
+                                        <p>${textHtml(lead)} </p>
                                         <p> Please set your new password by clicking the button below: </p>
                                         <table border="0" cellpadding="0" cellspacing="0" width="100%" style="border-collapse:collapse;border-spacing:0;table-layout:auto;padding:0">
                                             <tbody>
