@@ -16,6 +16,14 @@ from [Conventional Commits](https://www.conventionalcommits.org/) on `main`.
 
 ---
 
+## [14.46.3](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/compare/v14.46.2...v14.46.3) (2026-11-17)
+
+
+### 📘 Documentation
+
+* beta log to build 3 since v14.46.2 ([7d3beff](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/7d3beff9061dfac0d84c2ac09d3a20f1f50df7cb))
+* beta log to build 3 since v14.46.2 ([f6c5b4e](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/f6c5b4e66a3ed028c0433888c19457972fa3cdea))
+
 ## [14.46.2](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/compare/v14.46.1...v14.46.2) (2026-11-17)
 
 
