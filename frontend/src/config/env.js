@@ -185,6 +185,7 @@ module.exports.USER_AND_COMAPNY_CHECK = '/api/v1/userAndCompanyCheck';
 module.exports.DELETE_USER_CHAT = '/api/v1/deleteUserChat';
 module.exports.SAVE_BRAND_SETTINGS_INFORMATION = '/api/v1/saveBrandSettingsData';
 module.exports.GET_BRAND_SETTINGS_INFORMATION = '/api/v1/getBrandSettingsData';
+module.exports.DEMO_LEADS = '/api/v1/demo-leads';
 module.exports.PROJECTACTIONS = 'project';
 module.exports.GET_SPRINT_OR_PROJECT= 'project/sprintFolder';
 module.exports.PROJECTSPRINTUPDATE = 'project/sprint';

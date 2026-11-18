@@ -164,6 +164,7 @@
         </div>
 
     </AuthShell>
+    <DemoLeadPopup />
 </template>
 
 <script setup>
@@ -177,6 +178,7 @@ import { useToast } from "vue-toast-notification";
 import AuthShell from "@/components/templates/AuthShell/AuthShell.vue";
 import ProviderButton from "@/plugins/oauth/ProviderButton.vue";
 import ShellIcon from "@/components/organisms/Shell/ShellIcon.vue";
+import DemoLeadPopup from "@/components/atom/DemoLeadPopup/DemoLeadPopup.vue";
 import { apiRequestWithoutCompnay, apiRequestWithoutSecure, getAuth, SESSION_EXPIRED_KEY } from "@/services";
 import * as env from "@/config/env";
 import { publicConfig, enabledProviders, isManagedHosting } from "@/config/publicConfig";

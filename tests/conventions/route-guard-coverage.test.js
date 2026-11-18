@@ -104,6 +104,8 @@ const PUBLIC_ROUTES = [
     'GET /api/v2/instance/public-config',
     'GET /api/v1/getlogo',
     'GET /api/v1/getBrandSettingsData',
+    // Demo-site lead popup: 404 unless DEMO_MODE=true, rate limited, input validated.
+    'POST /api/v1/demo-leads',
     'GET /api/v2/changelog',
     'GET /api/v1/tracker',
     'GET /api/v2/tracker/handshake',
