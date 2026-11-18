@@ -1,9 +1,7 @@
 <template>
     <Teleport to="body">
-        <div v-if="isOpen" class="demo-lead" @click.self="close">
+        <div v-if="isOpen" class="demo-lead">
             <div class="demo-lead__modal" role="dialog" aria-modal="true" aria-labelledby="demo-lead-title">
-                <button type="button" class="demo-lead__close" :aria-label="$t('Demo.lead_close')" @click="close">&times;</button>
-
                 <template v-if="!isDone">
                     <h3 id="demo-lead-title" class="demo-lead__title">{{ $t('Demo.lead_title') }}</h3>
                     <p class="demo-lead__subtitle">{{ $t('Demo.lead_subtitle') }}</p>
@@ -124,21 +122,15 @@ const markSeen = () => {
     } catch (e) { /* ignore */ }
 };
 
-const onKeydown = (event) => {
-    if (event.key === 'Escape') close();
-};
-
 const open = () => {
     if (hasSeen()) return;
     isOpen.value = true;
-    document.addEventListener('keydown', onKeydown);
     nextTick(() => nameInput.value && nameInput.value.focus());
 };
 
 const close = () => {
     markSeen();
     isOpen.value = false;
-    document.removeEventListener('keydown', onKeydown);
 };
 
 watch(demoMode, (isDemo) => {
@@ -169,7 +161,9 @@ const submit = () => {
         markSeen();
         closeTimer = setTimeout(close, 1500);
     }).catch(() => {
+        // The popup has no close control, so a failed save must not keep the visitor out of the demo.
         submitFailed.value = true;
+        closeTimer = setTimeout(close, 3000);
     }).finally(() => {
         isSubmitting.value = false;
     });
@@ -178,7 +172,6 @@ const submit = () => {
 onBeforeUnmount(() => {
     clearTimeout(openTimer);
     clearTimeout(closeTimer);
-    document.removeEventListener('keydown', onKeydown);
 });
 </script>
 
@@ -205,20 +198,6 @@ onBeforeUnmount(() => {
     border-radius: var(--r-modal);
     padding: 28px 24px 24px;
     box-shadow: var(--shadow-modal);
-    color: var(--ink);
-}
-.demo-lead__close {
-    position: absolute;
-    top: 8px;
-    right: 12px;
-    border: 0;
-    background: transparent;
-    font-size: 26px;
-    line-height: 1;
-    color: var(--ink-3);
-    cursor: pointer;
-}
-.demo-lead__close:hover {
     color: var(--ink);
 }
 .demo-lead__title {
