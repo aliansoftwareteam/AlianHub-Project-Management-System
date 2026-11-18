@@ -12,7 +12,7 @@
                                 class="vs-component vs-con-input-label vs-input inputx inputx_milestone_status vs-input-primary">
                                 <div class="vs-con-input">
                                     <div class="color_picker">
-                                        <input type="color" v-model="formData.colorvalue"
+                                        <input type="color" v-model="formData.colorvalue" :aria-label="$t('Milestone.milestone_status_name')"
                                             class="vs-inputx vs-input--input normal hasValue cursor-pointer"/>
                                     </div>
                                     <InputText type="text" class="vs-inputx vs-input--input normal milestone__value-input" 
@@ -79,17 +79,17 @@
                                 </td>
                                 <td>
                                     <div class="d-flex Rename_Delete_wrapper justify-content-end" id="modelComponent0">
-                                        <DropDown class="mr-1" v-if="!item.isDefault && props.editPermission ==true">
+                                        <DropDown class="mr-1" mode="menu" v-if="!item.isDefault && props.editPermission ==true">
                                             <template #button>
-                                                <img :src=addIcon alt="addIconmilestoneSvg" class="cursor-pointer" :ref="item.value">
+                                                <img :src=addIcon :alt="$t('Milestone.status_actions', { name: item.name })" class="cursor-pointer">
                                             </template>
                                             <template #options>
-                                                <DropDownOption @click="$refs[item.value][0].click(), EditData(index)">
-                                                    <img :src='renameicon' alt="Editmilestone">
+                                                <DropDownOption @click="EditData(index)">
+                                                    <img :src='renameicon' alt="">
                                                     <label class="dropRename">{{$t('Projects.rename')}}</label>
                                                 </DropDownOption>
-                                                <DropDownOption @click="$refs[item.value][0].click(), deletetask(index)" v-if="item.isCount == 0">
-                                                    <img :src='deleteicon' alt="Deletemilestone">
+                                                <DropDownOption @click="deletetask(index)" v-if="item.isCount == 0">
+                                                    <img :src='deleteicon' alt="">
                                                     <label class="dropDelete">{{ $t('Projects.delete') }}</label>
                                                 </DropDownOption>
                                             </template>
@@ -362,5 +362,6 @@
 }
 .milestone__value-input{
     width:264px !important;
+    color: var(--ink-2) !important;
 }
 </style>

@@ -5,8 +5,8 @@
 
    Schema: the task document was once built by copying shapes from a create-project payload instead
    of reading the schema. Task_Leader is a required String holding a user id (an array, then an
-   empty string, both failed), status is an object, sprintArray holds the whole sprint document, and
-   TaskType stores the type's value ("task") rather than its display name. The insert failed inside
+   empty string, both failed), status is an object, sprintArray holds the sprint element the app's
+   own create stores ({ id, name } and the folder), and TaskType stores the type's value ("task") rather than its display name. The insert failed inside
    a catch that only logged, so a project appeared with no tasks and no error at all.
 
    Variety: eleven tasks still read as a blank project — every row To Do, nobody assigned, no dates,
@@ -43,7 +43,11 @@ const project = {
         { name: 'Complete', key: 2, type: 'close' },
     ],
 };
-const sprint = { _id: '67beeeea2930c35b90cd874c', name: 'List', projectId: project._id, tasks: 0 };
+const placed = (_id, name) => {
+    const id = new mongoose.Types.ObjectId(_id);
+    return { sprintId: id, sprintArray: { id, name } };
+};
+const sprint = placed('67beeeea2930c35b90cd874c', 'List');
 
 const build = (rows, from = 0) => buildTaskDocs(project, sprint, rows, from, OWNER);
 const demo = (focus = '') => build(demoTasksForFocus(focus));
@@ -85,10 +89,10 @@ describe('the task document matches the real schema', () => {
         }
     });
 
-    test('sprintArray holds the sprint document, not an array', () => {
+    test('sprintArray holds the sprint element the app reads, not the sprint document', () => {
         for (const doc of demo().docs) {
-            expect(Array.isArray(doc.sprintArray)).toBe(false);
-            expect(String(doc.sprintArray._id)).toBe(String(sprint._id));
+            expect(doc.sprintArray).toEqual(sprint.sprintArray);
+            expect(doc.sprintId).toBe(sprint.sprintId);
         }
     });
 
@@ -140,7 +144,7 @@ describe('the demo project looks worked-in — whatever the setup answer', () =>
         for (const p of used) expect(['URGENT', 'HIGH', 'MEDIUM', 'LOW']).toContain(p);
 
         // The expand arrow has something to open, and the chat column is not empty
-        expect(docs.filter((d) => d.isParentTask === false)).toHaveLength(3);
+        expect(docs.filter((d) => d.isParentTask === false)).toHaveLength(4);
         expect(comments).toHaveLength(1);
     });
 
@@ -148,7 +152,7 @@ describe('the demo project looks worked-in — whatever the setup answer', () =>
         const { docs, comments } = demo('marketing');
         expect(docs[0].TaskName).toBe('Start here — this project is a sandbox');
         expect(docs.some((d) => d.TaskName === 'Draft the message')).toBe(true);
-        expect(docs.filter((d) => d.isParentTask === false)).toHaveLength(3);
+        expect(docs.filter((d) => d.isParentTask === false)).toHaveLength(4);
         expect(comments).toHaveLength(1);
     });
 
@@ -157,13 +161,26 @@ describe('the demo project looks worked-in — whatever the setup answer', () =>
         const kids = docs.filter((d) => d.isParentTask === false);
         const parent = docs.find((d) => d.subTasks > 0);
         expect(parent).toBeDefined();
-        expect(parent.subTasks).toBe(kids.length);
+        const direct = kids.filter((d) => d.ParentTaskId === String(parent._id));
+        expect(parent.subTasks).toBe(direct.length);
         for (const kid of kids) {
-            expect(kid.ParentTaskId).toBe(String(parent._id));
-            expect(kid.sprintId).toBe(String(sprint._id));
-            expect(kid.subTasks).toBe(0);
+            const above = docs.find((d) => String(d._id) === kid.ParentTaskId);
+            expect(above).toBeDefined();
+            expect(kid.ancestors).toEqual([...above.ancestors, String(above._id)]);
+            expect(kid.sprintId).toBe(sprint.sprintId);
             expect(new TaskModel(kid).validateSync()).toBeUndefined();
         }
+    });
+
+    test('one task has subtasks three levels deep, and none goes deeper', () => {
+        const { docs } = demo('marketing');
+        const depths = docs.map((d) => d.ancestors.length);
+        expect(Math.max(...depths)).toBe(2);
+        const deepest = docs.find((d) => d.ancestors.length === 2);
+        expect(deepest.ancestors[0]).toBe(String(docs.find((d) => d.subTasks > 0)._id));
+        const middle = docs.find((d) => String(d._id) === deepest.ancestors[1]);
+        expect(middle.subTasks).toBe(1);
+        expect(deepest.subTasks).toBe(0);
     });
 
     test('the comment is attached to a task that exists', () => {
@@ -232,21 +249,17 @@ describe('the demo project is split across sprints', () => {
     });
 
     test('a subtask always sits in the same sprint as its parent', () => {
-        // Three distinct sprint documents, so a mismatch would show up as a different id.
-        const sprints = DEMO_SPRINTS.map((name, i) => ({
-            _id: `67beeeea2930c35b90cd87${40 + i}`, name, projectId: project._id, tasks: 0,
-        }));
+        // Three distinct sprints, so a mismatch would show up as a different id.
+        const sprints = DEMO_SPRINTS.map((name, i) => placed(`67beeeea2930c35b90cd87${40 + i}`, name));
         const { docs } = buildTaskDocs(project, sprints, demoTasksForFocus(''), 0, OWNER);
         const parent = docs.find((d) => d.subTasks > 0);
         const kids = docs.filter((d) => d.isParentTask === false);
-        expect(kids).toHaveLength(3);
+        expect(kids).toHaveLength(4);
         for (const kid of kids) expect(kid.sprintId).toBe(parent.sprintId);
     });
 
     test('the tasks that teach subtasks and comments are the ones that have them', () => {
-        const sprints = DEMO_SPRINTS.map((name, i) => ({
-            _id: `67beeeea2930c35b90cd87${40 + i}`, name, projectId: project._id, tasks: 0,
-        }));
+        const sprints = DEMO_SPRINTS.map((name, i) => placed(`67beeeea2930c35b90cd87${40 + i}`, name));
         const { docs, comments } = buildTaskDocs(project, sprints, demoTasksForFocus(''), 0, OWNER);
         expect(docs.find((d) => d.subTasks > 0).TaskName).toBe('Break a big task into subtasks');
         expect(docs.find((d) => String(d._id) === String(comments[0].taskId)).TaskName)
@@ -257,5 +270,66 @@ describe('the demo project is split across sprints', () => {
         for (const rows of templateSets()) {
             expect(rows.every((r) => r[2] === undefined)).toBe(true);
         }
+    });
+});
+
+/* A brand-new workspace opened on "Overdue · 1": the welcome row planned as done resolved to the
+   template's "Done" column, which is an active status, so it was open work due yesterday. */
+describe('no sample task starts overdue', () => {
+    const startOfToday = () => new Date(new Date().setHours(0, 0, 0, 0));
+    const openAndOverdue = (docs) => docs
+        .filter((d) => d.statusType !== 'close' && d.DueDate && d.DueDate < startOfToday())
+        .map((d) => `${d.TaskName} (${d.status.text})`);
+
+    test.each(TEAM_FOCUS_OPTIONS)('answer %s: nothing open is past its due date', (focus) => {
+        expect(openAndOverdue(demo(focus).docs)).toEqual([]);
+    });
+
+    test.each(TEAM_FOCUS_OPTIONS)('answer %s: work planned as finished is in a close status', (focus) => {
+        const rows = demoTasksForFocus(focus);
+        const parents = demo(focus).docs.filter((d) => d.isParentTask !== false);
+        const planned = rows.map((r, i) => [r[2].status, parents[i]])
+            .filter(([intent]) => intent === 'done' || intent === 'complete');
+        expect(planned.map(([intent]) => intent)).toContain('done');
+        for (const [, doc] of planned) expect(`${doc.TaskName}: ${doc.statusType}`).toBe(`${doc.TaskName}: close`);
+    });
+
+    test('a status list without a close status still starts nothing overdue', () => {
+        const noClose = { ...project, taskStatusData: project.taskStatusData.filter((s) => s.type !== 'close') };
+        for (const focus of TEAM_FOCUS_OPTIONS) {
+            const { docs } = buildTaskDocs(noClose, sprint, demoTasksForFocus(focus), 0, OWNER);
+            expect(openAndOverdue(docs)).toEqual([]);
+        }
+    });
+});
+
+describe('the sample custom fields', () => {
+    const made = {
+        hours: { id: '67beeeea2930c35b90cd8801' },
+        area: { id: '67beeeea2930c35b90cd8802', options: { Design: 'aa11', Build: 'bb22', Review: 'cc33' } },
+    };
+    const withFields = () => buildTaskDocs(project, sprint, demoTasksForFocus(''), 0, OWNER, made).docs;
+
+    test('a few tasks hold a number and a dropdown value, stored as the task panel stores them', () => {
+        const held = withFields().filter((d) => d.customField && Object.keys(d.customField).length);
+        expect(held.length).toBeGreaterThanOrEqual(3);
+        expect(held.length).toBeLessThan(8);
+        for (const doc of held) {
+            expect(typeof doc.customField[made.hours.id].fieldValue).toBe('string');
+            expect(Number.isFinite(Number(doc.customField[made.hours.id].fieldValue))).toBe(true);
+            expect(doc.customField[made.area.id].fieldValue).toHaveLength(1);
+            expect(Object.values(made.area.options)).toContain(doc.customField[made.area.id].fieldValue[0]);
+            expect(new TaskModel(doc).validateSync()).toBeUndefined();
+        }
+    });
+
+    test('the values group into more than one total', () => {
+        const groups = new Set(withFields().filter((d) => d.customField).map((d) => d.customField[made.area.id].fieldValue[0]));
+        expect(groups.size).toBeGreaterThanOrEqual(2);
+    });
+
+    test('a field that could not be created leaves its values off rather than failing the task', () => {
+        const docs = buildTaskDocs(project, sprint, demoTasksForFocus(''), 0, OWNER, {}).docs;
+        expect(docs.every((d) => !d.customField || Object.keys(d.customField).length === 0)).toBe(true);
     });
 });

@@ -1,11 +1,12 @@
 <template>
     <textarea
+        ref="field"
         class="form-control"
         :style="{ height: height, width: width , outline: !isOutline ? 'none' : '' }"
         :type="type"
 
         v-model="value"
-        :id="inputId"
+        :id="inputId || null"
         :maxlength="maxLength"
         :placeHolder="placeHolder"
         :disabled="isDisabled"
@@ -29,12 +30,12 @@
 </template>
 
 <script setup>
-    import { computed, defineProps,defineEmits, onMounted } from 'vue';
+    import { computed, defineProps, defineEmits, onMounted, ref } from 'vue';
 
     const props = defineProps({
         inputId: {
             type: String,
-            default: 'inputId'
+            default: ''
         },
         type: {
             type: String,
@@ -122,10 +123,9 @@
         }
     });
 
+    const field = ref(null);
     onMounted(() => {
-        if(!props.isDirectFocus) return;
-        const ele = document.getElementById(props.inputId);
-        ele.focus();
+        if (props.isDirectFocus) field.value?.focus();
     });
 </script>
 <style>

@@ -1,0 +1,127 @@
+{
+    "job": 12,
+    "title": "Five custom fields, filled",
+    "sentence": "Add fields to this project: a text field Note, a number field Cost, a dropdown Stage with Alpha and Beta, a date field Review date and a people field Reviewer. On \"[AI bench] Write release note\" set them to: ok, 120, Beta, tomorrow, me.",
+    "start": "The list",
+    "passed": "AI-1 run 1, 2026-10-08, builds 815 to 817: pass with one approval, 7 steps. Cost and Stage were there already and were reused",
+    "kept": "Rebuilt on 2026-10-09 from Tasks/active/047-ai-run/ai-1-run-1-results.md and the tool path of the job in ai-benchmark.md: the run did not record its calls. Ids are named by placeholder and resolved against the replay world.",
+    "seed": {
+        "tasks": [
+            "[AI bench] Write release note"
+        ]
+    },
+    "calls": [
+        {
+            "tool": "person.place",
+            "arguments": {},
+            "answer": "read"
+        },
+        {
+            "tool": "fields.list",
+            "arguments": {
+                "projectId": "$project"
+            },
+            "answer": "read"
+        },
+        {
+            "tool": "person.me",
+            "arguments": {},
+            "answer": "read"
+        },
+        {
+            "tool": "tasks.search",
+            "arguments": {
+                "projectId": "$project",
+                "query": "[AI bench] Write release note"
+            },
+            "answer": "read"
+        },
+        {
+            "tool": "fields.create",
+            "arguments": {
+                "projectId": "$project",
+                "reason": "The fields asked for, with their values on the release note",
+                "fields": [
+                    {
+                        "name": "Note",
+                        "type": "text"
+                    },
+                    {
+                        "name": "Review date",
+                        "type": "date"
+                    },
+                    {
+                        "name": "Reviewer",
+                        "type": "people"
+                    }
+                ],
+                "values": [
+                    {
+                        "taskId": "$task:[AI bench] Write release note",
+                        "field": "Note",
+                        "value": "ok"
+                    },
+                    {
+                        "taskId": "$task:[AI bench] Write release note",
+                        "field": "Cost",
+                        "value": 120
+                    },
+                    {
+                        "taskId": "$task:[AI bench] Write release note",
+                        "field": "Stage",
+                        "value": "Beta"
+                    },
+                    {
+                        "taskId": "$task:[AI bench] Write release note",
+                        "field": "Review date",
+                        "value": "$date:+1"
+                    },
+                    {
+                        "taskId": "$task:[AI bench] Write release note",
+                        "field": "Reviewer",
+                        "value": [
+                            "$me"
+                        ]
+                    }
+                ]
+            },
+            "answer": "pending"
+        },
+        {
+            "tool": "proposal.get",
+            "arguments": {
+                "proposalId": "$proposal"
+            },
+            "answer": "read",
+            "after": "approve"
+        }
+    ],
+    "preview": {
+        "kind": "fields",
+        "lines": [
+            {
+                "kind": "field",
+                "name": "Note",
+                "type": "text"
+            },
+            {
+                "kind": "field",
+                "name": "Review date",
+                "type": "date"
+            },
+            {
+                "kind": "field",
+                "name": "Reviewer",
+                "type": "people"
+            },
+            {
+                "kind": "fieldValue",
+                "field": "Note",
+                "task": "[AI bench] Write release note",
+                "value": "ok"
+            }
+        ]
+    },
+    "approve": true,
+    "undo": true
+}

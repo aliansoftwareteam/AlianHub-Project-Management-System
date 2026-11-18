@@ -130,9 +130,9 @@ const tooltip = computed(() => `${safeCompleted.value} of ${props.total} subtask
 .subtask-progress--bar {
     padding: 3px 10px;
     font-size: 12px;
-    background: #f1f2f4;
-    border: 1px solid #e0e2e6;
-    color: #5e6c84;
+    background: var(--fill);
+    border: 1px solid var(--border);
+    color: var(--ink-2);
     gap: 7px;
 }
 .subtask-progress__track {
@@ -140,7 +140,7 @@ const tooltip = computed(() => `${safeCompleted.value} of ${props.total} subtask
     width: 60px;
     height: 6px;
     border-radius: 999px;
-    background: #dfe1e6;
+    background: var(--track);
     overflow: hidden;
     position: relative;
     flex: 0 0 auto;
@@ -154,38 +154,38 @@ const tooltip = computed(() => `${safeCompleted.value} of ${props.total} subtask
     transition: width 0.25s ease;
 }
 .subtask-progress__count {
-    color: #5e6c84;
+    color: var(--ink-2);
 }
 
 /* Colour states. */
 .subtask-progress--empty {
-    color: #8993a4;
+    color: var(--ink-2);
 }
 .subtask-progress--empty.subtask-progress--pill {
-    background: #f1f2f4;
+    background: var(--fill);
 }
 .subtask-progress--progress.subtask-progress--pill {
     background: #e6f0fb;
     color: #185fa5;
 }
 .subtask-progress--done.subtask-progress--pill {
-    background: #e1f5ee;
-    color: #0f6e56;
+    background: var(--ok-bg);
+    color: var(--ok-ink);
 }
 
 .subtask-progress--empty .subtask-progress__fill {
-    background: #b4b2a9;
+    background: var(--ink-3);
 }
 .subtask-progress--progress .subtask-progress__fill {
     background: #378add;
 }
 .subtask-progress--done .subtask-progress__fill {
-    background: #1d9e75;
+    background: var(--ok);
 }
 .subtask-progress--progress .subtask-progress__percent {
     color: #185fa5;
 }
 .subtask-progress--done .subtask-progress__percent {
-    color: #0f6e56;
+    color: var(--ok-ink);
 }
 </style>

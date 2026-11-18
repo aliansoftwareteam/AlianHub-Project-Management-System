@@ -1,51 +1,43 @@
 <template>
-    <div class="fv">
-        <!-- list of the project's forms -->
-        <aside class="fv__side">
-            <div class="fv__side-head">
-                <span class="fv__side-title">{{ $t('Projects.forms') }}</span>
-                <button type="button" class="fv__icon-btn" :title="$t('Projects.add_form')" :disabled="creating" @click="createForm">+</button>
-            </div>
-            <div class="fv__list">
-                <div v-if="loading" class="fv__muted">{{ $t('Projects.loading') }}</div>
-                <div v-else-if="!forms.length" class="fv__muted">{{ $t('Projects.no_forms') }}</div>
-                <div
-                    v-for="form in forms"
-                    :key="form._id"
-                    class="fv__row"
-                    :class="{ 'is-active': current && String(current._id) === String(form._id) }"
-                    @click="openForm(form)"
-                >
-                    <span class="fv__row-title" :title="form.title">{{ form.title }}</span>
-                    <span class="fv__state" :class="'is-' + form.state">{{ stateLabel(form.state) }}</span>
-                </div>
-            </div>
-        </aside>
+    <div class="ah-page fv">
+        <div class="fv__bar">
+            <select v-if="forms.length" v-model="currentId" class="fv__pick" :aria-label="$t('Projects.forms')">
+                <option v-for="form in forms" :key="form._id" :value="String(form._id)">{{ form.title }}</option>
+            </select>
+            <span v-else class="ah-muted">{{ loading ? $t('Projects.loading') : $t('Projects.no_forms') }}</span>
+            <button type="button" class="ah-btn ah-btn--secondary ah-btn--sm" :disabled="creating" @click="createForm">
+                + {{ $t('Projects.add_form') }}
+            </button>
+            <input
+                v-if="current"
+                v-model="draftTitle"
+                type="text"
+                class="fv__title"
+                :placeholder="$t('Projects.form_untitled')"
+                :aria-label="$t('Projects.form_untitled')"
+            />
+            <span v-if="current" class="ah-chip" :class="current.state === 'live' ? 'ah-chip--ok' : ''">{{ stateLabel(current.state) }}</span>
+        </div>
 
-        <!-- the selected form -->
-        <section class="fv__main">
-            <div v-if="!current" class="fv__blank">
+        <div v-if="!current" class="fv__blank">
+            <div class="ah-empty fv__blank-card">
                 <p class="fv__blank-text">{{ forms.length ? $t('Projects.select_form') : $t('Projects.no_forms_hint') }}</p>
-                <button type="button" class="fv__btn fv__btn--primary" :disabled="creating" @click="createForm">
+                <button type="button" class="ah-btn ah-btn--primary ah-btn--sm" :disabled="creating" @click="createForm">
                     {{ creating ? '…' : $t('Projects.add_form') }}
                 </button>
             </div>
-            <template v-else>
-                <div class="fv__head">
-                    <input v-model="draftTitle" type="text" class="fv__title" :placeholder="$t('Projects.form_untitled')" />
-                    <button type="button" class="fv__subs" :class="{ 'is-on': showSubmissions }"
-                        @click="showSubmissions = !showSubmissions">
-                        <FormIcon :name="showSubmissions ? 'back' : 'table'" />
-                        {{ showSubmissions ? $t('Projects.form_back_to_form') : $t('Projects.form_view_submissions') }}
-                    </button>
-                    <span class="fv__state" :class="'is-' + current.state">{{ stateLabel(current.state) }}</span>
-                </div>
-                <FormBuilder v-model:showSubmissions="showSubmissions" :form="current"
-                    :projectData="projectData || {}" :titleDraft="draftTitle"
-                    @saved="onSaved" @deleted="onDeleted" @dirty="(v) => builderDirty = v" />
-            </template>
-            <div v-if="err" class="fv__err">{{ err }}</div>
-        </section>
+        </div>
+        <FormBuilder
+            v-else
+            v-model:showSubmissions="showSubmissions"
+            :form="current"
+            :projectData="projectData || {}"
+            :titleDraft="draftTitle"
+            @saved="onSaved"
+            @deleted="onDeleted"
+            @dirty="(v) => builderDirty = v"
+        />
+        <div v-if="err" class="ah-field__error fv__err">{{ err }}</div>
     </div>
 </template>
 
@@ -54,7 +46,8 @@ import { ref, computed, inject, onMounted, watch } from 'vue';
 import { useI18n } from 'vue-i18n';
 import { apiRequest } from '@/services';
 import FormBuilder from './FormBuilder.vue';
-import FormIcon from './FormIcon.vue';
+
+defineOptions({ name: 'FormsView' });
 
 const { t } = useI18n();
 const projectData = inject('selectedProject');
@@ -85,7 +78,7 @@ const load = async () => {
         // must not pull the user off the form they are editing.
         if (!current.value && forms.value.length) await openForm(forms.value[0]);
     } catch (e) {
-        err.value = (e && e.response && e.response.data && e.response.data.statusText) || (e && e.message) || 'Failed to load forms';
+        err.value = (e && e.response && e.response.data && e.response.data.statusText) || (e && e.message) || t('Toast.something_went_wrong');
     } finally { loading.value = false; }
 };
 
@@ -104,12 +97,20 @@ const openForm = async (form) => {
             current.value = body.data;
             draftTitle.value = body.data.title || '';
         } else {
-            err.value = (body && body.statusText) || 'Could not open that form';
+            err.value = (body && body.statusText) || t('Toast.something_went_wrong');
         }
     } catch (e) {
-        err.value = (e && e.message) || 'Could not open that form';
+        err.value = (e && e.message) || t('Toast.something_went_wrong');
     }
 };
+
+const currentId = computed({
+    get: () => String((current.value && current.value._id) || ''),
+    set: (id) => {
+        const form = forms.value.find((f) => String(f._id) === String(id));
+        if (form) openForm(form);
+    },
+});
 
 const createForm = async () => {
     if (creating.value || !projectId.value || !leaveBuilder()) return;
@@ -123,10 +124,10 @@ const createForm = async () => {
             await load();
             await openForm(body.data);
         } else {
-            err.value = (body && body.statusText) || 'Could not create a form';
+            err.value = (body && body.statusText) || t('Toast.something_went_wrong');
         }
     } catch (e) {
-        err.value = (e && e.response && e.response.data && e.response.data.statusText) || (e && e.message) || 'Could not create a form';
+        err.value = (e && e.response && e.response.data && e.response.data.statusText) || (e && e.message) || t('Toast.something_went_wrong');
     } finally { creating.value = false; }
 };
 
@@ -171,37 +172,31 @@ onMounted(load);
 </script>
 
 <style scoped>
-.fv { display: flex; align-items: stretch; height: 100%; min-height: 520px; font-family: 'Roboto', sans-serif; background: #fff; }
-.fv__side { flex: 0 0 280px; border-right: 1px solid #eef0f6; display: flex; flex-direction: column; min-height: 0; }
-.fv__side-head { display: flex; align-items: center; justify-content: space-between; padding: 14px 14px 10px; }
-.fv__side-title { font-size: 15px; font-weight: 600; color: #2f3444; }
-.fv__icon-btn { border: none; background: none; font-size: 20px; line-height: 1; color: #6b7280; cursor: pointer; padding: 0 4px; }
-.fv__icon-btn:disabled { opacity: .5; cursor: default; }
-.fv__list { flex: 1; min-height: 0; overflow-y: auto; padding: 0 6px 14px; }
-.fv__muted { font-size: 13px; color: #9aa0b4; padding: 8px 8px; }
-.fv__row { display: flex; align-items: center; gap: 8px; padding: 8px 10px; margin: 1px 0; border-radius: 6px; cursor: pointer; font-size: 13.5px; color: #3b4252; }
-.fv__row:hover { background: #f4f5f8; }
-.fv__row.is-active { background: #eceef3; font-weight: 600; color: #111; }
-.fv__row-title { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.fv__subs { flex: 0 0 auto; display: flex; align-items: center; gap: 7px; border: 1px solid #d7d9e6;
-    background: #fff; color: #3b4252; border-radius: 7px; padding: 6px 13px; font-size: 13px;
-    cursor: pointer; font-family: inherit; }
-.fv__subs:hover, .fv__subs.is-on { background: #f4f5fb; color: #2f3990; border-color: #b9c0ea; }
-.fv__state { flex: 0 0 auto; font-size: 11px; padding: 1px 8px; border-radius: 10px; border: 1px solid #d7d9e6; color: #6b7280; }
-.fv__state.is-live { color: #1c7a43; border-color: #bfe3cd; }
-.fv__main { flex: 1; min-width: 0; padding: 22px 26px; overflow-y: auto; }
-.fv__blank { height: 100%; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 14px; }
-.fv__blank-text { font-size: 13px; color: #9aa0b4; margin: 0; }
-.fv__btn { border: 1px solid #d7d9e6; background: #fff; border-radius: 7px; padding: 8px 16px; font-size: 13px; cursor: pointer; font-family: inherit; }
-.fv__btn--primary { background: #2f3a8f; border-color: #2f3a8f; color: #fff; }
-.fv__btn:disabled { opacity: .5; cursor: default; }
-.fv__head { display: flex; align-items: center; gap: 10px; margin-bottom: 18px; }
-.fv__title { flex: 1; min-width: 0; border: none; outline: none; font-size: 22px; font-weight: 600; color: #2f3444; padding: 2px 0; font-family: inherit; }
-.fv__placeholder { border: 1px dashed #dfe2ec; border-radius: 8px; padding: 34px; text-align: center; font-size: 13px; color: #9aa0b4; }
-.fv__err { font-size: 12px; color: #c0392b; margin-top: 12px; }
-@media (max-width: 860px) {
-    .fv { display: block; }
-    .fv__side { border-right: none; border-bottom: 1px solid #eef0f6; }
-    .fv__main { padding: 16px; }
+.fv { height: 100%; min-height: 520px; background: var(--canvas); font: var(--text-small); }
+.fv__bar {
+    height: 44px; flex: none;
+    display: flex; align-items: center; gap: 8px;
+    padding: 0 20px;
+    background: var(--surface);
+    border-bottom: 1px solid var(--hairline);
 }
+.fv__pick {
+    height: 28px; max-width: 220px;
+    border: 1px solid var(--border); border-radius: var(--r-input);
+    background: var(--surface); color: var(--ink);
+    font: var(--text-small); padding: 0 8px;
+}
+.fv__title {
+    flex: 1; min-width: 0; max-width: 360px;
+    border: 1px solid transparent; border-radius: var(--r-input);
+    background: transparent; color: var(--ink);
+    font: 600 15px/1.2 var(--font-ui); letter-spacing: -.2px;
+    padding: 4px 8px;
+}
+.fv__title:hover { border-color: var(--hairline); }
+.fv__title:focus { outline: none; border-color: var(--brand); box-shadow: var(--focus); }
+.fv__blank { flex: 1; display: grid; place-items: center; padding: 24px; }
+.fv__blank-card { display: flex; flex-direction: column; align-items: center; gap: 12px; background: var(--surface); text-align: center; }
+.fv__blank-text { margin: 0; }
+.fv__err { padding: 8px 20px; }
 </style>

@@ -1,0 +1,229 @@
+<title>AlianHub UI Quick Review</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+/* Layout: one reading column; each fix is a row with a before/after pair that stacks on phones. */
+:root {
+  --bg: #f6f6f9; --surface: #ffffff; --ink: #1b1a24; --ink-2: #5d5b6c; --line: #e3e2ea;
+  --accent: #2f3990; --accent-tint: #e8e9f6;
+  --sev-high: #b42318; --sev-high-bg: #fde8e6; --sev-med: #8a5a00; --sev-med-bg: #fdf1d8; --sev-low: #2e6b3a; --sev-low-bg: #e3f2e6;
+  --font-body: "IBM Plex Sans", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --font-mono: "IBM Plex Mono", ui-monospace, "Cascadia Mono", Consolas, monospace;
+}
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) {
+  --bg: #15151c; --surface: #1d1d26; --ink: #ecebf3; --ink-2: #a3a1b4; --line: #2f2e3b;
+  --accent: #a9b0ff; --accent-tint: #2a2c4a;
+  --sev-high: #ff9b8f; --sev-high-bg: #3d1c1a; --sev-med: #f2c46b; --sev-med-bg: #3a2e14; --sev-low: #8fd49c; --sev-low-bg: #1b3221;
+  color-scheme: dark } }
+:root[data-theme="dark"] {
+  --bg: #15151c; --surface: #1d1d26; --ink: #ecebf3; --ink-2: #a3a1b4; --line: #2f2e3b;
+  --accent: #a9b0ff; --accent-tint: #2a2c4a;
+  --sev-high: #ff9b8f; --sev-high-bg: #3d1c1a; --sev-med: #f2c46b; --sev-med-bg: #3a2e14; --sev-low: #8fd49c; --sev-low-bg: #1b3221;
+  color-scheme: dark }
+body { background: var(--bg); color: var(--ink); font: 400 15px/1.55 var(--font-body);
+  padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); padding-block: 28px 56px; }
+.wrap { max-width: 1080px; margin: 0 auto; display: grid; gap: 28px; }
+h1, h2, h3 { text-wrap: balance; margin: 0; }
+h1 { font-size: 28px; font-weight: 700; letter-spacing: -.4px; }
+h2 { font-size: 19px; font-weight: 600; }
+h3 { font-size: 16px; font-weight: 600; }
+p { margin: 0; }
+.mono { font-family: var(--font-mono); font-size: 12.5px; }
+.eyebrow { font: 500 11.5px/1 var(--font-mono); letter-spacing: .08em; text-transform: uppercase; color: var(--ink-2); }
+header.top { display: grid; gap: 10px; }
+.lede { color: var(--ink-2); max-width: 68ch; }
+.facts { display: flex; flex-wrap: wrap; gap: 8px 18px; color: var(--ink-2); font-size: 13.5px; }
+.facts b { color: var(--ink); font-weight: 600; }
+.checks { display: flex; flex-wrap: wrap; gap: 8px; }
+.pill { display: inline-flex; align-items: center; gap: 6px; padding: 3px 9px; border-radius: 99px; font: 500 12px/1.4 var(--font-body); }
+.pill.ok { background: var(--sev-low-bg); color: var(--sev-low); }
+.pill.sev-high { background: var(--sev-high-bg); color: var(--sev-high); }
+.pill.sev-med { background: var(--sev-med-bg); color: var(--sev-med); }
+.pill.sev-low { background: var(--sev-low-bg); color: var(--sev-low); }
+section.block { display: grid; gap: 14px; }
+.fix { background: var(--surface); border: 1px solid var(--line); border-radius: 10px; padding: 18px; display: grid; gap: 12px; min-width: 0; }
+.fix-head { display: flex; flex-wrap: wrap; align-items: baseline; gap: 8px 12px; }
+.fix-num { font: 500 13px/1 var(--font-mono); color: var(--accent); }
+.meta { display: grid; grid-template-columns: max-content 1fr; gap: 4px 14px; font-size: 13.5px; }
+.meta dt { color: var(--ink-2); }
+.meta dd { margin: 0; min-width: 0; overflow-wrap: anywhere; }
+.pair { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+.pair figure { margin: 0; display: grid; gap: 6px; min-width: 0; }
+.pair figcaption { font: 500 11.5px/1 var(--font-mono); letter-spacing: .06em; text-transform: uppercase; color: var(--ink-2); }
+.pair img { display: block; width: 100%; height: auto; border: 1px solid var(--line); border-radius: 6px; background: var(--bg); }
+.pair a:focus-visible, a:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.full { font-size: 13px; color: var(--accent); }
+a { color: var(--accent); }
+code { font-family: var(--font-mono); font-size: 12.5px; background: var(--accent-tint); padding: 1px 5px; border-radius: 4px; overflow-wrap: anywhere; }
+.issues { background: var(--surface); border: 1px solid var(--line); border-radius: 10px; overflow-x: auto; }
+table { width: 100%; border-collapse: collapse; font-size: 14px; }
+th, td { text-align: left; vertical-align: top; padding: 10px 14px; border-bottom: 1px solid var(--line); }
+th { font: 500 11.5px/1.2 var(--font-mono); letter-spacing: .06em; text-transform: uppercase; color: var(--ink-2); }
+tr:last-child td { border-bottom: 0; }
+td.where { white-space: nowrap; color: var(--ink-2); font-size: 13px; }
+.note { color: var(--ink-2); font-size: 13.5px; max-width: 75ch; }
+@media (max-width: 640px) {
+  .pair { grid-template-columns: 1fr; }
+  h1 { font-size: 23px; }
+  td.where { white-space: normal; }
+}
+</style>
+
+<div class="wrap">
+  <header class="top">
+    <span class="eyebrow">Task 089 · branch fix/ui-quick-review · not pushed</span>
+    <h1>AlianHub UI quick review</h1>
+    <p class="lede">Login, setup, Home, projects (board, list, details), task detail, docs, people, team, settings, notifications, Everything, goals, planner, approvals, automations, trash and the search palette were walked at 1440px and 375px on the local server against the demo data, read-only. Seven small fixes are committed locally. Each has a before and after shot taken at the same viewport with the same data.</p>
+    <div class="facts">
+      <span><b>7</b> fixes, 8 commits</span>
+      <span>Base <span class="mono">origin/chore/pre-staging</span> (ca7f83412)</span>
+      <span>No strings added, no data written</span>
+    </div>
+    <div class="checks">
+      <span class="pill ok">npm run style:check passes</span>
+      <span class="pill ok">npm run i18n:check passes</span>
+      <span class="pill ok">style baseline lowered by one colour</span>
+    </div>
+    <p class="note">The demo owner's language is set to Chinese in the shared database, so the screenshots force English in the browser only, by rewriting <code>languageCode</code> in API responses. Nothing was changed in the database.</p>
+  </header>
+
+  <section class="block" aria-labelledby="fixes-h">
+    <h2 id="fixes-h">Fixes</h2>
+
+    <article class="fix">
+      <div class="fix-head"><span class="fix-num">01</span><h3>Workspace setup card squeezed to 280px</h3><span class="pill sev-high">High</span></div>
+      <dl class="meta">
+        <dt>Issue</dt><dd>On "Name your workspace" the single-card auth shell shrank to its content inside the app's centring wrapper. The team-size chips ("Just me", "16–50") and "Back to login" wrapped onto two lines. This is the first screen a new workspace owner sees.</dd>
+        <dt>Fix</dt><dd><code>.auth { width: 100% }</code>, so the card uses its intended max-width of 498px.</dd>
+        <dt>Files</dt><dd><code>frontend/src/components/templates/AuthShell/style.css</code> (shared auth shell)</dd>
+        <dt>Commit</dt><dd class="mono">84cf2cc7f</dd>
+      </dl>
+      <div class="pair">
+        <figure><figcaption>Before · 1440</figcaption><img src="screenshots/01-workspace-card-width-before.png" alt="Setup card 280px wide with wrapped chips" loading="lazy"></figure>
+        <figure><figcaption>After · 1440</figcaption><img src="screenshots/01-workspace-card-width-after.png" alt="Setup card at full width with chips on one line" loading="lazy"></figure>
+        <figure><figcaption>Before · 375</figcaption><img src="screenshots/01-workspace-card-width-m-before.png" alt="Phone setup card with wrapped chips" loading="lazy"></figure>
+        <figure><figcaption>After · 375</figcaption><img src="screenshots/01-workspace-card-width-m-after.png" alt="Phone setup card with chips on one line" loading="lazy"></figure>
+      </div>
+    </article>
+
+    <article class="fix">
+      <div class="fix-head"><span class="fix-num">02</span><h3>Two-line rail label sat left of its icon</h3><span class="pill sev-low">Low</span></div>
+      <dl class="meta">
+        <dt>Issue</dt><dd>"App connections" wraps in the 52px rail, and the wrapped label was left-aligned under a centred icon.</dd>
+        <dt>Fix</dt><dd><code>text-align: center</code> on <code>.ah-rail__label</code>. Single-line labels are unchanged.</dd>
+        <dt>Files</dt><dd><code>frontend/src/components/organisms/Shell/style.css</code> (global rail)</dd>
+        <dt>Commit</dt><dd class="mono">1edf5dd91</dd>
+      </dl>
+      <div class="pair">
+        <figure><figcaption>Before · 1440, zoomed</figcaption><img src="screenshots/02-rail-label-centre-before-zoom.png" alt="App connections label left-aligned" loading="lazy"></figure>
+        <figure><figcaption>After · 1440, zoomed</figcaption><img src="screenshots/02-rail-label-centre-after-zoom.png" alt="App connections label centred" loading="lazy"></figure>
+      </div>
+      <a class="full" href="screenshots/02-rail-label-centre-before.png">Full screen before</a> · <a class="full" href="screenshots/02-rail-label-centre-after.png">Full screen after</a>
+    </article>
+
+    <article class="fix">
+      <div class="fix-head"><span class="fix-num">03</span><h3>Project Details values sat about 8px above their labels</h3><span class="pill sev-med">Medium</span></div>
+      <dl class="meta">
+        <dt>Issue</dt><dd>Value cells set <code>height: 36px</code> plus 8.5px padding on a content box, so each one rendered 53px tall with its text pinned to the top, above the label. Rows were also 17px taller than intended.</dd>
+        <dt>Fix</dt><dd><code>box-sizing: border-box</code> on <code>.hover__on-projectrightside</code>. Measured centres now match exactly (Key 250/250, Type 291/291, and so on).</dd>
+        <dt>Files</dt><dd><code>frontend/src/components/organisms/ProjectDetailRightSide/style.css</code></dd>
+        <dt>Commit</dt><dd class="mono">3c635e930</dd>
+      </dl>
+      <div class="pair">
+        <figure><figcaption>Before · 1440, zoomed</figcaption><img src="screenshots/03-project-details-align-before-zoom.png" alt="Values higher than labels" loading="lazy"></figure>
+        <figure><figcaption>After · 1440, zoomed</figcaption><img src="screenshots/03-project-details-align-after-zoom.png" alt="Values level with labels" loading="lazy"></figure>
+      </div>
+      <a class="full" href="screenshots/03-project-details-align-before.png">Full screen before</a> · <a class="full" href="screenshots/03-project-details-align-after.png">Full screen after</a>
+    </article>
+
+    <article class="fix">
+      <div class="fix-head"><span class="fix-num">04</span><h3>Setup chip hover border invisible in dark theme</h3><span class="pill sev-low">Low</span></div>
+      <dl class="meta">
+        <dt>Issue</dt><dd>The chip hover border was a hard-coded <code>rgba(0, 0, 0, .28)</code>, which is black on a dark surface. It also counted against the colour baseline.</dd>
+        <dt>Fix</dt><dd>Uses <code>var(--ink-3)</code>, which works in both themes. The style baseline was lowered by one colour.</dd>
+        <dt>Files</dt><dd><code>frontend/src/views/Authentication/authV2.css</code>, <code>scripts/style-baseline.json</code></dd>
+        <dt>Commit</dt><dd class="mono">d05b48082</dd>
+      </dl>
+      <div class="pair">
+        <figure><figcaption>Before · dark, "Just me" hovered</figcaption><img src="screenshots/04-chip-hover-dark-before.png" alt="Hovered chip with no visible border" loading="lazy"></figure>
+        <figure><figcaption>After · dark, "Just me" hovered</figcaption><img src="screenshots/04-chip-hover-dark-after.png" alt="Hovered chip with a visible border" loading="lazy"></figure>
+        <figure><figcaption>After · light, "Just me" hovered</figcaption><img src="screenshots/04-chip-hover-light-after.png" alt="Light theme hover still visible" loading="lazy"></figure>
+      </div>
+    </article>
+
+    <article class="fix">
+      <div class="fix-head"><span class="fix-num">05</span><h3>Team activity times broke onto two lines</h3><span class="pill sev-low">Low</span></div>
+      <dl class="meta">
+        <dt>Issue</dt><dd>The time column was a fixed 42px, enough for "07:10" but not for "07:10 PM", so every entry showed "PM" on its own line.</dd>
+        <dt>Fix</dt><dd><code>min-width: 42px; white-space: nowrap</code> on <code>.team__activity-at</code>.</dd>
+        <dt>Files</dt><dd><code>frontend/src/views/Team/style.css</code></dd>
+        <dt>Commit</dt><dd class="mono">009883b39</dd>
+      </dl>
+      <div class="pair">
+        <figure><figcaption>Before · 1440, zoomed</figcaption><img src="screenshots/05-team-activity-time-before-zoom.png" alt="Times wrapped with PM on its own line" loading="lazy"></figure>
+        <figure><figcaption>After · 1440, zoomed</figcaption><img src="screenshots/05-team-activity-time-after-zoom.png" alt="Times on one line" loading="lazy"></figure>
+      </div>
+      <a class="full" href="screenshots/05-team-activity-time-before.png">Full screen before</a> · <a class="full" href="screenshots/05-team-activity-time-after.png">Full screen after</a>
+    </article>
+
+    <article class="fix">
+      <div class="fix-head"><span class="fix-num">06</span><h3>Empty states ran 28px past their card on phones</h3><span class="pill sev-med">Medium</span></div>
+      <dl class="meta">
+        <dt>Issue</dt><dd>The shared <code>EmptyState</code> combined <code>width: 100%</code> with side padding on a content box, so it was 28px wider than its container. On Home at 375px the "Your day is clear" message ran to the card edge, off centre.</dd>
+        <dt>Fix</dt><dd><code>box-sizing: border-box</code> on <code>.empty-state</code>. It can only shrink an empty state to fit its container.</dd>
+        <dt>Files</dt><dd><code>frontend/src/components/atom/EmptyState/EmptyState.vue</code> (shared atom, used across the app)</dd>
+        <dt>Commit</dt><dd class="mono">9ec09053b</dd>
+      </dl>
+      <div class="pair">
+        <figure><figcaption>Before · 375</figcaption><img src="screenshots/06-empty-state-overflow-m-before.png" alt="Empty message touching the card edge" loading="lazy"></figure>
+        <figure><figcaption>After · 375</figcaption><img src="screenshots/06-empty-state-overflow-m-after.png" alt="Empty message centred inside the card" loading="lazy"></figure>
+      </div>
+    </article>
+
+    <article class="fix">
+      <div class="fix-head"><span class="fix-num">07</span><h3>Task properties column overflowed and used two label styles</h3><span class="pill sev-med">Medium</span></div>
+      <dl class="meta">
+        <dt>Issue</dt><dd>The overlay already styles TaskDetailRightSide's rows as compact label/value rows. That component's scoped stylesheet loads later at the same specificity, so its legacy padding, left border and 14px labels won. The column ran 31px past the 250px panel, cutting off the Status row's complete button, and its labels sat 18px right of the List, Type and Tags rows below.</dd>
+        <dt>Fix</dt><dd>The four overlay selectors gain <code>.ah-detail__body</code>, which raises them one class above the scoped rules, plus <code>box-sizing: border-box</code>. Every label now starts at the same x position with the same type.</dd>
+        <dt>Files</dt><dd><code>frontend/src/components/organisms/TaskDetailOverlay/style.css</code></dd>
+        <dt>Commit</dt><dd class="mono">d5917d69f</dd>
+      </dl>
+      <div class="pair">
+        <figure><figcaption>Before · 1440, properties column</figcaption><img src="screenshots/07-task-props-column-before-zoom.png" alt="Properties column overflowing with mixed label styles" loading="lazy"></figure>
+        <figure><figcaption>After · 1440, properties column</figcaption><img src="screenshots/07-task-props-column-after-zoom.png" alt="Properties column aligned in one style" loading="lazy"></figure>
+      </div>
+      <a class="full" href="screenshots/07-task-props-column-before.png">Full screen before</a> · <a class="full" href="screenshots/07-task-props-column-after.png">Full screen after</a>
+      <p class="note">Checked at 1440px only. The phone task view opens properties from a "Properties" button, so check it there when reviewing.</p>
+    </article>
+  </section>
+
+  <section class="block" aria-labelledby="open-h">
+    <h2 id="open-h">Found but not fixed</h2>
+    <p class="note">These are larger than a quick fix, or sit in areas other overnight sessions own.</p>
+    <div class="issues">
+      <table>
+        <thead><tr><th>Where</th><th>Issue</th><th>Why not fixed here</th></tr></thead>
+        <tbody>
+          <tr><td class="where">Timesheet tabs</td><td>The attached screenshot marks the Mine / Project / Workload / Tracker / Approvals tabs. On <code>chore/pre-staging</code> each tab box measured to wrap its own label, with the underline under "Mine", so I couldn't reproduce a misalignment. The tabs are only 29px tall, below a comfortable touch target.</td><td><code>views/Timesheet/**</code> belongs to the reports session (086).</td></tr>
+          <tr><td class="where">Demo data</td><td>The live demo owner's language is "ch", and that locale is mostly English copy, so the demo shows Chinese labels mixed with English: rail "项目", project tabs, settings.</td><td>Database setting on the shared live demo. Read-only here.</td></tr>
+          <tr><td class="where">Project views</td><td>An unknown <code>?tab=</code> value shows Project Details next to a "404 We can't find that page" card instead of falling back to the default view.</td><td>Routing behaviour, not a styling fix.</td></tr>
+          <tr><td class="where">Settings › General</td><td>Still on the legacy look: large outline Save/Cancel buttons, a legacy milestone table, and the phone placeholder clipped to "eg. 000-000-000C".</td><td>Needs a page restyle onto <code>ah-</code> components.</td></tr>
+          <tr><td class="where">Content-box sizing</td><td>Fixes 01, 03, 06 and 07 all come from <code>width: 100%</code> or a fixed height combined with padding on a content box. There is no global <code>box-sizing: border-box</code> reset, so more of these probably remain.</td><td>A global reset touches every legacy screen and needs a full visual pass.</td></tr>
+          <tr><td class="where">Demo banner, phone</td><td>The demo banner wraps to four lines (about 90px) at 375px, about 11% of the screen, on every page.</td><td>Demo-only copy and layout decision.</td></tr>
+          <tr><td class="where">Inbox, phone</td><td>The tab row cuts off at "D…" with no fade or arrow to show it scrolls.</td><td>Needs a shared scroll-hint pattern.</td></tr>
+          <tr><td class="where">Approvals, desktop</td><td>Cards are capped at about 450px with full-width Approve buttons, leaving most of a 1440px page empty.</td><td>Layout decision for the page owner.</td></tr>
+          <tr><td class="where">Task detail</td><td>The "Add description" placeholder is indented 24px from its section. "Remaining Hours" wraps. "Task Planning" is set in mono while its siblings are not.</td><td>Editor internals and copy, each its own small change.</td></tr>
+          <tr><td class="where">Project header, phone</td><td>"+ New", "•••" and "+ Task" wrap onto a second, right-aligned row under the breadcrumb.</td><td>Header layout change.</td></tr>
+          <tr><td class="where">Native selects</td><td>People "Reports to", Everything "Group by" and "Sort by", and Docs "Recent" use native selects next to the app's own dropdowns.</td><td>Component swap, not a quick fix.</td></tr>
+          <tr><td class="where">Rail, 900px tall</td><td>The rail list scrolls, and an item is half hidden above "More" with no hint that more is below.</td><td>Needs a scroll-shadow treatment for the rail.</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <section class="block" aria-labelledby="how-h">
+    <h2 id="how-h">How it was checked</h2>
+    <p class="note">Local API on :4440 with migrations, cron, automations and the indexer off, plus a Vue dev server on :5440. Login used the one-click demo button. Screens were captured with headless Chromium at 1440×900 and 375×812 (mobile emulation). Alignment fixes were confirmed by measuring element boxes in the page, not by eye alone. Shared files touched: the auth shell, the rail stylesheet, the EmptyState atom and the task detail overlay stylesheet, each with a one-line or selector-only change.</p>
+  </section>
+</div>

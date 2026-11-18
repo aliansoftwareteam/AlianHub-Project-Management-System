@@ -2,84 +2,52 @@ const { SCHEMA_TYPE } = require("../../../Config/schemaType");
 const { MongoDbCrudOpration,validateObjectId } = require("../../../utils/mongo-handler/mongoQueries");
 const { mongoose } = require("mongoose");
 const logger = require("../../../Config/loggerConfig");
+const { isPrivileged } = require("../../../Config/roleTypes");
+const { ACTIVE_SEAT } = require("../../../Config/seatStatus");
+const { sprintIdentities, visibleSprintClause } = require("../../Sprints/helpers/sprintVisibility");
 
 
-exports.getDefaultSprintData = (uid, query, companyId, projectId, roleType) => {
-    return new Promise((resolve, reject) => {
-        try {
-            const defaultPrivate = {
-                private: true,
-                projectId : new mongoose.Types.ObjectId(projectId),
-                deletedStatusKey: { $nin: [1] },
-            };
-            if(roleType !== 1 && roleType !== 2) {
-                defaultPrivate.AssigneeUserId = {
-                    $in: [uid]
-                }
-            }
-            const defaultPublic = {
-                projectId : new mongoose.Types.ObjectId(projectId),
-                deletedStatusKey: { $nin: [1] },
-                private: false
-            };
-            const queryArray = [
-                {
-                    $match: {
-                        $or: [
-                            defaultPrivate,
-                            defaultPublic
-                        ]
-                    }
-                }
-            ];
-            if (query.fields) {
-                const fields = query.fields.split(',');
-                const projection = {};
-                fields.forEach((field) => {
-                    projection[field] = 1;
-                });
-                queryArray.push(projection);
-            }
-            if (query.skip) {
-                queryArray.push({$skip: query.skip});
-            }
-            if (query.limit) {
-                queryArray.push({$limit: query.limit});
-            }
-            let mongoObj = {
-                type: SCHEMA_TYPE.SPRINTS,
-                data: [queryArray]
-            }
-            MongoDbCrudOpration(companyId, mongoObj, 'aggregate').then((res)=>{
-                resolve(res);
-            }).catch((error)=>{
-                reject(error);
-            })
-        } catch (error) {
-            reject(error);
-        }
-    })
-}
+exports.sprintVisibilityMatch = async (uid, companyId, projectId, roleType) => ({
+    projectId: new mongoose.Types.ObjectId(projectId),
+    deletedStatusKey: { $nin: [1] },
+    ...(isPrivileged(roleType) ? {} : visibleSprintClause(await sprintIdentities(companyId, uid))),
+});
 
+exports.getDefaultSprintData = async (uid, query, companyId, projectId, roleType) => {
+    const queryArray = [
+        { $match: await exports.sprintVisibilityMatch(uid, companyId, projectId, roleType) }
+    ];
+    if (query.fields) {
+        const projection = {};
+        query.fields.split(',').forEach((field) => {
+            projection[field] = 1;
+        });
+        queryArray.push(projection);
+    }
+    if (query.skip) {
+        queryArray.push({ $skip: query.skip });
+    }
+    if (query.limit) {
+        queryArray.push({ $limit: query.limit });
+    }
+    return MongoDbCrudOpration(companyId, {
+        type: SCHEMA_TYPE.SPRINTS,
+        data: [queryArray]
+    }, 'aggregate');
+};
+
+
+/* Every entry names its parent, null at the top level, so a client can nest the flat list. */
+const withParentFolder = (folder) => ({ ...folder, parentFolderId: folder.parentFolderId || null });
 
 exports.getDefaultFolderData = (uid,query,companyId,projectId) => {
     return new Promise((resolve, reject) => {
         try {
-            const defaultPrivate = {
-                projectId : new mongoose.Types.ObjectId(projectId),
-                deletedStatusKey: { $nin: [1] },
-            };
-            const defaultPublic = {
-                projectId : new mongoose.Types.ObjectId(projectId),
-                deletedStatusKey: { $nin: [1] },
-            };
             const queryArray = [
                 {
                     $match: {
-                        $or: [
-                            defaultPrivate,
-                            defaultPublic
-                        ]
+                        projectId : new mongoose.Types.ObjectId(projectId),
+                        deletedStatusKey: { $nin: [1] },
                     }
                 }
             ];
@@ -102,7 +70,7 @@ exports.getDefaultFolderData = (uid,query,companyId,projectId) => {
                 data: [queryArray]
             }
             MongoDbCrudOpration(companyId, mongoObj, 'aggregate').then((res)=>{
-                resolve(res);
+                resolve((res || []).map(withParentFolder));
             }).catch((error)=>{
                 reject(error);
             })
@@ -125,7 +93,7 @@ exports.getSprintFolder = async (req,res) => {
         const companyObj = {
             type: SCHEMA_TYPE.COMPANY_USERS,
             data: [
-                { userId: uid },
+                { userId: uid, ...ACTIVE_SEAT },
                 { roleType: 1, _id: 0 }
             ]
         };
@@ -137,19 +105,16 @@ exports.getSprintFolder = async (req,res) => {
         if (req.query.collection) {
             if (req.query.collection === 'sprints' || req.query.collection === 'folders') {
                 if (req.query.count) {
-                    let data = [
-                        {
-                            $match: {
-                                projectId: new mongoose.Types.ObjectId(projectId),
-                                // BUG-032 / #86 fix: count was including
-                                // soft-deleted sprints/folders, which made the
-                                // sidebar counters disagree with the actual
-                                // list (the list-rendering branches below use
-                                // `deletedStatusKey: { $nin: [1] }`).
-                                deletedStatusKey: { $nin: [1] }
-                            }
-                        },
-                    ]
+                    // BUG-032 / #86 fix: count was including soft-deleted
+                    // sprints/folders, which made the sidebar counters disagree
+                    // with the actual list.
+                    const countMatch = req.query.collection === 'sprints'
+                        ? await exports.sprintVisibilityMatch(uid, companyId, projectId, roleType)
+                        : {
+                            projectId: new mongoose.Types.ObjectId(projectId),
+                            deletedStatusKey: { $nin: [1] }
+                        };
+                    let data = [{ $match: countMatch }]
                     if (req.query.fields) {
                         const fields = req.query.fields.split(',');
                         const projection = {};

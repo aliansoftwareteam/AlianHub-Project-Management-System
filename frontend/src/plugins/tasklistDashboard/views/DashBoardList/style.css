@@ -1,6 +1,9 @@
 .list_view_dashboard {
   overflow-y: auto;
   height: calc(100% - 40px);
+}
+/* Where a spacing utility is on the element too, the utility decides; :where() adds no weight. */
+.list_view_dashboard:where(:not(.mt-20px)) {
   margin-top: 10px;
 }
 .assignee-user{
@@ -20,9 +23,6 @@
 .search__in-dropdown .drop-down-item{
   margin-bottom: 5px;
 }
-.search-datas-das{
-  width: 392px;
-}
 .colum-1-calss{
   border: none !important;
 }
@@ -30,9 +30,6 @@
   padding-left: 25px !important;
 }
 @container dashboard (max-width: 767px) {
-  .search-datas-das {
-    width: 170px;
-  } 
   .group_by {
     margin-right: 5px !important;
   }
@@ -40,15 +37,9 @@
     padding: 0px 16px 15px 0!important;
     height: calc(100% - 50px);
   }
-  .search-datas-das {
-    width: 200px;
-  }
 }
 
 @container dashboard (max-width: 767px) {
-  .search-datas-das {
-    width: 170px;
-  } 
   .group_by {
     margin-right: 5px !important;
   }
@@ -61,9 +52,6 @@
 }
 
 @container dashboard (max-width: 576px) {
-  .search-datas-das {
-    width: 145px;
-  }
   .group_by {
     margin-right: 5px !important;
   }

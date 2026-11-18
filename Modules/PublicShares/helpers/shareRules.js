@@ -3,7 +3,7 @@
 
 const crypto = require('crypto');
 
-const ENTITY_TYPES = Object.freeze(['sprint', 'report', 'page', 'form']);
+const ENTITY_TYPES = Object.freeze(['sprint', 'report', 'page', 'form', 'client_view']);
 const OBJECT_ID_PATTERN = /^[0-9a-fA-F]{24}$/;
 // Accept legacy 16-byte (32-hex) tokens and new 32-byte (64-hex) tokens.
 const TOKEN_PATTERN = /^[0-9a-f]{32,64}$/;
@@ -101,7 +101,6 @@ const SAFE_EMBED_SRC = new RegExp(
     + ')[\\w\\-/?=&.%]*$',
     'i',
 );
-exports.SAFE_EMBED_SRC = SAFE_EMBED_SRC;
 // Inline styles carry the editor's colours and alignment. Layout and anything
 // that can fetch or execute is not on the list.
 const ALLOWED_STYLE_PROPS = new Set([
@@ -148,6 +147,7 @@ const decodeForSchemeCheck = (value) => String(value || '')
     .replace(/&colon;/gi, ':')
     .replace(/&Tab;|&NewLine;/gi, '')
     // Control characters, whitespace and DEL are ignored inside a scheme.
+    // eslint-disable-next-line no-control-regex
     .replace(new RegExp('[\\u0000-\\u0020\\u007f]', 'g'), '')
     .trim();
 
@@ -184,6 +184,7 @@ const cleanAttrs = (tag, raw) => {
     const kept = [];
     let hasHref = false;
     let hasEmbedSrc = false;
+    let hasFullscreen = tag === 'iframe' && /(?:^|\s)allowfullscreen(?=[\s/]|$)/i.test(raw.replace(/"[^"]*"|'[^']*'/g, ''));
     const ATTR = /([a-zA-Z_:][-a-zA-Z0-9_:.]*)\s*=\s*(?:"([^"]*)"|'([^']*)'|([^\s"'=<>`]+))/g;
     let match;
     while ((match = ATTR.exec(raw))) {
@@ -209,7 +210,7 @@ const cleanAttrs = (tag, raw) => {
                 hasEmbedSrc = true;
             }
         } else if (name === 'allowfullscreen' && tag === 'iframe') {
-            kept.push('allowfullscreen');
+            hasFullscreen = true;
         } else if (name === 'data-checked' && tag === 'ul' && (value === 'true' || value === 'false')) {
             // The editor stores a checklist as <ul data-checked="true|false">.
             // Dropping it left plain bullets, losing the ticks entirely.
@@ -227,6 +228,7 @@ const cleanAttrs = (tag, raw) => {
     // the element rather than emit a bare <iframe> pointing nowhere.
     if (tag === 'iframe') {
         if (!hasEmbedSrc) return null;
+        if (hasFullscreen) kept.push('allowfullscreen');
         kept.push('loading="lazy"', 'referrerpolicy="strict-origin-when-cross-origin"');
     }
     return kept.length ? ` ${kept.join(' ')}` : '';
@@ -285,4 +287,5 @@ module.exports = {
     validateIntakeSubmission,
     escapeHtml,
     sanitizeDocHtml,
+    SAFE_EMBED_SRC,
 };

@@ -5,7 +5,7 @@
                 <div class="d-flex overflow-x-auto style-scroll media__component-left">
                     <div
                         v-for="(file, index) in modelValue" :key="index"
-                        class="border border-radius-5-px cursor-pointer position-re d-flex align-items-center justify-content-center mr-10px media__file-value"
+                        class="border-radius-5-px cursor-pointer position-re d-flex align-items-center justify-content-center mr-10px media__file-value"
                     >
                         <img :src="closeIcon" alt="closeIcon" class="position-ab cursor-pointer close__icon-img"  @click.stop="removeItem(index)">
                         <Image
@@ -16,8 +16,8 @@
                         />
                     </div>
                 </div>
-                <div class="d-flex bg-gray d-flex align-items-center justify-content-center border-radius-5-px cursor-pointer media__component-right" @click.stop="$emit('addNew')">
-                    <img :src="addNew" :alt="addNew" class="add__new-image">
+                <div class="d-flex align-items-center justify-content-center border-radius-5-px cursor-pointer media__component-right" @click.stop="$emit('addNew')">
+                    <span class="ah-mask-icon add__new-image" :style="maskOf(addNew)"></span>
                 </div>
             </div>
         </div>
@@ -30,6 +30,7 @@ import {defineProps, defineEmits} from "vue";
 
 // COMPONENTS
 import Image from "@/components/atom/ImageIcon/ImageIcon.vue"
+import { maskOf } from "@/utils/iconMask";
 
 // IMAGES
 const closeIcon = require("@/assets/images/png/cancelImage.png");
@@ -63,6 +64,8 @@ function removeItem(index) {
     }
     .media__component-right{
         width: 30px;
+        background: var(--fill);
+        color: var(--ink-2);
     }
     .media__component-right .add__new-image{
         width: 15px; 
@@ -74,6 +77,8 @@ function removeItem(index) {
     }
     .media__file-value{
         min-width: 140px;
+        border: 1px solid var(--border);
+        background: var(--surface-2);
     }
     .media__image{
        width: 140px; 

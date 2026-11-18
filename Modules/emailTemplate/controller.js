@@ -24,7 +24,7 @@ exports.updateEmailTemplate = (req,res) => {
                 return;
             }
             const newReturnStatement = `return {\n  subject: \`${req.body.subject}\`,\n  mail: \`${req.body.emailData}\`\n}`;
-            const updatedData = data.replace(/return\s*\{[\s\S]*?mail:\s*\`[\s\S]*?\`\s*\}/, newReturnStatement);
+            const updatedData = data.replace(/return\s*\{[\s\S]*?mail:\s*`[\s\S]*?`\s*\}/, newReturnStatement);
 
             // Write the updated content back to the file
             fs.writeFile(filePath, updatedData, 'utf8', (err) => {

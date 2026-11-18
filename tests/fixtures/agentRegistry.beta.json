@@ -1,0 +1,990 @@
+{
+  "source": "origin/beta fea5e063184a8e4e9c2804c80a0dd4313354830c Modules/Agents/registry.js, Modules/Agents/actions.js and Modules/Mcp/tools.js, plus aifield.fill from task 044 slice 4",
+  "registryKeys": [
+    "tasks.next",
+    "tasks.search",
+    "task.get",
+    "task.comment",
+    "task.status.set",
+    "task.link",
+    "task.assign",
+    "task.update",
+    "aifield.fill",
+    "task.sprint.move",
+    "subtask.create",
+    "task.create",
+    "timelog.start",
+    "timelog.stop",
+    "docs.read",
+    "page.draft",
+    "chat.post",
+    "reminder.create",
+    "deploy.staging"
+  ],
+  "registryManifest": {
+    "actions": [
+      {
+        "key": "tasks.next",
+        "label": "See the next task assigned",
+        "risk": "low",
+        "undoable": false,
+        "write": false,
+        "cost": "read",
+        "permission": "task.task_list"
+      },
+      {
+        "key": "tasks.search",
+        "label": "Search tasks",
+        "risk": "low",
+        "undoable": false,
+        "write": false,
+        "cost": "read",
+        "permission": "task.task_list"
+      },
+      {
+        "key": "task.get",
+        "label": "Read a task",
+        "risk": "low",
+        "undoable": false,
+        "write": false,
+        "cost": "read+summary",
+        "permission": "task.task_list"
+      },
+      {
+        "key": "task.comment",
+        "label": "Comment on a task",
+        "risk": "low",
+        "undoable": true,
+        "write": true,
+        "cost": "write",
+        "permission": "task.task_comment"
+      },
+      {
+        "key": "task.status.set",
+        "label": "Set the status",
+        "risk": "low",
+        "undoable": true,
+        "write": true,
+        "cost": "write",
+        "constraint": "statusType must not be \"close\"; status name must be In progress or In review",
+        "permission": "task.task_status"
+      },
+      {
+        "key": "task.link",
+        "label": "Add a link to a task",
+        "risk": "low",
+        "undoable": true,
+        "write": true,
+        "cost": "write",
+        "permission": "task.task_attachments"
+      },
+      {
+        "key": "task.assign",
+        "label": "Assign a task",
+        "risk": "medium",
+        "undoable": true,
+        "write": true,
+        "cost": "write",
+        "permission": "task.task_assignee"
+      },
+      {
+        "key": "task.update",
+        "label": "Change a task's details",
+        "risk": "medium",
+        "undoable": true,
+        "write": true,
+        "cost": "write",
+        "fields": [
+          "TaskName",
+          "description",
+          "rawDescription",
+          "Task_Priority",
+          "DueDate",
+          "startDate",
+          "tagsArray",
+          "checklistArray",
+          "points",
+          "totalEstimatedTime"
+        ],
+        "permission": {
+          "byField": {
+            "TaskName": "task.task_name_edit",
+            "description": "task.task_description",
+            "rawDescription": "task.task_description",
+            "Task_Priority": "task.task_priority",
+            "DueDate": "task.task_due_date",
+            "startDate": "task.task_start_date",
+            "tagsArray": "task.task_tag",
+            "checklistArray": "task.task_checklist",
+            "points": "task.task_estimated_hours",
+            "totalEstimatedTime": "task.task_estimated_hours"
+          }
+        }
+      },
+      {
+        "key": "aifield.fill",
+        "label": "Fill in an AI field",
+        "risk": "medium",
+        "undoable": true,
+        "write": true,
+        "cost": "write",
+        "permission": "task.task_custom_field"
+      },
+      {
+        "key": "task.sprint.move",
+        "label": "Move a task to another list",
+        "risk": "medium",
+        "undoable": true,
+        "write": true,
+        "cost": "write",
+        "permission": "task.task_move"
+      },
+      {
+        "key": "subtask.create",
+        "label": "Create a subtask",
+        "risk": "low",
+        "undoable": true,
+        "write": true,
+        "cost": "write",
+        "permission": "task.sub_task_create"
+      },
+      {
+        "key": "task.create",
+        "label": "Create a task",
+        "risk": "medium",
+        "undoable": true,
+        "write": true,
+        "cost": "write",
+        "constraint": "always the project's opening status; never assigned; only in a project the token can see",
+        "permission": "task.task_create"
+      },
+      {
+        "key": "timelog.start",
+        "label": "Start a timer",
+        "risk": "low",
+        "undoable": true,
+        "write": true,
+        "cost": "write",
+        "permission": "sheet_settings.user_timesheet"
+      },
+      {
+        "key": "timelog.stop",
+        "label": "Stop a timer",
+        "risk": "low",
+        "undoable": true,
+        "write": true,
+        "cost": "write",
+        "permission": "sheet_settings.user_timesheet"
+      },
+      {
+        "key": "docs.read",
+        "label": "Read a linked doc",
+        "risk": "low",
+        "undoable": false,
+        "write": false,
+        "cost": "read",
+        "permission": "project.project_details"
+      },
+      {
+        "key": "page.draft",
+        "label": "Draft a doc",
+        "risk": "medium",
+        "undoable": true,
+        "write": true,
+        "cost": "write",
+        "permission": "project.project_details"
+      },
+      {
+        "key": "chat.post",
+        "label": "Post in a chat channel",
+        "risk": "low",
+        "undoable": false,
+        "write": true,
+        "cost": "write",
+        "permission": "task.task_comment"
+      },
+      {
+        "key": "reminder.create",
+        "label": "Create a reminder",
+        "risk": "low",
+        "undoable": false,
+        "write": true,
+        "cost": "write",
+        "permission": {
+          "key": "task.task_list",
+          "write": false
+        }
+      },
+      {
+        "key": "deploy.staging",
+        "label": "Ask to publish to the test site",
+        "risk": "high",
+        "undoable": false,
+        "write": true,
+        "cost": "write",
+        "gate": "owner_admin",
+        "proposeOnly": true,
+        "permission": "settings.settings_edit_company"
+      }
+    ],
+    "never": [
+      "project.delete",
+      "task.delete",
+      "billing.*",
+      "deploy.production",
+      "git.merge",
+      "member.remove",
+      "permissions.edit",
+      "status.set(\"Done\")"
+    ],
+    "agentStatusNames": [
+      "in progress",
+      "in review"
+    ],
+    "autonomy": [
+      {
+        "level": 0,
+        "label": "Assist — answers only, proposes nothing on its own",
+        "actsOn": []
+      },
+      {
+        "level": 1,
+        "label": "Suggest — proposes everything, a person approves",
+        "actsOn": []
+      },
+      {
+        "level": 2,
+        "label": "Act in bounds — low and medium risk directly, proposes the rest",
+        "actsOn": [
+          "low",
+          "medium"
+        ]
+      },
+      {
+        "level": 3,
+        "label": "Scheduled — as L2, and may run unattended",
+        "actsOn": [
+          "low",
+          "medium"
+        ]
+      }
+    ]
+  },
+  "actionsManifest": {
+    "actions": [
+      {
+        "key": "tasks.next",
+        "label": "See the next task assigned",
+        "risk": "low",
+        "undoable": false,
+        "write": false,
+        "cost": "read",
+        "permission": "task.task_list",
+        "rating": {
+          "write": false,
+          "reversible": true,
+          "scope": "workspace",
+          "money": false
+        }
+      },
+      {
+        "key": "tasks.search",
+        "label": "Search tasks",
+        "risk": "low",
+        "undoable": false,
+        "write": false,
+        "cost": "read",
+        "permission": "task.task_list",
+        "rating": {
+          "write": false,
+          "reversible": true,
+          "scope": "workspace",
+          "money": false
+        }
+      },
+      {
+        "key": "task.get",
+        "label": "Read a task",
+        "risk": "low",
+        "undoable": false,
+        "write": false,
+        "cost": "read+summary",
+        "permission": "task.task_list",
+        "rating": {
+          "write": false,
+          "reversible": true,
+          "scope": "task",
+          "money": false
+        }
+      },
+      {
+        "key": "task.comment",
+        "label": "Comment on a task",
+        "risk": "low",
+        "undoable": true,
+        "write": true,
+        "cost": "write",
+        "permission": "task.task_comment",
+        "rating": {
+          "write": true,
+          "reversible": true,
+          "scope": "task",
+          "money": false
+        }
+      },
+      {
+        "key": "task.status.set",
+        "label": "Set the status",
+        "risk": "low",
+        "undoable": true,
+        "write": true,
+        "cost": "write",
+        "constraint": "statusType must not be \"close\"; status name must be In progress or In review",
+        "permission": "task.task_status",
+        "rating": {
+          "write": true,
+          "reversible": true,
+          "scope": "task",
+          "money": false
+        }
+      },
+      {
+        "key": "task.link",
+        "label": "Add a link to a task",
+        "risk": "low",
+        "undoable": true,
+        "write": true,
+        "cost": "write",
+        "permission": "task.task_attachments",
+        "rating": {
+          "write": true,
+          "reversible": true,
+          "scope": "task",
+          "money": false
+        }
+      },
+      {
+        "key": "task.assign",
+        "label": "Assign a task",
+        "risk": "medium",
+        "undoable": true,
+        "write": true,
+        "cost": "write",
+        "permission": "task.task_assignee",
+        "rating": {
+          "write": true,
+          "reversible": true,
+          "scope": "task",
+          "money": false
+        }
+      },
+      {
+        "key": "task.update",
+        "label": "Change a task's details",
+        "risk": "medium",
+        "undoable": true,
+        "write": true,
+        "cost": "write",
+        "fields": [
+          "TaskName",
+          "description",
+          "rawDescription",
+          "Task_Priority",
+          "DueDate",
+          "startDate",
+          "tagsArray",
+          "checklistArray",
+          "points",
+          "totalEstimatedTime"
+        ],
+        "permission": {
+          "byField": {
+            "TaskName": "task.task_name_edit",
+            "description": "task.task_description",
+            "rawDescription": "task.task_description",
+            "Task_Priority": "task.task_priority",
+            "DueDate": "task.task_due_date",
+            "startDate": "task.task_start_date",
+            "tagsArray": "task.task_tag",
+            "checklistArray": "task.task_checklist",
+            "points": "task.task_estimated_hours",
+            "totalEstimatedTime": "task.task_estimated_hours"
+          }
+        },
+        "rating": {
+          "write": true,
+          "reversible": true,
+          "scope": "task",
+          "money": false
+        }
+      },
+      {
+        "key": "aifield.fill",
+        "label": "Fill in an AI field",
+        "risk": "medium",
+        "undoable": true,
+        "write": true,
+        "cost": "write",
+        "permission": "task.task_custom_field",
+        "rating": {
+          "write": true,
+          "reversible": true,
+          "scope": "task",
+          "money": false
+        }
+      },
+      {
+        "key": "task.sprint.move",
+        "label": "Move a task to another list",
+        "risk": "medium",
+        "undoable": true,
+        "write": true,
+        "cost": "write",
+        "permission": "task.task_move",
+        "rating": {
+          "write": true,
+          "reversible": true,
+          "scope": "project",
+          "money": false
+        }
+      },
+      {
+        "key": "subtask.create",
+        "label": "Create a subtask",
+        "risk": "low",
+        "undoable": true,
+        "write": true,
+        "cost": "write",
+        "permission": "task.sub_task_create",
+        "rating": {
+          "write": true,
+          "reversible": true,
+          "scope": "task",
+          "money": false
+        }
+      },
+      {
+        "key": "task.create",
+        "label": "Create a task",
+        "risk": "medium",
+        "undoable": true,
+        "write": true,
+        "cost": "write",
+        "constraint": "always the project's opening status; never assigned; only in a project the token can see",
+        "permission": "task.task_create",
+        "rating": {
+          "write": true,
+          "reversible": true,
+          "scope": "project",
+          "money": false
+        }
+      },
+      {
+        "key": "timelog.start",
+        "label": "Start a timer",
+        "risk": "low",
+        "undoable": true,
+        "write": true,
+        "cost": "write",
+        "permission": "sheet_settings.user_timesheet",
+        "rating": {
+          "write": true,
+          "reversible": true,
+          "scope": "task",
+          "money": false
+        }
+      },
+      {
+        "key": "timelog.stop",
+        "label": "Stop a timer",
+        "risk": "low",
+        "undoable": true,
+        "write": true,
+        "cost": "write",
+        "permission": "sheet_settings.user_timesheet",
+        "rating": {
+          "write": true,
+          "reversible": true,
+          "scope": "task",
+          "money": false
+        }
+      },
+      {
+        "key": "docs.read",
+        "label": "Read a linked doc",
+        "risk": "low",
+        "undoable": false,
+        "write": false,
+        "cost": "read",
+        "permission": "project.project_details",
+        "rating": {
+          "write": false,
+          "reversible": true,
+          "scope": "project",
+          "money": false
+        }
+      },
+      {
+        "key": "page.draft",
+        "label": "Draft a doc",
+        "risk": "medium",
+        "undoable": true,
+        "write": true,
+        "cost": "write",
+        "permission": "project.project_details",
+        "rating": {
+          "write": true,
+          "reversible": true,
+          "scope": "project",
+          "money": false
+        }
+      },
+      {
+        "key": "chat.post",
+        "label": "Post in a chat channel",
+        "risk": "low",
+        "undoable": false,
+        "write": true,
+        "cost": "write",
+        "permission": "task.task_comment",
+        "rating": {
+          "write": true,
+          "reversible": false,
+          "scope": "task",
+          "money": false
+        }
+      },
+      {
+        "key": "reminder.create",
+        "label": "Create a reminder",
+        "risk": "low",
+        "undoable": false,
+        "write": true,
+        "cost": "write",
+        "permission": {
+          "key": "task.task_list",
+          "write": false
+        },
+        "rating": {
+          "write": true,
+          "reversible": false,
+          "scope": "task",
+          "money": false
+        }
+      },
+      {
+        "key": "deploy.staging",
+        "label": "Ask to publish to the test site",
+        "risk": "high",
+        "undoable": false,
+        "write": true,
+        "cost": "write",
+        "gate": "owner_admin",
+        "proposeOnly": true,
+        "permission": "settings.settings_edit_company",
+        "rating": {
+          "write": true,
+          "reversible": false,
+          "scope": "workspace",
+          "money": false
+        }
+      }
+    ],
+    "never": [
+      "project.delete",
+      "task.delete",
+      "billing.*",
+      "deploy.production",
+      "git.merge",
+      "member.remove",
+      "permissions.edit",
+      "status.set(\"Done\")"
+    ],
+    "agentStatusNames": [
+      "in progress",
+      "in review"
+    ],
+    "autonomy": [
+      {
+        "level": 0,
+        "label": "Assist — answers only, proposes nothing on its own",
+        "actsOn": []
+      },
+      {
+        "level": 1,
+        "label": "Suggest — proposes everything, a person approves",
+        "actsOn": []
+      },
+      {
+        "level": 2,
+        "label": "Act in bounds — low and medium risk directly, proposes the rest",
+        "actsOn": [
+          "low",
+          "medium"
+        ]
+      },
+      {
+        "level": 3,
+        "label": "Scheduled — as L2, and may run unattended",
+        "actsOn": [
+          "low",
+          "medium"
+        ]
+      }
+    ],
+    "ratingKeys": [
+      "write",
+      "reversible",
+      "scope",
+      "money"
+    ],
+    "scopes": [
+      "task",
+      "project",
+      "workspace"
+    ]
+  },
+  "ratings": {
+    "tasks.next": {
+      "write": false,
+      "reversible": true,
+      "scope": "workspace",
+      "money": false
+    },
+    "tasks.search": {
+      "write": false,
+      "reversible": true,
+      "scope": "workspace",
+      "money": false
+    },
+    "task.get": {
+      "write": false,
+      "reversible": true,
+      "scope": "task",
+      "money": false
+    },
+    "docs.read": {
+      "write": false,
+      "reversible": true,
+      "scope": "project",
+      "money": false
+    },
+    "task.comment": {
+      "write": true,
+      "reversible": true,
+      "scope": "task",
+      "money": false
+    },
+    "task.status.set": {
+      "write": true,
+      "reversible": true,
+      "scope": "task",
+      "money": false
+    },
+    "task.link": {
+      "write": true,
+      "reversible": true,
+      "scope": "task",
+      "money": false
+    },
+    "task.assign": {
+      "write": true,
+      "reversible": true,
+      "scope": "task",
+      "money": false
+    },
+    "task.update": {
+      "write": true,
+      "reversible": true,
+      "scope": "task",
+      "money": false
+    },
+    "aifield.fill": {
+      "write": true,
+      "reversible": true,
+      "scope": "task",
+      "money": false
+    },
+    "subtask.create": {
+      "write": true,
+      "reversible": true,
+      "scope": "task",
+      "money": false
+    },
+    "timelog.start": {
+      "write": true,
+      "reversible": true,
+      "scope": "task",
+      "money": false
+    },
+    "timelog.stop": {
+      "write": true,
+      "reversible": true,
+      "scope": "task",
+      "money": false
+    },
+    "task.sprint.move": {
+      "write": true,
+      "reversible": true,
+      "scope": "project",
+      "money": false
+    },
+    "task.create": {
+      "write": true,
+      "reversible": true,
+      "scope": "project",
+      "money": false
+    },
+    "page.draft": {
+      "write": true,
+      "reversible": true,
+      "scope": "project",
+      "money": false
+    },
+    "chat.post": {
+      "write": true,
+      "reversible": false,
+      "scope": "task",
+      "money": false
+    },
+    "reminder.create": {
+      "write": true,
+      "reversible": false,
+      "scope": "task",
+      "money": false
+    },
+    "deploy.staging": {
+      "write": true,
+      "reversible": false,
+      "scope": "workspace",
+      "money": false
+    }
+  },
+  "toolNames": [
+    "tasks.next",
+    "tasks.search",
+    "task.get",
+    "task.comment",
+    "task.status.set",
+    "task.link",
+    "task.create",
+    "subtask.create",
+    "timelog.start",
+    "timelog.stop",
+    "docs.read"
+  ],
+  "toolManifest": [
+    {
+      "name": "tasks.next",
+      "description": "Shows the next task assigned to the person: the most urgent first, then the soonest due. Changes nothing.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "projectId": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    {
+      "name": "tasks.search",
+      "description": "Finds tasks the person can open, by text, status or project. Changes nothing.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "query": {
+            "type": "string"
+          },
+          "projectId": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string"
+          },
+          "limit": {
+            "type": "integer"
+          }
+        }
+      }
+    },
+    {
+      "name": "task.get",
+      "description": "Shows one task in full: its goal, what counts as done, linked tasks and docs, and what the comments settled. Read it before you work on the task. Changes nothing.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "taskId": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "taskId"
+        ]
+      }
+    },
+    {
+      "name": "task.comment",
+      "description": "Adds a comment to a task at once, and the person can undo it. Use it to report what you found, ask a question or share a link. To mention a member so they are notified, write @[Their Name](their member id) with the id from members.list, or @Their Name exactly as members.list shows it; @[All](everyone) reaches everyone who can open the task. Only people who can open the task are notified, and never the person you act for: the answer lists who was told in mentioned, a named person who was not, and why, in notNotified, and a name that matched no one in notFound.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "taskId": {
+            "type": "string"
+          },
+          "body": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "taskId",
+          "body"
+        ]
+      }
+    },
+    {
+      "name": "task.status.set",
+      "description": "Sets a task to In progress or In review at once. You cannot close a task: a person does that.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "taskId": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "taskId",
+          "status"
+        ]
+      }
+    },
+    {
+      "name": "task.link",
+      "description": "Attaches a link to a task, such as a pull request, a branch or a doc, at once. The person can undo it.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "taskId": {
+            "type": "string"
+          },
+          "url": {
+            "type": "string"
+          },
+          "label": {
+            "type": "string"
+          },
+          "kind": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "taskId",
+          "url"
+        ]
+      }
+    },
+    {
+      "name": "task.create",
+      "description": "Adds a new task to a project, unassigned and in its first status, at once. Use it for work that is not on the board yet, and put the goal and what counts as done in the description.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "projectId": {
+            "type": "string"
+          },
+          "title": {
+            "type": "string"
+          },
+          "description": {
+            "type": "string"
+          },
+          "sprintId": {
+            "type": "string"
+          },
+          "priority": {
+            "type": "string",
+            "enum": [
+              "URGENT",
+              "HIGH",
+              "MEDIUM",
+              "LOW"
+            ]
+          }
+        },
+        "required": [
+          "projectId",
+          "title"
+        ]
+      }
+    },
+    {
+      "name": "subtask.create",
+      "description": "Adds one subtask to a task at once. Call it once for each subtask.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "taskId": {
+            "type": "string"
+          },
+          "title": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "taskId",
+          "title"
+        ]
+      }
+    },
+    {
+      "name": "timelog.start",
+      "description": "Starts a timer on a task at once, so the time is logged for the person.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "taskId": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "taskId"
+        ]
+      }
+    },
+    {
+      "name": "timelog.stop",
+      "description": "Stops the running timer at once and saves the time as a time entry.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "taskId": {
+            "type": "string"
+          },
+          "note": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "taskId"
+        ]
+      }
+    },
+    {
+      "name": "docs.read",
+      "description": "Shows a doc linked from a task, given its id. Changes nothing.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "pageId": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "pageId"
+        ]
+      }
+    }
+  ]
+}

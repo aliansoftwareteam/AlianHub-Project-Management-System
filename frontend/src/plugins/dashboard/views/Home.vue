@@ -1,17 +1,17 @@
 <template>
     <div class="w-100 h-100 overflow-y-auto"
         v-if="checkPermission('project') !== null && checkPermission('project.project_list') !== null && checkPermission('task.task_list') !== null">
-        <div class="bg-white px-1 d-flex white align-items-center justify-content-between p-15px border-gray">
+        <div class="home-bg-white px-1 d-flex home-white align-items-center justify-content-between p-15px home-border-gray">
             <div>
-                <h3 class="m-0 font-size-18 font-weight-700 blue">{{ $t('Home.Home') }}</h3>
+                <h3 class="m-0 home-font-size-18 home-font-weight-700 home-blue">{{ $t('Home.Home') }}</h3>
             </div>
             <div class="dashboard__calendar-wrapper">
-                <button class="text-capitalize outline-primary mr-10-px d-flex align-items-center" @click="toggleDashboardLock()">
+                <button class="text-capitalize home-outline-primary mr-10-px d-flex align-items-center" @click="toggleDashboardLock()">
                     <img :src="companyUser.dashboardLocked ? unlockImage : lockImage" alt="lock" class="mr-5px" />{{ companyUser.dashboardLocked ? $t('Home.unlock') : $t('Home.lock') }}
                 </button>
-                <button class="text-capitalize outline-primary mr-10-px" @click="addItem">{{ $t(`dashboardCard.add_card`) }}</button>
+                <button class="text-capitalize home-outline-primary mr-10-px" @click="addItem">{{ $t(`dashboardCard.add_card`) }}</button>
                 <div class="position-re dashboard__settings">
-                    <button class="outline-primary dashboard__settings-btn" :title="$t('dashboardCard.dashboard_settings')" @click.stop="dashMenuOpen = !dashMenuOpen">
+                    <button class="home-outline-primary dashboard__settings-btn" :title="$t('dashboardCard.dashboard_settings')" @click.stop="dashMenuOpen = !dashMenuOpen">
                         <img :src="settingIcon" alt="settings" />
                     </button>
                     <template v-if="dashMenuOpen">
@@ -34,8 +34,6 @@
                 <DashboardSpinner :is-spinner="isSpinner"/>
             </div>
         </div>
-        <TaskDetail v-if="isTaskDetail" :companyId="companyId" :projectId="projectId" :sprintId="sprintId"
-            :taskId="taskId" :isTaskDetailSideBar="isTaskDetail" @toggleTaskDetail="toggleTaskDetail" :zIndex='7' />
     </div>
     <div v-else class="d-flex bg-off-white align-items-center justify-content-center w-100 h-100">
         <img :src="accessDeniedImage" alt="accessDenied">
@@ -61,12 +59,13 @@ import { useRouter } from 'vue-router';
 import { useCustomComposable } from '@/composable';
 import { apiRequest, apiRequestWithoutCompnay } from '@/services';
 import { useGetterFunctions } from "@/composable/index.js";
-import TaskDetail from '@/views/TaskDetail/TaskDetail.vue';
+import { openTask } from '@/components/organisms/TaskDetailOverlay/useTaskOverlay';
 import ConfirmModal from '@/components/atom/Modal/Modal.vue';
-import { defineComponent ,ref,inject,computed,onMounted,provide, nextTick} from "vue";
+import { defineComponent ,ref,inject,computed,onMounted,provide} from "vue";
 import DashboardSpinner from '@/components/atom/Dashboard/DashboardSpinner.vue'
 import { useToast } from 'vue-toast-notification';
 import { useI18n } from 'vue-i18n';
+import { isOwnerOrAdmin } from "@/utils/roles";
 
 const { getters,dispatch,commit } = useStore();
 const { checkPermission } = useCustomComposable();
@@ -103,31 +102,25 @@ const allProjectsArrayFilter = ref(JSON.parse(JSON.stringify(projectsGetter.valu
 
 const {getUser} = useGetterFunctions();
 
-const toggleTaskDetail = (task,close=false,isComment = false) => {
+const toggleTaskDetail = (task, close = false, isComment = false) => {
     isTaskDetail.value = false;
-    if(close == true) {
+    if (close == true) {
         taskDetail.value = task;
-        router.push({name: 'Home',query: {}, params: {cid: companyId.value}})
         return;
     }
-    projectId.value = '';
-    sprintId.value = '';
-    taskId.value = '';
-    nextTick(()=>{
-        if(isComment) {
-            router.push({name: 'Home',query: {detailTab: "comment"}, params: {cid: companyId.value}})
-        }else{
-            router.push({name: 'Home',query: {detailTab: "task-detail-tab"}, params: {cid: companyId.value}});
-        }
-        openInNewTab(task);
-    })
-}
-const openInNewTab = (task) => {
-    projectId.value = task.ProjectID
-    sprintId.value = task.sprintId
-    taskId.value = task._id
+    projectId.value = task.ProjectID;
+    sprintId.value = task.sprintId;
+    taskId.value = task._id;
     isTaskDetail.value = true;
-};
+    openTask({
+        companyId: companyId.value,
+        projectId: task.ProjectID,
+        sprintId: task.sprintId,
+        folderId: task.folderObjId || task.sprintArray?.folderId || '',
+        taskId: task._id,
+        tab: isComment ? 'activity' : ''
+    });
+}
 
 const companyUser = computed(() => getUser(userId.value));
 
@@ -251,7 +244,7 @@ const getData = () => {
             let publicQuery = {
                 isPrivateSpace:false
             }
-            if(companyUserDetail.value.roleType !== 1 && companyUserDetail.value.roleType !== 2 && !getters["settings/rules"].toggle.showAllProjects) {
+            if(!isOwnerOrAdmin(companyUserDetail.value.roleType) && !getters["settings/rules"].toggle.showAllProjects) {
                 publicQuery.AssigneeUserId = {
                     $in:[uid]
                 }
@@ -262,7 +255,7 @@ const getData = () => {
             let privateQuery = {
                 isPrivateSpace:true
             }
-            if(companyUserDetail.value.roleType !== 1 && companyUserDetail.value.roleType !== 2) {
+            if(!isOwnerOrAdmin(companyUserDetail.value.roleType)) {
                 privateQuery.AssigneeUserId = {
                     $in:[uid]
                 }
@@ -282,7 +275,7 @@ const getData = () => {
                 }).then(()=>{
                     allProjectsArrayFilter.value = projectsGetter.value.data ? [...projectsGetter.value.data] : [];
                     if(allProjectsArrayFilter.value && allProjectsArrayFilter.value.length){
-                        allProjectsArrayFilter.value = [1,2].includes(roleType) === false ? allProjectsArrayFilter.value.filter((x) => x._id !== '6571e7195470e64b1203295c' && !x.isRestrict) : allProjectsArrayFilter.value.filter((x) => !x.isRestrict)
+                        allProjectsArrayFilter.value = isOwnerOrAdmin(roleType) === false ? allProjectsArrayFilter.value.filter((x) => x._id !== '6571e7195470e64b1203295c' && !x.isRestrict) : allProjectsArrayFilter.value.filter((x) => !x.isRestrict)
                     }
                     isSpinner.value = false;
                 })
@@ -300,7 +293,7 @@ const getData = () => {
         const roleType = companyUserDetail.value.roleType;
         allProjectsArrayFilter.value = [...projectsGetter.value.data.filter((x) => !x.isRestrict)];
         if(allProjectsArrayFilter.value && allProjectsArrayFilter.value.length){
-            allProjectsArrayFilter.value = [1,2].includes(roleType) === false ? allProjectsArrayFilter.value.filter((x) => x._id !== '6571e7195470e64b1203295c') : allProjectsArrayFilter.value
+            allProjectsArrayFilter.value = isOwnerOrAdmin(roleType) === false ? allProjectsArrayFilter.value.filter((x) => x._id !== '6571e7195470e64b1203295c') : allProjectsArrayFilter.value
         }
         isSpinner.value = false;
     }
@@ -334,6 +327,36 @@ provide('isSupport', ref(false));
 provide('showLoader', ref(false));
 provide('progress', ref(0));
 </script>
+<style scoped>
+.home-font-size-18 {
+    font-size: 18px !important;
+}
+.home-font-weight-700 {
+    font-weight: 700 !important;
+}
+.home-bg-white {
+    background-color: var(--surface);
+}
+.home-blue {
+    color: var(--brand) !important;
+}
+.home-white {
+    color: var(--on-brand) !important;
+}
+.home-border-gray {
+    border: 1px solid var(--hairline) !important;
+}
+.home-outline-primary {
+    height: 30px;
+    background: var(--surface);
+    border: 1px solid var(--brand);
+    border-radius: 4px;
+    color: var(--brand);
+    cursor: pointer;
+    font-family: var(--font-ui);
+}
+</style>
+
 <style scoped src="../css/style.css">
 </style>
 <style scoped>
@@ -347,8 +370,8 @@ provide('progress', ref(0));
     top: calc(100% + 6px);
     z-index: 21;
     min-width: 180px;
-    background: #fff;
-    border: 1px solid #e5e7eb;
+    background: var(--surface);
+    border: 1px solid var(--border);
     border-radius: 8px;
     box-shadow: 0 6px 20px rgba(0, 0, 0, 0.12);
     padding: 4px;
@@ -357,10 +380,10 @@ provide('progress', ref(0));
 .dashboard__settings-item {
     padding: 8px 12px;
     font-size: 13px;
-    color: #3a3f52;
+    color: var(--ink);
     border-radius: 6px;
     cursor: pointer;
     white-space: nowrap;
 }
-.dashboard__settings-item:hover { background: #f5f7fb; color: #2F3990; }
+.dashboard__settings-item:hover { background: var(--surface-hover); color: var(--brand); }
 </style>

@@ -237,6 +237,7 @@
     import { useCustomComposable } from '@/composable';
     import { onBeforeRouteLeave } from 'vue-router';
     import { abortAllRequests } from "@/services";
+    import { isOwnerOrAdmin } from "@/utils/roles";
 
     const { t } = useI18n();
     const $toast = useToast();
@@ -248,7 +249,7 @@
     const companyUserDetail = computed(() => getters["settings/companyUserDetail"]);
     const projectsGetter = computed(() => {
         const projects = getters["projectData/onlyActiveProjects"];
-        if ([1, 2].includes(companyUserDetail.value?.roleType) === false) {
+        if (isOwnerOrAdmin(companyUserDetail.value?.roleType) === false) {
             return projects?.data?.filter((e) => e._id !== '6571e7195470e64b1203295c') || [];
         }
         return projects?.data || [];
@@ -324,7 +325,7 @@
     // Owner/Admin (roleType 1/2). Hidden from the "Add card" catalog AND from
     // an already-saved layout for anyone below that.
     const MANAGEMENT_ONLY_CARDS = ['MilestoneReportCard', 'ActiveProjectsCard', 'ProjectsByTypeCard', 'RunningProjectsCard'];
-    const isManagementUser = () => [1, 2].includes(companyUserDetail.value?.roleType);
+    const isManagementUser = () => isOwnerOrAdmin(companyUserDetail.value?.roleType);
 
     const getUserDashboard = async() => {
         try {
@@ -501,31 +502,19 @@
             delete updateObject?.filter;
             filterData = filterData.filter((e) => e.comparisonsData.length > 0);
             if(isEditCard.value) {
-                let bodyData = {
-                    queryObject:[
-                        {
-                            userId: userId.value,
-                            templateId: currentLayout.value.templateId,
-                            "cards.uid": editCardId.value
-                        },
-                        {
-                            $set: { 
-                                "cards.$.config.cardData": updateObject,
-                                "cards.$.config.filterData": filterData
-                            }
-                        },
-                        { new: true, useFindAndModify: false }
-                    ],
-                    method:"findOneAndUpdate",
-                    userId: userId.value
-                }
-                const response = await apiRequest("post", `${env.DASHBOARD}`,bodyData);
+                const response = await apiRequest("post", `${env.DASHBOARD}`, {
+                    op: 'updateCard',
+                    templateId: currentLayout.value.templateId,
+                    cardUid: editCardId.value,
+                    cardData: updateObject || {},
+                    filterData,
+                });
                 if(response) {
                     let findIndex = layout.value.findIndex((e)=>e.i === editCardId.value);
                     if(findIndex > -1) {
                         layout.value[findIndex] = {...layout.value[findIndex],cardData:{...(layout.value[findIndex]?.cardData ?? {}),...updateObject},filterData: filterData};
                     }
-                    $toast.success("Dashboard Updated Successfully",{position: 'top-right'});
+                    $toast.success(t('dashboardCard.dashboard_updated'),{position: 'top-right'});
                     currentLayout.value = response.data?.data;
                     isShowModal.value = false;
                     fieldArray.value = {};
@@ -558,31 +547,17 @@
                     }
                 }
         
-                let bodyData = {
-                    queryObject:[
-                        {
-                            userId: userId.value,
-                            templateId: currentLayout.value.templateId,
-                        },
-                        {
-                            $push: {
-                                cards: {
-                                    ...object
-                                }
-                            }
-                        },
-                        { new: true, useFindAndModify: false }
-                    ],
-                    method:"findOneAndUpdate",
-                    userId: userId.value
-                }
-                const response = await apiRequest("post", `${env.DASHBOARD}`,bodyData);
+                const response = await apiRequest("post", `${env.DASHBOARD}`, {
+                    op: 'addCard',
+                    templateId: currentLayout.value.templateId,
+                    card: object,
+                });
                 if(response) {
                     currentLayout.value = response.data?.data;
                     layout.value.push({...posi,i:makeUid,componentId:fieldArray.value.key, cardData: updateObject, filterData: filterData});
                     isShowModal.value = false;
                     fieldArray.value = {};
-                    $toast.success("Dashboard Updated Successfully",{position: 'top-right'});
+                    $toast.success(t('dashboardCard.dashboard_updated'),{position: 'top-right'});
                     scrollToCard(makeUid);
                 }
             }
@@ -613,23 +588,11 @@
     }
     const updatePosition = async(card) => {
         try {
-            let bodyData = {
-                queryObject:[
-                    {
-                        userId: userId.value,
-                        templateId: currentLayout.value.templateId
-                    },
-                    {
-                        $set: {
-                            cards: card
-                        }
-                    },
-                    { new: true, useFindAndModify: false }
-                ],
-                method:"findOneAndUpdate",
-                userId: userId.value
-            }
-            const response = await apiRequest("post", `${env.DASHBOARD}`,bodyData);
+            const response = await apiRequest("post", `${env.DASHBOARD}`, {
+                op: 'setCards',
+                templateId: currentLayout.value.templateId,
+                cards: card,
+            });
             currentLayout.value = response.data?.data;
         } catch (error) {
             console.error(error)
@@ -673,26 +636,13 @@
         let cardIndex = layout.value.findIndex((e) => e.i == cardId);
         layout.value.splice(cardIndex, 1);
         try {
-            let bodyData = {
-                queryObject:[
-                    {
-                        userId: userId.value,
-                        templateId: currentLayout.value.templateId,
-                        "cards.uid": cardId
-                    },
-                    {
-                        $pull: {
-                            cards: { uid: cardId }
-                        }
-                    },
-                    { new: true, useFindAndModify: false }
-                ],
-                method:"findOneAndUpdate",
-                userId: userId.value
-            }
-            const response = await apiRequest("post", `${env.DASHBOARD}`,bodyData);
-            $toast.success("Dashboard Updated Successfully",{position: 'top-right'});
-            currentLayout.value = response.data;
+            const response = await apiRequest("post", `${env.DASHBOARD}`, {
+                op: 'removeCard',
+                templateId: currentLayout.value.templateId,
+                cardUid: cardId,
+            });
+            $toast.success(t('dashboardCard.dashboard_updated'),{position: 'top-right'});
+            currentLayout.value = response.data?.data;
         } catch (error) {
             console.error(error)
         }
@@ -815,30 +765,18 @@
     };
     const handleUpdateFromCard = async(data) => {
         let {id:editCardId,updateObject} = data;
-        let bodyData = {
-            queryObject:[
-                {
-                    userId: userId.value,
-                    templateId: currentLayout.value.templateId,
-                    "cards.uid": editCardId
-                },
-                {
-                    $set: { 
-                        "cards.$.config.cardData": updateObject
-                    }
-                },
-                { new: true, useFindAndModify: false }
-            ],
-            method:"findOneAndUpdate",
-            userId: userId.value
-        }
-        const response = await apiRequest("post", `${env.DASHBOARD}`,bodyData);
+        const response = await apiRequest("post", `${env.DASHBOARD}`, {
+            op: 'updateCard',
+            templateId: currentLayout.value.templateId,
+            cardUid: editCardId,
+            cardData: updateObject || {},
+        });
         if(response) {
             let findIndex = layout.value.findIndex((e)=>e.i === editCardId)
             if(findIndex > -1) {
                 layout.value[findIndex] = {...layout.value[findIndex],cardData:{...(layout.value[findIndex]?.cardData ?? {}),...updateObject}};
             }
-            $toast.success("Dashboard Updated Successfully",{position: 'top-right'});
+            $toast.success(t('dashboardCard.dashboard_updated'),{position: 'top-right'});
             currentLayout.value = response.data?.data;
         }
     }
@@ -928,13 +866,10 @@
         layout.value[idx] = { ...layout.value[idx], cardData: updateObject };
         try {
             await apiRequest('post', `${env.DASHBOARD}`, {
-                queryObject: [
-                    { userId: userId.value, templateId: currentLayout.value.templateId, 'cards.uid': item.i },
-                    { $set: { 'cards.$.config.cardData': updateObject } },
-                    { new: true, useFindAndModify: false },
-                ],
-                method: 'findOneAndUpdate',
-                userId: userId.value,
+                op: 'updateCard',
+                templateId: currentLayout.value.templateId,
+                cardUid: item.i,
+                cardData: updateObject,
             });
         } catch (e) {
             console.error('Failed to persist card period change', e);
@@ -944,8 +879,7 @@
     // ── Export / Import dashboard (gear menu in the Home header) ──────
     // File-based sharing: export the current cards + layout to a .json the
     // user can hand to a teammate, who imports it onto their OWN dashboard
-    // (replace, with confirmation). Reuses the existing updateDashboard
-    // passthrough — no backend change.
+    // (replace, with confirmation).
     const importFileInput = ref(null);
     const showImportConfirm = ref(false);
     const pendingImport = ref(null); // { cards, dropped }
@@ -1081,13 +1015,9 @@
         }
         try {
             const response = await apiRequest('post', `${env.DASHBOARD}`, {
-                queryObject: [
-                    { userId: userId.value, templateId: currentLayout.value.templateId },
-                    { $set: { cards } },
-                    { new: true, useFindAndModify: false },
-                ],
-                method: 'findOneAndUpdate',
-                userId: userId.value,
+                op: 'setCards',
+                templateId: currentLayout.value.templateId,
+                cards,
             });
             if (response) {
                 currentLayout.value = response.data?.data || currentLayout.value;
@@ -1121,7 +1051,7 @@
     .dashboard-range-label {
         font-size: 12px;
         font-weight: 600;
-        color: #3a3f52;
+        color: var(--ink-label);
     }
     .dashboard-range-picker {
         min-width: 210px;
@@ -1129,23 +1059,23 @@
     }
     .dashboard-range-picker .dp__input {
         font-size: 12px;
-        color: #3a3f52;
-        border: 1px solid #e5e7eb;
+        color: var(--ink);
+        border: 1px solid var(--border);
         border-radius: 6px;
         padding-top: 4px;
         padding-bottom: 4px;
         transition: border-color 0.15s ease, box-shadow 0.15s ease;
     }
     .dashboard-range-picker .dp__input:hover {
-        border-color: #c7ccd9;
+        border-color: var(--brand-border);
     }
     .dashboard-range-picker .dp__input:focus {
-        border-color: #2F3990;
-        box-shadow: 0 0 0 2px rgba(47, 57, 144, 0.12);
+        border-color: var(--brand);
+        box-shadow: 0 0 0 2px var(--brand-ring);
     }
     .dashboard-range-hint {
         font-size: 11px;
-        color: #9aa0b4;
+        color: var(--ink-2);
     }
     .center_no_record_found {
         position: absolute;
@@ -1154,27 +1084,27 @@
         transform: translate(-50%, -50%);
     }
     .vgl-layout {
-        background-color: #f5f3f3;
+        background-color: var(--fill);
         user-select: none;
     }
     .empty-layout {
         height: calc(100vh - 106px) !important;
     }
     :deep(.vgl-item:not(.vgl-item--placeholder)) {
-        background-color: #ccc;
-        border: 1px solid black;
+        background-color: var(--fill);
+        border: 1px solid var(--border);
     }
     :deep(.vgl-item--resizing) {
         opacity: 90%;
     }
     :deep(.vgl-item--static) {
-        background-color: #cce;
+        background-color: var(--brand-tint);
     }
     .layout-json {
         padding: 10px;
         margin-top: 10px;
-        background-color: #ddd;
-        border: 1px solid black;
+        background-color: var(--fill);
+        border: 1px solid var(--border);
     }
     .columns {
         columns: 120px;
@@ -1185,8 +1115,8 @@
         height: calc(100% - 5px);
         margin: 5px;
         content: '';
-        background-image: linear-gradient(to right, lightgrey 1px, transparent 1px),
-            linear-gradient(to bottom, lightgrey 1px, transparent 1px);
+        background-image: linear-gradient(to right, var(--hairline) 1px, transparent 1px),
+            linear-gradient(to bottom, var(--hairline) 1px, transparent 1px);
             background-size: calc(calc(100% - 5px) / 12) 40px;
         background-repeat: repeat;
     }
@@ -1200,11 +1130,11 @@
         overflow: hidden;
     }
     .grid_layout_hover .vgl-item__resizer:before {
-        border-color: transparent transparent #bbbbbb;
-        border-bottom-color:#bbbbbb;
+        border-color: transparent transparent var(--border);
+        border-bottom-color:var(--border);
     }
     .vgl-item--placeholder {
-        background-color: #D4D4D4;
+        background-color: var(--border);
         opacity: 1;
         border-radius: 12px;
     }

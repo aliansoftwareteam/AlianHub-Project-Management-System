@@ -1,7 +1,7 @@
 const fs = require('fs');
 const path = require('path');
 const os = require('os');
-const multer = require('multer');
+const multer = require('../../utils/contextMulter');
 
 const MAX_BRIEF_BYTES = 10 * 1024 * 1024; // 10 MB
 const MAX_BRIEF_CHARS = 100000;

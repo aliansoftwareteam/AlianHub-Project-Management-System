@@ -1,4 +1,7 @@
 const ctrl = require('./controller');
+const { resetTargetOf, mayReset } = require('./counterReset');
+const { agentsRefused } = require('../Agents/guard');
+
 exports.init = (app) => {
       /**
      * @swagger
@@ -9,7 +12,6 @@ exports.init = (app) => {
     *        required:
     *         - read
     *         - key
-    *         - companyId
     *        properties:
     *         read: 
     *           type: boolean
@@ -21,8 +23,8 @@ exports.init = (app) => {
     *           description: Key based on opration.
     *         companyId: 
     *           type: string
-    *           required: true
-    *           description: Id of comapny.
+    *           required: false
+    *           description: Ignored when it matches the companyid header, refused when it names another company.
     *         projectId: 
     *           type: string
     *           required: false
@@ -31,7 +33,7 @@ exports.init = (app) => {
     *           type: array
     *           items:
     *             type: string
-    *           description: UserId's array in which opration is need to perform.
+    *           description: Recipients of a bump; only active members of the company are counted. Read, set and readAll change only the signed-in user's own count.
     *         sprintId: 
     *           type: string
     *           required: false
@@ -78,24 +80,30 @@ exports.init = (app) => {
     app.post("/api/v1/updateunreadcommentscount", ctrl.updateUnReadCommentsCount);
     app.post("/api/v1/pushupdateunreadcommentscount", ctrl.updateUnReadCommentsCount);
 
-    app.post("/api/v1/unsetCommentCounts", (req, res) => {
-        try {
-            const {companyId = "", projectId = "", sprintId = "", searchKey} = req.body;
-            if(!companyId) {
-                return res.status(404).send("companyId is required")
-            } else if(!projectId && !searchKey) {
-                return res.status(404).send("projectId is required")
-            }
-
-            ctrl.unsetAllCounts(companyId, projectId, sprintId, {searchKey})
-            .then((res) => {
-                res.send(res.statusText)
+    app.post("/api/v1/unsetCommentCounts", agentsRefused('unread.reset'), (req, res) => {
+        const sessionCompanyId = String(req.headers.companyid || "");
+        const { companyId: bodyCompanyId, projectId = "", sprintId = "", searchKey } = req.body || {};
+        if (bodyCompanyId && String(bodyCompanyId) !== sessionCompanyId) {
+            return res.status(403).send({ status: false, statusText: "companyId does not match your session" });
+        }
+        const target = resetTargetOf({ projectId, sprintId, searchKey });
+        if (!target) {
+            return res.status(400).send({ status: false, statusText: "A reset names one project, by projectId or by its counter key" });
+        }
+        return mayReset(sessionCompanyId, req.uid, target)
+            .then((decision) => {
+                if (decision.allowed) return ctrl.unsetAllCounts(sessionCompanyId, target.projectId, target.sprintId, { searchKey: target.searchKey });
+                res.status(decision.statusCode).send(decision.statusCode === 404
+                    ? { status: false, statusText: "Project not found." }
+                    : { status: false, statusText: "You do not have permission to perform this action." });
+                return null;
+            })
+            .then((result) => {
+                if (result) res.send({ status: true, statusText: result.statusText, data: result.data });
             })
             .catch((error) => {
-                res.status(404).send(error)
-            })
-        } catch (error) {
-            res.status(404).send(error)
-        }
+                const statusText = (error && (error.statusText || error.message)) || String(error);
+                res.status(500).send({ status: false, statusText });
+            });
     });
 }

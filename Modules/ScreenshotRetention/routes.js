@@ -1,4 +1,5 @@
 const ctrl = require('./controller');
+const { agentsRefused } = require('../Agents/guard');
 
 exports.init = (app) => {
     // Read the caller's company retention setting + last-run stats.
@@ -13,5 +14,5 @@ exports.init = (app) => {
     app.get('/api/v1/screenshot-retention/preview', ctrl.previewDeletion);
 
     // Update the policy (enabled flag and/or maxAgeMonths). Owner-only.
-    app.put('/api/v1/screenshot-retention', ctrl.updateSettings);
+    app.put('/api/v1/screenshot-retention', agentsRefused('workspace.settings'), ctrl.updateSettings);
 };

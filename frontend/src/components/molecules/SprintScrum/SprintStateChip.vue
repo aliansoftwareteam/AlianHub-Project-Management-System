@@ -60,9 +60,9 @@ const daysLabel = computed(() => {
     // Whole calendar days, so "1 day left" means today is not the last day.
     const left = Math.round((new Date(end.getFullYear(), end.getMonth(), end.getDate())
         - new Date(endOfToday.getFullYear(), endOfToday.getMonth(), endOfToday.getDate())) / 86400000);
-    if (left < 0) return t('Scrum.days_over', { count: Math.abs(left) });
+    if (left < 0) return t('Scrum.days_over', { count: Math.abs(left) }, Math.abs(left));
     if (left === 0) return t('Scrum.last_day');
-    return t('Scrum.days_left', { count: left });
+    return t('Scrum.days_left', { count: left }, left);
 });
 </script>
 
@@ -93,13 +93,13 @@ const daysLabel = computed(() => {
     text-transform: uppercase;
     white-space: nowrap;
 }
-.ssc__state.is-planned { background: #eceef7; color: #4b5162; }
-.ssc__state.is-active { background: #e4f0e8; color: #1c7a43; }
-.ssc__state.is-overdue { background: #fdece7; color: #b0431f; }
-.ssc__state.is-closed { background: #eceef7; color: #8b90a0; }
+.ssc__state.is-planned { background: var(--fill); color: var(--ink-2); }
+.ssc__state.is-active { background: var(--ok-bg); color: var(--ok-ink); }
+.ssc__state.is-overdue { background: var(--warn-bg); color: var(--warn-ink); }
+.ssc__state.is-closed { background: var(--fill); color: var(--ink-2); }
 
-.ssc__range { flex: 0 0 auto; white-space: nowrap; font-size: 12px; color: #6b7280; font-variant-numeric: tabular-nums; }
-.ssc__days { flex: 0 0 auto; white-space: nowrap; font-size: 11.5px; color: #8b90a0; }
+.ssc__range { flex: 0 0 auto; white-space: nowrap; font-size: 12px; color: var(--ink-2); font-variant-numeric: tabular-nums; }
+.ssc__days { flex: 0 0 auto; white-space: nowrap; font-size: 11.5px; color: var(--ink-2); }
 
 /* Breakpoints measured against the real header rather than picked. New Task,
    Suggest tasks and the hours chip already fill this row: with a short sprint

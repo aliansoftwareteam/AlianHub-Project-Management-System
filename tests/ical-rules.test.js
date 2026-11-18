@@ -8,6 +8,12 @@ describe('feed tokens', () => {
         expect(R.generateFeedToken()).not.toBe(t);
     });
     test('junk rejected', () => { expect(R.isFeedToken('x')).toBe(false); expect(R.isFeedToken(null)).toBe(false); });
+    test('a token hashes to a stable SHA-256 hex digest that is not the token', () => {
+        const t = R.generateFeedToken();
+        expect(R.hashFeedToken(t)).toMatch(/^[a-f0-9]{64}$/);
+        expect(R.hashFeedToken(t)).toBe(R.hashFeedToken(t));
+        expect(R.hashFeedToken(t)).not.toContain(t);
+    });
 });
 
 describe('fmtDate', () => {

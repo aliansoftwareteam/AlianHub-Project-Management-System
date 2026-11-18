@@ -1,0 +1,49 @@
+{
+    "job": 17,
+    "title": "Timer and manual time",
+    "sentence": "Start a timer on this task and stop it, then log 1 hour 30 minutes on it for today.",
+    "start": "The task \"[AI bench] Write release note\"",
+    "passed": "AI-1 run 1, 2026-10-08, builds 815 to 817: pass, no approval, 6 steps",
+    "kept": "Rebuilt on 2026-10-09 from Tasks/active/047-ai-run/ai-1-run-1-results.md and the tool path of the job in ai-benchmark.md: the run did not record its calls. Ids are named by placeholder and resolved against the replay world.",
+    "seed": {
+        "tasks": [
+            "[AI bench] Write release note"
+        ]
+    },
+    "calls": [
+        {
+            "tool": "person.place",
+            "arguments": {},
+            "answer": "read"
+        },
+        {
+            "tool": "person.me",
+            "arguments": {},
+            "answer": "read"
+        },
+        {
+            "tool": "timelog.start",
+            "arguments": {
+                "taskId": "$task:[AI bench] Write release note"
+            },
+            "answer": "applied"
+        },
+        {
+            "tool": "timelog.stop",
+            "arguments": {
+                "taskId": "$task:[AI bench] Write release note"
+            },
+            "answer": "applied"
+        },
+        {
+            "tool": "timelog.create",
+            "arguments": {
+                "taskId": "$task:[AI bench] Write release note",
+                "minutes": 90,
+                "date": "$date:0"
+            },
+            "answer": "applied"
+        }
+    ],
+    "undo": true
+}

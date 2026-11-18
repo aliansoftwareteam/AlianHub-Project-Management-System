@@ -1,38 +1,29 @@
-// Personal notepad (COLLAB-06) — HTTP handlers. CRUD on a user's notes plus a
-// convert-marker stamp (convertedTaskId), set by the client after it has created
-// a task from a note through the EXISTING task-create flow (taskClass.create →
-// POST /api/v2/tasks). This module never creates tasks itself. All notes are
-// company-scoped (companyId from the request header), matching
-// Modules/Reminders/controller.js.
+// Personal notepad (COLLAB-06). A note belongs to req.uid: user ids in the body,
+// query or headers are ignored. The convert-to-task marker is stamped by the client
+// after it created the task through the task routes; this module never creates tasks.
 const mongoose = require('mongoose');
 const { SCHEMA_TYPE } = require('../../Config/schemaType');
 const { MongoDbCrudOpration } = require('../../utils/mongo-handler/mongoQueries');
 const { sanitizeNotePayload } = require('./notesRules');
 const logger = require('../../Config/loggerConfig');
 
-// Resolve the acting user id from the request (auth context first, then header,
-// then body) — identical resolution order to Modules/Reminders/controller.js.
-function resolveUserId(req) {
-    const b = req.body || {};
-    return (req.uid && String(req.uid))
-        || (req.user && (req.user.id || req.user._id))
-        || req.headers['userid']
-        || b.userId
-        || (b.userData && b.userData.id)
-        || '';
-}
+const OBJECT_ID_PATTERN = /^[a-f0-9]{24}$/i;
+const NOTE_DELETED = 1;
+
+const ownerOf = (req) => String(req.uid || '');
+const matchedCount = (result) => (result && result.matchedCount !== undefined ? result.matchedCount : (result && result.modifiedCount) || 0);
 
 exports.createNote = async (req, res) => {
     try {
         const companyId = req.headers['companyid'];
-        const userId = resolveUserId(req);
+        const userId = ownerOf(req);
         if (!companyId || !userId) {
             return res.send({ status: false, statusText: 'companyId and userId are required' });
         }
         const fields = sanitizeNotePayload(req.body);
         const doc = {
             _id: new mongoose.Types.ObjectId(),
-            userId: String(userId),
+            userId,
             companyId: String(companyId),
             title: fields.title || '',
             content: fields.content || '',
@@ -47,21 +38,19 @@ exports.createNote = async (req, res) => {
     }
 };
 
-// List the caller's own notes for the current company (newest updated first).
 exports.listMine = async (req, res) => {
     try {
         const companyId = req.headers['companyid'];
-        const userId = resolveUserId(req);
+        const userId = ownerOf(req);
         if (!companyId || !userId) {
             return res.send({ status: false, statusText: 'companyId and userId are required' });
         }
-        // ?archived=1 lists archived notes (deletedStatusKey 2) instead of active
-        // ones. Deleted notes (1) are never returned by either view.
+        // deletedStatusKey: 0 active, 1 deleted, 2 archived. Deleted notes are in neither view.
         const wantArchived = req.query && (req.query.archived === '1' || req.query.archived === 'true');
         const notes = await MongoDbCrudOpration(companyId, {
             type: SCHEMA_TYPE.NOTES,
             data: [
-                { userId: String(userId), deletedStatusKey: wantArchived ? 2 : 0 },
+                { userId, deletedStatusKey: wantArchived ? 2 : 0 },
                 null,
                 { sort: { updatedAt: -1 } },
             ],
@@ -73,42 +62,42 @@ exports.listMine = async (req, res) => {
     }
 };
 
-// Update title / content (autosave) or stamp convertedTaskId after a convert.
+const updateOwnNote = async (req, res, patch, statusText) => {
+    const companyId = req.headers['companyid'];
+    const id = String(req.params.id || '');
+    const userId = ownerOf(req);
+    if (!companyId || !userId || !OBJECT_ID_PATTERN.test(id)) {
+        return res.status(400).send({ status: false, statusText: 'companyId and a valid note id are required' });
+    }
+    const result = await MongoDbCrudOpration(companyId, {
+        type: SCHEMA_TYPE.NOTES,
+        data: [{ _id: new mongoose.Types.ObjectId(id), userId, deletedStatusKey: { $ne: NOTE_DELETED } }, { $set: patch }],
+    }, 'updateOne');
+    if (!matchedCount(result)) {
+        return res.status(404).send({ status: false, statusText: 'Note not found' });
+    }
+    return res.send({ status: true, statusText });
+};
+
 exports.updateNote = async (req, res) => {
     try {
-        const companyId = req.headers['companyid'];
-        const id = req.params.id;
-        if (!companyId || !id) {
-            return res.send({ status: false, statusText: 'companyId and note id are required' });
-        }
         const patch = sanitizeNotePayload(req.body);
         if (!Object.keys(patch).length) {
             return res.send({ status: false, statusText: 'Nothing to update' });
         }
-        await MongoDbCrudOpration(companyId, {
-            type: SCHEMA_TYPE.NOTES,
-            data: [{ _id: new mongoose.Types.ObjectId(id) }, { $set: patch }],
-        }, 'updateOne');
-        res.send({ status: true, statusText: 'Updated' });
+        if (patch.convertedTaskId && !OBJECT_ID_PATTERN.test(patch.convertedTaskId)) {
+            return res.status(400).send({ status: false, statusText: 'convertedTaskId must be a task id' });
+        }
+        return await updateOwnNote(req, res, patch, 'Updated');
     } catch (error) {
         logger.error(`[notes] update failed: ${error.message}`);
         res.send({ status: false, statusText: error.message });
     }
 };
 
-// Soft-delete a note.
 exports.deleteNote = async (req, res) => {
     try {
-        const companyId = req.headers['companyid'];
-        const id = req.params.id;
-        if (!companyId || !id) {
-            return res.send({ status: false, statusText: 'companyId and note id are required' });
-        }
-        await MongoDbCrudOpration(companyId, {
-            type: SCHEMA_TYPE.NOTES,
-            data: [{ _id: new mongoose.Types.ObjectId(id) }, { $set: { deletedStatusKey: 1 } }],
-        }, 'updateOne');
-        res.send({ status: true, statusText: 'Deleted' });
+        return await updateOwnNote(req, res, { deletedStatusKey: NOTE_DELETED }, 'Deleted');
     } catch (error) {
         logger.error(`[notes] delete failed: ${error.message}`);
         res.send({ status: false, statusText: error.message });

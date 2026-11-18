@@ -20,11 +20,11 @@
                     <div ref="contentRef" class="tooltip-text"
                         :class="{ 'is-truncated': showReadMore && !isExpanded && shouldTruncate }"
                         :style="truncateStyles">
-                        <span v-html="text" class="tooltip-desc"></span>
+                        <span v-html="richHtml(text)" class="tooltip-desc"></span>
                     </div>
                     <button v-if="showReadMore && shouldTruncate && !isExpanded" class="read-more-btn"
                         @click.stop.prevent="toggleExpand">
-                        Read more
+                        {{ $t('tooltipText.read_more') }}
                     </button>
                 </div>
             </div>
@@ -33,6 +33,7 @@
 </template>
 <script setup>
 import { ref, computed, onMounted, onUnmounted, watch, nextTick, inject } from 'vue';
+import { richHtml } from '@/utils/richHtml';
 
 const props = defineProps({
     text: {

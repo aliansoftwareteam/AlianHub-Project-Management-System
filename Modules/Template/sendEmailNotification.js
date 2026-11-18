@@ -58,8 +58,6 @@ function checkTemplateType(bodyData, type, isSingle,defaultMessage) {
             return changeDescriptionEmailTemplate(bodyData) 
         case Notification_key.PROJECT_FOLDER_CREATE:
             return changeDescriptionEmailTemplate(bodyData) 
-        case Notification_key.PROJECT_TYPE:
-            return changeDescriptionEmailTemplate(bodyData) 
         default:
             return commonMessageTemplate(defaultMessage)
             // return `<div>${defaultMessage}</div>`

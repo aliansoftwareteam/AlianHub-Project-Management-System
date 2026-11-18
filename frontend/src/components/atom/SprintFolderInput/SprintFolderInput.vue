@@ -29,9 +29,9 @@
 
 <script setup>
 // PACKAGE
-import { computed, ref, defineEmits, defineProps, inject, onMounted, nextTick } from "vue";
+import { ref, defineEmits, defineProps, inject, onMounted, nextTick } from "vue";
 import { useStore } from "vuex";
-import { useCustomComposable, useGetterFunctions } from "@/composable";
+import { useCustomComposable } from "@/composable";
 import { useValidation } from "@/composable/Validation";
 import * as env from '@/config/env';
 import { useToast } from "vue-toast-notification";
@@ -39,17 +39,14 @@ import { apiRequest } from '../../../services';
 import { dbCollections } from "../../../utils/Collections";
 import { sprintPlanPermission } from "@/composable/commonFunction";
 import { useI18n } from "vue-i18n";
-import { createFolders, createSprints } from "@/utils/NotificationTemplate";
 const { t } = useI18n();
 
 // UTILS
-const userId = inject('$userId');
 const companyId = inject('$companyId');
 const clientWidth = inject("$clientWidth");
 const projectData = inject('selectedProject');
-const {getters,commit} = useStore();
+const {commit} = useStore();
 const  { checkErrors , checkAllFields } = useValidation();
-const {getUser} = useGetterFunctions();
 const {makeUniqueId} = useCustomComposable();
 const $toast = useToast();
 const { checkPerProjectSprintPermission } = sprintPlanPermission();
@@ -82,8 +79,22 @@ const props = defineProps({
 	subItems: {
 		type: Array,
 		default: () => []
+	},
+	parentFolderId: {
+		type: String,
+		default: ''
+	},
+	project: {
+		type: Object,
+		default: null
 	}
 })
+
+/* A host that provides `selectedProject` cannot inject it, so it hands the project over. */
+const folderProject = () => props.project || projectData?.value;
+
+/* A folder entry carries its own id as `folderId` and its lists in `sprintsObj`; a list carries the id of the folder it is in. */
+const isSiblingOfNewList = (x) => x.deletedStatusKey !== 1 && !x.sprintsObj && String(x?.folderId || '') === String(props.folder?.folderId || '');
 
 const inProgress = ref(false);
 
@@ -102,16 +113,13 @@ onMounted(() => {
 	})
 })
 
-const companyOwner = computed(() => {
-    return getters["settings/companyOwnerDetail"];
-})
 
 // SPRINT OPERATIONS
 function createEditSprint() {
 	if(inProgress.value) {
 		return
 	}
-	checkPerProjectSprintPermission(projectData.value._id,dbCollections.SPRINTS).then((result) => {
+	checkPerProjectSprintPermission(folderProject()._id,dbCollections.SPRINTS).then((result) => {
 		if(result){
 			if(listName?.value?.value?.length) {
 				listName.value.value = listName.value.value.trim();
@@ -131,7 +139,7 @@ function createEditSprint() {
 						}
 						sprintIndex = props.subItems.filter((x) => x.deletedStatusKey !== 1 && !x?.folderId).findIndex((x) => x.name?.toLowerCase() === listName.value.value.toLowerCase() && x.id !== props.item.id)
 					} else {
-						sprintIndex = props.subItems.filter((x) => x.deletedStatusKey !== 1 && !x?.folderId).findIndex((x) => x.name?.toLowerCase() === listName.value.value.toLowerCase())
+						sprintIndex = props.subItems.filter(isSiblingOfNewList).findIndex((x) => x.name?.toLowerCase() === listName.value.value.toLowerCase())
 					}
 		
 					if(sprintIndex !== -1) {
@@ -140,18 +148,10 @@ function createEditSprint() {
 						return;
 					}
 		
-					let user = getUser(userId.value);
-		
 					const axiosData = {
 						companyId: companyId.value,
-						projectId: projectData.value._id,
+						projectId: folderProject()._id,
 						sprintName: listName.value.value,
-						userData: {
-							id: user.id,
-							Employee_Name: user.Employee_Name,
-							companyOwnerId: companyOwner.value.userId
-						},
-						projectName: projectData.value.ProjectName
 					}
 		
 					if(props.folder) {
@@ -166,7 +166,6 @@ function createEditSprint() {
 					let endPoint = "";
 					if(props.item !== null) {
 						endPoint = env.SPRINT+"/"+props.item.id;
-						axiosData.prevData = props.item;
 					} else {
 						endPoint = env.SPRINT;
 					}
@@ -184,29 +183,6 @@ function createEditSprint() {
 							emit("updateData",res?.data?.data,"Sprint");
 						}
 						if(res.data.status === true){
-							if(!props.item){
-								let notifyObj = {
-									'ProjectName' : projectData.value.ProjectName,
-									'sprintName' : listName.value.value
-								}
-								let notificationObject = {
-									message: createSprints(notifyObj),
-									key: "project_sprint_create",
-								};
-								
-								apiRequest("post", env.HANDLE_NOTIFICATION, {
-									type: 'project',
-									companyId: companyId.value,
-									projectId: projectData.value._id,
-									object: notificationObject,
-									userData: axiosData.userData,
-									changeType:'sprint_create',
-                                    changeData: notifyObj
-								})
-								.catch((error) => {
-									console.error("ERROR in update notification", error);
-								})
-							}
 							$toast.success(t(`Toast.Sprint ${props.item !== null ? 'updated' : 'created'} successfully`), {position: "top-right"})
 							emit('cancel');
 							listName.value.value = "";
@@ -260,7 +236,7 @@ function createEditFolder() {
 				}
 				folderIndex = props.subItems?.filter((y) => y.folderId && y.deletedStatusKey !== 1).findIndex((x) => x.name?.toLowerCase() === listName.value.value.toLowerCase() && x.folderId !== props.item.id)
 			} else {
-				folderIndex = props.subItems?.filter((y) => y.folderId && y.deletedStatusKey !== 1).findIndex((x) => x.name?.toLowerCase() === listName.value.value.toLowerCase())
+				folderIndex = props.subItems?.filter((y) => y.folderId && y.deletedStatusKey !== 1 && String(y.parentFolderId || '') === props.parentFolderId).findIndex((x) => x.name?.toLowerCase() === listName.value.value.toLowerCase())
 			}
 
 			if(folderIndex !== -1) {
@@ -269,23 +245,16 @@ function createEditFolder() {
 				return;
 			}
 
-			let user = getUser(userId.value);
 			const axiosData = {
 				companyId: companyId.value,
-				projectId: projectData.value._id,
+				projectId: folderProject()._id,
 				folderName: listName.value.value,
-				userData: {
-					id: user.id,
-					Employee_Name: user.Employee_Name,
-					companyOwnerId: companyOwner.value.userId
-				},
-				projectName: projectData.value.ProjectName
+				...(props.item === null && props.parentFolderId ? { parentFolderId: props.parentFolderId } : {}),
 			}
 
 			let endPoint = "";
 			if(props.item !== null) {
 				endPoint = env.FOLDER+"/"+props.item.id;
-				axiosData.prevFolderName = props.item.name;
 			} else {
 				endPoint = env.FOLDER;
 			}
@@ -303,29 +272,6 @@ function createEditFolder() {
 					emit("updateData",result?.data?.data,"Folder");
 				}
 				if(result.data.status){
-					if(!props.item){
-						let notifyObj = {
-							'ProjectName' : projectData.value.ProjectName,
-							'sprintFolderName' : listName.value.value
-						}
-						let notificationObject = {
-							message: createFolders(notifyObj),
-							key: "project_folder_create",
-						};
-						
-						apiRequest("post", env.HANDLE_NOTIFICATION, {
-							type: 'project',
-							companyId: companyId.value,
-							projectId: projectData.value._id,
-							object: notificationObject,
-							userData: axiosData.userData,
-							changeType:'sprint_create',
-							changeData: notifyObj
-						})
-						.catch((error) => {
-							console.error("ERROR in update notification", error);
-						});
-					}
 					$toast.success(t(`Toast.Folder ${props.item !== null ? 'updated' : 'created'} successfully`), {position: "top-right"})
 					emit('cancel');
 					listName.value.value = "";
@@ -338,7 +284,7 @@ function createEditFolder() {
 				inProgress.value = false;
 			})
 			.catch((err) => {
-				$toast.error(t(`Toast.something_went_wrong`), {position: "top-right"})
+				$toast.error(err?.response?.data?.statusText || t(`Toast.something_went_wrong`), {position: "top-right"})
 				emit('cancel');
 				inProgress.value = false;
 				console.error("Error: ", err);

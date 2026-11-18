@@ -1,18 +1,9 @@
 <template>
     <header class="mc-head">
-        <!-- Anything that has to sit left of the conversation, e.g. the button that
-             brings the list back on a narrow screen. Empty on wide layouts, where the
-             list is always visible and there is nothing to go back to. -->
         <slot name="lead"></slot>
 
-        <MainChatConversationIcon
-            :title="title"
-            :avatar-src="avatarSrc"
-            :is-channel="isChannel"
-            :icon="icon"
-            :presence="presence"
-            :size="34"
-        />
+        <span v-if="isChannel" class="mc-head-hash">#</span>
+        <MainChatAvatar v-else :name="title" :src="avatarSrc" :presence="presence" :size="28" />
 
         <div class="mc-head-id">
             <span class="mc-head-name">{{ title }}</span>
@@ -20,37 +11,53 @@
         </div>
 
         <div class="mc-head-actions">
-            <!--
-              Extension point for the planned Audio / Video call controls: drop the
-              buttons into this slot and they land left of the built-in actions,
-              without this component needing to know anything about calling.
-              e.g. <template #call-actions><button class="mc-icon-btn" …/></template>
-            -->
+            <button
+                v-if="canUseAi()"
+                type="button"
+                class="mc-head-ai"
+                :disabled="summarizing"
+                :aria-busy="summarizing"
+                :title="$t('Chat.summarize')"
+                :aria-label="$t('Chat.summarize')"
+                @click="$emit('summarize')"
+            >
+                <ShellIcon name="ai" :size="13" />
+                <span>{{ summarizing ? $t('Chat.summarizing') : $t('Chat.summarize') }}</span>
+            </button>
+
+            <button
+                v-if="canUseAi() && isChannel"
+                type="button"
+                class="mc-head-ai"
+                data-test="ask-channel"
+                :aria-expanded="asking ? 'true' : 'false'"
+                :title="$t('AiMention.ask_channel')"
+                :aria-label="$t('AiMention.ask_channel')"
+                @click="$emit('ask')"
+            >
+                <ShellIcon name="ai" :size="13" />
+                <span>{{ $t('AiMention.ask_channel') }}</span>
+            </button>
+
             <slot name="call-actions"></slot>
 
-            <!-- Both open a pane in the right-hand column; the active one stays lit
-                 so it is obvious which is showing and that clicking again closes it. -->
             <button
                 type="button"
                 class="mc-icon-btn"
                 :class="{ 'mc-icon-btn--on': activePane === 'search' }"
                 :title="$t('MainChat.search')"
+                :aria-label="$t('MainChat.search')"
+                :aria-pressed="activePane === 'search'"
                 @click="$emit('search')"
             ><MainChatIcon name="search" /></button>
 
             <button
                 type="button"
                 class="mc-icon-btn"
-                :class="{ 'mc-icon-btn--on': activePane === 'pinned' }"
-                :title="$t('MainChat.pinned_messages')"
-                @click="$emit('pinned')"
-            ><MainChatIcon name="pin" /></button>
-
-            <button
-                type="button"
-                class="mc-icon-btn"
-                :class="{ 'mc-icon-btn--on': activePane === 'info' }"
-                :title="isChannel ? $t('MainChat.channel_info') : $t('MainChat.user_info')"
+                :class="{ 'mc-icon-btn--on': detailsOpen }"
+                :title="detailsOpen ? $t('Chat.close_details') : $t('Chat.open_details')"
+                :aria-label="detailsOpen ? $t('Chat.close_details') : $t('Chat.open_details')"
+                :aria-expanded="detailsOpen"
                 @click="$emit('info')"
             ><MainChatIcon name="info" /></button>
 
@@ -61,7 +68,9 @@
 
 <script setup>
 import { defineProps, defineEmits } from 'vue';
-import MainChatConversationIcon from './MainChatConversationIcon.vue';
+import ShellIcon from '@/components/organisms/Shell/ShellIcon.vue';
+import { canUseAi } from "@/composable/aiAvailability";
+import MainChatAvatar from './MainChatAvatar.vue';
 import MainChatIcon from './MainChatIcon.vue';
 
 defineProps({
@@ -70,11 +79,11 @@ defineProps({
     avatarSrc: { type: String, default: '' },
     presence: { type: Boolean, default: null },
     isChannel: { type: Boolean, default: false },
-    // A channel's own icon (image or glyph); empty for direct messages.
-    icon: { type: Object, default: () => ({}) },
-    // '' | 'info' | 'search' | 'pinned' — which right-hand pane the parent has open.
     activePane: { type: String, default: '' },
+    detailsOpen: { type: Boolean, default: false },
+    summarizing: { type: Boolean, default: false },
+    asking: { type: Boolean, default: false },
 });
 
-defineEmits(['search', 'info', 'pinned']);
+defineEmits(['search', 'info', 'summarize', 'ask']);
 </script>

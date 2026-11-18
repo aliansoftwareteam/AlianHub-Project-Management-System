@@ -46,7 +46,7 @@ function createData(data) {
                                   <tbody>
                                     <tr style="display:flex;align-items: center;">
                                       <td style="mso-table-lspace:0pt;mso-table-rspace:0pt; padding-left: 0; padding-right: 20px; width: 100%; min-width:0px;" align="left" valign="top">
-                                         ${commonTemplate.messageTextOnly(changeText(item.message))}
+                                         ${commonTemplate.messageTextOnly(item.message)}
                                       </td>
                                     </tr>
                                 </tbody>
@@ -70,17 +70,4 @@ function createData(data) {
         </div>`
     )
 
-}
-
-function changeText(msg, wrapStart = `<b class="mentioned">`, wrapEnd = `</b>`) {
-    const mentionRegex = /@\[[\w ]+?\]\(\w{4,30}\)/gi;
-    let mentions = msg.match(mentionRegex);
-
-    if(mentions !== null) {
-        mentions.forEach((mention) => {
-            msg = msg.replace(mention, `${wrapStart}@${mention.split("]")[0].replace("@[", "")}${wrapEnd}`)
-        })
-    }
-
-    return msg;
 }

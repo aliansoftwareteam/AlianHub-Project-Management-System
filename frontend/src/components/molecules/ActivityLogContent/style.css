@@ -7,9 +7,23 @@
     min-width: 30px;
 }
 
+/* The log's own rules size and colour every span in a line; the mark keeps the chip's. */
+.main-activity .wrapperNameImage span.activity-agent-mark,
+.wrapperNameImage span.activity-agent-mark {
+    margin-left: 6px;
+    color: var(--agent-ink);
+    font-size: 10.5px;
+    line-height: 1;
+    vertical-align: middle;
+}
+
 @media (max-width:991px){
     .wrapperNameImage span {
-        font-size: 13px!important; 
+        font-size: 13px!important;
         line-height: 19px;
+    }
+    .wrapperNameImage span.activity-agent-mark {
+        font-size: 10.5px!important;
+        line-height: 1;
     }
 }

@@ -1,5 +1,5 @@
 <template>
-    <textarea v-model="fileContent" readonly rows="10" ref="textRef" class="previewer_sj style-scroll">
+    <textarea v-model="fileContent" readonly rows="10" ref="textRef" class="previewer_sj text-previewer-style-scroll">
     </textarea>
 </template>
 
@@ -49,4 +49,20 @@ onMounted(() => {
 
 <style lang="css" scoped>
 @import url("./style.css");
+</style>
+
+<style scoped>
+.text-previewer-style-scroll::-webkit-scrollbar-track {
+    background-color: var(--canvas);
+}
+.text-previewer-style-scroll::-webkit-scrollbar {
+    width: 2px;
+    height: 2px;
+    background-color: var(--canvas);
+    border-radius: 8px;
+}
+.text-previewer-style-scroll::-webkit-scrollbar-thumb {
+    background-color: var(--ink-3);
+    border-radius: 8px;
+}
 </style>

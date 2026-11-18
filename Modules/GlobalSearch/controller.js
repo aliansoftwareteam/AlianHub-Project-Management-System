@@ -1,52 +1,125 @@
+const mongoose = require("mongoose");
 const { SCHEMA_TYPE } = require("../../Config/schemaType");
 const { MongoDbCrudOpration } = require("../../utils/mongo-handler/mongoQueries");
 const logger = require("../../Config/loggerConfig");
 const { escapeRegex } = require("../../utils/escapeRegex");
+const { getRoleType, isPrivileged } = require("../../Config/permissionGuard");
+const { visibleProjectIds } = require("../Agents/scope");
+const { pageReachFilter } = require("../Pages/helpers/pageRules");
 const { validateSearchInput, truncate, RESULT_LIMIT_PER_TYPE } = require('./helpers/searchRules');
+const { hiddenSprintIds } = require('../Sprints/helpers/sprintVisibility');
+const { keepTaskListProjectIds } = require('../Tasks/helpers/taskListProjects');
+const { listsForViewerOf } = require('../Tasks/helpers/taskExtraLists');
+const { keptFromCaller } = require('../Comments/helpers/conversationRows');
+const { withoutConversationsOfOthers } = require('../Comments/helpers/conversationReaders');
 
-// Company-wide search across tasks, projects and comments. Regex-based so it
-// works on every existing tenant database immediately (the text indexes added
-// in createSchema speed up future $text adoption, but regex keeps behaviour
-// predictable for short queries and substring matches).
+// Regex rather than $text: it works on every existing tenant database and keeps
+// short queries and substring matches predictable.
+
+const asObjectIds = (ids) => ids
+    .map(String)
+    .filter((id) => mongoose.Types.ObjectId.isValid(id))
+    .map((id) => new mongoose.Types.ObjectId(id));
+
+/* A task comment is visible where its task is, whatever project id the comment row carries. */
+const onVisibleTasks = async (companyId, uid, comments, projectIds, sprintClause) => {
+    const taskIds = asObjectIds([...new Set(comments.map((comment) => comment.taskId).filter(Boolean).map(String))]);
+    if (!taskIds.length) return comments.filter((comment) => !comment.taskId).map((comment) => ({ comment, task: null }));
+    const tasks = await MongoDbCrudOpration(companyId, {
+        type: SCHEMA_TYPE.TASKS,
+        data: [{ _id: { $in: taskIds }, ProjectID: { $in: projectIds }, ...sprintClause, ...withoutConversationsOfOthers(uid) }, 'TaskKey TaskName folderObjId'],
+    }, 'find');
+    const visible = new Map((tasks || []).map((task) => [String(task._id), task]));
+    return comments
+        .filter((comment) => !comment.taskId || visible.has(String(comment.taskId)))
+        .map((comment) => ({ comment, task: comment.taskId ? visible.get(String(comment.taskId)) : null }));
+};
+
+/* `otherLists` counts the lists the task was added to that this caller can open: the ones the
+ * viewer read names. The entries themselves stay out of the row. */
+const toTaskRow = (task, lists) => {
+    const sprint = task.sprintArray || {};
+    return {
+        _id: task._id,
+        TaskName: task.TaskName,
+        TaskKey: task.TaskKey,
+        status: task.status,
+        statusType: task.statusType,
+        ProjectID: task.ProjectID,
+        sprintId: task.sprintId,
+        folderObjId: task.folderObjId,
+        deletedStatusKey: task.deletedStatusKey,
+        sprintName: sprint.name || '',
+        folderName: sprint.folderName || '',
+        updatedAt: task.updatedAt,
+        otherLists: (lists.get(String(task._id)) || []).filter((entry) => entry.name !== undefined).length,
+    };
+};
 
 /* POST /api/v2/search  body: { query } */
 exports.globalSearch = async (req, res) => {
     try {
         const companyId = req.headers['companyid'] || '';
+        const uid = String(req.uid || '');
         const { query } = req.body || {};
         const check = validateSearchInput({ companyId, query });
         if (!check.valid) {
             return res.send({ status: false, statusText: check.reason });
         }
 
-        const rx = { $regex: escapeRegex(String(query).trim()), $options: 'i' };
+        const roleType = await getRoleType(companyId, uid);
+        if (roleType === null) {
+            return res.status(403).send({ status: false, statusText: 'You are not a member of this company.' });
+        }
+        const visible = await visibleProjectIds(companyId, uid);
+        const projectIds = asObjectIds(visible);
+        const taskProjectIds = asObjectIds(await keepTaskListProjectIds(companyId, uid, visible));
+        const hidden = isPrivileged(roleType) ? [] : await hiddenSprintIds(companyId, uid, projectIds);
+        const sprintClause = hidden.length ? { sprintId: { $nin: hidden } } : {};
 
-        const [tasks, projects, comments] = await Promise.all([
+        const rx = { $regex: escapeRegex(String(query).trim()), $options: 'i' };
+        const chatKeptFromCaller = await keptFromCaller(companyId, uid);
+
+        const [tasks, projects, comments, pages] = await Promise.all([
             MongoDbCrudOpration(companyId, {
                 type: SCHEMA_TYPE.TASKS,
                 data: [
-                    { deletedStatusKey: { $ne: 1 }, $or: [{ TaskName: rx }, { TaskKey: rx }] },
-                    'TaskName TaskKey status statusType ProjectID sprintId folderObjId deletedStatusKey',
+                    { ProjectID: { $in: taskProjectIds }, ...sprintClause, ...withoutConversationsOfOthers(uid), deletedStatusKey: { $ne: 1 }, $or: [{ TaskName: rx }, { TaskKey: rx }] },
+                    'TaskName TaskKey status statusType ProjectID sprintId folderObjId deletedStatusKey sprintArray updatedAt extraLists',
                     { limit: RESULT_LIMIT_PER_TYPE, sort: { updatedAt: -1 } },
                 ],
             }, 'find'),
             MongoDbCrudOpration(companyId, {
                 type: SCHEMA_TYPE.PROJECTS,
                 data: [
-                    { deletedStatusKey: { $in: [0, undefined] }, ProjectName: rx },
-                    'ProjectName',
+                    { _id: { $in: projectIds }, deletedStatusKey: { $in: [0, undefined] }, ProjectName: rx },
+                    'ProjectName updatedAt',
                     { limit: RESULT_LIMIT_PER_TYPE, sort: { updatedAt: -1 } },
                 ],
             }, 'find'),
             MongoDbCrudOpration(companyId, {
                 type: SCHEMA_TYPE.COMMENTS,
                 data: [
-                    { isDeleted: { $ne: true }, type: { $in: ['text', 'link'] }, message: rx },
+                    { projectId: { $in: projectIds }, ...sprintClause, ...chatKeptFromCaller, isDeleted: { $ne: true }, type: { $in: ['text', 'link'] }, message: rx },
                     'message taskId projectId sprintId',
                     { limit: RESULT_LIMIT_PER_TYPE, sort: { createdAt: -1 } },
                 ],
             }, 'find'),
+            MongoDbCrudOpration(companyId, {
+                type: SCHEMA_TYPE.PAGES,
+                data: [
+                    {
+                        deletedStatusKey: { $ne: 1 },
+                        title: rx,
+                        ...pageReachFilter({ uid, projectIds }),
+                    },
+                    'title ProjectID updatedBy updatedAt',
+                    { limit: RESULT_LIMIT_PER_TYPE, sort: { updatedAt: -1 } },
+                ],
+            }, 'find').catch(() => []),
         ]);
+        const visibleComments = await onVisibleTasks(companyId, uid, comments || [], taskProjectIds, sprintClause);
+        const taskLists = await listsForViewerOf(companyId, uid, tasks || []);
 
         // Client project routes always carry a sprint segment, so attach each
         // project's first active sprint (the sprint the sidebar lands on).
@@ -74,6 +147,7 @@ exports.globalSearch = async (req, res) => {
                 return {
                     _id: project._id,
                     ProjectName: project.ProjectName,
+                    updatedAt: project.updatedAt,
                     sprintId: sprint ? sprint._id : null,
                     folderId: sprint && sprint.folderId ? sprint.folderId : null,
                 };
@@ -84,14 +158,24 @@ exports.globalSearch = async (req, res) => {
             status: true,
             statusText: 'Search complete.',
             data: {
-                tasks: tasks || [],
+                tasks: (tasks || []).map((task) => toTaskRow(task, taskLists)),
                 projects: projectResults,
-                comments: (comments || []).map((comment) => ({
+                comments: visibleComments.map(({ comment, task }) => ({
                     _id: comment._id,
                     message: truncate(comment.message),
                     taskId: comment.taskId,
                     projectId: comment.projectId,
                     sprintId: comment.sprintId,
+                    folderObjId: task ? task.folderObjId : undefined,
+                    taskKey: task ? task.TaskKey : undefined,
+                    taskName: task ? task.TaskName : undefined,
+                })),
+                pages: (pages || []).map((page) => ({
+                    _id: page._id,
+                    title: page.title,
+                    ProjectID: page.ProjectID,
+                    updatedBy: page.updatedBy,
+                    updatedAt: page.updatedAt,
                 })),
             },
         });

@@ -25,7 +25,7 @@ import Skelaton from "@/components/atom/Skelaton/Skelaton.vue";
 
 <style scoped>
 .skeleton-ui {
-  color: #333;
+  color: var(--ink);
   padding: 20px;
   margin-bottom: 20px;
 }
@@ -52,18 +52,18 @@ import Skelaton from "@/components/atom/Skelaton/Skelaton.vue";
 }
 
 .details {
-  background-color: #dfe1e6;
+  background-color: var(--fill);
   padding: 10px 20px;
   border-radius:  8px 8px 0 0;
-  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+  box-shadow: 0 2px 4px var(--shadow-ink);
   height: 60px;
   margin-bottom: 0;
 }
 .time-slots-div {
-  border: 1px solid #dfe1e6;
+  border: 1px solid var(--border);
   border-top: 0;
   padding-top: 10px;
-  background-color: #fff;
+  background-color: var(--surface);
   border-bottom-left-radius: 2px;
   border-bottom-right-radius: 2px;
   margin-top: -10px;

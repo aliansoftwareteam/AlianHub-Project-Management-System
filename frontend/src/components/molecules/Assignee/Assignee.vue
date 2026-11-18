@@ -1,6 +1,20 @@
 <template>
     <div>
-        <div class="d-flex align-items-center" @click.stop.prevent="!showAddUser ? addUser ? openSidebar() : '' : ''" :id="tourId">
+        <slot name="trigger" :open="openSidebar">
+        <component
+            :is="rowIsButton ? 'button' : 'div'"
+            :type="rowIsButton ? 'button' : null"
+            class="d-flex align-items-center"
+            :class="{ 'assignee__row-btn': rowIsButton }"
+            :role="rowOpensPicker && !rowIsButton ? 'button' : null"
+            :tabindex="rowOpensPicker && !rowIsButton ? 0 : null"
+            :aria-label="rowOpensPicker ? (buttonLabel || $t('ProjectDetails.assignee')) : null"
+            :aria-haspopup="rowOpensPicker ? 'dialog' : null"
+            @click.stop.prevent="!showAddUser ? addUser ? openSidebar() : '' : ''"
+            @keydown.enter.self.prevent="rowOpensPicker && openSidebar()"
+            @keydown.space.self.prevent="rowOpensPicker && openSidebar()"
+            :id="tourId"
+        >
             <UserProfile
                 v-for="user in detailedUsers.filter((x, index) => index < numOfUsers)"
                 :key="user._id"
@@ -10,11 +24,13 @@
                 :width="imageWidth"
                 :thumbnail="'30x30'"
             />
+            <span v-if="showName && detailedUsers.length === 1" class="assignee__name" data-test="assignee-name">{{ detailedUsers[0].title }}</span>
 
-            <DropDown :id="'Assignee_'+makeUniqueId(6)" v-if="detailedUsers.length > numOfUsers">
+            <DropDown :id="'Assignee_'+makeUniqueId(6)" mode="listbox" v-if="detailedUsers.length > numOfUsers">
                 <template #button>
                     <div class="d-flex align-items-center justify-content-center profile-image black text-nowrap font-weight-400 ml--5px border-2px-blue font-size-12 bg-colorlightgray position-re" :style="{width: imageWidth, height: imageWidth}">
-                        +{{detailedUsers.length - numOfUsers}}
+                        <span aria-hidden="true">+{{detailedUsers.length - numOfUsers}}</span>
+                        <span class="ah-sr-only">{{ $t('Common.more_assignees', { count: detailedUsers.length - numOfUsers }, detailedUsers.length - numOfUsers) }}</span>
                     </div>
                 </template>
                 <template #options>
@@ -23,7 +39,7 @@
                         :key="'user'+index"
                     >   
                         <div class="d-flex align-items-center" :title="user.label">
-                            <UserProfile
+                            <UserProfile decorative
                                 :showDot="false"
                                 class="cursor-pointer ml--5px"
                                 :data="user"
@@ -36,13 +52,33 @@
                 </template>
             </DropDown>
 
-            <img v-if="addUser && (showAddUser || !detailedUsers.length)" :src="addUserIcon" alt="add user" :title="$t('Members.adduser')" class="cursor-pointer add__user" @click.stop="addUser ? openSidebar() : ''" :style="{marginLeft: (detailedUsers.length ? '5px' : '0px'), width: imageWidth, height: imageWidth}" />
+            <button
+                v-if="addUser && emptyLabel && !detailedUsers.length"
+                type="button"
+                class="assignee__add-btn assignee__empty"
+                aria-haspopup="dialog"
+                :aria-label="`${emptyLabel}, ${$t('Members.adduser')}`"
+                :title="$t('Members.adduser')"
+                @click.stop="openSidebar()"
+            >{{ emptyLabel }}</button>
+            <button
+                v-else-if="addUser && (showAddUser || !detailedUsers.length)"
+                type="button"
+                class="assignee__add-btn"
+                aria-haspopup="dialog"
+                :aria-label="(!detailedUsers.length && buttonLabel) || $t('Members.adduser')"
+                :title="$t('Members.adduser')"
+                @click.stop="openSidebar()"
+            >
+                <img :src="addUserIcon" alt="" class="cursor-pointer add__user" :style="{marginLeft: (detailedUsers.length ? '5px' : '0px'), width: imageWidth, height: imageWidth}" />
+            </button>
             <span v-if="!addUser && !detailedUsers.length" class="font-size-13">N/A</span>
-        </div>
+        </component>
+        </slot>
 
         <Sidebar
-            :top="clientWidth<=767 ? '0px' : '46px' "
-            :title="$t('Projects.list_of_user')"
+            themed
+            :title="$t('Projects.choose_people')"
             :value="detailedUsers.map((x) => ({value: x.id, label: x.title ,id: x.id, image: x.image, isOnline: x.isOnline,designation:x.designation}))"
             v-model:visible="visible"
             :options="detailedOptions"
@@ -60,7 +96,7 @@
 </template>
 <script setup>
 // PACKAGES
-import { defineComponent, defineProps, defineEmits, ref, computed ,inject} from "vue";
+import { defineComponent, defineProps, defineEmits, ref, computed } from "vue";
 import { useCustomComposable, useGetterFunctions } from "@/composable";
 import { useStore } from 'vuex';
 
@@ -70,6 +106,7 @@ import Sidebar from "@/components/molecules/Sidebar/Sidebar.vue"
 import DropDown from '@/components/molecules/DropDown/DropDown.vue'
 import DropDownOption from '@/components/molecules/DropDownOption/DropDownOption.vue'
 import { useI18n } from "vue-i18n";
+import { twinNotes } from "@/utils/agentTwins";
 
 // UTILS
 const {getUser, getTeam} = useGetterFunctions();
@@ -77,7 +114,6 @@ const {makeUniqueId} = useCustomComposable();
 const { getters } = useStore();
 
 const addUserIcon = require("@/assets/images/svg/Assign_white.svg")
-const clientWidth = inject("$clientWidth");
 const {t} = useI18n()
 
 // COMPONENT
@@ -91,10 +127,14 @@ defineComponent({
     }
 })
 
-const emit = defineEmits(["selected", "removed"])
+const emit = defineEmits(["selected", "removed", "agent"])
 
 // PROPS
 const props = defineProps({
+    showName: {
+        type: Boolean,
+        default: false
+    },
     numOfUsers: {
         type: Number,
         default: 4
@@ -142,6 +182,21 @@ const props = defineProps({
     tourId: {
         type: String,
         default: ''
+    },
+    /** Shown in place of the add-person icon while nobody is assigned. */
+    emptyLabel: {
+        type: String,
+        default: ''
+    },
+    /** When set, the trigger is a real button with this accessible name. */
+    buttonLabel: {
+        type: String,
+        default: ''
+    },
+    /** Agents the person may start on this task: choosing one starts a run and assigns nobody. */
+    agents: {
+        type: Array,
+        default: () => []
     }
 })
 
@@ -196,6 +251,13 @@ const unselectedUser = computed(() => {
 })
 
 function selectFun(event) {
+    if (event?.type === 'agent') {
+        visible.value = false;
+        emit('agent', event);
+        return;
+    }
+    // The panel closes itself only on a new pick; taking the one person off must close it too.
+    if (!props.multiSelect) visible.value = false;
     selectedUser.value.includes(event.id) ? emit('removed', event) : emit('selected', event)
 }
 // Temporary team assign hide
@@ -227,6 +289,24 @@ const detailedOptions = computed(() => {
         // Temporary team assign hide
         // res[isDisplayTeam.value ? 1: 0].options.push(x);
     })
+    if (props.agents.length) {
+        const noteOf = twinNotes(props.agents.filter((agent) => !agent.connected));
+        res.push({
+            label: t('TaskPanel.agents_group'),
+            options: props.agents.map((agent) => ({
+                id: `agent_${agent._id}`,
+                value: `agent_${agent._id}`,
+                label: agent.connected ? t('TaskPanel.my_ai', { name: agent.name }) : agent.name,
+                image: '',
+                type: 'agent',
+                agentId: agent._id,
+                ...(agent.connected ? { connected: true, ownerId: agent.ownerId, shownAs: agent.shownAs } : {}),
+                ...(!agent.connected && noteOf(agent) ? { designation: noteOf(agent) } : {}),
+                tag: t('TaskPanel.agent_tag'),
+                teamColor: { color: '#fff', bgColor: 'var(--agent)' }
+            }))
+        });
+    }
     // Temporary team assign hide
     // if (isDisplayTeam.value) {
     //     res[0].options = teams.value.filter((tf) => unselectedUser.value.indexOf('tId_'+tf._id) !== -1 || selectedUser.value.indexOf('tId_'+tf._id) !== -1).map((tRow) => ({
@@ -242,6 +322,9 @@ const detailedOptions = computed(() => {
     // }
     return res;
 });
+
+const rowOpensPicker = computed(() => props.addUser && !props.showAddUser && detailedUsers.value.length > 0);
+const rowIsButton = computed(() => rowOpensPicker.value && Boolean(props.buttonLabel));
 
 function openSidebar () {
     visible.value = true;
@@ -280,10 +363,13 @@ function openSidebar () {
 
 </script>
 <style>
+.assignee__name { margin-left: var(--sp-4, 8px); min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--ink); font: 400 var(--row-font, 12.5px) var(--font-ui); }
 .share__with-assignee .profile-image{
     font-size: 8px !important;
 }
 .add__user{
     min-width: 25px;
 }
+.assignee__add-btn { display: inline-flex; padding: 0; border: 0; background: none; border-radius: 50%; cursor: pointer; }
+.assignee__row-btn { margin: 0; padding: 0; border: 0; background: none; font: inherit; color: inherit; text-align: inherit; cursor: pointer; }
 </style>

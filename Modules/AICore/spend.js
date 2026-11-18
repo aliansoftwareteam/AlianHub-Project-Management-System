@@ -1,0 +1,288 @@
+const { SCHEMA_TYPE } = require('../../Config/schemaType');
+const { dbCollections } = require('../../Config/collections');
+const { MongoDbCrudOpration } = require('../../utils/mongo-handler/mongoQueries');
+const logger = require('../../Config/loggerConfig');
+const usage = require('./usage');
+const replay = require('./replay');
+const { isFeature, isAudioFeature, UNKNOWN_FEATURE } = require('./features');
+const { isProviderError } = require('./providerError');
+const { resolveModel, routerEnabled } = require('./llmProvider/normalise');
+const { preflight } = require('./estimate');
+const decision = require('./decision');
+const reservation = require('./reservation');
+const providerContext = require('./providerContext');
+const aiSwitch = require('./aiSwitch');
+const telemetry = require('../../Config/telemetry');
+const budgetRead = require('./budgetRead');
+
+/* The spend ledger: one row per model call, written here and nowhere else, so
+ * a feature cannot spend without the budget seeing it. Callers name the
+ * feature and the tenant through the chat option `spend`:
+ *
+ *   provider.chat({ ..., spend: { feature: FEATURES.ASK, companyId, userId, runId?, account? } })
+ *
+ * Every call metered here goes out on the instance's or the workspace's key, so
+ * it is billed to the workspace whatever account label the run carries. A
+ * person's own Claude or ChatGPT reaches AlianHub over MCP and never calls
+ * through here. */
+
+const LOG_PREFIX = '[ai-spend]';
+const strict = () => process.env.NODE_ENV === 'test';
+
+const loud = (message) => {
+    if (strict()) throw new Error(`${LOG_PREFIX} ${message}`);
+    logger.warn(`${LOG_PREFIX} ${message}`);
+};
+
+function contextOf(opts, known = isFeature) {
+    const given = (opts && opts.spend) || {};
+    let feature = given.feature;
+    if (!known(feature)) {
+        loud(`model call without a known feature tag (${feature === undefined ? 'none' : JSON.stringify(feature)}); booked as "${UNKNOWN_FEATURE}"`);
+        feature = UNKNOWN_FEATURE;
+    }
+    const companyId = given.companyId ? String(given.companyId) : null;
+    if (!companyId) loud(`model call for "${feature}" without a companyId; booked against the global database`);
+    return {
+        feature, companyId, account: given.account || 'workspace', billedToWorkspace: true,
+        userId: given.userId ? String(given.userId) : null,
+        runId: given.runId ? String(given.runId) : null,
+    };
+}
+
+/* Refused before any token is bought. A zero price in LLM_PRICING is a price;
+ * an unknown model is not. */
+function ensurePriced(model, context) {
+    const price = usage.priceFor(model);
+    if (price.priced) return;
+    const error = new Error(price.message);
+    error.code = usage.UNPRICED_MODEL;
+    error.feature = context.feature;
+    throw error;
+}
+
+async function record(context, result, adapter, requestedModel) {
+    const model = (result && result.model) || requestedModel || adapter.model || null;
+    const priced = usage.summarize(usage.usageFromResult(result), model);
+    const row = {
+        companyId: context.companyId, feature: context.feature, model, provider: adapter.name || null,
+        inputTokens: priced.inputTokens, outputTokens: priced.outputTokens, totalTokens: priced.totalTokens,
+        costUsd: priced.priced ? priced.costUsd : null, priced: priced.priced, billedToWorkspace: context.billedToWorkspace,
+        runId: context.runId, userId: context.userId, at: new Date(),
+    };
+    await MongoDbCrudOpration(context.companyId || dbCollections.GLOBAL, { type: SCHEMA_TYPE.AI_USAGE, data: row }, 'save');
+    return row;
+}
+
+/* Agent runs announce budget levels themselves, with the run's task and
+ * project on the notification; every other feature announces from here. */
+const alert = async (context) => {
+    if (!context.companyId || context.runId) return;
+    try {
+        await require('../Agents/budget').alertIfCrossed(context.companyId, { feature: context.feature, userId: context.userId });
+    } catch (e) {
+        logger.error(`${LOG_PREFIX} ${context.companyId}: budget alert after ${context.feature} failed: ${e.message}`);
+    }
+};
+
+const wrapped = new WeakMap();
+
+/* The key payer is the ledger payer: the call runs inside the company the spend
+ * is booked to, falling back to whatever context already surrounds it. */
+const asCompany = (context, fn) => providerContext.run(
+    { companyId: providerContext.companyIdOf({ companyId: context.companyId }) || providerContext.companyIdOf() },
+    fn,
+);
+
+function metered(adapter) {
+    if (wrapped.has(adapter)) return wrapped.get(adapter);
+    const provider = {
+        get name() { return adapter.name; },
+        get isConfigured() { return adapter.isConfigured; },
+        get model() { return adapter.model; },
+        get capabilities() { return adapter.capabilities; },
+        async chat(opts) {
+            const context = contextOf(opts);
+            await aiSwitch.assertAllowed(context.companyId);
+            // The model the adapter will send, which is not the configured one
+            // once the router lets a caller name a model on the chat options.
+            const requestedModel = resolveModel(adapter, opts);
+            const call = decision.attach(opts, { routerEnabled: routerEnabled(), provider: adapter.name, model: opts && opts.model });
+            call.classified(context.feature, null);
+            try {
+                ensurePriced(requestedModel, context);
+            } catch (error) {
+                call.skip(adapter.name, requestedModel, decision.SKIP.UNPRICED);
+                telemetry.setAttributes(call.attributes());
+                throw error;
+            }
+            const estimate = preflight({ systemPrompt: opts.systemPrompt, messages: opts.messages, maxTokens: opts.maxTokens, model: requestedModel, feature: context.feature });
+            call.estimated(estimate);
+            const ticket = await reservation.reserve(context, estimate, adapter.name);
+            call.reserved(ticket);
+            if (!ticket.ok) {
+                call.skip(adapter.name, requestedModel, ticket.code);
+                telemetry.setAttributes(call.attributes());
+                throw Object.assign(new Error(ticket.reason), { code: ticket.code, period: ticket.period, feature: context.feature });
+            }
+            call.attempt(adapter.name, requestedModel);
+            const startedAt = Date.now();
+            let result;
+            try {
+                result = await asCompany(context, () => adapter.chat(opts));
+            } catch (error) {
+                await reservation.release(ticket);
+                call.settled(ticket.id ? decision.RESERVATION.RELEASED : ticket.state);
+                if (isProviderError(error)) logger.error(`${LOG_PREFIX} ${context.companyId}: ${context.feature} failed [${error.groupKey()}]${error.requestId ? ` request ${error.requestId}` : ''}: ${error.message}`);
+                telemetry.setAttributes(call.attributes());
+                await replay.record({ context, opts, adapter, error, durationMs: Date.now() - startedAt, decision: call.record() });
+                throw error;
+            }
+            const durationMs = Date.now() - startedAt;
+            const spent = usage.summarize(usage.usageFromResult(result), (result && result.model) || requestedModel || adapter.model);
+            call.answered(adapter.name, spent.model).used(spent);
+            try {
+                await record(context, result, adapter, requestedModel);
+            } catch (e) {
+                if (strict()) throw e;
+                logger.error(`${LOG_PREFIX} ${context.companyId}: ${context.feature} spent ${usage.usageFromResult(result).totalTokens} tokens that could not be booked: ${e.message}`);
+            }
+            await reservation.reconcile(ticket, spent);
+            call.settled(ticket.id ? decision.RESERVATION.SETTLED : ticket.state);
+            telemetry.setAttributes(call.attributes());
+            await replay.record({ context, opts, adapter, result, durationMs, decision: call.record() });
+            await alert(context);
+            return result;
+        },
+        /* Embeddings are priced, held against the workspace budget, booked and alerted on like a
+         * chat call. They carry no prompt to replay, so no replay row is written. */
+        async embed(opts) {
+            const context = contextOf(opts);
+            await aiSwitch.assertAllowed(context.companyId);
+            const model = String((opts && opts.model) || '').trim() || adapter.model;
+            ensurePriced(model, context);
+            const texts = Array.isArray(opts && opts.texts) ? opts.texts : [];
+            const estimate = preflight({ messages: texts.map((content) => ({ role: 'user', content })), maxTokens: 0, model, feature: context.feature });
+            const ticket = await reservation.reserve(context, estimate, adapter.name);
+            if (!ticket.ok) throw Object.assign(new Error(ticket.reason), { code: ticket.code, period: ticket.period, feature: context.feature });
+            let result;
+            try {
+                result = await asCompany(context, () => adapter.embed(opts));
+            } catch (error) {
+                await reservation.release(ticket);
+                if (isProviderError(error)) logger.error(`${LOG_PREFIX} ${context.companyId}: ${context.feature} failed [${error.groupKey()}]${error.requestId ? ` request ${error.requestId}` : ''}: ${error.message}`);
+                throw error;
+            }
+            const spent = usage.summarize(usage.usageFromResult(result), (result && result.model) || model);
+            try {
+                await record(context, result, adapter, model);
+            } catch (e) {
+                if (strict()) throw e;
+                logger.error(`${LOG_PREFIX} ${context.companyId}: ${context.feature} spent ${spent.totalTokens} tokens that could not be booked: ${e.message}`);
+            }
+            await reservation.reconcile(ticket, spent);
+            await alert(context);
+            return result;
+        },
+    };
+    wrapped.set(adapter, provider);
+    return provider;
+}
+
+const AUDIO_MINUTE = 'audio_minute';
+const audioUsd = (seconds, usdPerMinute) => Math.round((Number(seconds || 0) / 60) * Number(usdPerMinute || 0) * 1e6) / 1e6;
+
+/* Audio is priced by the minute, not by the token, so its row carries the minutes as `quantity` of `unit` and
+ * no tokens. `seconds` is what the caller measured and is what the budget holds; `call` answers `{ seconds }`
+ * when the vendor reported the length, and that is then what is booked. */
+async function audio({ spend, model, provider, usdPerMinute, seconds, estimated = false }, call) {
+    const context = contextOf({ spend }, isAudioFeature);
+    await aiSwitch.assertAllowed(context.companyId);
+    const hold = { priced: true, costUsd: audioUsd(seconds, usdPerMinute), model, inputTokens: 0, outputTokens: 0 };
+    const ticket = await reservation.reserve(context, hold, provider);
+    if (!ticket.ok) throw Object.assign(new Error(ticket.reason), { code: ticket.code, period: ticket.period, feature: context.feature });
+    let result;
+    try {
+        result = await asCompany(context, call);
+    } catch (error) {
+        await reservation.release(ticket);
+        throw error;
+    }
+    const reported = Number(result && result.seconds);
+    const vendorTimed = Number.isFinite(reported) && reported > 0;
+    const booked = vendorTimed ? reported : Number(seconds || 0);
+    const costUsd = audioUsd(booked, usdPerMinute);
+    const row = {
+        companyId: context.companyId, feature: context.feature, model: model || null, provider: provider || null,
+        inputTokens: 0, outputTokens: 0, totalTokens: 0, costUsd, priced: true, billedToWorkspace: context.billedToWorkspace,
+        unit: AUDIO_MINUTE, quantity: Math.round((booked / 60) * 1e4) / 1e4, estimated: !vendorTimed && estimated === true,
+        runId: context.runId, userId: context.userId, at: new Date(),
+    };
+    try {
+        await MongoDbCrudOpration(context.companyId || dbCollections.GLOBAL, { type: SCHEMA_TYPE.AI_USAGE, data: row }, 'save');
+    } catch (e) {
+        if (strict()) throw e;
+        logger.error(`${LOG_PREFIX} ${context.companyId}: ${context.feature} spent ${row.quantity} audio minutes that could not be booked: ${e.message}`);
+    }
+    await reservation.reconcile(ticket, { inputTokens: 0, outputTokens: 0, priced: true, costUsd });
+    await alert(context);
+    return result;
+}
+
+const monthRange = (month) => {
+    const from = new Date(`${month}-01T00:00:00.000Z`);
+    return { from, to: new Date(Date.UTC(from.getUTCFullYear(), from.getUTCMonth() + 1, 1)) };
+};
+
+const DAY_MS = 24 * 60 * 60 * 1000;
+const dayKey = (d = new Date()) => d.toISOString().slice(0, 10);
+const dayRange = (day) => {
+    const from = new Date(`${day}T00:00:00.000Z`);
+    return { from, to: new Date(from.getTime() + DAY_MS) };
+};
+
+const money = (n) => Math.round(Number(n || 0) * 10000) / 10000;
+
+async function between(companyId, { from, to }) {
+    const rows = await MongoDbCrudOpration(companyId, {
+        type: SCHEMA_TYPE.AI_USAGE, data: [{ at: { $gte: from, $lt: to }, billedToWorkspace: true }, 'feature costUsd totalTokens'],
+    }, 'find').catch(budgetRead.rethrow(companyId, 'the AI spend ledger'));
+    return rows || [];
+}
+
+/* The billed total alone, summed by the database: what a reservation reads on every call. */
+async function totalBetween(companyId, { from, to }) {
+    const rows = await MongoDbCrudOpration(companyId, {
+        type: SCHEMA_TYPE.AI_USAGE,
+        data: [[
+            { $match: { at: { $gte: from, $lt: to }, billedToWorkspace: true } },
+            { $group: { _id: null, usd: { $sum: '$costUsd' } } },
+        ]],
+    }, 'aggregate').catch(budgetRead.rethrow(companyId, 'the AI spend ledger'));
+    return { usedUsd: money((rows && rows[0] && rows[0].usd) || 0) };
+}
+
+const byFeature = (rows) => {
+    const groups = new Map();
+    (rows || []).forEach((r) => {
+        const key = r.feature || UNKNOWN_FEATURE;
+        const cur = groups.get(key) || { feature: key, usd: 0, calls: 0, tokens: 0 };
+        cur.usd += Number(r.costUsd || 0);
+        cur.calls += 1;
+        cur.tokens += Number(r.totalTokens || 0);
+        groups.set(key, cur);
+    });
+    const features = [...groups.values()].map((f) => ({ ...f, usd: money(f.usd) })).sort((a, b) => b.usd - a.usd || a.feature.localeCompare(b.feature));
+    return { usedUsd: money(features.reduce((s, f) => s + f.usd, 0)), features };
+};
+
+/* This month's workspace-billed spend, in total and per feature (largest first). */
+const monthly = async (companyId, month) => byFeature(await between(companyId, monthRange(month)));
+
+/* The same for one UTC day, which is what the daily budget is read against. */
+const daily = async (companyId, day = dayKey()) => byFeature(await between(companyId, dayRange(day)));
+
+const monthlyTotal = (companyId, month) => totalBetween(companyId, monthRange(month));
+const dailyTotal = (companyId, day = dayKey()) => totalBetween(companyId, dayRange(day));
+
+module.exports = { metered, audio, monthly, daily, monthlyTotal, dailyTotal, dayKey, dayRange, contextOf, ensurePriced, AUDIO_MINUTE };

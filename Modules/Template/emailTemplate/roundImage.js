@@ -1,9 +1,8 @@
 const { APIURL } = require("../../../Config/config")
+const { imageSrc } = require('../emailText')
 
 exports.roundImage = (image = "") => {
-    if (image == "") {
-        image = APIURL + 'api/v1/getlogo?key=defaultuser'
-    }
+    image = imageSrc(image) || imageSrc(APIURL + 'api/v1/getlogo?key=defaultuser')
     return`
     <div style="height: 50px;
 width: 50px;

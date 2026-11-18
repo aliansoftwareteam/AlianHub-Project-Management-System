@@ -2,47 +2,29 @@ const { SCHEMA_TYPE } = require("../../../Config/schemaType");
 const { MongoDbCrudOpration } = require("../../../utils/mongo-handler/mongoQueries");
 const { Notification_key } = require("../../../Config/notificationKey.js");
 const mongoose = require("mongoose")
+const { mentionsKeptFromReader, noticesKeptFromReader, withoutKept } = require("../../Comments/helpers/readerRows");
 
-/**
- * This endpoint is used to send message on mentions
- * @param {*} req 
- * @param {*} res 
- * @returns 
- */
-exports.sendMessage = async (req, res) => {
-    try {
-        const { data } = req.body
+/* The notices or the mentions of the person that a request leaves alone: those of a thread they cannot open. */
+const rowsKept = (req, userId, ofNotices) => (ofNotices ? noticesKeptFromReader : mentionsKeptFromReader)(req.headers['companyid'], userId);
 
-        const params = {
-            type: SCHEMA_TYPE.MENTIONS,
-            data: data
-        };
+const OBJECT_ID_PATTERN = /^[a-f0-9]{24}$/i;
 
-        const response = await MongoDbCrudOpration(req.headers['companyid'], params, "save");
+const fail = (res, code, message) => res.status(code).json({ status: false, statusText: message, message });
 
-        return res.status(200).json({ status: true, data: response || {} });
-
-    } catch (error) {
-        return res.status(500).json({
-            message: "An error occurred while send message on mentions",
-            error: error
-        });
+// The feed always belongs to the session user; a userId naming anyone else is refused, not silently swapped.
+const resolveRecipient = (req, res, claimedUserId) => {
+    if (claimedUserId && String(claimedUserId) !== String(req.uid)) {
+        fail(res, 403, "You can only read or change your own notifications.");
+        return null;
     }
+    return String(req.uid);
 }
 
-/**
- * This endpoint is used to get all the mentions messages
- * @param {*} req 
- * @param {*} res 
- * @returns 
- */
 exports.getMentionsMessages = async (req, res) => {
     try {
-        const { userId, mentions, lastMention, firstMention, loadMore } = req.query;
-
-        if (!userId) {
-            return res.status(400).json({ status: false, message: "userId is required." });
-        }
+        const { mentions, lastMention, firstMention, loadMore } = req.query;
+        const userId = resolveRecipient(req, res, req.query.userId);
+        if (!userId) return;
 
         let query = {
             mentionIds: {
@@ -65,13 +47,11 @@ exports.getMentionsMessages = async (req, res) => {
             sort: { createdAt: -1 }
         };
 
-        const projection = {};
-
         const params = {
             type: SCHEMA_TYPE.MENTIONS,
             data: [
-                query,
-                projection,
+                withoutKept(query, await rowsKept(req, userId, false)),
+                {},
                 options
             ]
         }
@@ -81,39 +61,24 @@ exports.getMentionsMessages = async (req, res) => {
         return res.status(200).json({ status: true, data: response || [] });
 
     } catch (error) {
-        return res.status(500).json({
-            status: false,
-            message: "An error occurred while fetching mentions",
-            error: error.message
-        });
+        return fail(res, 500, `An error occurred while fetching mentions: ${error.message}`);
     }
 }
 
-/**
- * This endpoint is used to get all the notification messages
- * @param {*} req 
- * @param {*} res 
- * @returns 
- */
 exports.getNotificationMessages = async (req, res) => {
     try {
-        const { userId, loadMore, batchSize = 10, notificationSkip = 0, filter = 'unread' } = req.query;
+        const { loadMore, batchSize = 10, notificationSkip = 0, filter = 'unread' } = req.query;
+        const userId = resolveRecipient(req, res, req.query.userId);
+        if (!userId) return;
 
         const limit = parseInt(batchSize);
         const skip = parseInt(notificationSkip);
 
         if (isNaN(limit) || limit <= 0 || isNaN(skip) || skip < 0) {
-            return res.status(400).json({
-                status: false,
-                message: "Invalid pagination parameters",
-            });
+            return fail(res, 400, "Invalid pagination parameters");
         }
 
-        // `notSeen` carries the IDs of recipients who have NOT yet read the
-        // notification. So `userId IN notSeen` ⇒ unread for that user, and
-        // `userId NOT IN notSeen` ⇒ already read / archived for that user.
-        // Default to 'unread' to keep the bell focused on actionable items;
-        // the dropdown's "View Archive" toggle passes filter=archived.
+        // `notSeen` holds the recipients who have NOT read the notification yet.
         const normalizedFilter = (filter === 'archived' || filter === 'archive') ? 'archived' : 'unread';
 
         const baseMatch = [
@@ -125,7 +90,9 @@ exports.getNotificationMessages = async (req, res) => {
                     { notificationType: null }
                 ]
             },
-            { receiverID: userId }
+            { receiverID: userId },
+            // Clearing in the Inbox stamps clearedAt; the bell has no cleared view, so those rows stay out of both lists.
+            { clearedAt: null }
         ];
 
         if (normalizedFilter === 'archived') {
@@ -135,7 +102,7 @@ exports.getNotificationMessages = async (req, res) => {
         }
 
         const query = [
-            { $match: { $and: baseMatch } },
+            { $match: withoutKept({ $and: baseMatch }, await rowsKept(req, userId, true)) },
             { $sort: { createdAt: -1, _id: 1 } },
             { $skip: loadMore ? skip : 0 },
             { $limit: limit },
@@ -151,156 +118,92 @@ exports.getNotificationMessages = async (req, res) => {
         return res.status(200).json({ status: true, data: response || [] });
 
     } catch (error) {
-        return res.status(500).json({
-            message: "An error occurred while fetching notification messages",
-            error: error.message,
-        });
+        return fail(res, 500, `An error occurred while fetching notification messages: ${error.message}`);
     }
 }
 
-/**
- * This endpoint is used to update mark read message
- * @param {*} req 
- * @param {*} res 
- * @returns 
- */
 exports.updateMarkRead = async (req, res) => {
     try {
-        const { key, id, userId, isClickPush=false, commentsId="" } = req.body;
+        const { key, id, isClickPush = false, commentsId = "" } = req.body;
+        const userId = resolveRecipient(req, res, req.body.userId);
+        if (!userId) return;
 
-        if (!id || !userId) {
-            return res.status(400).json({
-                status: false,
-                message: `'id' and 'userId' paramters are required`
-            })
+        const isNotification = key === 'notifications';
+        const byComment = isClickPush && key === "mentions";
+
+        if (byComment ? !commentsId : !OBJECT_ID_PATTERN.test(String(id || ''))) {
+            return fail(res, 400, byComment ? "'commentsId' is required" : "'id' must be a valid id");
         }
 
-        let params = {};
-        if (key === 'notifications') {
-            params = {
-                $set: {
-                    notificationStatus: 'completed',
-                },
-                $pull: { notSeen: userId }
-            }
-        } else {
-            params = {
-                $pull: { notSeen: userId }
-            }
-        }
+        const update = isNotification
+            ? { $set: { notificationStatus: 'completed' }, $pull: { notSeen: userId } }
+            : { $pull: { notSeen: userId } };
+
+        const recipientFilter = isNotification
+            ? { assigneeUsers: { $in: [userId] } }
+            : { mentionIds: { $in: [userId] } };
+
+        const filter = byComment
+            ? { comment_id: commentsId, ...recipientFilter }
+            : { _id: new mongoose.Types.ObjectId(id), ...recipientFilter };
 
         const query = {
-            type: key === 'notifications' ? SCHEMA_TYPE.NOTIFICATIONS : SCHEMA_TYPE.MENTIONS,
-            data: [
-                {
-                    _id: new mongoose.Types.ObjectId(id)
-                },
-                params
-            ],
+            type: isNotification ? SCHEMA_TYPE.NOTIFICATIONS : SCHEMA_TYPE.MENTIONS,
+            data: [withoutKept(filter, await rowsKept(req, userId, isNotification)), update],
         };
 
-        if (isClickPush && key === "mentions") {
-            query.data = [
-                {
-                    comment_id: commentsId
-                },
-                params
-            ]
-        }
         const response = await MongoDbCrudOpration(req.headers['companyid'], query, 'updateOne');
 
         return res.status(200).json({ status: true, data: response });
 
     } catch (error) {
-        return res.status(500).json({
-            message: "An error occurred while mark read message",
-            error: error.message,
-        });
+        return fail(res, 500, `An error occurred while mark read message: ${error.message}`);
     }
 }
 
-/**
- * This endpoint is used to delete mark read message from global database 
- * @param {*} req 
- * @param {*} res 
- * @returns 
- */
+// One answer for a notification that does not exist and one that belongs to someone else.
 exports.deleteMarkReadFromGlobal = async (req, res) => {
     try {
-        const { key, id } = req.params;
-
-        if (!id) {
-            return res.status(400).json({
-                status: false,
-                message: `'id' paramter id required`
-            })
+        const { id } = req.params;
+        if (!OBJECT_ID_PATTERN.test(String(id || ''))) {
+            return fail(res, 400, "'id' must be a valid id");
         }
 
         const query = {
             type: SCHEMA_TYPE.NOTIFICATIONS,
-            data: [
-                {
-                    notificationId: id
-                }
-            ],
+            data: [{ notificationId: String(id), receiverID: String(req.uid), companyId: String(req.headers['companyid']) }],
         };
 
         const response = await MongoDbCrudOpration(SCHEMA_TYPE.GOLBAL, query, 'deleteOne');
-
-        return res.status(200).json({ status: true, data: response });
+        if (!response || !response.deletedCount) {
+            return fail(res, 404, "Notification not found.");
+        }
+        return res.status(200).json({ status: true, statusText: "Notification removed." });
 
     } catch (error) {
-        return res.status(500).json({
-            message: "An error occurred while delete mark read message from global",
-            error: error.message,
-        });
+        return fail(res, 500, "An error occurred while removing the notification.");
     }
 }
 
-/**
- * This endpoint is used to update mark all read message
- * @param {*} req 
- * @param {*} res 
- * @returns 
- */
 exports.updateMarkAllRead = async (req, res) => {
     try {
-        const { key, userId } = req.body;
+        const { key } = req.body;
+        const userId = resolveRecipient(req, res, req.body.userId);
+        if (!userId) return;
 
-        if (!userId) {
-            return res.status(400).json({
-                status: false,
-                message: `'userId' paramter is required`
-            })
-        }
-
-        let params = [];
-        if (key === 'notifications') {
-            params = [
-                {
-                    assigneeUsers: { $in: [userId] },
-                    notSeen: { $in: [userId] },
-                    notificationType: 'push',
-                },
-                {
-                    $pull: { notSeen: userId }
-                }
+        const params = key === 'notifications'
+            ? [
+                { assigneeUsers: { $in: [userId] }, notSeen: { $in: [userId] }, notificationType: 'push' },
+                { $pull: { notSeen: userId } }
             ]
-        } else {
-            params = [
-                {
-                    mentionIds: { $in: [userId] },
-                    notSeen: { $in: [userId] }
-                },
-                {
-                    $pull: { notSeen: userId }
-                }
-            ]
-        }
+            : [
+                { mentionIds: { $in: [userId] }, notSeen: { $in: [userId] } },
+                { $pull: { notSeen: userId } }
+            ];
 
         const query = {
             type: key === 'notifications' ? SCHEMA_TYPE.NOTIFICATIONS : SCHEMA_TYPE.MENTIONS,
-            data: params,
+            data: [withoutKept(params[0], await rowsKept(req, userId, key === 'notifications')), params[1]],
         };
 
         const response = await MongoDbCrudOpration(req.headers['companyid'], query, 'updateMany');
@@ -308,9 +211,6 @@ exports.updateMarkAllRead = async (req, res) => {
         return res.status(200).json({ status: true, data: response });
 
     } catch (error) {
-        return res.status(500).json({
-            message: "An error occurred while mark read message",
-            error: error.message,
-        });
+        return fail(res, 500, `An error occurred while mark read message: ${error.message}`);
     }
 }

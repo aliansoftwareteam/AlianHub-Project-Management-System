@@ -14,6 +14,8 @@ const { updateCompanyFun, getCompanyDataFun } = require('../Company/controller/u
 const { updateMemberFunction } = require('../settings/Members/controller.js');
 const aiPrompts = require('../../utils/aiPrompts.json');
 const { generateDescription } = require('./aiDescriptionWriter');
+const { summarizeTask } = require('./taskSummary');
+const { categoriseTask } = require('./taskCategory');
 
 // AI-Assist used to post straight to OpenAI, so LLM_PROVIDER had no effect here
 // even though every other AI feature in the app honours it. It now goes through
@@ -22,9 +24,16 @@ const { generateDescription } = require('./aiDescriptionWriter');
 // reason the description writer does it: a missing or broken provider module
 // should degrade to "AI is not integrated" rather than take this controller
 // down at load time.
+const { FEATURES } = require('../AICore/features');
+
+const companyOf = (req) => req.headers['companyid'];
+/* In-memory chats are keyed by the session user, so a caller can only read, reset
+ * or delete their own conversation, whatever id the client sends. */
+const chatIdOf = (req, clientId) => `${req.uid}:${String(clientId || '')}`;
+
 let providerFactory = null;
 try {
-    providerFactory = require('../AIProjectGenerator/llmProvider');
+    providerFactory = require('../AICore/llmProvider');
 } catch (_e) {
     providerFactory = null;
 }
@@ -55,7 +64,7 @@ function isAiConfigured() {
  * (Providers that reject an explicit temperature, such as OpenAI's reasoning
  * models, already drop it inside their own implementation.)
  */
-function askProvider(messages, { jsonMode = false } = {}) {
+function askProvider(messages, { jsonMode = false, spend } = {}) {
     if (!providerFactory || typeof providerFactory.getProvider !== 'function') {
         return Promise.reject(new Error('No LLM provider is available.'));
     }
@@ -67,7 +76,7 @@ function askProvider(messages, { jsonMode = false } = {}) {
     } catch (error) {
         return Promise.reject(error);
     }
-    return provider.chat({ messages, jsonMode, temperature: 1 });
+    return provider.chat({ messages, jsonMode, temperature: 1, spend });
 }
 
 /**
@@ -95,8 +104,9 @@ exports.generatePrompt = (req,res) => {
             return;
         }
 
+        const chatId = chatIdOf(req, req.body.uniqueUserId);
         if(req.body.isRegenerate){
-            deleteChat(req.body.uniqueUserId);
+            deleteChat(chatId);
         }
         if(isAiConfigured()){
                 const promptData = aiPrompts.find((e) => e._id === req.body.prompt.id);
@@ -111,13 +121,13 @@ exports.generatePrompt = (req,res) => {
                             promptsText = promptsText + promptRes.outputFormat
                         }
                     })
-                    addChat(req.body.uniqueUserId,{role: "user",content: promptsText });
+                    addChat(chatId,{role: "user",content: promptsText });
                     // Kept verbatim, including the JSON.stringify: it wraps the prompt in
                     // quotes and escapes it, which is part of what these prompts have been
                     // tuned against. Sending the bare text would be a different prompt.
                     const messages = [{"role": "user", "content": `${JSON.stringify(promptsText)}`}];
                     if(stream === true){
-                        exports.generateWithStream(messages,req.body.userId,req.body.companyId,req.body.uniqueUserId,req.body.eventId).then((response) => {
+                        exports.generateWithStream(messages,req.uid,companyOf(req),chatId,req.body.eventId).then((response) => {
                             res.send({status: true, statusText: response});
                         }).catch((error) => {
                             res.send({status: false, statusText: (error && error.message) || String(error)});
@@ -127,8 +137,8 @@ exports.generatePrompt = (req,res) => {
                         try {
                             // No jsonMode here, matching the old direct call: only the
                             // streamed prompts ever asked for JSON-only output.
-                            askProvider(messages).then(async(result) => {
-                                const userUpdate = await exports.limitCountUpdate(req.body.userId,req.body.companyId,(result && result.totalTokens) || 0);
+                            askProvider(messages, { spend: { feature: FEATURES.ASSIST, companyId: companyOf(req), userId: req.uid } }).then(async(result) => {
+                                const userUpdate = await exports.limitCountUpdate(req.uid,companyOf(req),(result && result.totalTokens) || 0);
                                 res.send({status: true, statusText: (result && result.content) || '',userUpdate:userUpdate});
                             }).catch((error) => {
                                 res.send({status: false, statusText: (error && error.message) || String(error)});
@@ -156,15 +166,16 @@ exports.generatePrompt = (req,res) => {
 exports.generatePromptChat = (req,res) => {
     try {
         if(isAiConfigured()){
+            const chatId = chatIdOf(req, req.body.uniqueUserId);
             if(!req.body.isRegenerate){
-                pushChat(req.body.uniqueUserId,{role: "user",content: req.body.message});
+                pushChat(chatId,{role: "user",content: req.body.message});
             }else{
-                removeChat(req.body.uniqueUserId)
+                removeChat(chatId)
             }
-            if(getChat(req.body.uniqueUserId) && getChat(req.body.uniqueUserId).length>0){
+            if(getChat(chatId).length>0){
                 // The stored chat is already a role/content list, which is exactly what
                 // every provider takes.
-                exports.generateWithStream(getChat(req.body.uniqueUserId),req.body.userId,req.body.companyId,req.body.uniqueUserId,req.body.eventId).then((response) => {
+                exports.generateWithStream(getChat(chatId),req.uid,companyOf(req),chatId,req.body.eventId).then((response) => {
                     res.send({status: true, statusText: response});
                 }).catch((error) => {
                     res.send({status: false, statusText: (error && error.message) || String(error)});
@@ -185,7 +196,7 @@ exports.generatePromptChat = (req,res) => {
 // DELETE USER CHAT
 exports.deleteUserChat = (req,res) => {
     try {
-        deleteChat(req.body.userId);
+        deleteChat(chatIdOf(req, req.body.userId));
         res.send({status: true, statusText: 'Done'});
     } catch (error) {
         res.send({status: false, statusText: error});
@@ -442,6 +453,8 @@ exports.writeDescription = async (req, res) => {
         } = req.body || {};
 
         const result = await generateDescription({
+            companyId,
+            userId: req.uid,
             title,
             taskType,
             existingDescription,
@@ -492,7 +505,7 @@ exports.generateWithStream = (messages,userId,companyId,uniqueUserId,eventId) =>
             // part of the contract with the frontend. The factory holds that
             // guarantee on every provider — natively where one exists, by
             // instruction where it does not.
-            askProvider(messages, { jsonMode: true })
+            askProvider(messages, { jsonMode: true, spend: { feature: FEATURES.ASSIST, companyId, userId } })
             .then(async(result) => {
                 const fullText = (result && result.content) || '';
 
@@ -550,3 +563,40 @@ function delayProvider(data = "",eventId) {
         }
     }, fixedTime)
 }
+exports.summarizeTask = async (req, res) => {
+    try {
+        const companyId = req.headers['companyid'];
+        if (!companyId) {
+            return res.status(400).send({ status: false, statusText: 'companyId header required' });
+        }
+        const { taskId = '', force = false, keptOnly = false } = req.body || {};
+        const result = await summarizeTask({ companyId, uid: req.uid, taskId: String(taskId), force: force === true, keptOnly: keptOnly === true });
+        if (result.notFound) return res.status(404).send({ status: false, statusText: result.reason });
+        if (!result.status) {
+            return res.send({ status: false, statusText: result.reason || 'Could not summarise this task.', ...(result.aiState ? { aiState: result.aiState } : {}) });
+        }
+        return res.send({ status: true, data: result.data });
+    } catch (error) {
+        logger.error(`summarizeTask error: ${error && error.message ? error.message : error}`);
+        return res.send({ status: false, statusText: (error && error.message) || 'An error occurred while summarising the task.' });
+    }
+};
+
+exports.categoriseTask = async (req, res) => {
+    try {
+        const companyId = req.headers['companyid'];
+        if (!companyId) {
+            return res.status(400).send({ status: false, statusText: 'companyId header required' });
+        }
+        const { taskId = '', force = false } = req.body || {};
+        const result = await categoriseTask({ companyId, uid: req.uid, taskId: String(taskId), force: force === true });
+        if (result.notFound) return res.status(404).send({ status: false, statusText: result.reason });
+        if (!result.status) {
+            return res.send({ status: false, statusText: result.reason || 'Could not categorise this task.' });
+        }
+        return res.send({ status: true, data: result.data });
+    } catch (error) {
+        logger.error(`categoriseTask error: ${error && error.message ? error.message : error}`);
+        return res.send({ status: false, statusText: (error && error.message) || 'An error occurred while categorising the task.' });
+    }
+};

@@ -1,0 +1,860 @@
+const { default: mongoose } = require('mongoose');
+const logger = require('../../../Config/loggerConfig');
+const { myCache } = require('../../../Config/config');
+const { SCHEMA_TYPE } = require('../../../Config/schemaType');
+const { schema } = require('../../../utils/mongo-handler/schema');
+const { MongoDbCrudOpration } = require('../../../utils/mongo-handler/mongoQueries');
+const { sanitizeInput } = require('../../serviceFunction');
+const { BODY_COMPANY_PATHS } = require('../../../Config/taskWritePermissions');
+const { canReadProject } = require('../../../Config/projectAccess');
+const { namedIds, nonMembersOf, NOT_A_MEMBER } = require('../../../Config/companyMembers');
+const { mayAttachKey, taskAttachmentKey, formUploadKey, clipKey } = require('../../../common-storage/taskFileKeys');
+const { REPORT, scopeMode, countReported } = require('../../../common-storage/storedFileScope');
+const { tenantOf, TenantError } = require('../../../Config/tenant');
+const { canReadTask } = require('./taskReadAccess');
+const { loadSubtree, REFUSALS } = require('./taskTree');
+const { RichTextLimitError } = require('./cleanRichText');
+const { CANNOT_OPEN_PROJECT, peopleWhoOpen, cannotOpen } = require('../../../Config/projectPeople');
+const { openProject, isChatSpace, startsOwnConversation, listOf, listRef, listLeftBy, readableTaskIds, flatStatus, coveredByMapping, moveMappingInto, conversionRules } = require('./taskWritePlacement');
+
+const { IMPORT_MARK_FIELDS } = require('./importMark');
+const { byline } = require('../../Agents/actingAgent');
+
+const OBJECT_ID = /^[a-f0-9]{24}$/i;
+
+const PROTECTED_FIELDS = Object.freeze(['_id', 'CompanyId', 'ProjectID', 'TaskKey', 'createdBy', 'createdAt', 'sprintId', 'sprintArray', 'folderObjId', ...IMPORT_MARK_FIELDS]);
+const PLACEMENT_FIELDS = Object.freeze(['ProjectID', 'TaskKey', 'sprintId', 'sprintArray', 'folderObjId']);
+const PROTOTYPE_KEYS = Object.freeze(['__proto__', 'constructor', 'prototype']);
+const INDEX_NAMES = Object.freeze(['groupByStatusIndex', 'groupByPriorityIndex', 'groupByAssigneeIndex', 'groupByDueDateIndex']);
+const SEARCH_KEYS = Object.freeze(['statusKey', 'Task_Priority', 'AssigneeUserId', 'DueDate']);
+const UNKNOWN_USER = 'Unknown user';
+const USER_CACHE_SECONDS = 604800;
+
+class TaskWriteRefusal extends Error {
+    constructor(statusCode, message, code) {
+        super(message);
+        this.name = 'TaskWriteRefusal';
+        this.statusCode = statusCode;
+        if (code) this.code = code;
+    }
+}
+
+const refuse = (statusCode, message, code) => { throw new TaskWriteRefusal(statusCode, message, code); };
+const ATTACHMENT_KEY_REFUSED = 'ATTACHMENT_KEY_NOT_OWN';
+const CANNOT_OPEN_DESTINATION = 'Only people who can open the project a copy lands in can be copied to it.';
+const taskNotFound = () => new TaskWriteRefusal(404, 'Task not found');
+
+const isPlainObject = (value) => value !== null && typeof value === 'object' && !Array.isArray(value) && !(value instanceof Date);
+const isScalar = (value) => value === null || ['string', 'number', 'boolean'].includes(typeof value);
+
+const escapeText = (value) => sanitizeInput(String(value === undefined || value === null ? '' : value));
+
+/* tenantOf would fall back to a body company; a task write needs both the header and a token, so a route mounted without verifyJWTTokenWithCV2 never trusts a bare header. */
+const validatedCompanyOf = (req) => {
+    const header = String((req && req.headers && req.headers.companyid) || '').trim();
+    if (!OBJECT_ID.test(header) || !req.aud) refuse(400, 'A valid company is required for this request.');
+    try {
+        return tenantOf(req);
+    } catch (error) {
+        if (error instanceof TenantError) refuse(error.statusCode, error.message);
+        throw error;
+    }
+};
+
+/* The one id a value names, read as the task handlers and the permission guard read it: hex in any case, a lone { id } / { _id }, or the ObjectId a stored row carries. */
+const plainIdOf = (value) => {
+    if (value === undefined || value === null) return { absent: true };
+    if (value instanceof mongoose.Types.ObjectId) return { id: value.toHexString() };
+    if (typeof value === 'string') {
+        const trimmed = value.trim();
+        if (!trimmed) return { absent: true };
+        return OBJECT_ID.test(trimmed) ? { id: trimmed } : {};
+    }
+    if (isPlainObject(value)) {
+        const keys = Object.keys(value);
+        if (keys.length === 1 && ['id', '_id'].includes(keys[0]) && typeof value[keys[0]] === 'string') {
+            const inner = plainIdOf(value[keys[0]]);
+            return inner.id ? inner : {};
+        }
+    }
+    return {};
+};
+
+const STATUS_FIELDS = ['status', 'statusKey', 'statusType'];
+const PLACED_NAME_LIMIT = 255;
+const PLACED_ID_LIMIT = 64;
+
+const valueAt = (body, path) => path.reduce((node, key) => (isPlainObject(node) ? node[key] : undefined), body);
+
+const sameValue = (claimed, stored) => isScalar(claimed) && claimed !== null && stored !== undefined && stored !== null && String(claimed) === String(stored);
+
+const instantOf = (value) => (value === undefined || value === null ? null : new Date(value).getTime());
+
+/* An unreadable date is NaN on either side and never equal. */
+const sameInstant = (claimed, stored) => (claimed === null || ['string', 'number'].includes(typeof claimed)) && instantOf(claimed) === instantOf(stored);
+
+const holdsField = (path, field, same = sameValue) => (payload, stored) => same(valueAt(payload, path), stored[field]);
+
+const holdsAssignees = (payload, stored) => {
+    const claimed = valueAt(payload, ['firebaseObj', 'AssigneeUserId']);
+    const named = Array.isArray(claimed) ? claimed : [claimed];
+    if (named.some((id) => typeof id !== 'string' || !id)) return false;
+    const assigned = new Set((stored.AssigneeUserId || []).map(String));
+    if (payload.type === 'replace') return Array.isArray(claimed) && new Set(named).size === assigned.size && named.every((id) => assigned.has(id));
+    if (payload.type === 'assigneeAdd') return named.every((id) => assigned.has(id));
+    if (payload.type === 'assigneRemove') return named.every((id) => !assigned.has(id));
+    return false;
+};
+
+/* A person already on the task stays nameable after their seat ends, so a replacement list or a move keeps them. */
+const newlyNamed = (value, held) => {
+    const already = new Set(namedIds(held || []));
+    return namedIds(value).filter((id) => !already.has(id));
+};
+
+const peopleOnChecklist = (rows) => (Array.isArray(rows) ? rows : [rows]).flatMap((row) => (isPlainObject(row) ? namedIds(row.AssigneeUserId || []) : []));
+
+const peopleOnNewTask = (data) => (isPlainObject(data) ? [...namedIds(data.AssigneeUserId || []), ...namedIds(data.watchers || []), ...namedIds(data.Task_Leader || []), ...peopleOnChecklist(data.checklistArray || [])] : []);
+
+/* Both operations that name one person on a row push them when the history says 'add'; the others carry whole rows. */
+const peopleAddedToChecklist = (payload, stored) => {
+    const held = peopleOnChecklist(stored.checklistArray || []);
+    const history = isPlainObject(payload.historyObj) ? payload.historyObj : {};
+    if (['checklistassignee', 'assigneeremove'].includes(payload.operation)) return history.type === 'add' ? newlyNamed(history.assigneeId, held) : [];
+    return ['taskchecklistcreate', 'checklistadd', 'checklistchecked'].includes(payload.operation) ? newlyNamed(peopleOnChecklist(payload.data), held) : [];
+};
+
+const PEOPLE = Object.freeze({
+    create: (payload) => peopleOnNewTask(payload.data),
+    createMultipleTasks: (payload) => (Array.isArray(payload.tasks) ? payload.tasks.flatMap(peopleOnNewTask) : []),
+    updateAssignee: (payload, stored) => (payload.type === 'assigneRemove' ? [] : newlyNamed(valueAt(payload, ['firebaseObj', 'AssigneeUserId']), stored.AssigneeUserId)),
+    updateTaskLeader: (payload, stored) => newlyNamed(valueAt(payload, ['firebaseObj', 'Task_Leader']), stored.Task_Leader),
+    updateWatcher: (payload, stored) => (payload.add ? newlyNamed(payload.userId, stored.watchers) : []),
+    updateQueueList: (payload, stored) => (payload.actionType === 'add' ? newlyNamed(payload.userId, stored.queueListArray) : []),
+    updateChecklists: peopleAddedToChecklist,
+    AddAiChecklist: (payload, stored) => newlyNamed(peopleOnChecklist(payload.checklistArray), peopleOnChecklist(stored.checklistArray || [])),
+    carried: (payload, stored) => [...newlyNamed(payload.assignee, stored.AssigneeUserId), ...newlyNamed(payload.watcher, stored.watchers)],
+    bulkUpdateAssignee: (payload) => (payload.type === 'assigneRemove' ? [] : namedIds(payload.employeeId)),
+    bulkDuplicate: (payload) => [...namedIds(payload.assignee || []), ...namedIds(payload.watcher || [])],
+});
+
+/* Read as the duplicate handler reads it, so whoever it would store is whoever is checked. */
+const copiesPart = (payload, part) => Boolean(payload.duplicateData) && typeof payload.duplicateData.includes === 'function' && payload.duplicateData.includes(part);
+
+const peopleOnCopy = (payload) => namedIds([
+    ...(copiesPart(payload, 'Copy Assignees') ? namedIds(payload.assignee || []) : []),
+    ...(copiesPart(payload, 'Copy Watchers') ? namedIds(payload.watcher || []) : []),
+]);
+
+const holdsTaskType = (payload, stored) => {
+    const claimed = ['TaskType', 'TaskTypeKey'].filter((field) => valueAt(payload, ['newStatus', field]) !== undefined);
+    return claimed.length > 0 && claimed.every((field) => sameValue(payload.newStatus[field], stored[field]));
+};
+
+/*
+ * `params` are the body keys the handler and the web app use; any other key is dropped. `writes` names the body objects
+ * the handler copies into the task update, with the fields each may carry. `owns` are the protected fields the action is
+ * built to set. `company` are the paths the handler picks its database from. `fieldNames` are values naming a task field.
+ * `ids` must each resolve to one plain id, `scalars` and `numbers` are values a query compares against, `searchKeys` name
+ * the field a query matches on, `objects` must be objects when sent. `task` is the task the action writes: it is required,
+ * must exist and be visible, its project is written to the `project` paths, its id to the `taskIds` paths and its name to
+ * the `taskNames` paths, and its project's stored name to the `projectNames` paths; with `stored` the handler also gets
+ * the stored row as `storedTask`. `held` tells whether the stored task already has the value the body names; an action that takes
+ * isUpdateTask records history without writing only when it does. `others` are further tasks the action reaches, each of
+ * which must be visible too, and `listed` a list of task ids, or of rows carrying one under `id`, kept to the visible
+ * ones. `destination` names the project a create, move or copy writes into, which the caller must be able to open;
+ * `chat` is the flag that marks a conversation, whose container is a chat space instead. `list.id` is the list of that
+ * project the write names, which must be one of its lists the caller may see, and `list.ref` the object the handler
+ * stores on the task, rewritten from the stored list. `parent` is the task a new row goes under, which the caller
+ * must be able to read. `mapping` is the status and task type mapping of a move into another project. `people`
+ * returns the user ids the write newly names, each of whom must hold a live seat in the company and be able to open
+ * the project; `carries` are the lists of people a move or copy takes along. `landing`
+ * returns the user ids stored on a task the write creates in the destination, each of whom must be able to open that
+ * project. `lands` names, among `others`, the task whose project the written task ends up in when the action names
+ * no destination; that project is written to `projectData`. `rules` is the object that says what each status and
+ * task type becomes in the project the task ends up in: it is rebuilt from the two stored projects, and the body
+ * only chooses among what that project has. `leaves` are the objects that name the list the task leaves, rewritten
+ * from the stored task. `actor` are the params that receive the signed-in user. `strict` refuses a body key the
+ * action does not take, for an action no existing client sends extra fields to.
+ */
+const spec = ({ params, writes = {}, owns = [], company = [], fieldNames = [], ids = [], scalars = [], numbers = [], searchKeys = [], objects = [], task = null, others = [], listed = null, project = [], taskIds = [], taskNames = [], projectNames = [], stored = false, status = null, held = null, destination = null, chat = null, list = null, parent = null, mapping = null, attachments = null, people = null, carries = [], landing = null, lands = null, rules = null, leaves = [], strict = false, actor }) => Object.freeze({
+    params, writes, owns, company, fieldNames, ids, scalars, numbers, searchKeys, objects, task, others, listed, project, taskIds, taskNames, projectNames, stored, status, held, destination, chat, list, parent, mapping, attachments, people, carries, landing, lands, rules, leaves, strict,
+    actor: actor || (params.includes('userData') ? ['userData'] : []),
+});
+
+const HISTORY_USER = ['userData'];
+const companyId = [['companyId']];
+const projectCompany = [['projectData', 'CompanyId']];
+
+const TASK_ID = [['taskId']];
+const TASK = [['task', '_id']];
+const TASK_DATA = [['taskData', '_id']];
+const TASK_NAME = [['taskData', 'TaskName']];
+const PROJECT_NAME = [['project', 'ProjectName']];
+const PROJECT_DATA_NAME = [['projectData', 'ProjectName']];
+const TASK_IDS = [['taskIds', '*']];
+const LIST_ID = [['sprintId']];
+/* Both spellings of the company a client may send; each is replaced by the validated one. */
+const TENANT = ['companyId', 'CompanyId'];
+const PROJECT_DATA = [['projectData', '_id']];
+const PROJECT = [['project', '_id']];
+const PROJECT_ID = [['projectId']];
+const DESTINATION = ['projectData', 'id'];
+const DESTINATION_LIST = Object.freeze({ id: ['sprintObj', 'id'], ref: ['sprintObj'] });
+const LISTED_TASKS = Object.freeze({ path: ['taskIds'] });
+const CARRIED = Object.freeze(['assignee', 'watcher']);
+const RULES = ['oldProject'];
+const LIST_LEFT = [['oldSprintObj']];
+
+const CREATE_DATA_FIELDS = Object.freeze(Object.keys(schema.tasks).filter((field) => !['_id', 'createdBy', 'createdAt', 'ancestors', 'cascadedBy', 'extraLists', ...IMPORT_MARK_FIELDS].includes(field)));
+
+const CREATE = spec({
+    params: ['data', 'user', 'projectData', 'indexObj', 'setNotif'],
+    writes: { data: CREATE_DATA_FIELDS },
+    owns: ['CompanyId', ...PLACEMENT_FIELDS],
+    company: [['data', 'CompanyId'], ...projectCompany],
+    fieldNames: [['indexObj', 'indexName']],
+    ids: [['data', 'ParentTaskId'], ['data', 'ProjectID']],
+    objects: [['indexObj']],
+    actor: ['user'],
+    attachments: 'created',
+    people: PEOPLE.create,
+    destination: ['data', 'ProjectID'],
+    chat: ['data', 'mainChat'],
+    list: { id: ['data', 'sprintId'], ref: null },
+    parent: ['data', 'ParentTaskId'],
+});
+
+const TASK_ACTION_FIELDS = Object.freeze({
+    create: CREATE,
+    createSubTaskWithAi: spec({ params: ['companyId', 'userId', 'subTitles', 'sprintObj', 'projectData', 'userData', 'parentTask', 'type'], owns: PLACEMENT_FIELDS, company: [...companyId, ...projectCompany], ids: [['parentTask', 'id'], ['parentTask', 'ProjectID']], others: [['parentTask', 'id']], destination: ['parentTask', 'ProjectID'], list: { id: ['sprintObj', 'id'], ref: null } }),
+    createMultipleTasks: spec({ params: ['tasks', 'userData', 'projectData', 'indexObj', 'statusArray', 'sprint', 'eventId'], owns: PLACEMENT_FIELDS, company: projectCompany, fieldNames: [['indexObj', 'indexName']], ids: PROJECT_DATA, objects: [['indexObj']], attachments: 'imported', people: PEOPLE.createMultipleTasks, destination: PROJECT_DATA[0], list: { id: ['sprint', 'id'], ref: ['sprint'] } }),
+
+    updateStatus: spec({ params: ['newStatus', 'prevStatus', 'projectData', 'task', 'isUpdateTask', ...HISTORY_USER], writes: { newStatus: STATUS_FIELDS }, status: ['newStatus'], company: projectCompany, ids: [...TASK, ['prevStatus', 'taskId']], task: TASK[0], project: PROJECT_DATA, taskIds: [...TASK, ['prevStatus', 'taskId']], taskNames: [['prevStatus', 'taskName']], projectNames: PROJECT_DATA_NAME, held: holdsField(['newStatus', 'statusKey'], 'statusKey') }),
+    updatePriority: spec({ params: ['firebaseObj', 'projectData', 'taskData', 'priorityObj', 'isUpdateTask', ...HISTORY_USER], writes: { firebaseObj: ['Task_Priority', 'Updated_At'] }, company: projectCompany, ids: [...TASK_DATA, ['priorityObj', 'taskId']], task: TASK_DATA[0], project: PROJECT_DATA, taskIds: [...TASK_DATA, ['priorityObj', 'taskId']], taskNames: [['priorityObj', 'taskName']], projectNames: PROJECT_DATA_NAME, held: holdsField(['firebaseObj', 'Task_Priority'], 'Task_Priority') }),
+    updateDueDate: spec({ params: ['commonDateFormatString', 'timeZone', 'firebaseObj', 'project', 'task', 'obj', 'isUpdateTask', ...HISTORY_USER], writes: { firebaseObj: ['DueDate', 'dueDateDeadLine'] }, company: [['project', 'CompanyId']], ids: TASK, task: TASK[0], project: PROJECT, taskNames: [['task', 'TaskName']], projectNames: PROJECT_NAME, stored: true, held: holdsField(['firebaseObj', 'DueDate'], 'DueDate', sameInstant) }),
+    updateStartDate: spec({ params: ['commonDateFormatString', 'timeZone', 'firebaseObj', 'project', 'task', 'obj', 'isUpdateTask', 'isHistory', ...HISTORY_USER], writes: { firebaseObj: ['startDate'] }, company: [['project', 'CompanyId']], ids: TASK, task: TASK[0], project: PROJECT, taskNames: [['task', 'TaskName']], projectNames: PROJECT_NAME, stored: true, held: holdsField(['firebaseObj', 'startDate'], 'startDate', sameInstant) }),
+    updateStartDateAndDueDate: spec({ params: ['commonDateFormatString', 'timeZone', 'notificationObj', 'firebaseObj', 'task', 'project', ...HISTORY_USER], writes: { firebaseObj: ['DueDate', 'dueDateDeadLine', 'startDate'] }, company: [['project', 'CompanyId']], ids: TASK, task: TASK[0], project: PROJECT, taskNames: [['task', 'TaskName']], projectNames: PROJECT_NAME, stored: true }),
+    updateTaskName: spec({ params: ['firebaseObj', 'projectData', 'taskData', 'obj', ...HISTORY_USER], writes: { firebaseObj: ['TaskName'] }, company: projectCompany, ids: TASK_DATA, task: TASK_DATA[0], project: PROJECT_DATA, taskNames: [['obj', 'previousTaskName']], projectNames: PROJECT_DATA_NAME }),
+    updateTaskTotalEstimate: spec({ params: ['firebaseObj', 'projectData', 'taskData', 'obj', ...HISTORY_USER], writes: { firebaseObj: ['totalEstimatedTime'] }, company: projectCompany, ids: TASK_DATA, task: TASK_DATA[0], project: PROJECT_DATA, taskNames: TASK_NAME, stored: true }),
+    updatePoints: spec({ params: ['firebaseObj', 'projectData', 'taskData', ...HISTORY_USER], writes: { firebaseObj: ['points'] }, company: projectCompany, ids: TASK_DATA, task: TASK_DATA[0], project: PROJECT_DATA }),
+    updateDates: spec({ params: ['firebaseObj', 'projectData', 'taskData', ...HISTORY_USER], writes: { firebaseObj: ['startDate', 'DueDate'] }, company: projectCompany, ids: TASK_DATA, task: TASK_DATA[0], project: PROJECT_DATA }),
+    updateAssignee: spec({ params: ['firebaseObj', 'projectData', 'taskData', 'employeeName', 'type', 'isUpdateTask', ...HISTORY_USER], writes: { firebaseObj: ['AssigneeUserId'] }, company: projectCompany, ids: TASK_DATA, task: TASK_DATA[0], project: PROJECT_DATA, taskNames: TASK_NAME, projectNames: PROJECT_DATA_NAME, held: holdsAssignees, people: PEOPLE.updateAssignee }),
+    updateTaskLeader: spec({ params: ['firebaseObj', 'projectData', 'taskData', 'employeeName', 'isUpdateTask', ...HISTORY_USER], writes: { firebaseObj: ['Task_Leader'] }, company: projectCompany, ids: [...TASK_DATA, ['firebaseObj', 'Task_Leader']], task: TASK_DATA[0], project: PROJECT_DATA, held: holdsField(['firebaseObj', 'Task_Leader'], 'Task_Leader'), people: PEOPLE.updateTaskLeader }),
+    updateTaskType: spec({ params: ['newStatus', 'prevStatus', 'projectData', 'taskData', 'isUpdateTask', ...HISTORY_USER], writes: { newStatus: ['TaskType', 'TaskTypeKey', 'taskTypeImage', 'oldTaskTypeImage', 'taskTypeName'] }, company: projectCompany, ids: TASK_DATA, task: TASK_DATA[0], project: PROJECT_DATA, taskNames: TASK_NAME, projectNames: PROJECT_DATA_NAME, held: holdsTaskType }),
+
+    updateWatcher: spec({ params: ['companyId', 'projectId', 'sprintId', 'taskId', 'userId', 'add', 'employeeName', ...HISTORY_USER], company: companyId, ids: [...TASK_ID, ['userId']], task: TASK_ID[0], project: PROJECT_ID, people: PEOPLE.updateWatcher }),
+    updateTags: spec({ params: ['companyId', 'projectId', 'sprintId', 'taskId', 'tagId', 'operation', ...HISTORY_USER], company: companyId, ids: TASK_ID, scalars: [['tagId']], task: TASK_ID[0], project: PROJECT_ID, stored: true }),
+    updateChecklists: spec({ params: ['companyId', 'projectId', 'sprintId', 'taskId', 'operation', 'data', 'historyObj', 'taskData', ...HISTORY_USER], company: companyId, ids: TASK_ID, task: TASK_ID[0], project: PROJECT_ID, people: PEOPLE.updateChecklists }),
+    AddAiChecklist: spec({ params: ['companyId', 'taskId', 'checklistArray', 'sprintId', 'projectId', ...HISTORY_USER], company: companyId, ids: TASK_ID, task: TASK_ID[0], project: PROJECT_ID, people: PEOPLE.AddAiChecklist }),
+    updateAttachments: spec({ params: ['companyId', 'sprintId', 'taskId', 'taskData', 'id', 'operation', 'data', 'projectData', ...HISTORY_USER], company: companyId, ids: [...TASK_ID, ...TASK_DATA], scalars: [['data', 'id']], task: TASK_ID[0], project: [['projectData', 'id']], taskNames: TASK_NAME, projectNames: PROJECT_DATA_NAME, stored: true, attachments: 'added' }),
+    updateDescription: spec({ params: ['companyId', 'projectData', 'sprintId', 'task', 'text', ...HISTORY_USER], company: companyId, ids: TASK, task: TASK[0] }),
+    updateTaskCustomField: spec({ params: ['companyId', 'taskId', 'updateDetail', 'customFieldId', ...HISTORY_USER], company: companyId, fieldNames: [['customFieldId']], ids: TASK_ID, task: TASK_ID[0], stored: true }),
+    updateMarkAsFavourite: spec({ params: ['companyId', 'taskId', 'updateDetail', 'type'], company: companyId, ids: [...TASK_ID, ['updateDetail']], task: TASK_ID[0] }),
+    updateLastMessageTime: spec({ params: ['companyId', 'taskId', 'msgObj'], company: companyId, ids: TASK_ID, task: TASK_ID[0] }),
+    updateQueueList: spec({ params: ['CompanyId', 'projectId', 'sprintId', 'taskId', 'userId', 'actionType', 'taskName', ...HISTORY_USER], company: [['CompanyId']], ids: [...TASK_ID, ['userId']], task: TASK_ID[0], project: PROJECT_ID, people: PEOPLE.updateQueueList }),
+    updateArchiveDelete: spec({ params: ['companyId', 'projectData', 'sprintId', 'task', 'deletedStatusKey', ...HISTORY_USER], company: companyId, ids: [...TASK, ['task', 'ParentTaskId']], task: TASK[0], project: PROJECT_DATA }),
+
+    convertToSubTask: spec({ params: ['companyId', 'projectData', 'sprintId', 'selectedTaskId', 'taskId', 'oldProject', 'isSubTask', ...HISTORY_USER], owns: PLACEMENT_FIELDS, company: companyId, ids: [['selectedTaskId'], ...TASK_ID], task: ['selectedTaskId'], others: TASK_ID, lands: TASK_ID[0], rules: RULES }),
+    convertToTask: spec({ params: ['companyId', 'projectData', 'taskId', 'sprintObj', 'parentTaskId', 'oldSprintObj', 'oldProject'], owns: PLACEMENT_FIELDS, company: companyId, ids: [...TASK_ID, ['parentTaskId'], DESTINATION], task: TASK_ID[0], destination: DESTINATION, list: DESTINATION_LIST, rules: RULES, leaves: LIST_LEFT }),
+    convertToList: spec({ params: ['companyId', 'projectData', 'taskId', 'folderData', 'sprintObj', 'isSubTask', ...HISTORY_USER], owns: PLACEMENT_FIELDS, company: companyId, ids: [...TASK_ID, DESTINATION], task: TASK_ID[0], destination: DESTINATION }),
+    moveTask: spec({ params: ['companyId', 'projectData', 'sprintObj', 'moveTaskId', 'oldSprintObj', 'oldProject', 'isSubTask', 'assignee', 'watcher', ...HISTORY_USER], owns: PLACEMENT_FIELDS, company: companyId, ids: [['moveTaskId'], DESTINATION], task: ['moveTaskId'], destination: DESTINATION, list: DESTINATION_LIST, mapping: RULES, leaves: LIST_LEFT, people: PEOPLE.carried, carries: CARRIED }),
+    mergeTask: spec({ params: ['companyId', 'projectData', 'taskId', 'mergeTaskId', 'oldProject', 'isSubTask', ...HISTORY_USER], owns: PLACEMENT_FIELDS, company: companyId, ids: [...TASK_ID, ['mergeTaskId']], task: TASK_ID[0], others: [['mergeTaskId']], lands: ['mergeTaskId'], rules: RULES }),
+    duplicateTask: spec({ params: ['companyId', 'projectData', 'sprintObj', 'selectedTaskId', 'oldProject', 'isSubTask', 'duplicateData', 'assignee', 'watcher', 'taskName', 'oldSprintObj', ...HISTORY_USER], owns: PLACEMENT_FIELDS, company: companyId, ids: [['selectedTaskId'], DESTINATION], task: ['selectedTaskId'], destination: DESTINATION, list: DESTINATION_LIST, rules: RULES, leaves: LIST_LEFT, people: PEOPLE.carried, carries: CARRIED, landing: peopleOnCopy }),
+
+    addTaskRelation: spec({ params: ['companyId', 'taskId', 'relatedTaskId', 'type', ...HISTORY_USER], company: companyId, ids: [...TASK_ID, ['relatedTaskId']], task: TASK_ID[0], others: [['relatedTaskId']] }),
+    removeTaskRelation: spec({ params: ['companyId', 'taskId', 'relatedTaskId', ...HISTORY_USER], company: companyId, ids: [...TASK_ID, ['relatedTaskId']], task: TASK_ID[0] }),
+    getTaskRelations: spec({ params: ['companyId', 'taskId'], company: companyId, ids: TASK_ID, task: TASK_ID[0], actor: HISTORY_USER }),
+    getOpenBlockers: spec({ params: ['companyId', 'taskId'], company: companyId, ids: TASK_ID, task: TASK_ID[0], actor: HISTORY_USER }),
+
+    /* The handlers read the task and the list from the database and judge both, so neither is resolved here. */
+    addToList: spec({ params: [...TENANT, 'taskId', 'sprintId', ...HISTORY_USER], company: companyId, ids: [...TASK_ID, ...LIST_ID], strict: true }),
+    removeFromList: spec({ params: [...TENANT, 'taskId', 'sprintId', ...HISTORY_USER], company: companyId, ids: [...TASK_ID, ...LIST_ID], strict: true }),
+
+    bulkUpdateStatus: spec({ params: ['companyId', 'taskIds', 'newStatus', ...HISTORY_USER], writes: { newStatus: STATUS_FIELDS }, company: companyId, ids: TASK_IDS, listed: LISTED_TASKS }),
+    bulkUpdatePriority: spec({ params: ['companyId', 'taskIds', 'firebaseObj', 'priorityObj', ...HISTORY_USER], writes: { firebaseObj: ['Task_Priority', 'Updated_At'] }, company: companyId, ids: TASK_IDS, listed: LISTED_TASKS }),
+    bulkUpdateDueDate: spec({ params: ['companyId', 'taskIds', 'DueDate', 'commonDateFormatString', ...HISTORY_USER], company: companyId, ids: TASK_IDS, listed: LISTED_TASKS }),
+    bulkUpdateStartDate: spec({ params: ['companyId', 'taskIds', 'startDate', 'commonDateFormatString', ...HISTORY_USER], company: companyId, ids: TASK_IDS, listed: LISTED_TASKS }),
+    bulkUpdateDates: spec({ params: ['companyId', 'dates', ...HISTORY_USER], company: companyId, ids: [['dates', '*', 'taskId']], listed: { path: ['dates'], id: 'taskId' } }),
+    bulkUpdateAssignee: spec({ params: ['companyId', 'taskIds', 'employeeName', 'employeeId', 'type', ...HISTORY_USER], company: companyId, ids: TASK_IDS, people: PEOPLE.bulkUpdateAssignee, listed: LISTED_TASKS }),
+    bulkUpdateTags: spec({ params: ['companyId', 'taskIds', 'tagId', 'operation', ...HISTORY_USER], company: companyId, ids: TASK_IDS, scalars: [['tagId']], listed: LISTED_TASKS }),
+    bulkArchive: spec({ params: ['companyId', 'taskIds', ...HISTORY_USER], company: companyId, ids: TASK_IDS, listed: LISTED_TASKS }),
+    bulkRestore: spec({ params: ['companyId', 'taskIds', ...HISTORY_USER], company: companyId, ids: TASK_IDS, listed: LISTED_TASKS }),
+    bulkDelete: spec({ params: ['companyId', 'taskIds', ...HISTORY_USER], company: companyId, ids: TASK_IDS, listed: LISTED_TASKS }),
+    bulkTrash: spec({ params: ['companyId', 'taskIds', ...HISTORY_USER], company: companyId, ids: TASK_IDS, listed: LISTED_TASKS }),
+    bulkMove: spec({ params: ['companyId', 'taskIds', 'sprintObj', 'projectData', ...HISTORY_USER], owns: PLACEMENT_FIELDS, company: companyId, ids: [...TASK_IDS, DESTINATION], destination: DESTINATION, listed: LISTED_TASKS, list: DESTINATION_LIST }),
+    bulkConvertToSubTask: spec({ params: ['companyId', 'taskIds', 'parentTaskId', ...HISTORY_USER], owns: PLACEMENT_FIELDS, company: companyId, ids: [...TASK_IDS, ['parentTaskId']], listed: LISTED_TASKS, others: [['parentTaskId']] }),
+    bulkConvertToTask: spec({ params: ['companyId', 'taskIds', 'sprintObj', 'projectData', ...HISTORY_USER], owns: PLACEMENT_FIELDS, company: companyId, ids: [...TASK_IDS, DESTINATION], destination: DESTINATION, listed: LISTED_TASKS, list: DESTINATION_LIST }),
+    bulkAddToList: spec({ params: [...TENANT, 'taskIds', 'sprintId', ...HISTORY_USER], company: companyId, ids: [...TASK_IDS, ...LIST_ID], strict: true }),
+    bulkDuplicate: spec({ params: ['companyId', 'taskIds', 'sprintObj', 'oldProject', 'projectData', 'isSubTask', 'duplicateData', 'assignee', 'watcher', 'taskName', 'oldSprintObj', ...HISTORY_USER], owns: PLACEMENT_FIELDS, company: companyId, ids: [...TASK_IDS, DESTINATION], destination: DESTINATION, people: PEOPLE.bulkDuplicate, listed: LISTED_TASKS, list: DESTINATION_LIST, landing: peopleOnCopy }),
+});
+
+/* The pre-v2 class writes through prevStatus.taskId and priorityObj.taskId, not the task object. */
+const PRE_V2_ACTION_FIELDS = Object.freeze({
+    updateStatus: spec({ ...TASK_ACTION_FIELDS.updateStatus, task: ['prevStatus', 'taskId'] }),
+    updatePriority: spec({ ...TASK_ACTION_FIELDS.updatePriority, task: ['priorityObj', 'taskId'] }),
+    updateTaskName: TASK_ACTION_FIELDS.updateTaskName,
+});
+
+const TASK_INDEX_FIELDS = spec({
+    params: ['relevantIndex', 'projectId', 'companyId', 'taskId', 'isFirst', 'isFirstWithRecord', 'indexName', 'sprintId', 'relevantKey', 'searchKey', 'taskKey', 'updateData', 'userId'],
+    writes: { updateData: [...STATUS_FIELDS, 'AssigneeUserId', 'Task_Priority', 'DueDate', 'Updated_At', 'updateToken', 'islocalSnapStop'] },
+    fieldNames: [['indexName']],
+    ids: [...TASK_ID, ...PROJECT_ID],
+    scalars: [['relevantKey'], ['taskKey']],
+    numbers: [['relevantIndex']],
+    searchKeys: [['searchKey']],
+    task: TASK_ID[0],
+    project: PROJECT_ID,
+});
+
+const TASK_INDEX_ONLOAD_FIELDS = spec({
+    params: ['taskUpdate', 'companyId'],
+    fieldNames: [['taskUpdate', 'item', 'indexName']],
+    ids: [['taskUpdate', 'data']],
+    scalars: [['taskUpdate', 'item', 'searchValue']],
+    searchKeys: [['taskUpdate', 'item', 'searchKey']],
+    objects: [['taskUpdate'], ['taskUpdate', 'item']],
+    task: ['taskUpdate', 'data'],
+});
+
+const specFor = (table, action) => (typeof action === 'string' && Object.hasOwn(table, action) ? table[action] : null);
+
+/* The task the action in `body` writes, read as the preparation reads it; null when it names none. */
+const writtenTaskId = (table, body) => {
+    const taskSpec = specFor(table, isPlainObject(body) ? body.action : undefined);
+    return (taskSpec && taskSpec.task && plainIdOf(valueAt(body, taskSpec.task)).id) || null;
+};
+
+const setAt = (target, [key, ...rest], value) => {
+    if (!rest.length) {
+        target[key] = value;
+        return;
+    }
+    target[key] = isPlainObject(target[key]) ? { ...target[key] } : {};
+    setAt(target[key], rest, value);
+};
+
+const checkKey = (key, where) => {
+    if (key.split('.').some((segment) => PROTOTYPE_KEYS.includes(segment))) refuse(400, `The request contains a key that is not accepted in ${where}.`);
+    if (key.startsWith('$')) refuse(400, `Update operators are not accepted in ${where}.`);
+};
+
+/* An operator or prototype key is refused at any depth, so a value cannot carry a query or update condition. */
+const checkTree = (value, where) => {
+    if (Array.isArray(value)) {
+        value.forEach((item) => checkTree(item, where));
+    } else if (isPlainObject(value)) {
+        Object.keys(value).forEach((key) => {
+            checkKey(key, where);
+            checkTree(value[key], where);
+        });
+    }
+};
+
+const cleanWrite = (name, value, taskSpec, dropped) => {
+    if (value === undefined || value === null) return value;
+    if (!isPlainObject(value)) refuse(400, `${name} must be an object.`);
+    const allowed = taskSpec.writes[name];
+    const kept = {};
+    Object.keys(value).forEach((key) => {
+        checkKey(key, name);
+        const field = key.split('.')[0];
+        if (PROTECTED_FIELDS.includes(field) && !taskSpec.owns.includes(field)) refuse(400, `This action cannot change ${field}.`);
+        if (allowed.includes(key)) kept[key] = value[key];
+        else dropped.push(`${name}.${key}`);
+    });
+    return kept;
+};
+
+/* An index name is written as a field name, so it must be one of the index fields; a custom field id is a key under customField. */
+const checkFieldName = (path, value) => {
+    if (value === undefined || value === null || value === '') return;
+    const name = path[path.length - 1];
+    if (name === 'indexName') {
+        if (!INDEX_NAMES.includes(value)) refuse(400, 'indexName must name a task index.');
+        return;
+    }
+    if (typeof value !== 'string' || value.startsWith('$') || value.split('.').some((segment) => !segment || PROTOTYPE_KEYS.includes(segment))) {
+        refuse(400, `${name} is not accepted.`);
+    }
+};
+
+const nameOf = (path) => path.filter((key) => key !== '*').join('.');
+
+const checkScalar = (path, value) => {
+    if (value === undefined) return;
+    if (!isScalar(value) || (typeof value === 'string' && value.startsWith('$'))) refuse(400, `${nameOf(path)} must be a plain value.`);
+};
+
+const checkNumber = (path, value) => {
+    if (value === undefined) return;
+    if (typeof value !== 'number' || !Number.isFinite(value)) refuse(400, `${nameOf(path)} must be a number.`);
+};
+
+const checkSearchKey = (path, value) => {
+    if (value === undefined || value === null || value === '') return;
+    if (!SEARCH_KEYS.includes(value)) refuse(400, `${nameOf(path)} must name a field tasks are grouped by.`);
+};
+
+const checkObject = (path, value) => {
+    if (value === undefined || value === null) return;
+    if (!isPlainObject(value)) refuse(400, `${nameOf(path)} must be an object.`);
+};
+
+const isNone = (value) => value === undefined || value === null || value === '';
+
+/* None (null or '') is how a client says a list sits at the project root; it is kept as sent. */
+const placedId = (path, value) => {
+    if (!isNone(value) && (typeof value !== 'string' || value.length > PLACED_ID_LIMIT)) refuse(400, `${nameOf(path)} must be an id.`);
+    return value;
+};
+
+/* The name is the one the client shows and is cut, not refused: it is only repeated on the task and in its history. */
+const placedName = (path, value) => {
+    if (value === undefined || value === null) return undefined;
+    if (typeof value !== 'string') refuse(400, `${nameOf(path)} must be text.`);
+    return value.slice(0, PLACED_NAME_LIMIT);
+};
+
+const definedOnly = (fields) => Object.fromEntries(Object.entries(fields).filter(([, value]) => value !== undefined));
+
+/* A picker hands over the stored list with its people, counters and flags, and the handlers store what they are
+ * given as the task's sprintArray; they read these four. A stored list names itself by _id. */
+const placedList = (path, value, dropped) => {
+    if (!isPlainObject(value)) refuse(400, `${nameOf(path)} must be an object.`);
+    const folderId = placedId([...path, 'folderId'], value.folderId);
+    const placed = definedOnly({
+        id: placedId([...path, 'id'], value.id === undefined ? value._id : value.id),
+        name: placedName([...path, 'name'], value.name),
+        folderId,
+        folderName: isNone(folderId) ? undefined : placedName([...path, 'folderName'], value.folderName),
+    });
+    dropped.push(...Object.keys(value).filter((key) => !Object.hasOwn(placed, key)).map((key) => `${nameOf(path)}.${key}`));
+    return placed;
+};
+
+const placedFolder = (path, value, dropped) => {
+    if (!isPlainObject(value)) refuse(400, `${nameOf(path)} must be an object.`);
+    const folderId = placedId([...path, 'folderId'], value.folderId);
+    if (isNone(folderId)) return null;
+    dropped.push(...Object.keys(value).filter((key) => !['folderId', 'name'].includes(key)).map((key) => `${nameOf(path)}.${key}`));
+    return definedOnly({ folderId, name: placedName([...path, 'name'], value.name) });
+};
+
+/* Where an action that places a task takes the list from, and where a conversion to a list takes its folder. */
+const LIST_PATHS = [['sprintObj'], ['sprint'], ['data', 'sprintArray']];
+const FOLDER_PATHS = [['folderData']];
+
+const cutTo = (payload, paths, cut, dropped) => paths.forEach((path) => {
+    const value = valueAt(payload, path);
+    if (value !== undefined && value !== null) setAt(payload, path, cut(path, value, dropped));
+});
+
+/* Each id is written back as the plain id it names, so a handler never sees an object where it filters by id. */
+const resolveIds = (payload, path) => {
+    const star = path.indexOf('*');
+    if (star === -1) {
+        const read = plainIdOf(valueAt(payload, path));
+        if (read.absent) return;
+        if (!read.id) refuse(400, `${nameOf(path)} must be an id.`);
+        setAt(payload, path, read.id);
+        return;
+    }
+    const list = valueAt(payload, path.slice(0, star));
+    if (list === undefined || list === null) return;
+    if (!Array.isArray(list)) refuse(400, `${nameOf(path)} must be a list of ids.`);
+    const rest = path.slice(star + 1);
+    list.forEach((item, at) => {
+        const read = plainIdOf(rest.length ? valueAt(item, rest) : item);
+        if (read.absent) return;
+        if (!read.id) refuse(400, `${nameOf(path)} must be a list of ids.`);
+        if (rest.length) setAt(item, rest, read.id);
+        else list[at] = read.id;
+    });
+};
+
+const LOG_WINDOW_MS = 60000;
+const loggedDrops = new Map();
+const printable = (text) => String(text).replace(/[^\x20-\x7e]/g, '').slice(0, 60);
+
+const logDropped = (label, dropped) => {
+    if (!dropped.length) return;
+    const now = Date.now();
+    const last = loggedDrops.get(label);
+    if (last !== undefined && now - last < LOG_WINDOW_MS) return;
+    loggedDrops.set(label, now);
+    logger.warn(`task write ${printable(label)}: dropped fields this action does not change (${dropped.map(printable).join(', ')}); logged at most once a minute per action`);
+};
+
+/* Fields an action does not change are dropped rather than refused, so API clients that send extra harmless fields keep working. */
+const prepareTaskWrite = (req, taskSpec, label) => {
+    const company = validatedCompanyOf(req);
+    if (!taskSpec) refuse(400, 'This task action is not accepted.');
+    const body = req.body;
+    if (!isPlainObject(body)) refuse(400, 'The request body must be an object.');
+
+    const dropped = [];
+    const payload = {};
+    Object.keys(body).forEach((key) => {
+        checkKey(key, 'the request');
+        checkTree(body[key], key);
+        if (key === 'action') {
+            payload.action = body.action;
+        } else if (!taskSpec.params.includes(key)) {
+            if (taskSpec.strict) refuse(400, `${printable(key)} is not accepted by this action.`, 'UNKNOWN_FIELD');
+            dropped.push(key);
+        } else {
+            payload[key] = Object.hasOwn(taskSpec.writes, key) ? cleanWrite(key, body[key], taskSpec, dropped) : body[key];
+        }
+    });
+    taskSpec.fieldNames.forEach((path) => checkFieldName(path, valueAt(payload, path)));
+    taskSpec.objects.forEach((path) => checkObject(path, valueAt(payload, path)));
+    taskSpec.searchKeys.forEach((path) => checkSearchKey(path, valueAt(payload, path)));
+    taskSpec.scalars.forEach((path) => checkScalar(path, valueAt(payload, path)));
+    taskSpec.numbers.forEach((path) => checkNumber(path, valueAt(payload, path)));
+    taskSpec.ids.forEach((path) => resolveIds(payload, path));
+    if (taskSpec.owns.includes('sprintArray')) {
+        cutTo(payload, LIST_PATHS, placedList, dropped);
+        cutTo(payload, FOLDER_PATHS, placedFolder, dropped);
+    }
+    /* updateStartDate reads the flag loosely; only a literal false may skip the write, because only that is checked against the stored task. */
+    if (taskSpec.params.includes('isUpdateTask')) payload.isUpdateTask = payload.isUpdateTask !== false;
+
+    BODY_COMPANY_PATHS.forEach((path) => {
+        if (valueAt(payload, path) !== undefined) setAt(payload, path, company);
+    });
+    taskSpec.company.forEach((path) => setAt(payload, path, company));
+
+    logDropped(label, dropped);
+    return { companyId: company, payload, dropped };
+};
+
+const userCacheKey = (uid) => `UserData:${uid}`;
+
+const employeeNameOf = async (uid) => {
+    let user = null;
+    const cached = myCache.get(userCacheKey(uid));
+    if (cached) {
+        try {
+            user = JSON.parse(cached);
+        } catch {
+            user = null;
+        }
+    }
+    if (!user) {
+        user = await MongoDbCrudOpration(SCHEMA_TYPE.GOLBAL, { type: SCHEMA_TYPE.USERS, data: [{ _id: new mongoose.Types.ObjectId(uid) }] }, 'findOne');
+        if (user) myCache.set(userCacheKey(uid), JSON.stringify(user), USER_CACHE_SECONDS);
+    }
+    const name = user && user.Employee_Name ? String(user.Employee_Name).trim() : '';
+    return name || UNKNOWN_USER;
+};
+
+/* The actor is the signed-in user; the name is escaped here because every history and notification message renders it as HTML.
+ * An agent token's request is named as its change over MCP is: "Claude, for Priya". */
+const sessionActor = async (req) => {
+    const uid = String((req && req.uid) || '').trim();
+    if (!OBJECT_ID.test(uid)) refuse(401, 'A signed-in user is required for this request.');
+    const name = escapeText(await employeeNameOf(uid));
+    const mark = req.agentMark;
+    return { id: uid, Employee_Name: mark ? byline(escapeText(mark.agentName), name) : name };
+};
+
+/* A filter that names no task would match the first task in the collection once the driver drops the empty id. */
+const taskFilterOf = (id) => {
+    const read = plainIdOf(id);
+    if (!read.id) refuse(400, 'A task id is required.');
+    return { _id: new mongoose.Types.ObjectId(read.id) };
+};
+
+const storedTaskOf = (company, id) => MongoDbCrudOpration(company, { type: SCHEMA_TYPE.TASKS, data: [taskFilterOf(id)] }, 'findOne');
+
+const storedProjectOf = (company, id) => MongoDbCrudOpration(company, { type: SCHEMA_TYPE.PROJECTS, data: [{ _id: new mongoose.Types.ObjectId(id) }] }, 'findOne');
+
+/* A task the caller cannot read answers as if it did not exist, as the project routes do: its project
+ * must be one they can open, and its list one they may see. */
+const visibleTaskOf = async (req, company, taskId) => {
+    const stored = await storedTaskOf(company, taskId);
+    if (!stored) throw taskNotFound();
+    const access = await canReadProject(company, req.uid, String(stored.ProjectID));
+    if (!access.allowed) throw new TaskWriteRefusal(access.statusCode || 404, 'Task not found');
+    if (!(await canReadTask(company, req.uid, stored))) throw taskNotFound();
+    return stored;
+};
+
+/* Keeps a list of tasks to the ones the caller can read, and answers their ids. */
+const keepListed = async (req, company, payload, { path, id }) => {
+    const list = valueAt(payload, path);
+    if (!Array.isArray(list)) return [];
+    const taskIdOf = (item) => (id ? isPlainObject(item) && item[id] : item);
+    const readable = await readableTaskIds(company, req.uid, list.map(taskIdOf).filter((taskId) => typeof taskId === 'string'));
+    setAt(payload, path, list.filter((item) => readable.includes(taskIdOf(item))));
+    return readable;
+};
+
+const NOT_A_PROJECT_STATUS = 'The status is not one of this project\'s statuses.';
+
+/* The body chooses a status by its key; its type and name are the ones the project stores for that key. Null when it has no such key. */
+const statusInProject = (project, sent) => {
+    const shown = isPlainObject(sent.status) ? sent.status : {};
+    const key = sent.statusKey === undefined ? shown.key : sent.statusKey;
+    const stored = ((project && project.taskStatusData) || []).map(flatStatus).filter(Boolean).find((row) => isScalar(key) && key !== null && String(row.key) === String(key));
+    return stored ? { ...sent, statusKey: stored.key, statusType: stored.type, status: { ...shown, key: stored.key, text: stored.name, type: stored.type } } : null;
+};
+
+const statusAsStored = async (company, task, sent) => {
+    if (!isPlainObject(sent)) return sent;
+    return statusInProject(await storedProjectOf(company, String(task.ProjectID)), sent) || refuse(400, NOT_A_PROJECT_STATUS);
+};
+
+const projectNotFound = () => new TaskWriteRefusal(404, 'Project not found');
+const listNotFound = () => new TaskWriteRefusal(404, 'List not found');
+
+/* A conversation sits in a list of its chat space that the person starting it may see, under no parent, and that person is in it. */
+const checkConversation = async (req, company, taskSpec, payload, spaceId) => {
+    if (!taskSpec.list || !(await listOf(company, req.uid, spaceId, valueAt(payload, taskSpec.list.id)))) throw listNotFound();
+    if (taskSpec.parent && !isNone(valueAt(payload, taskSpec.parent))) refuse(400, 'A conversation is not a subtask.');
+    if (!startsOwnConversation(req.uid, valueAt(payload, taskSpec.chat.slice(0, -1)))) refuse(400, 'A conversation is started by one of the people in it.');
+};
+
+const CONVERSATION_IN_PROJECT = 'A conversation is started in a chat space, not in a project.';
+
+/* Where a create, move or copy lands: a project the caller can open and, when the action names one, a list
+ * of that project they may see. A conversation lands in a chat space, which has neither, and nowhere else:
+ * kept among a project's tasks it would be a row of that project only the people in it could see. */
+const destinationOf = async (req, company, taskSpec, payload) => {
+    const projectId = valueAt(payload, taskSpec.destination);
+    if (typeof projectId !== 'string' || !projectId) refuse(400, `${nameOf(taskSpec.destination)} is required.`);
+    const marked = taskSpec.chat ? valueAt(payload, taskSpec.chat) : false;
+    const project = await openProject(company, req.uid, projectId);
+    if (!project) {
+        if (marked === true && await isChatSpace(company, projectId)) {
+            await checkConversation(req, company, taskSpec, payload, projectId);
+            return null;
+        }
+        throw projectNotFound();
+    }
+    /* Any value the schema would store as true, not `true` alone. */
+    if (marked) refuse(400, CONVERSATION_IN_PROJECT);
+    if (taskSpec.list) {
+        const list = await listOf(company, req.uid, projectId, valueAt(payload, taskSpec.list.id));
+        if (!list) throw listNotFound();
+        if (taskSpec.list.ref) setAt(payload, taskSpec.list.ref, await listRef(company, list));
+    }
+    if (isPlainObject(payload.projectData)) {
+        payload.projectData = {
+            ...payload.projectData,
+            ...(payload.projectData._id === undefined ? {} : { _id: projectId }),
+            ProjectName: project.ProjectName || '',
+            ProjectCode: project.ProjectCode || '',
+        };
+    }
+    return project;
+};
+
+/* A parent the caller cannot read answers as one that does not exist. */
+const checkParent = async (req, company, taskSpec, payload) => {
+    const parentId = valueAt(payload, taskSpec.parent);
+    if (typeof parentId !== 'string' || !parentId) return;
+    if (!(await canReadTask(company, req.uid, await storedTaskOf(company, parentId)))) throw new TaskWriteRefusal(404, REFUSALS.PARENT_NOT_FOUND, 'PARENT_NOT_FOUND');
+};
+
+const MAPPING_REFUSED = 'A status or task type of this task has no place in the project it moves to.';
+
+const liveRowsUnder = async (company, task) => [task, ...await loadSubtree(company, task._id, { filter: { deletedStatusKey: { $nin: [1] } } })];
+
+/* A move into another project carries its status and type mapping; a move within a project carries none. */
+const checkMoveMapping = async (company, taskSpec, payload, { task, destination }) => {
+    const source = await storedProjectOf(company, String(task.ProjectID));
+    const sent = valueAt(payload, taskSpec.mapping);
+    const names = { id: String(task.ProjectID), ProjectName: (source && source.ProjectName) || '' };
+    if (String(task.ProjectID) === String(destination._id)) {
+        setAt(payload, taskSpec.mapping, { ...(isPlainObject(sent) ? sent : {}), ...names });
+        return;
+    }
+    const mapping = moveMappingInto(sent, destination);
+    if (!mapping || !coveredByMapping(await liveRowsUnder(company, task), mapping)) refuse(400, MAPPING_REFUSED);
+    setAt(payload, taskSpec.mapping, { ...names, ...mapping });
+};
+
+const NO_PLACE_IN_PROJECT = 'The project this task goes to has no status or no task type to give it.';
+
+/* The project a task ends up in when the action names another task instead of a destination. */
+const projectOfTask = async (company, payload, row) => {
+    const project = await storedProjectOf(company, String(row.ProjectID));
+    if (!project) throw projectNotFound();
+    payload.projectData = { ...(isPlainObject(payload.projectData) ? payload.projectData : {}), id: String(project._id), ProjectName: project.ProjectName || '', ProjectCode: project.ProjectCode || '' };
+    return project;
+};
+
+const storeConversionRules = async (company, taskSpec, payload, task, into) => {
+    const source = await storedProjectOf(company, String(task.ProjectID));
+    const rules = conversionRules(source, into, valueAt(payload, taskSpec.rules), await liveRowsUnder(company, task));
+    if (!rules) refuse(400, NO_PLACE_IN_PROJECT);
+    setAt(payload, taskSpec.rules, { ...rules, id: String(task.ProjectID) });
+};
+
+/* A new or imported task has no id yet and its body's origin is the client's word, so only its placement counts. */
+const attachmentsWritten = (taskSpec, { payload, task }) => {
+    if (taskSpec.attachments === 'created') {
+        const data = payload.data || {};
+        return { task: { ProjectID: data.ProjectID, sprintId: data.sprintId }, actor: payload.user, records: Array.isArray(data.attachments) ? data.attachments : [] };
+    }
+    if (taskSpec.attachments === 'imported') {
+        const rows = Array.isArray(payload.tasks) ? payload.tasks : [];
+        const records = rows.flatMap((row) => (isPlainObject(row) && Array.isArray(row.attachments) ? row.attachments : []));
+        return { task: { ProjectID: valueAt(payload, ['projectData', '_id']), sprintId: valueAt(payload, ['sprint', 'id']) }, actor: payload.userData, records };
+    }
+    if (taskSpec.attachments === 'added' && payload.operation === 'add') {
+        return { task, actor: payload.userData, records: [payload.data] };
+    }
+    return null;
+};
+
+const refusedKeyReason = (key) => {
+    if (taskAttachmentKey(key)) return 'other_task';
+    if (formUploadKey(key)) return 'form_upload';
+    if (clipKey(key)) return 'clip';
+    return 'unknown';
+};
+
+const checkAttachmentKeys = async (taskSpec, prepared) => {
+    const written = attachmentsWritten(taskSpec, prepared);
+    if (!written) return;
+    const actorId = written.actor && written.actor.id;
+    for (const record of written.records) {
+        const key = isPlainObject(record) ? record.url : undefined;
+        if (key !== undefined && key !== null && typeof key !== 'string') throw new TaskWriteRefusal(400, 'An attachment url must be text.', ATTACHMENT_KEY_REFUSED);
+        if (!(await mayAttachKey(prepared.companyId, written.task, key, actorId))) {
+            if (scopeMode() !== REPORT) throw new TaskWriteRefusal(400, 'An attachment can only name a file stored for this task.', ATTACHMENT_KEY_REFUSED);
+            const reason = refusedKeyReason(key);
+            logger.warn(`attachment write would be refused (reason: ${reason}, reported so far for this reason: ${countReported(`attachment_write:${reason}`)})`);
+        }
+    }
+};
+
+/* The projects the people a write names must be able to open: where the task lands, or where the tasks are. */
+const projectsOfPeople = async (company, { destination, task, listed }) => {
+    if (destination) return [String(destination._id)];
+    if (task) return task.ProjectID ? [String(task.ProjectID)] : [];
+    if (!listed || !listed.length) return [];
+    const rows = await MongoDbCrudOpration(company, {
+        type: SCHEMA_TYPE.TASKS,
+        data: [{ _id: { $in: listed.map((id) => new mongoose.Types.ObjectId(id)) } }, { ProjectID: 1 }],
+    }, 'find');
+    return [...new Set((rows || []).map((row) => String(row.ProjectID)))];
+};
+
+const checkPeople = async (company, taskSpec, prepared) => {
+    const { payload, task } = prepared;
+    const named = taskSpec.people(payload, task || {});
+    if ((await nonMembersOf(company, named)).length) refuse(400, NOT_A_MEMBER);
+    const projectIds = await projectsOfPeople(company, prepared);
+    for (const projectId of projectIds) {
+        if (await cannotOpen(company, projectId, named)) refuse(400, CANNOT_OPEN_PROJECT);
+    }
+    if (!task || !prepared.destination || String(task.ProjectID) === projectIds[0]) return;
+    for (const name of taskSpec.carries) {
+        if (Array.isArray(payload[name])) payload[name] = await peopleWhoOpen(company, projectIds[0], namedIds(payload[name]));
+    }
+};
+
+const prepareTaskRequest = async (req, taskSpec, label) => {
+    const prepared = prepareTaskWrite(req, taskSpec, label);
+    const { companyId: company, payload } = prepared;
+    if (taskSpec.actor.length) {
+        const actor = await sessionActor(req);
+        taskSpec.actor.forEach((name) => { payload[name] = actor; });
+    }
+    if (taskSpec.task) {
+        const taskId = valueAt(payload, taskSpec.task);
+        if (typeof taskId !== 'string' || !taskId) refuse(400, `${nameOf(taskSpec.task)} is required.`);
+        const stored = await visibleTaskOf(req, company, taskId);
+        prepared.task = stored;
+        taskSpec.project.forEach((path) => setAt(payload, path, String(stored.ProjectID)));
+        taskSpec.taskIds.forEach((path) => setAt(payload, path, String(stored._id)));
+        taskSpec.taskNames.forEach((path) => setAt(payload, path, stored.TaskName));
+        if (taskSpec.projectNames.length) {
+            const project = await storedProjectOf(company, String(stored.ProjectID));
+            taskSpec.projectNames.forEach((path) => setAt(payload, path, (project && project.ProjectName) || ''));
+        }
+        if (taskSpec.stored) payload.storedTask = stored;
+        taskSpec.leaves.forEach((path) => setAt(payload, path, listLeftBy(stored)));
+        if (payload.isUpdateTask === false && !(taskSpec.held && taskSpec.held(payload, stored))) refuse(409, 'The task does not hold the change this request records.');
+        if (taskSpec.status) setAt(payload, taskSpec.status, await statusAsStored(company, stored, valueAt(payload, taskSpec.status)));
+    }
+    const others = new Map();
+    for (const path of taskSpec.others) {
+        const otherId = valueAt(payload, path);
+        if (typeof otherId === 'string' && otherId) others.set(nameOf(path), await visibleTaskOf(req, company, otherId));
+    }
+    const landsBy = taskSpec.lands ? others.get(nameOf(taskSpec.lands)) : null;
+    const landsIn = landsBy ? await projectOfTask(company, payload, landsBy) : null;
+    if (taskSpec.listed) prepared.listed = await keepListed(req, company, payload, taskSpec.listed);
+    if (taskSpec.destination) {
+        prepared.destination = await destinationOf(req, company, taskSpec, payload);
+        if (taskSpec.landing && prepared.destination && await cannotOpen(company, String(prepared.destination._id), taskSpec.landing(payload))) refuse(400, CANNOT_OPEN_DESTINATION);
+        if (prepared.destination && taskSpec.mapping && prepared.task) await checkMoveMapping(company, taskSpec, payload, prepared);
+        /* A conversation in a chat space has no project, and what it names as its parent is not a task. */
+        if (prepared.destination && taskSpec.parent) await checkParent(req, company, taskSpec, payload);
+    }
+    const endsIn = prepared.destination || landsIn;
+    if (taskSpec.rules && prepared.task && endsIn) await storeConversionRules(company, taskSpec, payload, prepared.task, endsIn);
+    if (taskSpec.people) await checkPeople(company, taskSpec, prepared);
+    await checkAttachmentKeys(taskSpec, prepared);
+    return prepared;
+};
+
+const sendRefusal = (res, error) => res.status(error.statusCode).send({ status: false, statusText: error.message, ...(error.code ? { code: error.code } : {}) });
+const COULD_NOT_BE_PROCESSED = 'The request could not be processed.';
+
+const prepareOrRefuse = async (req, res, taskSpec, label) => {
+    try {
+        return (await prepareTaskRequest(req, taskSpec, label)).payload;
+    } catch (error) {
+        if (error instanceof TaskWriteRefusal) {
+            sendRefusal(res, error);
+        } else {
+            logger.error(`task write ${printable(label)} could not be prepared: ${error && error.message}`);
+            res.status(500).send({ status: false, statusText: COULD_NOT_BE_PROCESSED });
+        }
+        return null;
+    }
+};
+
+/* The handlers reject with an error, a sentence, or the answer of a helper they called. */
+const failureText = (error) => [error && error.message, error, error && error.statusText].find((text) => typeof text === 'string' && text) || COULD_NOT_BE_PROCESSED;
+
+const sendFailure = (res, error) => {
+    if (error instanceof TaskWriteRefusal) return sendRefusal(res, error);
+    if (error instanceof RichTextLimitError) return res.status(error.statusCode).send({ status: false, statusText: error.message });
+    return res.send({ status: false, statusText: failureText(error) });
+};
+
+module.exports = {
+    PROTECTED_FIELDS,
+    PLACEMENT_FIELDS,
+    INDEX_NAMES,
+    SEARCH_KEYS,
+    TASK_ACTION_FIELDS,
+    PRE_V2_ACTION_FIELDS,
+    TASK_INDEX_FIELDS,
+    TASK_INDEX_ONLOAD_FIELDS,
+    TaskWriteRefusal,
+    taskNotFound,
+    NOT_A_PROJECT_STATUS,
+    statusInProject,
+    escapeText,
+    plainIdOf,
+    taskFilterOf,
+    validatedCompanyOf,
+    specFor,
+    writtenTaskId,
+    prepareTaskWrite,
+    prepareTaskRequest,
+    prepareOrRefuse,
+    sessionActor,
+    employeeNameOf,
+    failureText,
+    sendFailure,
+};

@@ -4,7 +4,7 @@
 }
 .mainScreenShotPreview .sidebar-head.bg-white.d-flex.align-items-center.justify-content-between.px-1.blue.border-bottom.cursor-default {
     height: 61px !important;
-    background-color: #FCFCFC;
+    background-color: var(--surface-2);
 }
 .startEndMaidiv{
     padding-bottom: 10px;
@@ -13,7 +13,7 @@
     font-size: 18px;
 }
 .commentsidebarMaindiv{
-    border-bottom: 1px solid #DFE1E6;
+    border-bottom: 1px solid var(--border);
     padding-bottom: 23px;
 }
 .screnshotpreviewMain{
@@ -38,7 +38,7 @@
     flex: 0 0 21.101%;
     border-radius: 12px;
     box-sizing: border-box;
-    background: #F4F5F7;
+    background: var(--canvas);
 }
 .mainImageDiv{
     margin: 22px 20px 0;
@@ -81,7 +81,7 @@
     padding: 0px 4px;
 }
 .mainScreenShotPreview .sidebar-body {
-    background-color: #F4F5F7;
+    background-color: var(--canvas);
 }
 @media(max-width: 1199px){
     .mainImageDiv .timelogImage {max-width: 25%;flex: 0 0 25%;}

@@ -1,0 +1,28 @@
+const taint = require('../Agents/taint');
+
+/* The owner's rule (2026-09-21): an outside agent counts as tainted, so under AGENT_TAINT_ROUTING its
+ * risky writes wait for a person, as a tainted run's do in policy.decide. Answers the reason to hold
+ * the call, or '' to let it through to actions.perform. */
+const heldForApproval = (ctx, action) => {
+    if (!ctx || !ctx.oauth || !taint.routes(ctx.taint)) return '';
+    const { rating } = require('../Agents/actions');
+    const { escalations } = require('../Agents/policy');
+    const rated = rating(action);
+    const risky = rated ? escalations(rated) : ['has no risk rating'];
+    if (!risky.length) return '';
+    const client = (ctx.actor && ctx.actor.agentName) || ctx.oauth.clientId;
+    return `${action} ${risky.join(', ')}; it came from an outside client (${client}), so it needs a person's approval`;
+};
+
+const WAITS = 'From this app it waits for a person\'s approval in AlianHub, and changes nothing until then.';
+const PERSON_DOES = 'From this app it is refused: a person has to do this in AlianHub.';
+
+/* A tool as an outside client is told of it: a write that is held does not say it is made at once. */
+const describedFor = (ctx, tool) => {
+    if (tool.run || !heldForApproval(ctx, tool.action)) return tool;
+    const { outsideMayFile } = require('./propose');
+    const ending = outsideMayFile(ctx, tool) ? WAITS : PERSON_DOES;
+    return { ...tool, description: `${String(tool.description).replace(/,? at once(?=[.,;])/g, '')} ${ending}` };
+};
+
+module.exports = { heldForApproval, describedFor, WAITS, PERSON_DOES };

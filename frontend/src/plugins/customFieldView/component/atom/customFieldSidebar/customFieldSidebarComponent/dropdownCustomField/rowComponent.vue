@@ -25,7 +25,7 @@
                 <div v-else>
                     <CustomFieldInputComponent
                         :type="'text'"
-                        :placeHolder="$t('PlaceHolder.Enter_option')"
+                        :placeholder="$t('PlaceHolder.Enter_option')"
                         :validations="'required:trim'"
                         :bindValue="fieldValue.label"
                         :validationVisibility="'blur'"
@@ -58,7 +58,7 @@ import CustomFieldInputComponent from "../../../customFieldSidebar/customFieldSi
 const props = defineProps({
     data: {
         type: Object,
-        default: () => {}
+        default: () => ({})
     },
     rowIndex: {
         type: Number,
@@ -66,7 +66,7 @@ const props = defineProps({
     },
     fieldName: {
         type: Object,
-        default: () => {}
+        default: () => ({})
     },
     isDeletable: {
         type: Boolean,

@@ -16,13 +16,13 @@
             <Icon v-if="ready" v-bind="$attrs" class="tticon--lib tticon__box" :style="boxStyle" :icon="effectiveIcon" :color="iconColor" />
             <span v-else v-bind="$attrs" class="tticon__placeholder tticon--lib tticon__box" :style="boxStyle" />
         </template>
-        <!-- Uploaded icon stored as a full URL. -->
+        <!-- A default type's icon, which the app ships, or an uploaded one stored as a full URL. -->
         <img
-            v-else-if="isHttp"
+            v-else-if="imageSrc"
             v-bind="$attrs"
             class="tticon__box"
             :style="boxStyle"
-            :src="taskType.taskImage"
+            :src="imageSrc"
             :alt="taskType?.name || 'task_type'"
         >
         <!-- Uploaded icon stored as a storage path → resolve via WasabiImage. -->
@@ -37,13 +37,13 @@
 </template>
 
 <script setup>
-// Single renderer for a task type's icon, covering all three kinds:
-//   library (Iconify name) | uploaded http URL | uploaded storage path.
-// Centralizes the previously-duplicated `taskImage.includes('http')` idiom.
+// Single renderer for a task type's icon, covering every kind:
+//   library (Iconify name) | default type (bundled image) | uploaded http URL | uploaded storage path.
 import { computed, ref, watch } from 'vue';
 import { Icon, iconLoaded } from '@iconify/vue';
 import WasabiImage from '@/components/atom/WasabiIamgeCompp/WasabiIamgeCompp.vue';
 import { loadIconSets, isLoaded, DEFAULT_ICON, DEFAULT_ICON_COLOR } from '@/utils/iconLibrary';
+import { bundledTaskTypeImage } from '@/utils/taskTypeImages';
 
 defineOptions({ inheritAttrs: false });
 
@@ -54,6 +54,7 @@ const props = defineProps({
 
 const isLibrary = computed(() => props.taskType?.iconType === 'library' && !!props.taskType?.iconValue);
 const isHttp = computed(() => !!props.taskType?.taskImage && props.taskType.taskImage.includes('http'));
+const imageSrc = computed(() => bundledTaskTypeImage(props.taskType?.taskImage) || (isHttp.value ? props.taskType.taskImage : ''));
 const iconColor = computed(() => props.taskType?.iconColor || DEFAULT_ICON_COLOR);
 // Drives the boundary-box tint; kept as a CSS var so the color-mix lives in CSS.
 const boxStyle = computed(() => ({ '--tt-color': iconColor.value }));

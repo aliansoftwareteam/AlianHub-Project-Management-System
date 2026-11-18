@@ -1,23 +1,23 @@
 <template>
     <Teleport to="body">
         <div v-if="visible" class="alert-modal-overlay">
-            <div class="alert-box w-500px bg-white border-radius-10-px overflow-hidden box-shadow-6 text-center">
+            <div class="alert-box w-500px border-radius-10-px overflow-hidden box-shadow-6 text-center">
                 <div :class="headerClass" class="position-re d-flex align-items-center justify-content-center">
                     <div class="error-icon-container position-re d-flex justify-content-center w-100">
                         <div :class="bgColorShadow"
-                            class="top-50px position-re w-120px h-120px border-radius-50-per d-flex align-items-center justify-content-center border-thick-white">
+                            class="top-50px position-re w-120px h-120px border-radius-50-per d-flex align-items-center justify-content-center alert-box-border-thick-white">
                             <img :src="icon" alt="icon" class="w-40px" />
                         </div>
                     </div>
                 </div>
 
                 <div class="custom-padding-1">
-                    <h2 class="font-size-22 font-weight-bold dark-gray font-roboto">{{ title }}</h2>
-                    <p class="font-size-16 mt-10px color52 font-roboto" v-if="isHtml" v-html="message"></p>
-                    <p class="font-size-16 mt-10px color52 font-roboto" v-else>{{ message }}</p>
+                    <h2 class="alert-box-font-size-22 alert-box-font-weight-bold alert-box-dark-gray font-ui">{{ title }}</h2>
+                    <p class="alert-box-font-size-16 mt-10px alert-box-color52 font-ui" v-if="isHtml" v-html="richHtml(message)"></p>
+                    <p class="alert-box-font-size-16 mt-10px alert-box-color52 font-ui" v-else>{{ message }}</p>
                     <div v-if="fields.length" class="gap d-flex justify-content-center flex-wrap mt-10px">
                         <span v-for="field in fields" :key="field"
-                            class="border-gray p-5px border-radius-5-px font-size-14 font-weight-bold dark-gray font-roboto">{{
+                            class="alert-box-border-gray p-5px border-radius-5-px alert-box-font-size-14 alert-box-font-weight-bold alert-box-dark-gray font-ui">{{
                                 field
                             }}</span>
                     </div>
@@ -38,6 +38,7 @@
 
 <script setup>
 import { defineProps, defineEmits, ref, onMounted, computed } from "vue";
+import { richHtml } from "@/utils/richHtml";
 import { useCustomComposable } from "@/composable";
 
 const { makeUniqueId } = useCustomComposable();
@@ -125,13 +126,41 @@ const handleAction = (confirmed) => {
 };
 </script>
 
+<style scoped>
+.alert-box {
+    background: var(--surface);
+    color: var(--ink);
+    color-scheme: var(--scheme);
+}
+.alert-box-font-size-14 {
+    font-size: 14px;
+}
+.alert-box-font-size-16 {
+    font-size: 16px;
+}
+.alert-box-font-size-22 {
+    font-size: 22px;
+}
+.alert-box-font-weight-bold {
+    font-weight: bold;
+}
+.alert-box-dark-gray {
+    color: var(--ink);
+}
+.alert-box-color52 {
+    color: var(--ink);
+}
+.alert-box-border-gray {
+    border: 1px solid var(--hairline) !important;
+}
+.alert-box-border-thick-white {
+    border: 8px solid var(--surface);
+}
+</style>
+
 <style>
 .gap {
     gap: 10px;
-}
-
-.font-roboto {
-    font-family: "Roboto";
 }
 
 .top-50px {

@@ -7,9 +7,9 @@
             </div>
             <div class="d-flex align-items-center burndown__controls">
                 <span class="font-size-13 font-weight-500 mr-10px">{{ $t('Projects.select_sprint') }}:</span>
-                <select v-model="selectedSprintId" class="burndown__select font-size-13">
+                <select v-model="selectedSprintId" class="ah-input burndown__select">
                     <option v-for="sprint in sprintOptions" :key="'bd-'+sprint.id" :value="sprint.id">
-                        {{ sprint.folderName ? sprint.folderName + ' / ' : '' }}{{ sprint.name }}
+                        {{ listLabel(sprint) }}
                     </option>
                 </select>
             </div>
@@ -29,9 +29,11 @@
 <script setup>
 // PACKAGES
 import { computed, defineProps, ref, watch } from "vue";
+import { folderPathLabel, listLabel } from "@/utils/folderTree";
 
 // UTILS
 import { apiRequest } from '@/services';
+import { useChartTokens } from '@/utils/chartTokens';
 
 const props = defineProps({
     projectData: {
@@ -46,6 +48,8 @@ const props = defineProps({
 
 defineEmits(['update:modelValue']);
 
+const chart = useChartTokens();
+
 const selectedSprintId = ref('');
 const days = ref([]);
 const isLoading = ref(false);
@@ -59,7 +63,7 @@ const sprintOptions = computed(() => {
     });
     Object.values(props.projectData?.sprintsfolders || {}).forEach((folder) => {
         Object.values(folder?.sprintsObj || {}).forEach((sprint) => {
-            if (sprint?.id) options.push({ id: sprint.id, name: sprint.name || 'Sprint', folderName: folder.folderName || '' });
+            if (sprint?.id) options.push({ id: sprint.id, name: sprint.name || 'Sprint', folderName: folder.folderName || '', folderPath: folderPathLabel(props.projectData?.sprintsfolders, folder) });
         });
     });
     return options;
@@ -102,9 +106,10 @@ const chartSeries = computed(() => [
 ]);
 
 const chartOptions = computed(() => ({
-    chart: { toolbar: { show: false }, zoom: { enabled: false } },
+    chart: { toolbar: { show: false }, zoom: { enabled: false }, foreColor: chart.value.ink2 },
     stroke: { width: [3, 2], curve: 'straight', dashArray: [0, 6] },
     colors: ['#7b68ee', '#bdbdbd'],
+    grid: { borderColor: chart.value.grid },
     xaxis: { categories: days.value.map((day) => day.date), labels: { rotate: -45, hideOverlappingLabels: true } },
     yaxis: { min: 0, forceNiceScale: true, labels: { formatter: (value) => Math.round(value) } },
     legend: { position: 'top' },
@@ -116,36 +121,35 @@ const chartOptions = computed(() => ({
 .burndown__overlay {
     position: fixed;
     inset: 0;
-    background: rgba(0, 0, 0, 0.35);
+    background: var(--scrim);
     z-index: 1000;
     display: flex;
     align-items: center;
     justify-content: center;
 }
 .burndown__card {
-    background: #fff;
+    background: var(--surface);
+    color: var(--ink);
+    color-scheme: var(--scheme);
     border-radius: 10px;
     width: min(720px, 92vw);
     padding: 16px 20px;
-    box-shadow: 0 8px 30px rgba(0, 0, 0, 0.18);
+    box-shadow: var(--shadow-modal);
 }
 .burndown__head {
     margin-bottom: 12px;
 }
 .burndown__close {
-    color: #9a9a9a;
+    color: var(--ink-2);
 }
 .burndown__close:hover {
-    color: #e84a4a;
+    color: var(--danger);
 }
 .burndown__controls {
     margin-bottom: 10px;
 }
-.burndown__select {
-    border: 1px solid #e0e0e0;
-    border-radius: 6px;
-    padding: 6px 8px;
-    background: #fff;
+.ah-input.burndown__select {
+    width: auto;
     min-width: 220px;
 }
 .burndown__empty {

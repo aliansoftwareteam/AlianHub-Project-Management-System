@@ -88,8 +88,6 @@ function checkFolderAndSprint(item) {
 
 function manageSubRender(type, data) {
   switch (type) {
-      case ChangeTypes.STATUS:
-          return statusRender(data)
       case ChangeTypes.PROJECT_CREATE:
           return projectCreateRender(data)
       case ChangeTypes.SPRINT_CREATE:
@@ -109,7 +107,7 @@ function sprintCreateRender(data) {
   return commonTemplate.LabelAndValueTextOnly("",`${data.sprintName} Sprint Created in ${data.ProjectName}.`)
 }
 
-function sprintCreateRender(data) {
+function folderCreateRender(data) {
   return commonTemplate.LabelAndValueTextOnly("",`${data.sprintFolderName} Folder Created in ${data.ProjectName}.`)
 }
 

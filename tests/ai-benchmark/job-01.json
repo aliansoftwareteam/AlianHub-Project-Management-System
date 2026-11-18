@@ -1,0 +1,42 @@
+{
+    "job": 1,
+    "title": "Create a task",
+    "sentence": "Add a task \"[AI bench] Write release note\" for me, due tomorrow, high priority.",
+    "start": "The list",
+    "passed": "AI-1 run 1, 2026-10-08, builds 815 to 817: pass, no approval, 6 steps",
+    "kept": "Rebuilt on 2026-10-09 from Tasks/active/047-ai-run/ai-1-run-1-results.md and the tool path of the job in ai-benchmark.md: the run did not record its calls. Ids are named by placeholder and resolved against the replay world.",
+    "calls": [
+        {
+            "tool": "person.place",
+            "arguments": {},
+            "answer": "read"
+        },
+        {
+            "tool": "person.me",
+            "arguments": {},
+            "answer": "read"
+        },
+        {
+            "tool": "lists.list",
+            "arguments": {
+                "projectId": "$project"
+            },
+            "answer": "read"
+        },
+        {
+            "tool": "task.create",
+            "arguments": {
+                "projectId": "$project",
+                "sprintId": "$list",
+                "title": "[AI bench] Write release note",
+                "assigneeIds": [
+                    "$me"
+                ],
+                "dueDate": "$date:+1",
+                "priority": "HIGH"
+            },
+            "answer": "applied"
+        }
+    ],
+    "undo": true
+}

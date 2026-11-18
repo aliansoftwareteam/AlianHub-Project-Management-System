@@ -1,0 +1,6 @@
+.ai-alerts__mark { display: inline-block; flex: none; width: 9px; height: 9px; margin-right: 6px; vertical-align: middle; background: currentColor; }
+.ai-alerts__mark--circle { border-radius: 50%; }
+.ai-alerts__mark--square { border-radius: 1px; }
+.ai-alerts__mark--diamond { transform: rotate(45deg) scale(.8); }
+.ai-alerts__mark--triangle { width: 0; height: 0; background: transparent; border-left: 5px solid transparent; border-right: 5px solid transparent; border-bottom: 9px solid currentColor; }
+.ai-alerts__mark--clear { background: transparent; border: 1.5px solid currentColor; border-radius: 50%; }

@@ -52,11 +52,11 @@ export const cacheGet = async (key) => {
 };
 
 export const queueAdd = async (item) => {
-    const db = await open(); if (!db) return;
+    const db = await open(); if (!db) return undefined;
     try {
         const t = db.transaction(STORE_QUEUE, 'readwrite');
-        t.objectStore(STORE_QUEUE).add({ ...item, at: Date.now() });
-    } catch (e) { /* best-effort */ }
+        return await reqToPromise(t.objectStore(STORE_QUEUE).add({ ...item, at: Date.now() }));
+    } catch (e) { return undefined; }
 };
 
 export const queueAll = async () => {
@@ -72,6 +72,15 @@ export const queueDelete = async (id) => {
     try {
         const t = db.transaction(STORE_QUEUE, 'readwrite');
         t.objectStore(STORE_QUEUE).delete(id);
+    } catch (e) { /* best-effort */ }
+};
+
+export const queueUpdate = async (id, patch) => {
+    const db = await open(); if (!db) return;
+    try {
+        const store = db.transaction(STORE_QUEUE, 'readwrite').objectStore(STORE_QUEUE);
+        const current = await reqToPromise(store.get(id));
+        if (current) store.put({ ...current, ...patch });
     } catch (e) { /* best-effort */ }
 };
 

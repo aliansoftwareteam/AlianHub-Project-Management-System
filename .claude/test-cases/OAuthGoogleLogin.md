@@ -22,7 +22,6 @@ Copy the **Client ID** and **Client secret**, then set:
 | root `.env` | `GOOGLE_CLIENT_ID` | the client id |
 | root `.env` | `GOOGLE_CLIENT_SECRET` | the client secret |
 | root `.env` | `GOOGLE_OAUTH_URL` | `https://oauth2.googleapis.com/token` |
-| root `.env` | `GOOGLE_OAUTH_REQUIRED` | `true` (rejects logins that fail id-token verification) |
 | `frontend/.env` | `VUE_APP_GOOGLE_CLIENT_ID` | the **same** client id |
 | `frontend/.env` | `VUE_APP_IS_GOOGLE_LOGIN` | `true` |
 
@@ -50,7 +49,7 @@ Copy the **Client ID** and **Client secret**, then set:
 
 | ID     | Title                                          | Precondition                                  | Steps                                                            | Expected Result                                                        | Actual Result | Status |
 |--------|------------------------------------------------|-----------------------------------------------|------------------------------------------------------------------|------------------------------------------------------------------------|---------------|--------|
-| GGL_006 | Unverified id-token is rejected               | `GOOGLE_OAUTH_REQUIRED='true'`                | 1. Attempt a login where the id-token can't be verified (wrong/expired token) | Login rejected with a clear error; no session issued       |               | ⏳     |
+| GGL_006 | Unverified id-token is rejected               | Always on                | 1. Attempt a login where the id-token can't be verified (wrong/expired token) | Login rejected with a clear error; no session issued       |               | ⏳     |
 | GGL_007 | Blocked email cannot log in                   | A user whose auth record `isBlocked = true`   | 1. Click Google and pick that account                           | Rejected with the "email has been blocked" message                     |               | ⏳     |
 
 ---

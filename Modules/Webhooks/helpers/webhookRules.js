@@ -1,7 +1,9 @@
-// Outgoing-webhook rules. Pure (crypto only) — no DB or network — shared by
-// the controller, the dispatcher, and the unit tests.
+// Outgoing-webhook rules. No DB or network calls — shared by the controller,
+// the dispatcher, and the unit tests.
 
 const crypto = require('crypto');
+const { normalizeChangedFields } = require('../../../utils/entityEvents');
+const { isBlockedHostname } = require('../../Agents/engine/safeFetch');
 
 // Task lifecycle events a webhook can subscribe to. '*' subscribes to all.
 const EVENT_TYPES = Object.freeze([
@@ -30,22 +32,22 @@ const EVENT_LABELS = Object.freeze({
 
 const isObjectIdString = (id) => OBJECT_ID_PATTERN.test(String(id || ''));
 
-const isValidUrl = (value) => {
+const isValidUrl = (value, allowlist) => {
     try {
         const url = new URL(String(value || ''));
-        return url.protocol === 'http:' || url.protocol === 'https:';
+        const allowed = !isBlockedHostname(url.hostname) || Boolean(allowlist && allowlist.allowsHost(url.hostname));
+        return (url.protocol === 'http:' || url.protocol === 'https:') && allowed;
     } catch (e) {
         return false;
     }
 };
 
-/* Validate create/update input. Returns { valid, reason }. */
-const validateWebhookInput = ({ name, url, events, format }) => {
+const validateWebhookInput = ({ name, url, events, format, allowlist }) => {
     if (!name || !String(name).trim() || String(name).length > MAX_NAME_LENGTH) {
         return { valid: false, reason: `A name up to ${MAX_NAME_LENGTH} characters is required.` };
     }
-    if (!isValidUrl(url)) {
-        return { valid: false, reason: 'A valid http or https url is required.' };
+    if (!isValidUrl(url, allowlist)) {
+        return { valid: false, reason: 'A valid http or https url on a public host, or on a private host the instance owner allows, is required.' };
     }
     if (!Array.isArray(events) || !events.length) {
         return { valid: false, reason: 'At least one event is required.' };
@@ -100,25 +102,6 @@ const assigneeValue = (task) => {
 // update paths are inconsistent — most emit a plain field map ({ Task_Priority },
 // { TaskName }, { status, statusType }), but the assignee path emits an operator
 // object ({ $addToSet: { AssigneeUserId } }) — so flatten one level into these.
-const MONGO_FIELD_OPS = ['$set', '$addToSet', '$pull', '$push', '$pullAll', '$inc', '$unset'];
-
-/* Reduce a raw updatedFields payload to the SET of top-level task field names it
- * touched — flattening Mongo operators and stripping dotted suffixes
- * (customField.x → customField). Pure. */
-const normalizeChangedFields = (updatedFields) => {
-    const touched = new Set();
-    const add = (k) => { if (k) touched.add(String(k).split('.')[0]); };
-    const fields = updatedFields || {};
-    Object.keys(fields).forEach((key) => {
-        if (MONGO_FIELD_OPS.includes(key) && fields[key] && typeof fields[key] === 'object') {
-            Object.keys(fields[key]).forEach(add);
-        } else if (!key.startsWith('$')) {
-            add(key);
-        }
-    });
-    return touched;
-};
-
 // What changed → how to announce it. Ordered: when exactly one category changed,
 // the first match drives the headline. `value(task)` returns the row to show
 // (null = headline only). Internal plumbing fields (TaskKey, groupBy*, subTasks…)
@@ -276,12 +259,9 @@ const classifyTaskEvent = ({ type, doc, updatedFields, now = Date.now() }) => {
  * the project counter bump (internals.js fires { data: <project>, updatedFields:
  * {} } when it increments lastTaskId). Its _id is a project id, so the task
  * re-read finds nothing — and that must NOT go out as a phantom task.updated.
- * Returns: real task found → deliver; clean read + no task → drop; read errored
- * → best-effort delivery with whatever the socket gave us. */
-const shouldDeliverTask = (freshTask, readErrored) => {
-    if (freshTask && freshTask._id) return true;
-    return Boolean(readErrored);
-};
+ * A read that failed delivers nothing either: who may be told of a task is judged
+ * on the stored row, and what the socket carried may not say which list it is in. */
+const shouldDeliverTask = (freshTask) => Boolean(freshTask && freshTask._id);
 
 /* Whitelisted task payload — never ship the raw document. */
 const trimTaskForDelivery = (doc) => ({

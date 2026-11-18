@@ -21,6 +21,11 @@
   box-shadow: 0 0 2px 0 rgba(10, 10, 10, 0.29);
 }
 
+/* The legacy toggle's tracks are coloured in both states (lavender or green), so its knob is --on-brand. */
+:root[data-theme="dark"] .toggle-button {
+  background-color: var(--on-brand);
+}
+
 .toggle-button-active {
   left: 54%;
 }

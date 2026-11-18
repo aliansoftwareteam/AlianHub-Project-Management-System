@@ -21,8 +21,8 @@ exports.handleCreateCompanyDataStorageFun = async(cObj,companyId) => {
                 loggerConfig.error('Error handleCreateCompanyDataStorageFun' + err.message)
             });
         } catch (error) {
-            reject(err);
-            loggerConfig.error('Error handleCreateCompanyDataStorageFun' + err.message)
+            reject(error);
+            loggerConfig.error('Error handleCreateCompanyDataStorageFun' + error.message)
         }
     })
 }
@@ -44,8 +44,8 @@ exports.handleCreateCompanyDataStorageFunForUpload = async(bodyData,companyId) =
                 loggerConfig.error('Error handleCreateCompanyDataStorageFunForUpload' + err.message)
             });
         } catch (error) {
-            reject(err);
-            loggerConfig.error('Error handleCreateCompanyDataStorageFunForUpload' + err.message)
+            reject(error);
+            loggerConfig.error('Error handleCreateCompanyDataStorageFunForUpload' + error.message)
         }
     })
 }
@@ -76,9 +76,7 @@ exports.handleChargeebeCreditNotUpload = (companyId,_,fileData,id) => {
     })
 }
 
-exports.handleBucketSizeUpdateCron = () => {
-    getBucketSizeStorage();
-}
+exports.handleBucketSizeUpdateCron = () => getBucketSizeStorage();
 
 exports.cleanUpTrackshot = async () => {
     cleanUpTrackshotStorage();
@@ -165,16 +163,12 @@ exports.handleTaskTypeImageGet = async (req,res) => {
             });
             return;
         }
-        if(!(req.body || req.body.companyId)) {
-            res.send({
-                status: false,
-                statusText: 'companyId is required'
-            });
-            return;
+        if (!req.storageBucket) {
+            return res.status(403).send({ status: false, statusText: 'You do not have access to this bucket' });
         }
-        
+
         const domainUrl = `${req.protocol}://${req.get('host')}`;
-        const signedUrl = await generateSignedUrl(req.body.companyId, req.body.path, domainUrl);
+        const signedUrl = await generateSignedUrl(req.storageBucket, req.body.path, domainUrl);
 
         if(signedUrl) {
             return res.status(200).send({ status:true ,statusText: signedUrl });
@@ -186,7 +180,6 @@ exports.handleTaskTypeImageGet = async (req,res) => {
         }
 }
 exports.handleTaskAttachmentsDuplicateFunctionality = async (bucketId, previousPath, destinationPath) => {
-    try {
         const baseDir = newPath.join(__dirname, '../storage', bucketId);
         const fullPreviousPath = newPath.join(baseDir, newPath.dirname(previousPath));
         const destinationDir = newPath.join(baseDir, newPath.dirname(destinationPath));
@@ -206,7 +199,23 @@ exports.handleTaskAttachmentsDuplicateFunctionality = async (bucketId, previousP
         }));
 
         return true;
-    } catch (error) {
-        throw error;
-    }
+};
+
+const bucketFile = (bucketId, key) => {
+    const bucketRoot = newPath.resolve(__dirname, '../storage', String(bucketId || ''));
+    const target = newPath.resolve(bucketRoot, String(key || ''));
+    return target.startsWith(bucketRoot + newPath.sep) ? target : '';
+};
+
+exports.handleStoredFileCopy = async (bucketId, previousPath, destinationPath) => {
+    const from = bucketFile(bucketId, previousPath);
+    const to = bucketFile(bucketId, destinationPath);
+    if (!from || !to) throw new Error('The key leaves the company bucket.');
+    await fs.promises.mkdir(newPath.dirname(to), { recursive: true });
+    await fs.promises.copyFile(from, to);
+};
+
+exports.storedFileExists = async (bucketId, key) => {
+    const target = bucketFile(bucketId, key);
+    return Boolean(target) && fs.existsSync(target);
 };

@@ -1,0 +1,180 @@
+.cv {
+    height: 100%;
+    min-height: 520px;
+    background: var(--canvas);
+    font: var(--text-small);
+}
+/* Chat.vue's root is also ".ah-page.cv", which tokens.css turns into a row for its sidebar.
+   The calendar stacks its bar over its body, so it restates the column with the same classes. */
+.ah-page.cv { flex-direction: column; }
+
+/* Sizes read the look's tokens; a fallback is the size the rule had before the dense look, which the classic look draws. */
+.cv__bar {
+    height: calc(var(--control-h-lg, 32px) + var(--sp-3));
+    flex: none;
+    display: flex;
+    align-items: center;
+    gap: var(--sp-2);
+    padding: 0 var(--page-pad-x, 16px);
+    background: var(--surface);
+    border-bottom: 1px solid var(--hairline);
+}
+.cv__month { color: var(--ink-2); letter-spacing: .04em; }
+.cv__show { color: var(--ink-2); margin-right: 2px; }
+.cv__filter {
+    height: var(--control-h, 26px);
+    padding: 0 var(--sp-4);
+    border: 1px solid var(--border);
+    border-radius: var(--r-input);
+    background: var(--surface);
+    color: var(--ink-2);
+    font: var(--text-small);
+    cursor: pointer;
+    transition: border-color var(--t-state) var(--ease), color var(--t-state) var(--ease);
+}
+.cv__filter.is-on { border-color: var(--brand); color: var(--brand); background: var(--brand-tint); font-weight: 600; }
+
+/* FullCalendar stacks its header, events and popover on z-indexes of its own. Kept inside this box,
+   they no longer paint over the month picker the toolbar above opens. */
+.cv__body { flex: 1; display: flex; min-height: 0; isolation: isolate; }
+.cv__main { flex: 1; min-width: 0; display: flex; flex-direction: column; padding: var(--sp-6) var(--page-pad-x, 16px); gap: var(--sp-2); }
+
+.cv__bands { --lane-h: 22px; position: relative; height: calc(var(--lanes, 1) * var(--lane-h)); margin: 0 var(--sp-1); flex: none; }
+.cv__band {
+    position: absolute; top: calc(var(--lane, 0) * var(--lane-h) + 2px); height: 18px;
+    display: block; line-height: 18px;
+    padding: 0 var(--sp-3);
+    border-radius: var(--r-sm, 5px);
+    background: var(--fill);
+    color: var(--ink-2);
+    font: var(--text-label);
+    letter-spacing: .04em;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+.cv__band.is-current { background: var(--brand-tint); color: var(--brand); }
+
+.cv__grid { flex: 1; min-height: 0; }
+
+.cv__tray {
+    width: 230px;
+    flex: none;
+    background: var(--surface);
+    border-left: 1px solid var(--hairline);
+    padding: var(--sp-6);
+    display: flex;
+    flex-direction: column;
+    gap: var(--sp-3);
+    overflow: auto;
+}
+.cv__tray-head { display: flex; align-items: center; }
+.cv__tray-title { font-weight: 600; color: var(--ink); }
+.cv__tray-count { margin-left: auto; color: var(--ink-2); }
+.cv__tray-empty { margin: 0; }
+.cv__card {
+    padding: calc(var(--sp-3) + 1px) var(--sp-4);
+    border: 1px solid var(--border);
+    border-radius: var(--r-lg, 9px);
+    background: var(--surface);
+    cursor: pointer;
+    transition: box-shadow var(--t-state) var(--ease), border-color var(--t-state) var(--ease);
+}
+.cv__card:hover { border-color: var(--brand); }
+.cv__card.is-dragging { box-shadow: var(--shadow-pop); transform: rotate(-2deg); }
+.cv__card-name { display: block; color: var(--ink); }
+.cv__card-meta { display: block; margin-top: 2px; }
+.cv__proposal {
+    margin-top: auto;
+    padding: calc(var(--sp-3) + 1px) var(--sp-4);
+    border-radius: var(--r-lg, 9px);
+    background: var(--brand-tint);
+    color: var(--ink);
+    line-height: var(--lh-body, 1.45);
+}
+.cv__spark { color: var(--brand); font-weight: 600; }
+.cv__proposal-link { color: var(--brand); font-weight: 600; margin-left: var(--sp-1); }
+
+.cv__chip {
+    display: flex; align-items: center; gap: var(--sp-1);
+    width: 100%;
+    padding: 3px calc(var(--sp-2) + 1px);
+    border-radius: var(--r-sm, 5px);
+    background: var(--surface-2);
+    color: var(--ink);
+    font-size: var(--fs-sm, 11.5px);
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.cv__chip--done { text-decoration: line-through; color: var(--ink-2); }
+.cv__chip-icon { width: 11px; height: 11px; flex: none; }
+
+/* FullCalendar owns this DOM; the tokens are applied to its own class names. */
+.cv__grid :deep(.fc) { height: 100%; font-family: var(--font-ui); --fc-border-color: transparent; --fc-page-bg-color: transparent; }
+.cv__grid :deep(.fc-theme-standard td),
+.cv__grid :deep(.fc-theme-standard th) { border: 0; }
+.cv__grid :deep(.fc-scrollgrid) { border: 0; }
+.cv__grid :deep(.fc-col-header-cell) { padding-bottom: var(--sp-2); }
+.cv__grid :deep(.fc-col-header-cell-cushion) {
+    font: var(--text-label); letter-spacing: .06em; text-transform: uppercase;
+    color: var(--ink-2); text-decoration: none; padding: 0 var(--sp-1);
+}
+.cv__grid :deep(.fc-day-sat .fc-col-header-cell-cushion),
+.cv__grid :deep(.fc-day-sun .fc-col-header-cell-cushion) { color: var(--ink-2); opacity: .65; }
+/* The card is drawn on the frame, not the cell: the table collapses its borders, so rounded
+   cells touched and their cut corners showed the grid through as small diamonds. The cell's
+   padding is the gap between cards. */
+.cv__grid :deep(.fc-daygrid-day) { background: transparent; }
+.cv__grid :deep(.fc-daygrid-day-frame) {
+    padding: var(--sp-2);
+    min-height: 100%;
+    box-sizing: border-box;
+    background: var(--surface);
+    border: 1px solid var(--hairline);
+    border-radius: var(--r-lg, 10px);
+    transition: border-color var(--t-state) var(--ease);
+}
+.cv__grid :deep(.fc-day-sat .fc-daygrid-day-frame), .cv__grid :deep(.fc-day-sun .fc-daygrid-day-frame) { background: color-mix(in srgb, var(--surface) 50%, transparent); }
+:root[data-theme="dark"] .cv__grid :deep(.fc-day-sat .fc-daygrid-day-frame),
+:root[data-theme="dark"] .cv__grid :deep(.fc-day-sun .fc-daygrid-day-frame) { background: var(--surface-2); }
+.cv__grid :deep(.fc-day-other) { opacity: .55; }
+.cv__grid :deep(.fc-day-today .fc-daygrid-day-frame) { border: 1.5px solid var(--brand); background: var(--surface); }
+.cv__grid :deep(.fc-daygrid-day.cv-in-sprint .fc-daygrid-day-frame) { box-shadow: inset 0 2px 0 var(--brand-tint); }
+.cv__grid :deep(.fc-daygrid-day.cv-drop .fc-daygrid-day-frame) { border: 1px dashed var(--brand); }
+.cv__grid :deep(.fc-scrollgrid-sync-table td) { padding: 3px; }
+
+.cv__grid :deep(.fc-daygrid-day-top) { flex-direction: column !important; align-items: flex-start; }
+.cv__grid :deep(.fc-daygrid-day-number) { padding: 0; width: 100%; }
+.cv__grid :deep(.cv__daynum) { font: var(--text-data); color: var(--ink-2); }
+.cv__grid :deep(.fc-day-today .cv__daynum) { color: var(--brand); font-weight: 600; }
+.cv__grid :deep(.cv__pto) {
+    display: block; margin-top: var(--sp-1);
+    padding: 3px calc(var(--sp-2) + 1px); border-radius: var(--r-sm, 5px);
+    background: var(--warn-bg); color: var(--warn-ink);
+    font-size: var(--fs-xs, 10.5px); font-weight: 600;
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.cv__grid :deep(.cv-drop-hint) {
+    padding: 3px calc(var(--sp-2) + 1px); margin-bottom: 3px;
+    border-radius: var(--r-sm, 5px);
+    background: var(--brand-tint); color: var(--brand);
+    font-size: var(--fs-xs, 10.5px);
+}
+.cv__grid :deep(.fc-daygrid-event-harness) { margin-top: 3px; }
+.cv__grid :deep(.fc-daygrid-event) { border: 0; background: transparent; padding: 0; margin: 0; }
+.cv__grid :deep(.fc-daygrid-event:focus) { box-shadow: var(--focus); }
+.cv__grid :deep(.fc-daygrid-more-link) { font-size: var(--fs-xs, 10.5px); color: var(--ink-2); padding: 0 calc(var(--sp-2) + 1px); }
+.cv__grid :deep(.fc-popover) { border: 1px solid var(--hairline); border-radius: var(--r-lg, 10px); box-shadow: var(--shadow-pop); background: var(--surface); }
+.cv__grid :deep(.fc-popover-header) { background: var(--surface-2); color: var(--ink); font: var(--text-h3); }
+.cv__grid :deep(.fc-highlight) { background: var(--brand-tint); }
+
+@media (max-width: 1280px) {
+    .cv__tray { display: none; }
+}
+/* With a pointer the link is a full target; a phone's month grid keeps its small cells (calendar-phone.css). */
+@media (min-width: 768px) {
+    .cv__grid :deep(.fc-daygrid-more-link) { display: inline-flex; align-items: center; min-height: var(--hit-min); }
+}
+@media (max-width: 767px) {
+    .cv__main { padding: var(--sp-4); }
+    .cv__filter { height: var(--hit-min); }
+}

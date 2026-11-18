@@ -1,15 +1,21 @@
 <template>
     <div
-        :class="{'bg-light-blue black': selected && highlight, 'bg-light-gray black': selected && !highlight, 'bg-white': !selected, 'bg-blue white': !selected && highlight}"
-        class="sidebar_item_main hover-bg-blue hover-white cursor-pointer d-flex align-items-center justify-content-between mobile-listuser"
+        :class="themed ? ['sb-item', {'is-selected': selected, 'is-highlight': highlight}] : ['sidebar-items-hover-bg-blue sidebar-items-hover-white', {'sidebar-items-bg-light-blue sidebar-items-black': selected && highlight, 'sidebar-items-bg-light-gray sidebar-items-black': selected && !highlight, 'sidebar-items-bg-white': !selected, 'sidebar-items-bg-blue sidebar-items-white': !selected && highlight}]"
+        class="sidebar_item_main cursor-pointer d-flex align-items-center justify-content-between mobile-listuser"
+        role="option"
+        tabindex="0"
+        :aria-selected="selected ? 'true' : 'false'"
         @click="$emit('select', item)"
+        @keydown.enter.self.prevent="$emit('select', item)"
+        @keydown.space.self.prevent="$emit('select', item)"
     >
-        <div class="d-flex align-items-center assignee-userlist text-capitalize">
+        <div class="d-flex align-items-center assignee-userlist">
             <template v-if="item?.teamColor?.color">
                 <span class="team_icon_span cursor-pointer text-center" :style="[{'color': item?.teamColor?.color,'background-color': item?.teamColor?.bgColor, 'padding':'5px'}]">{{item.label.charAt(0)}}</span>
             </template>
             <template v-if="item.image && !imageDisplayForPriority">
                 <UserProfile
+                    decorative
                     :showDot="false"
                     class="cursor-pointer mr-10px"
                     width="2"
@@ -22,7 +28,7 @@
                 />
             </template>
             <template v-if="item.image && imageDisplayForPriority">
-                <img v-if="item.image.includes('http')" :title="item.title ? item.title : 'N/A'" :src="companyPrioritiesIcons(item.value).statusImage" alt="" :style="{width: '11px', height: '11px','margin-right': '10px','border-radius': '2px !important','vertical-align':'middle'}"/>
+                <img v-if="isBundledPriorityImage(item.image) || item.image.includes('http')" :title="item.title ? item.title : 'N/A'" :src="companyPrioritiesIcons(item.value)?.statusImage" alt="" :style="{width: '11px', height: '11px','margin-right': '10px','border-radius': '2px !important','vertical-align':'middle'}"/>
                 <WasabiImage :style="{width: '10px', height: '10px'}" v-else :data="{title: item.title ? item.title : 'N/A', url: item.image, filename: item.image.split('/').pop(), extension: item.image.split('/').pop().split('.').pop()}"/>
             </template>
             <div :class="[{'d-flex align-items-center' : isDisable === true}]">
@@ -30,9 +36,10 @@
                 <template v-if="item.taskImage && isDisable === true">
                     <TaskTypeIcon :taskType="item" class="sidebar__task-image" />
                 </template>
-                <span class="d-block emp_label" :class="[{'font-weight-400' : isDisable === true , 'font-weight-500 font-size-13' : isDisable === false, 'pl-5px': imageDisplayForPriority,'pl-10px' : taskType}]" :style="[{'font-size-13' : clientWidth > 767 &&  isDisable === true , 'font-size-16' : clientWidth <= 767 &&  isDisable === true }]">{{item.label}}</span>
-                <span v-if="item.designation" class="font-size-12 d-block designationAssignee emp_label">{{item.designation ? item.designation : ''}}</span>
+                <span class="d-block emp_label" :class="[{'sidebar-items-font-weight-400' : isDisable === true , 'sidebar-items-font-weight-500 sidebar-items-font-size-13' : isDisable === false, 'pl-5px': imageDisplayForPriority,'pl-10px' : taskType}]" :style="[{'font-size-13' : clientWidth > 767 &&  isDisable === true , 'font-size-16' : clientWidth <= 767 &&  isDisable === true }]">{{item.label}}</span>
+                <span v-if="item.designation" class="sidebar-items-font-size-12 d-block designationAssignee emp_label">{{item.designation ? item.designation : ''}}</span>
             </div>
+            <span v-if="item.tag" class="ah-chip ah-chip--agent ah-chip--mono ml-10px">{{ item.tag }}</span>
         </div>
 
         <div class="d-flex align-items-center">
@@ -42,9 +49,9 @@
                 </template>
             </div>
             <div v-if="isDisable === true" class="ml-15px position-re d-none status__change-wrapper">
-                <DropDown class="status_change_dropdown"  :bodyClass="{'status__renamecolordelete-dropdown' : true}">
+                <DropDown mode="menu" class="status_change_dropdown"  :bodyClass="{'status__renamecolordelete-dropdown' : true}">
                     <template #button>
-                        <img :src="addIcon" alt="addIconmilestoneSvg" class="cursor-pointer">
+                        <img :src="addIcon" :alt="$t('Projects.status_actions')" class="cursor-pointer">
                     </template>
                     <template #options>
                         <DropDownOption>
@@ -70,7 +77,7 @@ import DropDown from '@/components/molecules/DropDown/DropDown.vue';
 import DropDownOption from '@/components/molecules/DropDownOption/DropDownOption.vue';
 import WasabiImage from "@/components/atom/WasabiIamgeCompp/WasabiIamgeCompp.vue";
 import TaskTypeIcon from "@/components/atom/TaskTypeIcon/TaskTypeIcon.vue";
-import { companyPrioritiesIcons } from '@/composable/commonFunction';
+import { companyPrioritiesIcons, isBundledPriorityImage } from '@/composable/commonFunction';
 defineProps({
     item: {
         type: Object,
@@ -111,7 +118,8 @@ defineProps({
     removeKey: {
         type: Array,
         default: () => []
-    }
+    },
+    themed: { type: Boolean, default: true }
 })
 
 defineEmits(["select", "remove"])
@@ -125,4 +133,43 @@ const deleteIcon = require("@/assets/images/svg/redDelete_Icon.svg");
 </script>
 
 <style src="./style.css">
+</style>
+
+<style scoped>
+.sidebar-items-white {
+    color: var(--on-brand) !important;
+}
+.sidebar-items-black {
+    color: var(--ink);
+}
+.sidebar-items-hover-white:hover {
+    color: var(--on-brand) !important;
+}
+.sidebar-items-bg-white {
+    background-color: var(--surface);
+}
+.sidebar-items-bg-blue {
+    background-color: var(--brand);
+}
+.sidebar-items-bg-light-blue {
+    background-color: var(--brand-tint);
+}
+.sidebar-items-bg-light-gray {
+    background-color: var(--surface-2);
+}
+.sidebar-items-hover-bg-blue:hover {
+    background-color: var(--brand) !important;
+}
+.sidebar-items-font-weight-400 {
+    font-weight: 400 !important;
+}
+.sidebar-items-font-weight-500 {
+    font-weight: 500 !important;
+}
+.sidebar-items-font-size-12 {
+    font-size: 12px;
+}
+.sidebar-items-font-size-13 {
+    font-size: 13px;
+}
 </style>

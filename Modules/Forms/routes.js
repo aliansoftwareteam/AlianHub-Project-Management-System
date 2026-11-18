@@ -8,6 +8,7 @@ const formUpload = require('./helpers/formUpload');
 // limits rather than invented.
 const publicReadLimiter = rateLimit({ windowMs: 60 * 1000, limit: 60, standardHeaders: true, legacyHeaders: false });
 const publicWriteLimiter = rateLimit({ windowMs: 60 * 1000, limit: 10, standardHeaders: true, legacyHeaders: false });
+const { agentsRefused } = require('../Agents/guard');
 
 exports.init = (app) => {
     // Authenticated form management. Guarded as a prefix in setMiddleware, which
@@ -16,13 +17,13 @@ exports.init = (app) => {
     //
     // /fields is declared before /:id so it is not read as a form id.
     app.get('/api/v2/forms/fields', ctrl.listBindableFields);
-    app.post('/api/v2/forms/:id/publish', ctrl.publishForm);
+    app.post('/api/v2/forms/:id/publish', agentsRefused('share.public'), ctrl.publishForm);
     app.get('/api/v2/forms/:id/submissions', ctrl.listSubmissions);
     app.get('/api/v2/forms/:id', ctrl.getForm);
-    app.put('/api/v2/forms/:id', ctrl.updateForm);
+    app.put('/api/v2/forms/:id', agentsRefused('form.manage'), ctrl.updateForm);
     app.delete('/api/v2/forms/:id', ctrl.deleteForm);
     app.get('/api/v2/forms', ctrl.listForms);
-    app.post('/api/v2/forms', ctrl.createForm);
+    app.post('/api/v2/forms', agentsRefused('form.manage'), ctrl.createForm);
 
     // PUBLIC — server-rendered, no login. Deliberately NOT under /api/v2/forms:
     // that prefix requires a token, and these must not.

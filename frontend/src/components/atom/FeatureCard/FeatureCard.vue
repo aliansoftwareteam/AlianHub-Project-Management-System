@@ -48,7 +48,7 @@ const props = defineProps({
 
 <style scoped>
 .feature-card {
-    background-color: white;
+    background-color: var(--surface);
     border-radius: 12px;
     overflow: hidden;
     box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
@@ -82,8 +82,8 @@ const props = defineProps({
     position: absolute;
     top: 12px;
     right: 12px;
-    background-color: #fff;
-    color: #333;
+    background-color: var(--surface);
+    color: var(--ink);
     padding: 4px 10px;
     border-radius: 999px;
     font-size: 12px;
@@ -101,14 +101,14 @@ const props = defineProps({
     margin: 0;
     padding: 0;
     margin-bottom: 8px !important;
-    color: #333;
+    color: var(--ink);
 }
 
 .card-description {
     margin: 0;
     padding: 0;
     font-size: 14px;
-    color: #666;
+    color: var(--ink-2);
     line-height: 1.5;
     -webkit-line-clamp: 2 !important;
 }

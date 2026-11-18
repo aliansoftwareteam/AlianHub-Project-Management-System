@@ -11,8 +11,34 @@ const mongoose = require("mongoose");
 const { updateCompanyFun } = require("../../Company/controller/updateCompany.js");
 const { getUserByQueyFun } = require("../../Users/controller.js");
 const { updateMemberFunction } = require('../../settings/Members/controller.js');
+const { memberRowView } = require('../../settings/Members/membershipGuard.js');
 const logger = require("../../../Config/loggerConfig.js");
 const { emitListener } = require("../../Company/eventController.js");
+const { newLinkToken } = require("../helpers/linkToken");
+const { pinSessionTenant } = require("../../../Config/tenant");
+
+const MAIL_FAILED = 'Invitation_mail_failed';
+const SEND_FAILED = 'Could not send the invitation.';
+
+/* The sign-up link from the invite mail, for the admin to share when mail cannot go out. It carries the
+ * row's token, and signing up through it still admits only the invited address. */
+const joinLinkFor = (companyId, row) => (row && row._id && row.linkId
+    ? `${config.WEBURL}/#/invitation?companyId=${companyId}-${row._id}&token=${row.linkId}`
+    : '');
+
+// Transport errors name hosts and ports; they go to the log, never to the client.
+const logFailure = (what, companyId, error) => {
+    logger.error(`invitation ${what} (company ${companyId}): ${error && error.message ? error.message : error}`);
+};
+
+// The seat schema requires both as numbers. The Members page sends the designation empty when the person has none,
+// so that reads as none; a role that is not a number is refused before a seat is counted or written.
+const isNumber = (value) => (typeof value === 'number' || (typeof value === 'string' && value.trim() !== '')) && Number.isFinite(Number(value));
+const designationOf = (value) => (isNumber(value) ? Number(value) : 0);
+const missingField = (body, key) => body[key] === undefined || body[key] === null || (key === 'role' && !isNumber(body[key]));
+
+exports.MAIL_FAILED = MAIL_FAILED;
+exports.joinLinkFor = joinLinkFor;
 
 const buildVerifyInvitationLink = (userId, companyId, docId, token) =>
     `${config.WEBURL}/#/verify-invitation?id=${btoa(`userId=${userId}&companyId=${companyId}&docId=${docId}&linkId=${token}`)}`;
@@ -92,7 +118,7 @@ async function batchUpdate(arr, eventId) {
                         logger.error(`Invitation batch ${batch} failed: ${e.message || e}`);
                         reject(new Error(`Unexpected error in batch ${batch}`));
                     }
-                };
+                }
             }
             loopFun()
         } catch (error) {
@@ -111,11 +137,11 @@ async function batchUpdate(arr, eventId) {
 exports.sendInvitationEmailFun = (bodyData) => {
     return new Promise((resolve, reject) => {
         try {
-            let keys = ["email", "companyId", "companyName", "role", "designation"];
+            let keys = ["email", "companyName", "role", "designation"];
             let valid = "";
     
             keys.forEach((key) => {
-                if(bodyData[key] === undefined || bodyData[key] === null) {
+                if(missingField(bodyData, key)) {
                     valid += `${key}, `
                 }
             })
@@ -123,11 +149,12 @@ exports.sendInvitationEmailFun = (bodyData) => {
             // VALIDATE REQUEST BODY
             if(valid.length) {
                 valid += "fields are required.";
-                reject({status: false, statusText: new Error(valid)});
+                reject({status: false, statusText: valid});
                 return
             }
     
-            let {email, companyId, companyName, role, designation,isResend} = bodyData;
+            let {email, companyId, companyName, role, isResend} = bodyData;
+            const designation = designationOf(bodyData.designation);
     
             email = email.toLowerCase();
     
@@ -161,27 +188,34 @@ exports.sendInvitationEmailFun = (bodyData) => {
              * @param {String} mail - Mail Template which is need to send for email
              * @returns
             */
-            const sendMailFunction = (mailObj,data) => {
+            const sendMailFunction = (mailObj,row) => {
+                const data = memberRowView(row);
+                const joinLink = joinLinkFor(companyId, row);
                 try {
                     sendMail.SendEmail(mailObj.subject, mailObj.mail, email, true, (result) => {
                         if(result.status) {
                             resolve({
                                 status: true,
                                 statusText: 'Invitation_mail_sent_sucessfully',
-                                data
+                                data,
+                                joinLink
                             });
                         } else {
-                            reject({
+                            logFailure('mail failed', companyId, result.error);
+                            // The row is saved, so hand it back with its join link to share instead.
+                            resolve({
                                 status: false,
-                                statusText: result.error
+                                statusText: MAIL_FAILED,
+                                data,
+                                joinLink
                             });
-                            exports.decreaseUserCount(companyId);
                         }
                     });
                 } catch (error) {
+                    logFailure('mail failed', companyId, error);
                     reject({
                         status: false,
-                        statusText: error?.message || error
+                        statusText: SEND_FAILED
                     });
                 }
             };
@@ -221,14 +255,15 @@ exports.sendInvitationEmailFun = (bodyData) => {
                                 const re = res.data;
         
                                 if(userId === "") {
-                                    let link = `${config.WEBURL}/#/invitation?companyId=${companyId}-${re._id}`;
+                                    let link = `${config.WEBURL}/#/invitation?companyId=${companyId}-${re._id}&token=${token}`;
                                     sendMailFunction(require("../../Template/sendEmailInvitation")(link, companyName),re);
                                 } else {
                                     let link = buildVerifyInvitationLink(userId, companyId, re._id, token);
                                     sendMailFunction(require("../../Template/sendEmailInvitation")(link, companyName),re);
                                 }
                             }).catch((error) => {
-                                reject({status: false, statusText: error});
+                                logFailure('failed', companyId, error);
+                                reject({ status: false, statusText: SEND_FAILED });
                             })
                         } else {
                             // let alreadyIn = querySnapshot.docs.filter((userDoc) => userDoc.data().status === 2 && userDoc.data().userId === userId && !userDoc.data().isDelete);
@@ -263,27 +298,24 @@ exports.sendInvitationEmailFun = (bodyData) => {
                                 const resp = response.data
                                 
                                 if(userId === "") {
-                                    let link = `${config.WEBURL}/#/invitation?companyId=${companyId}-${resp._id}`;
+                                    let link = `${config.WEBURL}/#/invitation?companyId=${companyId}-${resp._id}&token=${token}`;
                                     sendMailFunction(require("../../Template/sendEmailInvitation")(link, companyName),resp);
                                 } else {
                                     let link = buildVerifyInvitationLink(userId, companyId, resp._id, token);
                                     sendMailFunction(require("../../Template/sendEmailInvitation")(link, companyName),resp);
                                 }
                             }).catch((error)=>{
-                                reject({status: false, statusText: error});
+                                logFailure('failed', companyId, error);
+                                reject({ status: false, statusText: SEND_FAILED });
                             })
                         }
                     }).catch((error)=>{
-                        reject({
-                            status: false,
-                            statusText: error
-                        })
+                        logFailure('failed', bodyData.companyId, error);
+                        reject({ status: false, statusText: SEND_FAILED })
                     })
                 } catch(error) {
-                    reject({
-                        status: false,
-                        statusText: error?.message || error
-                    })
+                    logFailure('failed', bodyData.companyId, error);
+                    reject({ status: false, statusText: SEND_FAILED })
                 }
             }
     
@@ -296,34 +328,23 @@ exports.sendInvitationEmailFun = (bodyData) => {
                 try {
                     if (resp.length > 0) {
                         const response = resp[0];
-                        let temp = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";
-                        let token = '';
-                        for ( let i = 0; i < 8; i++ ) {
-                            token += temp.charAt(Math.floor(Math.random() * temp.length));
-                        }
-        
+                        const token = newLinkToken();
                         let userId = response._id;
                         sendCheckRequest(email, userId, token)
                     } else {
-                        sendCheckRequest(email, "", "")
+                        sendCheckRequest(email, "", newLinkToken())
                     }
                 } catch (error) {
-                    reject({
-                        status: false,
-                        statusText: error?.message || error
-                    })
+                    logFailure('failed', bodyData.companyId, error);
+                    reject({ status: false, statusText: SEND_FAILED })
                 }
             }).catch((error)=>{
-                reject({
-                    status: false,
-                    statusText: error
-                })
+                logFailure('failed', bodyData.companyId, error);
+                reject({ status: false, statusText: SEND_FAILED })
             })
         } catch (error) {
-            reject({
-                status: false,
-                statusText: error
-            })
+            logFailure('failed', bodyData.companyId, error);
+            reject({ status: false, statusText: SEND_FAILED })
             exports.decreaseUserCount(bodyData.companyId);
         }
     })
@@ -337,12 +358,14 @@ exports.sendInvitationEmailFun = (bodyData) => {
  * @returns
  */
 exports.sendInvitationEmail = (req,res) => {
+    const sessionCompanyId = pinSessionTenant(req, res);
+    if (!sessionCompanyId) return;
     try {
-        let keys = ["email", "companyId", "companyName", "role", "designation"];
+        let keys = ["email", "companyName", "role", "designation"];
         let valid = "";
 
         keys.forEach((key) => {
-            if(req.body[key] === undefined || req.body[key] === null) {
+            if(missingField(req.body, key)) {
                 valid += `${key}, `
             }
         })
@@ -350,11 +373,13 @@ exports.sendInvitationEmail = (req,res) => {
         // VALIDATE REQUEST BODY
         if(valid.length) {
             valid += "fields are required.";
-            res.send({status: false, statusText: new Error(valid)});
+            res.send({status: false, statusText: valid});
             return
         }
 
-        let {email, companyId, companyName, role, designation,isResend} = req.body;
+        let {email, companyName, role, isResend} = req.body;
+        const designation = designationOf(req.body.designation);
+        const companyId = sessionCompanyId;
 
         email = email.toLowerCase();
 
@@ -384,20 +409,26 @@ exports.sendInvitationEmail = (req,res) => {
          * @param {String} mail - Mail Template which is need to send for email
          * @returns
         */
-        const sendMailFunction = (mailObj,data) => {
+        const sendMailFunction = (mailObj,row) => {
+            const data = memberRowView(row);
+            const joinLink = joinLinkFor(companyId, row);
             sendMail.SendEmail(mailObj.subject, mailObj.mail, email, true, (result) => {
                 if(result.status) {
                     res.send({
                         status: true,
                         statusText: 'Invitation_mail_sent_sucessfully',
-                        data
+                        data,
+                        joinLink
                     });
                 } else {
+                    logFailure('mail failed', companyId, result.error);
+                    // The row is saved, so hand it back with its join link to share instead.
                     res.send({
                         status: false,
-                        statusText: result.error
+                        statusText: MAIL_FAILED,
+                        data,
+                        joinLink
                     });
-                    exports.decreaseUserCount(companyId);
                 }
             });
         };
@@ -436,14 +467,15 @@ exports.sendInvitationEmail = (req,res) => {
                         const re = res.data;
 
                         if(userId === "") {
-                            let link = `${config.WEBURL}/#/invitation?companyId=${companyId}-${re._id}`;
+                            let link = `${config.WEBURL}/#/invitation?companyId=${companyId}-${re._id}&token=${token}`;
                             sendMailFunction(require("../../Template/sendEmailInvitation")(link, companyName),re);
                         } else {
                             let link = buildVerifyInvitationLink(userId, companyId, re._id, token);
                             sendMailFunction(require("../../Template/sendEmailInvitation")(link, companyName),re);
                         }
                     }).catch((error) => {
-                        res.send({status: false, statusText: error});
+                        logFailure('failed', companyId, error);
+                        res.send({ status: false, statusText: SEND_FAILED });
                     })
                 } else {
                     // let alreadyIn = querySnapshot.docs.filter((userDoc) => userDoc.data().status === 2 && userDoc.data().userId === userId && !userDoc.data().isDelete);
@@ -478,21 +510,20 @@ exports.sendInvitationEmail = (req,res) => {
                         const resp = response.data
                         
                         if(userId === "") {
-                            let link = `${config.WEBURL}/#/invitation?companyId=${companyId}-${resp._id}`;
+                            let link = `${config.WEBURL}/#/invitation?companyId=${companyId}-${resp._id}&token=${token}`;
                             sendMailFunction(require("../../Template/sendEmailInvitation")(link, companyName),resp);
                         } else {
                             let link = buildVerifyInvitationLink(userId, companyId, resp._id, token);
                             sendMailFunction(require("../../Template/sendEmailInvitation")(link, companyName),resp);
                         }
                     }).catch((error)=>{
-                        res.send({status: false, statusText: error});
+                        logFailure('failed', companyId, error);
+                        res.send({ status: false, statusText: SEND_FAILED });
                     })
                 }
             }).catch((error)=>{
-                res.send({
-                    status: false,
-                    statusText: error
-                })
+                logFailure('failed', sessionCompanyId, error);
+                res.send({ status: false, statusText: SEND_FAILED })
             })
         }
 
@@ -504,29 +535,20 @@ exports.sendInvitationEmail = (req,res) => {
         getUserByQueyFun(query).then((resp)=>{
             if (resp.length > 0) {
                 const response = resp[0];
-                let temp = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";
-                let token = '';
-                for ( let i = 0; i < 8; i++ ) {
-                    token += temp.charAt(Math.floor(Math.random() * temp.length));
-                }
-
+                const token = newLinkToken();
                 let userId = response._id;
                 sendCheckRequest(email, userId, token)
             } else {
-                sendCheckRequest(email, "", "")
+                sendCheckRequest(email, "", newLinkToken())
             }
         }).catch((error)=>{
-            res.send({
-                status: false,
-                statusText: error
-            })
+            logFailure('failed', sessionCompanyId, error);
+            res.send({ status: false, statusText: SEND_FAILED })
         })
     } catch (error) {
-        res.send({
-            status: false,
-            statusText: error
-        })
-        exports.decreaseUserCount(req.body.companyId);
+        logFailure('failed', sessionCompanyId, error);
+        res.send({ status: false, statusText: SEND_FAILED })
+        exports.decreaseUserCount(sessionCompanyId);
     }
 }
 
@@ -542,10 +564,8 @@ exports.checkSendInviatation = (req,res) => {
             res.send({ status: false, statusText: 'email is required' });
             return;
         }
-        if (!(req.body && req.body.companyId)) {
-            res.send({ status: false, statusText: 'companyId is required' });
-            return;
-        } 
+        const companyId = pinSessionTenant(req, res);
+        if (!companyId) return;
         let obj = {
             type: dbCollections.COMPANY_USERS,
             data: [
@@ -554,7 +574,7 @@ exports.checkSendInviatation = (req,res) => {
                 },
             ]
         }
-        mongoRef.MongoDbCrudOpration(req.body.companyId, obj, "findOne").then((resp)=>{
+        mongoRef.MongoDbCrudOpration(companyId, obj, "findOne").then((resp)=>{
             if (resp === null || resp?.status === 3) {
                 res.send({
                     status: true,
@@ -579,16 +599,12 @@ exports.checkSendInviatation = (req,res) => {
                 }
             }
         }).catch((error)=>{
-            res.send({
-                status: false,
-                statusText: error
-            });
+            logFailure('failed', req.headers && req.headers.companyid, error);
+            res.send({ status: false, statusText: SEND_FAILED });
         })       
     } catch (error) {
-        res.send({
-            status: false,
-            statusText: error
-        });
+        logFailure('failed', req.headers && req.headers.companyid, error);
+        res.send({ status: false, statusText: SEND_FAILED });
     }
 }
 

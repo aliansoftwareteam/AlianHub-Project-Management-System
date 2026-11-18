@@ -1,19 +1,43 @@
 import { nextTick } from "vue";
 import en from "@/locales/en"
 import { useI18n } from 'vue-i18n';
+const RULE_SEPARATOR = /\|(?=\s*(?:required|min|max|regex|confirmation)\s*(?::|\||$))/;
+const nameKey = (name) => name.toLowerCase().replaceAll(" ", "_");
+const PASSWORD_MESSAGES = new Map([
+    ["password", ["authErrorMessage.passwordValid", "authErrorMessage.validPassRegex"]],
+    ["new password", ["authErrorMessage.newPasswordValid", "authErrorMessage.newPassword"]],
+    ["current password", ["authErrorMessage.currentPasswordValid", "authErrorMessage.currentPassword"]],
+]);
+
 export function useValidation() {
     const { t } = useI18n();
 
     function checkErrors({ field = {}, name = "", validations = '', type = "string", event = null, checkLanguage = true }) {
         return new Promise((resolve, reject) => {
             try {
-                let rules = validations !== '' ? validations.split("|").map((x) => x.trim()) : '';
+                let rules = validations !== '' ? validations.split(RULE_SEPARATOR).map((x) => x.trim()) : '';
+                const hasRule = (ruleName) => rules.some((x) => x.split(":")[0].trim() === ruleName);
+                const ruleArg = (ruleName) => {
+                    const rule = rules.find((x) => x.split(":")[0].trim() === ruleName);
+                    return rule.includes(":") ? rule.slice(rule.indexOf(":") + 1) : "";
+                };
                 let valid = true;
+                const regexMessage = (typed) => {
+                    const lowered = name.toLowerCase();
+                    const passwordMessages = PASSWORD_MESSAGES.get(lowered);
+                    if (passwordMessages) {
+                        return typed.toString().length < 8 ? t(passwordMessages[0]) : t('errorPage.The') + ' ' + t(passwordMessages[1]);
+                    }
+                    if (lowered === "email") return t('authErrorMessage.emailError');
+                    if (lowered === "first name") return t('authErrorMessage.validCharactersfirst');
+                    if (lowered === "last name") return t('authErrorMessage.validCharacterslast');
+                    return t('errorPage.The') + ' ' + t(`errorPage.${nameKey(name)}`) + ' ' + t('errorPage.field_must_be_a_valid') + ' ' + t(`errorPage.${nameKey(name)}`);
+                };
                 let typeMsg = type === "number" ? "digits" : "characters";
 
                 if (rules.length) {
                     // REQUIRED
-                    if (rules.filter((x) => x.includes("required")).length) {
+                    if (rules.length && hasRule("required")) {
                         if (event !== null) {
                             if (event.target.value.trim() === "" || event.target.value.trim() === null || event.target.value === false) {
                                 valid = false;
@@ -27,121 +51,54 @@ export function useValidation() {
                         }
                     }
                     // REGEX
-                    if (rules.filter((x) => x.includes("regex")).length && valid) {
-                        let ind = rules.findIndex((x) => x.includes("regex"));
-                        if (ind !== -1) {
-                            let regex = rules[ind].split(":").pop().trim() || "";
-                            if (regex.length) {
-                                regex = new RegExp(regex);
-                                if (event !== null) {
-                                    if (!regex.test(event.target.value.trim())) {
-                                        valid = false;
-                                        field.error =
-                                            !checkLanguage ?
-                                                `The ${name.toLowerCase()} field must be a valid ${name.toLowerCase()}` :
-                                                (name?.toLocaleLowerCase() == en?.password?.toLocaleLowerCase() || name?.toLocaleLowerCase() === en?.newPassword?.toLocaleLowerCase() || name?.toLocaleLowerCase() === en?.currentPassword?.toLocaleLowerCase()) && field.value.toString().length < 8
-                                                    ? name?.toLocaleLowerCase() == en?.password?.toLocaleLowerCase() ? t('authErrorMessage.passwordValid') : name?.toLocaleLowerCase() === en?.newPassword?.toLocaleLowerCase() ? t('authErrorMessage.newPasswordValid') : name?.toLocaleLowerCase() === en?.currentPassword?.toLocaleLowerCase() ? t('authErrorMessage.currentPasswordValid') : ''
-                                                    : (name?.toLocaleLowerCase() == en?.password?.toLocaleLowerCase() || name?.toLocaleLowerCase() === en?.newPassword?.toLocaleLowerCase() || name?.toLocaleLowerCase() === en?.currentPassword?.toLocaleLowerCase()) && field.value.toString().length >= 8
-                                                        ? name?.toLocaleLowerCase() == en?.password?.toLocaleLowerCase() ? t('errorPage.The') + ' ' + t('authErrorMessage.validPassRegex') : name?.toLocaleLowerCase() === en?.newPassword?.toLocaleLowerCase() ? t('errorPage.The') + ' ' + t('authErrorMessage.newPassword') : name?.toLocaleLowerCase() === en?.currentPassword?.toLocaleLowerCase() ? t('errorPage.The') + ' ' + t('authErrorMessage.currentPassword') : ''
-                                                        : name == en.email
-                                                            ? t('authErrorMessage.emailError')
-                                                            : name == en.firstName
-                                                                ? t('authErrorMessage.validCharactersfirst')
-                                                                : name == en.lastName
-                                                                    ? t('authErrorMessage.validCharacterslast')
-                                                                    : t('errorPage.The') + ' ' + t(`errorPage.${name.toLowerCase().replace(" ", "_")}`) + ' ' + t('errorPage.field_must_be_a_valid') + ' ' + t(`errorPage.${name.toLowerCase().replace(" ", "_")}`);
-                                    }
-                                } else {
-                                    if (!regex.test(field.value)) {
-                                        valid = false;
-                                        field.error =
-                                            !checkLanguage ?
-                                                `The ${name.toLowerCase()} field must be a valid ${name.toLowerCase()}` :
-                                                (name?.toLocaleLowerCase() == en?.password?.toLocaleLowerCase() || name?.toLocaleLowerCase() === en?.newPassword?.toLocaleLowerCase() || name?.toLocaleLowerCase() === en?.currentPassword?.toLocaleLowerCase()) && field.value.toString().length < 8
-                                                    ? name?.toLocaleLowerCase() == en?.password?.toLocaleLowerCase() ? t('authErrorMessage.passwordValid') : name?.toLocaleLowerCase() === en?.newPassword?.toLocaleLowerCase() ? t('authErrorMessage.newPasswordValid') : name?.toLocaleLowerCase() === en?.currentPassword?.toLocaleLowerCase() ? t('authErrorMessage.currentPasswordValid') : ''
-                                                    : (name?.toLocaleLowerCase() == en?.password?.toLocaleLowerCase() || name?.toLocaleLowerCase() === en?.newPassword?.toLocaleLowerCase() || name?.toLocaleLowerCase() === en?.currentPassword?.toLocaleLowerCase()) && field.value.toString().length >= 8
-                                                        ? name?.toLocaleLowerCase() == en?.password?.toLocaleLowerCase() ? t('errorPage.The') + ' ' + t('authErrorMessage.validPassRegex') : name?.toLocaleLowerCase() === en?.newPassword?.toLocaleLowerCase() ? t('errorPage.The') + ' ' + t('authErrorMessage.newPassword') : name?.toLocaleLowerCase() === en?.currentPassword?.toLocaleLowerCase() ? t('errorPage.The') + ' ' + t('authErrorMessage.currentPassword') : ''
-                                                        : name == en.email
-                                                            ? t('authErrorMessage.emailError')
-                                                            : name == en.firstName
-                                                                ? t('authErrorMessage.validCharactersfirst')
-                                                                : name == en.lastName
-                                                                    ? t('authErrorMessage.validCharacterslast')
-                                                                    : t('errorPage.The') + ' ' + t(`errorPage.${name.toLowerCase().replace(" ", "_")}`) + ' ' + t('errorPage.field_must_be_a_valid') + ' ' + t(`errorPage.${name.toLowerCase().replace(" ", "_")}`);
-                                    }
-                                }
-                            } else {
-                                console.warn("No regex found!");
+                    if (hasRule("regex") && valid) {
+                        const pattern = ruleArg("regex").trim();
+                        if (pattern.length) {
+                            const regex = new RegExp(pattern);
+                            const typed = event !== null ? event.target.value.trim() : field.value;
+                            if (!regex.test(typed)) {
+                                valid = false;
+                                field.error = !checkLanguage ? `The ${name.toLowerCase()} field must be a valid ${name.toLowerCase()}` : regexMessage(typed);
                             }
+                        } else {
+                            console.warn("No regex found!");
                         }
                     }
 
                     // MIN
-                    if (rules.filter((x) => x.includes("min")).length && valid) {
-                        let ind = rules.findIndex((x) => x.includes("min"));
-                        if (ind !== -1) {
-                            let min = Number(rules[ind].split(":").pop());
-                            if (event !== null) {
-                                if (event.target.value.trim().toString().length < min) {
-                                    valid = false;
-                                    field.error =
-                                        !checkLanguage ?
-                                            `The ${name.toLowerCase()} field must be at least ${min} ${typeMsg}` :
-                                            name === en.phoneNumber
-                                                ? t('companyErrorMessage.phoneNumberValid')
-                                                : t('errorPage.The') + ' ' + t(`errorPage.${name.toLowerCase().replace(" ", "_")}`) + ' ' + t('errorPage.field_must_be_at_least') + ' ' + `${min}` + ' ' + t(`errorPage.${typeMsg}`)
-                                }
-                            } else {
-                                if (field.value.toString().length < min) {
-                                    valid = false;
-                                    field.error =
-                                        !checkLanguage ?
-                                            `The ${name.toLowerCase()} field must be at least ${min} ${typeMsg}` :
-                                            name === en.phoneNumber
-                                                ? t('companyErrorMessage.phoneNumberValid')
-                                                : t('errorPage.The') + ' ' + t(`errorPage.${name.toLowerCase().replace(" ", "_")}`) + ' ' + t('errorPage.field_must_be_at_least') + ' ' + `${min}` + ' ' + t(`errorPage.${typeMsg}`)
-                                }
-                            }
+                    if (hasRule("min") && valid) {
+                        const min = Number(ruleArg("min"));
+                        const typed = event !== null ? event.target.value.trim() : field.value;
+                        if (typed.toString().length < min) {
+                            valid = false;
+                            field.error =
+                                !checkLanguage ?
+                                    `The ${name.toLowerCase()} field must be at least ${min} ${typeMsg}` :
+                                    name.toLowerCase() === "phone number"
+                                        ? t('companyErrorMessage.phoneNumberValid')
+                                        : t('errorPage.The') + ' ' + t(`errorPage.${nameKey(name)}`) + ' ' + t('errorPage.field_must_be_at_least') + ' ' + `${min}` + ' ' + t(`errorPage.${typeMsg}`)
                         }
                     }
                     // MAX
-                    if (rules.filter((x) => x.includes("max")).length && valid) {
-                        let ind = rules.findIndex((x) => x.includes("max"));
-                        if (ind !== -1) {
-                            let max = Number(rules[ind].split(":").pop());
-                            if (event !== null) {
-                                if (event.target.value.trim().toString().length > max) {
-                                    valid = false;
-                                    field.error = !checkLanguage ? `${name} must be less than ${max} ${typeMsg}` : t(`errorPage.${name.toLowerCase().replace(" ", "_")}`) + ' ' + t('errorPage.must_be_less_than') + ' ' + `${max}` + ' ' + t(`errorPage.${typeMsg}`);
-                                }
-                            } else {
-                                if (field.value.toString().length > max) {
-                                    valid = false;
-                                    field.error = !checkLanguage ? `${name} must be less than ${max} ${typeMsg}` : t(`errorPage.${name.toLowerCase().replace(" ", "_")}`) + ' ' + t('errorPage.must_be_less_than') + ' ' + `${max}` + ' ' + t(`errorPage.${typeMsg}`);
-                                }
-                            }
+                    if (hasRule("max") && valid) {
+                        const max = Number(ruleArg("max"));
+                        const typed = event !== null ? event.target.value.trim() : field.value;
+                        if (typed.toString().length > max) {
+                            valid = false;
+                            field.error = !checkLanguage ? `${name} must be less than ${max} ${typeMsg}` : t(`errorPage.${nameKey(name)}`) + ' ' + t('errorPage.must_be_less_than') + ' ' + `${max}` + ' ' + t(`errorPage.${typeMsg}`);
                         }
                     }
                     // CONFIRMATION
-                    if (rules.filter((x) => x.includes("confirmation")).length && valid) {
-                        let ind = rules.findIndex((x) => x.includes("confirmation"));
-                        if (ind !== -1) {
-                            let confirm = rules[ind].split(":").pop().trim() || "";
-                            if (confirm.length) {
-                                if (event !== null) {
-                                    if (event.target.value.trim() !== confirm) {
-                                        valid = false;
-                                        field.error = t('authErrorMessage.confirmPasswordValid');
-                                    }
-                                } else {
-                                    if (field.value !== confirm) {
-                                        valid = false;
-                                        field.error = t('authErrorMessage.confirmPasswordValid');
-                                    }
-                                }
-                            } else {
-                                console.warn("No confirmation field found!");
+                    if (hasRule("confirmation") && valid) {
+                        const confirm = ruleArg("confirmation").trim();
+                        if (confirm.length) {
+                            const typed = event !== null ? event.target.value.trim() : field.value;
+                            if (typed !== confirm) {
+                                valid = false;
+                                field.error = t('authErrorMessage.confirmPasswordValid');
                             }
+                        } else {
+                            console.warn("No confirmation field found!");
                         }
                     }
 

@@ -116,7 +116,7 @@ This is the heart of it. Before these changes the screen was blank.
 **Check — the welcome tour** *(gap 8)*
 - A tour should start on the projects screen. Step through it to the end
 - The **last step should point at the "?" icon** in the header and talk about guides and help
-- The "?" icon itself should open `help.alianhub.com` in a new tab *(gap 13)*
+- The "?" icon itself should open `docs.alianhub.com` in a new tab *(gap 13)*
 
 ---
 

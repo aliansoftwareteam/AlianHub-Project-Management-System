@@ -8,7 +8,7 @@
     transition: all 0.5s ease;
     margin: 0px;
     font-size: 16px;
-    font-family: 'Roboto', sans-serif;
+    font-family: var(--font-ui);
     font-weight: 400;
 }
 .right-message {
@@ -32,10 +32,12 @@
     top: 50%; 
     height: 1px;
 }
-.show__day-format{
-    left: 50%; 
+.show__day .show__day-format{
+    left: 50%;
     bottom: -8px;
     transform: translateX(-50%);
+    background-color: var(--surface-2);
+    color: var(--ink-2);
 }
 .unread__message-text{
      width: 98%;
@@ -48,16 +50,19 @@
  }
 .comment__image{
    object-fit: contain;
-   border: 1px solid #cecece; 
+   border: 1px solid var(--border);
    border-radius: 5px;
 }
 .video_controls{
-    border: 1px solid #cecece; 
+    border: 1px solid var(--border);
     border-radius: 5px;
 }
 .message__profile-image{
     width: 25px;
     height: 25px;
+}
+.message__agent-avatar {
+    font-size: 12px;
 }
 .white__space-nowrap{
     white-space: nowrap !important;

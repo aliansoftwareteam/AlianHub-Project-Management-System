@@ -1,45 +1,67 @@
-.archive-delete-title{
-    font-size: 22px;
-    line-height: 33px;
-    text-align: center;
-    color: #000000;
-    margin-top: 24px;
-    margin-bottom: 5px;
-}
-.archive-delete-desc {
-    line-height: 24px;
-    color: #818181;
-    margin-bottom: 21px;
-}
-.archive-delete-input{
-    border: 1px solid #DFE1E6 !important;
-    border-radius: 5px !important;
-    font-size: 16px !important;
-}
-.archive-delete-input::placeholder{
-    font-size: 16px !important;
-}
-.archive-delete-btnwrapper .outline-primary{
-    padding: 3px 13.2px !important;
-}
-.archive-delete-btnwrapper .btn-primary{
-    padding: 3px 14.21px !important;
-}
-.archive-delete-btnwrapper .btn-danger{
-    padding: 3px 13.88px !important;
-}
 .conformation__sidebar-component{
     height:calc(100vh - 46px);
+    background: var(--canvas);
+    color: var(--ink);
+    color-scheme: var(--scheme);
 }
-.closeee__image-icon{
-    right: 15px; 
-    top: 14px;
+.conformation__busy{
+    background: var(--scrim);
+}
+.archive-delete-title{
+    font: var(--fw-title, 700) 22px/33px var(--font-ui);
+    text-align: center;
+    color: var(--ink);
+    margin-top: 24px;
+}
+.archive-delete-desc {
+    font: 400 var(--fs-lg, 16px)/24px var(--font-ui);
+    color: var(--ink-2);
+    margin-bottom: 21px;
+}
+/* Callers bold a name inside the message with the legacy .black class. */
+.archive-delete-desc .black {
+    color: var(--ink);
 }
 .type__confirmation-string{
+    font-weight: var(--fw-strong, 500);
+    color: var(--ink);
     word-break: break-all;
 }
-.archive-delete-input{
+/* !important: at phone widths the base .form-control forces its fixed greys with it. */
+.conformation__sidebar-component .archive-delete-input{
     max-width:420px !important;
+    background: var(--surface);
+    color: var(--ink) !important;
+    border: 1px solid var(--border) !important;
+    border-radius: var(--r-input) !important;
+    font-size: var(--fs-lg, 16px) !important;
+}
+.conformation__sidebar-component .archive-delete-input::placeholder{
+    color: var(--ink-2) !important;
+    font-size: var(--fs-lg, 16px) !important;
+}
+.conformation__sidebar-component .archive-delete-input:focus-visible{
+    outline: none;
+    border-color: var(--brand) !important;
+    box-shadow: var(--focus);
+}
+.archive-delete-btnwrapper{
+    gap: var(--sp-4);
+}
+.closeee__image-icon{
+    right: 15px;
+    top: 14px;
+    display: inline-flex;
+    padding: var(--sp-1);
+    border: 0;
+    border-radius: var(--r-chip);
+    background: transparent;
+    color: var(--ink-2);
+    cursor: pointer;
+}
+.closeee__image-icon:hover{
+    background: var(--surface-hover);
+    color: var(--ink);
 }
 
 @media(max-width:767px){

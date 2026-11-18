@@ -3,7 +3,10 @@ const { MongoDbCrudOpration } = require("../../utils/mongo-handler/mongoQueries"
 const mongoose = require("mongoose");
 const logger = require("../../Config/loggerConfig");
 const { validateCreateShare, generateShareToken, isObjectIdString } = require('./helpers/shareRules');
-const bcrypt = require('bcrypt');
+const { canManageShare } = require('./helpers/shareAccess');
+const { getRoleType } = require('../../Config/permissionGuard');
+const { ROLE_GUEST } = require('../../Config/roleTypes');
+const { hashPassword } = require('../Auth/helpers/passwordHash');
 
 // Parse a client-supplied expiry into a Date (null when absent / to clear).
 const parseExpiry = (v) => {
@@ -17,6 +20,7 @@ const sanitizeShare = (doc) => {
     const obj = doc.toObject ? doc.toObject() : { ...doc };
     obj.hasPassword = !!obj.passwordHash;
     delete obj.passwordHash;
+    delete obj.passwordHashVersion;
     return obj;
 };
 
@@ -24,29 +28,23 @@ const sanitizeShare = (doc) => {
 // in the GLOBAL DB maps token -> company so unauthenticated public requests
 // can resolve their tenant first.
 
-/**
- * A doc may only be published by someone who can already open it.
- *
- * Without this, any entityId would do: a member could mint a public link to a
- * colleague's private doc — a link that needs no login — purely by knowing its
- * id. Returns { ok, reason }.
- */
-const canShareEntity = async ({ companyId, entityType, entityId, userId }) => {
-    if (entityType !== 'page') return { ok: true, reason: '' };
-    const page = await MongoDbCrudOpration(companyId, {
-        type: SCHEMA_TYPE.PAGES,
-        data: [{ _id: new mongoose.Types.ObjectId(entityId), deletedStatusKey: 0 }],
-    }, 'findOne');
-    // Same wording either way, so a probe cannot tell "not yours" from "not there".
-    if (!page) return { ok: false, reason: 'Doc not found.' };
-    if (String(page.visibility || '') === 'private') {
-        return String(page.createdBy || '') === userId
-            // A public link on a private doc would contradict the doc's own setting the
-            // moment it was copied, and the renderer refuses to serve it anyway.
-            ? { ok: false, reason: 'This doc is private. Set it to Shared before creating a public link.' }
-            : { ok: false, reason: 'Doc not found.' };
-    }
-    return { ok: true, reason: '' };
+// "Not found" whether the entity is missing or merely hidden, so a probe cannot tell them apart.
+const refuse = (res, decision, notFoundText = 'Not found.') => (decision.statusCode === 403
+    ? res.status(403).send({ status: false, statusText: 'You do not have permission to manage public links here.' })
+    : res.status(404).send({ status: false, statusText: notFoundText }));
+
+const GUEST_REVIEW = 'A submission is accepted or rejected by a member of the workspace, not by a guest.';
+
+/* A form's public page never asks for a share password, so one set on a form link would promise
+ * protection that does not exist; forms stay public (owner, 2026-09-27). */
+const FORM_PASSWORD_REFUSED = 'A public form link cannot have a password.';
+const setsPasswordOnForm = (entityType, password) => entityType === 'form' && Boolean(password && String(password).length);
+
+const managedShare = async (companyId, uid, filter) => {
+    const share = await MongoDbCrudOpration(companyId, { type: SCHEMA_TYPE.PUBLIC_SHARES, data: [filter] }, 'findOne');
+    if (!share) return { share: null, decision: { ok: false, statusCode: 404 } };
+    const decision = await canManageShare({ companyId, uid, entityType: share.entityType, entityId: share.entityId });
+    return { share, decision };
 };
 
 /* POST /api/v2/public-shares  body: { entityType:'sprint'|'report'|'page', entityId, allowIntake? } */
@@ -58,13 +56,24 @@ exports.createShare = async (req, res) => {
         if (!check.valid) {
             return res.send({ status: false, statusText: check.reason });
         }
+        if (setsPasswordOnForm(entityType, password)) {
+            return res.send({ status: false, statusText: FORM_PASSWORD_REFUSED });
+        }
 
         // Taken from the JWT, never the body: a caller-supplied id would let anyone
         // record the link as someone else's work.
         const userId = String(req.uid || '');
-        const allowed = await canShareEntity({ companyId, entityType, entityId, userId });
+        const allowed = await canManageShare({ companyId, uid: userId, entityType, entityId });
         if (!allowed.ok) {
-            return res.send({ status: false, statusText: allowed.reason });
+            return refuse(res, allowed, entityType === 'page' ? 'Doc not found.' : 'Not found.');
+        }
+        if (allowed.privateDoc) {
+            return res.send({
+                status: false,
+                statusText: entityType === 'sprint'
+                    ? 'This sprint is private. Set it to Shared before creating a public link.'
+                    : 'This doc is private. Set it to Shared before creating a public link.',
+            });
         }
 
         const existing = await MongoDbCrudOpration(companyId, {
@@ -88,7 +97,7 @@ exports.createShare = async (req, res) => {
         };
         const exp = parseExpiry(expiresAt);
         if (exp) shareData.expiresAt = exp;
-        if (password && String(password).length) shareData.passwordHash = await bcrypt.hash(String(password), 10);
+        if (password && String(password).length) Object.assign(shareData, await hashPassword(String(password)));
 
         const share = await MongoDbCrudOpration(companyId, {
             type: SCHEMA_TYPE.PUBLIC_SHARES,
@@ -115,21 +124,13 @@ exports.getShare = async (req, res) => {
         if (!companyId || !isObjectIdString(entityId)) {
             return res.send({ status: false, statusText: 'companyId and a valid entityId are required.' });
         }
-        const share = await MongoDbCrudOpration(companyId, {
-            type: SCHEMA_TYPE.PUBLIC_SHARES,
-            data: [{ entityId: new mongoose.Types.ObjectId(entityId) }],
-        }, 'findOne');
-        // The token IS the access. Handing one out for a doc the caller cannot open would
-        // undo the check that stopped them creating it.
-        if (share && share.entityType === 'page') {
-            const allowed = await canShareEntity({
-                companyId, entityType: 'page', entityId, userId: String(req.uid || ''),
-            });
-            // 'Set it to Shared' means the doc is theirs and merely private — they may
-            // still see the link they made. Anything else is a refusal.
-            if (!allowed.ok && allowed.reason === 'Doc not found.') {
-                return res.send({ status: true, statusText: 'Share fetched.', data: null });
-            }
+        // The token IS the access, so it is only handed to someone who could have made it.
+        const { share, decision } = await managedShare(companyId, String(req.uid || ''), { entityId: new mongoose.Types.ObjectId(entityId) });
+        if (!share) {
+            return res.send({ status: true, statusText: 'Share fetched.', data: null });
+        }
+        if (!decision.ok) {
+            return refuse(res, decision);
         }
         return res.send({ status: true, statusText: 'Share fetched.', data: sanitizeShare(share) });
     } catch (error) {
@@ -151,13 +152,24 @@ exports.updateShare = async (req, res) => {
         if (enabled !== undefined) update.enabled = enabled === true;
         if (allowIntake !== undefined) update.allowIntake = allowIntake === true;
         if (expiresAt !== undefined) update.expiresAt = parseExpiry(expiresAt); // null clears expiry
-        if (password !== undefined) update.passwordHash = (password && String(password).length) ? await bcrypt.hash(String(password), 10) : null; // empty clears the password
+        if (password !== undefined) {
+            Object.assign(update, (password && String(password).length)
+                ? await hashPassword(String(password))
+                : { passwordHash: null, passwordHashVersion: null });
+        }
         if (!Object.keys(update).length) {
             return res.send({ status: false, statusText: 'Nothing to update.' });
         }
+        const { share, decision } = await managedShare(companyId, String(req.uid || ''), { _id: new mongoose.Types.ObjectId(id) });
+        if (!decision.ok) {
+            return refuse(res, decision, 'Share not found.');
+        }
+        if (setsPasswordOnForm(share.entityType, password)) {
+            return res.send({ status: false, statusText: FORM_PASSWORD_REFUSED });
+        }
         const updated = await MongoDbCrudOpration(companyId, {
             type: SCHEMA_TYPE.PUBLIC_SHARES,
-            data: [{ _id: new mongoose.Types.ObjectId(id) }, { $set: update }, { returnDocument: 'after' }],
+            data: [{ _id: share._id }, { $set: update }, { returnDocument: 'after' }],
         }, 'findOneAndUpdate');
         if (!updated) {
             return res.send({ status: false, statusText: 'Share not found.' });
@@ -177,9 +189,13 @@ exports.deleteShare = async (req, res) => {
         if (!companyId || !isObjectIdString(id)) {
             return res.send({ status: false, statusText: 'companyId and a valid share id are required.' });
         }
+        const { share, decision } = await managedShare(companyId, String(req.uid || ''), { _id: new mongoose.Types.ObjectId(id) });
+        if (!decision.ok) {
+            return refuse(res, decision, 'Share not found.');
+        }
         const removed = await MongoDbCrudOpration(companyId, {
             type: SCHEMA_TYPE.PUBLIC_SHARES,
-            data: [{ _id: new mongoose.Types.ObjectId(id) }],
+            data: [{ _id: share._id }],
         }, 'findOneAndDelete');
         if (removed && removed.token) {
             await MongoDbCrudOpration(SCHEMA_TYPE.GOLBAL, {
@@ -202,6 +218,10 @@ exports.listIntake = async (req, res) => {
         if (!companyId || !isObjectIdString(shareId)) {
             return res.send({ status: false, statusText: 'companyId and a valid shareId are required.' });
         }
+        const { decision } = await managedShare(companyId, String(req.uid || ''), { _id: new mongoose.Types.ObjectId(shareId) });
+        if (!decision.ok) {
+            return refuse(res, decision, 'Share not found.');
+        }
         const items = await MongoDbCrudOpration(companyId, {
             type: SCHEMA_TYPE.INTAKE_ITEMS,
             data: [{ publicShareId: new mongoose.Types.ObjectId(shareId), status: 'pending' }, null, { sort: { createdAt: -1 }, limit: 100 }],
@@ -222,6 +242,19 @@ exports.reviewIntake = async (req, res) => {
         const { intakeId, action } = req.body || {};
         if (!companyId || !isObjectIdString(intakeId) || !['accept', 'reject'].includes(action)) {
             return res.send({ status: false, statusText: 'companyId, intakeId and a valid action are required.' });
+        }
+        const item = await MongoDbCrudOpration(companyId, {
+            type: SCHEMA_TYPE.INTAKE_ITEMS,
+            data: [{ _id: new mongoose.Types.ObjectId(intakeId) }],
+        }, 'findOne');
+        const { decision } = item
+            ? await managedShare(companyId, String(req.uid || ''), { _id: item.publicShareId })
+            : { decision: { ok: false, statusCode: 404 } };
+        if (!decision.ok) {
+            return refuse(res, decision, 'Intake item not found or already reviewed.');
+        }
+        if ((await getRoleType(companyId, String(req.uid || ''))) === ROLE_GUEST) {
+            return res.status(403).send({ status: false, statusText: GUEST_REVIEW });
         }
         const updated = await MongoDbCrudOpration(companyId, {
             type: SCHEMA_TYPE.INTAKE_ITEMS,

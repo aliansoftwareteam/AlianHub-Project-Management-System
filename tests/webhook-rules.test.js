@@ -198,8 +198,8 @@ describe('🪝 WEBHOOKS - Rules', () => {
             expect(shouldDeliverTask({}, false)).toBe(false);
         });
 
-        test('a transient read error falls back to best-effort delivery', () => {
-            expect(shouldDeliverTask(null, true)).toBe(true);
+        test('a read that failed delivers nothing', () => {
+            expect(shouldDeliverTask(null, true)).toBe(false);
         });
     });
 

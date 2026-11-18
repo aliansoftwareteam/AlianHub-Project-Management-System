@@ -11,6 +11,9 @@
     border-radius: 6px;
     margin-bottom: 5px;
     align-items: center;
+}
+/* A menu row that carries justify-content-start keeps it; :where() adds no weight. */
+.mainDiv:where(:not(.justify-content-start)){
     justify-content: space-between;
 }
 .mainDiv:hover{
@@ -47,7 +50,7 @@
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
-    font-family: 'Roboto';
+    font-family: var(--font-ui);
     font-style: normal;
     font-weight: 400;
     font-size: 12px;

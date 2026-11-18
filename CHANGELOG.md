@@ -16,6 +16,733 @@ from [Conventional Commits](https://www.conventionalcommits.org/) on `main`.
 
 ---
 
+## [14.46.3](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/compare/v14.46.2...v14.46.3) (2026-11-17)
+
+
+### 📘 Documentation
+
+* beta log to build 3 since v14.46.2 ([7d3beff](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/7d3beff9061dfac0d84c2ac09d3a20f1f50df7cb))
+* beta log to build 3 since v14.46.2 ([f6c5b4e](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/f6c5b4e66a3ed028c0433888c19457972fa3cdea))
+
+## [14.46.2](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/compare/v14.46.1...v14.46.2) (2026-11-17)
+
+
+### 🐛 Bug Fixes
+
+* **auth:** leave the sign-in page before reloading after a sign-in link ([92f62dd](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/92f62dd4654a7c8480547f5d82622eb0a5997bf8))
+* **auth:** leave the sign-in page before reloading after a sign-in link ([32f1887](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/32f18877befbeea708574c95049de70006843ae0))
+* **auth:** leave the sign-in page first only after a sign-in link ([256471d](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/256471d1e4c3af98d2ea37f6c12aece3a30b2314))
+* **auth:** leave the sign-in page first only after a sign-in link ([2747b31](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/2747b316e9db2ae416e153452e5da248aee8ea0c))
+* **auth:** reload off the sign-in page even when the router refuses ([0c4e47c](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/0c4e47c115bb6cde0233e6ce23a929a2cbab2d12))
+
+## [14.46.1](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/compare/v14.46.0...v14.46.1) (2026-11-17)
+
+
+### 🐛 Bug Fixes
+
+* **auth:** clickable workspace choice after a sign-in link; a way in for hosted owners ([9e0f3b5](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/9e0f3b562a4dc1d9f8b115860072fc1202daf929))
+* **auth:** clickable workspace choice after a sign-in link; a way in for hosted owners ([e688855](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/e68885520ef1c859fab4397dc674eaf536a02570))
+
+## [14.46.0](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/compare/v14.45.1...v14.46.0) (2026-11-17)
+
+
+### 🚀 Features
+
+* **workspaces:** create a workspace from inside the app ([62fcb90](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/62fcb90252a555e0b63877169fd529b274b2620c))
+* **workspaces:** create a workspace from inside the app ([6d98674](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/6d98674ea4db29382a721d9f97fa57ae02b4651b))
+
+
+### 📘 Documentation
+
+* **ci:** name the AlianHub VPS as the tracker downloads server ([24a9362](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/24a9362f6ea0a3d195565850827b775601bf158e))
+
+## [14.45.1](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/compare/v14.45.0...v14.45.1) (2026-11-16)
+
+
+### 🐛 Bug Fixes
+
+* **deps:** install @modelcontextprotocol/sdk in the production image ([8f4ac5f](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/8f4ac5f98fa47bb34fff1a61ff579e5e8a60eb77))
+* **deps:** install @modelcontextprotocol/sdk in the production image ([19820e2](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/19820e2fcae86dd0c896929626fc09f998a78e61))
+
+## [14.45.0](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/compare/v14.44.1...v14.45.0) (2026-11-14)
+
+
+### 🚀 Features
+
+* **demo:** real time logs, richer dashboards, and an executive overview ([59c8c5c](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/59c8c5cc12cbd50ec7fcc0f54316bdde9e11eebb))
+
+
+### 🐛 Bug Fixes
+
+* **storage:** keep the uploader's id first in a Wasabi profile image name ([c91c4d6](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/c91c4d6c3d6384d5bbf8596642e2395bff986d81))
+
+## [14.44.1](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/compare/v14.44.0...v14.44.1) (2026-11-14)
+
+
+### 🐛 Bug Fixes
+
+* **ci:** trigger Docker build after release-please auto-publishes a release ([bd10143](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/bd10143076422fa924435ad90d6edb5b0cc65bc0))
+* **ci:** trigger Docker build after release-please auto-publishes a release ([6a06ad9](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/6a06ad9e94064216970befa4b486fab650732aec))
+* **ci:** unset empty CSC_LINK/CSC_KEY_PASSWORD before packaging the tracker ([6aec001](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/6aec00155b0aa5a937822f664d7da39f6de7b9d5))
+* **deps:** bump mongoose to 8.24.9 for CVE-2026-125120 ([6d4daf9](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/6d4daf9a0f5f5e64f70154c1c5c7bdbb6933d0b4))
+* **deps:** bump mongoose to 8.24.9 for CVE-2026-125120 ([97608c4](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/97608c4f2de1bd260fcaec094469ae2ec28148bc))
+
+
+### 📘 Documentation
+
+* **tasks:** record the tracker CI fix and beta.2 release for task 091 ([93e080d](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/93e080d1daf852340c571115b3f54d6e84e2120a))
+* **tasks:** record the tracker CI fix and beta.2 release for task 091 ([4320456](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/4320456b599c6bf0c31f44eeb0e61cc02c442b80))
+
+## [14.44.0](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/compare/v14.43.0...v14.44.0) (2026-11-14)
+
+
+### 🚀 Features
+
+* **agents:** agents use only the connectors ticked on them ([7ba310a](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/7ba310a0aafc3bd6e44d77b6f07561843e6c7397))
+* **ai:** connectors in the AI chat ([3395c59](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/3395c5932f6a2891207c5856383b9be69ac8c9ca))
+* **ai:** guide people through handing tasks to their own Claude Code ([e0721bc](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/e0721bc8541f0203d97689f9fb67077e217b1882))
+* **ai:** guide people through handing tasks to their own Claude Code ([4e897f3](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/4e897f339d298db899c0458fea0f42771776bdd5))
+* **ai:** redesign the Team packs page ([db00946](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/db0094644d025d659bc3b328d2478ec7f21733f0))
+* **ai:** redesign the Team packs page ([184d2fb](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/184d2fb38d615ef66e45b1db76a3988f3e5da9af))
+* **chat:** alert people to new messages and show an unread count on Chat ([c2c6f05](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/c2c6f056edf46e3be96f2e47df282529f74e6708))
+* **chat:** alert people to new messages and show an unread count on Chat ([a8530b4](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/a8530b4bb2154a14ee3db9d857dee98aba1cc7e7))
+* **connectors:** build the Outlook connector on Microsoft Graph ([bac8791](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/bac87914b83e49eaceae6b9654fd6bac2a14224e))
+* **connectors:** connectors v2 with app MCP servers, Ask, agent ticks and one Connectors screen ([914bab1](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/914bab1002047d12a5f93d4311da21b451f4963d))
+* **connectors:** custom MCP servers added by address, every tool reviewed ([9ed5d93](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/9ed5d937515f83bd4f15fc9132b67adbab98e3eb))
+* **connectors:** hosted instances sign in through one shared address ([2265374](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/2265374be61ecec296935e6b1aae06e093a028cd))
+* **connectors:** one Connectors screen under AI › Customize ([d05b5b8](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/d05b5b8a048432aa711481c38d3165771a8bad91))
+* **connectors:** owners and admins look again at a tool an app changed ([48fd937](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/48fd937cf494f13833a8527314639a44498e6502))
+* **connectors:** per-user connectors with app MCP servers, Ask, agent ticks and one Connectors screen ([f5cbb05](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/f5cbb052c139329be13bff6c3b305be0f41aafcb))
+* **connectors:** reach apps through their own MCP servers ([02cd81e](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/02cd81e8f35cd2c33d046bfe604dc262abe020ca))
+* **connectors:** reach Notion, GitHub and six more apps through their MCP servers ([6d4e2ea](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/6d4e2eace0e7425b9c241326b11021a0d53c779a))
+* **connectors:** show each app's official logo on the Connectors screen ([20cb41c](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/20cb41c68d01a6729303cdb41b9e99e51158346f))
+* **connectors:** sign in to apps that register themselves, or with a personal token ([643a77c](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/643a77c5d77e0c2f30aa873bed8b4a2d3ac84dcf))
+* **integrations:** move the GitHub sync into Integrations, apart from Connectors (task 106) ([3b3d422](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/3b3d42251da883492e470c098c0c6a02e8b69983))
+* **reports:** pick a whole team in the People filter ([bbc7a78](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/bbc7a78ebb830848fc81e7a9c1d76d2f8920a041))
+* **reports:** pick a whole team in the People filter ([8171b06](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/8171b0680d5ef715f9efa4c5e454a2d4e7025e76))
+* **tracker:** desktop tracker access by role, with seats only on plans that limit them ([c954e81](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/c954e811fec23b000f6cde369da425ac6be923ff))
+* **tracker:** desktop tracker access by role, with seats only on plans that limit them ([8f069c7](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/8f069c723b8fcb0f73055cf278300c76a9b5fd0d))
+* **tracker:** redesign Settings &gt; Time tracking as plain cards ([92d7749](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/92d77496755384b494bf35cdd1f4e6cf6e0b0e27))
+* **tracker:** redesign Settings &gt; Time tracking as plain cards ([bfd354a](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/bfd354a7ae0336061a2dfd14ab059439e3b05ac1))
+* **workload:** cells show the hours, tasks move from the side panel ([e449805](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/e44980522ba73f94aa3653282506c02ce3ba001d))
+* **workload:** cells show the hours, tasks move from the side panel ([9c181b1](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/9c181b18b7fbf0e5e4a8704f650da7c5ffe662f4))
+
+
+### 🐛 Bug Fixes
+
+* **ai:** scope the project search width so it does not depend on stylesheet order ([f40edd3](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/f40edd34bf4c603b540314da141087500526e19d))
+* **connectors:** ask for connectors only where the server switched one on ([256882d](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/256882db2b81d4abec72582eb82c74270be97bc0))
+* **connectors:** point people to Connectors, not the old My connections page ([9136432](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/913643242dda8b8c888cb11b76b7f9dd31f070c8))
+* **connectors:** register only the MCP tools that were reviewed ([e01086f](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/e01086f77a45f1b07585669c9fea2d89d959294a))
+* **integrations:** open the section the address names on an open page (task 106) ([7c47809](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/7c478093050193bd608e7441a87cc087b1602f92))
+* **sso:** keep the return path and finish every SSO landing ([3874747](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/3874747d9da0e60cec2bf270be884e816673b253))
+* **sso:** land OIDC and SAML sign-ins in the workspace ([64b315e](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/64b315ec2d14c5d73c365841eaa85f2e36b8582b))
+* **sso:** land SSO sign-ins in the workspace and keep the return path ([156ae4c](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/156ae4c1f54de49bd89f20d124a49b65356d9142))
+* **sso:** stop a remembered account booting under the SSO landing ([09c4c0e](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/09c4c0efd8cf66c25021778f4a0158369daa6c78))
+* **sso:** stop a remembered account booting under the SSO landing ([d51dac8](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/d51dac8d7fc29af1c78fc98a1b981a8534e09371))
+* **ui:** size the Team packs project search with two classes ([18cc91d](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/18cc91dd32b8a259beccf72cc0243698d10949fb))
+* **workload:** draw the panel's drag grip in --ink-2 ([d609a3a](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/d609a3a5cd9a3cecfbbd7b5fde48d1d359ce2dab))
+
+
+### ♻️ Refactors
+
+* **connectors:** remove the old google calendar and cloud storage paths ([d850ef7](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/d850ef760a2735294d52a46e0849755e25399bdc))
+* **connectors:** remove the old slack bot paths ([22a20df](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/22a20df16181935efaaf6bb77ffc815a8c7d1e8c))
+
+
+### 📘 Documentation
+
+* add SEO, AEO and GEO metadata, robots.txt and llms.txt to the docs site (task 105) ([61e1afe](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/61e1afe880c2d782eccb6d710fb88a8dc8651a20))
+* add SEO, AEO and GEO metadata, robots.txt and llms.txt to the docs site (task 105) ([abcad05](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/abcad059e3ea9615b69eee6648e18bc7643c52bf))
+* beta log to build 17, api doc, task progress for 092, 093, 102-105 ([89f9e5e](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/89f9e5ec77e6ea1064a461731dcfd91bfa11e37a))
+* beta log to build 17, api doc, task progress for 092, 093, 102-105 ([90b56f8](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/90b56f8df8eeef6fcdc850ce7fcd36543ba7b771))
+* **connectors:** document connectors and the integrations split on the docs site ([4a2dd57](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/4a2dd57693499b804a0014de7489d7e3eae3ca32))
+* **connectors:** document connectors and the integrations split on the docs site ([ea72766](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/ea727660a1c27e5f6b8859e21ee8e8e4955b06aa))
+* **tasks:** 097, 098 and 099 are active ([eef5783](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/eef5783ed69edc4edb64bbbabf1a0d913249ac41))
+* **tasks:** connector plan v2 on the built module ([45c64e0](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/45c64e0b13476735b04d3747400148a41d0a2f23))
+* **tasks:** connector v2 tasks built on the transport branch ([e633948](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/e633948f2943a8cfb895d0501934c0c87db0a802))
+* **tasks:** official connector logos replace the initials (101) ([1097db6](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/1097db61fb32010693bbedaa9d1883140188e001))
+* **tasks:** tell connectors and integrations apart (056 v2.1, task 106) ([b943517](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/b94351797355241a9cc1988c268f03b7810ab1ed))
+
+## [14.43.0](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/compare/v14.42.0...v14.43.0) (2026-11-06)
+
+
+### 🚀 Features
+
+* **analytics:** optional Google Analytics from GA_MEASUREMENT_ID ([d66ca33](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/d66ca3349c934aeb5b91ac1e286996a2575b9835))
+* **analytics:** optional Google Analytics from GA_MEASUREMENT_ID ([95b98db](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/95b98db66df006005ee56af3cf210de31815c078))
+* **auth:** workspace hint cookie and tracker sign-in round trip ([addd39f](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/addd39fc8c5156ee727b3ad5073c5ede044cff11))
+* **tracker:** sign in without typing the workspace ([d78e7d5](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/d78e7d52695babedc4d8892fb932532012b89bcc))
+* **tracker:** sign in without typing the workspace ([25c385c](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/25c385c259fa4476b4986ef73f2a661d19afb477))
+
+
+### 🐛 Bug Fixes
+
+* **analytics:** send the route pattern, never workspace or project ids ([5b44e6d](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/5b44e6d0cebdaf2ab5f38ea6a7d9f0269fc949f1))
+* **ask:** ask for the skill list only with the right to see it ([1f40087](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/1f400879172ef2e9863d638397eee44f3caec68a))
+* **auth:** the control plane sets WORKSPACE_HINT_DOMAIN when it creates an instance ([c402d85](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/c402d85df6b44f73cd7cb195b49b419fa9ebb428))
+* keep ids out of Google Analytics and keep a workspace's path for the tracker ([3033259](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/30332599de97c866295a81d209d9045481a60aec))
+* link the remaining help.alianhub.com references to docs.alianhub.com ([87ae741](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/87ae74142a8d9c2023669befc7f6c748d4ec4a15))
+* link the remaining help.alianhub.com references to docs.alianhub.com ([0459018](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/04590186b34bb879057b2d65d03b4ea586e130ef))
+* point documentation links at docs.alianhub.com ([b9c6134](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/b9c61343a71fac1969cd4e635187d644bb95a511))
+* **settings:** default new users to System theme and Full menu ([cecfcfc](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/cecfcfceeafa4accb5abe245cb44ad28798086f9))
+* **settings:** default new users to System theme and Full menu ([d9e70d4](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/d9e70d46c7313ee487460765ac2977595b3c635f))
+* **tracker:** name a workspace served under a path with that path ([26716b3](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/26716b3ea5c088ec4d18ab583c61f18f93582143))
+* **tracker:** show the sign-in screen when a workspace refuses the code ([5a474f7](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/5a474f74a774b64301703aef4444898cc9ef324d))
+* **tracker:** start the main process and deliver every connect link ([cd705ba](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/cd705baf548c3c7ef00e1e1ca00d0d2871891395))
+
+
+### 📘 Documentation
+
+* beta log from v14.42.0, to build 7 ([94f7843](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/94f7843ea469b014f3544c821becdb7e54206d4e))
+* beta log to build 21, api doc, task 091 progress ([73b45a5](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/73b45a55bd06dd216ab7a13fb32933b33e887cc1))
+* beta log to build 7 (since v14.42.0), api doc, task 091 progress ([3ebd63d](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/3ebd63d2e56f15897a4860eb0c9c1434017e9140))
+* beta log to build 9, task 091 progress ([e78b41e](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/e78b41e717b35a7c19ae66b2b08c27b4bbfec8b2))
+* beta log to build 9, task 091 progress ([d79b6f2](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/d79b6f244014acb2c3b6979ac21d0c97643364f0))
+* **tasks:** 090 finder hosted locally, end-to-end through it ([2de03bf](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/2de03bfa0b019879ab3aa79510068a06c3064dd6))
+* **tasks:** 090 tracker sign-in finds the workspace ([c2af5ea](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/c2af5eaa530ea7d3935753ce66d8b62ffc205e67))
+* **tasks:** renumber the tracker finder task to 091 ([823748a](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/823748ac279aa3b2a160af4ccf446dc86939813a))
+
+## [14.42.0](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/compare/v14.41.0...v14.42.0) (2026-11-03)
+
+
+### 🚀 Features
+
+* **ai:** agents and skills by role, with owner/admin approval ([49dff9e](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/49dff9ef965785451a9a488e5738a6fed013ce9b))
+* **ai:** ai access by role, with owner/admin approval for agents and skills ([4a3041f](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/4a3041f379d5c2913f7f8ea2727684253a906e3a))
+* **ai:** per-role ai rights in security & permissions ([289de4c](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/289de4cb73d07ac5bc0259d442833ae49dcda47b))
+* **ai:** split the agent settings page into tabs ([8db7b59](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/8db7b59140121e4e52dc48c085ef807923c9d843))
+* **ai:** split the agent settings page into tabs ([03358b1](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/03358b154acdb52131e9827c17de79de69f2051b))
+* **ai:** web screens for ai rights, agent approval and sharing ([10e11cd](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/10e11cd51a1b094de6ff253ba15e034bf5664d75))
+* **ask:** project briefings and a grouped @ picker for projects, lists, tasks, docs and people ([1050d8a](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/1050d8a0c795b229e334731304bf9fe062bd31cd))
+* **ask:** project briefings and a grouped @ picker for projects, lists, tasks, docs and people ([0415388](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/04153881524420b3ed5a1f083ba51c94df87791b))
+* **billing:** close the in-app billing on a hosted instance ([92f2a8c](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/92f2a8cd2871820567611c3360ce833e8b68fff6))
+* **deploy:** managed tenant stack template and one-command bring-up ([4bc24d7](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/4bc24d70aec9bb02059f80517d8d66c9e0af0260))
+* **deploy:** route a managed instance's custom domain (cloud task 085) ([ca7f834](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/ca7f834120acd3031fc66e02de791b9340787af8))
+* **deploy:** route a managed instance's custom domain (cloud task 085) ([ef997d6](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/ef997d61573e532eec5844fe0e4a23ee91293f1f))
+* **docker:** name containers, volumes and network after the compose project ([4aae260](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/4aae2603a92fd555cbdf3ee3fae8f723cdf88648))
+* **entitlements:** add the Plan & usage page, plan banner and suspended notice ([ae843d6](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/ae843d6fc11afd766f728754b2024e37821a9b4e))
+* **entitlements:** enforce the plan on the server ([0791d6d](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/0791d6de768c650dd818d2bc3a002de5c252c61c))
+* **instance:** add HOSTING_MODE and a platform settings source ([aa7abda](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/aa7abda286d1f01a5fc6f5838b859ee1a0a17883))
+* **instance:** classify every setting and env variable for hosting ([269c053](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/269c05396973728e92764a6b4972c4e4986fc337))
+* **instance:** close operator routes to a hosted owner and add restart ([4cef01e](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/4cef01e9502755104a8fcecf0e4be31b3e794fa8))
+* **instance:** settings an owner can fill in, grouped with setup steps ([c5a1f1e](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/c5a1f1e66f0c527e53869fe324bbcb871cf3265b))
+* **instance:** settings an owner can fill in, grouped with setup steps ([016ddc2](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/016ddc2f2c5d160368326dc19210095821d25592))
+* **instance:** show a hosted owner what AlianHub Cloud runs ([b3948a3](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/b3948a3856ff63dd69ad45b27a6067915604a4bd))
+* link previews with title, description and share image ([6a5e6a0](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/6a5e6a08683d1570d85ba047e584b1dc22e60493))
+* link previews with title, description and share image ([6558be7](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/6558be7743395ff5826f0069651a82d7264f5f7a))
+* **mail:** send through Amazon SES or Resend, not only SMTP ([9474652](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/9474652cdab16490313ee7fc2f6916f23f32b91f))
+* **mail:** send through Amazon SES or Resend, not only SMTP ([73a0c8c](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/73a0c8c5cb63721010f3e800ac3283a711b220ea))
+* **managed:** add backup and restore scripts for tenant stacks ([21bf3fe](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/21bf3fe7c5e2baaab7b52c8cc8a743695b7bcf1c))
+* **managed:** add backup and restore scripts for tenant stacks ([7c37203](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/7c3720323c799ec16d2932a73ea1490224002000))
+* **platform:** owner activation, portal sign-in and hosted banners ([52cea39](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/52cea39fd41cb1eba09fd3f95aa5b9b34cad828a))
+* **platform:** platform API on hosted instances ([9040949](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/904094925c2ae633a6c97b028b1c9876e4c29be7))
+* **setup:** close the setup wizard on a hosted instance ([3d6b531](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/3d6b5312a9a906b3a685d4e5fc4bde0df9aa4c56))
+* **shell:** link the source code of the running build ([05d1ccb](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/05d1ccbdd3cf32b0ac6d9c2d0d5b157f229dbaba))
+* **storage:** add storage:migrate --to-prefix ([69baf0e](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/69baf0e70297f9cf6110dcd1f9eca7dda75fef64))
+* **storage:** one layout, client factory and store for every S3 call ([8cae59c](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/8cae59c4a6fb53e3b9d6121bb707dedaa7e6d6de))
+* **storage:** provider-neutral S3 settings with Wasabi fallbacks ([1e1a4b1](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/1e1a4b1137a0ac0816abdfa6bcc965868a8d6362))
+* **storage:** reconcile usage nightly and empty a deleted workspace ([558e334](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/558e334a83f3c0fddb213aaa66d08f5823deb1e1))
+* **timesheet:** move the project, tracker, approvals and variance reports onto the shared layout ([a14bd35](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/a14bd350e004df2500ff010a8e93a908f3546023))
+* **timesheet:** narrow report filter options by the chosen people with any or all ([3cc9bdf](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/3cc9bdf1ae4a0cebbba6d8dccb610571a204a93d))
+* **timesheet:** one layout, deep filters and export on every Time report ([f81c08a](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/f81c08aaa57264adec4d9913c3f3275f637285cc))
+* **timesheet:** shared report toolbar, filter bar and export for Mine and Workload ([03319b1](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/03319b1703657d99ccc18266b7c064db534d2b81))
+* **tracker:** answer the desktop tracker's handshake and describe its card ([7b7cbb0](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/7b7cbb09bfb2cc7dfa44ea5f815c7f19118661f6))
+* **tracker:** connect the desktop tracker to any workspace ([cc42907](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/cc42907fbd142b43cab2c11cdf9b1ba25bf10020))
+* **tracker:** show the desktop app card in Settings &gt; Time tracking ([a522e51](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/a522e51e44d672d11709e0734e6dae4abe811a8b))
+
+
+### 🐛 Bug Fixes
+
+* **ai:** keep the ai row flags in the rules schema and give new guests a migrated guest's ai ([dabf3dc](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/dabf3dce5dc9cc818ae151426bc6ed69ede828b7))
+* **ai:** size the project search box with two classes ([f214ee4](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/f214ee43c9fb1cba2538b074abff0eb1d580a9bc))
+* **ask:** briefing fixes from the demo data check, picked name stays in the question ([ca2c819](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/ca2c819d65017077912d11ec145bc9dd2095f2ec))
+* **auth:** let the single-card auth shell fill the page width ([c3e1e56](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/c3e1e56d12bfe15a154a11d9a6c1bf81ca909a02))
+* **auth:** use a token for the setup chip hover border ([68499a7](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/68499a739a482703c371ae5bd14e0ffec5ea35ac))
+* **deps:** clear the critical CVEs the image scan reports ([179efa0](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/179efa0d92e107ec669b746b58eb58cdcd5369cc))
+* **deps:** clear the critical CVEs the image scan reports ([9f5d720](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/9f5d720414d529f5cbf74009be4a6dcfc19d8884))
+* **docs:** drop the control-character regex the backend lint rejects (task 088) ([ef667a4](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/ef667a4bc8f3761e616789bc0ede8e3eea9dac87))
+* **empty-state:** keep the padded empty state inside its card ([6ef5286](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/6ef528640de05b340452c61f2e545427b0395094))
+* **entitlements:** list the workspace limit guard in front of the company create upload ([92e0486](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/92e04868a3b7485582a7667ceac5a2d635acebcb))
+* **inbox:** give workspace notices the uniqueId the notifications schema requires ([6a7da91](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/6a7da91a4d66e120c46909aae6c62e5c68bfd316))
+* **instance:** give the restart audit row words and list its route ([155ca74](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/155ca74282517375f36a882975a89329b45073d0))
+* **managed:** back up a stopped stack by starting its mongo alone ([8389bc1](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/8389bc156f4670ac0e9e3995cad1b9d0943a4c22))
+* **platform:** keep the lastSeenAt write off the request path ([979ef1b](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/979ef1b50fe59a6b2190bede3bac9aff10a20fb5))
+* **platform:** keep the support account to its support session ([5b80b5b](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/5b80b5b280b88822ecd8979842928e3c3f22e1e2))
+* **platform:** key the lockout on the trusted request address ([da14cc1](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/da14cc1b5976c95d0f4b2d9f80ab89f98cc44132))
+* **project:** line project detail values up with their labels ([a4bd22b](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/a4bd22b4fca880c18bd2e5a60f07fafcf152f1e3))
+* serve the shell as middleware and unpin the ai-connection test clock ([3309d15](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/3309d1594383b4b473ff6c388e943939dd1bf0b1))
+* **shell:** centre rail labels that wrap onto two lines ([c8cf1f7](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/c8cf1f7f4e12f46c452db9c619dca61d3dd4a8d4))
+* **tags:** list view shows new tags and the tag picker reads in dark mode ([5f9b97d](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/5f9b97d22daf06f67f3adfe64b36618f026ee6e5))
+* **tags:** list view shows new tags and the tag picker reads in dark mode ([73aa686](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/73aa686f444463bef8261d7cc0d42a9de4348df3))
+* **task-detail:** apply the properties column row style again ([423f91e](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/423f91ec199d0b910835629eef0ac76d425ea171))
+* **team:** keep activity times on one line in 12-hour locales ([e77ca5d](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/e77ca5d8c1213c449e945cde10a27e710deec7cf))
+* **timesheet:** pick a custom report range on the app's calendar instead of native date boxes ([dc4a60f](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/dc4a60fcdf47d2d0b0af826daec34ddb1d60e41b))
+* **timesheet:** show each tracker screenshot's box and loading state from the first paint ([ba40d98](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/ba40d98d0ab910dcdc4ac5d819893159e0b153de))
+* **timesheet:** show each tracker screenshot's box and loading state from the first paint ([af9dd1a](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/af9dd1a729f534729ace27d3568dd90dcf5e2159))
+* **tracker:** return to sign-in when the session cannot be refreshed ([30a5d0e](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/30a5d0e298633cef5a4f2f9b6e55014ec0ec4d90))
+* **tracker:** return to sign-in when the session cannot be refreshed (ABFT-73) ([1f4e526](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/1f4e52611eb5cd4204aaa5188cfef0550e227f93))
+* **ui:** quick UI review — seven small layout and theme fixes (task 089) ([15d2558](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/15d2558a89ea182d08f4e4e0c6d5b3ed55af9adb))
+
+
+### ⚡ Performance
+
+* **timesheet:** index time logs by date and scope task filters to the range ([4041525](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/4041525d6173f40e5d64fc1bf7089d23320226ec))
+* **timesheet:** sum workload logged minutes per person and day in the database ([f9e78cb](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/f9e78cb4bbbe4e17a992027df2e32992824726ea))
+
+
+### 📘 Documentation
+
+* add the AlianHub documentation site (task 088) ([c70256a](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/c70256a6f23aad7e1334840a45fd117e04d59065))
+* add the AlianHub documentation site, published to docs.alianhub.com (task 088) ([05ac0a0](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/05ac0a03771dbd1b6c5c96c79199f27526a457b0))
+* **api:** regenerate the API reference after the cloud merges ([b28168b](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/b28168bfe93ec2690920332c0870ce9bf62a38e1))
+* beta log to build 9 and record the merge of task 058 ([3fae80f](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/3fae80f78904de5a4f81cd6e79e81216367ae7ba))
+* beta log to build 9 and record the merge of task 058 ([c57c837](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/c57c837ec7a139dd635240df32c1654bcb8a93c6))
+* **platform:** document the platform API of hosted instances ([3328368](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/33283688e4e8bb52e85baa4306b11e7c4cb325d5))
+* show a Try the live demo button in the docs header (task 088) ([67f2aa4](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/67f2aa4ca0fcd1b039c40cc6c9347120cf50fb71))
+* **tasks:** 082 progress, both PRs open ([94236c7](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/94236c738df2dadcfabc97b4f698b28d3022a8ff))
+* **tasks:** 083 blocked on the quarantined SES user ([959603a](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/959603a1e49844a676e11ef543634bc9276a6311))
+* **tasks:** 083 real SES sends worked ([fa6706b](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/fa6706b0dbd7aa11f842ce4cf93ab9a1f355b584))
+* **tasks:** 087 moved onto staging ([aafdb9f](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/aafdb9f9ea8bb5b12e8ad68a38ad5a2d41d0648e))
+* **tasks:** add 074 and plan m2 on route 53 and wasabi ([b94b25e](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/b94b25ef97507ab625e3882d70dc386942521d7d))
+* **tasks:** add 074 local docker host and record its build ([e22827d](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/e22827d46f34c3c944a5cac85be7abf52ee080a4))
+* **tasks:** add task 080, cloud plans choose their server ([4190738](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/41907388048ec7e3bf1de3e150e798f9155b6014))
+* **tasks:** add task 080, the cloud catalog editor, as done ([36b9df7](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/36b9df745965983df4606d98789322fb2e7675ad))
+* **tasks:** add task 080, the cloud catalog editor, as done ([9a2c446](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/9a2c4464e9e4b2f6d887b08b11e3a58b6207f069))
+* **tasks:** add task 081, cloud plans choose their server ([d10b094](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/d10b094a72c900673688fa2e54e94d00e873b2a6))
+* **tasks:** add task 082, Amazon SES mail everywhere ([5f1d62c](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/5f1d62ce362f39068ae4382b2b5f5427d88581b5))
+* **tasks:** add task 082, cloud orchestrator hardening ([d292e00](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/d292e0070a4713d34912a113a9bd8f60a5a819e0))
+* **tasks:** add task 082, cloud orchestrator hardening ([8d18fd8](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/8d18fd802345b4806029870ef686c3418354a635))
+* **tasks:** add task 089 quick UI review ([46044df](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/46044dfa7f1d04b1a53efc769a8cfc62d7a4cf94))
+* **tasks:** add the task 089 review report ([2beee90](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/2beee9080e66a36e2052b2a5775e29f501f96944))
+* **tasks:** keep dns on quic.cloud and record the wasabi names ([104ad67](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/104ad6770096159cd478593e33253533b52515d8))
+* **tasks:** log the local review of task 059 against the demo database ([db15068](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/db15068a33d10849e170a74000d96480ec673e94))
+* **tasks:** plan AlianHub Cloud (060-073) and start M1 ([e6ac229](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/e6ac2292e40c6448ae86210e3ce3ff4fa2155240))
+* **tasks:** plan m2 on route 53 and wasabi and record its overnight build ([bdfa3c1](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/bdfa3c124688cea47b4b55b19b58bb05e99884bd))
+* **tasks:** record 061 progress and decisions ([c6b8100](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/c6b81002419fd5f2a23775b083a320f4ab8e482d))
+* **tasks:** record 062 progress and decisions ([a435914](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/a435914da63a1fd9d6fad8c5abe74409cdd59c84))
+* **tasks:** record 063 progress and decisions ([33f309d](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/33f309df5cff7714e005c2701610828912f6dd19))
+* **tasks:** record 064 progress and decisions ([3d42609](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/3d42609e74e202b75e948eb2be60f2a2c7afcecb))
+* **tasks:** record 065 progress, decisions and what is left to run ([f4cc12d](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/f4cc12dfc6417e03ef5ea384853d2d134389dc3f))
+* **tasks:** record 066 progress and the tracker release checklist ([5c00b3b](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/5c00b3ba5e3c93d3c468d7c52b656ce446ec3013))
+* **tasks:** record 086 test results and follow-ups ([47e401d](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/47e401d9c003c26338bfb31661e297752d3da049))
+* **tasks:** record M1 and M3 progress; start 067 and 072 ([7a8c60a](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/7a8c60a1d04e6672c89fe62d14f38b8f71de5637))
+* **tasks:** record the 062 lastSeenAt fix ([f16d477](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/f16d477181377b80bd8132bf47bf9a2e618ce891))
+* **tasks:** record the alianhub-cloud repository on github ([56ff83e](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/56ff83edba6f9e262466751d99d0482962e6f66f))
+* **tasks:** record the staging merge and test results for task 060 ([5c0160d](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/5c0160db3c6cf1442ab4ae943b5ff2442eec7f44))
+* **tasks:** renumber cloud plan servers to task 081 ([a35912e](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/a35912eb2ff5bbec8aa5dd7cb04b794134ce8290))
+* **tasks:** split task 056 into sub tasks 061-077 ([e5e0fb0](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/e5e0fb0f78f55251ea085540ae582dc2e02e42f8))
+* **tasks:** split task 056 into sub tasks 061-077 ([76e4660](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/76e466096169e52c0a9f6b9405bdba9c3d9c626c))
+* **tasks:** split task 056 into two independent tracks, beta log to build 14 ([09b7538](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/09b7538e3fa30ffcc89785c7a4970dc6c159c32a))
+* **tasks:** split task 056 into two independent tracks, beta log to build 14 ([3f2d247](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/3f2d2472e289f1545698c974f2faf8f32637362d))
+
+## [14.41.0](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/compare/v14.40.2...v14.41.0) (2026-10-26)
+
+
+### 🚀 Features
+
+* **projects:** open, archived and closed tabs; restore returns the exact previous state ([d7ecdc5](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/d7ecdc5f2fa893cc6373a84706eada096a591e3f))
+* **projects:** open, archived and closed tabs; restore returns the exact previous state ([d49a6fa](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/d49a6fa33fa94427b84f8fb541d8ee891b374dad))
+* **projects:** search the project tree sidebar ([f244b04](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/f244b04c237fdccc48d6b93665df1c9769d96438))
+* **projects:** search the projects list by name or code ([fd97db3](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/fd97db3d7e410e0a375477b95d4efbde2f25fb33))
+* **projects:** search the projects list by name or code ([845cfd5](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/845cfd5f2d94b9d3a712282b6baa3540280bb6d3))
+* **scripts:** record the product demo and how-to videos ([7b69651](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/7b69651c9df7b23ab1c2b1bedcbf209cc06165e8))
+
+
+### 🐛 Bug Fixes
+
+* env update ([155e160](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/155e16055a37eb22b3e1df9a54aa88807432cbd5))
+* **projects:** the header buttons, task panel controls and menus share one style ([a55512e](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/a55512e7592e6770c2a6cc590728ee06094beb55))
+* **projects:** the header buttons, task panel controls and menus share one style ([354635c](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/354635cfa90625926ccab4f210dc07f7ccf639ff))
+
+
+### 📘 Documentation
+
+* **tasks:** add task 056, PRD for personal app connectors ([5af2467](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/5af246723094ac93047f4b0ed4111b97f6c5920c))
+* **tasks:** add task 056, PRD for personal app connectors ([fa1f4a5](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/fa1f4a514ad0b0054566406af31a57c0b767d232))
+* **tasks:** answer the open questions in the task 056 PRD ([10c7721](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/10c77219cd5d3a8dce590ab03c7a0f232431a3c6))
+
+## [14.40.2](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/compare/v14.40.1...v14.40.2) (2026-10-20)
+
+
+### 🐛 Bug Fixes
+
+* **projects:** the new-project pickers open above the modal ([a45023a](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/a45023a66399c8cc8e070aa5f681ad1070ce93f0))
+* **projects:** the new-project pickers open above the modal ([a2184f3](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/a2184f38c09b7415d83d4ad29a2a1e76d58c8395))
+
+## [14.40.1](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/compare/v14.40.0...v14.40.1) (2026-10-20)
+
+
+### 🐛 Bug Fixes
+
+* allow a separate SMTP login user (NODEMAILER_USER) ([d5b6240](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/d5b6240204c1355ae11ea55a8f48fae5ddfd633d))
+* **shell:** fit the app shell under the demo banner ([079e770](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/079e7706d21b68fd3ea6bfeadc2a46f708f64afc))
+
+## [14.40.0](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/compare/v14.39.0...v14.40.0) (2026-10-19)
+
+
+### 🚀 Features
+
+* **auth:** fill in the demo account and add a one-click "Try the demo" button ([7b6a5ba](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/7b6a5bad00fb16c1a07fbd8b3ed247471f289802))
+* **demo:** an industry demo for every company blueprint, named by industry ([55beb79](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/55beb7999e0e8881dc4fcb963d4089cb4f2ca9bd))
+* **demo:** dispatcher, Company view and workflow runs in the industry demos ([29bfc0d](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/29bfc0dab66403b9ca245b977c8604e0b14c9d3d))
+* **demo:** industry demo companies with role agents, automations, routing and workflows ([149fb19](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/149fb192d94df5d99d92d6f0209ca0d613bf342f))
+
+
+### 🐛 Bug Fixes
+
+* **automations:** book a delayed job on the inline queue instead of awaiting it ([0752af1](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/0752af11347664cae4fc21a0fbae27b4a2526b90))
+* **oauth:** accept clients that name grant types the server does not run ([d0e9eee](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/d0e9eee20561f7a17282f4f5dbe8fd104b27f59c))
+* **permissions:** gate project-wise permission UI by plan feature ([bbd92ba](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/bbd92baf155c17616570a9017c8302d58f40bddb))
+* **workflows:** name who a waiting run waits for instead of a user id ([c8e861c](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/c8e861c51a58ebbf17c5e5c650c7bfae9e524c2e))
+
+
+### 📘 Documentation
+
+* beta log to build 2 and close task 051 (demo login) ([5de9215](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/5de921512599084a1d6a7ff379583e9d5ee111e8))
+* beta log to build 7 and close tasks 052 to 054 (industry demos) ([f3cd8f1](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/f3cd8f1ac4ef8e78b4447c063e267f22fd08dcd2))
+* beta log to build 8 and record the Claude connector fix in task 018 ([b189b15](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/b189b15f722700243c0899042130fd6b20f84ea6))
+* **demo:** drop the note that inline-queue approvals hang ([bbbc80f](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/bbbc80f40f7b3124b953e72c9205dfe8ea010eeb))
+
+## [14.39.0](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/compare/v14.38.1...v14.39.0) (2026-10-14)
+
+
+### 🚀 Features
+
+* **inbox:** an approved change offers a link to the project it made or changed ([bec74b5](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/bec74b5dcc52af9ff4da44cc2556a16a88457f21))
+
+
+### 🐛 Bug Fixes
+
+* **auth:** keep the new invitee's session across the reload; keep the undo button's own rule ([733ff0d](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/733ff0d9b85f9e03de000671123b1be765c8e535))
+* **auth:** set up a new invitee's notifications on the session that carries the workspace ([94a828c](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/94a828ca5b5ce08412cb1582f35085d4dcf2687d))
+* **auth:** the log-in page says how to get an account on an invitation-only server ([f931e1c](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/f931e1c315c764f79e1c21d8b97a85f98d6aef50))
+* **auth:** the log-in page says how to get an account on an invitation-only server ([33f0618](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/33f06187bf412bf31ae383fc7603450f77e0ba50))
+* defects from the 046 leftover hand check on staging ([af2d746](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/af2d7466808d1eda59527ef1b9f39ca5d31556ee))
+* defects from the 046 leftover hand check on staging ([b278601](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/b2786019aa4f0934cb73e16ddd840d2d320511ad))
+* **frontend:** object and array props default to a value, not undefined ([e346161](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/e3461612019e9c400f5a984720de9dbd50d3d52e))
+* **frontend:** object and array props default to a value, not undefined ([0479256](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/04792561826e1cc3fbd5f6bac235b847f2075b7e))
+* **frontend:** read optional fields of object props that now default to {} ([dff0292](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/dff02929e456baead1b412063b183f09a9bdc5a4))
+* **home:** what next points at the person's own work before the sample project ([c5a8242](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/c5a82425590d93091186193b810587d9aec672a6))
+* keep the muted My Work placeholder readable under its opacity cue ([1fd8f34](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/1fd8f3482feff0f19ff7f5e64269ca3c79ef9b29))
+* **lists:** announce task-count changes and drop the empty starter list from an AI-planned project ([35d831f](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/35d831f44883cb24cc68758458a15180c054d306))
+* newcomer run 2 and hand-check findings ([fc13864](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/fc13864905f773962bf56219865bc18ec57aee50))
+* **onboarding:** sign a new invitee in and keep the tour card off the first rows ([14f4863](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/14f4863b53237a30d1a1db98139e9db3f55bd11a))
+* review of [#1681](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/issues/1681) — sign out on a failed join, scope the tile scrim, reset the Open link ([4c1e49a](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/4c1e49a742d0323f8148d12dd8b2e5ec9eaca4eb))
+* **ui:** readable project letter tiles and an explained empty archive view ([31f27cb](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/31f27cb02a08744799bd941b94871a534e69fcdf))
+
+
+### 📘 Documentation
+
+* **047:** newcomer run 2 from the install wizard on path A ([d2778a3](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/d2778a368b82c9382d1595ca4a164f2f0995d124))
+* **047:** newcomer run 2 on the connect path ([c16a2d9](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/c16a2d9a29a0195ddc35e46dfc1c19ed005be7db))
+* **047:** newcomer run 2 on the connect path ([b5dff5e](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/b5dff5ebd9427175386e2b6a57e8751d23bdad0c))
+* **agents:** the guide lists all eight company blueprints ([1346aea](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/1346aea04fa2691c3d0f5ec0f418e60be0e9aa81))
+* **agents:** the guide lists all eight company blueprints ([4b43c5d](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/4b43c5d5acab0bfe10f2af7eefb8bc3ef0d2ffb9))
+
+## [14.38.1](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/compare/v14.38.0...v14.38.1) (2026-10-14)
+
+
+### 📘 Documentation
+
+* **readme:** a product landing page layout ([13733b3](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/13733b3a379433eb8a28dfae77c54882290714e8))
+* **readme:** a product landing page layout ([7035ed9](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/7035ed9f43ab88705f6563087969b67790c92125))
+* **readme:** lead with AI and add an AI section ([97d0f78](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/97d0f78ccc2e5c228adb98efeb063d9b8632a326))
+* **readme:** one workspace for every team ([9701d94](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/9701d9477dac9bee87738f551029fc897ec78818))
+* **readme:** replace the old screenshots with the current app ([2cd4a26](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/2cd4a26c5c7105b8e7ec23865562882c6bf5a7ca))
+* **readme:** replace the old screenshots with the current app ([a8d233a](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/a8d233abbf10adae29401ebdd625fde4cda3d0a3))
+
+## [14.38.0](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/compare/v14.37.0...v14.38.0) (2026-10-14)
+
+
+### 🚀 Features
+
+* **ai:** a plan can add a project dashboard ([d8163b5](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/d8163b5710b8dc49928f66cb1de8cd007ca34fb0))
+
+
+### 📘 Documentation
+
+* **readme:** add light and dark screenshots, requirements, upgrade note and what's new ([#1657](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/issues/1657)) ([0895fc3](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/0895fc39ddcd158ffdd270c4fa3df47e998251d1))
+* **readme:** add navigation, a feature grid, an AI flow diagram and collapsible FAQ ([#1655](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/issues/1655)) ([b4dbdb7](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/b4dbdb7b0e6b3bba0059d54dc2ff66a46735f467))
+
+## [14.37.0](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/compare/v14.36.0...v14.37.0) (2026-10-13)
+
+
+### 🚀 Features
+
+* **agents:** a company blueprint picker ([b01c903](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/b01c903fb1b98427d81b8cbf17393b3a24a7c5ba))
+* **agents:** a role's who-it-is line reads the workspace's tuned playbook ([b02bc51](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/b02bc51204c1c3ecb49274d007ffd481ae12ef02))
+* **agents:** a Team filter in the catalogue shows each team's roles ([4a5b059](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/4a5b059474659021ab5094bac73a0cffcdb28de3))
+* **agents:** a team pack brings its starter rules and proposes its tags ([baa5a69](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/baa5a69e4f97df886a9e49885791bae901de37ab))
+* **agents:** a team pack creates one agent per role ([dbddffc](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/dbddffc54fa7c03cdbc0ffb054da4f6efb93a911))
+* **agents:** a workspace may tune a role playbook ([6c2e10a](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/6c2e10a0c0e0c8bf0feed0c78ea7d8967d7cf954))
+* **agents:** an agent can play a role, and the dispatcher keeps to its projects ([1e65e2b](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/1e65e2ba611fa542866b4b0bf5d81440b75dcd95))
+* **agents:** edit dispatcher roles, rules and needs routing on the project ([2bb9aed](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/2bb9aed608b312783b01aa59ba1822401be2d057))
+* **agents:** every role playbook names its team ([7352eca](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/7352eca3af601bfe84d87daec48342d66f7ad2ba))
+* **agents:** one route turns a team pack's roles on in projects, undoable ([4d7bd17](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/4d7bd173f3874b73ec45c869614c1b40751d5c62))
+* **agents:** relay dispatcher changes to the company's open pages ([0f96ea6](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/0f96ea638766ef115d5f270d6bc3ee11a9499719))
+* **agents:** role hand-overs as workflow steps and the ready-made team workflows ([98be301](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/98be30181704efdd4c9af1373486295327d5df97))
+* **agents:** role hand-overs as workflow steps and the ready-made team workflows ([dca4949](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/dca4949aba4d2f498f19e19d92734b6c49e586b1))
+* **agents:** role playbooks as prompts and skills for the connected ai ([bc5abcf](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/bc5abcfdb64ce99ebe394d66211eb3a3ae30e2c8))
+* **agents:** show the dispatcher's role on a task and its mode on the project ([1dc3745](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/1dc374540929dd06aa6ec77cd0238c5823b06e07))
+* **agents:** store dispatcher settings and routing decisions ([b95d35c](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/b95d35cc045d2a02eaa4c38a65c06c02d2e004cd))
+* **agents:** team packs page turns a pack on in chosen projects, with undo ([23569d3](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/23569d3736c7e93f7045173c7173da4cbd57c70d))
+* **agents:** team packs: a Team filter in the catalogue and one-click packs ([e28e2f1](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/e28e2f11fab8aa6892ba82daddb7600019651879))
+* **agents:** the company view, an org chart and a flow board ([457cb0b](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/457cb0bc3b8a06acd0eb89b9b90e3f953d5c5a34))
+* **agents:** the dispatcher may guess a role with a model ([798f0ae](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/798f0ae1253f1e4f044d7a91366c17eedcdeb76a))
+* **agents:** the dispatcher routes a task to a role in suggest or apply mode ([08f6904](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/08f6904523c31039bc6cd19151a42b96d54dc57d))
+* **agents:** the model guess reads each role's who-it-is line per workspace ([2954068](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/2954068ffb6b1f9c22b8f2883f4e88454a6abf82))
+* **agents:** the project manager triages new tasks with the server model ([842f72c](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/842f72c47cf5ac93a5c64fed8c2a6d16a8346b3a))
+* **agents:** the project manager triages new tasks with the server model ([be1e314](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/be1e3146a2f1c1bd984989589c319bd86dd6dc63))
+* **agents:** the thirty-fifth batch: the company view, tuning a role playbook, the dispatcher's model guess ([27620d5](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/27620d5ffe72bbab3c6e3ebbc031c3a6ab686e5d))
+* **agents:** the thirty-second batch: same-named fields asked, live view tabs, tag.create and search filters ([513b657](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/513b6577093156bad7a486eb42d46aa3a13cde1e))
+* **agents:** the thirty-seventh batch: pack starter rules and tags, one agent per role ([49e8ad9](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/49e8ad9a9f5d269db34befb2b704e1a6bf761830))
+* **agents:** the thirty-sixth batch: clinic playbooks and the company blueprint picker ([33a72e4](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/33a72e4bc648e4ee9a7e0f7e68eac6c5439ec372))
+* **agents:** the thirty-third batch: role playbooks, role prompts and skills, the dispatcher in suggest mode ([f8c51d2](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/f8c51d24e66106f9f7eb1f8087b6bd0f6a9fbc04))
+* **agents:** the twenty-ninth batch: replies in a thread, doc versions, a timesheet week, uploads ([6437177](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/643717774a69903fa3ca401ac9e6c1ec8683738f))
+* **ai:** a daily AI budget for the workspace ([7717341](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/7717341234135fcbbb19c705791f47fce8307974))
+* **ai:** show why a planned view was not made in plain words ([c550781](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/c550781834aa878f84f69358f33cdd697d78a550))
+* **ai:** the Ask box plans with the server model ([bf259ef](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/bf259ef091893b5b7a97dd3f404dfe32176b4562))
+* **ai:** the Ask box plans with the server model ([7b8642e](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/7b8642e9a1f8417d54b79533aeca6eb558d07e07))
+* **ai:** the generator's plan can add starter automations, switched off ([0acb48a](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/0acb48ad9ebbe850c7080d71c97bf7009e36f12e))
+* **ai:** the generator's plan can add starter automations, switched off ([04a9692](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/04a9692adc0dd1016e5fc69d9282765936f73652))
+* **ai:** the generator's plan names and sets up its views ([2ac1421](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/2ac1421d22ed7889d0fc492678de9d8fe24370a3))
+* **ai:** the generator's plan names and sets up its views ([991aee2](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/991aee20b25f64b8afa99859f4777a35ebe7a5e2))
+* **ai:** the generator's plan uses the shared plan card with part ticks ([6f3aaa9](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/6f3aaa9a60622ebf444d689084086de5739943a8))
+* **ai:** the project guide answers where no guide is stored yet ([ed4d9bb](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/ed4d9bb877e4bbf38d4e92967e5ab7cd8123c91d))
+* **ai:** the project guide answers where no guide is stored yet ([ed33bc2](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/ed33bc22e45c2da391477e935d973be34b95af69))
+* **app-connections:** own place in the main menu, read-only view and localised copy ([d90a3b8](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/d90a3b8f2e4c3f79ca668c623152860f8eb4a65b))
+* **app:** the app can be installed and its shell opens offline ([687b099](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/687b099d8493113d46e1150911e0b03c5b721f93))
+* **app:** the app can be installed and its shell opens offline ([43b02ba](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/43b02ba26cbad3f9ac4110ab3627352ced6390ff))
+* **i18n:** label the five new blueprints and their teams ([69006dd](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/69006dd9f36c51ccbbbd219fcfc3a76811671a6f))
+* **i18n:** words for a tag an agent asks to add ([be7eb95](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/be7eb95efc37b887bed4e3810dbd6a8ae9f4278a))
+* **integrations:** app connections, and GitHub pull requests linked to tasks ([1f10b75](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/1f10b756eb012298706e4ec71f0831d6209f9f3b))
+* **integrations:** app connections, and GitHub pull requests linked to tasks ([17c8c29](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/17c8c295beba7883f1b48275fe4c6fdde3690c63))
+* **integrations:** connect GitHub in one click through GitHub sign-in ([aba889d](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/aba889d013332e6d98d2d9d4ee364da051f74daa))
+* **integrations:** connect GitHub in one click through GitHub sign-in ([6eaf60a](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/6eaf60a4d6bbd507deb1443d5c26b2a3fab674dd))
+* **integrations:** each project picks its own GitHub repositories ([db959d9](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/db959d9205a4804f009fd47165d4292e239a3f33))
+* **integrations:** each project picks its own GitHub repositories ([2b50d23](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/2b50d23215675858a83333e207c8143231309de1))
+* **mcp:** a tool reads a task's GitHub pull request ([aa740f0](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/aa740f0bfb4e8da8389965cd292938b63c62bc08))
+* **mcp:** a tool reads a task's GitHub pull request ([f967d11](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/f967d110f0d7794f816219716e52bc29dc2a35b2))
+* **mcp:** connect your own AI works out of the box: the AI tools are on by default ([bfb7996](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/bfb79961080f3cade610cf1b97461615c1d439d6))
+* **mcp:** create a project tag on approval, and search by tag, priority and field ([d8d0e0a](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/d8d0e0ab1cb18e85bed218f13d07413f468b6559))
+* **mcp:** dates read as the person's days, and a tool lists saved views ([1d96b66](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/1d96b6665abd622ff23ee7c37f8ef32bb0395b1d))
+* **mcp:** read day arguments in the person's zone and keep view names unique ([c04ae5a](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/c04ae5ac10f55ea37daf5e8886b0212486e7345f))
+* **mcp:** the ai tools and mcp oauth are on by default ([fca0409](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/fca04097dd58522bbeb92bb9f196b81bba989035))
+* **mcp:** upgraded installs keep the ai tools off, and taint routing is shown read-only ([184c091](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/184c0915e4d9f121c5c69e54aa82ec008aeed876))
+* **packs:** a pack proposes its playbooks' fields and routes on its tag when a type is missing ([4c8830b](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/4c8830b11a203921c64414c64461abb7ddc4b31c))
+* **packs:** a pack proposes its playbooks' fields and routes on its tag when a type is missing ([25e1efb](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/25e1efbadcc873512687602db3ed685104836555))
+
+
+### 🐛 Bug Fixes
+
+* **agents:** a batch takes the step names an mcp client lists ([2216b9b](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/2216b9b122eb724823c85fe4afbba8b30a65954a))
+* **agents:** a broken role playbook is skipped and logged, not fatal ([0fa74a7](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/0fa74a7335f810e488c64ccdd7a26905eb386dce))
+* **agents:** a claimed role item shows its held mark with the manager off ([95b482a](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/95b482a90301567847109bb30d386404294b214f))
+* **agents:** a comment result without mention ids announces no mentions ([47fe98b](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/47fe98b001f76d4dd7a3010475da3aee2f1332ea))
+* **agents:** a failed or slow model guess sends the task to needs routing ([b38f6da](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/b38f6dacac1b1a2e4e9f777aaac5c7523ef38108))
+* **agents:** a model guess is only ever a suggestion, its reason shown as plain text ([0d7d38a](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/0d7d38ada3d18a61a4fe776e3e121d503d8badc3))
+* **agents:** a paused project says so, and the sidebar catches up after a hidden tab ([60bdc43](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/60bdc43834b3c8c5d400959cbed0c1ba0ab04b66))
+* **agents:** a proposeOnly change in a paused project is refused as a pause ([0795b13](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/0795b13c78c9e87d60b81034881851a57cbf94da))
+* **agents:** a role's routed tasks reach its queue, filtered by role ([1b0008b](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/1b0008b9e48004681468dfa55a58b4a10913f290))
+* **agents:** a supervisor with no name is named through i18n ([e13e3f6](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/e13e3f6337a0e849916c88595fb72451a4e2f0ea))
+* **agents:** a team pack widens only the agents it made ([fc1b182](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/fc1b182a46db727ac5858d8718f3aa8bb8f58ba7))
+* **agents:** a team pack writes all its projects or none, undo stays inside the pack ([3da2d1e](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/3da2d1e05819995031d7bb5909181525c617182a))
+* **agents:** a value for one of several same-named fields is asked, not guessed ([23f159f](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/23f159f478a64bfcee50559684dcb8cc154d38d0))
+* **agents:** a value only a text field takes does not pick it over a typed field of the same name ([ac9c74f](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/ac9c74fd79dcfc636c49b566e0ecb6b205f49700))
+* **agents:** a view approved elsewhere shows in the open project at once ([995a36c](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/995a36cdebd1285282e91fc09c2ecbc058a91b08))
+* **agents:** a view approved elsewhere shows in the open project at once ([9bab5bd](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/9bab5bde7d24f73af4d9ce1448a6656c56944edb))
+* **agents:** agency roles get unique slugs, names and hyphenated teams ([b711a71](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/b711a718563c5cd54d02e99b31bda2b309062872))
+* **agents:** an agent's date change moves the tasks waiting on it, as the gantt does ([e889081](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/e88908105eab969950c0b4dd667bffbb05152981))
+* **agents:** an agent's role is kept in its versions ([ee26368](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/ee26368961bf8e46ca69a1761449898359bb7886))
+* **agents:** an approved subtask is made, and an approval that made nothing says so ([879a1b8](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/879a1b8b689750da816ebf89801645bd27f46e96))
+* **agents:** an approved subtask is made, and an approval that made nothing says so ([9c6d6e3](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/9c6d6e32b490dde4e008118e6f0b7ce6eed9ab9e))
+* **agents:** an edited role playbook reaches every instance within a minute ([83eb8e2](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/83eb8e2a555cc01f323410bbf9d58ae68e3bc6bb))
+* **agents:** check a role claim and a re-route against the row as written ([8c0abac](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/8c0abac9fbc54abac8babc0b4d2b1053c2661def))
+* **agents:** construction roles get a team and a project planner slug of their own ([150a9fb](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/150a9fb19adb24085aa7cd8db0c91d5a0f418989))
+* **agents:** drop the clear of an agents cache key nothing reads ([dce2cbe](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/dce2cbe90628cf85e6fb2300242fa1337edd04db))
+* **agents:** each role keeps its own queue claim on a shared connection ([03e7bb7](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/03e7bb7315db51716178c6d4d081de26aaeccc23))
+* **agents:** each role keeps its own queue claim on a shared connection ([69fc8bc](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/69fc8bc7106dac4afd0174f7ad0593261829fceb))
+* **agents:** education roles name their team in lower-case hyphenated words ([99e24e0](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/99e24e0bbcfbbbd8c8a115d98def8abe2886df5f))
+* **agents:** every routed role takes its work from the queue and marks its optional tools ([8ab3563](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/8ab35630b4cfd5aad818984768b7694000f0028b))
+* **agents:** give a pack's agents their role's playbook tools, queue tools included ([3a5d2ae](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/3a5d2ae8c552db99e7fdcaa6b5a2c690976f0a93))
+* **agents:** held marks read the claims once, role rows included ([d77280a](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/d77280a9c47f40223532e77924e747d07f4375be))
+* **agents:** hold role claims to routed items and drop them on re-route ([d78c5e6](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/d78c5e61a1d79449c1f520fb376907a5625d59dd))
+* **agents:** keep running or edited pack agents on undo, drop unused role skills, audit each agent ([2202ff6](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/2202ff69730fe61f2a821136fd7dea7c4721111b))
+* **agents:** label the agent created audit event on screen ([7e35137](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/7e351378d94a06f243cedad71a8fa4f90b533dc4))
+* **agents:** let only an agent manager create or remove agents through a pack ([ba8101a](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/ba8101a89f7fe1e4a41d72e96f6531b1746166f8))
+* **agents:** match a pack's tag approval by every stored form of its project id ([acae72b](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/acae72b8f4a01771a1e786ff7fc879817a77962f))
+* **agents:** offer a role when a few of its tools are missing, and say which ([f453b5a](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/f453b5ae9847873fa1a3995d58dcf6e10583d699))
+* **agents:** only the connection's person or an admin approves always; home counts own approvals ([211691f](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/211691fc95b13c6968f5493e7393640abc43eaaf))
+* **agents:** only the connection's person or an admin approves always; home counts own approvals ([72a73ac](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/72a73ac80d8f9249cc116f0f5fcdd1d7eb2c5b5e))
+* **agents:** pin the triage cursor ids as an agent setting and word triage in plain terms ([c5c09c2](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/c5c09c27794aab5c41fa02d9af069edb37f2857c))
+* **agents:** plan a whole team pack before writing, and take back what was written if a step fails ([e2b115d](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/e2b115d7b1cd42823c1f7f2353ba756b2f47f52b))
+* **agents:** point every blueprint role at a written playbook and flag the rest ([d1ad320](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/d1ad320d0ac612e2117cdfd5d4698a20b3af50ee))
+* **agents:** professional services roles get a team and slugs no other blueprint uses ([615b942](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/615b9428d5d540da20b02d2efbe237970794da27))
+* **agents:** reuse and widen a role's overlapping agent, read every one, one pack change at a time ([b8e5a01](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/b8e5a014a6192b4d36917c6ca7cd5e1d75db837d))
+* **agents:** roles take routed work from their queue and are offered when a few tools are missing ([d2a4bdd](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/d2a4bdde8f42ba225461e4b9823ba80df450040b))
+* **agents:** routing rules offer the company's priorities as tasks store them ([fc84a5f](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/fc84a5fcf719d79a1a8cdbd8a477101ee4eb5b20))
+* **agents:** say a starter rule waits for its proposed tag, and add it on the next apply ([2db4f07](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/2db4f074c282567ce8b89da987aa8dc67c292d3f))
+* **agents:** say only you were not notified when you name yourself ([ff6a149](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/ff6a149d08509547aa8ee347979e1131dad627a2))
+* **agents:** show an outside app with its host and an app mark wherever it is named ([9d9abc2](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/9d9abc2a76a2ccade4459877478072b67d6af6a3))
+* **agents:** show me a list grouped by a field by its name, or the one view to save ([fc8675b](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/fc8675bc1567594c79cea7f234cc9551dd6de0bd))
+* **agents:** start a pack's agents paused, with no mention trigger, and say so ([eb1ed5e](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/eb1ed5e49cb8adb13dfe5924823752ed4e8ef169))
+* **agents:** store roles get distinct names, hyphenated teams, no timed reminder ([a0bd1da](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/a0bd1da95c031c77af84b28f9e681e6e0b9b613b))
+* **agents:** tell a proposal and a new doc to who may see them; name an app by its approved name ([258e568](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/258e5684a5988769e94f36033fefe6b621780d28))
+* **agents:** the company view reads again after a switch of company ([3488bc9](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/3488bc931d6074916d0397cd3fc315560629d653))
+* **agents:** the dispatcher card framed, IT company named, the accepter shown, a role sees its queue ([1301cf0](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/1301cf04470e9ea411a53ff6f3b11960be767637))
+* **agents:** the dispatcher leaves done tasks alone and leaves decisions to leads ([6039ef6](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/6039ef6d804f439145ef7feff79750ca669d583f))
+* **agents:** the flow board counts a backlog past the rows it lists ([6a5db38](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/6a5db3840a6460496bbb03ea07e24637102cbc0a))
+* **agents:** the inbox and the docs list read again when a proposal or a doc arrives ([ede7555](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/ede7555333b023a09688ff6fb57f80fa7effe4a2))
+* **agents:** the reply notice is loaded when a reply is sent, not with the agent actions ([d7a0a29](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/d7a0a294f925da5b8f4940e938df27077c9a4d51))
+* **agents:** the role playbook editor hides itself while role playbooks are off ([2028108](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/20281084590bb784f0a0d924a135aed7dc08d72f))
+* **agents:** the roles list answers someone outside the members with no role ([f5a37d8](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/f5a37d8b5f5316ec3971dd154269364638c164b5))
+* **agents:** the team pack picker offers only projects the person may change, up to 50 ([9f7bca6](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/9f7bca648f9a16f0b9b360a7ca6e178d534db41b))
+* **agents:** the thirtieth batch: AI-1 run fixes, live Inbox and Docs, an app named with its host ([4267234](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/4267234925d232f5f240f4bb53795b175310a0eb))
+* **agents:** triage never pays twice for a batch and caps daily spend without a budget ([8ced0e4](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/8ced0e4ba147ed005d22711e63960ef202159b07))
+* **agents:** trim narrating comments, translate the role separator, drop an inline style ([2a18645](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/2a186457186b47f45f6349412dbee9cb9ac60d66))
+* **agents:** undo a team pack from what the server recorded, never from the client's lists ([413df8a](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/413df8a29f0524d42fcb14f7f7fd8a87eb1a2f93))
+* **agents:** undoing an agent's list or doc comment asks the web app's delete rule ([f363088](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/f3630887b6000c37da08cd11f0cf1234fd4c5040))
+* **agents:** waiting tasks follow their own project's rules, the card and the undo say what moves ([1baa723](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/1baa7235c1a9a4a795d29b5cddfa822e01250568))
+* **ai:** ask plan sends the sentence as the request and words skipped steps by code ([60ad4dc](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/60ad4dce2bdf613e0b4bd2aeeed56b31fe4b7c4f))
+* **ai:** cache budget limits for a minute and check the pinned model's price ([85cf140](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/85cf1403178e5ac63a4a631f22985d094f84e3c2))
+* **ai:** every server-key call counts toward the budget, and a failed read refuses ([054726f](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/054726fe38f612d7aefc1f009b6b2da216f2c4b8))
+* **ai:** every server-key call counts toward the budget, and a failed read refuses ([0f5fafe](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/0f5fafe54ee9a50e55022a9997adc7964b6130d8))
+* **ai:** hand the fetched team packs to the blueprint picker ([e5b7fd8](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/e5b7fd8826ac3cd2c18ac18e16e2e69244429d08))
+* **ai:** hide the team set-up link while the dispatcher is off ([4815f41](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/4815f41db428c844c1746de1f30cf8ea664d3c7c))
+* **ai:** mark left-out parts in the generator's list editor and count only kept parts ([a83f673](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/a83f6737fba1ac621052ebd5dd217784f64282fd))
+* **ai:** raise view reason codes at the source and tidy the generator's views ([7801058](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/7801058f502ca5b582b4dd30beff23654974a944))
+* **ai:** show team labels in the company org chart ([7fa50e7](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/7fa50e7ab9aaaf1234e834dca91fa380296b2015))
+* **ai:** show what each starter automation will do and drop the ones a person cannot make ([acb9c13](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/acb9c1363cfc9e85cf2e047206ea6ae345ca9688))
+* **ai:** the budget holds every AI call whenever a budget is set ([a5298c8](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/a5298c84189859f966a29e966b228ad902be5c05))
+* **ai:** the generator checks create rights and builds the plan it proposed ([827af85](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/827af857375dc4a0c70fd22cfa784588bce7b079))
+* **ai:** the generator checks create rights and builds the plan it proposed ([3968b93](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/3968b93e501421f1b82fc0f13379444cf25d568b))
+* **ai:** the project guide skips a run with no person to read as ([de9c8ed](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/de9c8ede266bfdb722a8abb0117e3737a26dddcd))
+* **app-connections:** accept the new place in nav preferences and expect six simple places ([03cd71a](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/03cd71a965fe9a573e1cd9747372e9e29a6c6874))
+* **app-connections:** keyed event ledger, full paging, rate-limit waits and hub rows ([2d30e7f](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/2d30e7fc53e076e4a1dea0928f426e1d8c1f58a9))
+* **app:** find the people picker by its new title in the e2e specs ([a0a7c22](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/a0a7c22c72bc005150cc68184684990caf2d07d2))
+* **app:** what a newcomer met in the first run ([401e85a](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/401e85afc8ccba2a97c03a9ba6fb10f508d52420))
+* **app:** what a newcomer met in the first run ([60dde1d](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/60dde1d09be73bd4819becfc7b7a5e5e1066eb99))
+* **comments:** a comment an agent writes raises the task's unread counts ([1cc3e7a](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/1cc3e7a592a37009170b63858ca4435c393b26b2))
+* **comments:** a comment from your connected AI counts as unread on the task ([dcd12a7](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/dcd12a70a47bbe1b6c89ac2f75ba3ad788eceed4))
+* **comments:** a comment your connected AI writes shows at once in the open task ([748b1ee](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/748b1eef7c84cd95a6a8a1227ed9123179e0f18e))
+* **comments:** announce a comment an agent or automation writes to the open task ([f051d5b](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/f051d5bb26de92224aab801d398f18defc733035))
+* **comments:** opening a task's comments reads them, keeping the new line in place ([f382e6b](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/f382e6b13724b70af81ca84e73298f6547a7d818))
+* **comments:** place a live comment by its id, never by its author ([83eb195](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/83eb195ed1f996ae1a5122a05f7a3be28ebaabc2))
+* **custom-fields:** a formula made after its values is worked out at once ([f7ca60c](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/f7ca60cc90e41e7182f2e46c0781fae3476d370f))
+* **dispatcher:** agents are refused before the off switch, and its task routes are mapped ([b4a3ac9](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/b4a3ac9e3317fec53372f1983743f6a1136b70f5))
+* **dispatcher:** an accepted suggestion names the lead who accepted it ([635a0fe](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/635a0fe90e8d3d6239a9ab23c5a3dd89301b276c))
+* **dispatcher:** the card framed like assignment rules, blueprints named through i18n ([726967f](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/726967f8d3e93392f06735ba2f5954589792d9b5))
+* **dispatcher:** the model guess reads a workspace's edited role text ([e0b8e8f](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/e0b8e8f31500bd10018e10465f3a82f1ebf4e3a9))
+* **home:** keep the team's proposals out of the waiting step ([fc6cf2e](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/fc6cf2eea9f34a0fcb654598397d451aedbc5fea))
+* **i18n:** label the clinic blueprint and its teams ([cdef142](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/cdef142fc34b96913b61dbfe7b6189f3282fcfe0))
+* **i18n:** spell the ecommerce blueprint as E-commerce ([ef1cf7b](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/ef1cf7bf04ec735fc957c1d06ded6e471006d391))
+* **i18n:** word the issuer error without the setting name ([8e4f6e3](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/8e4f6e375583625d39a03563aa9827f0db98126e))
+* **integrations:** allow only api.github.com from the card and clear refusals the list now admits ([e7eea52](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/e7eea523db42b8a54f010cd05df111e10d3c8dda))
+* **integrations:** finish GitHub sign-in on the signed-in page ([5c15682](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/5c15682fe6926d2f2ce627dd499493e12c3923dd))
+* **integrations:** github says when the server may not reach it, and an owner can allow it ([944c7de](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/944c7de0e586a28baeccb87b0f4cb6402f72b611))
+* **integrations:** github says when the server may not reach it, and an owner can allow it ([8402bab](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/8402babe45f2bfe6fffb656bad9db8e7c325a840))
+* **integrations:** one shape per GitHub row, pair-level mapping writes, per-viewer errors ([49ea1ac](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/49ea1ac2a0c9eba5cddd656e60c5c940157080a6))
+* **integrations:** revoke with the issuing GitHub app and don't hold disconnect ([3d40da5](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/3d40da5870656c808894ca500545cfc159694b5e))
+* **integrations:** the GitHub card is one Connect button that goes to GitHub ([376478d](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/376478dfb8b418a2e874a45ab36e8cde86db58a1))
+* **integrations:** the GitHub card is one Connect button that goes to GitHub ([63d2bab](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/63d2babbf2e42e23212e148165e6abb57cfede5b))
+* **list:** unread comments show as a chat count on each task row ([1fc70ee](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/1fc70ee2e31cfa8df7d056e61a78bcbd348aadde))
+* **list:** unread comments show as a chat count on each task row ([5710b8e](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/5710b8ed757c0f3442054f128ce093cb3893c666))
+* **mcp:** a batch is checked against the connection's actions before its changes run ([199724f](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/199724f89ed60a1836e348c7444655b38aa63337))
+* **mcp:** a mention in an agent's task comment reaches the person ([25fa1e4](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/25fa1e4f0c1bbca5d3721a5d9475575e57b2d094))
+* **mcp:** a mention in an agent's task comment reaches the person ([e9ef5ba](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/e9ef5baa79cc6300af5dd2a43c28cd0e70e40932))
+* **mcp:** a time entry with no start never defaults into the future ([2e8ad3e](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/2e8ad3ed520a06d2fe0571f08f9379ea801cd209))
+* **mcp:** a time entry with no start never defaults into the future ([56f5edb](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/56f5edbf39038be68bf9ef99ca40a1632b9e2ef7))
+* **mcp:** a workspace-wide write is checked against the token's projects first ([4b203f0](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/4b203f09b494eece1220449ef5f75fc2ee7d24ac))
+* **mcp:** an unexpected tool failure gives the client a general answer ([c74f765](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/c74f765345b80684a72a6297a59e11dc5f09f87a))
+* **mcp:** approving a new doc asks again for its parent doc and the workspace ([511fb1c](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/511fb1c7b69209e654aff74625cc2ab3450f6962))
+* **mcp:** dates read as the person's days, and a tool lists saved views ([8c44e0f](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/8c44e0f0958b4a49f801de500c1f26105b50c3e8))
+* **mcp:** every comment tool reports who its mentions reached ([4d70075](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/4d70075f926984083e7315da717a1c4358800484))
+* **mcp:** every comment tool reports who its mentions reached ([a5cb91d](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/a5cb91dabb0fbedcb476b1ed7fe0eb60589e8046))
+* **mcp:** fewer needless holds and conflicts on a person's own AI's writes ([6e029ac](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/6e029ac6257271c9e607d9b78c58b2248985d220))
+* **mcp:** fewer needless holds and conflicts on a person's own AI's writes ([a4cf0ba](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/a4cf0ba0c2081470fcee44ddade6ba109c57964c))
+* **mcp:** keep an agent's read current after its own bookkeeping write ([0f52819](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/0f5281946e5b62b456036477e27cb9ddef8d2d02))
+* **mcp:** list, setup, automation and goal writes need the manage grant ([c751343](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/c7513435d1260912233c459c0701209e24e57c50))
+* **mcp:** members list shows the people of the projects the caller can open ([f25e6e3](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/f25e6e3dd783080389408582d386527d1fbe5cdf))
+* **mcp:** narrow list reads, approved-change reads and link moves ([5eac904](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/5eac90499a176d7d60625c15b9f8017a95176f08))
+* **mcp:** read search filters from open projects only, and add or remove a tag once ([c2c694e](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/c2c694e6ddb9ff57547cdacabfc553b43ae4a556))
+* **mcp:** the pull request tool answers one way for a pull request on no readable task ([92bf80e](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/92bf80e885bdbc770f68c67961276460f69ad2c4))
+* **mcp:** the pull request tool follows the task list rules on every path ([84f35c9](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/84f35c9bc48709381b703af1554cfa30449400f3))
+* **mcp:** timesheet days end on the next local midnight, and time is not logged ahead ([e3b7679](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/e3b7679c5614e8e8c4e0a7aa626e964c1bf33e22))
+* **mcp:** timesheet read follows the web timesheet's list and project rules ([3999ca7](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/3999ca7cf4bb65a5dd77b3d45f114824be8d73c7))
+* **mcp:** tool access follows the same rules as the web app in every case ([02a43a9](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/02a43a9925d31ece4bfdf984e6f805fbab45b327))
+* **packs:** a blueprint pack brings its starter rules and tags and turns routing on ([8dce7d4](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/8dce7d42c475afaaf74d37b5d27e2bfa7fe9fbd4))
+* **packs:** a blueprint pack brings its starter rules and tags and turns routing on ([7c333f7](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/7c333f7e5b3d0ace9ce4f235a6598a298c2baec1))
+* **packs:** add waiting tag rules without the pack lock and keep routing while a pack remains ([20d30c2](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/20d30c21e227ee6d0596a516a42428bc0b37af2f))
+* **packs:** merge dispatcher writes onto the latest revision so concurrent ones keep each other ([7960aaa](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/7960aaa29b293d93ecc02eabac89dbf8c3617f36))
+* **packs:** skip fields a person declined and keep fields an applying approval makes ([b6416df](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/b6416dfece1c7f025e350404725fa5d84167c4a4))
+* **packs:** unchecked saves take their own revision and undo removes rules recorded late ([f2a018d](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/f2a018dc61a7138345a5c14f2650439fdac5ac53))
+* **projects:** a view added elsewhere shows in the open project's tabs without a reload ([6a8f092](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/6a8f0920aeb879bbb2e88d00de0e56157c3389fb))
+* **projects:** the projects page always offers a new project ([fcb367d](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/fcb367d6f6db21d20704f75991ee2b3d14a8c485))
+* **projects:** the projects page always offers a new project ([8dd76b3](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/8dd76b3034856f31fede67aea41be08a2f631dde))
+* **projects:** the sidebar reads its project list once after a hidden tab reconnects ([e69f8da](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/e69f8da9d934989956ef5e3e77739f8e76edc128))
+* **workflows:** a hand-over deadline counts from the hand-over, and a retry hands over again ([2b89acf](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/2b89acfbaf7475ae76a6e3af5220071a10509329))
+* **workflows:** a role hand-over takes its task back however its step ends ([22890bd](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/22890bddef2a897b873ac6bac05f90b1d85ede1c))
+* **workflows:** templates say when they cannot be installed, and a skip cleans up ([d7cd2e7](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/d7cd2e7af249fc6259c55405126d3130b5c7a5bb))
+
+
+### ♻️ Refactors
+
+* **agents:** keep the batched own-proposal rule beside askedFor ([06ebcb6](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/06ebcb637e2a2c1bae05bc2accc0cf7c9ea5c326))
+
+
+### 📘 Documentation
+
+* **agents:** it roles read field dates per task and set incident priority ([7618062](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/76180626a72457cdf78d297a9049d72365d812d3))
+* **agents:** manufacturing roles state status limits, schedules and the dispatch handoff ([98bc57e](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/98bc57e30d8494731e2918656d3a99061698d080))
+* **agents:** manufacturing roles take work from the agent queue ([576b294](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/576b29407d97fe4f609cd187b27b0d8c9c607c40))
+* **agents:** name the queue tools in each manufacturing tools section ([7e91ae1](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/7e91ae17b66c4e0168bef3c0f1f9f38eb55e8d7d))
+* **agents:** role playbooks for a manufacturing company ([2a91e70](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/2a91e70556ef2bb2f47c751e8bda28877c22bfd0))
+* **agents:** role playbooks for a marketing or creative agency ([40c9d7a](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/40c9d7a1e243e60dcd426278b296d257e52b5bae))
+* **agents:** role playbooks for an it company ([56f7eac](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/56f7eacac9ee68681c85f7962db710da205604fc))
+* **agents:** role playbooks for clinic administration ([5a138f1](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/5a138f14298623af5af50a36768050d1de53b0f3))
+* **agents:** role playbooks for construction ([a9a60a4](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/a9a60a43633c0c5be684641ec96ba3401bbe7046))
+* **agents:** role playbooks for e-commerce and retail ([777ac1c](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/777ac1c515116e273bb93b7b061b99dee4ff8b58))
+* **agents:** role playbooks for education ([6777320](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/6777320d844d84bd457abdda2dc1fd4d868f68a2))
+* **agents:** role playbooks for professional services ([ccc56ed](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/ccc56edc447751b081be9c2ec11b5e956ef3c7d9))
+* **agents:** the roles the blueprints named but had not written ([51ac781](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/51ac78122c862d6138ae320471ecee1cdb9e4490))
+* **agents:** the roles the blueprints named but had not written ([a465c4b](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/a465c4ba61123048c339a507fd37443835af8b8b))
+* **agents:** the thirty-fourth batch: playbooks for five more industries and the team packs guide ([9657e74](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/9657e746de785cff7a5af178397a937e249d1bb1))
+* **ai:** measure AI-1 again, three runs each, on build 852 ([c048bdd](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/c048bdd68e98c40ae0f4050044f0ea07f5d2d8d4))
+* **ai:** measure AI-1 again, three runs each, on build 852 ([64f12d5](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/64f12d5eefb64a06d7fa1b7da298c9facd72d7e7))
+* **ai:** plan for AP-490, the wider project setup and the workspace agent ([96ca907](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/96ca9076a9d953a91a0efa5e7299d5d2e273e093))
+* **ai:** plan for AP-490, the wider project setup and the workspace agent ([29a30f7](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/29a30f7bf96c541ae601d5a6462e5ee1beab87e6))
+* **ai:** the AI row names the gaps fixed since run 2 ([d17bdaa](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/d17bdaaa3b1ff6aac68714ff95f7e46082a8cf26))
+* **ai:** the first newcomer run, an AI newcomer on path B ([57bef22](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/57bef22c88bd91d6df9868b1dd88064ea418014a))
+* **ai:** the first newcomer run, an AI newcomer on path B ([19468d6](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/19468d6bb3ff518c4135573a2618a9f0481a5640))
+* **ai:** the scorecard's AI row from the two measured runs ([11d4233](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/11d4233a8e0b324b397618a90b922117803c96af))
+* **ai:** the scorecard's AI row from the two measured runs ([6083d71](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/6083d7148a232fa27fd4fa04459093eeac04a359))
+* beta log, API docs and progress for builds 836 to 852 ([daf1aff](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/daf1affea0d4569cb0e5a8aee6267aad7aac8d5d))
+* beta log, API docs and progress for builds 836 to 852 ([5c074d3](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/5c074d3e46e9d5fae0cd42585e2f0d656e07e5ec))
+* beta log, API docs and progress for builds 853 to 861 ([1a01f25](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/1a01f25f8c307bdf78c28554176527f16e471fce))
+* beta log, API docs and progress for builds 853 to 861 ([3c9fb9d](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/3c9fb9d9e11df2aff1b5697b986c82d6dd18ebb5))
+* beta log, API docs and progress for builds 863 to 866 ([641297c](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/641297c4ea3930149a4f587273463bf6b10b8bdb))
+* beta log, API docs and progress for builds 863 to 866 ([87993c6](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/87993c664559a2cd311a3cda4cba0ad8089fa3f0))
+* **guide:** group roles by team, describe team packs, no model guess yet ([d897619](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/d897619dca3b158002b989bd589c32d5a3e960c6))
+* **guide:** name all seven blueprints and the prefixed roles, drop the stale [#1585](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/issues/1585) note ([bed29b5](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/bed29b5bbadde6f07099f67f910053672fa8acc8))
+* **guide:** team packs and role agents ([5fba33b](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/5fba33badab58542fddf43dcbd653b53429c94cc))
+* **mcp:** tag.create and the tag, priority and field filters of tasks.search ([f3112f1](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/f3112f12fb8bc0408eec92fd03c0a7623e4d3a91))
+* **mcp:** the ai tools are on by default, and how to turn them off ([ee9aad4](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/ee9aad41a47ce30bd242dccf8085feb0352c723b))
+* **packs:** measured run of the Manufacturing pack on build 852 ([0b88269](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/0b882694834269015ef678c257c1d164b11c35f6))
+* **packs:** measured run of the Manufacturing pack on build 852 ([a31e5bc](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/a31e5bcdda3ab604d383d192ef2ad54e4f181a59))
+* **tasks:** builds 816 to 819 in the log, the AI-1 results and the 048 plan ([86b9721](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/86b9721297fe01519397dd4b5044c75d6b7ea690))
+* **tasks:** builds 816 to 819 in the log, the AI-1 results and the 048 plan ([7f32aea](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/7f32aea398434b6312fddbb9009ce080ad893476))
+* **tasks:** builds 820 to 822 in the log, the 047 and 048 progress and the handoff ([a2f1774](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/a2f177454fdccfc30ca1d25bba1a4ed97c277e54))
+* **tasks:** builds 820 to 822 in the log, the 047 and 048 progress and the handoff ([03a0aec](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/03a0aec7689fbd9422c9528b4c4bf8da035c9bcb))
+* **tasks:** builds 823 to 825 in the log and the API reference, 048 progress and the handoff ([6b8d6c4](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/6b8d6c490317c2835b8d1e68105539e40c91189f))
+* **tasks:** builds 823 to 825 in the log and the API reference, 048 progress and the handoff ([55e532a](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/55e532ac1be6abb80077c73e494ee12b75f54366))
+* **tasks:** builds 826 to 833 in the log and the API reference, 048 progress and the handoff ([1fc6b85](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/1fc6b857cc4ca70802373944e489629582514807))
+* **tasks:** builds 826 to 833 in the log and the API reference, 048 progress and the handoff ([98672f5](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/98672f5e207478e5b9c3cd54bfc4534f37db4aea))
+* **tasks:** keep the 046 working notes out of the repository ([3bac7eb](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/3bac7eb6cd5c51f4c61bb7692a5796d20d59048b))
+* **tasks:** the first measured run of a team pack, and builds 834 and 835 in the log ([0a9be2c](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/0a9be2c245ba1716a868afc93235d510c61d8f10))
+* **tasks:** the first measured run of a team pack, and builds 834 and 835 in the log ([7fc5aec](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/7fc5aec6aefc67a973f8fed14adaa84606302737))
+* **workflows:** the hand-over deadline and retry in the readme ([45ef610](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/45ef6107a64457a2e4292bac3ed6b05bae117302))
+
 ## [14.36.0](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/compare/v14.35.0...v14.36.0) (2026-10-06)
 
 

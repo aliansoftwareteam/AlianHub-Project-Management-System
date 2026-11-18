@@ -11,18 +11,18 @@
                 <input
                     v-model="newEpicName"
                     type="text"
-                    class="epics__input font-size-13"
+                    class="ah-input epics__input"
                     :placeholder="$t('Projects.epic_name_placeholder')"
                     @keydown.enter="createEpic"
                 />
                 <div class="d-flex align-items-center epics__create-meta">
-                    <select v-model="newEpicPriority" class="epics__select font-size-12" :title="$t('Projects.epic_priority')">
+                    <select v-model="newEpicPriority" class="ah-input epics__select" :title="$t('Projects.epic_priority')">
                         <option value="low">{{ $t('Projects.priority_low') }}</option>
                         <option value="medium">{{ $t('Projects.priority_medium') }}</option>
                         <option value="high">{{ $t('Projects.priority_high') }}</option>
                     </select>
-                    <input v-model="newEpicStartDate" type="date" class="epics__date font-size-12" :title="$t('Projects.epic_start_date')" />
-                    <input v-model="newEpicDueDate" type="date" class="epics__date font-size-12" :title="$t('Projects.epic_due_date')" />
+                    <input v-model="newEpicStartDate" type="date" class="ah-input epics__date" :title="$t('Projects.epic_start_date')" />
+                    <input v-model="newEpicDueDate" type="date" class="ah-input epics__date" :title="$t('Projects.epic_due_date')" />
                     <button class="btn-primary font-size-13" :disabled="isSaving" @click="createEpic">{{ $t('Projects.add_epic') }}</button>
                 </div>
             </div>
@@ -189,40 +189,31 @@ function deleteEpic(epic) {
 .epics__overlay {
     position: fixed;
     inset: 0;
-    background: rgba(0, 0, 0, 0.35);
+    background: var(--scrim);
     z-index: 1000;
     display: flex;
     align-items: center;
     justify-content: center;
 }
 .epics__card {
-    background: #fff;
+    background: var(--surface);
+    color: var(--ink);
+    color-scheme: var(--scheme);
     border-radius: 10px;
     width: min(620px, 94vw);
     max-height: 74vh;
     overflow-y: auto;
     padding: 16px 20px;
-    box-shadow: 0 8px 30px rgba(0, 0, 0, 0.18);
+    box-shadow: var(--shadow-modal);
 }
 .epics__head { margin-bottom: 12px; }
-.epics__close { color: #9a9a9a; }
-.epics__close:hover { color: #e84a4a; }
+.epics__close { color: var(--ink-2); }
+.epics__close:hover { color: var(--danger); }
 .epics__create { margin-bottom: 14px; }
-.epics__input {
-    width: 100%;
-    border: 1px solid #e0e0e0;
-    border-radius: 6px;
-    padding: 7px 10px;
-}
 .epics__create-meta { gap: 8px; margin-top: 8px; flex-wrap: wrap; }
-.epics__select, .epics__date {
-    border: 1px solid #e0e0e0;
-    border-radius: 6px;
-    padding: 6px 8px;
-    background: #fff;
-}
+.ah-input.epics__select, .ah-input.epics__date { width: auto; }
 .epics__create-meta .btn-primary { margin-left: auto; }
-.epics__row { padding: 10px 0; border-bottom: 1px solid #f0f0f0; }
+.epics__row { padding: 10px 0; border-bottom: 1px solid var(--hairline); }
 .epics__row-main { min-width: 0; flex: 1; }
 .epics__row-actions { gap: 6px; flex: none; }
 .epics__dot {
@@ -241,26 +232,27 @@ function deleteEpic(epic) {
     text-transform: capitalize;
     white-space: nowrap;
 }
-.epics__badge--low { background: #eef0f3; color: #5b6470; }
-.epics__badge--medium { background: #e7f0fb; color: #1565c0; }
-.epics__badge--high { background: #fdecea; color: #c0392b; }
+.epics__badge--low { background: var(--fill); color: var(--ink-label); }
+.epics__badge--medium { background: var(--brand-tint); color: var(--brand); }
+.epics__badge--high { background: var(--danger-bg); color: var(--danger-ink); }
 .epics__status-select {
-    border: 1px solid #e0e0e0;
+    border: 1px solid var(--hairline);
     border-radius: 12px;
     padding: 2px 6px;
-    background: #fff;
+    background: var(--surface);
+    color: var(--ink);
     cursor: pointer;
 }
-.epics__status-select--open { color: #5b6470; }
-.epics__status-select--in_progress { color: #b06a00; border-color: #f0d8a8; background: #fff5e6; }
-.epics__status-select--done { color: #2e7d32; border-color: #bfe3c4; background: #e9f6ea; }
+.epics__status-select--open { color: var(--ink-label); }
+.epics__status-select--in_progress { color: var(--warn-ink); border-color: var(--warn); background: var(--warn-bg); }
+.epics__status-select--done { color: var(--ok-ink); border-color: var(--ok); background: var(--ok-bg); }
 .epics__count { white-space: nowrap; }
-.epics__delete { color: #c9c9c9; padding: 0 4px; }
-.epics__delete:hover { color: #e84a4a; }
+.epics__delete { color: var(--ink-2); padding: 0 4px; }
+.epics__delete:hover { color: var(--danger); }
 .epics__bar {
     height: 6px;
     border-radius: 3px;
-    background: #f0f0f0;
+    background: var(--fill);
     margin-top: 8px;
     overflow: hidden;
 }

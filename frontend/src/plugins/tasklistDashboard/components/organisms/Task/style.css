@@ -5,10 +5,13 @@
   /* position: relative; */
 }
 
+/* The subtask counter carries p3x-5px, and there the utility decides; :where() adds no weight. */
+.task-options-image:where(:not(.p3x-5px)) {
+  padding: 4px 5px;
+}
 .task-options-image {
   border: 1px solid #97989a;
   vertical-align: middle;
-  padding: 4px 5px;
   border-radius: 4px;
   color: #818181;
   /* margin-left: 5px; */

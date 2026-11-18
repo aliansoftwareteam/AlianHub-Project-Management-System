@@ -31,6 +31,17 @@ exports.resolveProjectSkills = async (companyId, requested) => {
     }
 };
 
+/** Display names for stored slugs, falling back to the slug as the project panel does. */
+exports.skillNamesOf = async (companyId, slugs) => {
+    const list = Array.isArray(slugs) ? slugs : [];
+    if (!list.length) return [];
+    const settings = await loadSettings(companyId).catch(() => []);
+    return list.map((slug) => {
+        const match = settings.find((skill) => skill && skill.slug === slug);
+        return match && match.name ? match.name : slug;
+    });
+};
+
 /** Slugs the AI plan prompt is allowed to offer. */
 exports.getActiveSkillSlugs = async (companyId) => {
     try {

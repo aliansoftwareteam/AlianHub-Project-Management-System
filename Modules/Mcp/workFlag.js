@@ -1,0 +1,19 @@
+const { isOn } = require('./defaultOn');
+
+// Read on every call like the other feature flags: an explicit off leaves the registry, the ratings
+// and the MCP tool list exactly what they were before these tools existed.
+const ACTIONS = Object.freeze([
+    'tags.list', 'task.tags.add', 'task.tags.remove', 'tag.create',
+    'task.relations.list', 'task.relation.add', 'task.relation.remove',
+    'lists.list', 'list.create', 'list.rename', 'list.move',
+    'page.comments.list', 'page.comment.create', 'page.comment.reply', 'page.comment.assign',
+    'goals.list', 'goal.get', 'goal.target.set', 'goal.target.sources.add', 'goal.target.sources.remove',
+    'task.lists.list', 'task.lists.add', 'task.lists.remove',
+    'fields.create', 'view.create', 'project.setup', 'project.create', 'project.duplicate', 'folder.create', 'list.sprint.set',
+    'automation.catalogue', 'automation.create',
+    'timesheet.week', 'timesheet.week.submit',
+]);
+
+const enabled = () => isOn(process.env.MCP_TOOLS_WORK);
+
+module.exports = { ACTIONS, enabled };

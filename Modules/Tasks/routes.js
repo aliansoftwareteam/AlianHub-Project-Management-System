@@ -1,43 +1,49 @@
 const {task} = require('./helpers/task_class');
 const {taskMongo} = require('./helpers/task_class_Mongo');
 const tabSyncTaskCtrl = require('./controller/getTabSyncTasks');
+const everythingCtrl = require('./controller/everything');
+const everythingViewsCtrl = require('./controller/everythingViews');
 const advanceFilter = require('./helpers/manageGlobalFilter');
 const getTaskCtrl = require('./helpers/getTasksData');
 const { handleEvents } = require('../Company/eventController');
 const logger = require('../../Config/loggerConfig');
-const { requireTaskActionPermission, requirePermission } = require('../../Config/permissionGuard');
+const { requireTaskActionPermission, requireTaskWritePermission } = require('../../Config/permissionGuard');
+const { TASK_ACTIONS, PRE_V2_TASK_ACTIONS, RELATION_ACTIONS, TASK_WRITE_ROUTES, actionEntry } = require('../../Config/taskWritePermissions');
+const { TASK_ACTION_FIELDS, PRE_V2_ACTION_FIELDS, specFor, writtenTaskId, prepareOrRefuse, sendFailure, failureText } = require('./helpers/taskWriteFields');
+const { importTargetAccess, refuseImport } = require('../Importers/helpers/importAccess');
+const { taskPatchGuard, taskCreateGuard, relationGuard, agentsRefused } = require('../Agents/guard');
+
+const agentRule = (fields) => taskPatchGuard((body) => writtenTaskId(fields, body));
+
+/* Every route below prepares its request before it writes, and that answers "not found" for what the caller cannot open. */
+const PREPARED = Object.freeze({ unopenableAsMissing: true });
+const taskActionPermission = (actions) => requireTaskActionPermission(actions, PREPARED);
+const taskWritePermission = (route) => requireTaskWritePermission(TASK_WRITE_ROUTES[route].entry, PREPARED);
+
+/* Whatever the handler throws or rejects with is answered as a failed write, so a request never waits for an answer that is not coming. */
+const answering = (run, fail = sendFailure) => async (req, res) => {
+    try {
+        await run(req, res);
+    } catch (error) {
+        logger.error(`ERROR: ${error}`);
+        if (!res.headersSent) fail(res, error);
+    }
+};
 
 exports.init = (app) => {
-    app.post('/api/tasks', (req, res) => {
-        try {
-            task.create(req.body)
-            .then(() => {
-                res.send({status: true, statusText: 'Task created successfully.'});
-            })
-            .catch((error) => {
-                logger.error(`ERROR: ${error.message}`);
-                res.send({status: false, statusText: error.message});
-            });
-        } catch (error) {
-            logger.error(`ERROR: ${error.message}`);
-            res.send({status: false, statusText: error.message});
-        }
-    });
+    app.patch('/api/tasks/', taskActionPermission(PRE_V2_TASK_ACTIONS), agentRule(PRE_V2_ACTION_FIELDS), answering(async (req, res) => {
+        const action = req.body && req.body.action;
+        const payload = await prepareOrRefuse(req, res, specFor(PRE_V2_ACTION_FIELDS, action), `PATCH /api/tasks/ ${action}`);
+        if (!payload) return;
+        const response = await task[action](payload);
+        res.send({status: true, statusText: 'Task updated successfully.',data:response});
+    }));
 
-    app.patch('/api/tasks/', (req, res) => {
-        task[req.body.action](req.body)
-        .then((response) => {
-            res.send({status: true, statusText: 'Task updated successfully.',data:response});
-        })
-        .catch((error) => {
-            logger.error(`ERROR: ${error}`);
-            res.send({status: false, statusText: error.message});
-        });
-    });
-
-    app.post('/api/v2/tasks', requirePermission('task.task_create'), (req, res) => {
+    app.post('/api/v2/tasks', taskWritePermission('POST /api/v2/tasks'), taskCreateGuard, async (req, res) => {
         try {
-            taskMongo.create(req.body)
+            const payload = await prepareOrRefuse(req, res, TASK_ACTION_FIELDS.create, 'create');
+            if (!payload) return;
+            taskMongo.create(payload)
             .then((resData) => {
                 if(resData.status){
                     res.send({status: true, statusText: 'Task created successfully.', id: resData.id});
@@ -46,36 +52,30 @@ exports.init = (app) => {
                 }
             })
             .catch((error) => {
-                logger.error(`ERROR: ${error.message}`);
-                res.send({status: false, statusText: error.message});
+                logger.error(`ERROR: ${failureText(error)}`);
+                sendFailure(res, error);
             });
         } catch (error) {
             logger.error(`ERROR: ${error.message}`);
-            res.send({status: false, statusText: error.message});
+            res.send({status: false, statusText: failureText(error)});
         }
     });
 
-    app.patch('/api/v2/tasks', requireTaskActionPermission(), (req, res) => {
-        taskMongo[req.body.action](req.body)
-        .then((response) => {
-            res.send({status: true, statusText: 'Task updated successfully.',data:response});
-        })
-        .catch((error) => {
-            logger.error(`ERROR: ${error}`);
-            res.send({status: false, statusText: error.message});
-        });
-    });
+    app.patch('/api/v2/tasks', taskActionPermission(TASK_ACTIONS), agentRule(TASK_ACTION_FIELDS), answering(async (req, res) => {
+        const action = req.body && req.body.action;
+        const payload = await prepareOrRefuse(req, res, specFor(TASK_ACTION_FIELDS, action), action);
+        if (!payload) return;
+        const response = await taskMongo[action](payload);
+        // A handler that matched no document resolves {status:false}; without this the
+        // envelope below would report a write that never happened as a success.
+        if (response && response.status === false) {
+            res.send(response);
+            return;
+        }
+        res.send({status: true, statusText: 'Task updated successfully.',data:response});
+    }));
 
-    // Bulk multi-task operations. Single endpoint, dynamic action dispatch —
-    // matches the PATCH /api/v2/tasks convention.
-    // Body: { action: 'bulkUpdateStatus' | 'bulkDelete' | ..., taskIds: [..], ...payload }
-    // CompanyId comes from the verified header set by the auth middleware;
-    // it overrides anything the client put in the body to prevent spoofing.
-    // requireTaskActionPermission mirrors the single PATCH above: it enforces only
-    // for PAT/MCP requests, and only for actions named in TASK_ACTION_PERMISSION.
-    // No bulk action is named there yet, so nothing changes today — the point is
-    // that the map now governs both endpoints instead of only the single one.
-    app.post('/api/v2/tasks/bulk', requireTaskActionPermission(), (req, res) => {
+    app.post('/api/v2/tasks/bulk', taskActionPermission(TASK_ACTIONS), async (req, res) => {
         try {
             const action = req.body && req.body.action;
             if (!action || typeof action !== 'string' || !action.startsWith('bulk')) {
@@ -84,41 +84,41 @@ exports.init = (app) => {
             if (typeof taskMongo[action] !== 'function') {
                 return res.send({ status: false, statusText: `Unknown bulk action: ${action}` });
             }
-            const headerCompanyId = req.headers['companyid'] || '';
-            const payload = { ...req.body, companyId: headerCompanyId };
+            const payload = await prepareOrRefuse(req, res, specFor(TASK_ACTION_FIELDS, action), action);
+            if (!payload) return;
 
             taskMongo[action](payload)
             .then((response) => {
                 res.send({ status: true, statusText: 'Bulk operation completed', data: response });
             })
             .catch((error) => {
-                logger.error(`ERROR bulk ${action}: ${error.message}`);
-                res.send({ status: false, statusText: error.message });
+                logger.error(`ERROR bulk ${action}: ${failureText(error)}`);
+                sendFailure(res, error);
             });
         } catch (error) {
             logger.error(`ERROR bulk dispatch: ${error.message}`);
-            res.send({ status: false, statusText: error.message });
+            res.send({ status: false, statusText: failureText(error) });
         }
     });
 
-    // Task-to-task relations (blocks / blocked_by / duplicates / duplicated_by
-    // / relates_to). Single endpoint, explicit action allowlist — same dispatch
-    // + verified-header companyId convention as POST /api/v2/tasks/bulk above.
-    // Body: { action: 'add' | 'remove' | 'list', taskId, relatedTaskId?, type?, userData? }
-    app.post('/api/v2/tasks/relations', (req, res) => {
+    app.post('/api/v2/tasks/everything', everythingCtrl.listEverything);
+
+    app.get('/api/v2/tasks/everything/views', everythingViewsCtrl.listViews);
+    app.post('/api/v2/tasks/everything/views', everythingViewsCtrl.createView);
+    app.patch('/api/v2/tasks/everything/views/:id', everythingViewsCtrl.updateView);
+    app.delete('/api/v2/tasks/everything/views/:id', everythingViewsCtrl.deleteView);
+
+    app.get('/api/v2/tasks/:id/lists', getTaskCtrl.getTaskLists);
+
+    app.post('/api/v2/tasks/relations', taskActionPermission(RELATION_ACTIONS), relationGuard, async (req, res) => {
         try {
-            const RELATION_ACTIONS = {
-                add: 'addTaskRelation',
-                remove: 'removeTaskRelation',
-                list: 'getTaskRelations',
-                openBlockers: 'getOpenBlockers',
-            };
-            const method = RELATION_ACTIONS[req.body && req.body.action];
-            if (!method) {
+            const relation = actionEntry(RELATION_ACTIONS, req.body && req.body.action);
+            if (!relation) {
                 return res.send({ status: false, statusText: 'Invalid relation action' });
             }
-            const headerCompanyId = req.headers['companyid'] || '';
-            const payload = { ...req.body, companyId: headerCompanyId };
+            const { method } = relation;
+            const payload = await prepareOrRefuse(req, res, specFor(TASK_ACTION_FIELDS, method), method);
+            if (!payload) return;
 
             taskMongo[method](payload)
             .then((response) => {
@@ -134,16 +134,18 @@ exports.init = (app) => {
         }
     });
 
-    app.patch('/api/v1/importTasks', (req, res) => {
-        taskMongo.createMultipleTasks(req.body)
-        .then((response) => {
-            res.send({status: true, statusText: 'Task updated successfully.',data:response});
-        })
-        .catch((error) => {
-            console.error("ERRORsssss: ", error.message);
-            res.send({status: false, statusText: error.message});
-        });
-    });
+    app.patch('/api/v1/importTasks', agentsRefused('tasks.import'), taskWritePermission('PATCH /api/v1/importTasks'), answering(async (req, res) => {
+        const payload = await prepareOrRefuse(req, res, TASK_ACTION_FIELDS.createMultipleTasks, 'createMultipleTasks');
+        if (!payload) return;
+        const projectData = payload.projectData || {};
+        const target = await importTargetAccess(projectData.CompanyId, String(req.uid || ''), { projectId: String(projectData._id || ''), sprintId: payload.sprint && payload.sprint.id });
+        if (!target.allowed) {
+            refuseImport(res, target);
+            return;
+        }
+        const response = await taskMongo.createMultipleTasks({ ...payload, sprint: target.sprint });
+        res.send({status: true, statusText: 'Task updated successfully.',data:response});
+    }, (res, error) => res.send({status: false, statusText: failureText(error)})));
     
     app.post('/api/v1/tabSyncTask',tabSyncTaskCtrl.getTabSyncTasks);
 
@@ -159,7 +161,7 @@ exports.init = (app) => {
 
     app.post('/api/v1/task/find', getTaskCtrl.getTaskByQyery);
 
-    app.put('/api/v1/task',getTaskCtrl.updateTask);
+    app.put('/api/v1/task', agentsRefused('tasks.cascade'), getTaskCtrl.updateTask);
 
     app.get('/task-import/events/:id', (req, res) => {
         res.setHeader('Content-Type', 'text/event-stream');

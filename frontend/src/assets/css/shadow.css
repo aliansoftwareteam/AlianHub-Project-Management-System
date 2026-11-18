@@ -24,7 +24,7 @@
     box-shadow: 0px 0px 73.4px rgb(73 182 67);
 }
 .box-shadow-blue {
-    box-shadow: 0px 0px 73.4px #2F3990;
+    box-shadow: 0px 0px 73.4px var(--brand);
 }
 .box-shadow-serach{
     box-shadow: 0px 0px 8px 0px rgba(0, 0, 0, 0.15);

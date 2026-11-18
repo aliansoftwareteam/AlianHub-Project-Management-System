@@ -1,0 +1,34 @@
+{
+    "job": 2,
+    "title": "Quick-create from anywhere",
+    "sentence": "Add a task \"[AI bench] Call supplier\" to [AI bench] list.",
+    "start": "Home",
+    "passed": "AI-1 run 1, 2026-10-08, builds 815 to 817: pass, no approval, 11 steps",
+    "kept": "Rebuilt on 2026-10-09 from Tasks/active/047-ai-run/ai-1-run-1-results.md and the tool path of the job in ai-benchmark.md: the run did not record its calls. Ids are named by placeholder and resolved against the replay world.",
+    "calls": [
+        {
+            "tool": "projects.list",
+            "arguments": {
+                "query": "QA Sandbox"
+            },
+            "answer": "read"
+        },
+        {
+            "tool": "lists.list",
+            "arguments": {
+                "projectId": "$project"
+            },
+            "answer": "read"
+        },
+        {
+            "tool": "task.create",
+            "arguments": {
+                "projectId": "$project",
+                "sprintId": "$list",
+                "title": "[AI bench] Call supplier"
+            },
+            "answer": "applied"
+        }
+    ],
+    "undo": true
+}

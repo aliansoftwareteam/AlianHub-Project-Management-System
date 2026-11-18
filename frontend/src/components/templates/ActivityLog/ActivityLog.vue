@@ -24,6 +24,12 @@
         />
     </div>
     <div class="activity-log" v-else>
+        <div class="activity-filter">
+            <div class="ah-tabs" role="group" :aria-label="$t('ActivityLog.filter_label')">
+                <button type="button" class="ah-tab" :class="{ 'is-active': !agentsOnly }" :aria-pressed="!agentsOnly" data-test="activity-filter-all" @click="showAgentsOnly(false)">{{ $t('ActivityLog.filter_all') }}</button>
+                <button type="button" class="ah-tab" :class="{ 'is-active': agentsOnly }" :aria-pressed="agentsOnly" data-test="activity-filter-agent" @click="showAgentsOnly(true)">{{ $t('ActivityLog.filter_agents') }}</button>
+            </div>
+        </div>
         <div class="activity-scroll">
             <div v-for="data in activityLog" :key="data.id" class="main-activity">
                 <ActivityContent :data="data" :key="data.id"/>
@@ -32,14 +38,13 @@
                 <button @click="commonGetQuery(true)" class="btn-class cursor-pointer">{{ $t('Header.load_more') }}</button>
             </div>
             <div v-if="activityLog.length === 0 && (!isSpinner && !isLoading)" class="d-flex justify-content-center">
-                <span>{{ $t('ProjectSlider.no_activity_log_found') }}</span>
+                <span>{{ agentsOnly ? $t('ActivityLog.no_agent_activity') : $t('ProjectSlider.no_activity_log_found') }}</span>
             </div>
         </div>
     </div>
 </template>
 <script setup>
 import { defineComponent,defineProps,inject,ref,onMounted, watch, computed } from "vue";
-import moment from "moment";
 import { useGetterFunctions } from '@/composable/index';
 import ActivityContent from "@/components/molecules/ActivityLogContent/ActivityContent.vue";
 import SpinnerComp from '@/components/atom/SpinnerComp/SpinnerComp.vue';
@@ -83,6 +88,8 @@ const isSpinner = ref(false);
 const isLoading = ref(props.isMainSpinner);
 const skip = ref(0);
 const limit = ref(10);
+const agentsOnly = ref(false);
+let latestRequest = 0;
 const route = useRoute()
 
 watch(() => props.dataObj,(prValue) => {
@@ -99,6 +106,13 @@ watch(() => props.isMainSpinner,() => {
         commonGetQuery();
     }
 })
+
+function showAgentsOnly(on) {
+    if (agentsOnly.value === on) return;
+    agentsOnly.value = on;
+    isVisibleLoadMoreButton.value = true;
+    commonGetQuery();
+}
 
 function commonGetQuery(loadMore = false) {
     if (loadMore) {
@@ -118,11 +132,15 @@ function commonGetQuery(loadMore = false) {
         projectId: projectId,
         ...(props.fromProject ? {} : { taskId: props.dataObj._id }),
         skip: skip.value,
-        limit: limit.value
+        limit: limit.value,
+        ...(agentsOnly.value ? { madeBy: 'agent' } : {})
     }).toString();
 
+    // A filter switched while a page was loading must not have that page's rows land in the new list.
+    const request = ++latestRequest;
     apiRequest("get", `${env.ACTIVITYLOG}?${requestParams}`)
         .then((response) => {
+            if (request !== latestRequest) return;
             const res = response.data;
 
             if (res.length === 0) {
@@ -134,9 +152,6 @@ function commonGetQuery(loadMore = false) {
 
             res.forEach((element) => {
                 let dataObject = { ...element };
-                dataObject.displayDate = dataObject.createdAt == undefined 
-                    ? moment(new Date()).format('ddd, MMM DD, YYYY hh:mm:ss A') 
-                    : moment(new Date(dataObject?.createdAt)).format('ddd, MMM DD, YYYY hh:mm:ss A');
                 const user = getUser(dataObject.UserId);
                 dataObject.userData = {
                     image: user.Employee_profileImageURL ? user.Employee_profileImageURL : defaultpic,
@@ -150,6 +165,7 @@ function commonGetQuery(loadMore = false) {
             isLoading.value = false;
         })
         .catch((error) => {
+            if (request !== latestRequest) return;
             console.error(`ERROR in getting activity log of ${props.fromProject == false ? 'task' : 'project'}`, error);
             isSpinner.value = false; 
             isLoading.value = false;

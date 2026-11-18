@@ -18,8 +18,8 @@
                                                 'type': formData.priorityname.type,
                                                 'event': $event.event
                                             })" @input="confirmationErr=''"/>
-                                    <div class="invalid-feedback red" v-if="confirmationErr">{{ confirmationErr }}</div>
-                                    <div class="invalid-feedback red" v-else>{{ formData.priorityname.error }}</div>
+                                    <div class="invalid-feedback setting-task-priority-red" v-if="confirmationErr">{{ confirmationErr }}</div>
+                                    <div class="invalid-feedback setting-task-priority-red" v-else>{{ formData.priorityname.error }}</div>
                                 </div>
                                 <div class="from-group d-flex align-items-center" @click="$refs.fileInputUser.click()">
                                     <label class="cursor-pointer Upload_icon">
@@ -31,7 +31,7 @@
                             </div>
                             <div>
                                 <span class="Upload_img_span">
-                                        {{$t('Settings.maximum_image_size')}} <span class="black"><b>250x250px</b></span>.
+                                        {{$t('Settings.maximum_image_size')}} <span class="setting-task-priority-black"><b>{{ $t('Settings.image_dimensions', { width: 250, height: 250 }) }}</b></span>.
                                 </span>
                             </div>
                         </div>
@@ -47,7 +47,7 @@
                         <div class="con-vs-chip vs-chip-null">
                             <span class="text-chip vs-chip--text">
                                 <div class="priorityWrapper d-flex align-items-center">
-                                    <img v-if="!item.image || item.image === ''" :src="companyPrioritiesIcons(item.value)?.statusImage" alt="priority_img">
+                                    <img v-if="isBundledPriorityImage(item.image)" :src="companyPrioritiesIcons(item.value)?.statusImage" alt="priority_img">
                                     <WasabiImage v-else :data="{ url: item?.statusImage }" class="wasabi__priority-image"/>
                                     <span class="font_family_status">{{ item.name }}</span>
                                     <img class="cursor-pointer" :src="cancel_icon" alt="cancel" @click="deleteTaskPriority(index,item)" v-if="item.isDeleted && props.editPermission">
@@ -92,7 +92,7 @@ import { useStore } from "vuex";
 import SpinnerComp from '@/components/atom/SpinnerComp/SpinnerComp.vue';
 import { useValidation } from "@/composable/Validation.js";
 import ConfirmModal from '@/components/atom/Modal/Modal.vue';
-import { companyPrioritiesIcons } from '@/composable/commonFunction';
+import { companyPrioritiesIcons, isBundledPriorityImage } from '@/composable/commonFunction';
 import WasabiImage from "@/components/atom/WasabiIamgeCompp/WasabiIamgeCompp.vue";
 import { apiRequest, apiRequestWithoutCompnay } from '../../../services';
 import { useCustomComposable } from "@/composable";
@@ -388,4 +388,13 @@ async function removedata() {
     height: 100px;
 }
 @import './style.css'
+</style>
+
+<style scoped>
+.setting-task-priority-red {
+    color: var(--danger-ink);
+}
+.setting-task-priority-black {
+    color: var(--ink);
+}
 </style>

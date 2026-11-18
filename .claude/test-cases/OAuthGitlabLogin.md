@@ -25,7 +25,6 @@ Copy the **Application ID** and **Secret**, then set:
 | root `.env` | `GITLAB_CLIENT_SECRET` | the secret |
 | root `.env` | `GITLAB_BASE_OAUTH_URL` | `https://gitlab.com/oauth` |
 | root `.env` | `GITLAB_BASE_API_URL` | `https://gitlab.com/api/v4` (identity verify `/user`) |
-| root `.env` | `GITLAB_OAUTH_REQUIRED` | `true` (requires server-side verify via GitLab `/user`) |
 | `frontend/.env` | `VUE_APP_GITLAB_CLIENT_ID` | the **same** application id |
 | `frontend/.env` | `VUE_APP_GITLAB_BASE_OAUTH_URL` | `https://gitlab.com/oauth` |
 | `frontend/.env` | `VUE_APP_IS_GITLAB_LOGIN` | `true` |
@@ -55,7 +54,7 @@ Copy the **Application ID** and **Secret**, then set:
 
 | ID     | Title                                          | Precondition                                  | Steps                                                            | Expected Result                                                        | Actual Result | Status |
 |--------|------------------------------------------------|-----------------------------------------------|------------------------------------------------------------------|------------------------------------------------------------------------|---------------|--------|
-| GLL_006 | accessToken verification enforced             | `GITLAB_OAUTH_REQUIRED='true'`                | 1. Attempt login without a valid GitLab access token            | Rejected ("accessToken is required" / verification failed); no session |               | ⏳     |
+| GLL_006 | accessToken verification enforced             | Always on                | 1. Attempt login without a valid GitLab access token            | Rejected ("accessToken is required" / verification failed); no session |               | ⏳     |
 | GLL_007 | Blocked email cannot log in                   | Auth record `isBlocked = true`                | 1. Click GitLab and authorize that account                      | Rejected with the "email has been blocked" message                     |               | ⏳     |
 
 ## Coexistence

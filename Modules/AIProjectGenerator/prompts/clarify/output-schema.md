@@ -8,10 +8,11 @@ Return ONE JSON object, exactly this shape. No prose, no markdown fences.
   "questions": [
     {
       "id": "<kebab-case, unique>",
+      "point": "what_for_whom | done_when | existing | constraints | team",
       "category": "platform | features | audience | timeline | budget | compliance | integrations | tech_stack",
       "question": "<plain-language question, ends with '?'>",
       "rationale": "<1 sentence: what changes in the plan>",
-      "required": true,
+      "required": false,
       "type": "segmented | select_card | toggle_chips | toggle | preset_chips | text",
       "options": [ { "value": "...", "label": "...", "description": "..." } ],
       "recommended": "...",
@@ -22,7 +23,9 @@ Return ONE JSON object, exactly this shape. No prose, no markdown fences.
 ```
 
 - `understanding` is shown to the user as a "here's what I heard" line.
-- `questions` may be empty (`[]`) when the brief is already complete.
+- `questions` is empty (`[]`) when no point is missing.
+- `point` is required on every question and must be one of the missing
+  points named in the user message.
 - `description` on an option is optional (used mainly by `select_card`).
 
 ## Question types
@@ -42,11 +45,12 @@ sends back `{ "value": "custom", "customText": "..." }`.
 ## Server validation — write valid JSON the first time
 
 - `id` matches `^[a-z][a-z0-9-]{0,40}$` and is unique within `questions`.
-- `category` and `type` come from the enums above.
+- `point`, `category` and `type` come from the enums above.
 - `option.value` is unique within its question.
 - `recommended` matches the type: string for single-choice, array for
   `toggle_chips`, boolean for `toggle`, absent for `text`.
-- `options` has ≤ 8 entries. `questions` has ≤ 14 entries.
+- `options` has ≤ 8 entries. `questions` has at most the number the user
+  message allows, and never more than 3.
 
 A validation failure triggers a repair round — avoid it by following the
 rules above.

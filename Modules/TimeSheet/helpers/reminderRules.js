@@ -1,5 +1,6 @@
 // TIME-06 time-entry reminder rules. Pure — no I/O — shared by the service and tests.
 
+const { textHtml } = require('../../Template/emailText');
 const REMINDER_KEY = 'time_entry_reminder';
 
 /* Members who still need a nudge: those with an email who are NOT in the set of
@@ -23,7 +24,7 @@ const reminderSubject = () => 'Reminder: log your time';
 
 const reminderHtml = (name) => {
     const who = name ? String(name).split(' ')[0] : 'there';
-    return `<p>Hi ${who},</p>`
+    return `<p>Hi ${textHtml(who)},</p>`
         + `<p>This is a friendly reminder to log your time for today in AlianHub. `
         + `Keeping your timesheet up to date helps your team and keeps approvals on track.</p>`
         + `<p>— AlianHub</p>`;

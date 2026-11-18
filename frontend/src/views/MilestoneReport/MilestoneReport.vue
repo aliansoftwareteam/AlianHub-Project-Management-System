@@ -1,6 +1,6 @@
 <template>
     <SpinnerComp :is-spinner="loading" />
-    <div class="milestone-report-wrapper" v-if="!loading" :class="[{'error_404':!error404}]">
+    <div class="ah-page milestone-report-wrapper" v-if="!loading" :class="[{'error_404':!error404}]">
         <div v-if="error404">
             <div v-if="!currentCompany?.planFeature?.milstoneReport">
                 <UpgradePlan
@@ -15,17 +15,16 @@
                 <div class="product_top_bar d-flex justify-content-between align-items-center">
                     <div class="product_top_bar_left milestone-report-backarrow d-flex align-items-center">
                         <div class="prev_mile_report padding_right_report">
-                            <router-link :to="{name: 'Home', params: {cid: companyId}}">
-                                <img src="../../assets/images/svg/Home.svg" alt="backarrow" />
+                            <router-link class="mr-home" :to="{name: 'Home', params: {cid: companyId}}" :aria-label="$t('Milestone.home_link')">
+                                <span class="ah-mask-icon" :style="maskOf(homeIcon)" aria-hidden="true"></span>
                             </router-link>
                         </div>
                         <div class="breadcrumb d-flex align-items-center">
                             <div class="pipeline padding_right_report" v-if="clientWidth > 767">
-                                <router-link class="milestone_reports_family blue text-decoration-underline" :to="`/${companyId}/project`" >{{$t('UserTimesheet.back_projects')}}</router-link>
-                                <!-- <a href="#" >Back to Projects</a> -->
+                                <router-link class="milestone_reports_family" :to="`/${companyId}/project`" >{{$t('UserTimesheet.back_projects')}}</router-link>
                             </div>
                             <div class="pipeline padding_right_report">
-                                <span class="milestone_reports_family black">{{$t('UserTimesheet.milestone_reports')}}</span>
+                                <span class="milestone_reports_family">{{$t('UserTimesheet.milestone_reports')}}</span>
                             </div>
                         </div>
                     </div>
@@ -35,10 +34,10 @@
                         <div class="filterSection">
                             <div class="wf_filter" @click.stop="$refs.filter_ut_click_empty.click()">
                                 <span class="timesheet_user_filter">
-                                    <DropDown id="FilterDropDownSheet" :title="`status`" :dropDownClass="true" class="status_change_dropdown">
-                                        <template #button>
-                                            <button class="btn-white border cursor-pointer dot-btn" ref="filter_ut_click_empty">
-                                                <a href="#" class="link_disable_css">{{$t('Filters.filter_by')}} {{$t('ProjectDetails.status')}}</a>
+                                    <DropDown mode="listbox" id="FilterDropDownSheet" themed :title="$t('ProjectDetails.status')" :dropDownClass="true" class="status_change_dropdown">
+                                        <template #button="{ triggerAttrs }">
+                                            <button type="button" class="dot-btn" v-bind="triggerAttrs" ref="filter_ut_click_empty">
+                                                <span class="link_disable_css">{{$t('Filters.filter_by')}} {{$t('ProjectDetails.status')}}</span>
                                             </button>
                                         </template>
                                         <template #head v-if="clientWidth > 767">
@@ -60,11 +59,10 @@
                                         <span @click.stop.prevent class="user_name" :title="chip.name">
                                             {{chip.name}}
                                         </span>
-                                        <button @click.stop.prevent="handleFilter(chip,chipKey,'remove')" type="button" class="btn-close vs-chip--close cursor-pointer">
-                                            <img src="@/assets/images/cancel.png" alt="cancel"/>
-                                        </button>
+                                        <button @click.stop.prevent="handleFilter(chip,chipKey,'remove')" type="button" :aria-label="$t('Reports.remove_filter')">×</button>
                                     </span>
                                 </span>
+                                <span class="ah-mask-icon wf_filter__icon" :style="maskOf(filterIcon)" aria-hidden="true"></span>
                             </div>
                         </div>
                     </div>
@@ -103,16 +101,15 @@
             </div>
         </div>
         <div v-else class="h-100">
-            <NotFound />
+            <AppState kind="denied" />
         </div>
     </div>
 </template>
 
 <script setup>
-    //import
     import { useStore } from "vuex";
     import * as env from '@/config/env';
-    import NotFound from '../NotFound.vue'
+    import AppState from '@/components/molecules/AppState/AppState.vue'
     import { apiRequest } from "@/services";
     import '@/views/MilestoneReport/MilestoneReport.css';
     import { ref,inject,computed, watch, onMounted } from 'vue';
@@ -123,28 +120,29 @@
     import UpgradePlan from '@/components/atom/UpgradYourPlanComponent/UpgradYourPlanComponent.vue';
     import MilestoneReportThead from '@/components/atom/MilestoneReportThead/MilestoneReportThead.vue'
     import MilestoneReportTbody from '@/components/atom/MilestoneReportTbody/MilestoneReportTbody.vue'
-    // getter and permission
+    import { isOwnerOrAdmin } from "@/utils/roles";
+    import { maskOf } from '@/utils/iconMask';
+    import { useI18n } from 'vue-i18n';
+    const { t } = useI18n();
+    const homeIcon = require('@/assets/images/svg/Home.svg');
+    const filterIcon = require('@/assets/images/svg/filter_icon.svg');
     const { getters,dispatch} = useStore();
     const { checkPermission } = useCustomComposable();
-    // computed
     const currentCompany = computed(() => getters["settings/selectedCompany"])
     const projectsGetter = computed(() => getters["projectData/allProjects"]);
     const companyUserDetail = computed(() => getters["settings/companyUserDetail"]);
     const settingStatus = computed(() => getters['settings/projectMilestoneStatus']);
     const settingStatusFilter = ref(settingStatus.value);
-    // watch
     watch(settingStatus, (val) => {
         settingStatusFilter.value = JSON.parse(JSON.stringify(val.filter((x) => x.value !== 'CANCELLED' && x.value !== "REFUNDED").sort((a, b) => {if (a.value < b.value) return -1;if (a.value > b.value) return 1;return 0;})));
     });
-    // inject
     const clientWidth = inject("$clientWidth");
     const companyId = inject('$companyId');
-    // Variable 
     const projects = ref([]);
     const loading = ref(false);
     const objectProjectCurrency = ref({});
     const daysOrMonth = ref([]);
-    const settingNotFound =ref([{'name':'no Filter'}]);
+    const settingNotFound = ref([{ name: t('Milestone.no_filter'), isPlaceholder: true }]);
     const selectedFilters = ref([]);
     const statusNameArray = ref([]);
     const endDateFilter = ref('');
@@ -172,7 +170,7 @@
                 let publicQuery = {
                     isPrivateSpace:false
                 }
-                if(companyUserDetail.value.roleType !== 1 && companyUserDetail.value.roleType !== 2 && !getters["settings/rules"].toggle.showAllProjects) {
+                if(!isOwnerOrAdmin(companyUserDetail.value.roleType) && !getters["settings/rules"].toggle.showAllProjects) {
                     publicQuery.AssigneeUserId = {
                         $in:[uid]
                     }
@@ -183,7 +181,7 @@
                 let privateQuery = {
                     isPrivateSpace:true
                 }
-                if(companyUserDetail.value.roleType !== 1 && companyUserDetail.value.roleType !== 2) {
+                if(!isOwnerOrAdmin(companyUserDetail.value.roleType)) {
                     privateQuery.AssigneeUserId = {
                         $in:[uid]
                     }
@@ -246,29 +244,27 @@
                                                         resolve();
                                                     }catch(error){
                                                         loading.value = false;
-                                                        reject()
-                                                        console.error("error",error)
+                                                        reject(error)
                                                     }
                                                 }else{
                                                     objectProjectCurrency.value = {};
                                                     loading.value = false;
-                                                    reject();
+                                                    resolve();
                                                 }
                                             }else{
                                                 objectProjectCurrency.value = {};
                                                 loading.value = false;
-                                                reject();
+                                                resolve();
                                             }
-                                        }).catch(()=>{
+                                        }).catch((error)=>{
                                             objectProjectCurrency.value = {};
                                             loading.value = false;
-                                            reject();
+                                            reject(error);
                                         });
                                     } catch (error) {
                                         objectProjectCurrency.value = {};
                                         loading.value = false;
-                                        console.error(error)
-                                        reject()
+                                        reject(error)
                                     }
                                 })
                             }
@@ -353,10 +349,9 @@
                                     loading.value = false;
                                     resolve();
                                 }catch(error){
-                                    reject();
                                     loading.value = false;
-                                    console.error("error",error);
                                     objectProjectCurrency.value = {};
+                                    reject(error);
                                 }
                             }else{
                                 loading.value = false;
@@ -368,16 +363,15 @@
                             objectProjectCurrency.value = {};
                             resolve();
                         }
-                    }).catch(()=>{
+                    }).catch((error)=>{
                         loading.value = false;
                         objectProjectCurrency.value = {};
-                        reject();
+                        reject(error);
                     });
                 } catch (error) {
                     loading.value = false;
-                    console.error(error)
                     objectProjectCurrency.value = {};
-                    reject()
+                    reject(error)
                 }
             })
         }
@@ -395,7 +389,7 @@
         daysOrMonth.value = value;
     };
     const handleFilter = (ele,ind,action) => {
-        if(ele.name == "no Filter"){
+        if(ele.isPlaceholder){
             return;
         }
         if(action === 'add'){

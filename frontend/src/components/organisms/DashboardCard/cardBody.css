@@ -1,0 +1,66 @@
+/* Shared atoms for dashboard card bodies (handoff 20a–20d). Every card body is
+   built from these, which is what makes thirty cards read as one product. A figure is the
+   look's largest type plus a fixed step, so it grows and shrinks with the look. */
+
+.dc-body { display: flex; flex-direction: column; gap: calc(var(--sp-3) + 1px); height: 100%; min-height: 0; }
+
+.dc-metric { display: flex; align-items: baseline; gap: var(--sp-3); }
+.dc-num { font: 600 calc(var(--fs-xl, 20px) + 6px)/1 var(--font-ui); letter-spacing: -.7px; color: var(--ink); }
+.dc-num--mono { font-family: var(--font-mono); letter-spacing: -1px; font-size: calc(var(--fs-xl, 20px) + 4px); }
+.dc-num--danger { color: var(--danger); }
+.dc-num--sm { font-size: var(--fs-xl, 20px); letter-spacing: -.5px; }
+.dc-sub { font: var(--text-small); font-size: var(--fs-sm, 11.5px); color: var(--ink-2); }
+
+.dc-stats { display: flex; gap: calc(var(--sp-7) + 2px); flex-wrap: wrap; }
+.dc-stat__num { font: 600 var(--fs-xl, 19px)/1.1 var(--font-ui); letter-spacing: -.4px; color: var(--ink); }
+.dc-stat__num--danger { color: var(--danger); }
+.dc-stat__num--ok { color: var(--ok-ink); }
+.dc-stat__label { font-size: var(--fs-sm, 11px); color: var(--ink-2); }
+
+.dc-track { flex: 1 1 auto; height: 8px; border-radius: 99px; background: var(--hairline); overflow: hidden; }
+.dc-track--tall { height: 16px; border-radius: var(--r-sm, 4px); }
+.dc-fill { height: 100%; border-radius: 99px; background: var(--brand); }
+.dc-fill--danger { background: var(--danger); }
+.dc-fill--ok { background: var(--ok); }
+
+.dc-row { display: flex; align-items: center; gap: calc(var(--sp-3) + 1px); min-width: 0; }
+.dc-row__name { width: 84px; flex: none; font-size: var(--fs-sm, 11.5px); color: var(--ink); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.dc-row__val { width: 52px; flex: none; text-align: right; font: var(--text-data); color: var(--ink-2); }
+.dc-row__val--danger { color: var(--danger-ink); }
+.dc-row__val--ok { color: var(--ok-ink); }
+
+.dc-list { display: flex; flex-direction: column; }
+.dc-item {
+    display: flex;
+    align-items: center;
+    gap: var(--sp-3);
+    padding: var(--sp-2) 2px;
+    border-bottom: 1px solid var(--hairline);
+    min-width: 0;
+    font-size: var(--fs-md, 12.5px);
+    color: var(--ink);
+}
+.dc-item:last-child { border-bottom: 0; }
+.dc-item--click { box-sizing: border-box; min-height: var(--hit-min); cursor: pointer; border-radius: var(--r-chip); }
+.dc-item--click:hover { background: var(--surface-hover); }
+.dc-item__text { flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.dc-item__meta { font: var(--text-data); color: var(--ink-2); flex: none; }
+
+.dc-legend { display: flex; flex-wrap: wrap; gap: var(--sp-4); font-size: var(--fs-sm, 11px); color: var(--ink-2); }
+.dc-legend__key { display: inline-block; width: 8px; height: 8px; border-radius: 2px; vertical-align: middle; margin-right: var(--sp-1); }
+
+.dc-note {
+    padding: var(--sp-3) var(--sp-4);
+    background: var(--surface-2);
+    border-radius: var(--r-input);
+    font-size: var(--fs-sm, 11.5px);
+    line-height: var(--lh-body, 1.45);
+    color: var(--ink-label);
+}
+
+.dc-spark { display: flex; align-items: flex-end; gap: 3px; height: 30px; }
+.dc-spark__bar { flex: 1 1 0; border-radius: 3px; background: var(--brand-tint); min-height: 2px; }
+.dc-spark__bar--strong { background: var(--brand); }
+.dc-spark__bar--danger { background: var(--danger); }
+.dc-spark__labels { display: flex; justify-content: space-between; font: var(--text-label); color: var(--ink-label); }
+.dc-spark__labels span { flex: 1 1 0; text-align: center; }

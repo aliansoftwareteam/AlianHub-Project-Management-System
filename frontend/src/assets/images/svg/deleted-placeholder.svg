@@ -22,7 +22,7 @@
   </g>
 
   <!-- label -->
-  <text x="200" y="220" font-family="Segoe UI, Roboto, Arial" font-size="16" fill="#6b7785" text-anchor="middle">
+  <text x="200" y="220" font-family="Inter Tight, Inter, system-ui, -apple-system, Segoe UI, sans-serif" font-size="16" fill="#6b7785" text-anchor="middle">
     Screenshot deleted
   </text>
 </svg>

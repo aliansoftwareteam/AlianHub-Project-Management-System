@@ -1,56 +1,106 @@
 <template>
-    <div class="kanban-board style-scroll-6-px">
-        <div v-for="(column, columnIndex) in columns" :key="column.key" class="kanban-column" @drop.prevent="onDrop(columnIndex)">
-            <!-- Card Area -->
-            <div class="kanban-card-wrapper" :style="{ backgroundColor: groupValue === 0 ? column.textColor + '14' : '#f4f5f7' }">
-                <!-- Add Task Section --> 
-                <div class="d-flex justify-content-between align-items-center" :class="{ 'mb-10px': column.tasksArray?.length }">
-                    <span class="d-flex justify-content-between align-items-center">
-                        <span class="status-color-dot" :style="`background-color: ${column.textColor || '#000'}`"></span>
-                        <span class="column-title">{{ column.name }}</span>
-                        <span class="task-count" v-if="column.tasksArray?.length">{{ tasksCount(column) }}</span>
-                    </span>
-                    <img class="cursor-pointer add-task-icon" src="@/assets/images/svg/pluss.svg" alt="addTask" @click="showAddInput(column.key)">
+    <div ref="boardRoot" class="kanban-board style-scroll-6-px ah-scroll">
+        <div
+            v-for="(column, columnIndex) in columns"
+            :key="column.key"
+            class="kanban-column"
+            role="group"
+            :aria-label="column.name"
+            :class="{ 'kanban-column--danger': isBlockedColumn(column), 'is-drop-target': hoveredColumnIndex === columnIndex }"
+            @dragover.prevent="hoveredColumnIndex = columnIndex"
+            @dragleave="onColumnDragLeave"
+            @drop="hoveredColumnIndex = null"
+        >
+            <div class="kanban-card-wrapper">
+                <div class="column-head column-head-wrap">
+                    <span class="status-color-dot" :style="`background-color: ${column.textColor || 'var(--ink-3)'}`"></span>
+                    <span class="column-title" :title="column.name">{{ column.name }}</span>
+                    <button
+                        type="button"
+                        class="task-count"
+                        :class="{ 'task-count--at': atWipLimit(column), 'task-count--over': overWipLimit(column) }"
+                        :title="overWipLimit(column) ? $t('Gaps.wip_over', { limit: wipLimit(column) }) : $t('Projects.wip_set')"
+                        :aria-expanded="wipFor === column.key"
+                        @click.stop="wipFor = wipFor === column.key ? '' : column.key"
+                    >{{ wipLimit(column) > 0 ? $t('Projects.wip_chip', { n: tasksCount(column), limit: wipLimit(column) }) : tasksCount(column) }}</button>
+                    <span class="column-head__spacer"></span>
+                    <div v-if="wipFor === column.key" class="ah-pop wip-pop" @click.stop>
+                        <div class="ah-label">{{ $t('Projects.wip_limit') }}</div>
+                        <input class="ah-input" type="number" min="0" :value="wipLimit(column) || ''" :placeholder="$t('Projects.wip_none')" @change="setWipLimit(column, $event.target.value)">
+                        <p class="ah-small wip-pop__note">{{ wipError || $t('Gaps.wip_note') }}</p>
+                    </div>
+                    <button
+                        v-if="!column.agentWork"
+                        type="button"
+                        class="add-task-btn"
+                        :title="$t('Projects.add_task_to_column', { name: column.name })"
+                        :aria-label="$t('Projects.add_task_to_column', { name: column.name })"
+                        @click="showAddInput(column.key)"
+                    >
+                        <span class="ah-mask-icon add-task-icon" :style="maskOf(plusIcon)" aria-hidden="true"></span>
+                    </button>
                 </div>
                 <div class="add-task-section" v-if="activeColumnId === column.key" :id="column.key">
                     <BoardViewTaskCreateVue :data="column" :groupValue="groupValue" @toggle="(val) => showAddInput(val)" :sprintData="{}" :sprintId="sprintId" />
                 </div>
 
-                <!-- Tasks List -->
-                <Draggable 
-                    class="kanban-cards"
-                    :list="column.tasksArray"
-                    group="tasks"
-                    item-key="id"
-                    @start="onDragStart"
-                    @change="updateEvent($event, column)"
-                    @scroll="checkScroll($event, column)"
-                    :style="`max-height: ${columnMaxHeight(column.key)};`"
-                    :disabled="isDisabled"
-                >
-                    <template #item="{ element }">
-                        <div class="kanban-card hover-bg-light-lavender" draggable="true" @dragstart="(e) => onManualDragStart(cardData, e)">
-                            <BoardViewDisplayCardComponent
-                                :data="element"
-                                :groupValue="groupValue"
-                                :isSubTask="false"
-                            />
-                        </div>
-                    </template>
-                </Draggable>
+                <div class="kanban-cards-area">
+                    <Draggable
+                        class="kanban-cards"
+                        :list="column.tasksArray"
+                        :group="{ name: 'tasks', put: (to, from, card) => !column.dropDisabled && groupTakesTask(column, card?.dataset?.taskType) }"
+                        item-key="id"
+                        @change="updateEvent($event, column)"
+                        @scroll="checkScroll($event, column)"
+                        :style="`max-height: ${columnMaxHeight(column.key)};`"
+                        :disabled="isDisabled || column.agentWork"
+                        :delay="clientWidth <= 767 ? 250 : 0"
+                        :delayOnTouchOnly="true"
+                        :emptyInsertThreshold="24"
+                    >
+                        <template #item="{ element }">
+                            <div class="kanban-card" :class="{ 'is-agent-run': !!runFor(element._id) }" :data-task-type="element.TaskTypeKey" v-bind="taskNavAttrs(element)">
+                                <BoardViewDisplayCardComponent
+                                    :data="element"
+                                    :itemData="column"
+                                    :groupValue="groupValue"
+                                    :isSubTask="false"
+                                    :agentRun="runFor(element._id)"
+                                    :agentProposal="proposalFor(element._id)"
+                                />
+                            </div>
+                        </template>
+                    </Draggable>
+                    <OtherProjectRows as="card" :rows="otherRows.placed[column.key] || []" :projects="otherProjects" :list="viewedList" />
+                    <p v-if="!column.tasksArray?.length && !otherRows.placed[column.key]?.length" class="column-empty">{{ $t('Projects.column_empty_drop') }}</p>
+                </div>
+
+                <button v-if="moreCount(column) > 0" type="button" class="more-count" @click="loadMore(column)">{{ $t('Projects.more_count', { n: moreCount(column) }) }}</button>
             </div>
 
-            <!-- Drop Area -->
             <div class="column-drop-area" :class="{ 'highlight-drop': hoveredColumnIndex === columnIndex }"></div>
+        </div>
+        <div v-if="otherRows.unplaced.length || otherTruncated" class="kanban-column" data-other-project-column>
+            <div class="kanban-card-wrapper">
+                <div class="column-head column-head-wrap">
+                    <span class="column-title" :title="$t('TaskLists.other_projects')">{{ $t('TaskLists.other_projects') }}</span>
+                </div>
+                <div class="kanban-cards-area">
+                    <OtherProjectRows as="card" :rows="otherRows.unplaced" :projects="otherProjects" :list="viewedList" :truncated="otherTruncated" />
+                </div>
+            </div>
         </div>
     </div>
 </template>
 
 <script setup>
-import { ref, defineProps, nextTick, inject, watch, onMounted, computed } from 'vue'
+import { ref, defineProps, nextTick, inject, provide, watch, onMounted, onUnmounted, computed } from 'vue'
 import Draggable from 'vuedraggable'
 import { useStore } from "vuex";
-import Cookies from "js-cookie";
+import { useI18n } from "vue-i18n";
+import { useToast } from "vue-toast-notification";
+import { isAddedRow, putBack } from "@/views/Projects/composables/taskHomeMark";
+import OtherProjectRows from "@/views/Projects/components/OtherProjectRows.vue";
 
 //Cmponents
 import BoardViewTaskCreateVue from "@/views/Projects/Kanban/BoardViewTaskCreate"
@@ -58,10 +108,20 @@ import BoardViewDisplayCardComponent from '@/views/Projects/Kanban/BoardViewDisp
 
 // Utils
 import { useUpdateTasks } from "../helper";
+import { groupTakesTask } from "@/views/Projects/composables/customFieldQuery";
 import * as env from '@/config/env';
+import { indexRepairBody, indexRepairRows, plainGroupValue } from "@/views/Projects/composables/taskGroupIndex";
 import { apiRequest } from "../../../services";
 import { useCustomComposable } from "@/composable";
 import { useTaskSelection } from "@/composable/useTaskSelection.js";
+import { useProjectAgents } from "@/views/Projects/Kanban/useProjectAgents";
+import { tabUpdateMarker } from "@/utils/taskUpdateMarker";
+import { taskNavAttrs } from "@/components/organisms/TaskDetailOverlay/taskNavigation";
+import { useTaskSequenceSource } from "@/components/organisms/TaskDetailOverlay/useTaskOverlay";
+import { useSubtaskTree } from "@/views/Projects/composables/subtaskTree";
+import { maskOf } from "@/utils/iconMask";
+
+const plusIcon = require("@/assets/images/svg/pluss.svg");
 
 //Props
 const props = defineProps({
@@ -70,12 +130,28 @@ const props = defineProps({
         default: () => []
     },
     group: {
-        type: Number
+        type: [Number, String]
     },
     sprintId: {
         type: String
+    },
+    /** Cards of tasks added to this list from other projects: `placed` by column key, `unplaced` when no column is named for them. */
+    otherRows: {
+        type: Object,
+        default: () => ({ placed: {}, unplaced: [] })
+    },
+    otherProjects: {
+        type: Object,
+        default: () => ({})
+    },
+    otherTruncated: {
+        type: Boolean,
+        default: false
     }
 })
+
+const boardRoot = ref(null)
+useTaskSequenceSource(boardRoot)
 
 // Variables
 const columns = ref(props.data)
@@ -83,15 +159,21 @@ const groupValue = ref(props.group)
 const activeColumnId = ref(null)
 const companyId = inject("$companyId")
 const projectData = inject("selectedProject")
+const viewedList = computed(() => ({ sprintId: props.sprintId, projectId: projectData.value?._id }))
 const showArchiveVar = inject("showArchived");
 const clientWidth = inject("$clientWidth");
-const draggedCard = ref(null)
 const hoveredColumnIndex = ref(null)
-const isExternalDrop = ref(false)
 const timer = ref(null)
 const { dispatch, commit } = useStore()
+const { t } = useI18n()
+const $toast = useToast();
 const { updateTaskByGroup } = useUpdateTasks()
 const { checkPermission } = useCustomComposable();
+
+// The watch is shared with the project header, which owns its lifetime; the
+// board only makes sure it is running for the project on screen.
+const { start: startAgentWatch, runFor, proposalFor } = useProjectAgents();
+watch(() => projectData.value?._id, (id) => { if (id) startAgentWatch(id); }, { immediate: true });
 
 const selection = useTaskSelection();
 const { setActiveView, setActiveProject } = selection;
@@ -100,16 +182,35 @@ watch(() => projectData.value?._id, (newId) => {
     if (newId) setActiveProject(String(newId));
 }, { immediate: true });
 
+/* The open subtask lists are held here, not in the card, so a card keeps its list when it is
+   redrawn or dropped in another column. */
+const subtasks = useSubtaskTree({
+    project: projectData,
+    sprintId: computed(() => columns.value[0]?.sprintId || props.sprintId),
+    rows: computed(() => columns.value.flatMap((column) => column.tasksArray || [])),
+    showArchived: showArchiveVar,
+    searched: inject("searchedTask", ref(false))
+});
+const subtaskFor = ref("");
+provide("boardSubtaskTree", {
+    ...subtasks,
+    subtaskFor,
+    startSubtask: (task, column) => {
+        subtasks.expand(task, column);
+        subtaskFor.value = String(task._id);
+    },
+    cancelSubtask: () => { subtaskFor.value = ""; }
+});
+
 // Computed properties
 const isDisabled = computed(() => {
-    const shouldDisableOnWidth = clientWidth.value <= 768;
+    // 12e keeps drag on the phone; the 250ms touch delay above lets a swipe
+    // scroll the column instead of picking a card up.
     const shouldDisableOnPermission = (checkPermission('task.task_list', projectData.value?.isGlobalPermission) !== true || checkPermission('task.task_status', projectData.value?.isGlobalPermission) !== true);
     const shouldDisableOnArchive = (showArchiveVar.value !== false);
-    // Disable drag when multi-select is active (>=2 selected). Multi-move
-    // happens via the BulkActionBar's "Move" action — keeps the drag
-    // behavior unambiguous for the user.
+    // With two or more cards selected, moving goes through the bulk bar, so a drag never means "move all".
     const shouldDisableOnMultiSelect = selection.count.value >= 2;
-    const finalDisabled = shouldDisableOnWidth || shouldDisableOnPermission || shouldDisableOnArchive || shouldDisableOnMultiSelect;
+    const finalDisabled = shouldDisableOnPermission || shouldDisableOnArchive || shouldDisableOnMultiSelect;
     return finalDisabled;
 });
 
@@ -141,49 +242,21 @@ onMounted(() => {
 })
 
 function init() {
-    let taskWithoutFilter = []
-    let taskArray = [];
+    const taskListPermission = checkPermission('task.task_list', projectData.value?.isGlobalPermission);
+    const rows = columns.value.flatMap((column) => indexRepairRows(column.tasksArray, column, taskListPermission));
+    if (!rows.length) return;
 
-    columns.value.forEach((data) => {
-        let withoutIndexTask = data.tasksArray?.filter((x) => {
-            return (x[data.indexName] === undefined || x[data.indexName] === null) && x.TaskKey !== '--'
-        })
-        if (withoutIndexTask?.length > 0) {
-            withoutIndexTask.map((x) => taskWithoutFilter.push({ data: x._id, item: data, taskKey: x.TaskKey }))
-            withoutIndexTask.map((x) => taskArray.push(x));
-        }
-    })
-
-    if (!(taskWithoutFilter.length === 0 && taskArray.length === 0)) {
-        var newObj = { pid: projectData.value._id, sprintId: columns.value[0].sprintId || props.sprintId, tasksArray: taskArray, indexName: columns.value[0].indexName };
-        commit("projectData/mutateTaskIndex", newObj)
-        let count = 0;
-
-        let countFunction = async (row) => {
-            if (count >= taskWithoutFilter.length) {
-                return;
-            } else {
-                if (row.taskKey != '--') {
-                    await apiRequest("post", env.ONLOAD_UPDATE_TASK_INDEX, {
-                        taskUpdate: row,
-                        companyId: companyId.value,
-                    }).then(() => {
-                        count++;
-                        countFunction(taskWithoutFilter[count])
-                    })
-                    .catch((error) => {
-                        console.error("ERROR in update project history: ", error);
-                        count++;
-                        countFunction(taskWithoutFilter[count])
-                    })
-                } else {
-                    count++;
-                    countFunction(taskWithoutFilter[count]);
-                }
-            }
-        }
-        countFunction(taskWithoutFilter[count])
-    }
+    commit("projectData/mutateTaskIndex", { pid: projectData.value._id, sprintId: columns.value[0].sprintId || props.sprintId, tasksArray: rows.map((row) => ({ _id: row.data })), indexName: columns.value[0].indexName });
+    const next = (index) => {
+        if (index >= rows.length) return;
+        apiRequest("post", env.ONLOAD_UPDATE_TASK_INDEX, indexRepairBody(rows[index], companyId.value))
+            .then(() => next(index + 1))
+            .catch((error) => {
+                console.error("ERROR in update task index: ", error);
+                next(index + 1);
+            });
+    };
+    next(0);
 }
 
 function debouncer(timeout = 1000) {
@@ -197,42 +270,10 @@ function debouncer(timeout = 1000) {
     })
 }
 
-const onDragStart = (evt) => {
-    const draggedElement = evt.item?._underlying_vm_;
-    if (draggedElement) {
-        draggedCard.value = draggedElement;
-        isExternalDrop.value = true;
-    }
-}
-
-const onManualDragStart = (card, event) => {
-    if (!event.dataTransfer.types.includes('application/json')) {
-        draggedCard.value = card
-        isExternalDrop.value = true
-        event.dataTransfer.setData("application/json", JSON.stringify(card))
-    }
-}
-
-const onDrop = (columnIndex) => {
-    if (!draggedCard.value || !isExternalDrop.value) return
-
-    columns.value.forEach((col) => {
-        const index = col.tasksArray.findIndex((task) =>
-            task._id === draggedCard.value._id
-        )
-        if (index !== -1) {
-            col.tasksArray.splice(index, 1)
-        }
-    })
-
-    const droppedCard = draggedCard.value
-    columns.value[columnIndex].tasksArray.push(droppedCard)
-
-    updateTaskByGroup(droppedCard, columns.value[columnIndex], groupValue.value, null, true)
-
-    draggedCard.value = null
-    isExternalDrop.value = false
-    hoveredColumnIndex.value = null
+// dragleave also fires when the pointer crosses into a child, which would blink
+// the highlight off over every card in the column.
+const onColumnDragLeave = (event) => {
+    if (!event.currentTarget.contains(event.relatedTarget)) hoveredColumnIndex.value = null;
 }
 
 const showAddInput = (columnId) => {
@@ -257,7 +298,6 @@ function getPaginatedTasks(params) {
 }
 
 const updateEvent = (event, task) => {
-    isExternalDrop.value = false;
     let element = null;
     let index = null;
     if (event.added) {
@@ -270,8 +310,17 @@ const updateEvent = (event, task) => {
     }
     if (element) {
         if (event.added) {
-            updateTaskByGroup(element, task, groupValue.value, null, true);
+            updateTaskByGroup(element, task, groupValue.value, null, true).catch((error) => console.error("ERROR in board drop: ", error));
         }
+        /* A card of a task added to this list takes the column it is dropped in; its place is kept by the list it lives in. */
+        if (isAddedRow(element, columns.value[0]?.sprintId || props.sprintId)) {
+            if (event.moved) {
+                putBack(task.tasksArray, event.moved);
+                $toast.info(t("TaskLists.order_kept_at_home"), { position: "top-right" });
+            }
+            return;
+        }
+        if (task.customFieldId) return;
         let relevantIndex
         let tempIndex;
         let taskDt = columns.value.find((x) => x.searchValue === task.searchValue);
@@ -308,14 +357,14 @@ const updateEvent = (event, task) => {
                 status: updatedStatus,
                 'statusType': task.type,
                 'statusKey': task.key,
-                'updateToken': { user: Cookies.get('accessToken'), timeStamp: uniqueeTime },
+                'updateToken': tabUpdateMarker(uniqueeTime),
                 'islocalSnapStop': true
             }
         }
         if (groupValue.value === 2) {
             UpdateData = {
                 Task_Priority: task.value,
-                'updateToken': { user: localStorage.getItem('updateToken'), timeStamp: uniqueeTime },
+                'updateToken': tabUpdateMarker(uniqueeTime),
                 'islocalSnapStop': true,
                 Updated_At: new Date()
             }
@@ -323,14 +372,14 @@ const updateEvent = (event, task) => {
         if (groupValue.value === 1) {
             UpdateData = {
                 AssigneeUserId: task.value !== '' ? task.value.split("_") : [],
-                'updateToken': { user: localStorage.getItem('updateToken'), timeStamp: uniqueeTime },
+                'updateToken': tabUpdateMarker(uniqueeTime),
                 'islocalSnapStop': true
             }
         }
         if (groupValue.value === 3) {
             UpdateData = {
                 DueDate: new Date(task.searchValue * 1000),
-                'updateToken': { user: localStorage.getItem('updateToken'), timeStamp: uniqueeTime },
+                'updateToken': tabUpdateMarker(uniqueeTime),
                 Updated_At: new Date(),
                 'islocalSnapStop': true
             }
@@ -344,7 +393,7 @@ const updateEvent = (event, task) => {
             isFirstWithRecord: (index === 0 && taskDt.tasksArray.length !== 1 && taskDt.tasksArray.length !== 0) ? true : false,
             indexName: task.indexName,
             sprintId: element.sprintId,
-            relevantKey: task.searchValue,
+            relevantKey: plainGroupValue(task.searchValue),
             searchKey: task.searchKey,
             taskKey: element.TaskKey,
             updateData: UpdateData
@@ -378,5 +427,110 @@ const tasksCount = (column) => {
         ? countFromTotal
         : column?.tasksArray?.length || 0;
 };
+
+// The column header counts every task in the status; the list itself is paged.
+const moreCount = (column) => Math.max(0, tasksCount(column) - (column?.tasksArray?.length || 0));
+
+// A column that never overflows never fires checkScroll, so the remainder needs
+// its own way in.
+const loadMore = (column) => getPaginatedTasks({ pid: projectData.value?._id, sprintId: column.sprintId, item: column, fetchNew: true });
+
+const isBlockedColumn = (column) => /block/i.test(String(column?.name || ''));
+
+// The limit lives on the status entry inside project.taskStatusData, which the
+// board columns are already built from — so `column.wipLimit` is the value once
+// one has been set. The per-viewer localStorage map is only a fallback: it still
+// answers for projects that never had a limit saved, and for the assignee /
+// priority / due-date groupings, which have no status document to hang one on.
+const WIP_KEY = 'ah.wip';
+const wipFor = ref('');
+const wipLimits = ref({});
+// A saved limit, held here as well as written back to the project, because the
+// board columns are rebuilt from a grouping snapshot taken before the save.
+const wipSaved = ref({});
+const wipError = ref('');
+
+const readWipLimits = () => {
+    try {
+        wipLimits.value = JSON.parse(localStorage.getItem(`${WIP_KEY}.${projectData.value?._id}`) || '{}');
+    } catch (error) {
+        wipLimits.value = {};
+    }
+};
+readWipLimits();
+watch(() => projectData.value?._id, () => { wipSaved.value = {}; readWipLimits(); });
+watch(wipFor, () => { wipError.value = ''; });
+
+const wipLimit = (column) => {
+    const key = column?.key;
+    const saved = Object.prototype.hasOwnProperty.call(wipSaved.value, key) ? wipSaved.value[key] : column?.wipLimit;
+    if (saved !== undefined && saved !== null && saved !== '') return Number(saved) || 0;
+    return Number(wipLimits.value[key] || 0);
+};
+const atWipLimit = (column) => {
+    const limit = wipLimit(column);
+    return limit > 0 && tasksCount(column) >= limit;
+};
+const overWipLimit = (column) => {
+    const limit = wipLimit(column);
+    return limit > 0 && tasksCount(column) > limit;
+};
+
+const rememberWipLocally = (column, limit) => {
+    wipLimits.value = { ...wipLimits.value, [column.key]: limit };
+    try {
+        localStorage.setItem(`${WIP_KEY}.${projectData.value?._id}`, JSON.stringify(wipLimits.value));
+    } catch (error) {
+        // Private-mode storage refuses writes; the in-memory map still answers.
+    }
+};
+
+const applyWipLimit = (column, limit) => {
+    wipSaved.value = { ...wipSaved.value, [column.key]: limit };
+    const statuses = projectData.value?.taskStatusData;
+    const entry = Array.isArray(statuses) ? statuses.find((s) => String(s.key) === String(column.key)) : null;
+    if (entry) entry.wipLimit = limit;
+};
+
+const setWipLimit = async (column, value) => {
+    const limit = Math.max(0, Number(value) || 0);
+    const projectId = projectData.value?._id;
+    if (Number(groupValue.value) !== 0 || !projectId) {
+        rememberWipLocally(column, limit);
+        wipFor.value = '';
+        return;
+    }
+    wipError.value = '';
+    try {
+        const body = (await apiRequest('post', env.PROJECT_WIP_LIMIT, {
+            companyId: companyId.value,
+            projectId: String(projectId),
+            statusKey: column.key,
+            wipLimit: limit || null,
+        }))?.data;
+        if (!body || body.status !== true) {
+            wipError.value = (body && body.statusText) || t('Gaps.wip_save_failed');
+            return;
+        }
+        applyWipLimit(column, body.data?.wipLimit ?? null);
+        rememberWipLocally(column, limit);
+        wipFor.value = '';
+    } catch (error) {
+        wipError.value = t('Gaps.wip_save_failed');
+    }
+};
+
+// "+ Task" in the project header (ProjectHeader) bumps this counter; the board
+// answers by opening the first column's create row.
+const addTaskRequest = inject('addTaskRequest', null);
+if (addTaskRequest) {
+    watch(addTaskRequest, () => {
+        const first = columns.value[0];
+        if (first) showAddInput(first.key);
+    });
+}
+
+const closeWipPop = () => { wipFor.value = ''; };
+document.addEventListener('click', closeWipPop);
+onUnmounted(() => document.removeEventListener('click', closeWipPop));
 </script>
-<style src="./new-style.css" scoped />

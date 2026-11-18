@@ -1,9 +1,9 @@
 /**
- * Unit check for the task-type migration's pure logic (scripts/migrate-task-type-icons.js).
+ * Unit check for the task-type migration's pure logic (migrations/lib/taskTypeIcons.js).
  * Requires only the exported helpers — no DB connection. Run: node .claude/tests/test-task-type-migration.js
  */
 const assert = require('assert');
-const { rekey, mapFor, isBadKey, STATUS_LIKE } = require('../../scripts/migrate-task-type-icons');
+const { rekey, mapFor, isBadKey, STATUS_LIKE } = require('../../migrations/lib/taskTypeIcons');
 
 // isBadKey: NaN / non-integer / missing are bad; finite integers are fine.
 assert.strictEqual(isBadKey(NaN), true);

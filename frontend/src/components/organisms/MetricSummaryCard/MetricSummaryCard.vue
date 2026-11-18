@@ -82,13 +82,13 @@ onMounted(load);
 
 <style scoped>
 .msc { height: 100%; width: 100%; padding: 6px 8px; overflow: auto; display: flex; flex-direction: column; }
-.msc-msg { color: #9aa0b4; font-size: 12px; padding: 10px; }
-.msc-number { font-size: 40px; font-weight: 700; color: #2f3a8f; text-align: center; margin-top: auto; }
-.msc-number-label { font-size: 12px; color: #6b7280; text-align: center; margin-bottom: auto; }
+.msc-msg { color: var(--ink-2); font-size: 12px; padding: 10px; }
+.msc-number { font-size: 40px; font-weight: 700; color: var(--brand); text-align: center; margin-top: auto; }
+.msc-number-label { font-size: 12px; color: var(--ink-2); text-align: center; margin-bottom: auto; }
 .msc-bars { display: flex; flex-direction: column; gap: 7px; }
 .msc-bar-row { display: flex; align-items: center; gap: 8px; }
-.msc-label { width: 38%; font-size: 12px; color: #3a3f52; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.msc-track { flex: 1; height: 14px; background: #eef0f6; border-radius: 4px; overflow: hidden; }
-.msc-fill { height: 100%; background: #2f3a8f; }
-.msc-val { width: 44px; text-align: right; font-size: 12px; color: #3a3f52; }
+.msc-label { width: 38%; font-size: 12px; color: var(--ink); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.msc-track { flex: 1; height: 14px; background: var(--track); border-radius: 4px; overflow: hidden; }
+.msc-fill { height: 100%; background: var(--brand); }
+.msc-val { width: 44px; text-align: right; font-size: 12px; color: var(--ink); }
 </style>

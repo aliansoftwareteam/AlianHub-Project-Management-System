@@ -1,6 +1,6 @@
 <template>
     <div>
-        <span class="cursor-pointer black project-type-name" :class="{'font-size-13 font-weight-400' : clientWidth > 767, 'font-size-16' : clientWidth <=767}" @click="checkMilestone" :title="projectData.ProjectType ? projectData.ProjectType : 'Fix'">{{projectData.ProjectType ? projectData.ProjectType :"Fix" }}</span>
+        <span class="cursor-pointer project-type-name" :class="{'font-size-13 font-weight-400' : clientWidth > 767, 'font-size-16' : clientWidth <=767}" @click="checkMilestone" :title="projectData.ProjectType ? projectData.ProjectType : 'Fix'">{{projectData.ProjectType ? projectData.ProjectType :"Fix" }}</span>
 
         <Sidebar
             v-if="checkPermission('project.project_list',projectData?.isGlobalPermission) === true && checkPermission('project.project_type',projectData?.isGlobalPermission) === true"

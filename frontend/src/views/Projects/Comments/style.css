@@ -1,19 +1,24 @@
 .scroll-bottom-btn {
-  box-shadow: 5px 5px 10px #ccc;
+  display: inline-flex;
+  box-shadow: var(--shadow-card);
   padding: 12px;
-  background: #dbf1ff;
-  color: white;
+  background: var(--surface);
+  color: var(--ink-2);
   right: 12px;
   top: -55px;
-  border: 1px solid #CECECE;
-  border-radius: 10px;
+  border: 1px solid var(--border);
+  border-radius: var(--r-card);
 }
+.scroll-bottom-btn:hover { color: var(--ink); border-color: var(--brand); }
 .disable__send-button{
-  background-color: #e3e3e3 !important;
+  background-color: var(--fill) !important;
+}
+/* The icon inside the button carries cursor-pointer, and there the utility decides. */
+.disable__send-button:where(:not(.cursor-pointer)){
   cursor: not-allowed !important;
 }
 .highlighted-message{
-  background-color: #ffff3630 !important;
+  background-color: var(--warn-bg) !important;
 }
 .comment_footer_icon{min-width:174px;}
 .createTask__modal .createTask__modal-field span {
@@ -23,7 +28,7 @@
 }
 .creator_div{
   height: 45px !important;
-  box-shadow:0px 4px 5px 0px #cecece;
+  box-shadow: var(--shadow-card);
   position: relative;
   z-index: 100;
 }
@@ -32,9 +37,7 @@
 }
 
 .media__extension{
-  /* height: 100% !important;  */
-  background-color: #ffffffd6 !important;
-  /* position: absolute; */
+  background-color: color-mix(in srgb, var(--surface) 84%, transparent) !important;
 }
 .upload-body-dragged.media__extension.chat__drag-drop{
     top: 0px;
@@ -48,15 +51,15 @@
 }
 .convert_dateformat{
   left: 50%;
-  transform: translateX(-50%); 
+  transform: translateX(-50%);
   top: 26px;
-  box-shadow: 0px 0px 4px 2px rgba(0,0,0,0.09);
-  background-color: #717bd5!important;
-  color: #fff;
+  box-shadow: var(--shadow-card);
+  background-color: var(--brand)!important;
+  color: var(--on-brand);
 }
 .msg__initaluser{
-  height: 65px; 
-  box-shadow:0px 4px 5px 0px #cecece;
+  height: 65px;
+  box-shadow: var(--shadow-card);
 }
 .comment__footer{
   height: max-content; 
@@ -73,6 +76,8 @@
 .record__progress{
   height: 5px;
 }
+.record__progress--done { background: var(--ok); }
+.record__progress--left { background: var(--track); }
 .send__media-btn{
   height: 54px !important; 
   width: 54px;
@@ -92,10 +97,32 @@
   .upload-body-dragged.media__extension.chat__drag-drop{width: calc(99.3% - 7px);}
 }
 @media(max-width: 767px){
-  .msg__initaluser{background-color: #fff;}
+  .msg__initaluser{background-color: var(--surface);}
   .upload-body-dragged.media__extension.chat__drag-drop{width: calc(99.2% - 9px);}
 }
 @media(max-width: 480px){
 audio {width: 225px !important;}
 .upload-body-dragged.media__extension.chat__drag-drop{width: calc(98.8% - 8px);}
 }
+
+/* On the project's Comments tab the feed sits on the theme canvas (.list-view-body--detail). The task
+   panel paints its own copy of the feed in TaskDetailOverlay/style.css. */
+.list-view-body--detail .commments__component-wrapper { background: transparent; }
+.list-view-body--detail .message_id-sent { color: var(--ink); }
+.list-view-body--detail .message_id-sent.bg-white { background-color: var(--surface); }
+.list-view-body--detail .message_id-sent.bg-light-blue { background-color: var(--brand-tint); }
+.list-view-body--detail .show__user { color: var(--ink); }
+.list-view-body--detail .message_replay { background-color: var(--fill); }
+.list-view-body--detail :is(.show__userlist, .reply-box) { background-color: var(--surface); color: var(--ink); }
+/* An id, to outweigh the rule that keeps .bg-white on light controls in dark. */
+.list-view-body--detail #comment_footer {
+  background-color: var(--surface);
+  border-color: var(--hairline);
+  color-scheme: var(--scheme);
+}
+.list-view-body--detail .write-message { border-color: var(--border); background: var(--surface); color: var(--ink); }
+.list-view-body--detail .write-message::placeholder { color: var(--ink-2); }
+.list-view-body--detail .write-message:focus { border-color: var(--brand); }
+.list-view-body--detail .write-message.disabled,
+.list-view-body--detail .disable__send-button { background-color: var(--fill) !important; }
+.list-view-body--detail .msg__initaluser { background-color: var(--surface); color: var(--ink); }

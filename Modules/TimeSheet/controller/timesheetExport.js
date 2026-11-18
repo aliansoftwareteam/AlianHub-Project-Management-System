@@ -3,30 +3,32 @@ const { SCHEMA_TYPE } = require("../../../Config/schemaType");
 const { MongoDbCrudOpration } = require("../../../utils/mongo-handler/mongoQueries");
 const { buildTimesheetCsv } = require("../helpers/timesheetCsv");
 const logger = require("../../../Config/loggerConfig");
+const { sessionTenantOf, TenantError } = require('../../../Config/tenant');
+const { resolveSheetScope, scopedTimeMatch, SHEET_PERMISSION } = require('../helpers/timeScope');
+const { normalizeReportFilters, reportTimeClauses, narrowMatch } = require('../helpers/reportFilters');
 
 const toObjId = (id) => {
     try { return new mongoose.Types.ObjectId(String(id)); } catch (e) { return null; }
 };
 
-// TIME-04 — export time entries as a payroll CSV. Resolves user names from the
-// global DB and project names from the company DB so the file is self-contained
-// (User, Project, Date, Description, Billable, Hours). LogStartTime is seconds.
+/* The rows are the ones the user timesheet shows the caller. LogStartTime is in seconds. */
 exports.exportTimesheetCsv = async (req, res) => {
     try {
-        const companyId = req.headers['companyid'] || (req.body && req.body.companyId);
-        if (!companyId) return res.status(400).send('companyId is required');
-        const { userArray = [], projectArray = [], start, end } = req.body || {};
-        const match = {};
-        if (Array.isArray(userArray) && userArray.length) match.Loggeduser = { $in: userArray };
-        if (Array.isArray(projectArray) && projectArray.length) match.ProjectId = { $in: projectArray };
-        if (start && end) match.LogStartTime = { $gte: Number(start), $lte: Number(end) };
+        const companyId = sessionTenantOf(req);
+        const { userArray = [], projectArray = [], start, end, filters } = req.body || {};
+        const scope = await resolveSheetScope(companyId, req.uid, SHEET_PERMISSION.user);
+        const scoped = scopedTimeMatch(scope, {
+            userIds: Array.isArray(userArray) && userArray.length ? userArray : null,
+            projectIds: Array.isArray(projectArray) && projectArray.length ? projectArray : null,
+        });
+        if (start && end) scoped.LogStartTime = { $gte: Number(start), $lte: Number(end) };
+        const match = narrowMatch(scoped, (await reportTimeClauses(companyId, scope, normalizeReportFilters(filters), { baseMatch: scoped })).clauses);
 
         const entries = await MongoDbCrudOpration(companyId, {
             type: SCHEMA_TYPE.TIMESHEET,
             data: [match, null, { sort: { LogStartTime: 1 } }],
         }, 'find') || [];
 
-        // Resolve names.
         const userIds = [...new Set(entries.map((e) => e.Loggeduser).filter(Boolean))];
         const projectIds = [...new Set(entries.map((e) => e.ProjectId).filter(Boolean))];
         const userMap = {};
@@ -51,6 +53,7 @@ exports.exportTimesheetCsv = async (req, res) => {
         res.setHeader('Content-Disposition', 'attachment; filename="timesheet-export.csv"');
         return res.status(200).send(csv);
     } catch (error) {
+        if (error instanceof TenantError) return res.status(error.statusCode).json({ status: false, statusText: error.message });
         logger.error(`ERROR in timesheet CSV export: ${error.message}`);
         return res.status(500).send('Export failed');
     }

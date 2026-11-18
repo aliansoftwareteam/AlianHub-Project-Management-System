@@ -2,8 +2,10 @@ const { SCHEMA_TYPE } = require("../../Config/schemaType");
 const { MongoDbCrudOpration } = require("../../utils/mongo-handler/mongoQueries");
 const logger = require("../../Config/loggerConfig");
 const { extractIdentity } = require("./helpers/ssoRules");
-const { jitProvisionUser } = require("./provisioning");
-const { finalizeSsoSession } = require("./ssoSession");
+const { ssoSignInUser, SSO_NOT_ALLOWED } = require("./provisioning");
+const { finalizeSsoSession, ssoFailed } = require("./ssoSession");
+const { isKnownCompany } = require("../../Config/knownCompany");
+const { sameOriginPath } = require("../Auth/helpers/sameOriginPath");
 
 // `samlify` (+ its schema validator) are lazy-required so app load never breaks
 // before `npm install`. SAML responses MUST be signature-validated — samlify
@@ -23,13 +25,14 @@ const ensureValidator = () => {
     validatorReady = true;
 };
 
-const loadConfig = async (companyId) => MongoDbCrudOpration(companyId, {
+const loadConfig = async (companyId) => ((await isKnownCompany(companyId)) ? MongoDbCrudOpration(companyId, {
     type: SCHEMA_TYPE.SSO_CONFIGS, data: [{ deletedStatusKey: 0, isEnabled: true }],
-}, 'findOne');
+}, 'findOne') : null);
 
-const buildSp = (companyId) => {
+const buildSp = (companyId, relayState = '') => {
     const samlify = require('samlify');
     return samlify.ServiceProvider({
+        relayState,
         entityID: `${apiBase()}/api/v2/sso/saml/metadata?companyId=${companyId}`,
         assertionConsumerService: [{
             Binding: samlify.Constants.namespace.binding.post,
@@ -53,54 +56,48 @@ const buildIdp = (cfg) => {
 /* GET /api/v2/sso/saml/initiate?companyId= — redirect to the IdP. */
 exports.samlInitiate = async (req, res) => {
     try {
-        const companyId = req.query.companyId || req.headers['companyid'];
-        if (!companyId) return res.status(400).send('companyId is required');
+        const companyId = req.query.companyId || req.headers['companyid']; // tenant-scoping: sign-in starts before any session; the company only picks which IdP to redirect to
+        if (!companyId) return ssoFailed(res, 'config');
         const cfg = await loadConfig(companyId);
-        if (!cfg || cfg.provider !== 'saml') return res.status(404).send('SAML SSO is not configured for this company');
-        const sp = buildSp(companyId);
+        if (!cfg || cfg.provider !== 'saml') return ssoFailed(res, 'config');
+        const sp = buildSp(companyId, sameOriginPath(req.query.redirect_url));
         const idp = buildIdp(cfg);
         const { context } = sp.createLoginRequest(idp, 'redirect');
         return res.redirect(context);
     } catch (error) {
         logger.error(`samlInitiate: ${error.message || error}`);
-        return res.redirect('/login?ssoError=initiate');
+        return ssoFailed(res, 'initiate');
     }
 };
 
 /* POST /api/v2/sso/saml/acs?companyId= — IdP posts the signed assertion here. */
 exports.samlAcs = async (req, res) => {
     try {
-        const companyId = req.query.companyId || (req.body && req.body.companyId);
-        if (!companyId) return res.redirect('/login?ssoError=config');
+        const companyId = req.query.companyId || (req.body && req.body.companyId); // tenant-scoping: the IdP posts here before any session; the company only picks whose IdP certificate must have signed the response
+        if (!companyId) return ssoFailed(res, 'config');
         const cfg = await loadConfig(companyId);
-        if (!cfg || cfg.provider !== 'saml') return res.redirect('/login?ssoError=config');
+        if (!cfg || cfg.provider !== 'saml') return ssoFailed(res, 'config');
         ensureValidator();
         const sp = buildSp(companyId);
         const idp = buildIdp(cfg);
         const { extract } = await sp.parseLoginResponse(idp, 'post', req); // validates signature
         const claims = { ...(extract.attributes || {}), nameID: extract.nameID };
         const id = extractIdentity(claims, (cfg.saml && cfg.saml.attributeMap) || {});
-        if (!id.valid) return res.redirect('/login?ssoError=identity');
-        const uid = await jitProvisionUser({
-            companyId,
-            email: id.email,
-            firstName: id.firstName,
-            lastName: id.lastName,
-            externalId: id.externalId,
-            defaultRoleType: cfg.defaultRoleType,
-            autoProvision: cfg.autoProvisionUsers !== false,
-        });
-        return finalizeSsoSession(req, res, uid, `/${companyId}`);
+        if (!id.valid) return ssoFailed(res, 'identity');
+        const uid = await ssoSignInUser({ companyId, cfg, identity: id });
+        return finalizeSsoSession(req, res, uid, companyId, req.body && req.body.RelayState);
     } catch (error) {
+        if (error && error.code === SSO_NOT_ALLOWED) return ssoFailed(res, 'not_allowed');
+        if (error && error.code === 'seat_limit') return ssoFailed(res, 'seat_limit');
         logger.error(`samlAcs: ${error.message || error}`);
-        return res.redirect('/login?ssoError=callback');
+        return ssoFailed(res, 'callback');
     }
 };
 
 /* GET /api/v2/sso/saml/metadata?companyId= — SP metadata for the IdP admin. */
 exports.samlMetadata = async (req, res) => {
     try {
-        const companyId = req.query.companyId || req.headers['companyid'];
+        const companyId = req.query.companyId || req.headers['companyid']; // tenant-scoping: public SP metadata for the IdP admin; it names the company but holds none of its data
         if (!companyId) return res.status(400).send('companyId is required');
         const sp = buildSp(companyId);
         res.type('application/xml');

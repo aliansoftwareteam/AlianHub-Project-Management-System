@@ -50,7 +50,7 @@
         },
         inputValues:{
             type: Object,
-            default:() => {}
+            default:() => ({})
         },
         options:{
             type: Array,
@@ -74,7 +74,7 @@
         },
         detail:{
             type: Object,
-            default: () => {}
+            default: () => ({})
         },
         className:{
             type: String,
@@ -82,7 +82,7 @@
         },
         customValidationMessage:{
             type: Object,
-            default: () => {}
+            default: () => ({})
         },
         preventDefault:{
             type: Boolean,
@@ -92,9 +92,10 @@
             type: Boolean,
             default: false
         },
+        /* Left empty, the field takes an id of its own; a fixed default gave every field in the form the same one. */
         id:{
             type: String,
-            default: "text"
+            default: ""
         }
     });
 </script>

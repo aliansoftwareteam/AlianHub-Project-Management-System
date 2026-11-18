@@ -1,10 +1,10 @@
-.section-left {
-  min-width: 375px;
-  width: 375px;
-  border-right: 1px solid #e0e0e0;
-}
+/* Column layout so the body claims whatever the two header rows leave, rather
+   than subtracting a hard-coded header height. */
 .section-right {
-  width: calc(100% - 376px);
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
 }
 .list-type-error {
   padding-bottom: 3px;
@@ -12,26 +12,19 @@
 }
 .list-view-header {
   padding: 0px 19px;
-  border-bottom: 1px solid #e8eaed;
+  border-bottom: 1px solid var(--hairline);
   display: flex;
   align-items: center;
   justify-content: space-between;
   height: 44px;
-  background-color: #fff;
+  background-color: var(--surface);
 }
-/* ── Project view-tabs strip lives on its OWN full-width row (ClickUp-style),
-   between the project header and the filter toolbar — so short tab names like
-   "List" get a roomy, unambiguous clickable area instead of being squeezed in
-   the header next to the title + actions. Hidden on mobile (the header keeps
-   its own "all views" dropdown there). */
+/* The strip sits inside .ph2__viewrow, which owns the row's height, padding,
+   hairline and horizontal scrolling. */
 .project-views-row {
   display: flex;
-  align-items: center;
-  height: 36px;
-  min-height: 36px;
-  padding: 0 12px;
-  background-color: #fff;
-  border-bottom: 1px solid #e8eaed;
+  align-items: stretch;
+  min-width: 0;
   box-sizing: border-box;
 }
 @media (max-width: 767px) {
@@ -50,50 +43,22 @@
   /* margin-top: 6px; */
 }
 
-/* ── Project view-tabs: responsive + readable (AHE) ─────────────────────
-   With many views (List, Board, Table, Whiteboard, Canvas, Map, Reports,
-   Gantt, Recurring, Timeline …) the tab row overflowed the header. The strip
-   now fills the available width and scrolls horizontally (a flex item only
-   scrolls if it can shrink below its content — hence `min-width: 0`), tabs
-   get a gap, the right-side icon bar stays fully visible, and the scrollbar
-   is clearly visible so users know there are more views to scroll to. */
 .list-head-leftrightwrappper { min-width: 0; }
 .list-head-mid { min-width: 0; }
-/* Right-side action icons (files / audio / watchers): never shrink and don't
-   cap the width, so they're always clearly visible. !important overrides the
-   old base rule that capped this bar to ~15%. */
-.list-head-right { flex-shrink: 0; max-width: none !important; }
-/* Tab strip: sized to its tabs (no width cap) so "+ View" sits right after the
-   last tab, ClickUp-style, across the full-width row. It only scrolls when the
-   tabs genuinely overflow the row — in the common case everything fits and no
-   scrollbar shows at all. */
+/* Scrolling belongs to .ph2__viewrow, one row up, so the tabs and "+ View"
+   travel together instead of in two nested scrollers. */
 .view_list_scroll {
-  flex: 0 1 auto;
-  min-width: 0;
-  /* Horizontal scroll only (the tall active tab must not trigger a vertical
-     scrollbar). No top padding: with no scrollbar in the common case the tabs
-     sit vertically centered on their own. */
-  overflow-y: hidden;
+  flex: 0 0 auto;
+  align-items: stretch;
   box-sizing: border-box;
-  scrollbar-width: thin;                 /* Firefox */
-  scrollbar-color: #c7ccd4 transparent;  /* Firefox: thumb / track */
 }
 .view-list-wrapper { flex-shrink: 0; }
 .project__requirementcomponent-wrapper { flex-shrink: 0; }
-/* Clearly-visible 6px horizontal scrollbar (the strip no longer uses the
-   2px `style-scroll` utility). */
-.view_list_scroll::-webkit-scrollbar { height: 4px; }
-.view_list_scroll::-webkit-scrollbar-track { background: transparent; }
-.view_list_scroll::-webkit-scrollbar-thumb { background: #c7ccd4; border-radius: 4px; }
-.view_list_scroll::-webkit-scrollbar-thumb:hover { background: #a9afb9; }
-/* Per-tab "⋯" menu shows on hover only; it's positioned over the tab's right
-   edge in ViewsList (out of flow) so it never reserves space or resizes. */
 .list-head-right {
-  max-width: 15%;
+  flex-shrink: 0;
   display: flex;
   justify-content: flex-end;
   align-items: center;
-  /* margin-left: auto; */
 }
 .list-head-right ul{
   padding-left: 0 !important;
@@ -103,7 +68,7 @@
   align-items: center;
 }
 .list-text-wrapper{
-  max-width: 288px;
+  min-width: 0;
 }
 .list-view-header-title, .key-text
 {
@@ -120,8 +85,20 @@
   margin-right: 2px;
 }
 .list-view-body {
-  /* height: calc(100% - 46px); */
+  flex: 1 1 auto;
+  min-height: 0;
 }
+.list-view-body--detail {
+  background: var(--canvas);
+  color: var(--ink);
+  color-scheme: var(--scheme);
+}
+/* The blocks inside (description, checklist, attachments, the comment feed, the activity list) are
+   shared with the task panel and still carry the legacy colour classes. */
+.list-view-body--detail :is(.black, .dark-gray, .GunPowder, .color52, .color63) { color: var(--ink); }
+.list-view-body--detail :is(.gray, .gray81) { color: var(--ink-2); }
+.list-view-body--detail .blue { color: var(--brand) !important; }
+.list-view-body--detail .bg-colorlightgray { background-color: var(--fill); }
 .showProjectDetailRight{
   width: calc(100% - 375px);
   overflow: auto;
@@ -159,16 +136,12 @@
   display: none;
 }
 .activeViewList span {
-  color: #2f3990;
+  color: var(--brand);
   font-weight: 500;
 }
 .list_make_as_defaultimg {
   right: 2px;
   top: -6px;
-}
-.activeViewList img.position-ab.list_make_as_defaultimg {
-  top: 9px;
-  right: 2px;
 }
 .audio_dropdown button.cursor-pointer.dot-btn {
   padding: 0;
@@ -192,21 +165,21 @@
   min-width: 186px !important;
 }
 
+/* The Add view panel is only a frame for .view__list-dropdown, which brings the surface, border and width. */
 .embed__dropdown .search-project-filter {
-  background-color: #F4F5F7;
-  width: 669px;
+  width: auto;
   height: auto;
   padding: 0 !important;
-  border-radius: 6px !important;
+  border-radius: var(--r-card) !important;
 }
 .embed__dropdown {
-  border-radius: 6px !important;
-  box-shadow: 0px 5px 10px 0px rgba(0, 0, 0, 0.10);
+  border-radius: var(--r-card) !important;
+  box-shadow: var(--shadow-pop);
   border: 0 !important;
 }
 .embed__dropdown .drop-down-options {
   max-height: none!important;
-  border-radius: 6px 0px 0px 6px!important;
+  border-radius: var(--r-card) !important;
 }
 
 .embed-option{
@@ -219,12 +192,12 @@
 }
 
 .view-count{
-    background-color: rgb(56, 69, 179);
+    background-color: var(--brand);
     border-radius: 20px;
     margin-left: 5px;
     width: 100%;
     max-width: 23px;
-    color: rgb(255, 255, 255);
+    color: var(--on-brand);
     padding-left: 3.7px;
     padding-right: 3.7px;
     font-size: 10px;
@@ -242,11 +215,11 @@
 }
 
 .embed-edit-options:hover {
-  background: #F4F5F7;
+  background: var(--surface-hover);
 }
 
 .embed-option:hover {
-    background: #F4F5F7;
+    background: var(--surface-hover);
     border-radius: 5px;
 }
 
@@ -274,7 +247,7 @@
   top: 0;
 }
 .archived_wrapper{
-  background: rgb(255 255 255 / 70%);
+  background: color-mix(in srgb, var(--surface) 70%, transparent);
     width: 100%;
     height: 100%;
     top: 0;
@@ -291,11 +264,9 @@
   .view-list {padding: 0 12px;}
   .view-list-wrapper {margin-left: 5px;}
   .list-head-leftrightwrappper {width: 80%;}
-  .list-head-right {width: 20%;}
   .view-list-wrapper {margin-left: 10px;}
 }
 @media (max-width: 1599px) {
-  .list-text-wrapper {max-width: 200px;}
   .key-wapper {max-width: 75px;}
   .list-head-mid {max-width: 50%;}
   .list-head-left {max-width: 50%;}
@@ -304,24 +275,20 @@
   .list-view-header-title{font-size: 16px;line-height: 24.4px;padding-right: 8px;}
 }
 @media (max-width: 1300px) {
-  .section-right {width: 100%;}
   .showProjectDetailRight{width: calc(100% - 280px);overflow: auto;}
   .projectRightside {max-width: 280px;}
 }
 @media (max-width: 1024px) {
 .search__in-dropdown {margin-left: -8px;}
 .list-head-leftrightwrappper {width: 80%;}
-.list-head-right {width: 20%;max-width: 20%;}
 .list-view-header{padding: 0px 16px;}
 }
 @media (max-width: 991px) {
 .list-head-left {max-width: 55%;}
 .list-head-mid {max-width: 45%;}
-.list-text-wrapper {max-width: 130px;}
-
 }
 @media (max-width: 767px) {
-  .project_detail_dropdown_wrapper{height: 50px;color: #4B4B4B;}
+  .project_detail_dropdown_wrapper{height: 50px;color: var(--ink);}
   .project-firtsleeter-box{min-width: 22px !important;max-width: 22px !important;height: 22px !important;border-radius: 6px;font-size: 14px;font-weight: 400;color: #fff;margin-left: 0px !important;margin-right: 10px;}
   .mobile-projectlist-icon {min-width: 22px !important; width: 22px !important;height: 22px !important;border-radius: 5px;margin-left: 0px !important; margin-right: 10px;}
   .list-text-wrapper {max-width: 207px;padding-left: 12px;}
@@ -330,42 +297,43 @@
   .list-view-header {padding: 5.3px 16px;height: auto;}
   .list-head-left {max-width: 100%;}
   .list-head-leftrightwrappper {max-width: 70%;width: 70%;}
-  .list-head-right {max-width: 30%;width: 30%;}
-  .list-view-header-title {padding-right: 10px;margin-left: 0 !important;overflow: hidden;color: #090A0A;text-overflow: ellipsis;font-size: 18px;font-weight: 500;padding-bottom: 5px;}
-  .assigneelist-audiofile-dropdown {min-width: auto;left: 50% !important;right: auto !important;}
+  .list-view-header-title {padding-right: 10px;margin-left: 0 !important;overflow: hidden;color: var(--ink);text-overflow: ellipsis;font-size: 18px;font-weight: 500;padding-bottom: 5px;}
+  /* The rows and the title of this sheet already follow the theme. The sheet behind them and the legacy grey labels did not, so in the dark theme the title was white on white and the labels dark on dark. */
+  .assigneelist-audiofile-dropdown {min-width: auto;left: 50% !important;right: auto !important;background: var(--surface) !important;border-color: var(--hairline) !important;}
+  .assigneelist-audiofile-dropdown .drop-down-item {color: var(--ink-2);}
+  .assigneelist-audiofile-dropdown .drop-down-item .gray4b {color: var(--ink);}
   .assigneelist-audiofile-dropdown .search-project-filter {height: 100% !important;min-width: 100% !important;width: 100% !important;padding: 0 20px !important;}
   .mobiledropdown-projecttitleimage-wrapper {display: flex;align-items: center;}
   .mobiledropdown-projecttitleimage-wrapper .mobile-projectlist-icon,  .mobiledropdown-projecttitleimage-wrapper .project-firtsleeter-box {width: 30px !important;height: 30px !important;border-radius: 5px;font-size: 16px;font-weight: 400;line-height: 19.24px;min-width: 30px !important;max-width: 30px !important;}
   .mobiledropdown-projecttitleimage-wrapper .mobile-projectlist-icon{margin-left: 0 !important;}
   .mobiledropdown-projecttitleimage-wrapper .list-text-wrapper {max-width: 70%;padding-left: 10px;}
-  .mobiledropdown-projecttitleimage-wrapper .list-view-header-title {padding-bottom: 0;font-size: 16px;font-weight: 500;color: #3a3a3a !important; padding-top: 4px;}
+  .mobiledropdown-projecttitleimage-wrapper .list-view-header-title {padding-bottom: 0;font-size: 16px;font-weight: 500;color: var(--ink) !important; padding-top: 4px;}
   .assigneelist-audiofile-dropdown .assignee-data img.profile-image.asignee-profile {width: 30px !important;height: 30px !important;border: 0 !important;object-fit: cover !important;}
   .assigneelist-audiofile-dropdown .assignee-data .position-re.cursor-pointerm,  .assigneelist-audiofile-dropdown .profile-image {width: 30px !important;height: 30px !important;}
   .assigneelist-audiofile-dropdown .assignee-data {margin-left: 5px !important;width: 100%;padding-bottom: 30px;padding-top: 30px;}
   ul.filelinks-audiolist li {height: 50px;}
   ul.filelinks-audiolist{padding-bottom: 20px;}
-  .assigneelist-audiofile-dropdown .drop-down-item {background: #fff !important;padding: 0px 0px !important;width: 100%;display: inline-block;margin-bottom: 0!important;border-radius: 0 !important;}
+  .assigneelist-audiofile-dropdown .drop-down-item {background: var(--surface) !important;padding: 0px 0px !important;width: 100%;display: inline-block;margin-bottom: 0!important;border-radius: 0 !important;}
   ul.filelinks-audiolist li img {vertical-align: middle;margin-right: 15px;}
-  ul.filelinks-audiolist li:hover, .avtar-options:hover {border-radius: 12px;background: #F4F5F7;}
+  ul.filelinks-audiolist li:hover, .avtar-options:hover {border-radius: 12px;background: var(--surface-hover);}
   ul.filelinks-audiolist li {height: 50px;margin-right: 0 !important;padding-left: 10px;}
   .project-titlerename-input{margin-left: 0 !important;}
   .assigneelist-audiofile-dropdown .assignee-data .position-re.cursor-pointer {width: 30px !important;height: 30px !important;}
   .viewlist-mobile-dropdown {border: 0 !important;}
   .viewlist-mobile-dropdown .drop-down-item {padding: 7.5px 10px !important;}
   .viewlist-mobile-dropdown .mobileCloseIcon {display: none;}
-  .mobile-defaultview-text img.list_make_as_defaultimg {margin-right: 10px;margin-bottom: 1px;}
-  .activeTab-tick{height: 10px;width: 10px;}
-  .showProjectDetailRight .description-main, .showProjectDetailRight .checklist-main, .showProjectDetailRight .project__detail-atttachment{padding: 10px 20px 0px 20px;background-color: #fff;border-bottom: 0;}
+  .activeTab-tick{height: 12px;width: 12px;flex: none;color: var(--brand);}
+  .showProjectDetailRight .description-main, .showProjectDetailRight .checklist-main, .showProjectDetailRight .project__detail-atttachment{padding: 10px 20px 0px 20px;background-color: var(--surface);border-bottom: 0;}
   .showProjectDetailRight .project__detail-atttachment{padding-bottom: 20px;padding-top: 15px;}
   .showProjectDetailRight{width:100%;order: 2;padding: 0 !important;height: calc(100% - 0px);}
-  .projectRightside {max-width: 100%;order: 1;background-color: #fff;padding: 0px;height: auto;overflow: auto;padding: 20px;}
-  .sticky_item-wrapper{background-color: #fff;}
+  .projectRightside {max-width: 100%;order: 1;background-color: var(--surface);padding: 0px;height: auto;overflow: auto;padding: 20px;}
+  .sticky_item-wrapper{background-color: var(--surface);}
   .checklist-main .hover-action {visibility: visible;}
   .list-view-body {flex-wrap: wrap;}
   .task-body-buttons button {width: 46.25%;height: 39px;}
-  .showProjectDetailRight .description-main h4.task-details-subtitle {margin-top: 0;margin-bottom: 10px;background: #fff;position: relative;}
-  .description-main .ql-editor p{font-size: 14px;color: #3a3a3a !important;line-height: 22.4px !important;}
-  .milestone__fixhourly-wrapper {margin: 20px 0;padding: 20px;background-color: #fff;}
+  .showProjectDetailRight .description-main h4.task-details-subtitle {margin-top: 0;margin-bottom: 10px;background: var(--surface);position: relative;}
+  .description-main .ql-editor p{font-size: 14px;color: var(--ink) !important;line-height: 22.4px !important;}
+  .milestone__fixhourly-wrapper {margin: 20px 0;padding: 20px;background-color: var(--surface);}
   .milestone__fixhourly-wrapper .milestone_font {padding: 0;border-top: 0;}
   .task-assigneesearch-groupbywrapper .task-body-buttons{padding: 20px !important;}
   .viewlist-mobile-dropdown .drop-down-options{max-height: 70vh!important;}
@@ -379,7 +347,6 @@
 @media (max-width: 414px) {
 .list-text-wrapper {max-width: calc(100% - 35px);}
 .list-head-leftrightwrappper {max-width: 63%;width: 63%;}
-.list-head-right {max-width: 37%;width: inherit;}
 .list-view-header {padding: 5.3px 10px;flex-wrap: wrap;}
 .assignee-filter .monthly-calendar-view {width: 75px !important;}
 .task-filter-assignee{overflow: auto;}
@@ -405,15 +372,12 @@
   margin: 0!important;
 }
 .calendar-currentday-text {
-  font-size: 14px!important;
-  font-weight: 500!important;
-  line-height: 20.72px!important;
-  color: #535358!important;
+  font: var(--text-h3)!important;
+  color: var(--ink)!important;
   text-transform: capitalize!important;
   margin-left: 14px!important;
   background: transparent!important;
   border: 0!important;
   padding: 0!important;
   cursor: pointer!important;
-  font-family: Roboto!important;
 }

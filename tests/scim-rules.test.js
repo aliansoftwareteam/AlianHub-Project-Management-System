@@ -61,7 +61,7 @@ describe('isActive', () => {
 describe('toScimUser', () => {
     test('maps a global user + membership to a SCIM resource', () => {
         const gu = { _id: 'u1', Employee_Email: 'p@q.com', Employee_FName: 'Pat', Employee_LName: 'Lee', Employee_Name: 'Pat Lee' };
-        const cu = { userId: 'u1', status: 1 };
+        const cu = { userId: 'u1', status: 2 };
         const r = R.toScimUser(gu, cu, 'https://h/scim/v2');
         expect(r.id).toBe('u1');
         expect(r.userName).toBe('p@q.com');
@@ -70,6 +70,13 @@ describe('toScimUser', () => {
         expect(r.active).toBe(true);
         expect(r.meta.location).toBe('https://h/scim/v2/Users/u1');
         expect(r.schemas).toContain('urn:ietf:params:scim:schemas:core:2.0:User');
+    });
+    test('shows nothing from the shared record while the invitation is pending', () => {
+        const gu = { _id: 'u1', Employee_Email: 'p@q.com', Employee_FName: 'Pat', Employee_LName: 'Lee', Employee_Name: 'Pat Lee' };
+        const r = R.toScimUser(gu, { _id: 'row1', userId: 'u1', userEmail: 'p@q.com', status: 1, scimGivenName: 'Req' });
+        expect(r.id).toBe('row1');
+        expect(r.active).toBe(false);
+        expect(r.name).toEqual({ givenName: 'Req', familyName: '', formatted: 'Req' });
     });
     test('reflects deactivation', () => {
         const r = R.toScimUser({ _id: 'u2', Employee_Email: 'x@y.com' }, { userId: 'u2', isDelete: true });

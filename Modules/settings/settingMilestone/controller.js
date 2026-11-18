@@ -2,6 +2,7 @@ const { myCache } = require("../../../Config/config");
 const { removeCache } = require("../../../utils/commonFunctions");
 const { dbCollections,settingsCollectionDocs } = require("../../../Config/collections");
 const { MongoDbCrudOpration } = require("../../../utils/mongo-handler/mongoQueries");
+const { settingsUpdateProblem, milestoneArrayFiltersProblem, SETTINGS_UPDATES } = require("../settingsDocUpdate");
 
 exports.getMilestoneBillingPeriod = async (req, res) => {
     try {
@@ -65,6 +66,9 @@ exports.updateMilestoneStatus = async (req, res) => {
                 message: "Key is required.",
             });
         }
+
+        const problem = settingsUpdateProblem(SETTINGS_UPDATES.milestoneStatus, key, updateObject) || milestoneArrayFiltersProblem(key, arrayFilters);
+        if (problem) return res.status(400).json({ status: false, message: problem });
 
         const queryObject = [
             { name: settingsCollectionDocs.PROJECT_MILESTONE_STATUS },

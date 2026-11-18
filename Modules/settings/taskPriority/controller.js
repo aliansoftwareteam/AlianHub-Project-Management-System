@@ -2,6 +2,7 @@ const { myCache } = require("../../../Config/config");
 const { removeCache } = require("../../../utils/commonFunctions");
 const { dbCollections,settingsCollectionDocs } = require("../../../Config/collections");
 const { MongoDbCrudOpration } = require("../../../utils/mongo-handler/mongoQueries");
+const { settingsUpdateProblem, SETTINGS_UPDATES } = require("../settingsDocUpdate");
 
 exports.getTaskPriority = async (req, res) => {
     try {
@@ -63,6 +64,9 @@ exports.updateTaskPriority = async (req, res) => {
                 message: "Key is required.",
             });
         }
+
+        const problem = settingsUpdateProblem(SETTINGS_UPDATES.catalogue, key, updateObject);
+        if (problem) return res.status(400).json({ status: false, message: problem });
 
         const queryObject = [
             { name: settingsCollectionDocs.TASK_PRIORITIES },

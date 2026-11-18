@@ -4,6 +4,11 @@ const { SendEmail } = require("../../service");
 const { usersNeedingReminder, reminderSubject, reminderHtml } = require("../helpers/reminderRules");
 const reminderSettings = require("../helpers/reminderSettings");
 const logger = require("../../../Config/loggerConfig");
+const { sessionTenantOf, TenantError } = require('../../../Config/tenant');
+const { isPrivileged } = require('../../../Config/roleTypes');
+const { ACTIVE_SEAT } = require('../../../Config/seatStatus');
+const { companyWorkingDays } = require('../../Company/helpers/companyWeek');
+const { activeMemberIds } = require('../../notification/activeMembers');
 
 // TIME-06 — time-entry reminders. A daily nudge (prod cron) to members who
 // haven't logged time today; the /send-reminders endpoint runs the same path
@@ -30,7 +35,7 @@ const loggedUserIdsInWindow = async (companyId, startSec, endSec) => {
 // Email a "log your time today" reminder to each SELECTED company member who
 // hasn't logged today. Governed by the per-company opt-in policy: the reminder
 // is OFF by default, and when ON it targets only the explicitly chosen users.
-const sendTimeRemindersForCompany = async (companyId) => {
+const sendTimeRemindersForCompany = async (companyId, now = new Date()) => {
     if (!companyId) return { reminded: 0, total: 0, users: [], skipped: 'no-company' };
 
     // Opt-in gate. A company must explicitly enable the reminder; disabled is
@@ -39,8 +44,8 @@ const sendTimeRemindersForCompany = async (companyId) => {
     if (!settings.enabled) return { reminded: 0, total: 0, users: [], skipped: 'disabled' };
     // Enabled but no recipients chosen ⇒ nobody to nudge.
     if (!settings.userIds.length) return { reminded: 0, total: 0, users: [], skipped: 'no-recipients' };
+    if (!(await companyWorkingDays(companyId)).includes(now.getDay())) return { reminded: 0, total: 0, users: [], skipped: 'non-working-day' };
 
-    const now = new Date();
     const start = new Date(now); start.setHours(0, 0, 0, 0);
     const end = new Date(now); end.setHours(23, 59, 59, 999);
     const loggedIds = await loggedUserIdsInWindow(
@@ -90,10 +95,10 @@ const isCompanyOwner = async (companyId, userId) => {
     try {
         const record = await MongoDbCrudOpration(companyId, {
             type: SCHEMA_TYPE.COMPANY_USERS,
-            data: [{ userId: String(userId) }, { _id: 1, roleType: 1 }],
+            data: [{ userId: String(userId), ...ACTIVE_SEAT }, { _id: 1, roleType: 1 }],
         }, 'findOne');
         // Owner (1) or Admin (2) may manage this setting.
-        return !!record && [1, 2].includes(Number(record.roleType));
+        return !!record && isPrivileged(Number(record.roleType));
     } catch (err) {
         logger.error(`[timeReminders] role check failed companyId=${companyId} userId=${userId} ${err && err.message}`);
         return false;
@@ -103,11 +108,14 @@ const isCompanyOwner = async (companyId, userId) => {
 // POST /api/v1/timesheet/send-reminders — manual trigger for the caller's company.
 exports.triggerReminders = async (req, res) => {
     try {
-        const companyId = req.headers['companyid'] || (req.body && req.body.companyId);
-        if (!companyId) return res.send({ status: false, statusText: 'companyId is required.' });
+        const companyId = sessionTenantOf(req);
+        if (!(await isCompanyOwner(companyId, req.uid))) {
+            return res.status(403).send({ status: false, statusText: 'Only an owner or admin can send the time reminders.' });
+        }
         const result = await sendTimeRemindersForCompany(companyId);
         return res.send({ status: true, statusText: 'Reminders processed.', data: result });
     } catch (error) {
+        if (error instanceof TenantError) return res.status(error.statusCode).json({ status: false, statusText: error.message });
         logger.error(`ERROR in triggerReminders: ${error.message}`);
         return res.send({ status: false, statusText: error.message });
     }
@@ -147,7 +155,7 @@ exports.updateReminderSettings = async (req, res) => {
             if (!Array.isArray(body.userIds)) {
                 return res.status(400).send({ status: false, statusText: 'userIds must be an array.' });
             }
-            patch.userIds = body.userIds;
+            patch.userIds = await activeMemberIds(companyId, body.userIds.filter((id) => typeof id === 'string'));
         }
         if (Object.keys(patch).length === 0) {
             return res.status(400).send({ status: false, statusText: 'No supported fields in body.' });

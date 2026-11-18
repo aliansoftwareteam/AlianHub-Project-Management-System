@@ -54,7 +54,7 @@
                                                 :enabledArrowIcon="true"/>
 
                                             <InputText :readonly="!props.editPermission" class="form-control login-input border-topbottom-right-6-px"
-                                                v-model="formData.phoneNumber.value" placeHolder="eg. 000-000-0000"
+                                                v-model="formData.phoneNumber.value" :placeHolder="$t('Settings.phone_placeholder')"
                                                 tabindex="1" @keypress="isNumber($event.event)"
                                                 @keyup="checkErrors({
                                                 'field': formData.phoneNumber,
@@ -75,7 +75,7 @@
                                             {{$t('Settings.country')}}
                                         </label>
                                         <InputText :readonly="true" :style="{ 'pointer-events': !props.editPermission ? 'none' : '' }"  type="text" class="form-control login-input cursor-pointer" v-model="formData.country.value"
-                                            placeHolder="Country" @click="setfocus('country'), visible = !visible"
+                                            :placeHolder="$t('Settings.country')" @click="setfocus('country'), visible = !visible"
                                             @focus="setCurrentSidebarValue('country'), setfocus('country')" @keyup="checkErrors({
                                                 'field': formData.country,
                                                 'name': formData.country.name,
@@ -92,7 +92,7 @@
                                             {{ $t('Settings.state') }}
                                         </label>
                                         <InputText :disabled="locationObj['state'].isStateVal" :readonly="true" :style="{ 'pointer-events': !props.editPermission ? 'none' : '' }" type="text" class="form-control login-input" v-model="formData.state.value"
-                                            :placeHolder="locationObj['state'].isStateVal == false ? 'State' : 'No States'" 
+                                            :placeHolder="locationObj['state'].isStateVal == false ? $t('Settings.state') : $t('PlaceHolder.No_States')" 
                                             inputId="refState" @click="setfocus('state')"
                                             :class="[{'cursor-pointer': locationObj['state'].isStateVal == false}]"
                                             @focus="setCurrentSidebarValue('state'), setfocus('state')" @keyup="checkErrors({
@@ -112,7 +112,7 @@
                                             {{ $t('Settings.city') }}
                                         </label>
                                         <InputText :disabled="(locationObj['state']?.isStateVal || locationObj['city']?.isCityVal)" :style="{ 'pointer-events': !props.editPermission ? 'none' : '' }" type="text" class="form-control login-input" v-model="formData.city.value"
-                                            :placeHolder="!(locationObj['state']?.isStateVal || locationObj['city']?.isCityVal) ? 'City' : 'No Cities'" 
+                                            :placeHolder="!(locationObj['state']?.isStateVal || locationObj['city']?.isCityVal) ? $t('Settings.city') : $t('PlaceHolder.No_Cities')" 
                                             inputId="refCity"
                                             :class="[{'cursor-pointer': !(locationObj['state']?.isStateVal || locationObj['city']?.isCityVal)}]"
                                             @keyup="checkErrors({
@@ -133,8 +133,7 @@
 
                                         <div class="con-select selectExample autocompletex">
                                             <div class="input-select-con">
-                                                <DropDown :id="formatdate"
-                                                    :style="{ 'pointer-events': !props.editPermission ? 'none' : '' }">
+                                                <DropDown v-if="props.editPermission" :id="formatdate" mode="listbox">
                                                     <template #button>
                                                         <div class=" cursor-pointer text-capitalize" :ref="formatdate">
                                                             {{ formData.format_date }}
@@ -144,10 +143,14 @@
                                                         <DropDownOption
                                                             @click="formData.format_date = date, $refs[formatdate].click()"
                                                             v-for="(date, index) in dateArray" :key="index"
+                                                            :selected="date === formData.format_date"
                                                             :item="{ label: date }">
                                                         </DropDownOption>
                                                     </template>
                                                 </DropDown>
+                                                <div v-else class="text-capitalize">
+                                                    {{ formData.format_date }}
+                                                </div>
                                             </div>
                                         </div>
                                     </div>
@@ -181,6 +184,12 @@
                                 </div>
                             </div>
 
+                            <div class="company-week">
+                                <p class="company-week__label">{{ $t('Settings.working_days') }}</p>
+                                <p class="company-week__hint">{{ $t('Settings.working_days_hint') }}</p>
+                                <WorkingDaysPicker v-model="workingDays" :disabled="!props.editPermission" />
+                            </div>
+
                             <button v-if="props.editPermission" :disabled="isSpinner" ref="refButton"
                                 @click.prevent="SaveChangeToDb()" class="blue_btn" id="blue-btn-savecompany">{{ $t('Settings.save_changes') }}</button>
                         </form>
@@ -192,7 +201,7 @@
             </div>
         </div>
         <CroppingTool :image="{ url: formData.companyprofileImage, name: fileName }" :isVisible="isCropper"
-            title="Company Profile"
+            :title="$t('Settings.company_profile')"
             :stencilSize='stencilSize'
             :stencilProps="stencilProps"
             @updateVisible="(val) => isCropper = val"
@@ -206,6 +215,8 @@ import PhoneCountry from "@/components/molecules/CountryPhoneNumberDropdown/Phon
 import Sidebar from '@/components/molecules/Sidebar/Sidebar.vue';
 import InputText from "@/components/atom/InputText/InputText.vue";
 import Toggle from "@/components/atom/Toggle/Toggle.vue";
+import WorkingDaysPicker from "@/components/molecules/WorkingDaysPicker/WorkingDaysPicker.vue";
+import { workingDaysFor } from "@workingDays";
 import { computed, defineComponent, inject, onMounted, ref, watchEffect,defineProps, nextTick, watch } from "vue";
 import { useStore } from "vuex";
 import DropDown from "@/components/molecules/DropDown/DropDown.vue";
@@ -261,6 +272,8 @@ const isTempPreview = ref(false);
 const isCropper = ref(false);
 const base64Image = ref();
 const phoneError = ref("");
+const workingDays = ref(workingDaysFor());
+const sameWeek = (a, b) => a.join() === b.join();
 
 const stencilSize = {
     width: 180,
@@ -312,19 +325,23 @@ const openCropperTool = () => {
 const onSelect = (val) => {
     countryCodeObj.value = val
 }
+
+// Companies set up before phone became optional hold the setup wizard's "N/A" placeholder.
+const storedPhone = (value) => (value == null || value === 'N/A' ? '' : value);
 onMounted(() => {
     formData.value.companyprofileImage = selectedCompany.value?.Cst_profileImage == undefined ? '' : selectedCompany.value?.Cst_profileImage;
     formData.value.companyName.value = selectedCompany.value?.Cst_CompanyName;
-    formData.value.phoneNumber.value = selectedCompany.value?.Cst_Phone;
+    formData.value.phoneNumber.value = storedPhone(selectedCompany.value?.Cst_Phone);
     formData.value.country.value = selectedCompany.value?.Cst_Country;
-    formData.value.state.value = selectedCompany.value?.Cst_State;
+    formData.value.state.value = selectedCompany.value?.Cst_State ?? '';
     formData.value.Cst_DialCode = selectedCompany.value?.Cst_DialCode;
-    formData.value.city.value = selectedCompany.value?.Cst_City;
+    formData.value.city.value = selectedCompany.value?.Cst_City ?? '';
     formData.value.day.value = selectedCompany.value?.Cst_LogTimeDays;
     // Absent means a company that predates the setting, which has the cap today — so it
     // reads as ON. Only an explicit false turns it off.
     formData.value.trackerEstimateLimit = selectedCompany.value?.trackerEstimateLimit !== false;
     formData.value.format_date = companyDate.value.dateFormat;
+    workingDays.value = workingDaysFor(selectedCompany.value);
     oldFileValue.value = selectedCompany.value?.Cst_profileImage;
     formData.value.Cst_countryCode.value = selectedCompany.value?.Cst_countryCode || 'IN';
     formData.value.Cst_stateCode.value = selectedCompany.value?.Cst_stateCode || 'GJ';
@@ -349,7 +366,8 @@ const SaveChangeToDb = async () => {
                 && formData.value.city.value == selectedCompany.value?.Cst_City && formData.value.format_date == companyDate.value.dateFormat
                 // Compared the same way it is read — absent counts as ON — or flipping only
                 // this switch would be judged "nothing to update" and silently not save.
-                && formData.value.trackerEstimateLimit === (selectedCompany.value?.trackerEstimateLimit !== false)) {
+                && formData.value.trackerEstimateLimit === (selectedCompany.value?.trackerEstimateLimit !== false)
+                && sameWeek(workingDays.value, workingDaysFor(selectedCompany.value))) {
                 return $toast.error(t('Toast.Nothing_to_update'), { position: 'top-right' });
             }
             isSpinner.value = true;
@@ -401,6 +419,7 @@ const SaveChangeToDb = async () => {
                 Cst_City: formData.value.city.value,
                 Cst_LogTimeDays: formData.value.day.value,
                 trackerEstimateLimit: formData.value.trackerEstimateLimit !== false,
+                workingDays: workingDays.value,
                 Cst_countryCode: formData.value.Cst_countryCode.value,
                 Cst_stateCode: formData.value.Cst_stateCode.value,
                 updatedAt: new Date()
@@ -447,7 +466,9 @@ const SaveChangeToDb = async () => {
 }
 
 function phoneValidation (number) {
-    if(number === ""){
+    // Callers pass String(value), so a missing number arrives as "undefined".
+    if (["", "undefined", "null", "N/A"].includes(number)) {
+        phoneError.value = '';
         return;
     }
     let code = countryCodeObj.value.isoCode;
@@ -456,7 +477,7 @@ function phoneValidation (number) {
     if (result.isValid) {
         phoneError.value = '';
     } else {
-        phoneError.value = "Please enter valid number";
+        phoneError.value = t('Settings.phone_invalid');
     }
 
     return result.isValid;
@@ -469,6 +490,10 @@ function phoneValidation (number) {
 .invalid-feedback{
     top: unset !important;
 }
+
+.company-week { padding: var(--sp-7) 0 var(--sp-5); border-top: 1px solid var(--hairline); }
+.company-week__label { margin: 0 0 var(--sp-1); font: 500 14px/1.5 var(--font-ui); color: var(--ink); }
+.company-week__hint { margin: 0 0 var(--sp-4); font: var(--text-small); color: var(--ink-2); }
 
 .setting__wasabi-image {
     width: 120px !important;

@@ -2,22 +2,26 @@ const { SCHEMA_TYPE } = require("../../../Config/schemaType");
 const { MongoDbCrudOpration } = require("../../../utils/mongo-handler/mongoQueries");
 const { validateRateInput, buildInvoice } = require("../helpers/billingRules");
 const logger = require("../../../Config/loggerConfig");
+const { resolveTimeScope, withoutHidden, openProjects } = require("../helpers/timeScope");
 
 // TIME-07 — billing rates + invoicing. Rates live in the per-company
 // billing_rates collection (one per scope+refId). Invoices are generated from
 // billable time entries at the resolved rates (user > project > default).
-const companyOf = (req) => req.headers['companyid'] || (req.body && req.body.companyId);
+const { sessionTenantOf, TenantError } = require('../../../Config/tenant');
+const { idForms } = require('../../../utils/mongo-handler/objectIdKeys');
+const MONEY_RESTRICTED = 'Only an owner or admin can see billing amounts.';
 
 /* POST /api/v1/timesheet/rates — upsert a rate. body { scope, refId?, rate, currency?, userData } */
 exports.setRate = async (req, res) => {
     try {
-        const companyId = companyOf(req);
-        if (!companyId) return res.send({ status: false, statusText: 'companyId is required.' });
+        const companyId = sessionTenantOf(req);
+        const caller = await resolveTimeScope(companyId, req.uid);
+        if (!caller.canSeeMoney) return res.status(403).json({ status: false, statusText: 'Only an owner or admin can set billing rates.' });
         const { scope, refId = '', rate, currency = 'USD', userData } = req.body || {};
         const check = validateRateInput({ scope, refId, rate });
         if (!check.valid) return res.send({ status: false, statusText: check.reason });
         const ref = scope === 'default' ? '' : String(refId);
-        const createdBy = userData && (userData.id || userData._id) ? String(userData.id || userData._id) : '';
+        const createdBy = caller.uid || (userData && (userData.id || userData._id) ? String(userData.id || userData._id) : '');
         const saved = await MongoDbCrudOpration(companyId, {
             type: SCHEMA_TYPE.BILLING_RATES,
             data: [
@@ -31,6 +35,7 @@ exports.setRate = async (req, res) => {
         }, 'findOneAndUpdate');
         return res.send({ status: true, statusText: 'Rate saved.', data: saved });
     } catch (error) {
+        if (error instanceof TenantError) return res.status(error.statusCode).json({ status: false, statusText: error.message });
         logger.error(`ERROR in setRate: ${error.message}`);
         return res.send({ status: false, statusText: error.message });
     }
@@ -39,14 +44,17 @@ exports.setRate = async (req, res) => {
 /* GET /api/v1/timesheet/rates — list configured rates. */
 exports.listRates = async (req, res) => {
     try {
-        const companyId = companyOf(req);
-        if (!companyId) return res.send({ status: false, statusText: 'companyId is required.' });
+        const companyId = sessionTenantOf(req);
+        if (!(await resolveTimeScope(companyId, req.uid)).canSeeMoney) {
+            return res.send({ status: true, statusText: MONEY_RESTRICTED, data: [], restricted: true });
+        }
         const rates = await MongoDbCrudOpration(companyId, {
             type: SCHEMA_TYPE.BILLING_RATES,
             data: [{ deletedStatusKey: 0 }],
         }, 'find');
         return res.send({ status: true, statusText: 'OK', data: rates || [] });
     } catch (error) {
+        if (error instanceof TenantError) return res.status(error.statusCode).json({ status: false, statusText: error.message });
         logger.error(`ERROR in listRates: ${error.message}`);
         return res.send({ status: false, statusText: error.message });
     }
@@ -56,13 +64,17 @@ exports.listRates = async (req, res) => {
  * body { start, end (seconds), userArray?, projectArray?, currency?, defaultRate? } */
 exports.generateInvoice = async (req, res) => {
     try {
-        const companyId = companyOf(req);
-        if (!companyId) return res.send({ status: false, statusText: 'companyId is required.' });
+        const companyId = sessionTenantOf(req);
+        const caller = await resolveTimeScope(companyId, req.uid);
+        if (!caller.canSeeMoney) {
+            return res.send({ status: true, statusText: MONEY_RESTRICTED, data: null, restricted: true });
+        }
         const { start, end, userArray = [], projectArray = [], currency = 'USD', defaultRate = 0 } = req.body || {};
         const match = { billable: { $ne: false } };
         if (start && end) match.LogStartTime = { $gte: Number(start), $lte: Number(end) };
-        if (Array.isArray(userArray) && userArray.length) match.Loggeduser = { $in: userArray };
-        if (Array.isArray(projectArray) && projectArray.length) match.ProjectId = { $in: projectArray };
+        if (Array.isArray(userArray) && userArray.length) match.Loggeduser = { $in: userArray.map(String) };
+        if (Array.isArray(projectArray) && projectArray.length) match.ProjectId = { $in: idForms(openProjects(caller, projectArray)) };
+        else Object.assign(match, withoutHidden(caller));
         const entries = await MongoDbCrudOpration(companyId, {
             type: SCHEMA_TYPE.TIMESHEET,
             data: [match, { Loggeduser: 1, ProjectId: 1, LogTimeDuration: 1, billable: 1 }],
@@ -74,6 +86,7 @@ exports.generateInvoice = async (req, res) => {
         const invoice = buildInvoice({ entries: entries || [], rates: rates || [], currency, defaultRate });
         return res.send({ status: true, statusText: 'Invoice generated.', data: invoice });
     } catch (error) {
+        if (error instanceof TenantError) return res.status(error.statusCode).json({ status: false, statusText: error.message });
         logger.error(`ERROR in generateInvoice: ${error.message}`);
         return res.send({ status: false, statusText: error.message });
     }

@@ -48,7 +48,7 @@
                     </div>
                 </div>
                 <div class="red pt-5px" >
-                    <span v-if="taskTypeError" class="font-size-12 red">{{taskTypeError}}</span>
+                    <span v-if="taskTypeError" class="project-task-type-form-font-size-12 red">{{taskTypeError}}</span>
                 </div>
             </template>
         </TemplateSelectForm>
@@ -98,7 +98,7 @@ const { t } = useI18n();
     const isTaskSidebarOpen = ref(false);
     const statusOPtion = ref([]);
     const isDelete = ref(false);
-    const hanldeProjectTaktypeTour = inject("hanldeProjectTaktypeTour");
+    const hanldeProjectTaktypeTour = inject("hanldeProjectTaktypeTour", null);
     onMounted(() => {
         taskTypeTemplates.value = JSON.parse(JSON.stringify(getters['settings/taskType']));
         emit('update:modelValue', theModel.value);
@@ -454,6 +454,12 @@ const { t } = useI18n();
         }
     }
 </script>
+<style scoped>
+.project-task-type-form-font-size-12 {
+    font-size: 12px;
+}
+</style>
+
 <style scoped>
 @import './style.css';
 </style>

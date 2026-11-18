@@ -1,75 +1,24 @@
-import React, { useEffect, useState } from 'react';
-import { useDispatch } from 'react-redux';
-import { login } from '../../store/authSlice';
+import React, { useEffect } from 'react';
 import { useRouter } from 'next/router';
-import { getUserData } from '../../controller/user/user';
-import { getAssignCompanyData } from '../../controller/company/company';
-const { publicRuntimeConfig } = getConfig();
-import getConfig from "next/config";
-import { apiRequestWithoutSecure} from '../../utils/services';
-const { APIURL } = publicRuntimeConfig
-const Login = () => {
-  // const [email, setEmail] = useState('');
-  // const [password, setPassword] = useState('');
-  const dispatch = useDispatch();
-  const router = useRouter();
+import { useSelector } from 'react-redux';
+import { takeAutoSignIn } from '../../controller/workspace/workspace';
+import { beginSignIn, openInBrowser, signInPageUrl } from '../../controller/user/signIn';
+import { selectCurrentWorkspace } from '../../store/workspace';
+import { workspaceHost } from '../../utils/workspaceAddress';
 
-  const loginAPI = (refreshToken) => {
-    return new Promise((resolve, reject) => {
-      try {
-        apiRequestWithoutSecure("post", `/api/v1/auth/loginAuthTracker`, {refreshToken}).then((ele) => {
-          resolve(ele?.data)
-        }).catch((error)=>{
-          reject(error);
-        })
-      } catch (error) {
-        reject(error)
-      }
-    })
+const Login = () => {
+  const router = useRouter();
+  const workspace = useSelector(selectCurrentWorkspace);
+
+  async function openAlianhub() {
+    if (!workspace) return;
+    const started = await beginSignIn(workspace.url);
+    openInBrowser(signInPageUrl(workspace.url, started));
   }
 
   useEffect(() => {
-    let isProcessing = false;
-    
-    const handleDeeplinkUrl = (url) => {
-      if (isProcessing) return; // Prevent multiple executions
-      isProcessing = true;
-      
-      let refreshToken = url.url.split("?")[1].split("&")[1].split("=")[1]
-      let userId = url.url.split("?")[1].split("&")[0].split("=")[1]
-      loginAPI(refreshToken).then((ele)=>{
-        localStorage.setItem('refreshToken', ele.refreshToken)
-        localStorage.setItem('token', ele.accessToken)
-        localStorage.setItem("userId", userId);
-        getUserData(dispatch).then(() => {
-          dispatch(login());
-          getAssignCompanyData().then(() => {
-            router.push('/home');
-          }).catch((error) => {
-            console.error("Error getting Company Data", error);
-            isProcessing = false; // Reset flag on error
-          });
-        }).catch((error) => {
-          console.error(error);
-          isProcessing = false; // Reset flag on error
-        });
-      }).catch((error) => {
-        console.error(error);
-        isProcessing = false; // Reset flag on error
-      });
-    };
-
-    window.ipc.on('deeplinkUrl', handleDeeplinkUrl);
-    
-    // Cleanup function to remove the event listener
-    return () => {
-      window.ipc.removeAll('deeplinkUrl');
-    };
-  }, [dispatch, router]);
-
-  function openAlianhub() {
-    window.ipc.send("open-external-url", `${APIURL}/#/oauth2`)
-  }
+    if (workspace && takeAutoSignIn(workspace.url)) openAlianhub();
+  }, [workspace && workspace.url]);
 
   return (
     <div className="flex justify-center items-center h-[calc(100vh-45px)] bg-white relative overflow-hidden">
@@ -89,6 +38,11 @@ const Login = () => {
         <div className="flex flex-col items-center text-center text-[#3A3A3A] mb-6">
           <h3 className="font-bold text-2xl m-0">Login to your Account</h3>
           <p className="font-normal text-xs leading-[19px] mt-2 mb-0">See what is going on with your business</p>
+          {workspace && (
+            <p className="font-normal text-xs leading-[19px] mt-2 mb-0 text-[#6B7280] truncate max-w-full" title={workspace.url}>
+              {workspace.name ? `${workspace.name} · ` : ''}{workspaceHost(workspace.url)}
+            </p>
+          )}
         </div>
         <button
           type="submit"
@@ -96,6 +50,13 @@ const Login = () => {
           className="w-full bg-[#2F3990] border border-[#2F3990] text-white py-2.5 text-sm leading-[23px] rounded hover:bg-[#252d75] transition-colors cursor-pointer"
         >
           Browser Login 
+        </button>
+        <button
+          type="button"
+          onClick={() => router.push('/connect')}
+          className="block mx-auto mt-3 text-xs text-[#2F3990] underline bg-transparent border-0 cursor-pointer"
+        >
+          Use another workspace
         </button>
       </div>
     </div>

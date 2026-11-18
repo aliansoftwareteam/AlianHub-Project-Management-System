@@ -1,4 +1,5 @@
 const rules = require('../Modules/Importers/helpers/csvRules');
+const { levelRows } = require('../Modules/Tasks/helpers/taskTreeRules');
 
 const STATUSES = ['To Do', 'In Progress', 'Completed'];
 const PID = '6571e7195470e64b120328dd';
@@ -42,6 +43,75 @@ describe('csvRules — transformCsvRows', () => {
         expect(skipped).toBe(1);
         expect(tasks).toHaveLength(1);
         expect(tasks[0].status).toBe('To Do');
+    });
+});
+
+describe('csvRules — a file that names each row\'s parent', () => {
+    const transform = (rows, mapping) => rules.transformCsvRows({ rows, mapping, statusNames: STATUSES, leaderId: 'u1' }).tasks;
+    const names = (level) => level.map((row) => row.TaskName);
+    const parentNames = (tasks) => {
+        const { levels, parentIdOf } = levelRows(tasks);
+        const byId = new Map(tasks.map((task) => [task._id, task.TaskName]));
+        return Object.fromEntries(levels.flat().map((row) => [row.TaskName, byId.get(parentIdOf.get(row)) || '']));
+    };
+
+    test('keeps three levels whatever order the rows come in', () => {
+        const tasks = transform([
+            { 'Task Key': 'T-3', Title: 'Grandchild', Parent: 'T-2' },
+            { 'Task Key': 'T-4', Title: 'Second child', Parent: 'T-1' },
+            { 'Task Key': 'T-1', Title: 'Root' },
+            { 'Task Key': 'T-2', Title: 'Child', Parent: 'T-1' },
+        ]);
+        const { levels, adjusted } = levelRows(tasks);
+        expect(levels.map(names)).toEqual([['Root'], ['Second child', 'Child'], ['Grandchild']]);
+        expect(parentNames(tasks)).toEqual({ Root: '', 'Second child': 'Root', Child: 'Root', Grandchild: 'Child' });
+        expect(adjusted).toEqual([]);
+    });
+
+    test('reads the parent from a mapped column', () => {
+        const tasks = transform([{ A: 'Child', B: '2', C: '1' }, { A: 'Root', B: '1', C: '' }], { taskName: 'A', taskKey: 'B', parent: 'C' });
+        expect(parentNames(tasks)).toEqual({ Root: '', Child: 'Root' });
+    });
+
+    test('a parent named by its title is found when one row holds that title', () => {
+        const tasks = transform([{ Title: 'Child', Parent: 'root' }, { Title: 'Root' }]);
+        expect(parentNames(tasks)).toEqual({ Root: '', Child: 'Root' });
+    });
+
+    test('a row whose parent is not in the file becomes a task and is listed', () => {
+        const tasks = transform([{ 'Task Key': 'T-1', Title: 'Root' }, { 'Task Key': 'T-9', Title: 'Orphan', Parent: 'T-404' }]);
+        const { levels, adjusted } = levelRows(tasks);
+        expect(names(levels[0])).toEqual(['Root', 'Orphan']);
+        expect(adjusted).toEqual([{ _id: 'T-9', TaskName: 'Orphan', reason: 'PARENT_MISSING' }]);
+    });
+
+    test('rows whose parents loop, and the rows under them, become tasks and are listed', () => {
+        const tasks = transform([
+            { 'Task Key': 'A', Title: 'First', Parent: 'B' },
+            { 'Task Key': 'B', Title: 'Second', Parent: 'A' },
+            { 'Task Key': 'C', Title: 'Under the loop', Parent: 'A' },
+            { 'Task Key': 'D', Title: 'Apart' },
+        ]);
+        const { levels, adjusted } = levelRows(tasks);
+        expect(names(levels[0])).toEqual(['First', 'Second', 'Under the loop', 'Apart']);
+        expect(adjusted.map(({ TaskName, reason }) => [TaskName, reason])).toEqual([['First', 'CYCLE'], ['Second', 'CYCLE'], ['Under the loop', 'CYCLE']]);
+    });
+
+    test('a Jira export, whose parent column holds the issue id, still finds the parent', () => {
+        const tasks = transform([
+            { Summary: 'Story', 'Issue key': 'WEB-1', 'Issue id': '10001' },
+            { Summary: 'Sub-task', 'Issue key': 'WEB-2', 'Issue id': '10002', 'Parent id': '10001' },
+        ]);
+        expect(parentNames(tasks)).toEqual({ Story: '', 'Sub-task': 'Story' });
+    });
+
+    test('a file without a parent column imports every row as a task', () => {
+        const tasks = transform([{ Title: 'One' }, { Title: 'Two' }]);
+        expect(levelRows(tasks)).toMatchObject({ levels: [[{ TaskName: 'One' }, { TaskName: 'Two' }], [], []], adjusted: [] });
+    });
+
+    test('offers the task key and the parent as mapping targets', () => {
+        expect(rules.TARGET_KEYS).toEqual(expect.arrayContaining(['taskKey', 'parent']));
     });
 });
 

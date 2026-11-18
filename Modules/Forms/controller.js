@@ -3,6 +3,8 @@ const { MongoDbCrudOpration } = require("../../utils/mongo-handler/mongoQueries"
 const mongoose = require("mongoose");
 const logger = require("../../Config/loggerConfig");
 const { generateShareToken } = require('../PublicShares/helpers/shareRules');
+const { projectAccess } = require('../../Config/contentAccess');
+const { canReadTask } = require('../Tasks/helpers/taskReadAccess');
 const { menu, TYPES, TASK_PROPERTIES, SPANS, GRID_COLUMNS, resolveSpan } = require('./helpers/questionTypes');
 const {
     PRIORITIES,
@@ -32,6 +34,21 @@ const {
 /* Who is acting, from the JWT — never from the request body, which the caller
  * chooses. */
 const callerId = (req) => String((req && req.uid) || '');
+
+const refuse = (res, statusCode, statusText) => res.status(statusCode).send({ status: false, statusText });
+
+/* The caller must see the form's project to read the form, and be able to edit it to
+ * change the form or read its submissions, which hold submitters' personal data. */
+const formFor = async (req, companyId, id, { edit = false } = {}) => {
+    const form = await MongoDbCrudOpration(companyId, {
+        type: SCHEMA_TYPE.FORMS, data: [{ _id: id, deletedStatusKey: 0 }],
+    }, 'findOne');
+    if (!form) return { refusal: [404, 'Form not found.'] };
+    const access = await projectAccess(companyId, callerId(req), form.ProjectID);
+    if (!access.visible) return { refusal: [404, 'Form not found.'] };
+    if (edit && !access.canEdit) return { refusal: [403, 'You do not have permission to manage this form.'] };
+    return { form };
+};
 
 const mask = (d) => ({
     _id: d._id,
@@ -73,9 +90,9 @@ async function buildSnapshots(companyId, form, req) {
     }, 'findOne');
     if (!project) return { ok: false, reason: 'Project not found.' };
 
-    // Read the sprint from the sprints collection, not from anything embedded on
-    // the project: a project document does not reliably carry sprintsObj (the ones
-    // checked were empty), so scanning it rejected sprints that plainly exist.
+    // Read the sprint from the sprints collection, the one source of truth: a
+    // project document's sprintsObj is a legacy copy that no sprint write
+    // maintains, so scanning it rejected sprints that plainly exist.
     //
     // Naming the project in the FILTER is what keeps this a check rather than a
     // lookup — a sprint id from another project simply does not match, so a form
@@ -95,7 +112,7 @@ async function buildSnapshots(companyId, form, req) {
         }],
     }, 'findOne').catch(() => null);
     if (!sprint) {
-        return { ok: false, reason: 'That sprint does not belong to this project. Pick one from this project.' };
+        return { ok: false, reason: 'That list does not belong to this project. Pick one from this project.' };
     }
     const sprintArray = { id: String(sprint._id), name: sprint.name || 'Sprint' };
     if (sprint.folderId) {
@@ -223,6 +240,37 @@ const SUBMISSIONS_EXPORT_CAP = 5000;
  * metacharacters — otherwise a stray "(" is a 500 and ".*" scans everything. */
 const escapeRegex = (value) => String(value).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 
+const DELETED = 1;
+
+/* Only what the task panel needs to open a task, and only for one the caller could open
+ * through GET /api/v1/task/:id; anything else answers null, as a missing task would. The
+ * task is read where it lives now, since it may have moved since the submission. */
+const taskLinks = async (companyId, uid, rows) => {
+    const ids = [...new Set(rows.map((row) => String(row.taskId || '')).filter(isObjectIdString))];
+    const links = new Map();
+    if (!ids.length) return links;
+    const tasks = await MongoDbCrudOpration(companyId, {
+        type: SCHEMA_TYPE.TASKS,
+        data: [
+            { _id: { $in: ids.map((id) => new mongoose.Types.ObjectId(id)) }, deletedStatusKey: { $ne: DELETED } },
+            { ProjectID: 1, sprintId: 1, folderObjId: 1, mainChat: 1, AssigneeUserId: 1 },
+        ],
+    }, 'find').catch(() => []);
+    const decided = new Map();
+    for (const task of tasks || []) {
+        const place = task.mainChat === true ? String(task._id) : `${task.ProjectID}:${task.sprintId || ''}`;
+        if (!decided.has(place)) decided.set(place, canReadTask(companyId, uid, task).catch(() => false));
+        if (!(await decided.get(place))) continue;
+        links.set(String(task._id), {
+            id: String(task._id),
+            projectId: String(task.ProjectID),
+            sprintId: task.sprintId ? String(task.sprintId) : '',
+            folderId: task.folderObjId ? String(task.folderObjId) : '',
+        });
+    }
+    return links;
+};
+
 exports.listSubmissions = async (req, res) => {
     try {
         const companyId = req.headers['companyid'] || '';
@@ -230,10 +278,8 @@ exports.listSubmissions = async (req, res) => {
         if (!companyId || !isObjectIdString(id)) {
             return res.send({ status: false, statusText: 'companyId and a valid form id are required.' });
         }
-        const form = await MongoDbCrudOpration(companyId, {
-            type: SCHEMA_TYPE.FORMS, data: [{ _id: id, deletedStatusKey: 0 }],
-        }, 'findOne');
-        if (!form) return res.send({ status: false, statusText: 'Form not found.' });
+        const { form, refusal } = await formFor(req, companyId, id, { edit: true });
+        if (refusal) return refuse(res, ...refusal);
 
         const formId = new mongoose.Types.ObjectId(id);
         const term = String(req.query.q === undefined ? '' : req.query.q).trim().slice(0, 120);
@@ -282,6 +328,7 @@ exports.listSubmissions = async (req, res) => {
             }
         }
 
+        const links = await taskLinks(companyId, callerId(req), rows || []);
         const data = (rows || []).map((row) => {
             const values = {};
             const files = {};
@@ -301,11 +348,13 @@ exports.listSubmissions = async (req, res) => {
                     };
                 }
             }
+            const task = links.get(String(row.taskId || '')) || null;
             return {
                 _id: row._id,
                 submittedAt: row.createdAt,
                 taskKey: row.taskKey || '',
-                taskId: row.taskId || '',
+                ...(task ? { taskId: task.id } : {}),
+                task,
                 values,
                 files,
             };
@@ -361,6 +410,9 @@ exports.listForms = async (req, res) => {
         if (!companyId || !isObjectIdString(projectId)) {
             return res.send({ status: false, statusText: 'companyId and a valid projectId are required.' });
         }
+        if (!(await projectAccess(companyId, callerId(req), projectId)).visible) {
+            return refuse(res, 404, 'Project not found.');
+        }
         const rows = await MongoDbCrudOpration(companyId, {
             type: SCHEMA_TYPE.FORMS,
             data: [
@@ -384,11 +436,8 @@ exports.getForm = async (req, res) => {
         if (!companyId || !isObjectIdString(id)) {
             return res.send({ status: false, statusText: 'companyId and a valid form id are required.' });
         }
-        const form = await MongoDbCrudOpration(companyId, {
-            type: SCHEMA_TYPE.FORMS,
-            data: [{ _id: id, deletedStatusKey: 0 }],
-        }, 'findOne');
-        if (!form) return res.send({ status: false, statusText: 'Form not found.' });
+        const { form, refusal } = await formFor(req, companyId, id);
+        if (refusal) return refuse(res, ...refusal);
         const data = mask(form);
         if (data.state === 'live') data.url = await publishedUrl(companyId, id);
         return res.send({ status: true, statusText: 'Form fetched.', data });
@@ -409,6 +458,12 @@ exports.createForm = async (req, res) => {
             return res.send({ status: false, statusText: 'sprintId must be a valid id when provided.' });
         }
         const userId = callerId(req);
+        const access = await projectAccess(companyId, userId, projectId);
+        if (!access.canEdit) {
+            return access.visible
+                ? refuse(res, 403, 'You do not have permission to manage this form.')
+                : refuse(res, 404, 'Project not found.');
+        }
         const doc = {
             title: String(title).trim().slice(0, MAX_TITLE_LENGTH),
             description: String(description || '').trim().slice(0, MAX_DESCRIPTION_LENGTH),
@@ -443,11 +498,8 @@ exports.updateForm = async (req, res) => {
         if (!companyId || !isObjectIdString(id)) {
             return res.send({ status: false, statusText: 'companyId and a valid form id are required.' });
         }
-        const existing = await MongoDbCrudOpration(companyId, {
-            type: SCHEMA_TYPE.FORMS,
-            data: [{ _id: id, deletedStatusKey: 0 }],
-        }, 'findOne');
-        if (!existing) return res.send({ status: false, statusText: 'Form not found.' });
+        const { form: existing, refusal } = await formFor(req, companyId, id, { edit: true });
+        if (refusal) return refuse(res, ...refusal);
 
         const b = req.body || {};
         const set = { updatedBy: callerId(req) };
@@ -561,10 +613,8 @@ exports.publishForm = async (req, res) => {
         }
         const publish = (req.body || {}).publish !== false;
 
-        const form = await MongoDbCrudOpration(companyId, {
-            type: SCHEMA_TYPE.FORMS, data: [{ _id: id, deletedStatusKey: 0 }],
-        }, 'findOne');
-        if (!form) return res.send({ status: false, statusText: 'Form not found.' });
+        const { form, refusal } = await formFor(req, companyId, id, { edit: true });
+        if (refusal) return refuse(res, ...refusal);
 
         if (!publish) {
             await MongoDbCrudOpration(companyId, {
@@ -626,10 +676,8 @@ exports.deleteForm = async (req, res) => {
         if (!companyId || !isObjectIdString(id)) {
             return res.send({ status: false, statusText: 'companyId and a valid form id are required.' });
         }
-        const form = await MongoDbCrudOpration(companyId, {
-            type: SCHEMA_TYPE.FORMS, data: [{ _id: id, deletedStatusKey: 0 }],
-        }, 'findOne');
-        if (!form) return res.send({ status: false, statusText: 'Form not found.' });
+        const { form, refusal } = await formFor(req, companyId, id, { edit: true });
+        if (refusal) return refuse(res, ...refusal);
 
         // Refused here, not only in the browser: a published form has a link in
         // circulation, and deleting it would turn that link into a 404 with no

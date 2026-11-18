@@ -104,7 +104,7 @@ Modules/FeatureName/
 ```
 
 ### Route Registration Pattern
-Every module exports an `init(app)` function:
+One `routes.js` per module exports `init(app)` (no `routes2.js`, `router.js` or `route.js`):
 ```javascript
 // Modules/Task/routes.js
 const ctrl = require('./controller/createTask.js');
@@ -116,58 +116,30 @@ exports.init = (app) => {
 };
 ```
 
-Then in main server file:
-```javascript
-// index.js or server.js
-const taskRoutes = require('./Modules/Task/routes.js');
-taskRoutes.init(app);
-```
+`Modules/Task/init.js` re-exports it and `initializeControllers()` in `index.js` calls `require('./Modules/Task/init').init(app)`. The route prefix must also appear in the `verifyJWTToken` list of `Config/setMiddleware.js` (or be declared public / self-guarded in `tests/conventions/v2-guard.test.js`); the conventions test fails until it does.
 
 ## Error Handling Pattern
 
-### Try-Catch with Middleware Propagation
+### asyncHandler + respond
 ```javascript
-exports.updateProject = (req, res, next) => {
-  try {
-    const { companyId, projectId } = req.params;
-    const { projectData } = req.body;
-    
-    // Validation
-    if (!projectData.name) {
-      req.errorMessageObject = { 
-        message: "Project name is required", 
-        statusCode: 400 
-      };
-      return next();
-    }
-    
-    // Database operation
-    const mongoObj = {
-      type: SCHEMA_TYPE.PROJECTS,
-      data: [{ _id: projectId, ...projectData }]
-    };
-    
-    MongoDbCrudOpration(companyId, mongoObj, 'update')
-      .then(project => {
-        res.status(200).json({
-          status: true,
-          statusText: "Project updated successfully",
-          data: project
-        });
-      })
-      .catch(error => {
-        req.errorMessageObject = { 
-          message: error.message, 
-          statusCode: 500 
-        };
-        next();
-      });
-  } catch (error) {
-    req.errorMessageObject = { message: error.message };
-    next();
-  }
-};
+const { tenantOf } = require('../../Config/tenant');
+const { ok, fail, asyncHandler } = require('../../Config/respond');
+
+exports.updateProject = asyncHandler(async (req, res) => {
+  const companyId = tenantOf(req);                       // throws TenantError (403) when missing or outside req.aud
+  const { projectId } = req.params;
+  const { projectData } = req.body;
+  if (!projectData?.name) return fail(res, 'Project name is required', 400);
+
+  const project = await MongoDbCrudOpration(companyId, {
+    type: SCHEMA_TYPE.PROJECTS,
+    data: [{ _id: projectId }, { $set: projectData }]
+  }, 'findOneAndUpdate');
+  return ok(res, { statusText: 'Project updated successfully', data: project });
+});
 ```
+
+`asyncHandler` forwards a rejection to `next(err)`; `Config/errorHandler.js` logs the stack with the request id and answers `{ status: false, statusText, requestId }`. Older handlers that `try/catch` and `res.send({ status: false, statusText: error.message })` themselves keep working — use `fail(res, error.message, error.statusCode)` in the catch so API-token callers get the right HTTP status. `req.errorMessageObject` + `next()` is a legacy pattern (four call sites); do not add to it.
 
 ## Response Format (All Endpoints)
 
@@ -258,9 +230,18 @@ const mongoObj = {
 // ❌ WRONG: Missing company scoping
 Task.findOne({ taskId: 123 });  // Data leak!
 
-// ✅ CORRECT: Company scoped
+// ❌ WRONG: tenant from the client, literal or undefined (ESLint rejects the last two in controllers)
+MongoDbCrudOpration(req.body.companyId, mongoObj, 'findOne');
+MongoDbCrudOpration('64b1f0c2a1b2c3d4e5f60718', mongoObj, 'findOne');
+
+// ✅ CORRECT: the request tenant, validated against the token
+const companyId = tenantOf(req);
 MongoDbCrudOpration(companyId, mongoObj, 'findOne');
+const db = tenantDb(req);
+db(mongoObj, 'findOne');
 ```
+
+`'global'` (`SCHEMA_TYPE.GOLBAL`) is the only literal first argument: users, companies and sessions live there. `tests/conventions/tenant-scoping.test.js` counts `req.body`/`req.query` tenant reads per file and only lets the number fall.
 
 ## Cache Invalidation Pattern
 
@@ -306,3 +287,16 @@ results.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
 // Sort results in descending order by creation date
 results.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
 ```
+
+## Tests
+
+- `tests/*.test.js` (Jest project `unit`): pure helpers and rule modules, one file per module (`<module>-rules.test.js`). No database, no network; require the helper and assert.
+- `tests/conventions/*.test.js` (Jest project `conventions`): repository-wide rules that read the tree (`v2-guard`, `tenant-scoping`, `i18n-namespaces`, `env-doc`, `unused-components`, `naming-conventions`). A rule that must hold in every module belongs here, with a baseline file only when the tree does not satisfy it yet — and the baseline may only shrink.
+- `frontend/tests/*.spec.js` (Vitest, jsdom): mount with `@vue/test-utils`; `frontend/tests/setup.js` provides i18n, `$t` and the shell injections. Mock `@/services` and heavy children; declare shared mocks in `vi.hoisted`.
+- `npm test`, `npm run lint`, `cd frontend && npm test && npm run lint -- --no-fix && npm run build` are the CI gate (`.github/workflows/ci.yml`).
+
+## Locale keys (i18n)
+
+- One namespace per area in `frontend/src/locales/en.js` (`Projects`, `Settings`, `Time`, …). Never create a `<Name>V2` twin; add keys to the existing block. `node scripts/i18n-rename-namespace.js <From> <To>` moves a namespace and rewrites every reference.
+- Call `t('Namespace.key')` with a literal. A key built at run time ends its literal with `_` or `.` (`t('Inbox.tab_' + kind)`) so `tests/conventions/i18n-namespaces` can resolve the prefix.
+- Other locales fall back to English for a missing key; a new key needs an English value first.

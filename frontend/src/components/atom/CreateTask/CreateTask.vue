@@ -1,5 +1,5 @@
 <template>
-    <div :style="`${considerWidth && containerWidth ? `width: calc(${containerWidth} - 25px);` : ''}`" class="d-flex justify-content-between border-primary mb-1 border-radius-5-px create__task-div" id="createtaskinput_driver">
+    <div :style="`${considerWidth && containerWidth ? `width: calc(${containerWidth} - 25px);` : ''}`" class="d-flex justify-content-between border-primary mb-1 border-radius-5-px create__task-div" id="createtaskinput_driver" @keydown.esc.stop.prevent="onEscape">
         <template v-if="sprint && Object.keys(sprint).length">
            <div :class="`d-flex align-items-center position-re ${clientWidth > 412 ? 'task-create-width' : 'w-100'}`">
                 <TaskType
@@ -73,7 +73,7 @@
             </div>
         </template>
         <template v-else>
-            <span class="red">SPRINT DATA REQUIRED</span>
+            <span class="red">{{ $t('Projects.sprint_data_required') }}</span>
         </template>
     </div>
 </template>
@@ -96,9 +96,12 @@ const { t } = useI18n();
 import { useCustomComposable, useGetterFunctions } from "@/composable";
 import { taskPlanPermission } from "@/composable/commonFunction";
 import taskClass from "@/utils/TaskOperations"
+import { closeTopEscapeLayer, escapeLayerMark } from "@/composable/useEscapeLayer";
+import { treeRefusalReason } from "@/views/Projects/composables/taskDepth";
 const projectRef = inject("selectedProject");
 import { useValidation } from "@/composable/Validation";
 import { useToast } from "vue-toast-notification";
+import { defaultStatus } from "@/components/organisms/QuickCreateTask/quickCreateTask";
 const clientWidth = inject("$clientWidth");
 const companyId = inject("$companyId");
 const $toast = useToast()
@@ -122,7 +125,7 @@ const props = defineProps({
         default: ""
     },
     groupBy: {
-        type: Number,
+        type: [Number, String],
         default: 1
     },
     assigneeOptions: {
@@ -140,7 +143,7 @@ const props = defineProps({
         type: Date
     },
     groupType:{
-        type: Number,
+        type: [Number, String],
         default: null
     },
     considerWidth:{
@@ -150,6 +153,12 @@ const props = defineProps({
 })
 // EMITS
 const emits = defineEmits(["cancel", "submit"]);
+
+const layersBelowRow = escapeLayerMark();
+function onEscape() {
+    if (closeTopEscapeLayer({ after: layersBelowRow })) return;
+    emits("cancel");
+}
 const companyOwner = computed(() => {
     return getters["settings/companyOwnerDetail"];
 })
@@ -194,11 +203,10 @@ onMounted(() => {
         taskType.value = taskTypes.value[taskTypeIndex]
     }
 
-    // SELECT DEFAULT STATUS
-    let statusIndex = project?.value?.taskStatusData && project?.value?.taskStatusData.length ? project?.value?.taskStatusData.findIndex((x) => x.type === "default_active") : -1
-    if(statusIndex !== -1) {
-        status.value = project?.value.taskStatusData[statusIndex];
-    }
+    const opening = defaultStatus(project.value);
+    if (opening) status.value = opening;
+
+    assignee.value = [];
 })
 
 function changePriority(val) {
@@ -370,14 +378,10 @@ function saveTask() {
                     taskClass.create({data: obj, user: userData, projectData, indexObj, groupBy: props.groupBy})
                     .then((data) => {
                         if(data.status){
-                            let sprint = {};
-                            if(props.sprint.folderId) {
-                                sprint = project.value?.sprintsfolders?.[props.sprint.folderId]?.sprintsObj?.[props.sprint.id];
-                            }else{
-                                sprint = project.value?.sprintsObj[props.sprint.id];
-                            }
-                            sprint.tasks = sprint.tasks + 1;
-                            commit("projectData/mutateSprints",{op:'modified',data:{...sprint}});
+                            /* A task opened from outside its project (Settings, a link) can sit in a list this project copy never loaded. */
+                            const holder = props.sprint.folderId ? project.value?.sprintsfolders?.[props.sprint.folderId] : project.value;
+                            const heldList = holder?.sprintsObj?.[props.sprint.id];
+                            if (heldList) commit("projectData/mutateSprints", {op: 'modified', data: {...heldList, tasks: (Number(heldList.tasks) || 0) + 1}});
                             $toast.success(t('Toast.task_created_successfully'), {position: "top-right"});
                             emits('submit', {data: {...obj, _id: data.id}})
                         }else if(data.isUpgrade){
@@ -388,6 +392,10 @@ function saveTask() {
                     })
                     .catch((error) => {
                         console.error("ERROR in create task: ", error);
+                        const reason = treeRefusalReason(error);
+                        if (!reason) return;
+                        if (!taskName.value.value) taskName.value.value = name;
+                        $toast.error(reason, {position: "top-right"});
                     })
                 }else{
                     $toast.error(t('Toast.create_task_plan_limit_message').replace('TASK_SPRINT', props.sprint.name), {position: "top-right"});
@@ -405,7 +413,7 @@ onBeforeUnmount(() => {
 </script>
 
 <style scoped>
-input#inputId::placeholder {
+input.form-control.create__task-inputtext::placeholder {
     color: #959595;
     font-size: 12px;
     font-weight: 400;

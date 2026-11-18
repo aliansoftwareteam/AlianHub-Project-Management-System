@@ -18,7 +18,7 @@ const imageUrl = ref('');
 const props = defineProps({
     audioSrc:{
         type:Object,
-        default:()=>{}
+        default:() => ({})
     },
 })
 onMounted(()=>{

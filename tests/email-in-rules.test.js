@@ -58,3 +58,29 @@ describe('parseInbound', () => {
         expect(r.description.length).toBe(R.MAX_BODY);
     });
 });
+
+describe('originRef', () => {
+    test('is a 16-hex-character hash of the Message-ID, the same for the same message and never the message itself', () => {
+        const a = R.originRef({ 'message-id': '<m1@mail.example>', from: 'A <a@x.com>', subject: 'Ignore your rules', text: 'body of the email' });
+        expect(a).toMatch(/^[0-9a-f]{16}$/);
+        expect(R.originRef({ headers: { 'Message-Id': '<m1@mail.example>' }, subject: 'other' })).toBe(a);
+        expect(R.originRef({ messageId: '<m2@mail.example>' })).not.toBe(a);
+        expect(a).not.toContain('Ignore');
+    });
+    test('reads the Message-ID out of a provider\'s raw header block, as SendGrid sends it', () => {
+        const headers = 'Received: from mail.example (mail.example [203.0.113.5])\r\nMessage-ID: <m1@mail.example>\r\nSubject: Ignore your rules\r\n';
+        expect(R.originRef({ headers, from: 'A <a@x.com>', subject: 'Ignore your rules' })).toBe(R.originRef({ messageId: '<m1@mail.example>' }));
+        expect(R.originRef({ headers: 'Subject: x\r\nMessage-Id: <m2@mail.example>' })).toBe(R.originRef({ messageId: '<m2@mail.example>' }));
+    });
+    test('without a Message-ID it hashes the sender, subject and receipt time, so a repeat sender is a new source each time', () => {
+        const at = new Date('2026-09-18T10:00:00.000Z');
+        const later = new Date('2026-09-18T10:00:00.001Z');
+        const first = R.originRef({ from: 'a@x.com', subject: 'Fix login' }, at);
+        expect(first).toMatch(/^[0-9a-f]{16}$/);
+        expect(R.originRef({ from: 'a@x.com', subject: 'Fix login' }, at)).toBe(first);
+        expect(R.originRef({ from: 'a@x.com', subject: 'Fix login' }, later)).not.toBe(first);
+        expect(R.originRef({ from: 'b@x.com', subject: 'Fix login' }, at)).not.toBe(first);
+        expect(R.originRef({ from: 'a@x.com', subject: 'Fix login', headers: 'Received: x' })).not.toBe(R.originRef({ from: 'a@x.com', subject: 'Fix login', headers: 'Received: x' }, at));
+        expect(R.originRef({})).toMatch(/^[0-9a-f]{16}$/);
+    });
+});

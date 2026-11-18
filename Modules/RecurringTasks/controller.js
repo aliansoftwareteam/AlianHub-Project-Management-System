@@ -3,15 +3,24 @@
 // feature be exercised in dev). Definitions and instances are company-scoped.
 const mongoose = require('mongoose');
 const helper = require('./helper');
+const rules = require('./recurrenceRules');
 const { SCHEMA_TYPE } = require('../../Config/schemaType');
 const { MongoDbCrudOpration } = require('../../utils/mongo-handler/mongoQueries');
 const logger = require('../../Config/loggerConfig');
+const { cleanDescription, RichTextLimitError } = require('../Tasks/helpers/cleanRichText');
+const { hiddenSprintFilter } = require('../Sprints/helpers/sprintVisibility');
+const { actingUser } = require('../Sprints/helpers/actingUser');
+const { namedPeopleRefusal } = require('../../Config/projectPeople');
+
+const ASSIGNEES_MAX = 50;
+const idList = (value) => value === undefined || value === null
+    || (Array.isArray(value) && value.length <= ASSIGNEES_MAX && value.every((id) => typeof id === 'string'));
 
 // Build a valid task `data` template from the request (mirrors the defaults in
 // taskMongo.createSubTaskWithAi so taskMongo.create accepts it).
-function buildTemplateFromBody(body) {
+function buildTemplateFromBody(body, creatorId) {
     const project = body.projectData || {};
-    return {
+    return cleanDescription({
         TaskName: body.taskName,
         TaskKey: '-',
         AssigneeUserId: Array.isArray(body.assignees) ? body.assignees : [],
@@ -25,7 +34,7 @@ function buildTemplateFromBody(body) {
         CompanyId: project.CompanyId,
         status: { text: 'To Do', key: 1, type: 'default_active' },
         isParentTask: true,
-        Task_Leader: (body.userData && body.userData.id) || '',
+        Task_Leader: creatorId,
         Task_Priority: body.priority || 'MEDIUM',
         deletedStatusKey: 0,
         statusType: 'default_active',
@@ -33,7 +42,7 @@ function buildTemplateFromBody(body) {
         points: (body.points === undefined || body.points === null || body.points === '') ? null : Number(body.points),
         rawDescription: body.rawDescription || '',
         descriptionBlock: body.descriptionBlock || {},
-    };
+    });
 }
 
 exports.createDefinition = async (req, res) => {
@@ -43,6 +52,11 @@ exports.createDefinition = async (req, res) => {
         if (!companyId || !b.name || !b.taskName || !b.projectData || !b.projectData._id || !b.freq) {
             return res.send({ status: false, statusText: 'Missing required fields (name, taskName, projectData, freq)' });
         }
+        const creator = await actingUser(req);
+        if (!creator) return res.status(401).send({ status: false, statusText: 'A signed-in user is required.' });
+        if (!idList(b.assignees)) return res.status(400).send({ status: false, statusText: `assignees is a list of at most ${ASSIGNEES_MAX} member ids.` });
+        const refusal = await namedPeopleRefusal(companyId, b.projectData._id, b.assignees || []);
+        if (refusal) return res.status(400).send({ status: false, statusText: refusal });
         const def = {
             _id: new mongoose.Types.ObjectId(),
             name: b.name,
@@ -55,30 +69,28 @@ exports.createDefinition = async (req, res) => {
             monthday: b.monthday ? Number(b.monthday) : undefined,
             runHour: Number.isFinite(Number(b.runHour)) ? Number(b.runHour) : 9,
             skipIfOpen: !!b.skipIfOpen,
+            missedPolicy: rules.MISSED_POLICIES.includes(b.missedPolicy) ? b.missedPolicy : (b.skipIfOpen ? 'skip' : 'create'),
             until: b.until ? new Date(b.until) : undefined,
             runCount: 0,
-            templateSnapshot: buildTemplateFromBody(b),
+            templateSnapshot: buildTemplateFromBody(b, creator.id),
             projectSnapshot: {
                 _id: b.projectData._id,
                 CompanyId: b.projectData.CompanyId,
                 ProjectCode: b.projectData.ProjectCode,
                 ProjectName: b.projectData.ProjectName,
             },
-            userSnapshot: {
-                id: b.userData && b.userData.id,
-                Employee_Name: b.userData && b.userData.Employee_Name,
-                companyOwnerId: b.userData && b.userData.companyOwnerId,
-            },
+            userSnapshot: { id: creator.id, Employee_Name: creator.Employee_Name, companyOwnerId: '' },
             sprintArray: b.sprintArray || {},
-            createdBy: (b.userData && b.userData.id) || '',
+            createdBy: creator.id,
             deletedStatusKey: 0,
         };
         def.nextRunAt = helper.computeNextRun(def, new Date());
         const saved = await MongoDbCrudOpration(companyId, { type: SCHEMA_TYPE.RECURRING_TASKS, data: def }, 'save');
+        helper.announce(companyId, def, 'insert');
         res.send({ status: true, statusText: 'Recurring task created', data: saved });
     } catch (error) {
         logger.error(`[recurringTasks] create failed: ${error.message}`);
-        res.send({ status: false, statusText: error.message });
+        res.status(error instanceof RichTextLimitError ? error.statusCode : 200).send({ status: false, statusText: error.message });
     }
 };
 
@@ -90,7 +102,8 @@ exports.listByProject = async (req, res) => {
             type: SCHEMA_TYPE.RECURRING_TASKS,
             data: [{ ProjectID: new mongoose.Types.ObjectId(projectId), deletedStatusKey: 0 }],
         }, 'find');
-        res.send({ status: true, data: defs || [] });
+        const hidden = ((await hiddenSprintFilter(companyId, req.uid, [projectId])).sprintId || { $nin: [] }).$nin.map(String);
+        res.send({ status: true, data: (defs || []).filter((def) => !hidden.includes(String(def.sprintId || ''))) });
     } catch (error) {
         logger.error(`[recurringTasks] list failed: ${error.message}`);
         res.send({ status: false, statusText: error.message });
@@ -106,6 +119,7 @@ exports.updateDefinition = async (req, res) => {
         ['name', 'enabled', 'freq', 'interval', 'byweekday', 'monthday', 'runHour', 'skipIfOpen'].forEach((k) => {
             if (b[k] !== undefined) patch[k] = b[k];
         });
+        if (b.missedPolicy !== undefined && rules.MISSED_POLICIES.includes(b.missedPolicy)) patch.missedPolicy = b.missedPolicy;
         if (b.until !== undefined) patch.until = b.until ? new Date(b.until) : null;
 
         // If the schedule changed, recompute nextRunAt from the merged definition.
@@ -120,6 +134,7 @@ exports.updateDefinition = async (req, res) => {
             }
         }
         await helper.updateDef(companyId, id, patch);
+        helper.announce(companyId, { _id: id });
         res.send({ status: true, statusText: 'Updated' });
     } catch (error) {
         logger.error(`[recurringTasks] update failed: ${error.message}`);
@@ -132,6 +147,7 @@ exports.deleteDefinition = async (req, res) => {
         const companyId = req.headers['companyid'];
         const id = req.params.id;
         await helper.updateDef(companyId, id, { deletedStatusKey: 1, enabled: false });
+        helper.announce(companyId, { _id: id }, 'delete');
         res.send({ status: true, statusText: 'Deleted' });
     } catch (error) {
         logger.error(`[recurringTasks] delete failed: ${error.message}`);
@@ -152,6 +168,7 @@ exports.runNow = async (req, res) => {
         const out = await helper.instantiateOne(companyId, def);
         const patch = { lastRunAt: new Date(), runCount: (Number(def.runCount) || 0) + (out.created ? 1 : 0) };
         if (out.id) patch.lastInstanceTaskId = String(out.id);
+        if (rules.hasEnded({ maxRuns: def.maxRuns, runCount: patch.runCount })) patch.enabled = false;
         await helper.updateDef(companyId, id, patch);
         res.send({
             status: !!(out.created || out.skipped),
@@ -179,3 +196,4 @@ exports.runDueForCompany = async (req, res) => {
 
 // Cron entry (all companies) — consumed by cron.js.
 exports.runRecurringForAllCompanies = helper.runRecurringForAllCompanies;
+exports.buildTemplateFromBody = buildTemplateFromBody;

@@ -1,4 +1,5 @@
 const events = require('events');
+const { keepStreamOpen } = require('../Agents/engine/timeouts');
 const eventEmitter = new events.EventEmitter();
 
 exports.emitListener = (evId, data) => {
@@ -6,6 +7,7 @@ exports.emitListener = (evId, data) => {
 }
 exports.handleEvents = (req, res) => {
     try {
+        keepStreamOpen(req);
         const evId = req.params.id;
         const sendProgress = (data) => {
             res.write(`data: ${JSON.stringify({ data })}\n\n`);

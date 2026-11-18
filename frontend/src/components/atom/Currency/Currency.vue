@@ -1,6 +1,6 @@
 <template>
     <div>
-        <span class="black project-type-name cursor-pointer"  :class="{'font-size-13 font-weight-400' : clientWidth > 767, 'font-size-16' : clientWidth <=767}"
+        <span class="project-type-name cursor-pointer"  :class="{'font-size-13 font-weight-400' : clientWidth > 767, 'font-size-16' : clientWidth <=767}"
             :style="[{padding : clientWidth > 767 ? '0' : '10px 0px'}]"
          @click="isVisible = true" :title="projectData?.ProjectCurrency?.symbol + '-' + projectData?.ProjectCurrency?.code">{{projectData?.ProjectCurrency?.symbol}} - {{projectData?.ProjectCurrency?.code}}</span>
         <Sidebar

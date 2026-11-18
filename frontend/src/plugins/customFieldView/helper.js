@@ -1,7 +1,7 @@
 import * as env from '@/config/env';
 import { apiRequest } from "@/services";
 export function customField() {
-    // deleteMilestoneHelper
+    // SettingsShell renders this list as the plugin-contributed settings tabs.
     function tabRouteHelper(){
         return [{
             label: "Custom Field Manager",
@@ -9,6 +9,12 @@ export function customField() {
             icon: require("@/assets/images/svg/WorkspaceSettingsInactive.svg"),
             isVisible: true,
             permissions: ['settings.settings_custom_field'],
+            activeIcon: require("@/assets/images/svg/WorkspaceSettings.svg")
+        },{
+            label: "Language & Region",
+            to: { name: "LanguageRegion" },
+            icon: require("@/assets/images/svg/WorkspaceSettingsInactive.svg"),
+            isVisible: true,
             activeIcon: require("@/assets/images/svg/WorkspaceSettings.svg")
         }];
     }

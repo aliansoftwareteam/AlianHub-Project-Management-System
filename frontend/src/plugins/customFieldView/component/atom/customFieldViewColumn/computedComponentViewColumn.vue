@@ -15,12 +15,12 @@
         // Custom field definition (has fieldType, formulaExpression, rollupSourceFieldId, rollupFunction).
         def:{
             type:Object,
-            default:() => {}
+            default:() => ({})
         },
         // The task this cell belongs to.
         task:{
             type:Object,
-            default:() => {}
+            default:() => ({})
         },
         // Flat task list (incl. subtasks) for rollup aggregation.
         allTasks:{

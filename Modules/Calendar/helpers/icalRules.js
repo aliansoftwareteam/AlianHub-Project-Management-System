@@ -7,6 +7,7 @@ const crypto = require('crypto');
 
 const generateFeedToken = () => crypto.randomBytes(18).toString('hex'); // 36 hex
 const isFeedToken = (t) => /^[a-f0-9]{24,}$/.test(String(t || ''));
+const hashFeedToken = (token) => crypto.createHash('sha256').update(String(token)).digest('hex');
 
 const pad = (n) => String(n).padStart(2, '0');
 
@@ -58,4 +59,4 @@ const buildIcs = ({ calName = 'AlianHub', events = [], stamp } = {}) => {
     ].filter(Boolean).join('\r\n');
 };
 
-module.exports = { generateFeedToken, isFeedToken, fmtDate, fmtStamp, escapeText, buildIcs };
+module.exports = { generateFeedToken, isFeedToken, hashFeedToken, fmtDate, fmtStamp, escapeText, buildIcs };

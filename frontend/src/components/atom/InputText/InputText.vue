@@ -1,12 +1,13 @@
 <template>
     <input
+        ref="field"
         class="form-control"
         :class="{'border-radius-6-px': clientWidth > 767 , 'border-radius-8-px': clientWidth <= 767}"
         :style="{ height: height, width: width , outline: !isOutline ? 'none' : '' }"
         :type="type"
 
         v-model.trim="value"
-        :id="inputId"
+        :id="inputId || null"
         :maxlength="maxLength"
         :placeHolder="placeHolder"
         :disabled="isDisabled"
@@ -30,12 +31,12 @@
 </template>
 
 <script setup>
-    import { computed, defineProps,defineEmits, onMounted , inject} from 'vue';
+    import { computed, defineProps, defineEmits, onMounted, inject, ref } from 'vue';
 
     const props = defineProps({
         inputId: {
             type: String,
-            default: 'inputId'
+            default: ''
         },
         type: {
             type: String,
@@ -123,10 +124,9 @@
         }
     });
 
+    const field = ref(null);
     onMounted(() => {
-        if(!props.isDirectFocus) return;
-        const ele = document.getElementById(props.inputId);
-        ele.focus();
+        if (props.isDirectFocus) field.value?.focus();
     });
 </script>
 <style>

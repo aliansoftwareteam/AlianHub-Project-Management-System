@@ -25,7 +25,7 @@
                                             <img v-if="viewCurrentPassword === 'password'" src="@/assets/images/password_view_hide.png" class="password-view"/>
                                             <img v-else src="@/assets/images/password_view_show.png" class="password-view"/>
                                         </span>
-                                        <div class="invalid-feedback red pt-5px error-capitalize">{{ formDataChangePassword.currentPassword.error }}
+                                        <div class="invalid-feedback change-password-red pt-5px error-capitalize">{{ formDataChangePassword.currentPassword.error }}
                                         </div>
                                     </div>
                                     <div class="inputfield position-re">
@@ -45,7 +45,7 @@
                                             <img v-if="viewPassword === 'password'" src="@/assets/images/password_view_hide.png" class="password-view"/>
                                             <img v-else src="@/assets/images/password_view_show.png" class="password-view"/>
                                         </span>
-                                        <div class="invalid-feedback red pt-5px error-capitalize">{{ formDataChangePassword.newPassword.error }}</div>
+                                        <div class="invalid-feedback change-password-red pt-5px error-capitalize">{{ formDataChangePassword.newPassword.error }}</div>
                                     </div>
                                     <div class="inputfield position-re">
                                         <label>
@@ -64,13 +64,13 @@
                                             <img v-if="viewConfirmPassword === 'password'" src="@/assets/images/password_view_hide.png" class="password-view"/>
                                             <img v-else src="@/assets/images/password_view_show.png" class="password-view"/>
                                         </span>
-                                        <div class="invalid-feedback red pt-5px error-capitalize">{{ confirmationErr }}</div>
+                                        <div class="invalid-feedback change-password-red pt-5px error-capitalize">{{ confirmationErr }}</div>
                                     </div>
                                 </div>
                                 <div class="d-flex align-items-center justify-content-start mysetiing_save">
                                     <button :disabled="isSpinner" @click.prevent="handleChangePassword()"
                                         :class="[{ 'pointer-events-none': isSpinner }]"
-                                        class="btn_btn mysetting_save_btn ml-15px">{{ $t('Settings.save_changes')
+                                        class="ah-btn ah-btn--primary mysetting_save_btn ml-15px">{{ $t('Settings.save_changes')
                                         }}</button>
                                 </div>
                             </form>
@@ -90,6 +90,7 @@
     import SpinnerComp from '@/components/atom/SpinnerComp/SpinnerComp.vue';
     import { apiRequest,useAuth } from "../../../services";
     import { useI18n } from 'vue-i18n';
+    import { MIN_PASSWORD_LENGTH, PASSWORD_PATTERN } from '@passwordRule';
     const { t } = useI18n();
     const { logOut } = useAuth();
 
@@ -106,13 +107,13 @@
     const formDataChangePassword = ref({
         currentPassword: {
             value: "",
-            rules:"required | regex: ^(?=.*?[A-Z])(?=.*?[a-z])(?=.*?[0-9])(?=.*?[#?!@$%^&*-]).*$ | min:8",
+            rules:"required",
             name: "current password",
             error: "",
         },
         newPassword: {
             value: "",
-            rules:"required | regex: ^(?=.*?[A-Z])(?=.*?[a-z])(?=.*?[0-9])(?=.*?[#?!@$%^&*-]).*$ | min:8",
+            rules:`required | regex: ${PASSWORD_PATTERN.source} | min:${MIN_PASSWORD_LENGTH}`,
             name: "new password",
             error: "",
         },
@@ -236,4 +237,10 @@
 
 <style scoped>
 @import '../MySettings/style.css';
+</style>
+
+<style scoped>
+.change-password-red {
+    color: var(--danger-ink);
+}
 </style>

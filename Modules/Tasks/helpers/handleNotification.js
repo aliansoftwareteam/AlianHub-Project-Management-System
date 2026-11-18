@@ -7,7 +7,25 @@ const mongoose = require("mongoose");
 const { MongoDbCrudOpration } = require("../../../utils/mongo-handler/mongoQueries");
 const { myCache } = require("../../../Config/config");
 
-exports.HandleBothNotification = ({ type, companyId, projectId, taskId, folderId, sprintId, object, userData, changeType = '', changeData = {},comments_id = "", mentionUserId = [],isGroupChat}) => {
+const narrowRecipients = async (keepRecipients, users, leader = '') => {
+    if (typeof keepRecipients !== 'function') return { users, leader };
+    const kept = new Set((await keepRecipients([...new Set([...users, leader].filter(Boolean).map(String))])).map(String));
+    return { users: users.filter((id) => kept.has(String(id))), leader: leader && kept.has(String(leader)) ? leader : '' };
+};
+
+const idsOf = (list) => (Array.isArray(list) ? list : [list]).filter(Boolean).map(String);
+
+/* Who an update is about, as opposed to who merely watches the item. Everyone else it
+ * reaches is filed under the Inbox's Other tab. Undefined for rows that have no such split. */
+exports.directUsersFor = ({ type, taskData, projectData, mentionUserId = [] } = {}) => {
+    if (['tasks', 'task'].includes(type)) {
+        return [...new Set([...idsOf(taskData?.Task_Leader), ...idsOf(taskData?.AssigneeUserId), ...idsOf(taskData?.LeadUserId), ...idsOf(mentionUserId)])];
+    }
+    if (type === 'project') return [...new Set([...idsOf(projectData?.LeadUserId), ...idsOf(mentionUserId)])];
+    return undefined;
+};
+
+exports.HandleBothNotification = ({ type, companyId, projectId, taskId, folderId, sprintId, object, userData, changeType = '', changeData = {},comments_id = "", mentionUserId = [],isGroupChat, keepRecipients} = {}) => {
     return new Promise(async (resolve, reject) => {
         try {
             let projectPath = `${companyId}/${companyId}/${dbCollections.PROJECTS}/${projectId}`
@@ -109,13 +127,11 @@ exports.HandleBothNotification = ({ type, companyId, projectId, taskId, folderId
                         ...watchers
                     ]));
                 } else {
-                    users = Array.from(new Set([...taskData.AssigneeUserId, ...doc.data().LeadUserId, ...watchers]));
+                    users = Array.from(new Set([...taskData.AssigneeUserId, ...(taskData.LeadUserId || []), ...watchers]));
                 }
 
-                var leaderId = ""
-                if (taskData?.LeadUserId !== undefined && taskData?.LeadUserId != "") {
-                    leaderId = taskData.LeadUserId
-                }
+                const taskRecipients = await narrowRecipients(keepRecipients, users, taskData?.Task_Leader || "");
+                users = taskRecipients.users;
 
                 const obj = {
                     "createdAt": new Date(),
@@ -132,10 +148,11 @@ exports.HandleBothNotification = ({ type, companyId, projectId, taskId, folderId
                     "sprintId": sprintId || "",
                     "updatedAt": new Date(),
                     "companyId": companyId || "",
-                    "task_leader_ID": taskData?.Task_Leader || "",
+                    "task_leader_ID": taskRecipients.leader,
                     "changeType": changeType || "",
                     "changeData": changeData || {},
-                    "comments_id": comments_id ? comments_id : ""
+                    "comments_id": comments_id ? comments_id : "",
+                    "directUsers": exports.directUsersFor({ type, taskData, mentionUserId })
                 }
                 handleNotificationtFun({body:obj})
                     .then((response) => {
@@ -160,6 +177,7 @@ exports.HandleBothNotification = ({ type, companyId, projectId, taskId, folderId
                 const includeOwner = ownerId && !ownerIgnoringProject;
                 let users = [];
                 users = Array.from(new Set([...filteredIds, ...(includeOwner ? [ownerId] : [])]));
+                users = (await narrowRecipients(keepRecipients, users)).users;
                 const obj = {
                     "createdAt": new Date(),
                     "key": object.key,
@@ -174,7 +192,8 @@ exports.HandleBothNotification = ({ type, companyId, projectId, taskId, folderId
                     "companyId": companyId || "",
                     "changeType": changeType || "",
                     "changeData": changeData || {},
-                    "comments_id": comments_id ? comments_id : ""
+                    "comments_id": comments_id ? comments_id : "",
+                    "directUsers": exports.directUsersFor({ type, projectData, mentionUserId })
                 }
                 handleNotificationtFun({body:obj})
                     .then((response) => {
@@ -201,7 +220,7 @@ exports.HandleBothNotification = ({ type, companyId, projectId, taskId, folderId
                             const hasCache = myCache.get(cacheKey);
 
                             if (hasCache) {
-                                userArray = JSON.parse(hasCache);
+                                const userArray = JSON.parse(hasCache);
                                 if (userArray?.length) {
                                     chatData.watchers = userArray.filter(x => x.status === 2).map(x => x?._id ? x?.userId : '');
                                 }
@@ -212,7 +231,7 @@ exports.HandleBothNotification = ({ type, companyId, projectId, taskId, folderId
                                 myCache.set(cacheKey, JSON.stringify(response), 604800);
                             }
                         } else {
-                            chatData.watchers = chatData.watchers && chatData.watchers.length ? chatData.watchers : chatData?.AssigneeUserId && chatData?.AssigneeUserId?.length ? [...chatData?.AssigneeUserId] : []
+                            chatData.watchers = chatData.watchers && chatData.watchers.length ? chatData.watchers : chatData?.AssigneeUserId && chatData?.AssigneeUserId?.length ? [...chatData.AssigneeUserId] : []
                         }
 
                     } catch (error) {
@@ -235,6 +254,8 @@ exports.HandleBothNotification = ({ type, companyId, projectId, taskId, folderId
                 } else {
                     users = Array.from(new Set([...(chatData?.AssigneeUserId || []), ...watchers]));
                 }
+                const chatRecipients = await narrowRecipients(keepRecipients, users, chatData?.Task_Leader || '');
+                users = chatRecipients.users;
 
                 const obj = {
                     createdAt: new Date(),
@@ -251,7 +272,7 @@ exports.HandleBothNotification = ({ type, companyId, projectId, taskId, folderId
                     sprintId: sprintId || "",
                     updatedAt: new Date(),
                     companyId: companyId || "",
-                    task_leader_ID: chatData?.Task_Leader || "",
+                    task_leader_ID: chatRecipients.leader,
                     changeType: changeType || "",
                     changeData: changeData || {},
                     comments_id: comments_id || ""
@@ -261,6 +282,8 @@ exports.HandleBothNotification = ({ type, companyId, projectId, taskId, folderId
                     logger.error(`ERROR in Notification API info::${error.message}`);
                     reject({ status: false, message: error.message });
                 });
+            } else {
+                reject({ status: false, message: "Nothing to notify: the project or task was not found" });
             }
         } catch (error) {
 

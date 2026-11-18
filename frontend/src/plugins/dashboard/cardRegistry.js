@@ -1,0 +1,22 @@
+import { defineAsyncComponent } from 'vue';
+
+/**
+ * Card key → the component that renders its body inside DashboardCard.
+ * Only cards listed here can be rendered; the catalogue marks the rest as not
+ * built yet and the picker refuses to add them.
+ */
+const COMPONENTS = {
+    DueSoonCard: defineAsyncComponent(() => import(/* webpackChunkName: "dash-cards" */ '@/components/organisms/DueSoonCard/DueSoonCard.vue')),
+    MyTimeCard: defineAsyncComponent(() => import(/* webpackChunkName: "dash-cards" */ '@/components/organisms/MyTimeCard/MyTimeCard.vue')),
+    ProjectPulseCard: defineAsyncComponent(() => import(/* webpackChunkName: "dash-cards" */ '@/components/organisms/ProjectPulseCard/ProjectPulseCard.vue')),
+    TeamLoggedVsEtaCard: defineAsyncComponent(() => import(/* webpackChunkName: "dash-cards" */ '@/components/organisms/TeamLoggedVsEtaCard/TeamLoggedVsEtaCard.vue')),
+    FreeResourcesCard: defineAsyncComponent(() => import(/* webpackChunkName: "dash-cards" */ '@/components/organisms/FreeResourcesCard/FreeResourcesCard.vue')),
+    AtRiskTodayCard: defineAsyncComponent(() => import(/* webpackChunkName: "dash-cards" */ '@/components/organisms/AtRiskTodayCard/AtRiskTodayCard.vue')),
+    AgentSpendCard: defineAsyncComponent(() => import(/* webpackChunkName: "dash-cards" */ '@/components/organisms/AgentSpendCard/AgentSpendCard.vue')),
+    TasksByStatusCard: defineAsyncComponent(() => import(/* webpackChunkName: "dash-cards" */ '@/components/organisms/TasksByStatusCard/TasksByStatusCard.vue')),
+    BurndownCard: defineAsyncComponent(() => import(/* webpackChunkName: "dash-cards" */ '@/components/organisms/BurndownCard/BurndownCard.vue')),
+    VelocityCard: defineAsyncComponent(() => import(/* webpackChunkName: "dash-cards" */ '@/components/organisms/VelocityCard/VelocityCard.vue')),
+    AskAQuestionCard: defineAsyncComponent(() => import(/* webpackChunkName: "dash-cards" */ '@/components/organisms/AskAQuestionCard/AskAQuestionCard.vue')),
+};
+
+export const cardComponent = (key) => COMPONENTS[key] || null;

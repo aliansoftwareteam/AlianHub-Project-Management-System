@@ -1,0 +1,428 @@
+const EventEmitter = require('events');
+const { AsyncResource } = require('async_hooks');
+const { ulid } = require('ulid');
+const { SCHEMA_TYPE } = require('../Config/schemaType');
+const { MongoDbCrudOpration } = require('../utils/mongo-handler/mongoQueries');
+const logger = require('../Config/loggerConfig');
+const telemetry = require('../Config/telemetry');
+const socketEmitter = require('./socketEventEmitter');
+const { normalizeChangedFields, createSnapshotStore, isNotAnEdit } = require('../utils/entityEvents');
+const actingAgent = require('../Modules/Agents/actingAgent');
+const providerContext = require('../Modules/AICore/providerContext');
+const writerLimits = require('./writerLimits');
+
+// Canonical domain-event bus — stage 1 of the automation engine (ADR 002).
+//
+// Subscribes to the namespaced socketEmitter events every mutation already fires,
+// exactly as Modules/Webhooks/dispatcher.js does, so no existing write path needed
+// changing. Raw Mongoose documents never reach a rule: everything is normalised to
+// one envelope shape first, because `previous` and `changedFields` are what make
+// "when status changes FROM In Progress TO Done" expressible at all.
+//
+// Phase 0 only observes. Nothing here matches rules or mutates data — envelopes are
+// emitted for future consumers and optionally recorded, so a week of real traffic
+// can be read before the matcher is built against a shape that turns out wrong.
+
+const LOG_PREFIX = '[domain-events]';
+const DEBOUNCE_MS = 2000;
+const MAX_DEPTH = 3;
+
+// Actor kinds. Events an automation itself caused are marked so rules can ignore
+// them by default — without this, rule A's write wakes rule B, whose write wakes
+// rule A, and one tenant's database absorbs the difference. An import's writes are
+// marked too: the lists that count tasks still hear of them, and no rule answers them.
+const ACTOR_KINDS = Object.freeze(['user', 'automation', 'agent', 'system', 'import']);
+
+const bus = new EventEmitter();
+bus.setMaxListeners(50);
+
+// What we last *observed* per task. Deliberately not shared with the webhook
+// dispatcher's store, which holds what it last *delivered* — a task the dispatcher
+// filtered out still moved, and the engine has to see that.
+const taskSnapshots = createSnapshotStore({ max: 5000 });
+
+// `${companyId}:${entityId}:${type}` -> { companyId, doc, changed, emitType, actor, depth, timer }
+const pending = new Map();
+
+let started = false;
+let recording = String(process.env.AUTOMATION_EVENT_LOG || '').toLowerCase() === 'true';
+
+const isRecording = () => recording;
+const setRecording = (on) => { recording = !!on; };
+
+/* Which envelope type a task emit represents. Insert is unambiguous; an update is
+ * named after the field that changed so rules can subscribe narrowly instead of
+ * filtering every task.updated. Returns null for emits that carry no field change
+ * (counter bumps and similar plumbing) — those are noise, not domain events. */
+const classifyTaskEvent = (type, changedFields) => {
+    if (type === 'insert') return 'task.created';
+    if (!changedFields || !changedFields.size) return null;
+    if (changedFields.has('statusType') || changedFields.has('status') || changedFields.has('statusKey')) return 'task.status_changed';
+    if (changedFields.has('AssigneeUserId')) return 'task.assignee_changed';
+    if (changedFields.has('Task_Priority')) return 'task.priority_changed';
+    if (changedFields.has('Task_Leader')) return 'task.lead_changed';
+    if (changedFields.has('DueDate') || changedFields.has('dueDateDeadLine')) return 'task.due_date_changed';
+    if (changedFields.has('TaskName')) return 'task.renamed';
+    if (changedFields.has('sprintId')) return 'task.sprint_changed';
+    return 'task.updated';
+};
+
+/* The subset of a task an envelope carries. Bounded on purpose: the envelope is
+ * copied into every matching run document, so putting the whole task in here makes
+ * the run log grow with the description field. */
+const trimTask = (doc) => ({
+    _id: String(doc._id),
+    TaskKey: doc.TaskKey || null,
+    TaskName: doc.TaskName || null,
+    statusType: doc.statusType || null,
+    statusKey: doc.statusKey || null,
+    Task_Priority: doc.Task_Priority || null,
+    AssigneeUserId: Array.isArray(doc.AssigneeUserId) ? doc.AssigneeUserId.map(String) : [],
+    Task_Leader: doc.Task_Leader ? String(doc.Task_Leader) : null,
+    DueDate: doc.DueDate || null,
+    startDate: doc.startDate || null,
+    taskType: doc.taskType || null,
+    isParentTask: doc.isParentTask !== false,
+    ParentTaskId: doc.ParentTaskId ? String(doc.ParentTaskId) : null,
+    ProjectID: doc.ProjectID ? String(doc.ProjectID) : null,
+    sprintId: doc.sprintId ? String(doc.sprintId) : null,
+});
+
+/* An emit tells us a task changed but not who changed it. Until every write path
+ * threads an actor through, fall back to system rather than inventing a user id —
+ * a wrong actor on an audit entry is worse than an honest unknown. */
+const resolveActor = (payload) => {
+    const raw = payload?.actor;
+    const kind = ACTOR_KINDS.includes(raw?.kind) ? raw.kind : 'system';
+    return { userId: raw?.userId ? String(raw.userId) : null, kind };
+};
+
+/* A web handler an agent ran (Modules/Agents/taskRequests, workRequests) emits a task change as it does for a
+ * person: with no actor and no depth. The agent's mark supplies both, one hop past the event the agent
+ * answered, which is what the older agent path sends with its emits. An emit that names its own actor keeps it. */
+const originOf = (payload) => {
+    const mark = payload?.actor ? null : actingAgent.current();
+    if (!mark) return { actor: resolveActor(payload), depth: Number(payload?.depth) || 0 };
+    return { actor: { userId: mark.userId ? String(mark.userId) : null, kind: 'agent' }, depth: (Number(mark.depth) || 0) + 1 };
+};
+
+/* Present only where the change came from a token held to some projects (./writerLimits). */
+const narrowingOf = (narrowing) => (narrowing ? { narrowing } : {});
+
+const buildEnvelope = ({ companyId, type, doc, changedFields, previous, actor, depth, traceId, narrowing }) => ({
+    id: ulid(),
+    companyId: String(companyId),
+    type,
+    occurredAt: new Date().toISOString(),
+    traceId: traceId || telemetry.traceIdNow() || telemetry.newTraceId(),
+    actor,
+    depth: Number(depth) || 0,
+    ...narrowingOf(narrowing),
+    scope: {
+        projectId: doc.ProjectID ? String(doc.ProjectID) : null,
+        sprintId: doc.sprintId ? String(doc.sprintId) : null,
+    },
+    entity: { kind: 'task', id: String(doc._id), key: doc.TaskKey || null },
+    data: trimTask(doc),
+    previous: previous || null,
+    changedFields: Array.from(changedFields || []),
+});
+
+/* Pages, projects and members have no field-level classification: an envelope names what
+ * happened to the entity, and its data is the few fields a consumer needs to act on it. */
+const buildEntityEnvelope = ({ companyId, type, entity, scope = {}, data = {}, actor, depth, narrowing }) => ({
+    id: ulid(),
+    companyId: String(companyId),
+    type,
+    occurredAt: new Date().toISOString(),
+    traceId: telemetry.traceIdNow() || telemetry.newTraceId(),
+    actor: resolveActor({ actor }),
+    depth: Number(depth) || 0,
+    ...narrowingOf(narrowing),
+    scope: {
+        projectId: scope.projectId ? String(scope.projectId) : null,
+        sprintId: scope.sprintId ? String(scope.sprintId) : null,
+    },
+    entity,
+    data,
+    previous: null,
+    changedFields: [],
+});
+
+/* A page delete is one emit for the whole subtree it took, carrying every id in `ids`. */
+const classifyPageEvent = (emitType, doc) => {
+    if (Number(doc.deletedStatusKey) === 1) return 'page.deleted';
+    return emitType === 'insert' ? 'page.created' : 'page.updated';
+};
+
+const trimPage = (doc) => ({
+    _id: String(doc._id),
+    ids: Array.isArray(doc.ids) && doc.ids.length ? doc.ids.map(String) : [String(doc._id)],
+    ProjectID: doc.ProjectID ? String(doc.ProjectID) : null,
+    visibility: doc.visibility || null,
+    createdByAgent: doc.createdByAgent === true,
+    deletedStatusKey: Number(doc.deletedStatusKey) || 0,
+});
+
+/* A comment is deleted by setting isDeleted, so its delete arrives as an update emit. */
+const classifyCommentEvent = (emitType, doc) => {
+    if (doc.isDeleted === true) return 'comment.deleted';
+    return emitType === 'insert' ? 'comment.created' : 'comment.updated';
+};
+
+const idOrNull = (value) => (value ? String(value) : null);
+
+const trimComment = (doc) => ({
+    _id: String(doc._id),
+    projectId: idOrNull(doc.projectId),
+    sprintId: idOrNull(doc.sprintId),
+    taskId: idOrNull(doc.taskId),
+    isDeleted: doc.isDeleted === true,
+});
+
+/* Call notes are discarded by setting deletedStatusKey. The envelope never carries the transcript
+ * or who was on the call: a consumer that needs them reads the row. */
+const classifyTranscriptEvent = (emitType, doc) => {
+    if (Number(doc.deletedStatusKey) === 1) return 'transcript.deleted';
+    return emitType === 'insert' ? 'transcript.created' : 'transcript.updated';
+};
+
+const trimCall = (doc) => ({
+    _id: String(doc._id),
+    projectId: idOrNull(doc.projectId),
+    deletedStatusKey: Number(doc.deletedStatusKey) || 0,
+});
+
+// Mongo rejects with strings, plain objects and sometimes nothing at all.
+const failureText = (error) => (error && error.message) || String(error);
+
+const eventLabel = (envelope) => {
+    const entity = (envelope && envelope.entity) || {};
+    return `${envelope && envelope.type} on ${entity.kind} ${entity.id} in company ${envelope && envelope.companyId}`;
+};
+
+async function record(envelope) {
+    if (!recording) return;
+    await MongoDbCrudOpration(envelope.companyId, {
+        type: SCHEMA_TYPE.AUTOMATION_EVENT_LOG,
+        data: {
+            eventId: envelope.id,
+            type: envelope.type,
+            occurredAt: envelope.occurredAt,
+            actor: envelope.actor,
+            depth: envelope.depth,
+            scope: envelope.scope,
+            entity: envelope.entity,
+            changedFields: envelope.changedFields,
+            hasPrevious: !!envelope.previous,
+        },
+    }, 'save');
+}
+
+/* A listener acts for its own people (a rule for its maker, a notice for the person it is sent to), not for whoever
+ * made the change. Bound here, where no request is running, it is told under no token's project list, no agent's
+ * mark and no request. What it may know of the change is in the envelope: who made it and how deep in a chain,
+ * which the loop guards read, the project list of a token that made it, and the trace and the workspace, which
+ * are entered again from it. */
+const toListeners = AsyncResource.bind((envelope, recorded) => providerContext.run({ companyId: envelope.companyId },
+    () => telemetry.withTrace(envelope.traceId, () => {
+        bus.emit('domain.event', envelope);
+        bus.emit(envelope.type, envelope);
+        if (recorded) record(envelope).catch((error) => logger.error(`${LOG_PREFIX} could not record ${eventLabel(envelope)}: ${failureText(error)}`));
+    })));
+
+/* For an envelope built elsewhere (a form submission). */
+const tell = (envelope) => toListeners(envelope, false);
+
+function publish(envelope) {
+    if (envelope.depth > MAX_DEPTH) {
+        logger.error(`${LOG_PREFIX} dropped ${envelope.type} for ${envelope.entity.id} — depth ${envelope.depth} exceeds ${MAX_DEPTH}`);
+        return;
+    }
+    toListeners(envelope, true);
+}
+
+function flush(entry) {
+    const { companyId, doc, changed, actor, depth, emitType, traceId, narrowing } = entry;
+    const type = classifyTaskEvent(emitType, changed);
+    if (!type) return;
+
+    const taskId = String(doc._id);
+    const previous = taskSnapshots.get(taskId);
+    const data = trimTask(doc);
+    taskSnapshots.remember(taskId, data);
+
+    publish(buildEnvelope({ companyId, type, doc, changedFields: changed, previous, actor, depth, traceId, narrowing }));
+}
+
+const fieldValue = (doc, field) => {
+    const value = doc ? doc[field] : undefined;
+    if (value === null || value === undefined) return '';
+    return typeof value === 'object' ? JSON.stringify(value) : String(value);
+};
+
+/* Whether this emit is a second change rather than another echo of the pending one.
+ * The window exists to collapse the several emits ONE write produces, and those all
+ * carry the same values; an emit that reports a NEW value for a field the pending
+ * emit already moved is a separate domain event, and merging the two would publish
+ * one envelope for two changes — an automation that should fire twice fires once. */
+const supersedesPending = (entry, doc, changedNow) => Boolean(entry) && [...changedNow]
+    .some((field) => entry.changed.has(field) && fieldValue(entry.doc, field) !== fieldValue(doc, field));
+
+function flushSafely(entry) {
+    try {
+        flush(entry);
+    } catch (error) {
+        logger.error(`${LOG_PREFIX} flush failed for ${entry.emitType} on task ${entry.doc._id} in company ${entry.companyId}: ${failureText(error)}`);
+    }
+}
+
+/* One user action fires several emits (the write, then counter and index updates).
+ * Collapsing them within a window means a status+priority change in the same save
+ * produces one envelope carrying both fields, not two envelopes that each see half
+ * the change. Same window the webhook dispatcher uses, for the same reason.
+ *
+ * The window is fixed from its first emit: re-arming it on every emit let a task
+ * that kept emitting hold its automations back indefinitely. */
+function onTaskEvent(emitType) {
+    return (payload) => {
+        try {
+            const doc = payload?.data;
+            // A conversation is kept in the tasks collection and sends the same emits; it is no task for a rule.
+            if (!doc || !doc.CompanyId || !doc._id || doc.mainChat === true || isNotAnEdit(payload)) return;
+
+            const companyId = String(doc.CompanyId);
+            const key = `${companyId}:${String(doc._id)}:${emitType}`;
+            const changedNow = normalizeChangedFields(payload?.updatedFields);
+            const { actor, depth } = originOf(payload);
+            const narrowing = writerLimits.handedOrHere(payload.narrowing);
+
+            const existing = pending.get(key);
+            if (supersedesPending(existing, doc, changedNow)) {
+                clearTimeout(existing.timer);
+                pending.delete(key);
+                flushSafely(existing);
+            }
+
+            const open = pending.get(key);
+            if (open) {
+                open.doc = doc;
+                changedNow.forEach((field) => open.changed.add(field));
+                // The loop guard only holds if a merged envelope is never shallower than
+                // an emit it absorbed, so the deepest emit's actor and depth win. Limits once named stay: an
+                // emit of the same write that names none (a counter, an index) must not lift them. A person's
+                // change absorbed in the window is published as the deeper writer's, limits included.
+                if (depth >= open.depth) {
+                    open.actor = actor;
+                    open.depth = depth;
+                }
+                open.narrowing = open.narrowing || narrowing;
+                return;
+            }
+
+            const entry = { companyId, doc, changed: new Set(changedNow), emitType, actor, depth, narrowing, traceId: telemetry.traceIdNow() || telemetry.newTraceId() };
+            entry.timer = setTimeout(() => {
+                if (pending.get(key) !== entry) return;
+                pending.delete(key);
+                flushSafely(entry);
+            }, DEBOUNCE_MS);
+            pending.set(key, entry);
+        } catch (error) {
+            logger.error(`${LOG_PREFIX} event handling failed: ${failureText(error)}`);
+        }
+    };
+}
+
+function publishEntityEvent(input) {
+    const envelope = buildEntityEnvelope({ ...input, narrowing: writerLimits.handedOrHere(input.narrowing) });
+    publish(envelope);
+    return envelope;
+}
+
+/* A task event no write emitted: one derived from stored state, such as a due date
+ * passing or the last open subtask closing. `doc` is the stored task. */
+function publishTaskEvent({ companyId, type, doc, actor, depth, narrowing }) {
+    const envelope = buildEnvelope({ companyId, type, doc, changedFields: [], previous: null, actor: resolveActor({ actor }), depth, narrowing: writerLimits.handedOrHere(narrowing) });
+    publish(envelope);
+    return envelope;
+}
+
+/* Page, comment and call rows carry no company id, so their emits carry it beside the row
+ * (Modules/Pages/helpers/pageEvents.js, Modules/Comments/controller.js, Modules/Calls/notes.js);
+ * one without it is dropped, never guessed. */
+function onEntityEmit(kind, emitType, classify, trim) {
+    return (payload) => {
+        try {
+            const doc = payload?.data;
+            if (!payload?.companyId || !doc || !doc._id) return;
+            const data = trim(doc);
+            const { actor, depth } = originOf(payload);
+            publishEntityEvent({
+                companyId: payload.companyId,
+                type: classify(emitType, doc),
+                entity: { kind, id: data._id },
+                scope: { projectId: data.ProjectID || data.projectId, sprintId: data.sprintId },
+                data,
+                actor,
+                depth,
+                narrowing: payload.narrowing,
+            });
+        } catch (error) {
+            logger.error(`${LOG_PREFIX} ${kind} event handling failed: ${failureText(error)}`);
+        }
+    };
+}
+
+const listening = new Set();
+
+function listenFor(kind, modules, classify, trim) {
+    if (listening.has(kind)) return;
+    listening.add(kind);
+    modules.forEach((module) => ['insert', 'update'].forEach((emitType) => {
+        socketEmitter.on(`${module}:${emitType}`, onEntityEmit(kind, emitType, classify, trim));
+    }));
+    logger.info(`${LOG_PREFIX} listening for ${kind} events`);
+}
+
+const listenForPages = () => listenFor('page', ['pages'], classifyPageEvent, trimPage);
+const listenForComments = () => listenFor('comment', ['comments', 'comments_project'], classifyCommentEvent, trimComment);
+const listenForCalls = () => listenFor('transcript', ['calls'], classifyTranscriptEvent, trimCall);
+
+function start() {
+    if (started) return;
+    started = true;
+    socketEmitter.on('task:update', onTaskEvent('update'));
+    socketEmitter.on('task:insert', onTaskEvent('insert'));
+    logger.info(`${LOG_PREFIX} listening for task events (recording=${recording})`);
+}
+
+module.exports = {
+    start,
+    listenForPages,
+    listenForComments,
+    listenForCalls,
+    publishEntityEvent,
+    publishTaskEvent,
+    tell,
+    bus,
+    isRecording,
+    setRecording,
+    eventLabel,
+    failureText,
+    MAX_DEPTH,
+    ACTOR_KINDS,
+    // Exported for unit tests — pure, no IO.
+    classifyTaskEvent,
+    trimTask,
+    resolveActor,
+    originOf,
+    buildEnvelope,
+    buildEntityEnvelope,
+    classifyPageEvent,
+    trimPage,
+    classifyCommentEvent,
+    trimComment,
+    classifyTranscriptEvent,
+    trimCall,
+    supersedesPending,
+};

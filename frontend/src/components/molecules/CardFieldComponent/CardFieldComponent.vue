@@ -177,6 +177,7 @@ import TextInputFieldComponent from "@/components/templates/Dashboard/TextInputF
 import HomeTaskFilter from '@/components/molecules/TaskFilter/HomeTaskFilter.vue'
 import RecentlyAddedProjects from '@/components/molecules/RecentlyAddedProjects/RecentlyAddedProjects.vue';
 import CategoryTaskTypeMapper from '@/components/molecules/CategoryTaskTypeMapper/CategoryTaskTypeMapper.vue';
+import { isOwnerOrAdmin } from "@/utils/roles";
 
 const { t } = useI18n();
 const store = useStore();
@@ -189,7 +190,7 @@ const teams = computed(() => {
     // own data anyway, so showing the full team list is misleading.
     if (props.componentId === 'EmployeeWorkloadReportCard') {
         const roleType = getters["settings/companyUserDetail"]?.roleType;
-        if (roleType !== 1 && roleType !== 2) return [];
+        if (!isOwnerOrAdmin(roleType)) return [];
     }
     const teamsArr = getters["settings/teams"] || [];
     return teamsArr
@@ -308,7 +309,7 @@ const usersArray = computed(() => {
     //   else   (Member)      → only themselves
     if (props.componentId === 'EmployeeWorkloadReportCard') {
         const roleType = getters["settings/companyUserDetail"]?.roleType;
-        if (roleType !== 1 && roleType !== 2) {
+        if (!isOwnerOrAdmin(roleType)) {
             selectedUser.value = [userId.value]; // eslint-disable-line
             return currentUserOnly;
         }

@@ -3,11 +3,7 @@
 
 const CSV_HEADERS = ['User', 'Project', 'Date', 'Description', 'Billable', 'Hours'];
 
-// RFC-4180 field escaping: quote when the value contains a comma, quote or newline.
-const escapeCsv = (v) => {
-    const s = v === null || v === undefined ? '' : String(v);
-    return /[",\n\r]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
-};
+const { csvCell: escapeCsv } = require('../../../utils/csv');
 
 // LogStartTime is stored in Unix SECONDS.
 const formatDate = (logStartSeconds) => {

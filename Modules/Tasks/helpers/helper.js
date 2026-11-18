@@ -9,6 +9,8 @@ const { MongoDbCrudOpration } = require("../../../utils/mongo-handler/mongoQueri
 const { taskCheckListEdit, taskCheckList, taskCheckListRemove, taskCheckListChecked, taskCheckListAssignee, taskCheckListAssigneeRemove } = require('./notificationTemplate');
 const { default: mongoose } = require("mongoose");
 const { insertCustomFieldPromise } = require('../../CustomField/controller');
+const { escapeHtml } = require('../../../utils/escapeHtml');
+const { historyFields } = require('../../Agents/actingAgent');
 
 
 /* ------------- HANDLE HISTIRY FOR ALL THE ACTIVITIES ------------- */
@@ -37,6 +39,7 @@ exports.HandleHistory = (type, companyId, projectId, taskId, object, userData) =
                 'ProjectId': projectId,
                 'TaskId': taskId !== null ? taskId : "",
                 'Message': object.message,
+                ...historyFields(),
             }
             let typeSchema = SCHEMA_TYPE.HISTORY
           
@@ -67,9 +70,26 @@ exports.changeDateFormat = (date, format) => {
     return formatDate(date, format);
 }
 
+/* History renders as HTML, so every user-typed value is escaped before it is placed in a message; the actor's name arrives escaped. */
+const escapedHistoryParams = (raw) => {
+    const params = { ...raw };
+    ['name', 'previousName', 'newName', 'label', 'checkList', 'projectName', 'taskName', 'value'].forEach((key) => {
+        if (params[key] !== undefined) params[key] = escapeHtml(params[key]);
+    });
+    if (params.extractedData && typeof params.extractedData === 'object') {
+        params.extractedData = {
+            ...params.extractedData,
+            name: escapeHtml(params.extractedData.name),
+            subItemNames: Array.isArray(params.extractedData.subItemNames) ? params.extractedData.subItemNames.map(escapeHtml) : [],
+        };
+    }
+    return params;
+};
+
 //Checklist history Object
-exports.buildHistoryObject = (ops, params) => {
+exports.buildHistoryObject = (ops, raw) => {
     let historyObj = {};
+    const params = escapedHistoryParams(raw || {});
 
     switch (ops) {
         case 'taskchecklistcreate':

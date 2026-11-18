@@ -13,11 +13,11 @@
     overflow: auto;
 }
 .description-wrapper {
-    border-bottom: 1px solid #d4d6d7;
+    border-bottom: 1px solid var(--border);
 }
 .ql-snow .ql-editor pre.ql-syntax {
     background-color: transparent !important;
-    color: black;
+    color: var(--ink);
 }
 .description-wrapper pre {
     white-space: pre-wrap;
@@ -40,8 +40,8 @@
     padding: 0px 15px;
 }
 .description-editor {
-    background: #ffffff;
-    border: 1px solid #DFE1E6;
+    background: var(--surface);
+    border: 1px solid var(--border);
     border-radius: 6px;
     margin-top: 11px;
 }

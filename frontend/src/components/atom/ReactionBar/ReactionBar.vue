@@ -1,5 +1,5 @@
 <template>
-    <div class="reaction-bar d-flex align-items-center">
+    <div class="reaction-bar d-flex align-items-center" :class="{ 'reaction-bar--themed': themed }">
         <span
             v-for="group in groupedReactions"
             :key="'reaction-'+group.emoji"
@@ -21,7 +21,7 @@
              clip or overlap it (right-aligned comments sit at the edge). -->
         <Teleport to="body">
             <span v-if="pickerOpen" class="reaction-bar__overlay" @click.stop="pickerOpen = false"></span>
-            <span v-if="pickerOpen" class="reaction-bar__picker" :style="pickerStyle">
+            <span v-if="pickerOpen" class="reaction-bar__picker" :class="{ 'reaction-bar__picker--themed': themed }" :style="pickerStyle">
                 <span
                     v-for="emoji in REACTION_EMOJIS"
                     :key="'pick-'+emoji"
@@ -55,6 +55,11 @@ const props = defineProps({
         default: () => []
     },
     compact: {
+        type: Boolean,
+        default: false
+    },
+    // The task comment list and chat keep their fixed light colours; a themed surface asks for the design tokens.
+    themed: {
         type: Boolean,
         default: false
     }
@@ -109,30 +114,46 @@ function pick(emoji) {
     gap: 4px;
 }
 .reaction-bar__chip {
-    border: 1px solid #e0e0e0;
+    border: 1px solid var(--border);
     border-radius: 12px;
     padding: 1px 8px;
-    background: #fff;
+    background: var(--surface);
     line-height: 18px;
     white-space: nowrap;
 }
 .reaction-bar__chip--mine {
-    border-color: #7b68ee;
-    background: #f3f0ff;
+    border-color: var(--brand);
+    background: var(--brand-tint);
 }
 .reaction-bar__count {
-    color: #6a6a6a;
+    color: var(--ink-2);
 }
 .reaction-bar__add {
-    color: #9a9a9a;
+    color: var(--ink-2);
     font-size: 15px;
     padding: 0 4px;
 }
 .reaction-bar__add:hover {
-    color: #555;
+    color: var(--ink-label);
 }
 .reaction-bar__add--compact {
     font-size: 13px;
+}
+.reaction-bar--themed .reaction-bar__chip {
+    border-color: var(--border);
+    background: var(--surface);
+    color: var(--ink);
+}
+.reaction-bar--themed .reaction-bar__chip--mine {
+    border-color: var(--brand);
+    background: var(--brand-tint);
+}
+.reaction-bar--themed .reaction-bar__count,
+.reaction-bar--themed .reaction-bar__add {
+    color: var(--ink-2);
+}
+.reaction-bar--themed .reaction-bar__add:hover {
+    color: var(--ink);
 }
 </style>
 
@@ -148,11 +169,11 @@ function pick(emoji) {
     z-index: 9999;
     display: flex;
     gap: 4px;
-    background: #fff;
-    border: 1px solid #e0e0e0;
+    background: var(--surface);
+    border: 1px solid var(--border);
     border-radius: 16px;
     padding: 5px 8px;
-    box-shadow: 0 2px 10px rgba(0,0,0,0.12);
+    box-shadow: var(--shadow-pop);
 }
 .reaction-bar__picker-emoji {
     font-size: 16px;
@@ -161,6 +182,14 @@ function pick(emoji) {
     cursor: pointer;
 }
 .reaction-bar__picker-emoji:hover {
-    background: #f0f0f0;
+    background: var(--fill);
+}
+.reaction-bar__picker--themed {
+    background: var(--surface);
+    border-color: var(--border);
+    box-shadow: var(--shadow-pop);
+}
+.reaction-bar__picker--themed .reaction-bar__picker-emoji:hover {
+    background: var(--surface-hover);
 }
 </style>

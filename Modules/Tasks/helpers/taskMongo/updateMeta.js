@@ -1,3 +1,4 @@
+const { escapeHtml } = require('../../../../utils/escapeHtml');
 const { dbCollections } = require('../../../../Config/collections')
 const { sanitizeInput } = require("../../../serviceFunction");
 const { HandleHistory,HandleTask,convertToSubTaskFunction, moveTaskFunction, convertToListSubTask,mergeSubTask, duplicateSubTaskFunction, addHistoryCollection, removeCommentCount,updateHistoryCollection, updateTimesheetCollection, updateEstimatedTimeCollection} = require("../mongo_helper")
@@ -20,10 +21,64 @@ const { emitListener } = require("../../../Company/eventController.js");
 const { createCustomFields } = require("../helper.js");
 const { removeCache } = require('../../../../utils/commonFunctions.js');
 const { updateRemainingTime } = require('../../../LogTime/controllerV2.js');
+const { taskNotFound, escapeText, TaskWriteRefusal } = require('../taskWriteFields');
+const { cleanDescription } = require('../cleanRichText');
+const { recordCustomFieldValue, recordTaskTag, projectHoldsTag, TAG_NOT_IN_PROJECT } = require('../taskItemHistory');
+const { customFieldDefinitionOf } = require('../../../CustomField/helpers/customFieldText');
+const { fieldAppliesToTask } = require('../../../CustomField/helpers/fieldTaskTypes');
+const { checkedFieldDetail, FieldValueRefused } = require('../../../CustomField/helpers/fieldValueWrite');
+
+const FIELD_NOT_FOR_TASK_TYPE = 'This custom field is not used for this task type.';
+const FIELD_NOT_FOUND = 'This custom field does not exist.';
+
+/* The value as it is stored, or a refusal: the field is not for this task's type, or the value does not fit the field's type. */
+/* A write made after someone else's change (an AI field filled again) names who that change was by, how deep in a
+ * chain it was and the project list of a token that made it, so the event bus counts it as theirs; a person's write
+ * names none of them and emits as it always has. */
+const originOnEvent = (eventOrigin) => ({
+    ...(eventOrigin && eventOrigin.actor ? { actor: eventOrigin.actor, depth: Number(eventOrigin.depth) || 0 } : {}),
+    ...(eventOrigin && eventOrigin.narrowing ? { narrowing: eventOrigin.narrowing } : {}),
+});
+
+const fieldDetailToStore = async ({ companyId, taskId, customFieldId, storedTask, updateDetail, actorId }) => {
+    const definition = await customFieldDefinitionOf(companyId, customFieldId);
+    if (!definition) throw new TaskWriteRefusal(400, FIELD_NOT_FOUND);
+    const task = storedTask || await MongoDbCrudOpration(companyId, { type: SCHEMA_TYPE.TASKS, data: [{ _id: new mongoose.Types.ObjectId(taskId) }] }, 'findOne');
+    if (!fieldAppliesToTask(definition, task)) throw new TaskWriteRefusal(400, FIELD_NOT_FOR_TASK_TYPE);
+    try {
+        return await checkedFieldDetail({ companyId, definition, task, updateDetail, actorId });
+    } catch (error) {
+        if (error instanceof FieldValueRefused) throw new TaskWriteRefusal(400, error.message);
+        throw error;
+    }
+};
+
+const storedFileName = (storedTask, data) => {
+    const stored = ((storedTask && storedTask.attachments) || []).find((file) => file && file.id !== undefined && file.id === data.id);
+    return stored ? stored.filename : data.filename;
+};
+
+const isPlainItemId = (value) => (typeof value === 'string' && value.trim() !== '' && !value.startsWith('$')) || (typeof value === 'number' && Number.isFinite(value));
+
+/* The ids a checklist operation filters or pulls by; each must be one plain id, never a condition. */
+const checklistItemIds = (operation, data, history) => {
+    if (operation === 'checklistedit') return [history.updatedId];
+    if (['checklistassignee', 'assigneeremove'].includes(operation)) return [history.updateCheckListId, history.assigneeId];
+    if (operation === 'checklistremove') return Array.isArray(data) ? data : [data];
+    return [];
+};
+
+/* A tag the project no longer has can still be taken off a task. */
+const tagMayBeWritten = async (companyId, taskId, tagId, operation, storedTask) => {
+    if (operation !== 'add') return true;
+    const task = storedTask || await MongoDbCrudOpration(companyId, { type: SCHEMA_TYPE.TASKS, data: [{ _id: new mongoose.Types.ObjectId(taskId) }, { ProjectID: 1 }] }, 'findOne');
+    if (!task) throw taskNotFound();
+    return projectHoldsTag(companyId, task.ProjectID, tagId);
+};
+
 module.exports = {
 
-    /* -------------- UPDATE TAGS -----------------*/
-    updateTags({companyId, projectId, sprintId, taskId, tagId, operation}) {
+    updateTags({companyId, taskId, tagId, operation, userData, storedTask}) {
         return new Promise((resolve, reject) => {
             try {
 
@@ -45,21 +100,32 @@ module.exports = {
                 } else {
                     queryFilter = { _id: new mongoose.Types.ObjectId(taskId) };
                     queryObj.$pull = { tagsArray: tagId };
-                };
+                }
 
                 let obj = {
                     type: schema,
                     data: [
                         queryFilter,
                         queryObj,
-                        { upsert: true, returnDocument: 'after' }
+                        { returnDocument: 'after' }
                     ]
                 }
 
-                MongoDbCrudOpration(companyId, obj, "findOneAndUpdate").then((response) => {
-                    socketEmitter.emit('update', { type: "update", data: response , updatedFields: {}, module: 'task' });
+                tagMayBeWritten(companyId, taskId, tagId, operation, storedTask).then((allowed) => {
+                    if (!allowed) throw new TaskWriteRefusal(400, TAG_NOT_IN_PROJECT);
+                    return MongoDbCrudOpration(companyId, obj, "findOneAndUpdate");
+                }).then((response) => {
+                    if (!response) {
+                        reject(taskNotFound());
+                        return;
+                    }
+                    socketEmitter.emit('update', { type: "update", data: response , updatedFields: { tagsArray: response.tagsArray }, module: 'task', companyId });
                     resolve({status: true, statusText: `Tag updated successfully`});
-                });
+                    if (storedTask && userData) {
+                        recordTaskTag({ companyId, task: storedTask, tagId, operation, actor: userData })
+                            .catch((error) => logger.error(`task tag history: ${error && error.message}`));
+                    }
+                }).catch(reject);
 
             } catch (error) {
                 reject(error);
@@ -68,15 +134,28 @@ module.exports = {
     },
 
     /* -------------- UPDATE CHECKLISTS -----------------*/
-    updateChecklists({ companyId, projectId, sprintId, taskId, operation, data = {}, historyObj: historyObject, taskData }) {
+    updateChecklists({ companyId, projectId, sprintId, taskId, operation, data = {}, historyObj: sentHistory, userData }) {
         return new Promise((resolve, reject) => {
             try {
+                const historyObject = { ...(sentHistory || {}), userId: userData.id, Employee_Name: userData.Employee_Name };
+                if (operation === 'checklistremove' && !Array.isArray(data)) {
+                    reject(new TaskWriteRefusal(400, 'data must list the checklist item ids to remove.'));
+                    return;
+                }
+                if (!checklistItemIds(operation, data, historyObject).filter((value) => value !== undefined && value !== null).every(isPlainItemId)) {
+                    reject(new TaskWriteRefusal(400, 'Checklist item ids must be plain ids.'));
+                    return;
+                }
                 const schema = SCHEMA_TYPE.TASKS;
                 let queryObj = buildQueryObject(operation, taskId, data, historyObject);
                 let obj = { type: schema, data: queryObj };
 
                 MongoDbCrudOpration(companyId, obj, "findOneAndUpdate").then((response)=>{
-                    socketEmitter.emit('update', { type: "update", data: response , updatedFields: {checklistArray: response.checklistArray}, module: 'task' });
+                    if (!response) {
+                        reject(taskNotFound());
+                        return;
+                    }
+                    socketEmitter.emit('update', { type: "update", data: response , updatedFields: {checklistArray: response.checklistArray}, module: 'task', companyId });
                     resolve({ status: true, statusText: "Checklist updated successfully" });
 
                     let historyData = buildHistoryObject(operation, historyObject);
@@ -87,26 +166,11 @@ module.exports = {
                             message: historyData.message,
                             key: historyData.key,
                             sprintId: sprintId
-                        }, { id: historyObject.userId }).catch(err => {
+                        }, userData).catch(err => {
                             logger.error(`ERROR in history checklist: ${err}`);
                         });
                     }
-
-                    // if (notificationObject && Object.keys(notificationObject).length > 0) {
-                    //     HandleBothNotification({
-                    //         type: 'tasks',
-                    //         companyId,
-                    //         projectId,
-                    //         taskId,
-                    //         folderId: taskData.folderObjId || "",
-                    //         sprintId: taskData.sprintId,
-                    //         object: notificationObject,
-                    //         userData: { id: historyObject.userId }
-                    //     }).catch((error)=>{
-                    //         logger.error(`ERROR in notification checklist: ${error.message}`);
-                    //     });
-                    // }
-                })
+                }).catch(reject);
 
             } catch (error) {
                 logger.error(`ERROR in update Checklist: ${JSON.stringify(error)}`);
@@ -116,7 +180,7 @@ module.exports = {
     },
 
     /* -------------- UPDATE ATTACHMENTS -----------------*/
-    updateAttachments({companyId, sprintId, taskId, taskData, id = "", operation, data = {}, userData, projectData}) {
+    updateAttachments({companyId, sprintId, taskId, taskData, id = "", operation, data = {}, userData, projectData, storedTask}) {
         return new Promise((resolve, reject) => {
             try {
 
@@ -128,31 +192,34 @@ module.exports = {
                     queryObj.$push = { attachments: data };
                     queryFilter = { _id: new mongoose.Types.ObjectId(taskId) };
                 } else {
-                    // Update the 'name' of the specific object in the 'settings' array matching the given 'key'
                     queryFilter = { 
                         _id: new mongoose.Types.ObjectId(taskId),
                     };
                     queryObj.$pull = { attachments: { id: data.id } };
-                };
+                }
 
                 let obj = {
                     type: schema,
                     data: [
                         queryFilter,
                         queryObj,
-                        { upsert: true, returnDocument: 'after' }
+                        { returnDocument: 'after' }
                     ]
                 }
 
                 MongoDbCrudOpration(companyId, obj, "findOneAndUpdate").then((response) => {
-                    socketEmitter.emit('update', { type: "update", data: response , updatedFields: {attachments: response.attachments}, module: 'task' });
+                    if (!response) {
+                        reject(taskNotFound());
+                        return;
+                    }
+                    socketEmitter.emit('update', { type: "update", data: response , updatedFields: {attachments: response.attachments}, module: 'task', companyId });
                     resolve({status: true, statusText: "Attachment updated successfully"});
 
                     let historyObj = {};
                     let notificationObject = {};
                     if(operation === "add") {
                         historyObj = {
-                            message: `<b>${userData.name}</b> has attached <b>${data.filename}</b> on <b>${sanitizeInput(taskData.TaskName)}</b>.`,
+                            message: `<b>${userData.Employee_Name}</b> has attached <b>${escapeHtml(data.filename)}</b> on <b>${escapeText(taskData.TaskName)}</b>.`,
                             key: "Task_Attachment",
                             sprintId: taskData.sprintId,
                         }
@@ -165,8 +232,9 @@ module.exports = {
                             key: "task_attachments",
                         }
                     } else if(operation === "remove") {
+                        const removedName = storedFileName(storedTask, data);
                         historyObj = {
-                            message: `<b>${data.filename}</b> removed from <b>${sanitizeInput(taskData.TaskName)}</b>&apos;s attchments.`,
+                            message: `<b>${escapeHtml(removedName)}</b> removed from <b>${escapeText(taskData.TaskName)}</b>&apos;s attachments.`,
                             key: "Task_Attachment_Remove",
                             sprintId: taskData.sprintId,
                         }
@@ -174,7 +242,7 @@ module.exports = {
                             'message': taskAttachmentRemove({
                                 'ProjectName': projectData.ProjectName,
                                 'TaskName': taskData.TaskName,
-                                'removeFileName': data.filename
+                                'removeFileName': removedName
                             }),
                             'key': 'task_attachments',
                         }
@@ -212,12 +280,11 @@ module.exports = {
     updateDescription({companyId, task, text}) {
         return new Promise((resolve, reject) => {
             try {
-                let description = text.blocks;
                 const schema = SCHEMA_TYPE.TASKS
-                let updateObj = { 
-                    descriptionBlock: description,
+                let updateObj = cleanDescription({
+                    descriptionBlock: text.blocks,
                     rawDescription: text.text
-                }
+                })
                 let obj = {
                     type: schema,
                     data: [
@@ -232,9 +299,13 @@ module.exports = {
                 }
 
                 MongoDbCrudOpration(companyId, obj, "findOneAndUpdate").then((result) => {
-                    socketEmitter.emit('update', { type: "update", data: result , updatedFields: updateObj, module: 'task' });
+                    if (!result) {
+                        reject(taskNotFound());
+                        return;
+                    }
+                    socketEmitter.emit('update', { type: "update", data: result , updatedFields: updateObj, module: 'task', companyId });
                     resolve({status: true, statusText: "Description updated successfully"});
-                })
+                }).catch(reject);
             } catch (error) {
                 logger.error(`Update Discription Error:${error.message}`)
                 reject(error);
@@ -242,39 +313,8 @@ module.exports = {
         })
     },
 
-    updateSupportTicket({companyId,updateObj,taskId}) {
-        return new Promise((resolve,reject) => {
-            try {
-                const query = {
-                    type: dbCollections.TASKS,
-                    data: [
-                        {
-                            _id: new mongoose.Types.ObjectId(taskId)
-                        }, 
-                        {
-                            $set: {
-                                ...updateObj,
-                            },
-                        }
-                    ]
-                }
-
-                MongoDbCrudOpration(companyId, query, "updateOne")
-                .then(() => {
-                    resolve({status: true, statusText: "Ticket Update Successfully"});
-                })
-                .catch((error) => {
-                    logger.error(`ERROR in task status: ${error.message}`);
-                    reject(error)
-                })
-            } catch (error) {
-                logger.error(`ERROR in task status : ${error.message}`);
-                reject(error)
-            }
-        })
-    },
-
-    updateTaskCustomField({companyId,taskId,updateDetail,customFieldId}) {
+    async updateTaskCustomField({companyId,taskId,updateDetail: sentDetail,customFieldId,userData,storedTask,filledByAi = false,eventOrigin = null}) {
+        const updateDetail = await fieldDetailToStore({ companyId, taskId, customFieldId, storedTask, updateDetail: sentDetail, actorId: userData && userData.id });
         return new Promise((resolve,reject) => {
             try {
                 const query = {
@@ -290,8 +330,12 @@ module.exports = {
 
                 MongoDbCrudOpration(companyId, query, "findOneAndUpdate")
                 .then((result) => {
-                    socketEmitter.emit('update', { type: "update", data: result , updatedFields: {[`customField.${customFieldId}`]: updateDetail}, module: 'task' });
+                    socketEmitter.emit('update', { type: "update", data: result , updatedFields: {[`customField.${customFieldId}`]: updateDetail}, module: 'task', companyId, ...originOnEvent(eventOrigin) });
                     resolve({status: true,data: result, statusText: "Custom Field Update Successfully"});
+                    if (result && storedTask && userData) {
+                        recordCustomFieldValue({ companyId, task: storedTask, customFieldId, updateDetail, actor: userData, viaAi: filledByAi })
+                            .catch((error) => logger.error(`custom field value history: ${error && error.message}`));
+                    }
                 })
                 .catch((error) => {
                     logger.error(`Error in Updating Custom Field: ${error.message}`);
@@ -332,7 +376,7 @@ module.exports = {
 
                 MongoDbCrudOpration(companyId, query, "findOneAndUpdate")
                 .then((result) => {
-                    socketEmitter.emit('update', { type: "update", data: result , updatedFields: { favouriteTasks: result.favouriteTasks }, module: 'task' });
+                    socketEmitter.emit('update', { type: "update", data: result , updatedFields: { favouriteTasks: result.favouriteTasks }, module: 'task', companyId });
                     resolve({status: true,data: result, statusText: "Custom Field Update Successfully"});
                 })
                 .catch((error) => {
@@ -370,7 +414,7 @@ module.exports = {
                 }
 
                 MongoDbCrudOpration(companyId, query, "findOneAndUpdate").then((response) => {
-                    socketEmitter.emit('update', { type: "update", data: response , updatedFields: updatedObj, module: 'task' });
+                    socketEmitter.emit('update', { type: "update", data: response , updatedFields: updatedObj, module: 'task', companyId });
                     resolve({ status: true });
                 })
                 .catch((error) => {
@@ -405,21 +449,27 @@ module.exports = {
                     ]
                 }
                 MongoDbCrudOpration(companyId, object, "findOneAndUpdate").then((response) => {
+                    if (!response) {
+                        reject(taskNotFound());
+                        return;
+                    }
                     resolve({status: true, statusText: "Checklist added successfully"});
-                    socketEmitter.emit('update', { type: "update", data: response , updatedFields: {checklistArray: checklistArray}, module: 'task' });
+                    socketEmitter.emit('update', { type: "update", data: response , updatedFields: {checklistArray: checklistArray}, module: 'task', companyId });
+                    const names = escapeText(checklistArray.map(item => item.name).join(", "));
+
+                    let historyObj = {
+                        key: "task_checklist",
+                        message: `<b>${userData.Employee_Name}</b> has created new checklist item <b class="text-ellipsis vertical-middle d-inline-block" style="max-width:150px" title="${names}">${names}</b>`,
+                        sprintId: sprintId
+                    };
+                    HandleHistory('task',companyId,projectId,taskId,historyObj,userData).catch((error) => {
+                        logger.error(`ERROR in checklist history: ${error.message}`);
+                    });
                 })
                 .catch((error) => {
                     logger.error(`Error in Adding Checklist: ${error.message}`);
                     reject(error)
                 })
-                const names = checklistArray.map(item => item.name).join(", ");
-
-                let historyObj = {
-                    key: "task_checklist",
-                    message: `<b>${userData.Employee_Name}</b> has created new checklist item <b class="text-ellipsis vertical-middle d-inline-block" style="max-width:150px" title="${names}">${names}</b>`,
-                    sprintId: sprintId
-                };
-                HandleHistory('task',companyId,projectId,taskId,historyObj,userData)
 
             } catch (error) {
                 logger.error(`ERROR in Adding Checklist: ${JSON.stringify(error)}`);
@@ -429,9 +479,10 @@ module.exports = {
     },
 
 
-    updateTaskTotalEstimate({firebaseObj,projectData ,taskData , obj, userData}) {
+    updateTaskTotalEstimate({firebaseObj,projectData ,taskData , obj, userData, storedTask}) {
         return new Promise((resolve,reject) => {
             try {
+                const previousEstimate = Number(storedTask && storedTask.totalEstimatedTime) || 0;
                 const query = {
                     type: dbCollections.TASKS,
                     data: [
@@ -442,7 +493,7 @@ module.exports = {
                                 ...firebaseObj,
                                 // AHE — flag the task for the TL on a RE-update (an estimate
                                 // already existed). First-time set (previous 0/undefined) never flags.
-                                ...(Number(obj.previousEstimatedTime) > 0 ? { estimateChangedFlag: true } : {})
+                                ...(previousEstimate > 0 ? { estimateChangedFlag: true } : {})
                             }
                         },
                         {returnDocument: "after"}
@@ -450,11 +501,11 @@ module.exports = {
                 }
                 MongoDbCrudOpration(projectData.CompanyId, query, "findOneAndUpdate")
                 .then((result) => {
-                    socketEmitter.emit('update', { type: "update", data: result , updatedFields: firebaseObj, module: 'task' });
+                    socketEmitter.emit('update', { type: "update", data: result , updatedFields: firebaseObj, module: 'task', companyId: projectData.CompanyId });
                     updateRemainingTime(projectData.CompanyId,taskData._id);
                     resolve({status: true, statusText: "Task total estimate update successfully"});
                     const updatedDisplayText = convertToDisplayFormat(firebaseObj.totalEstimatedTime);
-                    const previousDisplayText = convertToDisplayFormat(obj.previousEstimatedTime);
+                    const previousDisplayText = convertToDisplayFormat(previousEstimate);
                     let editTaskObj = {
                         'TaskName' : taskData.TaskName,
                         'UserName': userData.Employee_Name,
@@ -481,17 +532,13 @@ module.exports = {
                             logger.error(`ERROR in notification: ${error.message}`);
                         });
                     }
-                    // AHE — a RE-update requires a reason; append it to the activity-log
-                    // message. Message renders as HTML (v-html), so escape the user text.
-                    const escapeHtml = (s) => String(s == null ? '' : s)
-                        .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
-                        .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+                    // AHE — a RE-update requires a reason; append it to the activity-log message.
                     const reasonText = obj.reason && String(obj.reason).trim()
                         ? ` <b>Reason:</b> ${escapeHtml(String(obj.reason).trim())}`
                         : '';
                     let historyObj = {
                         key: "task_total_estimate",
-                        message : `<b>${obj.userName}</b> has updated total estimated time from <b>${previousDisplayText}</b> to <b>${updatedDisplayText}</b>.${reasonText}`,
+                        message : `<b>${userData.Employee_Name}</b> has updated total estimated time from <b>${previousDisplayText}</b> to <b>${updatedDisplayText}</b>.${reasonText}`,
                         sprintId: taskData.sprintId
                     };
                     HandleHistory('task',projectData.CompanyId, projectData._id,taskData._id,historyObj, userData).then(async () => {});

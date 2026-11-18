@@ -16,7 +16,9 @@
                     {{ title }}
                     <span v-if="!loading" class="plm-count">({{ projects.length }})</span>
                 </h3>
-                <img :src="cancelIcon" class="cursor-pointer cancel__icon-img ml-2" alt="close" @click.prevent="$emit('close')" />
+                <button type="button" class="cancel__icon-btn ml-2" :aria-label="$t('Projects.close')" @click.prevent="$emit('close')">
+                    <span class="ah-mask-icon cancel__icon-img" :style="maskOf(cancelIcon)" aria-hidden="true"></span>
+                </button>
             </div>
         </template>
         <template #body>
@@ -61,7 +63,7 @@
                                     <!-- Colored dot + name from the project's own status
                                          palette (same pattern as the project filters). -->
                                     <span class="plm-status">
-                                        <span class="plm-status-dot" :style="{ backgroundColor: p.statusColor || '#9aa0b4' }"></span>
+                                        <span class="plm-status-dot" :style="p.statusColor ? { backgroundColor: p.statusColor } : null"></span>
                                         {{ p.statusName || prettyStatus(p.status) }}
                                     </span>
                                 </td>
@@ -84,6 +86,7 @@ export default { name: 'ProjectListModal' };
 
 <script setup>
 import Modal from '@/components/atom/Modal/Modal.vue';
+import { maskOf } from '@/utils/iconMask';
 
 // Drill-down modal behind the project-count dashboard cards (Project Pulse,
 // Active Projects, Projects by Type, Running Projects): lists the projects a
@@ -108,20 +111,20 @@ const prettyStatus = (s) => String(s || '—').replace(/_/g, ' ').replace(/\b\w/
 
 <style scoped>
 .plm { min-width: 480px; }
-.plm-msg { color: #9aa0b4; font-size: 12px; padding: 16px 20px; }
-.plm-count { color: #9aa0b4; font-weight: 500; font-size: 13px; }
+.plm-msg { color: var(--ink-2); font-size: 12px; padding: 16px 20px; }
+.plm-count { color: var(--ink-2); font-weight: 500; font-size: 13px; }
 .plm-table-wrap { overflow: auto; max-height: 480px; padding: 0 20px 16px 20px; }
 .plm-table { width: 100%; border-collapse: collapse; font-size: 12.5px; white-space: nowrap; }
-.plm-table th { text-align: left; color: #6b7280; font-weight: 600; padding: 6px 8px; border-bottom: 1px solid #eef0f6; position: sticky; top: 0; background: #fff; text-transform: capitalize; }
-.plm-table td { padding: 6px 8px; border-bottom: 1px solid #f4f5f9; color: #3a3f52; }
+.plm-table th { text-align: left; color: var(--ink-2); font-weight: 600; padding: 6px 8px; border-bottom: 1px solid var(--border); position: sticky; top: 0; background: var(--surface); text-transform: capitalize; }
+.plm-table td { padding: 6px 8px; border-bottom: 1px solid var(--hairline); color: var(--ink); }
 .plm-name { max-width: 340px; overflow: hidden; text-overflow: ellipsis; font-weight: 500; }
-.plm-type { color: #6b7280; }
+.plm-type { color: var(--ink-2); }
 .plm-status { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; text-transform: capitalize; }
-.plm-status-dot { width: 9px; height: 9px; border-radius: 2px; flex: none; }
-.plm-worked { color: #6b7280; }
-.plm-dot { display: inline-block; width: 7px; height: 7px; border-radius: 50%; background: #d1d5db; margin-right: 5px; vertical-align: middle; }
-.plm-dot-on { background: #0d9488; }
-.plm-skel { background: linear-gradient(90deg, #eef0f6 25%, #e3e7f1 37%, #eef0f6 63%); background-size: 400% 100%; animation: plm-shimmer 1.4s ease infinite; border-radius: 4px; height: 13px; }
+.plm-status-dot { width: 9px; height: 9px; border-radius: 2px; flex: none; background: var(--border); }
+.plm-worked { color: var(--ink-2); }
+.plm-dot { display: inline-block; width: 7px; height: 7px; border-radius: 50%; background: var(--border); margin-right: 5px; vertical-align: middle; }
+.plm-dot-on { background: var(--ok); }
+.plm-skel { background: linear-gradient(90deg, var(--fill) 25%, var(--track) 37%, var(--fill) 63%); background-size: 400% 100%; animation: plm-shimmer 1.4s ease infinite; border-radius: 4px; height: 13px; }
 @keyframes plm-shimmer { 0% { background-position: 100% 0; } 100% { background-position: 0 0; } }
 .plm-skel-name { width: 240px; }
 .plm-skel-type { width: 70px; }

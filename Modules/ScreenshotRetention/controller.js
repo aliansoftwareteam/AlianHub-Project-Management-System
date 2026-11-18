@@ -22,6 +22,8 @@ const helper = require('./helper');
 const { MongoDbCrudOpration } = require('../../utils/mongo-handler/mongoQueries');
 const { SCHEMA_TYPE } = require('../../Config/schemaType');
 const logger = require('../../Config/loggerConfig');
+const { isPrivileged } = require('../../Config/roleTypes');
+const { ACTIVE_SEAT } = require('../../Config/seatStatus');
 
 // ----- Common helpers ---------------------------------------------------
 
@@ -45,13 +47,13 @@ async function isCompanyOwner(companyId, userId) {
         const query = {
             type: SCHEMA_TYPE.COMPANY_USERS,
             data: [
-                { userId: String(userId) },
+                { userId: String(userId), ...ACTIVE_SEAT },
                 { _id: 1, roleType: 1, userId: 1 }
             ]
         };
         const record = await MongoDbCrudOpration(companyId, query, 'findOne');
         // Owner (1) or Admin (2) may manage this setting.
-        return !!record && [1, 2].includes(Number(record.roleType));
+        return !!record && isPrivileged(Number(record.roleType));
     } catch (err) {
         logger.error(`[ScreenshotRetention] role check failed companyId=${companyId} userId=${userId} ${err && err.message}`);
         return false;

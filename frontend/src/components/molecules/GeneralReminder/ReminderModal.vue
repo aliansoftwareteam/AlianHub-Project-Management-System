@@ -441,7 +441,7 @@ async function save() {
         }
     } catch (error) {
         console.error('ERROR in create reminder: ', error);
-        $toast.error(t('Reminders.failed'), { position: 'top-right' });
+        $toast.error(error?.response?.data?.statusText || t('Reminders.failed'), { position: 'top-right' });
         saving.value = false;
     }
 }

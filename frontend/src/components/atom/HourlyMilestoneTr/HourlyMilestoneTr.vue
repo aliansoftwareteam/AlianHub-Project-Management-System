@@ -27,11 +27,11 @@
                         :inputId="`milestonename`+hourlyMilestoneIndex"
                         @keyup="checkErrors({'field':formData.milestoneName,'name':'name','validations':formData.milestoneName.rules,'type':formData.milestoneName.type,'event':$event.event})"
                     ></InputText>
-                    <small class="red" v-if="formData.milestoneName.error">{{formData.milestoneName.error}}</small>
+                    <small class="hourly-milestone-tr-red" v-if="formData.milestoneName.error">{{formData.milestoneName.error}}</small>
                 </div>
             </td>
             <!-- startdate and endDate -->
-            <td class="padding_top_cal">{{convertDateFormat(props.milestoneArray.startDate,'',{showDayName: false})}} to {{convertDateFormat(props.milestoneArray.endDate,'',{showDayName: false})}}</td>
+            <td class="padding_top_cal">{{ $t('Milestone.date_range', { start: convertDateFormat(props.milestoneArray.startDate,'',{showDayName: false}), end: convertDateFormat(props.milestoneArray.endDate,'',{showDayName: false}) }) }}</td>
             <!-- loggedHours -->
             <td class="padding_top_cal">{{props.userArray[props.milestoneArray._id] ? !props.userArray[props.milestoneArray._id].loggedHours ? `0h 0m` : convertMintuesToHours(props.userArray[props.milestoneArray._id].loggedHours):''}}</td>
             <td>
@@ -43,7 +43,7 @@
                             @update:modelValue="val => hours = val.toString()"
                             type="number"
                             :id="`hours`+hourlyMilestoneIndex"
-                            placeHolder="hh"
+                            :placeHolder="$t('Milestone.hh_placeholder')"
                             :inputId="`hours`+hourlyMilestoneIndex"
                             @input="hours = hours.replace(/^0/g, '')"
                             @keypress="onlyNumberHour($event.event)"
@@ -59,7 +59,7 @@
                             @update:modelValue="val => minute = val.toString()"
                             type="number"
                             :id="`minute`+hourlyMilestoneIndex"
-                            placeHolder="mm"
+                            :placeHolder="$t('Milestone.mm_placeholder')"
                             :inputId="`minute`+hourlyMilestoneIndex"
                             @input="minute = minute.replace(/^0/g, '')"
                             @keypress="onlyNumberHour($event.event)"
@@ -69,7 +69,7 @@
                             class="hourminutes minutesMilestone"
                         ></InputText>
                     </div>
-                    <small class="red" v-if="error">{{$t(`Milestone.${error.replaceAll(' ',"_")}`)}}</small>
+                    <small class="hourly-milestone-tr-red" v-if="error">{{$t(`Milestone.${error.replaceAll(' ',"_")}`)}}</small>
                 </div>
             </td>
             <!-- amountPerHours -->
@@ -94,8 +94,8 @@
                         class="amountCurr amountperhours"
                     ></InputText>
                 </div>
-                <small class="red" v-if="formData.amountPerHours.error">{{formData.amountPerHours.error}}</small>
-                <small class="red" v-if="errAmountPer">{{$t(`Milestone.${errAmountPer.replaceAll(' ',"_")}`)}}</small>
+                <small class="hourly-milestone-tr-red" v-if="formData.amountPerHours.error">{{formData.amountPerHours.error}}</small>
+                <small class="hourly-milestone-tr-red" v-if="errAmountPer">{{$t(`Milestone.${errAmountPer.replaceAll(' ',"_")}`)}}</small>
             </td>
             <!-- amount -->
             <td>
@@ -119,8 +119,8 @@
                         class="amountCurr amountperhours"
                     ></InputText>
                 </div>
-                <small class="red" v-if="formData.amount.error">{{formData.amount.error}}</small>
-                <small class="red" v-if="err">{{$t(`Milestone.${err.replaceAll(' ',"_")}`)}}</small>
+                <small class="hourly-milestone-tr-red" v-if="formData.amount.error">{{formData.amount.error}}</small>
+                <small class="hourly-milestone-tr-red" v-if="err">{{$t(`Milestone.${err.replaceAll(' ',"_")}`)}}</small>
             </td>
             <td></td>
             <td></td>
@@ -539,3 +539,9 @@
         removeKeyUpListener();
     });
 </script>
+
+<style scoped>
+.hourly-milestone-tr-red {
+    color: var(--danger-ink);
+}
+</style>

@@ -4,7 +4,7 @@
 }
 .main-checkbox-component input[type=checkbox] {
     position: relative;
-    border: 1px solid #DFE1E6;
+    border: 1px solid var(--border);
     border-radius: 2px;
     background: none;
     cursor: pointer;
@@ -25,16 +25,16 @@
     align-items: center;
 }
 .main-checkbox-component input[type=checkbox]:checked {
-    background-color: #2F3990;
-    border: 1px solid #2F3990!important;
+    background-color: var(--brand);
+    border: 1px solid var(--brand)!important;
 }
 .custom_field_checkbox.main-checkbox-component input.is_checked {
-    background-color: #2F3990 !important;
-    border: 1px solid #2F3990!important;
+    background-color: var(--brand) !important;
+    border: 1px solid var(--brand)!important;
 }
 .custom_field_checkbox.main-checkbox-component input.remove_checked {
     background-color: transparent !important;
-    border: 1px solid #DFE1E6 !important;
+    border: 1px solid var(--border) !important;
 }
 .main-checkbox-component input[type=checkbox]:checked::before {
     content: '';
@@ -43,13 +43,13 @@
     top: 50%;
     width: 3px;
     height: 8px;
-    border: solid #FFF;
+    border: solid var(--on-brand);
     border-width: 0 1px 1px 0;
     margin: -1px -1px 0 -1px;
     transform: rotate(45deg) translate(-50%, -50%);
 }
 .advance_setting_warpper_check .checkbox-input {
-    border: 1px solid #DFE1E6 !important;
+    border: 1px solid var(--border) !important;
 }
 .advance_setting_warpper_check input[type=checkbox]:before {
     right: 53%;
@@ -64,14 +64,14 @@
     top: 5px;
     width: 3px;
     height: 7px;
-    border: solid #FFF;
+    border: solid var(--on-brand);
     border-width: 0 1px 1px 0;
     margin: -1px -1px 0 -1px;
     transform: rotate(45deg) translate(-50%, -50%);
 }
 .duplicatetask__converttask--wrapper input[type=checkbox] {
     position: relative;
-    border: 1px solid #DFE1E6 !important;
+    border: 1px solid var(--border) !important;
     border-radius: 2px;
     background: none;
     cursor: pointer;

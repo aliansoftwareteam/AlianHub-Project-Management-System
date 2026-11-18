@@ -1,0 +1,52 @@
+const mongoose = require('mongoose');
+const { SCHEMA_TYPE } = require('../../Config/schemaType');
+const { MongoDbCrudOpration } = require('../../utils/mongo-handler/mongoQueries');
+const { evaluatePermission, isWritable, isReadable } = require('../../Config/permissionGuard');
+const registry = require('./registry');
+
+// The person behind an agent decides what the agent may do: the token holder,
+// the person who started the run, or the approver of a proposal. Their
+// Security & Permissions catalogue is evaluated for the action's project by the
+// same evaluator the API guards use. Anything that cannot be resolved (no
+// person, not a member, rules unreadable) is refused.
+
+const OBJECT_ID = /^[0-9a-fA-F]{24}$/;
+const REASON = 'permission_denied';
+
+const oid = (v) => (OBJECT_ID.test(String(v || '')) ? new mongoose.Types.ObjectId(String(v)) : null);
+
+const projectOf = async (companyId, params = {}) => {
+    if (params.projectId) return String(params.projectId);
+    const taskId = oid(params.taskId);
+    if (!taskId) return null;
+    const task = await MongoDbCrudOpration(companyId, { type: SCHEMA_TYPE.TASKS, data: [{ _id: taskId }, { ProjectID: 1 }] }, 'findOne');
+    return task && task.ProjectID ? String(task.ProjectID) : null;
+};
+
+const denied = (key, why) => ({ allowed: false, reason: `${REASON}: ${key} ${why}`, permission: key });
+
+/* Does the person behind `actor` hold every catalogue entry `action` needs? With `byWorkspaceRules` the entries are
+ * judged by the workspace's rules, whatever project `params` names. */
+const holderMay = async (companyId, actor, action, params = {}, { byWorkspaceRules = false } = {}) => {
+    const required = registry.permissionsFor(action, params);
+    if (!required.length) return { allowed: true, reason: '', permission: null };
+    const uid = String((actor && actor.userId) || '');
+    if (!OBJECT_ID.test(uid)) return denied(required[0].key, 'cannot be checked, because no person is behind this connection. Ask the person to connect you again.');
+    try {
+        const projectId = byWorkspaceRules ? null : await projectOf(companyId, params);
+        const holds = async (key, write) => {
+            const value = await evaluatePermission(companyId, uid, key, { projectId });
+            return write ? isWritable(value) : isReadable(value);
+        };
+        for (const { key, write, anyOf } of required) {
+            let granted = false;
+            for (const option of anyOf || [key]) granted = granted || await holds(option, write);
+            if (!granted) return denied(key, 'is not allowed for the person you act for. Tell the person, and ask them to change it in AlianHub or do it themselves.');
+        }
+    } catch (e) {
+        return denied(required[0].key, 'could not be checked just now. Try again, and tell the person if it keeps failing.');
+    }
+    return { allowed: true, reason: '', permission: null };
+};
+
+module.exports = { holderMay, evaluate: evaluatePermission, REASON };

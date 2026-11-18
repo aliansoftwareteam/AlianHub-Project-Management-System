@@ -5,11 +5,11 @@
                 <img class="screenShotDisplay__innerImageTimelog" src='@/assets/images/svg/deleted-placeholder.svg' @click="previewScreenShot()">
             </div>
             <div v-else>
-                <img :src="trackshotI.image" class="screenShotDisplay__innerImageTimelog"  v-if="trackshotI.image.includes('http')" alt="timelogImage"  @click="previewScreenShot()"/>
+                <ImageIcon v-if="trackshotI.image.includes('http')" :src="trackshotI.image" :alt="$t('TimeTracker.screenshot_preview')" class="screenShotDisplay__innerImageTimelog" @click="previewScreenShot()"/>
                 <WasabiImage v-else class="screenShotDisplay__innerImageTimelog" :data="{url: trackshotI.image} " :thumbnail='thumbnailSize' @click="previewScreenShot()"/>
             </div>
             <div class="screenShotDisplay__timecheckbox">
-                <span class="screenShotDisplay__timedispalyImg GunPowder d-flex align-items-center justify-content-between" v-if="trackshotI.time">{{trackshotI.time?._seconds ? getDateType(parseInt(trackshotI.time._seconds * 1000)) : getDateType(parseInt(trackshotI.time))}}</span>
+                <span class="screenShotDisplay__timedispalyImg screen-shot-display-component-GunPowder d-flex align-items-center justify-content-between" v-if="trackshotI.time">{{trackshotI.time?._seconds ? getDateType(parseInt(trackshotI.time._seconds * 1000)) : getDateType(parseInt(trackshotI.time))}}</span>
                 <span class="screenShotDisplay__screenshotActivity"><ScreenShotActivityBar v-if="trackshotI.trackShots.strokes !== undefined" :data="trackshotI.trackShots" :widthData="57" :heightData="3"/></span>
                 <UserProfile
                     :showDot="false"
@@ -35,6 +35,7 @@ import ScreenShotActivityBar from '@/components/atom/PreviewTimelogScreenShot/Sc
 import moment from 'moment';
 import UserProfile from "@/components/atom/UserProfile/UserProfile.vue";
 import WasabiImage from "@/components/atom/WasabiIamgeCompp/WasabiIamgeCompp.vue";
+import ImageIcon from "@/components/atom/ImageIcon/ImageIcon.vue";
 import PreviewTimelogScreenShot from '@/components/atom/PreviewTimelogScreenShot/PreviewTimelogScreenShot.vue';
 const {getUser} = useGetterFunctions()
 const userId = inject('$userId');
@@ -88,3 +89,9 @@ const clearTimeout = () => {
 }
 </script>
 <style scoped src="./ScreenShotDisplayComponent.css"></style>
+
+<style scoped>
+.screen-shot-display-component-GunPowder {
+    color: var(--ink-2);
+}
+</style>

@@ -1,0 +1,50 @@
+{
+    "job": 19,
+    "title": "Dependency and shift",
+    "sentence": "Make \"[AI bench] Build\" wait on \"[AI bench] Design\", then move Design two working days later.",
+    "start": "The list",
+    "passed": "AI-1 run 1 again, 2026-10-08, build 819: pass, no approval, 11 steps",
+    "kept": "Rebuilt on 2026-10-09 from Tasks/active/047-ai-run/ai-1-run-1-results.md and the tool path of the job in ai-benchmark.md: the run did not record its calls. Ids are named by placeholder and resolved against the replay world.",
+    "calls": [
+        {
+            "tool": "person.place",
+            "arguments": {},
+            "answer": "read"
+        },
+        {
+            "tool": "tasks.search",
+            "arguments": {
+                "projectId": "$project",
+                "query": "[AI bench]"
+            },
+            "answer": "read"
+        },
+        {
+            "tool": "workdays.get",
+            "arguments": {
+                "projectId": "$project"
+            },
+            "answer": "read"
+        },
+        {
+            "tool": "task.relation.add",
+            "arguments": {
+                "taskId": "$task:[AI bench] Build",
+                "relatedTaskId": "$task:[AI bench] Design",
+                "type": "blocked_by"
+            },
+            "answer": "applied"
+        },
+        {
+            "tool": "task.update",
+            "arguments": {
+                "taskId": "$task:[AI bench] Design",
+                "startDate": "2026-10-14",
+                "dueDate": "2026-10-15",
+                "reason": "Design moves two working days later"
+            },
+            "answer": "applied"
+        }
+    ],
+    "undo": true
+}

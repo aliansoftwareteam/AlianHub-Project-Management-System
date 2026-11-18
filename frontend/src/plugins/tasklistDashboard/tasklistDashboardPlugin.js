@@ -1,10 +1,11 @@
-import DashBoardList from "./views/DashBoardList/DashBoardList.vue"
+import { defineAsyncComponent } from 'vue';
+
+export const loadDashBoardList = () => import(/* webpackChunkName: "dashboard-cards" */ './views/DashBoardList/DashBoardList.vue');
 
 export default {
     install (app) {
+        const DashBoardList = defineAsyncComponent(loadDashBoardList);
         app.component('DashBoardList', DashBoardList);
-
-        // Provide globally
         app.provide("DashBoardList", DashBoardList);
     }
 }

@@ -1,8 +1,8 @@
 {
   "permissions": {
     "allow": [
-      "Bash(npm run *)",
-      "Bash(xargs grep -l \"apiRequest\\\\|fetch\\\\|axios\")"
+      "Bash(gh auth *)",
+      "Bash(gh repo *)"
     ]
   }
 }

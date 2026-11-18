@@ -5,20 +5,35 @@
     <meta http-equiv="X-UA-Compatible" content="IE=edge">
     <meta name="viewport" content="width=device-width,initial-scale=1.0,viewport-fit=cover">
     <link rel="icon" href="/api/v1/getlogo?key=favicon">
-    <!-- PWA (SEC-03): installable + mobile meta -->
-    <meta name="theme-color" content="#2F3990">
+    <!-- The two colours are --canvas in tokens.css; tests/unit/appManifest.spec.js keeps them equal. -->
+    <meta name="theme-color" media="(prefers-color-scheme: light)" content="#f7f6f3">
+    <meta name="theme-color" media="(prefers-color-scheme: dark)" content="#111114">
     <meta name="mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="default">
     <meta name="apple-mobile-web-app-title" content="AlianHub">
-    <link rel="apple-touch-icon" href="/api/v1/getlogo?key=favicon">
+    <link rel="apple-touch-icon" href="/icons/apple-touch-icon.png">
     <link rel="manifest" href="/manifest.webmanifest">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Inter+Tight:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
     <script src="https://accounts.google.com/gsi/client" async defer></script>
-    <!-- <title><%= htmlWebpackPlugin.options.title %></title> -->
-    <title></title>
+    <title>AlianHub – Project management for your team</title>
+    <meta name="description" content="Tasks, projects, docs and chat for your team, in one place. AlianHub is self-hosted, open-source project management.">
+    <!-- The server replaces __APP_ORIGIN__ with the address asked for (Config/shellPage.js); previews need absolute URLs. -->
+    <meta property="og:type" content="website">
+    <meta property="og:site_name" content="AlianHub">
+    <meta property="og:title" content="AlianHub – Project management for your team">
+    <meta property="og:description" content="Tasks, projects, docs and chat for your team, in one place. Self-hosted, open-source project management.">
+    <meta property="og:url" content="__APP_ORIGIN__/">
+    <meta property="og:image" content="__APP_ORIGIN__/og-image.png">
+    <meta property="og:image:width" content="1200">
+    <meta property="og:image:height" content="630">
+    <meta property="og:image:alt" content="AlianHub logo with the line: Tasks, projects, docs and chat for your team, in one place.">
+    <meta name="twitter:card" content="summary_large_image">
+    <meta name="twitter:title" content="AlianHub – Project management for your team">
+    <meta name="twitter:description" content="Tasks, projects, docs and chat for your team, in one place. Self-hosted, open-source project management.">
+    <meta name="twitter:image" content="__APP_ORIGIN__/og-image.png">
     <favicon src=""></favicon>
   </head>
   <body>

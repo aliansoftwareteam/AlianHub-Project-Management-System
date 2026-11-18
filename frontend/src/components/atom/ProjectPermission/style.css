@@ -21,9 +21,9 @@
 }
 .disableButton{
     pointer-events: none;
-    background-color: #312d2d57;
-    border: 1px solid #FFFFFF;
-    color: #FFFFFF !important;
+    background-color: var(--fill);
+    border: 1px solid var(--border);
+    color: var(--ink-2) !important;
 }
 @media(max-width:848px) {
     .add_permission_project{

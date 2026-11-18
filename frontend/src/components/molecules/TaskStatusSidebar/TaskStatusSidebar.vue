@@ -1,8 +1,8 @@
 <template>
     <div class="list__taskstatus-sidebar">
-        <Sidebar width="374px" :zIndex="props.zTndex" :top="clientWidth <= 767 ? '0px' : '46px'" >
+        <Sidebar width="374px" :zIndex="props.zTndex" >
             <template #head-left>
-                <div class="font-size-18 font-weight-700 black font-roboto-sans">{{title}}</div>
+                <div class="font-size-18 font-weight-700 black font-ui">{{title}}</div>
             </template>
             <template #head-right>
                 <span class="add_status font-size-12 font-weight-400" v-if="isOpenAddStatus === false && isAddStatus === true" @click="isOpenAddStatus = true,formData.status.value = ''">+ {{props.type === 'task_type' ? $t("Home.add_task_type") : $t("Projects.add_status")}}</span>
@@ -56,7 +56,7 @@
                     </div>
                     <IconPicker v-if="iconSource === 'library'" v-model="selectedIconValue" v-model:color="selectedIconColor" />
                 </div>
-                <div class="overflow-y-auto sidebar-options overflow-x-hidden bg-white">
+                <div class="overflow-y-auto sidebar-options overflow-x-hidden bg-white" :role="filteredStatusOptions && filteredStatusOptions.length ? 'listbox' : null">
                     <template v-if="filteredStatusOptions && filteredStatusOptions.length">
                         <SidebarItems
                             v-for="(item, itemIndex) in filteredStatusOptions"
@@ -446,10 +446,10 @@ const organizeDataArray = (data) => {
 
 <style scoped src="./style.css"></style>
 <style scoped>
-.tasktype__iconpop { padding: 10px 15px; border-bottom: 1px solid #eef0f6; }
+.tasktype__iconpop { padding: 10px 15px; border-bottom: 1px solid var(--hairline); }
 .tasktype__iconpop-toggle { display: flex; gap: 6px; margin-bottom: 8px; }
-.tasktype__iconpop-toggle button { flex: 1; border: 1px solid #e2e5ee; background: #fff; color: #6b7280; border-radius: 6px; padding: 4px 8px; font-size: 12px; cursor: pointer; }
-.tasktype__iconpop-toggle button.active { background: #2F3990; border-color: #2F3990; color: #fff; }
+.tasktype__iconpop-toggle button { flex: 1; border: 1px solid var(--hairline); background: var(--surface); color: var(--ink-2); border-radius: 6px; padding: 4px 8px; font-size: 12px; cursor: pointer; }
+.tasktype__iconpop-toggle button.active { background: var(--brand); border-color: var(--brand); color: var(--on-brand); }
 
 /* Flex-column body: search / add-form / icon-picker take their natural height; the
    options list fills the rest and scrolls. Replaces a hardcoded calc(100% - Npx) that

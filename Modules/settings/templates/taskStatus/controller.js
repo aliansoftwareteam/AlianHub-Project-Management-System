@@ -3,6 +3,7 @@ const { removeCache } = require("../../../../utils/commonFunctions");
 const { dbCollections } = require("../../../../Config/collections");
 const { MongoDbCrudOpration } = require("../../../../utils/mongo-handler/mongoQueries");
 const mongoose = require("mongoose");
+const { settingsUpdateProblem, SETTINGS_UPDATES } = require("../../settingsDocUpdate");
 
 /**
  * This endpoint is used to insert the task status template
@@ -75,6 +76,8 @@ exports.updateTaskStatusTemplate = async (req, res) => {
         }else{
             return res.status(400).json({message: 'Invalid type'});
         }
+        const problem = settingsUpdateProblem(SETTINGS_UPDATES.templateName, key, updateObject);
+        if (problem) return res.status(400).json({ status: false, message: problem });
         const currentDate = new Date();
 
         const updateObjectDate = {

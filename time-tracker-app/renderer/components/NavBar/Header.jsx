@@ -1,13 +1,10 @@
 import React, { useEffect, useState } from 'react';
-const { publicRuntimeConfig } = getConfig();
-import getConfig from "next/config";
 import { useSelector, useDispatch } from 'react-redux'
 import { fetchAndProcessProjects } from '../../utils/projectUtils'
 import WasabiImage from '../WasabiImage/WasabiImage';
 import TaskTypeIcon from '../TaskTypeIcon/TaskTypeIcon';
 import TimeElapsed from '../TimeElapsed/TimeElapsed';
 import { removeAllTimeLog, setTrackerStopTime } from '../../store/timelog';
-const { APIURL } = publicRuntimeConfig
 import { useRouter } from 'next/router';
 import { TrackerController } from '../../controller/tracker/tracker';
 import store from '../../store/store';
@@ -16,6 +13,7 @@ import Modal from '../Modal/Modal';
 import { logoutFunction } from '../../controller/user/user';
 import Loader from '../Loader/Loader';
 import { useTodayLoggedMinutes, formatMinutes } from '../../hooks/useTodayLogged';
+import WorkspaceSwitcher from '../Workspace/WorkspaceSwitcher';
 
 function Header() {
     const { user } = useSelector((state) => state.user)
@@ -120,13 +118,8 @@ function Header() {
             {isSpinner && <Loader/>}
             <div className="flex justify-between items-center mb-0 pl-[15px] h-[45px] drag-region bg-[#2F3990]">
                 {/* Logo and Title Section */}
-                <div className="moveApp flex items-center flex-row text-white text-sm">
-                    <img
-                        src={`${APIURL}/api/v1/getLogo?key=logo&type=desktop`}
-                        className="h-[26px] w-[26px]"
-                        alt="Logo"
-                    />
-                    <span className="ml-[5px] text-white">Time Tracker</span>
+                <div className="moveApp flex items-center flex-row text-white text-sm min-w-0">
+                    <WorkspaceSwitcher />
                 </div>
 
                 {/* Window Controls */}

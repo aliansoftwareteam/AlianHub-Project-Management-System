@@ -6,91 +6,38 @@ const { MongoDbCrudOpration } = require("../../utils/mongo-handler/mongoQueries"
 const { SCHEMA_TYPE } = require("../../Config/schemaType");
 const { getCompanyDataFun } = require("../Company/controller/updateCompany");
 const socketEmitter = require("../../event/socketEventEmitter");
+const { pinSessionTenant } = require("../../Config/tenant");
+const { keepTabMarkerOnly } = require("./helpers/updateMarker");
+const { TASK_INDEX_FIELDS, TASK_INDEX_ONLOAD_FIELDS, prepareOrRefuse, taskFilterOf } = require("../Tasks/helpers/taskWriteFields");
 
 const projectQueues = {};
 const processingProjects = new Set();
+/* A due date group is a window of days around the viewer's today: it moves every day and its bounds are not
+   sent, so no stored value names it and a second count never equals a stored date. A task repaired under one
+   goes after every task of its project that has a due date position, the end of whichever window shows it. */
+const groupMembers = (item) => (item.searchKey === 'DueDate' ? [] : [{ [item.searchKey]: item.searchValue }]);
+
+const REQUIRED_FIELDS = ['isFirst', 'isFirstWithRecord', 'taskId', 'projectId', 'sprintId', 'relevantIndex', 'indexName', 'relevantKey', 'searchKey', 'taskKey', 'updateData'];
 /**
  * Update TaskIndex Of Task For Drag And Drop
  * @param {Objcet} 
  */
-exports.updateTaskIndex = (req,res) => {
+exports.updateTaskIndex = async (req,res) => {
     try {
-        if (!req.body&& req.body.isFirst === undefined) {
-            res.send({
-                status: false,
-                statusText: `isFirst is required`
-            })
-        }
-        if (!req.body&& req.body.isFirstWithRecord === undefined) {
-            res.send({
-                status: false,
-                statusText: `isFirstWithRecord is required`
-            })
-        }
-        if (!(req.body && req.body.taskId)) {
-            res.send({
-                status: false,
-                statusText: `taskId is required`
-            })
-        }
-        if (!(req.body && req.body.companyId)) {
-            res.send({
-                status: false,
-                statusText: `companyId is required`
-            })
-        }
-        if (!(req.body && req.body.projectId)) {
-            res.send({
-                status: false,
-                statusText: `projectId is required`
-            })
-        }
-        if (!(req.body && req.body.sprintId)) {
-            res.send({
-                status: false,
-                statusText: `sprintId is required`
-            })
-        }
-        if (!req.body&& req.body.relevantIndex === undefined) {
-            res.send({
-                status: false,
-                statusText: `relevantIndex is required`
-            })
-        }
-        if (!req.body&& req.body.indexName === undefined) {
-            res.send({
-                status: false,
-                statusText: `indexName is required`
-            })
-        }
-        if (!req.body&& req.body.relevantKey === undefined) {
-            res.send({
-                status: false,
-                statusText: `relevantKey is required`
-            })
-        }
-        if (!req.body&& req.body.searchKey === undefined) {
-            res.send({
-                status: false,
-                statusText: `searchKey is required`
-            })
-        }
-        if (!req.body&& req.body.taskKey === undefined) {
-            res.send({
-                status: false,
-                statusText: `taskKey is required`
-            })
-        }
-        if (!req.body&& req.body.updateData === undefined) {
-            res.send({
-                status: false,
-                statusText: `updateData is required`
-            })
+        const companyId = pinSessionTenant(req, res);
+        if (!companyId) return;
+        const payload = await prepareOrRefuse(req, res, TASK_INDEX_FIELDS, 'taskIndex');
+        if (!payload) return;
+        req.body = payload;
+        const missing = REQUIRED_FIELDS.find((field) => req.body[field] === undefined || req.body[field] === '');
+        if (missing) {
+            res.status(400).send({ status: false, statusText: `${missing} is required` });
+            return;
         }
         let taskData = {
             relevantIndex: req.body.relevantIndex,
             projectId: req.body.projectId,
-            companyId: req.body.companyId,
+            companyId,
             taskId: req.body.taskId,
             isFirst: req.body.isFirst,
             indexName: req.body.indexName,
@@ -99,7 +46,7 @@ exports.updateTaskIndex = (req,res) => {
             searchKey: req.body.searchKey,
             taskKey: req.body.taskKey,
             isFirstWithRecord: req.body.isFirstWithRecord,
-            updateData: req.body.updateData,
+            updateData: keepTabMarkerOnly(req.body.updateData),
             isTaskUpdate: true,
         }
         enqueueTask(req.body.projectId, taskData);
@@ -143,11 +90,17 @@ function processQueue() {
 */
 function processNextTask(projectId) {
     const projectQueue = projectQueues[projectId];
-    if (projectQueue && projectQueue.length > 0) {
-        processingProjects.add(projectId);
-        const taskData = projectQueue.shift();
-        exports.processTask(projectId, taskData);
-    }
+    if (!(projectQueue && projectQueue.length > 0)) return;
+    processingProjects.add(projectId);
+    const taskData = projectQueue.shift();
+    exports.processTask(projectId, taskData)
+        .catch((error) => {
+            logger.error(`Error While Update Kanban Index of Project : ${projectId} TasKId: ${taskData.taskId} ::: Erorr => ${error}`);
+        })
+        .finally(() => {
+            processingProjects.delete(projectId);
+            processNextTask(projectId);
+        });
 }
 
 
@@ -156,171 +109,49 @@ function processNextTask(projectId) {
  * @param {String} ProjectId - ProjectId For Process Next Task.
  * @param {Object} TaskData - Task Object
 */
-exports.processTask = (projectId, taskData)  =>{
-    try {       
-        let object
-        if (taskData.isFirst && !taskData.isFirstWithRecord) {
-            object = {
-                type: dbCollections.TASKS,
-                data: [[
-                    {
-                        $match: {
-                            $and: [
-                                {[taskData.searchKey]: taskData.relevantKey},
-                                {"ProjectID": new mongoose.Types.ObjectId(projectId)},
-                                // {"sprintId": taskData.sprintId},
-                                {[taskData.indexName]: {$exists: true}},
-                                {"TaskKey": {$ne: taskData.taskKey}}
-                            ]
-                        }
-                    },
-                    { $sort: { [taskData.indexName]: 1 } },
-                    { $limit: 1 }
-                ]]
-            }
-        } else if (taskData.isFirst && taskData.isFirstWithRecord) {
-            object = {
-                type: dbCollections.TASKS,
-                data: [[
-                    {
-                        $match: {
-                            $and: [
-                                {[taskData.searchKey]: taskData.relevantKey},
-                                {[taskData.indexName]: {$lt: taskData.relevantIndex}},
-                                {"ProjectID": new mongoose.Types.ObjectId(projectId)},
-                                // {"sprintId": taskData.sprintId},
-                                {[taskData.indexName]: {$exists: true}},
-                                {"TaskKey": {$ne: taskData.taskKey}},
-                            ],
-                        }
-                    },
-                    { $sort: { [taskData.indexName]: -1 } },
-                    { $limit: 1 }
-                ]]
-            }
-        } else {
-            object = {
-                type: dbCollections.TASKS,
-                data: [[
-                    {
-                        $match: {
-                            $and: [
-                                { [taskData.searchKey]: taskData.relevantKey },
-                                { [taskData.indexName]: { $gt: taskData.relevantIndex } },
-                                { "ProjectID": new mongoose.Types.ObjectId(projectId) },
-                                {[taskData.indexName]: {$exists: true}},
-                                // { "sprintId": taskData.sprintId },
-                                { "TaskKey": { $ne: taskData.taskKey } },
-                            ]
-                        }
-                    },
-                    { $sort: { [taskData.indexName]: 1 } },
-                    { $limit: 1 }
-                ]]
-            }
-        }
-        MongoDbCrudOpration(taskData.companyId,object,'aggregate').then((task)=>{
-            if (task.length) {
-                let newIndex;
-                if (taskData.isFirst && !taskData.isFirstWithRecord) {
-                    newIndex = (task[0][taskData.indexName] || 0) - 65536
-                } else {
-                    newIndex = (task[0][taskData.indexName] + taskData.relevantIndex) / 2;
-                }
-                let upobj
-                if (taskData.isTaskUpdate) {
-                    upobj = {
-                        type: dbCollections.TASKS,
-                        data: [
-                            {
-                                _id: taskData.taskId
-                            },
-                            {
-                                [taskData.indexName]: newIndex, 
-                                ...taskData.updateData
-                            }
-                        ]
-                   }
-                    if (taskData.indexName == "groupByDueDateIndex") {                        
-                        upobj.data[1].DueDate = upobj.data[1].DueDate ? new Date(upobj.data[1].DueDate) : null
-                    }
-                } else {
-                    upobj = {
-                        type: dbCollections.TASKS,
-                        data: [
-                            {
-                                _id: taskData.taskId
-                            },
-                            {
-                                [taskData.indexName]: newIndex,
-                            },
-                            {
-                                returnDocument: 'after'
-                            }
-                        ]
-                   }
-                }
-                MongoDbCrudOpration(taskData.companyId,upobj,"findOneAndUpdate").then((result)=>{
-                    socketEmitter.emit('update', { type: "update", data: result , updatedFields: {[taskData.indexName]: result[taskData.indexName]}, module: 'task' });
-                    processingProjects.delete(projectId);
-                    processNextTask(projectId);
-                }).catch((error)=> {
-                    logger.error(`Error While Update In Firebase For Kanban Index of Project : ${projectId} TasKId: ${taskData.taskId} ::: Erorr => ${error}`);
-                })
-            } else {
-                let newIndex;
-                if (taskData.isFirst && !taskData.isFirstWithRecord) {
-                    newIndex = 0;
-                } else if (taskData.isFirst && taskData.isFirstWithRecord) {
-                    newIndex = taskData.relevantIndex - 65536
-                } else {
-                    newIndex = taskData.relevantIndex + 65536
-                }
-                let upobj
-                if (taskData.isTaskUpdate) {
-                    upobj = {
-                        type: dbCollections.TASKS,
-                        data: [
-                            {
-                                _id: taskData.taskId
-                            },
-                            {
-                                [taskData.indexName]: newIndex, 
-                                ...taskData.updateData
-                            }
-                        ]
-                   }
-                    if (taskData.indexName == "groupByDueDateIndex") {
-                        upobj.data[1].DueDate = upobj.data[1].DueDate ? new Date(upobj.data[1].DueDate) : null
-                    }
-                } else {
-                    upobj = {
-                        type: dbCollections.TASKS,
-                        data: [
-                            {
-                                _id: taskData.taskId
-                            },
-                            {
-                                [taskData.indexName]: newIndex,
-                            }
-                        ]
-                   }
-                }
-                MongoDbCrudOpration(taskData.companyId,upobj,"findOneAndUpdate").then((result)=>{
-                    socketEmitter.emit('update', { type: "update", data: result , updatedFields: {[taskData.indexName]: result[taskData.indexName]} , module: 'task'});
-                    processingProjects.delete(projectId);
-                    processNextTask(projectId);
-                }).catch((error)=> {
-                    logger.error(`Error While Update In Firebase For Kanban Index of Project : ${projectId} TasKId: ${taskData.taskId} ::: Erorr => ${error}`);
-                })
-            }
-        }).catch((error)=>{
-            logger.error(`Error GET TASKS: ${error}`);
-        })
-        
-    } catch (error) {
-        logger.error(`ProcessTask Try Catch Error: ${error}`)
+exports.processTask = async (projectId, taskData) => {
+    const project = new mongoose.Types.ObjectId(projectId);
+    const scope = { [taskData.searchKey]: taskData.relevantKey };
+    let match;
+    let sort;
+    if (taskData.isFirst && !taskData.isFirstWithRecord) {
+        match = [scope, { ProjectID: project }, { [taskData.indexName]: { $exists: true } }, { TaskKey: { $ne: taskData.taskKey } }];
+        sort = 1;
+    } else if (taskData.isFirst && taskData.isFirstWithRecord) {
+        match = [scope, { [taskData.indexName]: { $lt: taskData.relevantIndex } }, { ProjectID: project }, { [taskData.indexName]: { $exists: true } }, { TaskKey: { $ne: taskData.taskKey } }];
+        sort = -1;
+    } else {
+        match = [scope, { [taskData.indexName]: { $gt: taskData.relevantIndex } }, { ProjectID: project }, { [taskData.indexName]: { $exists: true } }, { TaskKey: { $ne: taskData.taskKey } }];
+        sort = 1;
     }
+    const object = {
+        type: dbCollections.TASKS,
+        data: [[{ $match: { $and: match } }, { $sort: { [taskData.indexName]: sort } }, { $limit: 1 }]],
+    };
+    const task = await MongoDbCrudOpration(taskData.companyId, object, 'aggregate');
+
+    let newIndex;
+    if (task.length) {
+        newIndex = taskData.isFirst && !taskData.isFirstWithRecord ? (task[0][taskData.indexName] || 0) - 65536 : (task[0][taskData.indexName] + taskData.relevantIndex) / 2;
+    } else if (taskData.isFirst && !taskData.isFirstWithRecord) {
+        newIndex = 0;
+    } else if (taskData.isFirst && taskData.isFirstWithRecord) {
+        newIndex = taskData.relevantIndex - 65536;
+    } else {
+        newIndex = taskData.relevantIndex + 65536;
+    }
+
+    const update = taskData.isTaskUpdate ? { [taskData.indexName]: newIndex, ...taskData.updateData } : { [taskData.indexName]: newIndex };
+    if (taskData.isTaskUpdate && taskData.indexName == "groupByDueDateIndex") {
+        update.DueDate = update.DueDate ? new Date(update.DueDate) : null;
+    }
+    const upobj = {
+        type: dbCollections.TASKS,
+        data: [taskFilterOf(taskData.taskId), update, { returnDocument: 'after' }],
+    };
+    const result = await MongoDbCrudOpration(taskData.companyId, upobj, "findOneAndUpdate");
+    if (!result) return;
+    socketEmitter.emit('update', { type: "update", data: result, updatedFields: { [taskData.indexName]: result[taskData.indexName] }, module: 'task', companyId: taskData.companyId });
 }
 
 
@@ -331,7 +162,7 @@ exports.processTask = (projectId, taskData)  =>{
  * @param {Object} res
  * @returns
  */
-exports.updateTaskIndexWhenLoad = (req,res) => {
+exports.updateTaskIndexWhenLoad = async (req,res) => {
     try {
         if(!(req.body && req.body.taskUpdate)) {
             res.send(({
@@ -340,13 +171,11 @@ exports.updateTaskIndexWhenLoad = (req,res) => {
             }))
             return;
         }
-        if(!(req.body && req.body.companyId)) {
-            res.send(({
-                status: false,
-                statusText: `CompanyId Is Required`
-            }))
-            return;
-        }
+        const companyId = pinSessionTenant(req, res);
+        if (!companyId) return;
+        const payload = await prepareOrRefuse(req, res, TASK_INDEX_ONLOAD_FIELDS, 'updateTaskIndexOnload');
+        if (!payload) return;
+        req.body = payload;
         let obj = {
             type: dbCollections.TASKS,
             data: [
@@ -355,7 +184,11 @@ exports.updateTaskIndexWhenLoad = (req,res) => {
                 }
             ]
         }
-        MongoDbCrudOpration(req.body.companyId,obj,"findOne").then((rep)=>{
+        MongoDbCrudOpration(companyId,obj,"findOne").then((rep)=>{
+            if (!rep) {
+                res.status(404).send({ status: false, statusText: 'Task not found' });
+                return;
+            }
             if (rep[req.body.taskUpdate.item.indexName] === undefined || rep[req.body.taskUpdate.item.indexName] === null) {
                 if (req.body.taskUpdate.item.searchKey === "AssigneeUserId" && req.body.taskUpdate.item.searchValue == "[]") {
                     let taskObj = [
@@ -363,12 +196,12 @@ exports.updateTaskIndexWhenLoad = (req,res) => {
                           $match: {
                             ProjectID: rep.ProjectID,
                             TaskKey: {$ne: rep.TaskKey},
-                            [indexObj.indexName]: { $exists: true },
+                            [req.body.taskUpdate.item.indexName]: { $exists: true },
                             // sprintId: rep.sprintId,
                             AssigneeUserId: { $size: 0 }
                           }
                         },
-                        { $sort: { [indexObj.indexName]: 1 } },
+                        { $sort: { [req.body.taskUpdate.item.indexName]: 1 } },
                         {
                           $group: {
                             _id: "$AssigneeUserId",
@@ -382,15 +215,15 @@ exports.updateTaskIndexWhenLoad = (req,res) => {
                         type: SCHEMA_TYPE.TASKS,
                         data: [taskObj]
                     }
-                    MongoDbCrudOpration(req.body.companyId, objSh, 'aggregate').then((resp)=>{
-                        if (resp && resp[0].results && resp[0].results.length) {
-                            exports.updateIndex(req.body.taskUpdate,req.body.companyId,rep,typsenseTask).then((response)=>{
+                    MongoDbCrudOpration(companyId, objSh, 'aggregate').then((resp)=>{
+                        if (resp?.[0]?.results?.length) {
+                            exports.updateIndex(req.body.taskUpdate,companyId,rep,resp[0].results[0]).then((response)=>{
                                 res.send(response)
                             }).catch((error)=>{
                                 res.send(error)
                             })
                         } else {
-                            exports.update0Index(req.body.taskUpdate,req.body.companyId,rep).then((response)=>{
+                            exports.update0Index(req.body.taskUpdate,companyId,rep).then((response)=>{
                                 res.send(response)
                             }).catch((error)=>{
                                 res.send(error)
@@ -410,7 +243,7 @@ exports.updateTaskIndexWhenLoad = (req,res) => {
                                 $match: {
                                     $and: [
                                         {[req.body.taskUpdate.item.indexName]: {$exists: true}},
-                                        { [req.body.taskUpdate.item.searchKey]: req.body.taskUpdate.item.searchValue },
+                                        ...groupMembers(req.body.taskUpdate.item),
                                         { "ProjectID": new mongoose.Types.ObjectId(rep.ProjectID) },
                                         // { "sprintId": rep.sprintId },
                                         { "TaskKey": { $ne: rep.TaskKey } },
@@ -421,20 +254,22 @@ exports.updateTaskIndexWhenLoad = (req,res) => {
                             { $limit: 1 }
                         ]]
                     }
-                    MongoDbCrudOpration(req.body.companyId,object,"aggregate").then((task) => {
+                    MongoDbCrudOpration(companyId,object,"aggregate").then((task) => {
                         if (task.length > 0) {
-                            exports.updateIndex(req.body.taskUpdate,req.body.companyId,rep,task[0]).then((response)=>{
+                            exports.updateIndex(req.body.taskUpdate,companyId,rep,task[0]).then((response)=>{
                                 res.send(response)
                             }).catch((error)=>{
                                 res.send(error)
                             })
                         } else {
-                            exports.update0Index(req.body.taskUpdate,req.body.companyId,rep).then((response)=>{
+                            exports.update0Index(req.body.taskUpdate,companyId,rep).then((response)=>{
                                 res.send(response)
                             }).catch((error)=>{
                                 res.send(error)
                             })
                         }
+                    }).catch((error) => {
+                        res.send({ status: false, statusText: `Error Get Neighbour: ${error.message}` });
                     })
                 }
             } else {
@@ -450,7 +285,7 @@ exports.updateTaskIndexWhenLoad = (req,res) => {
             })
         })
     } catch (error) {
-        reject(error);
+        res.send({ status: false, statusText: error.message });
     }
 }
 
@@ -461,7 +296,7 @@ exports.updateTaskIndexWhenLoad = (req,res) => {
  * @param {Object} TaskUpdate - Task Object In which Index is to be updated
  * @param {String} CompanyId - Company Id In which Task Is Created
  * @param {Object} Rep - Response Of Task Object Which is Get from Typsense
- * @returns {Promise<String>} A Promise that resolves with the status true if index update succesfully.
+ * @returns {Promise<String>} A Promise that resolves with the status true if the index was updated successfully.
  *                            Rejects with an error message if any issues occur during the Update Process.
  */
 exports.update0Index = (taskUpdate,companyId,rep) => {
@@ -482,7 +317,7 @@ exports.update0Index = (taskUpdate,companyId,rep) => {
                 ]
             }
             MongoDbCrudOpration(companyId,obj,"findOneAndUpdate").then((result)=>{
-                socketEmitter.emit('update', { type: "update", data: result , updatedFields: {[taskUpdate.item.indexName]: result[taskUpdate.item.indexName]} , module: 'task'});
+                socketEmitter.emit('update', { type: "update", data: result , updatedFields: {[taskUpdate.item.indexName]: result[taskUpdate.item.indexName]} , module: 'task', companyId});
                 resolve({
                     status: true,
                     statusText: `Index Update Successfully`
@@ -511,7 +346,7 @@ exports.update0Index = (taskUpdate,companyId,rep) => {
  * @param {String} CompanyId - Company Id In which Task Is Created
  * @param {Object} Rep - Response Of Task Object Which is Get from Typsense
  * @param {Object} TypsenseTask - We need to update the new task index from the task object referenced by this task index.
- * @returns {Promise<String>} A Promise that resolves with the status true if index update succesfully.
+ * @returns {Promise<String>} A Promise that resolves with the status true if the index was updated successfully.
  *                            Rejects with an error message if any issues occur during the Update Process.
  */
 exports.updateIndex = (taskUpdate,companyId,rep,typsenseTask) => {
@@ -533,7 +368,7 @@ exports.updateIndex = (taskUpdate,companyId,rep,typsenseTask) => {
                     ]
                 }
                 MongoDbCrudOpration(companyId,obj,"findOneAndUpdate").then((result)=>{
-                    socketEmitter.emit('update', { type: "update", data: result , updatedFields: {[taskUpdate.item.indexName]: result[taskUpdate.item.indexName]}, module: 'task' });
+                    socketEmitter.emit('update', { type: "update", data: result , updatedFields: {[taskUpdate.item.indexName]: result[taskUpdate.item.indexName]}, module: 'task', companyId });
                     resolve({
                         status: true,
                         statusText: `Index Update Successfully`

@@ -1,10 +1,7 @@
 <template>
     <div>
         <div class="createProjectListSidebarContentWrapper">
-            <a href="#" @click.prevent="scrollToBottom" class="btn-scroll-to-bottom" :style="{paddingBottom: checkApps('tags') ? '15px' : ''}" v-if="clientWidth < 767">
-                {{$t('general.scroll_to_bottom')}}
-            </a>
-            <div class="d-flex mobile__bg--withPadding" v-if="checkApps('tags')">
+            <div class="d-flex mobile__bg--withPadding" v-if="show.tags && checkApps('tags')">
                 <div class="d-flex align-items-center overflow-auto style-scroll tagList__main-wrapper-sidebar pb-1px">
                     <div v-for="(item, index) in tagChipArray" :key="index" @click.stop="">
                         <div class="tagList taglist__mobile-margin">
@@ -18,13 +15,13 @@
             </div>
             <!-- Tags app available on the plan but not switched on for this project: representational teaser. -->
             <AppTeaserBlock
-                v-else-if="getAppState('tags', projectData) === 'disabled'"
+                v-else-if="show.tags && getAppState('tags', projectData) === 'disabled'"
                 appKey="tags" class="mb-1"
             />
             <Description
-                v-if="checkPermission('task.task_description',projectData?.isGlobalPermission) !== null && checkApps('AI',projectData) !== undefined && checkPermission('task.task_description',projectData?.isGlobalPermission) !== undefined && Object.keys(projectData).length > 0"
-                :isShowAi="checkApps('AI',projectData) && checkPermission('task.task_description',projectData?.isGlobalPermission) == true"
-                :description="task?.descriptionBlock ? task.descriptionBlock : task.description"
+                v-if="show.description && checkPermission('task.task_description',projectData?.isGlobalPermission) !== null && checkPermission('task.task_description',projectData?.isGlobalPermission) !== undefined && Object.keys(projectData).length > 0"
+                :isShowAi="canUseAi({ project: projectData, permitted: checkPermission('task.task_description',projectData?.isGlobalPermission) == true })"
+                :description="taskDescription"
                 :editPermission="checkPermission('task.task_description',projectData?.isGlobalPermission)"
                 :minlength="10"
                 :projectData="projectData"
@@ -33,8 +30,9 @@
                 :task="task"
                 :isMainSpinner="isMainSpinner"
             />
+            <slot v-if="show.description" name="after-description" />
             <SubTasks
-                v-if="task.isParentTask && checkPermission('task.sub_task_create',projectData?.isGlobalPermission) !== null"
+                v-if="show.subtasks && task.isParentTask && checkPermission('task.sub_task_create',projectData?.isGlobalPermission) !== null"
                 :task="task"
                 class="mt-1"
                 :parentAssignee="task.AssigneeUserId"
@@ -42,25 +40,30 @@
                 :isMainSpinner="isMainSpinner"
             />
             <LinkedTasks
+                v-if="show.linkedTasks"
                 :task="task"
                 class="mt-1"
             />
             <LinkedDocs
+                v-if="show.linkedDocs"
                 :task="task"
                 :refreshKey="docsRefreshKey"
                 class="mt-1"
                 @open="$emit('openDoc', $event)"
             />
+            <TaskLinks v-if="show.linkedDocs" :links="task.links" />
             <EpicPicker
+                v-if="show.epic"
                 :task="task"
                 class="mt-1"
             />
-            <div class="position-re" v-if="checkPermission('task.task_custom_field',projectData?.isGlobalPermission) !== null">
+            <div class="position-re" v-if="show.customFields && checkPermission('task.task_custom_field',projectData?.isGlobalPermission) !== null">
                 <!-- App enabled for this project: existing behavior (feature, or blurred feature + upgrade overlay when the plan doesn't include it). -->
                 <div v-if="checkApps('CustomFields')">
                     <div :class="[{'pointer-event-none opacity-5 blur-3-px':!currentCompany?.planFeature?.customFields}]">
                         <CustomFieldRenderViewComponent
                             @blurUpdate="submitHandler"
+                            @fieldValue="submitFieldValue"
                             @editCustomField="editCustomField"
                             :task="props.task"
                             @isCustomField="isCustomField = true"
@@ -85,8 +88,9 @@
                     appKey="CustomFields"
                 />
             </div>
-            <CheckListComponent 
-                v-if="checkPermission('task.task_checklist',projectData?.isGlobalPermission) !== null"
+            <CheckListComponent
+                v-if="show.checklist && checkPermission('task.task_checklist',projectData?.isGlobalPermission) !== null"
+                ref="checklistRef"
                 :taskId="task._id"
                 :sprintId="task.sprintId"
                 :data="checkList"
@@ -98,7 +102,8 @@
             />
             <Attachments
                 class="mt-20px"
-                v-if="checkPermission('task.task_attachments',projectData?.isGlobalPermission) !== null"
+                v-if="show.attachments && checkPermission('task.task_attachments',projectData?.isGlobalPermission) !== null"
+                ref="attachmentsRef"
                 :permission="checkPermission('task.task_attachments',projectData?.isGlobalPermission)"
                 :attachments="task.attachments"
                 :extensions="fileExtentions"
@@ -117,7 +122,7 @@
         @closeSidebar="handleCloseSidebar"
         :componentDetail="componentDetail && Object.keys(componentDetail).length ? componentDetail : {}"
         :customFieldObject="componentDetail && Object.keys(componentDetail).length ? customFieldObject : {}"
-        :isCustomField="isCustomField"
+        v-model:isCustomField="isCustomField"
         @handleClose="handleClose()"
     />
     <PromptSidebar v-if="isOpenPromptDeatil" @closePrompt="isOpenPromptDeatil = false" :selectedPrompt="selectedPrompt" @closeMainSidebar="isOpenPromptDeatil = false" :project="projectData" :task="task" />
@@ -125,30 +130,33 @@
 
 <script setup>
 // PACKAGES
-import Swal from 'sweetalert2';
+import Swal from '@/utils/lazySwal';
 import { useStore } from 'vuex';
 import { useToast } from 'vue-toast-notification';
 import { computed, defineProps, inject, ref, nextTick,onMounted, watch } from 'vue';
 
 // COMPONENTS
-import { dbCollections } from '@/utils/Collections';
 import Description from '@/components/atom/Description/Description.vue'
 import Attachments from '@/components/atom/Attachments/Attachments.vue'
 import CheckListComponent from '@/components/molecules/CheckList/CheckList.vue'
 import SubTasks from '@/components/organisms/SubTasks/SubTasks.vue'
 import LinkedTasks from '@/components/organisms/LinkedTasks/LinkedTasks.vue'
 import LinkedDocs from '@/components/molecules/Pages/LinkedDocs.vue'
+import TaskLinks from '@/components/molecules/TaskLinks/TaskLinks.vue'
+import { shownDescription } from '@/utils/taskDescription'
 import EpicPicker from '@/components/molecules/Epics/EpicPicker.vue'
 import CreateTagPopup from "@/components/molecules/TagList/CreateTagPopup.vue";
 import TagChip from '@/components/atom/TagChip/TagChip.vue'
 import PromptSidebar from "@/components/molecules/PromptSidebar/PromptSidebar.vue";
 import { apiRequest, apiRequestWithoutCompnay } from '../../../services';
 import * as env from '@/config/env';
-import axios from 'axios';
 
-// UTILS
 import { useCustomComposable, useGetterFunctions } from '@/composable';
+import { canUseAi } from '@/composable/aiAvailability';
 import taskClass from '@/utils/TaskOperations';
+import { tellViews } from '@/utils/instantTaskEdit';
+import { customFieldPayload } from '@/views/Projects/composables/projectCustomFields';
+import { fieldTypeCatalogue } from '@/plugins/customFieldView/fieldTypes';
 import UpgradePlan from '@/components/atom/UpgradYourPlanComponent/UpgradYourPlanComponent.vue';
 import AppTeaserBlock from '@/components/molecules/AppTeaserBlock/AppTeaserBlock.vue';
 import {storageQueryBuilder,generateFileName} from '@/utils/storageQueryBuild.js';
@@ -165,7 +173,6 @@ const { getUser } = useGetterFunctions();
 const { checkPermission, makeUniqueId, checkBucketStorage,checkApps,getAppState } = useCustomComposable();
 const { openRecorder } = useClipRecorder();
 
-// props
 const props = defineProps({
     task: {
         type: Object,
@@ -187,13 +194,22 @@ const props = defineProps({
     docsRefreshKey: {
         type: Number,
         default: 0
+    },
+    // Which blocks to render; the task overlay splits them across its tabs.
+    sections: {
+        type: Object,
+        default: () => ({})
     }
 });
 
-// emit
+const show = computed(() => ({
+    tags: true, description: true, subtasks: true, linkedTasks: true, linkedDocs: true,
+    epic: true, customFields: true, checklist: true, attachments: true,
+    ...(props.sections || {})
+}));
+
 const emit = defineEmits(["openSeeAll", 'openDoc']);
 
-//computed
 const fileExtentions = computed(() => {
     return getters['settings/fileExtentions'];
 });
@@ -201,11 +217,11 @@ const companyOwner = computed(() => {
     return getters["settings/companyOwnerDetail"];
 });
 const checkList = computed(() => props.task.checklistArray);
+const taskDescription = computed(() => shownDescription(props.task));
 const currentCompany = computed(() => getters["settings/selectedCompany"]);
 const projectsGetter = computed(() => getters["projectData/onlyActiveProjects"]);
 const showCustomField = computed(() => checkPermission("task.task_custom_field", projectData.value?.isGlobalPermission, {gettersVal: getters}));
 
-// ref
 const ids = ref();
 const tagChipArray = ref();
 const isSpinner = ref(false);
@@ -213,14 +229,12 @@ const submitted = ref(false);
 const componentDetail = ref({});
 const customFieldObject = ref({});
 const isCustomField = ref(false);
-const allProjectsArrayFilter = ref([]);
+const allProjectsArrayFilter = computed(() => (props.isSupport ? [] : projectsGetter.value?.data || []));
 const CustomFieldData = ref(JSON.parse(JSON.stringify(getters["settings/customFields"])));
-const selectedProject = ref([])
 const isOpenPromptDeatil = ref(false);
 const selectedPrompt = ref({})
 const isSpinnerAi = ref(false);
 
-// inject
 const userId = inject('$userId');
 
 // Recently-visited tracking — fire-and-forget on every task open.
@@ -238,42 +252,9 @@ function recordRecentVisit() {
 onMounted(recordRecentVisit);
 watch(() => props.task?._id, recordRecentVisit);
 const companyId = inject('$companyId');
-const clientWidth = inject("$clientWidth");
 const projectData = inject("selectedProject");
 
-//getUser
 const user = getUser(userId.value);
-
-onMounted(() => {
-    let data = {
-        type: dbCollections.PROJECTS,
-        data: [{ _id: process.env.VUE_APP_SUPPORT_PROJECTID}],
-    };
-    const axiosData = {
-        dataObj: data.data,
-        dbName: process.env.VUE_APP_SUPPORT_COMPANYID,
-        collection: data.type,
-        methodName: "findOne",
-    };
-    axios.post(env.API_URI + env.MONGO_OPRATION, axiosData).then((response) => {
-        selectedProject.value.push(response.data.statusText)
-    });
-    if(props.isSupport === true){
-        allProjectsArrayFilter.value = selectedProject.value;
-    }else{
-        allProjectsArrayFilter.value = JSON.parse(JSON.stringify(projectsGetter.value.data))
-    }
-})
-
-const scrollToBottom = () => {
-    const targetDiv = document.querySelector('.task-detail-leftside');
-    if (targetDiv) {
-        targetDiv.scrollTo({
-            top: targetDiv.scrollHeight,
-            behavior: 'smooth'
-        });
-    }
-};
 
 const newAttachments = (files) => {
     if(!files.length) {
@@ -533,8 +514,7 @@ const deleteAttachments = (attachment) => {
         text: `${t('Toast.Are_you_sure_to_delete_this_file')} ?`,
         icon: 'warning',
         showCancelButton: true,
-        confirmButtonColor: '#3085d6',
-        cancelButtonColor: '#d33',
+        customClass: { confirm: 'swal2-deny' },
         cancelButtonText: t('Projects.cancel'),
         confirmButtonText: t('conformationmsg.yes_delete')
     }).then((result)=>{
@@ -603,21 +583,21 @@ const submitHandler = async (value,detail,id,edit) => {
             if(detail.fieldType === 'date'){
                 try{
                     detail.fieldValue = new Date(value);
-                    insertCustomField(detail,value);
+                    insertCustomField(detail);
                 } catch(error){
                     console.error('ERROR',error);
                 }
             }else if(detail.fieldType === 'dropdown'){
                 detail.fieldValue = [value.id];
                 try {
-                    insertCustomField(detail,value);
+                    insertCustomField(detail);
                 } catch(error){
                     console.error('ERROR',error);
                 }
             }else if(detail.fieldType === 'number' || detail.fieldType === 'money'){
                 try{
                     detail.fieldValue = String(value);
-                    insertCustomField(detail,value);
+                    insertCustomField(detail);
                 } catch(error){
                     console.error('ERROR',error);
                 }
@@ -640,7 +620,7 @@ const submitHandler = async (value,detail,id,edit) => {
                                     detail.fieldFlag = detail.fieldFlag ? detail.fieldFlag : detail.fieldCountryObject.code;
                                 }
                             }
-                            insertCustomField(detail,value);
+                            insertCustomField(detail);
                         } catch(error){
                             console.error('ERROR',error);
                         }
@@ -650,20 +630,32 @@ const submitHandler = async (value,detail,id,edit) => {
         } else if(detail.fieldType === 'checkbox'){
             try{
                 detail.fieldValue = value;
-                insertCustomField(detail,value);
+                insertCustomField(detail);
             } catch(error){
                 console.error('ERROR',error);
             }
         }
     }
 };
-const insertCustomField = (detail,data) => {
-    let updateDetail = {};
-    let userData = {
-        id: user.id,
-        name: user.Employee_Name,
-        companyOwnerId: companyOwner.value._id,
+const submitFieldValue = (def, input) => {
+    if(showCustomField.value !== true) return;
+    const payload = customFieldPayload(def, input);
+    if(payload.invalid){
+        $toast.error(t('ViewColumns.field_invalid', { field: def.fieldTitle || '' }), {position: 'top-right' });
+        return;
     }
+    const customField = { ...(props.task.customField || {}) };
+    taskClass.updateTaskCustomField({taskId: props.task._id, customFieldId: def._id, updateDetail: payload, companyId: companyId.value, taskObj: props.task}).then(() => {
+        $toast.success(t("Toast.Custom_field_updated_successfully"), {position: 'top-right' });
+    }).catch((err) => {
+        console.error('Error in updating the custom field',err);
+        commit('projectData/mutateUpdateFirebaseTasks', {snap: null, op: 'modified', pid: props.task.ProjectID || '', sprintId: props.task?.sprintId || '', data: {...props.task, customField}, updatedFields: {customField}});
+        tellViews(props.task._id, {customField});
+        $toast.error(err?.error?.response?.data?.statusText || t('Toast.something_went_wrong'), {position: 'top-right' });
+    });
+};
+const insertCustomField = (detail) => {
+    let updateDetail = {};
     updateDetail.fieldValue = detail.fieldValue;
     if(detail.fieldType === "phone"){
         updateDetail.fieldCode = detail?.fieldCode;
@@ -673,21 +665,6 @@ const insertCustomField = (detail,data) => {
     updateDetail._id = detail._id;
     taskClass.updateTaskCustomField({taskId: props.task._id, customFieldId: detail._id, updateDetail: updateDetail,companyId:companyId.value,taskObj:props.task,detail:detail}).then((res) => {
         if(res.status){
-            let historyObj = {
-                'message': `<b>${userData.name}</b> has added value in <b> ${detail.fieldTitle}</b> Custom Field as <b>${data.value ? data.value : data}</b>.`,
-                'key' : 'Project_Category',
-                'sprintId' : props.task.sprintId
-            }
-            apiRequest("post", env.HANDLE_HISTORY, {
-                "type": 'task',
-                "companyId": companyId.value,
-                "projectId": props.task.ProjectID,
-                "taskId": props.task._id,
-                "object": historyObj,
-                "userData": userData
-            }).catch((err) =>{
-                console.error("Error in updating the notification",err);
-            })
             $toast.success(t("Toast.Custom_field_updated_successfully"), {position: 'top-right' });
         }else{
             $toast.error(t('Toast.something_went_wrong'), {position: 'top-right' });
@@ -700,11 +677,6 @@ const insertCustomField = (detail,data) => {
 } 
 const customFieldStore = async(object,isEdit) => {
     let value = JSON.parse(JSON.stringify(object))
-    let userData = {
-        id: user.id,
-        name: user.Employee_Name,
-        companyOwnerId: companyOwner.value._id,
-    }
     if(!isEdit){
         try {
             value.global = false;
@@ -722,18 +694,6 @@ const customFieldStore = async(object,isEdit) => {
                     value._id = res?.data?._id || '';
                     commit("settings/mutateFinalCustomFields", {data: value || {},op: "added"});
                     $toast.success(t("Toast.Field_Added_Successfully"), {position: 'top-right' });
-                    let historyObj = {
-                        'message': `<b>${userData.name}</b> has Created <b> Custom Field </b> as <b>${value.fieldTitle}</b> for task.`,
-                        'key' : 'Project_CustomField',
-                    }
-                    apiRequest("post", env.HANDLE_HISTORY, {
-                        "type": 'project',
-                        "companyId": companyId.value,
-                        "projectId": props.task.ProjectID,
-                        "taskId": null,
-                        "object": historyObj,
-                        "userData": userData
-                    })
                 }else{
                     $toast.error(t('Toast.something_went_wrong'), {position: 'top-right' });
                 }
@@ -750,7 +710,6 @@ const customFieldStore = async(object,isEdit) => {
         }
     }else{
         try {
-            const oldFieldValue = customFieldObject.value.fieldTitle
             value.updatedAt = new Date();
             const object = {
                 type: "updateOne",
@@ -763,20 +722,6 @@ const customFieldStore = async(object,isEdit) => {
             await apiRequest("put",env.CUSTOM_FIELD,object).then((res) => {
                 if(res.status === 200){
                     commit("settings/mutateFinalCustomFields", {data: {...customFieldObject.value,...value} || {},op: "modified"});
-                    if(oldFieldValue !== value.fieldTitle){
-                        let historyObj = {
-                            'message': `<b>${userData.name}</b> has Edited <b> Custom Field </b> from <b>${oldFieldValue}</b> to <b>${value.fieldTitle}</b> for task.`,
-                            'key' : 'Project_CustomField',
-                        }
-                        apiRequest("post", env.HANDLE_HISTORY, {
-                            "type": 'project',
-                            "companyId": companyId.value,
-                            "projectId": props.task.ProjectID,
-                            "taskId": null,
-                            "object": historyObj,
-                            "userData": userData
-                        })
-                    }
                     $toast.success(t("Toast.Field_Updated_Successfully"), {position: 'top-right' })
                 }else{
                     $toast.error(t('Toast.something_went_wrong'), {position: 'top-right' });
@@ -806,7 +751,7 @@ function openSeeAll (value) {
 }
 const editCustomField = (val) => {
     if(showCustomField.value === true && currentCompany.value?.planFeature?.customFields === true){
-        componentDetail.value = CustomFieldData.value.find((x)=> x.cfType === val.fieldType);
+        componentDetail.value = fieldTypeCatalogue(CustomFieldData.value, t).find((x)=> x.cfType === val.fieldType);
         customFieldObject.value = val;
         if(componentDetail.value && Object.keys(componentDetail.value).length){            
             isCustomField.value = true;
@@ -818,6 +763,19 @@ const handleClose = () => {
     componentDetail.value = {};
     customFieldObject.value = {};
 };
+
+const checklistRef = ref(null);
+const attachmentsRef = ref(null);
+defineExpose({
+    addChecklist() {
+        if (!checklistRef.value) return;
+        checklistRef.value.addCheckList?.();
+        nextTick(() => checklistRef.value?.$el?.scrollIntoView?.({ block: 'nearest', behavior: 'smooth' }));
+    },
+    attachFile() {
+        attachmentsRef.value?.pickFromComputer?.();
+    }
+});
 </script>
 <style>
 

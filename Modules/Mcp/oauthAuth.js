@@ -1,0 +1,128 @@
+const grants = require('../OAuthServer/grants');
+const store = require('../OAuthServer/store');
+const tokenHash = require('../OAuthServer/tokenHash');
+const mcpOAuth = require('../../Config/mcpOAuth');
+const { verifyCompanyMembership } = require('../../Config/jwt');
+const { externalClientActor } = require('../Agents/actor');
+const taint = require('../Agents/taint');
+const approvalsHook = require('./approvalsHook');
+const { appLabel, hostOfClient } = require('../OAuthServer/clientLabel');
+const logger = require('../../Config/loggerConfig');
+
+const isAccessToken = (raw) => typeof raw === 'string' && raw.startsWith(tokenHash.PREFIX.access);
+
+const OAUTH_PREFIXES = [tokenHash.PREFIX.access, tokenHash.PREFIX.refresh, tokenHash.PREFIX.code];
+const looksLikeOAuthSecret = (value) => OAUTH_PREFIXES.some((prefix) => String(value).startsWith(prefix));
+
+/* A client ID metadata document client has no row to revoke; its grants are still revoked one by one,
+ * and slice S3's workspace approval covers it. */
+const clientStanding = async (clientId) => {
+    if (!tokenHash.CLIENT_ID.test(String(clientId))) return { ok: true, name: hostOfClient(clientId) || String(clientId), host: hostOfClient(clientId) };
+    const row = await store.clients.find(clientId);
+    if (!row || row.revokedAt) return { ok: false };
+    return { ok: true, name: row.name || String(clientId), host: hostOfClient(clientId, row) };
+};
+
+/* The name the workspace approved the client under, which a metadata document client takes from its own
+ * client_name, as the Members page names it; the registered name or the publisher's host otherwise. */
+const nameInWorkspace = async (companyId, clientId, fallback) => {
+    const rows = await store.approvals.namesFor([{ companyId, clientId }]).catch(() => []);
+    const approved = (rows || []).find((row) => row && row.clientName);
+    return approved ? String(approved.clientName) : fallback;
+};
+
+const refuseApproval = (clientId, why) => {
+    logger.error(`mcp oauth: refusing client ${clientId}, its workspace approval could not be checked: ${why}`);
+    return false;
+};
+
+/* Slice S3's per-workspace client approval: Modules/OAuthServer/approvals.js exporting
+ * isClientApproved(companyId, clientId). Until that file exists every client with a live grant passes;
+ * once it exists, anything short of a plain true refuses. */
+const clientApprovedInWorkspace = async (companyId, clientId) => {
+    let approvals;
+    try {
+        approvals = approvalsHook.load();
+    } catch (error) {
+        return refuseApproval(clientId, `the approval module failed to load (${error.message})`);
+    }
+    if (!approvals) return true;
+    if (typeof approvals.isClientApproved !== 'function') return refuseApproval(clientId, 'the approval module has no isClientApproved');
+    try {
+        return (await approvals.isClientApproved(companyId, clientId)) === true;
+    } catch (error) {
+        return refuseApproval(clientId, `isClientApproved failed (${error.message})`);
+    }
+};
+
+/* The scopes the workspace still allows the client, read on every request so a narrowed approval narrows tokens
+ * already issued. Every scope but the manage ones while the approval module is not installed, since those take
+ * an approval that names them; null (refuse) for anything else short of a list. */
+const approvalCeiling = async (companyId, clientId) => {
+    let approvals;
+    try {
+        approvals = approvalsHook.load();
+    } catch (error) {
+        return refuseApproval(clientId, `the approval module failed to load (${error.message})`) || null;
+    }
+    if (!approvals) return mcpOAuth.SCOPES.filter((scope) => !mcpOAuth.OPT_IN_SCOPES.includes(scope));
+    if (typeof approvals.approvedScopes !== 'function') return refuseApproval(clientId, 'the approval module has no approvedScopes') || null;
+    try {
+        const ceiling = await approvals.approvedScopes(companyId, clientId);
+        return Array.isArray(ceiling) ? ceiling : null;
+    } catch (error) {
+        return refuseApproval(clientId, `approvedScopes failed (${error.message})`) || null;
+    }
+};
+
+/* What approving a proposal asks of the grant that filed it: everything a call under that grant would need
+ * now. Answers the scopes it still holds in the workspace, or null when it could no longer make a call at all. */
+const standingOfGrant = async ({ companyId, grantId, clientId, userId, now = new Date() }) => {
+    if (!mcpOAuth.isOn()) return null;
+    const grant = await store.grants.find(String(grantId || ''));
+    if (!grant || grant.revokedAt || new Date(grant.expiresAt).getTime() <= now.getTime()) return null;
+    const sameFiler = String(grant.companyId) === String(companyId) && String(grant.clientId) === String(clientId) && String(grant.userId) === String(userId);
+    if (!sameFiler || grant.resource !== mcpOAuth.resource()) return null;
+    if (!(await clientStanding(grant.clientId)).ok) return null;
+    if (!(await clientApprovedInWorkspace(grant.companyId, grant.clientId))) return null;
+    const ceiling = await approvalCeiling(grant.companyId, grant.clientId);
+    if (!ceiling) return null;
+    if (!(await verifyCompanyMembership(String(grant.userId), String(grant.companyId)))) return null;
+    return mcpOAuth.SCOPES.filter((scope) => (grant.scopes || []).includes(scope) && ceiling.includes(scope));
+};
+
+const taintOf = (clientId, at = new Date()) => ({ tainted: true, taintSources: [{ kind: taint.KINDS.CLIENT, ref: String(clientId).slice(0, 200), at }] });
+
+/* The audience must be exactly this server's canonical /mcp resource (MCP 2025-11-25 "Token Audience
+ * Binding and Validation"): no normalising, so a trailing slash or other case is another resource. */
+const authenticate = async (req, raw, { namedCompanies = [], now = new Date() } = {}) => {
+    const token = await grants.introspect(raw, now);
+    if (!token.active || token.aud !== mcpOAuth.resource()) return null;
+    const client = await clientStanding(token.clientId);
+    if (!client.ok) return null;
+    if (!(await clientApprovedInWorkspace(token.companyId, token.clientId))) return null;
+    const ceiling = await approvalCeiling(token.companyId, token.clientId);
+    if (!ceiling) return null;
+
+    if (namedCompanies.some((asked) => asked !== String(token.companyId))) return { wrongWorkspace: true };
+    const userId = String(token.userId || '');
+    if (!(await verifyCompanyMembership(userId, String(token.companyId)))) return { forbidden: true };
+
+    const scopes = mcpOAuth.SCOPES.filter((scope) => (token.scopes || []).includes(scope) && ceiling.includes(scope));
+    if (!scopes.length) return null;
+    req.uid = userId;
+    req.mcp = true;
+    return {
+        companyId: String(token.companyId),
+        userId,
+        actor: await externalClientActor({ userId, clientId: token.clientId, clientName: appLabel(await nameInWorkspace(String(token.companyId), token.clientId, client.name), client.host), grantId: token.grantId }),
+        token: { oauth: true, scopes },
+        oauth: { clientId: token.clientId, grantId: token.grantId, scopes },
+        canWrite: scopes.some((scope) => mcpOAuth.WRITE_SCOPES.includes(scope)),
+        projectIds: [],
+        allowedActions: undefined,
+        taint: taintOf(token.clientId, now),
+    };
+};
+
+module.exports = { isAccessToken, looksLikeOAuthSecret, authenticate, clientStanding, nameInWorkspace, clientApprovedInWorkspace, standingOfGrant };

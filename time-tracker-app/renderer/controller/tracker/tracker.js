@@ -2,6 +2,7 @@ import { apiRequest } from '../../utils/services';
 import store from '../../store/store';
 import { DateTime } from 'luxon';
 import { removeExtraClicks } from '../../store/timelog';
+import captureRefusal from '../../utils/captureRefusal';
 
 export const TrackerController = {
   ScreenShotCapture: async (image, previousTime, strokesData = []) => {
@@ -54,8 +55,14 @@ export const TrackerController = {
         }
       }
     } catch (e) {
-      return { status: false, message: e.message };
+      return { status: false, message: e.message, timerStoppedElsewhere: captureRefusal.timerStoppedElsewhere(e) };
     }
+  },
+
+  // The server already closed this timer, so nothing is sent: asking it to end the timer again would move its end time.
+  StopLocally: () => {
+    window.ipc.send("trackerStop");
+    window.ipc.send("stop-listen-event");
   },
 
   manageStrokesData: () => {

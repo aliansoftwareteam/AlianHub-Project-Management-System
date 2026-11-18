@@ -48,20 +48,22 @@ tests
 *.log
 logs
 
-# Local storage (mounted as a volume at runtime)
+# Local storage, logs and backups (mounted as volumes at runtime)
 /storage
-/common-storage/uploads
+/log
+/backups
 
-# Installation artifacts (one-time setup, not needed in image)
-/installation
-/installation-single
-/installation-saas
-
-# Documentation / metadata (not used at runtime)
+# Documentation is not shipped, except the changelog the Instance console reads.
 *.md
-!brandSettings.json
+!CHANGELOG.md
+docs
 .claude
-CHANGELOG.md
+Tasks
+
+# Not part of the server image
+deploy
+e2e
+time-tracker-app
 
 # Docker files themselves (the Dockerfile is already loaded by Docker)
 Dockerfile

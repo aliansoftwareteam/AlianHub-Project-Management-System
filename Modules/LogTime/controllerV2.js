@@ -9,4 +9,5 @@ module.exports = {
     ...require('./controllerV2/tracker'),
     ...require('./controllerV2/capture'),
     ...require('./controllerV2/timelog'),
+    ...require('./controllerV2/webTimer'),
 };

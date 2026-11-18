@@ -49,6 +49,7 @@ import { useI18n } from 'vue-i18n';
 import { apiRequest } from '@/services';
 import * as env from '@/config/env';
 import ProjectListModal from '@/components/molecules/ProjectListModal/ProjectListModal.vue';
+import { ROLE_GUEST } from "@/utils/roles";
 
 // AHE-3789 — company-wide project-progress cards. Both fetch a server-side,
 // companyId-scoped count from POST /dashboard/project-metrics, so the totals
@@ -100,7 +101,7 @@ const userIdRef = inject('$userId', ref(''));
 const basePayload = () => ({
     metric: cfg.value.metric,
     callerUserId: (userIdRef && userIdRef.value) || '',
-    callerRoleType: Number(props.companyUserDetail && props.companyUserDetail.roleType) || 3,
+    callerRoleType: Number(props.companyUserDetail?.roleType ?? ROLE_GUEST),
 });
 const load = async () => {
     loading.value = true;
@@ -147,19 +148,19 @@ onMounted(load);
 
 <style scoped>
 .ppm { height: 100%; width: 100%; padding: 6px 8px; overflow: auto; display: flex; flex-direction: column; }
-.ppm-msg { color: #9aa0b4; font-size: 12px; padding: 10px; }
+.ppm-msg { color: var(--ink-2); font-size: 12px; padding: 10px; }
 .ppm-clickzone { display: flex; flex-direction: column; flex: 1; cursor: pointer; border-radius: 8px; transition: background-color 0.15s ease; }
-.ppm-clickzone:hover { background: #f5f7fb; }
+.ppm-clickzone:hover { background: var(--surface-hover); }
 .ppm-clickable { cursor: pointer; border-radius: 4px; }
-.ppm-clickable:hover { background: #f5f7fb; }
+.ppm-clickable:hover { background: var(--surface-hover); }
 .ppm-number { font-size: 40px; font-weight: 700; color: #0e7490; text-align: center; margin-top: auto; }
-.ppm-number-label { font-size: 12px; color: #6b7280; text-align: center; margin-bottom: auto; }
+.ppm-number-label { font-size: 12px; color: var(--ink-2); text-align: center; margin-bottom: auto; }
 .ppm-bars { display: flex; flex-direction: column; gap: 7px; }
 .ppm-bar-row { display: flex; align-items: center; gap: 8px; }
-.ppm-label { width: 40%; font-size: 12px; color: #3a3f52; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.ppm-track { flex: 1; height: 14px; background: #eef0f6; border-radius: 4px; overflow: hidden; }
+.ppm-label { width: 40%; font-size: 12px; color: var(--ink); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ppm-track { flex: 1; height: 14px; background: var(--fill); border-radius: 4px; overflow: hidden; }
 .ppm-fill { height: 100%; background: #0e7490; }
-.ppm-val { width: 44px; text-align: right; font-size: 12px; color: #3a3f52; }
+.ppm-val { width: 44px; text-align: right; font-size: 12px; color: var(--ink); }
 .ppm-skel { background: linear-gradient(90deg, #eef0f6 25%, #e3e7f1 37%, #eef0f6 63%); background-size: 400% 100%; animation: ppm-shimmer 1.4s ease infinite; border-radius: 4px; }
 @keyframes ppm-shimmer { 0% { background-position: 100% 0; } 100% { background-position: 0 0; } }
 .ppm-skel-num { width: 90px; height: 40px; margin: auto auto 8px auto; }

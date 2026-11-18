@@ -8,8 +8,21 @@ const { addSprintFun } = require("../Sprints/controller")
 const config = require("../../Config/config");
 const { getCachedGlobalTemplateData } = require("../../utils/enterpriseHelper");
 const { removeCache } = require('../../utils/commonFunctions');
+const { announceProject } = require('../Project/helpers/projectEvents');
+const { tenantOf } = require("../../Config/tenant");
+const { fieldKeptFromNewProject, withoutStartingFields } = require("../../Config/projectAccess");
 const { updateCompanyFun } = require("../Company/controller/updateCompany");
 const projectTemplate = require("../../utils/projectTemplates.json");
+const { pickKnownApps } = require("./apps");
+const { withViewIds } = require("./viewEntries");
+const blankTemplate = require("./blankTemplate");
+const { focusForTemplate, normaliseFocus, sampleTaskNamesFor, SAMPLE_TASK_COUNT } = require("./sampleTasks");
+
+const pickGlobalTemplate = (templateId) => {
+    if (String(templateId) === blankTemplate._id) return blankTemplate;
+    return projectTemplate.find((tpl) => String(tpl._id) === String(templateId)) || projectTemplate[0];
+};
+
 const { seedSampleTasks, sampleTasksForTemplate } = require("../../utils/sampleTasks");
 
 // A project created from a template arrives with columns but nothing in them, which teaches a
@@ -19,6 +32,10 @@ function seedTemplateSamples (project, createObject, sprintRes) {
     try {
         // The demo project composes its own list from the team's answer during setup, so it hands
         // the rows over directly rather than being looked up by template name.
+        // "Include the sample tasks" is a real choice: an explicit false means none, even
+        // for a built-in template. Only an absent flag falls back to the template's own set.
+        if (createObject && createObject.includeSampleTasks === false) return;
+
         let rows = (createObject && Array.isArray(createObject.sampleTaskRows) && createObject.sampleTaskRows.length)
             ? createObject.sampleTaskRows
             : null;
@@ -43,14 +60,19 @@ function seedTemplateSamples (project, createObject, sprintRes) {
 }
 const { resolveProjectSkills } = require("../settings/ProjectSkills/helper");
 const { normaliseSource, cleanProposalId, numericProposalId, validateProposalId } = require("../Project/helpers/projectSourceRules");
+const { stepProjectCount } = require("../Project/helpers/projectQuota");
+const { recordProjectCreated } = require("../Project/helpers/projectHistory");
+const { announceFields } = require("../CustomField/helpers/fieldProjects");
+const { defaultCurrencyOf, hasCurrency } = require("../Company/helpers/companyCurrency");
 
 exports.checkProjectPlan = (req) => {
     return new Promise(async(resolve,reject) => {
         try {
+            const companyId = req.body.CompanyId; // tenant-scoping: internal payload; createProjectFun and the AI project generator pass the verified session tenant
             let projectIncObj = {
                 type: SCHEMA_TYPE.COMPANIES,
                 data: [
-                    { _id : new mongoose.Types.ObjectId(req.body.CompanyId)},
+                    { _id : new mongoose.Types.ObjectId(companyId)},
                     { $inc: {'projectCount.projectCount': 1} },
                     {
                         returnDocument : 'after'
@@ -63,7 +85,7 @@ exports.checkProjectPlan = (req) => {
                 projectIncObj.data[1].$inc = {...projectIncObj.data[1].$inc,'projectCount.publicCount': 1 }
             }
 
-            const companyData = await updateCompanyFun(SCHEMA_TYPE.GOLBAL,projectIncObj,"findOneAndUpdate",req.body.CompanyId,true)
+            const companyData = await updateCompanyFun(SCHEMA_TYPE.GOLBAL,projectIncObj,"findOneAndUpdate",companyId,true)
             .then((respone) => respone)
             .catch((error) => {
                 reject({status : false,error:error,countRollBack:false});
@@ -82,27 +104,64 @@ exports.checkProjectPlan = (req) => {
     })
 }
 
+const refusedFields = (reason) => (reason && reason.name === 'ValidationError' && reason.errors ? Object.keys(reason.errors) : []);
+
+const failureReason = (outcome) => {
+    const reason = outcome && outcome.statusText !== undefined ? outcome.statusText : outcome;
+    const missing = refusedFields(reason);
+    if (missing.length) return `The project was not created: ${missing.join(', ')} ${missing.length === 1 ? 'is' : 'are'} missing.`;
+    if (reason && reason.message) return reason.message;
+    return typeof reason === 'string' ? reason : JSON.stringify(reason);
+};
+
+const namesOtherCompany = (body, companyId) => [body.CompanyId, body.companyId]
+    .some((value) => value !== undefined && value !== null && value !== '' && String(value) !== companyId);
+
+const OBJECT_ID = /^[0-9a-fA-F]{24}$/;
+
+// The HTTP entry pins the tenant and the creator here, not inside createProject: PersonalList, the
+// setup demo project and the demo seeder call createProject in-process with a body they built themselves.
 exports.createProjectFun = async(req, res) => {
+    let companyId;
+    try {
+        companyId = tenantOf(req);
+    } catch (error) {
+        return res.status(error.statusCode || 403).send({ status: false, statusText: error.message, message: error.message });
+    }
+    const body = req.body || {};
+    if (namesOtherCompany(body, companyId)) {
+        return res.status(403).send({ status: false, statusText: 'You do not have access to this company', message: 'Forbidden' });
+    }
+    const creator = String(req.uid || '');
+    if (!OBJECT_ID.test(creator)) {
+        return res.status(401).send({ status: false, statusText: 'A signed-in user is required.', message: 'A signed-in user is required.' });
+    }
+    const keptField = fieldKeptFromNewProject(body);
+    if (keptField) {
+        const refusal = `${keptField} cannot be set here.`;
+        return res.status(400).send({ status: false, statusText: refusal, message: refusal });
+    }
+    req.body = { ...withoutStartingFields(body), CompanyId: companyId, projectCreatedBy: creator };
+    const { isPrivateSpace } = req.body;
     try {
         exports.checkProjectPlan(req).then((data) => {
             if(data.status) {
                 exports.createProject(req).then((cData) => {
                     removeCache("UserProjectData:", true);
                     res.send(cData);
+                    if (cData && cData.status === true && cData.data) {
+                        announceProject(companyId, 'insert', cData.data);
+                        recordProjectCreated({ companyId, project: cData.data, actorId: creator })
+                            .catch((error) => logger.error(`project created history failed: ${(error && error.message) || error}`));
+                    }
                 })
                 .catch((error) => {
-                    exports.removeProjectCount(req.body.CompanyId,req.body.isPrivateSpace);
-                    res.send({status:false, statusText: error});
+                    exports.removeProjectCount(companyId, isPrivateSpace);
+                    res.send({status:false, statusText: failureReason(error)});
                 });
             } else {
-                // BUG-010 / #64 fix: previously this branch was missing, so
-                // when `checkProjectPlan` resolved with `{status: false}`
-                // (e.g. a future refactor moves a failure path from `reject`
-                // to `resolve`) the request would hang until the proxy timed
-                // out. `checkProjectPlan` increments the project count
-                // before validating limits, so we must also roll the count
-                // back here to mirror the .catch branch below.
-                exports.removeProjectCount(req.body.CompanyId, req.body.isPrivateSpace);
+                // checkProjectPlan has already incremented the count, so a failed check rolls it back too.
+                exports.removeProjectCount(companyId, isPrivateSpace);
                 res.status(400).send({
                     status: false,
                     statusText: (data && data.statusText) || 'Project plan check did not pass.',
@@ -113,16 +172,11 @@ exports.createProjectFun = async(req, res) => {
                 res.send({status:false, statusText: error});
             }
             else{
-                exports.removeProjectCount(req.body.CompanyId,req.body.isPrivateSpace);
+                exports.removeProjectCount(companyId, isPrivateSpace);
                 res.send({status:false, statusText: error});
             }
         })
     } catch (error) {
-        // BUG-009 / #63 fix: `createProjectFun` is `async (req, res)`, not a
-        // `new Promise` constructor body — `reject` is not defined in this
-        // scope. Reaching this branch previously threw a ReferenceError that
-        // masked the real error and left the request hanging until the
-        // client / proxy timed out. Respond with the actual error instead.
         logger.error(`createProjectFun error: ${error && error.message ? error.message : error}`);
         res.status(400).send({
             status: false,
@@ -138,7 +192,8 @@ exports.createProject = async (req) => {
                 reject({status: false, statusText: 'req body is requried'});
                 return;
             }
-            if(!req.body.CompanyId){
+            const companyId = req.body.CompanyId; // tenant-scoping: internal payload; createProjectFun pins CompanyId to the session tenant and other callers build it from trusted data
+            if(!companyId){
                 reject({status: false, statusText: 'company Id is requried'});    
                 return;
             }
@@ -168,17 +223,19 @@ exports.createProject = async (req) => {
                 return;
             }
             const collectionPromises = [
-                MongoDbCrudOpration(req.body.CompanyId, {type: dbCollections.SETTINGS,data: [{name : settingsCollectionDocs.PROJECT_STATUS}]}, "find"),
-                MongoDbCrudOpration(req.body.CompanyId, {type: dbCollections.SETTINGS,data: [{name : settingsCollectionDocs.TASK_STATUS}]}, "find"),
-                MongoDbCrudOpration(req.body.CompanyId, {type: dbCollections.SETTINGS,data: [{name : settingsCollectionDocs.TASK_TYPE}]}, "find"),
-                MongoDbCrudOpration(req.body.CompanyId, {type: dbCollections.APPS,data: [{}]}, "find"),
-                MongoDbCrudOpration(req.body.CompanyId, {type: dbCollections.PROJECT_TAB_COMPONENTS,data: [{}]}, "find")
+                MongoDbCrudOpration(companyId, {type: dbCollections.SETTINGS,data: [{name : settingsCollectionDocs.PROJECT_STATUS}]}, "find"),
+                MongoDbCrudOpration(companyId, {type: dbCollections.SETTINGS,data: [{name : settingsCollectionDocs.TASK_STATUS}]}, "find"),
+                MongoDbCrudOpration(companyId, {type: dbCollections.SETTINGS,data: [{name : settingsCollectionDocs.TASK_TYPE}]}, "find"),
+                MongoDbCrudOpration(companyId, {type: dbCollections.APPS,data: [{}]}, "find"),
+                MongoDbCrudOpration(companyId, {type: dbCollections.PROJECT_TAB_COMPONENTS,data: [{}]}, "find")
             ]
             Promise.allSettled(collectionPromises).then(async(results) => {
                 let rejected = results.filter((x) => x.status === 'rejected');
                 if (rejected.length === 0) {
                     let resultsValue = results.map((x) => x.value);
                     let createProjectObject = req.body;
+                    // Same object as req.body, so the template merges below overwrite `apps`; keep the client's pick first.
+                    const clientApps = Array.isArray(req.body.apps) ? [...req.body.apps] : null;
                     let appArray = [];
                     let tabComponentsArray = [];
                     //template
@@ -189,6 +246,20 @@ exports.createProject = async (req) => {
                     let updateTaskTypeStatus = {};
                     let TaskTypeStatusArrayCheck = [];
                     const [projectStatusData, taskStatusData, taskTypeData, appsData, projectTabComponentsData] = resultsValue;
+                    // A workspace can be missing one of these settings documents entirely
+                    // (task_type is absent on workspaces created before it was seeded), and a
+                    // template merge would then throw "cannot read properties of undefined".
+                    // Reading through these keeps the merge a no-op instead of failing the
+                    // whole project creation.
+                    const settingsOf = (rows) => (Array.isArray(rows) && rows[0] && Array.isArray(rows[0].settings)) ? rows[0].settings : [];
+                    // These seed the key counter for entries the template introduces. Left
+                    // undefined (no settings document) every `+= 1` produced NaN, which stored
+                    // as a null key — the project created, but nothing could be added to it
+                    // because the schema needs a Number.
+                    const totalOf = (rows) => (Array.isArray(rows) && rows[0] && Number.isFinite(Number(rows[0].totalStatus))) ? Number(rows[0].totalStatus) : 0;
+                    const projectStatusSettings = settingsOf(projectStatusData);
+                    const taskStatusSettings = settingsOf(taskStatusData);
+                    const taskTypeSettings = settingsOf(taskTypeData);
                     appsData.forEach(element => {
                         appArray.push(element);
                     });
@@ -198,7 +269,7 @@ exports.createProject = async (req) => {
                     if(req.body.isTemplate === true){
                         try {
                             const projectStatusMergedArray = createProjectObject.projectStatusData.map(item => {
-                                const valueItem = projectStatusData[0].settings.find(value => value.key === item.key);
+                                const valueItem = projectStatusSettings.find(value => value.key === item.key);
                                 if (valueItem) {
                                     return Object.assign(
                                         {},
@@ -214,7 +285,7 @@ exports.createProject = async (req) => {
                                 return item;
                             });
                             const taskStatusMergedArray = createProjectObject.taskStatusData.map(item => {
-                                const valueItem = taskStatusData[0].settings.find(value => value.key === item.key);
+                                const valueItem = taskStatusSettings.find(value => value.key === item.key);
                                 if (valueItem) {
                                     return Object.assign(
                                         {},
@@ -229,7 +300,7 @@ exports.createProject = async (req) => {
                                 return item;
                             });
                             const taskTypeMergedArray = createProjectObject.taskTypeCounts.map(item => {
-                                const valueItem = taskTypeData[0].settings.find(value => value.key === item.key);
+                                const valueItem = taskTypeSettings.find(value => value.key === item.key);
                                 if (valueItem) {
                                     return Object.assign(
                                         {},
@@ -284,12 +355,12 @@ exports.createProject = async (req) => {
                                         reject({status: false, statusText: 'error in getting template with category'});
                                         return;
                                     }
-                                    let projectTemplateData = projectTemplate[0];
-                                    let incrementProjectStatus = projectStatusData[0].totalStatus;
-                                    let incrementTask = taskStatusData[0]?.totalStatus;
-                                    let incrementTaskType = taskTypeData[0]?.totalStatus;
+                                    let projectTemplateData = pickGlobalTemplate(createProjectObject.TemplateId);
+                                    let incrementProjectStatus = totalOf(projectStatusData);
+                                    let incrementTask = totalOf(taskStatusData);
+                                    let incrementTaskType = totalOf(taskTypeData);
                                     const projectStatusMergedTempArray = projectTemplateData.projectStatusData.map(item => {
-                                    const valueItem = projectStatusData[0].settings.find(value => value.name.toLowerCase() === item.name.toLowerCase());
+                                    const valueItem = projectStatusSettings.find(value => value.name.toLowerCase() === item.name.toLowerCase());
                                         if (valueItem) {
                                             return Object.assign(
                                                 {},
@@ -325,7 +396,7 @@ exports.createProject = async (req) => {
                                     });
                                     
                                     const taskStatusMergedTempArray = projectTemplateData.taskStatusData.map(item => {
-                                        const valueItem = taskStatusData[0].settings.find(value => value.name.toLowerCase() === item.name.toLowerCase());
+                                        const valueItem = taskStatusSettings.find(value => value.name.toLowerCase() === item.name.toLowerCase());
                                         if (valueItem) {
                                             return Object.assign(
                                                 {},
@@ -358,7 +429,7 @@ exports.createProject = async (req) => {
                                         return item;
                                     });
                                     const taskTypeMergedTempArray = projectTemplateData.TemplateTaskType.map(item => {
-                                        const valueItem = taskTypeData[0].settings.find(value => value.name.toLowerCase() === item.name.toLowerCase());
+                                        const valueItem = taskTypeSettings.find(value => value.name.toLowerCase() === item.name.toLowerCase());
                                         if (valueItem) {
                                             return Object.assign(
                                                 {},
@@ -429,12 +500,15 @@ exports.createProject = async (req) => {
                                     createProjectObject.ProjectRequiredComponent = projectRequiredTempComponent;
                                     createProjectObject.status = createProjectObject.projectStatusData.filter((x) => x.type === 'default_active')[0].value;
                             } catch(err){
-                                reject({status: false, statusText: 'error in getting template with category'});
-                                logger.error(`status update error: ${err}`);
+                                // Say what actually broke: this catch used to report a template
+                                // problem for any failure in the merge, including a missing
+                                // settings document, which sent debugging the wrong way.
+                                reject({status: false, statusText: `error applying the category template: ${err && err.message ? err.message : err}`});
+                                logger.error(`create project (category template): ${err && err.stack ? err.stack : err}`);
                             }
                         }else{
                             try{
-                                await MongoDbCrudOpration(req.body.CompanyId, {type: dbCollections.PROJECT_TEMPLATES,data: [{_id: new mongoose.Types.ObjectId(createProjectObject.TemplateId)}]}, "findOne").then((res)=> {
+                                await MongoDbCrudOpration(companyId, {type: dbCollections.PROJECT_TEMPLATES,data: [{_id: new mongoose.Types.ObjectId(createProjectObject.TemplateId)}]}, "findOne").then((res)=> {
                                     if(Object.keys(res).length <= 0){
                                         reject({status: false, statusText: 'error in getting template without category'})
                                         return;
@@ -459,7 +533,13 @@ exports.createProject = async (req) => {
                             }
                         }
                     }
-                    createProjectObject.skills = await resolveProjectSkills(req.body.CompanyId, createProjectObject.skills);
+                    if (clientApps) {
+                        createProjectObject.apps = pickKnownApps(clientApps, appArray);
+                    }
+                    // Every branch above can leave an entry whose view the company's catalogue does
+                    // not carry, and the project view bar cannot render an entry with no id.
+                    createProjectObject.ProjectRequiredComponent = withViewIds(createProjectObject.ProjectRequiredComponent, tabComponentsArray);
+                    createProjectObject.skills = await resolveProjectSkills(companyId, createProjectObject.skills);
                     createProjectObject.DueDate = createProjectObject.DueDate ? new Date(createProjectObject.DueDate) : '';
                     createProjectObject.viewColumn = [
                         {
@@ -509,131 +589,91 @@ exports.createProject = async (req) => {
                             show:true
                         }
                     ] 
-                    let customFieldVal = JSON.parse(JSON.stringify(createProjectObject.customFiedlsValue)) || [];
+                    if (!hasCurrency(createProjectObject.ProjectCurrency)) {
+                        createProjectObject.ProjectCurrency = await defaultCurrencyOf(companyId);
+                    }
+                    let customFieldVal = JSON.parse(JSON.stringify(createProjectObject.customFiedlsValue || []));
                     createProjectObject._id = new mongoose.Types.ObjectId(createProjectObject?._id);
+                    // "Include the sample tasks" plus the team's setup answer become rows for
+                    // seedTemplateSamples, which is the single seeding path.
+                    if (createProjectObject.includeSampleTasks === true && !createProjectObject.sampleTaskRows) {
+                        const focus = normaliseFocus(createProjectObject.sampleFocus || focusForTemplate(pickGlobalTemplate(createProjectObject.TemplateId)));
+                        createProjectObject.sampleTaskRows = sampleTaskNamesFor(focus)
+                            .map((name) => [name, 'An example task. Open it, try the controls, then delete it.']);
+                    }
                     delete createProjectObject?.isTemplate;
                     delete createProjectObject?.useTemplateProj;
                     delete createProjectObject?.customFiedlsValue;
+                    // Kept for seedTemplateSamples, which runs after the project is saved.
+                    const includeSampleTasks = createProjectObject.includeSampleTasks;
+                    delete createProjectObject?.includeSampleTasks;
+                    delete createProjectObject?.sampleFocus;
                     let finalObj = {
                         type: dbCollections.PROJECTS,
                         data: createProjectObject
                     }
-                    MongoDbCrudOpration(req.body.CompanyId, finalObj, "save").then((respone) => {
-                        if(projectStatusArrayCheck && projectStatusArrayCheck.length > 0){
-                            let projectStatusObj = {
+                    MongoDbCrudOpration(companyId, finalObj, "save").then(async (respone) => {
+                        const newSettingsRows = [
+                            [settingsCollectionDocs.PROJECT_STATUS, projectStatusArrayCheck],
+                            [settingsCollectionDocs.TASK_STATUS, TaskStatusArrayCheck],
+                            [settingsCollectionDocs.TASK_TYPE, TaskTypeStatusArrayCheck],
+                        ].filter(([, rows]) => rows && rows.length > 0);
+                        try {
+                            await Promise.all(newSettingsRows.map(([name, rows]) => MongoDbCrudOpration(companyId, {
                                 type: dbCollections.SETTINGS,
                                 data: [
+                                    { name },
                                     {
-                                        name: settingsCollectionDocs.PROJECT_STATUS
-                                    },
-                                    {
-                                        $push: {
-                                            settings: { $each: projectStatusArrayCheck.map(setting => ({ ...setting })) }
-                                        },
-                                        $inc: {
-                                            totalStatus:projectStatusArrayCheck.length
-                                        }
+                                        $push: { settings: { $each: rows.map((setting) => ({ ...setting })) } },
+                                        $inc: { totalStatus: rows.length }
                                     }
                                 ]
-                            }
-                            MongoDbCrudOpration(req.body.CompanyId, projectStatusObj, "updateOne").catch((err)=>{
-                                logger.error(`add project status: ${err}`);
-                                reject({status: false, statusText: 'error in creating project'});
-                                exports.deleteProject(respone,req.body.CompanyId);
-                            });
+                            }, "updateOne")));
+                        } catch (err) {
+                            logger.error(`add template settings: ${err}`);
+                            exports.deleteProject(respone, companyId);
+                            reject({status: false, statusText: 'error in creating project'});
+                            return;
                         }
-                        if(TaskStatusArrayCheck && TaskStatusArrayCheck.length > 0){
-                            let taskStatusObj = {
-                                type: dbCollections.SETTINGS,
-                                data: [
-                                    {
-                                        name: settingsCollectionDocs.TASK_STATUS
-                                    },
-                                    {
-                                        $push: {
-                                            settings: { $each: TaskStatusArrayCheck.map(setting => ({ ...setting })) }
-                                        },
-                                        $inc: {
-                                            totalStatus:TaskStatusArrayCheck.length
-                                        }
-                                    }
-                                ]
-                            }
-                            MongoDbCrudOpration(req.body.CompanyId, taskStatusObj, "updateOne").catch((err)=>{
-                                logger.error(`add task status: ${err}`);
-                                exports.deleteProject(respone,req.body.CompanyId);
-                                reject({status: false, statusText: 'error in creating project'});
-                            });
-                        }
-                        if(TaskTypeStatusArrayCheck && TaskTypeStatusArrayCheck.length > 0){
-                            let taskTypeObj = {
-                                type: dbCollections.SETTINGS,
-                                data: [
-                                    {
-                                        name: settingsCollectionDocs.TASK_TYPE
-                                    },
-                                    {
-                                        $push: {
-                                            settings: { $each: TaskTypeStatusArrayCheck.map(setting => ({ ...setting })) }
-                                        },
-                                        $inc: {
-                                            totalStatus:TaskTypeStatusArrayCheck.length
-                                        }
-                                    },
-                                    
-                                ]
-                            }
-                            MongoDbCrudOpration(req.body.CompanyId, taskTypeObj, "updateOne").catch((err)=>{
-                                logger.error(`add task type: ${err}`);
-                                exports.deleteProject(respone,req.body.CompanyId);
-                                reject({status: false, statusText: 'error in creating project'});
-                            });
-                        }
+
+                        let customResponce;
                         if(customFieldVal.length > 0) {
-                            let finalCustonArray = customFieldVal.map((ele)=>{return {...ele,userId:createProjectObject?.projectCreatedBy || '',type:'task',global:false,projectId:[respone?._id?.toString()]}})
-                            let finalObjCostom = {
-                                type: dbCollections.CUSTOM_FIELDS,
-                                data: [finalCustonArray]
-                            }
-                            MongoDbCrudOpration(req.body.CompanyId,finalObjCostom,"insertMany").then((customResponce)=>{   
-                                removeCache(`customField:${req.body.CompanyId}`);
-                                resolve({status: true, statusText: 'createProject added successfully', data: respone,customFieldVal: customResponce})
-                                const addObj = {
-                                    body: {
-                                        companyId: req.body.CompanyId,
-                                        projectId: respone._id,
-                                        sprintName: 'List',
-                                        userData:{},
-                                        projectName: createProjectObject.ProjectName
-                                    }
-                                }
-                                addSprintFun(addObj)
-                                .then((sprintRes) => seedTemplateSamples(respone, createProjectObject, sprintRes))
-                                .catch((err)=>{
-                                    logger.error('Create Sprint Error',err)
-                                });
-                            }).catch((e)=>{
+                            const finalCustonArray = customFieldVal.map((ele)=>{return {...ele,userId:createProjectObject?.projectCreatedBy || '',type:'task',global:false,projectId:[respone?._id?.toString()]}});
+                            try {
+                                customResponce = await MongoDbCrudOpration(companyId, { type: dbCollections.CUSTOM_FIELDS, data: [finalCustonArray] }, "insertMany");
+                            } catch (e) {
                                 logger.error(`error in add create project: ${e}`);
-                                exports.deleteProject(respone,req.body.CompanyId);
+                                exports.deleteProject(respone, companyId);
                                 reject({status: false, statusText: 'error in creating project'});
-                            })
-                        } else {
-                            resolve({status: true, statusText: 'createProject added successfully', data: respone});
-                            const addObj = {
-                                body: {
-                                    companyId: req.body.CompanyId,
-                                    projectId: respone._id,
-                                    sprintName: 'List',
-                                    userData:{},
-                                    projectName: createProjectObject.ProjectName
-                                }
+                                return;
                             }
-                            addSprintFun(addObj)
-                            .then((sprintRes) => seedTemplateSamples(respone, createProjectObject, sprintRes))
-                            .catch((err)=>{
-                                logger.error('Create Sprint Error',err)
-                            });
+                            announceFields(companyId, 'insert');
                         }
+
+                        // Awaited because clients create their first task straight from this response and a task needs a sprint.
+                        const sprintRes = await addSprintFun({
+                            body: {
+                                companyId,
+                                projectId: respone._id,
+                                sprintName: 'List',
+                                userData:{},
+                                projectName: createProjectObject.ProjectName
+                            }
+                        }).catch((err) => err || { status: false });
+                        if (!(sprintRes && sprintRes.status === true && sprintRes.data && sprintRes.data._id)) {
+                            logger.error(`Create Sprint Error: ${failureReason(sprintRes)}`);
+                            exports.deleteProject(respone, companyId);
+                            reject({status: false, statusText: 'error in creating project'});
+                            return;
+                        }
+
+                        const result = {status: true, statusText: 'createProject added successfully', data: respone};
+                        if(customFieldVal.length > 0) result.customFieldVal = customResponce;
+                        resolve(result);
+
+                        Promise.resolve(seedTemplateSamples(respone, { ...createProjectObject, includeSampleTasks }, sprintRes)).catch((err) => {
+                            logger.error(`seedTemplateSamples: ${err && err.message ? err.message : err}`);
+                        });
                     }).catch((err)=>{
                         reject({status: false, statusText: err});
                         logger.error(`add create project: ${err}`);
@@ -754,31 +794,39 @@ exports.deleteProject = (data,companyId) => {
     }
 }
 
+// Rolls back the increment `checkProjectPlan` already applied, for a creation that
+// never produced a project. The delete path decrements on its own transition, so the
+// two can never both fire for the same project.
 exports.removeProjectCount = (companyId,isPrivateSpace) => {
     try {
-        let decObj = {
-            type: SCHEMA_TYPE.COMPANIES,
-            data: [
-                { _id : new mongoose.Types.ObjectId(companyId)},
-                { $inc: {'projectCount.projectCount': -1} },
-                { new: true }
-            ]
-        }
-        if(isPrivateSpace === true){
-            decObj.data[1].$inc = {...decObj.data[1].$inc,'projectCount.privateCount': -1 }
-        }else{
-            decObj.data[1].$inc = {...decObj.data[1].$inc,'projectCount.publicCount': -1 }
-        }
-        updateCompanyFun(SCHEMA_TYPE.GOLBAL,decObj,"findOneAndUpdate",companyId,true);
+        stepProjectCount(companyId, isPrivateSpace, -1).catch((error) => {
+            logger.error(`removeProjectCount ${companyId}: ${error && error.message ? error.message : error}`);
+        });
     } catch (error) {
         logger.error(`ERROR: ${error}`);
     }
 }
 
+exports.decorateGlobalTemplates = (templates, teamFocus) => {
+    const focus = teamFocus ? normaliseFocus(teamFocus) : '';
+    const list = (Array.isArray(templates) ? templates : []).map((tpl) => {
+        const plain = JSON.parse(JSON.stringify(tpl));
+        plain.focus = focusForTemplate(plain);
+        plain.sampleTaskCount = SAMPLE_TASK_COUNT;
+        plain.sampleTaskNames = sampleTaskNamesFor(plain.focus);
+        return plain;
+    });
+    if(!focus) return list;
+    return list
+        .map((tpl, index) => ({ tpl, index }))
+        .sort((a, b) => (a.tpl.focus === focus ? 0 : 1) - (b.tpl.focus === focus ? 0 : 1) || a.index - b.index)
+        .map((x) => x.tpl);
+};
+
 exports.getGlobalTemplate = (req,res) => {
     try {
         getCachedGlobalTemplateData().then((resp) => {
-            res.send(resp);
+            res.send({ status: true, statusText: exports.decorateGlobalTemplates(resp.statusText, req.body?.teamFocus) });
         }).catch((error) => {
             res.send({status: false,statusText: error});
         })

@@ -154,7 +154,7 @@ exports.findAndUpdateProjectOrTaskStartDate = async ({
             }
             MongoDbCrudOpration(companyId,object, "findOneAndUpdate")
             .then((result) => {
-                socketEmitter.emit('update', { type: "update", data: result , updatedFields: firebaseObject, module: 'task' });
+                socketEmitter.emit('update', { type: "update", data: result , updatedFields: firebaseObject, module: 'task', companyId });
             });
 
             const historyObj = {
@@ -223,7 +223,7 @@ try {
            {returnDocment: "after"}
         ]
     }, 'findOneAndUpdate');
-    socketEmitter.emit('update', { type: "update", data: result , updatedFields: {remainingHours:remainingLogtime > 0 ? remainingLogtime : 0}, module: 'task' });
+    socketEmitter.emit('update', { type: "update", data: result , updatedFields: {remainingHours:remainingLogtime > 0 ? remainingLogtime : 0}, module: 'task', companyId: companyID });
 } catch (error) {
     loggerConfig.error(`Remaining LOg hours Error:${error}`);
 }

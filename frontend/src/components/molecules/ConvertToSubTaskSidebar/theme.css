@@ -1,0 +1,35 @@
+/* Unscoped on purpose: the panel, its head and the rows inside the pickers are rendered by child
+   components, which a scoped rule of the host cannot reach. Every selector starts at
+   .converted__sidebar, the class the Merge, Convert, Move and Duplicate sidebars give their panel. */
+.converted__sidebar .sidebar-head,
+.converted__sidebar .sidebar-content { background: var(--surface); color: var(--ink); }
+.converted__sidebar .sidebar-head { border-color: var(--hairline); }
+.converted__sidebar .sidebar-body { background: var(--canvas); color: var(--ink); }
+.converted__sidebar .assignee-headtitle { min-width: 0; }
+
+/* The task rows, the duplicate options and the name fields still carry the legacy colour
+   classes, whose fixed greys are unreadable on a dark surface. */
+.converted__sidebar .blue { color: var(--brand) !important; }
+.converted__sidebar :is(.black, .dark-gray, .GunPowder) { color: var(--ink); }
+.converted__sidebar :is(.gray, .gray81) { color: var(--ink-2); }
+.converted__sidebar .border-bottom-mobiledrop { border-bottom-color: var(--hairline) !important; }
+.converted__sidebar .bg-colorlightgray { background-color: var(--fill); }
+
+.converted__sidebar .form-control { background: var(--surface); color: var(--ink); border-color: var(--border); }
+.converted__sidebar .form-control::placeholder { color: var(--ink-2); }
+.converted__sidebar .form-control:focus-visible { outline: none; border-color: var(--brand); box-shadow: var(--focus); }
+
+.converted__sidebar .task__name-sidebar { border-radius: 5px; }
+.converted__sidebar .task__name-sidebar:hover { background-color: var(--fill); }
+.converted__sidebar .task__name-sidebar.bg-grey-2 { background-color: var(--brand-tint); }
+
+.converted__sidebar .duplicate__component--wrapper { background: var(--surface); }
+.converted__sidebar .duplicate__component--copysection { border-color: var(--border); }
+.converted__sidebar .copy__assignee-checkbox:before { border-top-color: var(--hairline); }
+
+@media (max-width: 767px) {
+    .converted__sidebar .sidebar-body { background: var(--surface); }
+    .converted__sidebar .sidebar-head .ah-btn--sm { padding: 0 8px; font-size: 12px; }
+    .converted__sidebar .form-control { color: var(--ink) !important; }
+    .converted__sidebar .form-control::placeholder { color: var(--ink-2) !important; }
+}

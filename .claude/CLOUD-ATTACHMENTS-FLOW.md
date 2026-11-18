@@ -1,6 +1,8 @@
 # Cloud attachments — Google Drive / Dropbox
 
-**Task:** AHE-3838 · **Status:** ✅ built (local branch `feat/cloud-storage-attachments`, 4 commits, unpushed)
+**Task:** AHE-3838 · **Status:** superseded. The picker runs on the connectors module since task 076, and
+`Modules/CloudStorage` with its per-person app settings was removed in task 077. This page is the history; see
+`docs/connectors/google.md` and `docs/connectors/dropbox.md` for the current setup.
 
 > **Both modes shipped.** Link is the default; "Import a copy" is a checkbox on
 > the same menu. See §10 for what you must register before it can be tested.

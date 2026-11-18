@@ -129,13 +129,13 @@
 
 @keyframes pulse-bg {
     0% {
-      background-color: #ddd;
+      background-color: var(--track);
     }
     50% {
-      background-color: #d0d0d0;
+      background-color: var(--border);
     }
     100% {
-      background-color: #ddd;
+      background-color: var(--track);
     }
 }
 </style>

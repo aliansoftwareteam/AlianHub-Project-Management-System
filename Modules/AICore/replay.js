@@ -1,0 +1,230 @@
+const crypto = require('crypto');
+const { SCHEMA_TYPE } = require('../../Config/schemaType');
+const { dbCollections } = require('../../Config/collections');
+const { MongoDbCrudOpration } = require('../../utils/mongo-handler/mongoQueries');
+const logger = require('../../Config/loggerConfig');
+const usage = require('./usage');
+const { FEATURES } = require('./features');
+const { redact, redactMessages } = require('./redact');
+
+/* The replay record: one row per model call, written by the core meter
+ * (spend.js) so no feature can call a model without leaving one. The prompt
+ * holds tenant content, so the stored copy is redacted and capped and expires;
+ * promptHash is taken before redaction so identical prompts still match.
+ * `decision` is the routing decision for the same call (decision.js): provider
+ * names and numbers only, so it carries nothing to redact. */
+
+const LOG_PREFIX = '[ai-replay]';
+const MODES = ['off', 'agent', 'all'];
+const DEFAULT_MODE = 'agent';
+const DEFAULT_RETENTION_DAYS = 30;
+const DAY_MS = 86400000;
+const MAX_BYTES = 200 * 1024;
+
+const mode = () => {
+    const value = String(process.env.AI_REPLAY || 'agent').trim().toLowerCase();
+    return MODES.includes(value) ? value : DEFAULT_MODE;
+};
+
+const retentionDays = () => {
+    const days = Number(process.env.AI_REPLAY_RETENTION_DAYS || 30);
+    return Number.isFinite(days) && days > 0 ? days : DEFAULT_RETENTION_DAYS;
+};
+
+const shouldRecord = (feature) => {
+    const current = mode();
+    if (current === 'off') return false;
+    return current === 'all' || feature === FEATURES.AGENT_RUN;
+};
+
+const promptHashOf = (opts) => crypto.createHash('sha256').update(JSON.stringify({ system: opts && opts.systemPrompt, messages: opts && opts.messages })).digest('hex');
+
+function cut(text, budget) {
+    const bytes = Buffer.byteLength(text);
+    if (bytes <= budget) return { text, used: bytes, cut: false };
+    const kept = Buffer.from(text).subarray(0, Math.max(0, budget)).toString('utf8').replace(/�+$/, '');
+    return { text: kept, used: Buffer.byteLength(kept), cut: true };
+}
+
+function cappedPrompt(system, messages) {
+    let left = MAX_BYTES;
+    let truncated = false;
+    const take = (text) => {
+        const out = cut(text, left);
+        left -= out.used;
+        truncated = truncated || out.cut;
+        return out.text;
+    };
+    const cappedSystem = typeof system === 'string' ? take(system) : null;
+    return { system: cappedSystem, messages: messages.map((m) => ({ role: m.role, content: take(m.content) })), truncated };
+}
+
+const orNull = (value) => (value === undefined || value === null ? null : value);
+
+const revisionOf = (value) => {
+    const n = Number(value);
+    return value === undefined || value === null || !Number.isFinite(n) ? null : n;
+};
+
+const skillRevisionOf = (ref) => (ref && ref.key ? { key: String(ref.key), hash: orNull(ref.hash), n: orNull(ref.n) } : null);
+
+/* Set only on a call from a tainted run (Agents/taint.js): where the run's external content came from, never the content. */
+const taintOf = (given) => (given.tainted ? { tainted: true, taintSources: (Array.isArray(given.taintSources) ? given.taintSources : []).map(({ kind, ref, at }) => ({ kind: String(kind), ref: String(ref), at })) } : {});
+
+const currentTraceId = () => {
+    try {
+        return require('../../Config/telemetry').traceIdNow() || null;
+    } catch (e) {
+        return null;
+    }
+};
+
+const errorCodeOf = (error) => String(error.code || error.status || error.name || 'error');
+
+function rowFor({ context, opts, adapter, result, error, durationMs, decision }) {
+    const given = (opts && opts.spend) || {};
+    const model = (result && result.model) || adapter.model || null;
+    const tally = usage.usageFromResult(result);
+    const priced = result ? usage.summarize(tally, model) : null;
+    const prompt = cappedPrompt(redact(opts.systemPrompt), redactMessages(opts.messages));
+    const response = result ? cut(redact(String(orNull(result.content) === null ? '' : result.content)), MAX_BYTES) : null;
+    const createdAt = new Date();
+    return {
+        feature: context.feature,
+        runId: context.runId,
+        agentId: given.agentId ? String(given.agentId) : null,
+        agentRevision: revisionOf(given.agentRevision),
+        skillRevision: skillRevisionOf(given.skillRevision),
+        model,
+        provider: adapter.name || null,
+        params: { temperature: orNull(opts.temperature), maxTokens: orNull(opts.maxTokens), jsonMode: Boolean(opts.jsonMode) },
+        promptHash: promptHashOf(opts),
+        system: prompt.system,
+        messages: prompt.messages,
+        retrievedChunkIds: Array.isArray(given.retrievedChunkIds) ? given.retrievedChunkIds.map(String) : [],
+        ...taintOf(given),
+        response: response ? response.text : null,
+        truncated: prompt.truncated || Boolean(response && response.cut),
+        usage: { inputTokens: tally.inputTokens, outputTokens: tally.outputTokens },
+        costUsd: priced && priced.priced ? priced.costUsd : null,
+        durationMs: Number(durationMs) || 0,
+        decision: decision || null,
+        status: error ? 'error' : 'ok',
+        errorCode: error ? errorCodeOf(error) : null,
+        traceId: currentTraceId(),
+        createdAt,
+        expiresAt: new Date(createdAt.getTime() + retentionDays() * DAY_MS),
+    };
+}
+
+const TOOL_KIND = 'tool';
+
+/* A registry read an agent called, kept beside the model calls of the same run so a
+ * number in an answer traces back to the query that produced it. The query is ids,
+ * dates and metric names and the result is numbers, so neither carries text to redact.
+ * promptHash is the hash of the query, so the same query matches across runs. */
+async function recordToolStep({ companyId, runId, agentId, action, args, scope, result, durationMs, tainted, taintSources }) {
+    if (!shouldRecord(FEATURES.AGENT_RUN)) return null;
+    const query = { action, args, scope };
+    const createdAt = new Date();
+    try {
+        return await MongoDbCrudOpration(companyId || dbCollections.GLOBAL, {
+            type: SCHEMA_TYPE.AI_REPLAYS,
+            data: {
+                feature: FEATURES.AGENT_RUN,
+                kind: TOOL_KIND,
+                runId: runId || null,
+                agentId: agentId ? String(agentId) : null,
+                model: null,
+                provider: null,
+                promptHash: crypto.createHash('sha256').update(JSON.stringify(query)).digest('hex'),
+                messages: [],
+                retrievedChunkIds: [],
+                ...taintOf({ tainted, taintSources }),
+                query,
+                result,
+                truncated: false,
+                usage: { inputTokens: 0, outputTokens: 0 },
+                costUsd: null,
+                durationMs: Number(durationMs) || 0,
+                decision: null,
+                status: 'ok',
+                errorCode: null,
+                traceId: currentTraceId(),
+                createdAt,
+                expiresAt: new Date(createdAt.getTime() + retentionDays() * DAY_MS),
+            },
+        }, 'save');
+    } catch (e) {
+        logger.warn(`${LOG_PREFIX} ${companyId}: ${action}${runId ? ` in run ${runId}` : ''} not recorded: ${e.message}`);
+        return null;
+    }
+}
+
+const FETCH_KIND = 'fetch';
+const FETCH_BODY_BYTES = 32 * 1024;
+const FETCH_TRUNCATION_MARKER = '\n[truncated: only the first 32 KB is kept]';
+
+const withoutQuery = (path) => String(path || '').split(/[?#]/)[0];
+
+/* A data skill's declared read (Agents/engine/agentFetch.readDeclared). The body arrives already scrubbed of the
+ * credential; it is redacted again here, like a prompt, then capped. sha256 covers the whole body, taken before
+ * the cap. No header is ever passed in, so none can be kept. */
+async function recordFetch({ companyId, runId, host, path, status, bytes, hops, sha256, body, taintSources, durationMs }) {
+    if (!runId || !shouldRecord(FEATURES.AGENT_RUN)) return null;
+    const kept = cut(redact(String(body === undefined || body === null ? '' : body)), FETCH_BODY_BYTES);
+    const createdAt = new Date();
+    try {
+        return await MongoDbCrudOpration(companyId || dbCollections.GLOBAL, {
+            type: SCHEMA_TYPE.AI_REPLAYS,
+            data: {
+                feature: FEATURES.AGENT_RUN,
+                kind: FETCH_KIND,
+                runId: String(runId),
+                agentId: null,
+                model: null,
+                provider: null,
+                promptHash: sha256,
+                messages: [],
+                retrievedChunkIds: [],
+                ...taintOf({ tainted: true, taintSources }),
+                fetch: {
+                    host: String(host),
+                    path: withoutQuery(path),
+                    status: Number(status),
+                    bytes: Number(bytes) || 0,
+                    hops: (Array.isArray(hops) ? hops : []).map((hop) => ({ host: String(hop.host), path: withoutQuery(hop.path), status: Number(hop.status) })),
+                    sha256,
+                    body: kept.cut ? `${kept.text}${FETCH_TRUNCATION_MARKER}` : kept.text,
+                    bodyTruncated: kept.cut,
+                },
+                truncated: kept.cut,
+                usage: { inputTokens: 0, outputTokens: 0 },
+                costUsd: null,
+                durationMs: Number(durationMs) || 0,
+                decision: null,
+                status: 'ok',
+                errorCode: null,
+                traceId: currentTraceId(),
+                createdAt,
+                expiresAt: new Date(createdAt.getTime() + retentionDays() * DAY_MS),
+            },
+        }, 'save');
+    } catch (e) {
+        logger.warn(`${LOG_PREFIX} ${companyId}: a read of ${host} in run ${runId} not recorded: ${e.message}`);
+        return null;
+    }
+}
+
+async function record(call) {
+    const { context } = call;
+    if (!shouldRecord(context.feature)) return null;
+    try {
+        return await MongoDbCrudOpration(context.companyId || dbCollections.GLOBAL, { type: SCHEMA_TYPE.AI_REPLAYS, data: rowFor(call) }, 'save');
+    } catch (e) {
+        logger.warn(`${LOG_PREFIX} ${context.companyId}: ${context.feature} call${context.runId ? ` in run ${context.runId}` : ''} not recorded: ${e.message}`);
+        return null;
+    }
+}
+
+module.exports = { record, recordToolStep, recordFetch, mode, retentionDays, shouldRecord, promptHashOf, MAX_BYTES, TOOL_KIND, FETCH_KIND, FETCH_BODY_BYTES, FETCH_TRUNCATION_MARKER };

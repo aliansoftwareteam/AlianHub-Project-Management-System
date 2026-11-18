@@ -1,10 +1,10 @@
 <template>
     <div class="mt-1 custom-field__bg" :class="containerClasses">
         <div class="d-flex align-items-center justify-content-between">
-            <h4 :class="headerClasses">
+            <h3 class="custom-field__title" :class="headerClasses">
                 {{ $t('CustomField.custom_field') }}
-            </h4>
-            <h4 v-if="props.editPermission" class="font-roboto-sans font-size-14 font-weight-500 font-normal text-decoration-underline blue cursor-pointer" @click="emit('isCustomField', true)">+ {{ $t('CustomField.custom_field') }}</h4>
+            </h3>
+            <button v-if="props.editPermission" type="button" class="ah-btn ah-btn--ghost ah-btn--sm custom-field__add" @click="emit('isCustomField', true)">+ {{ $t('CustomField.custom_field') }}</button>
         </div>
         
         <!-- Loading skeleton -->
@@ -18,7 +18,11 @@
         <template v-else>
             <template v-if="filteredCustomFields.length">
                 <template v-for="item in filteredCustomFields" :key="item._id">
-                    <div class="position-re" :class="itemClasses">
+                    <div v-if="fieldTypeUi(item?.fieldType)" class="position-re">
+                        <ModuleFieldListing :detail="item" :task="props.task" :editable="props.editPermission === true" @change="handleFieldValue(item, $event)" @edit="handleEdit(item)" />
+                        <AiFieldMark v-if="isAiField(item)" class="custom-field__ai" :def="item" :task="props.task" :canFill="props.editPermission === true" show-text />
+                    </div>
+                    <div v-else class="position-re" :class="itemClasses">
                         <component
                             :is="getView(item?.fieldType)"
                             :detail="item"
@@ -27,6 +31,7 @@
                             @handleEdit="handleEdit(item)"
                             @handleUpdate="handleUpdate"
                         />
+                        <AiFieldMark v-if="isAiField(item)" class="custom-field__ai" :def="item" :task="props.task" :canFill="Boolean(props.editPermission)" show-text />
                     </div>
                 </template>
             </template>
@@ -47,8 +52,13 @@
     import EmailComponentListing from '../../atom/customFieldTaskView/emailComponentListing.vue';
     import PhoneComponentListing from '../../atom/customFieldTaskView/phoneComponentListing.vue';
     import ComputedComponentListing from '../../atom/customFieldTaskView/computedComponentListing.vue';
-    import { computeCustomFieldValue } from '@/plugins/customFieldView/formulaEngine.js';
+    import ModuleFieldListing from '../../atom/customFieldTaskView/moduleFieldListing.vue';
+    import { fieldTypeUi } from '@/plugins/customFieldView/fieldTypes';
+    import { computeCustomFieldValue, neverComputed, recomputeCustomFields } from '@/plugins/customFieldView/formulaEngine.js';
     import Skelaton from '@/components/atom/Skelaton/Skelaton.vue';
+    import AiFieldMark from '@/components/atom/AiFieldMark/AiFieldMark.vue';
+    import { isAiField } from '@/views/Projects/composables/aiFields';
+    import { fieldAppliesToTask } from '@fieldTaskTypes';
 
 
     const { getters } = useStore();
@@ -70,7 +80,7 @@
         }
     });
     // Emits
-    const emit = defineEmits(['blurUpdate','isCustomField','editCustomField']);
+    const emit = defineEmits(['blurUpdate','isCustomField','editCustomField','fieldValue']);
 
     // Injections
     const clientWidth = inject("$clientWidth");
@@ -145,10 +155,11 @@
     const filteredCustomFields = computed(() => {
         if (!processedCustomFieldList.value?.length) return [];
         
-        return processedCustomFieldList.value.filter(val => 
-            val?.isDelete && 
-            val?.type === 'task' && 
-            (val?.global || val?.projectId?.includes(props?.task?.ProjectID))
+        return processedCustomFieldList.value.filter(val =>
+            val?.isDelete &&
+            val?.type === 'task' &&
+            (val?.global || val?.projectId?.includes(props?.task?.ProjectID)) &&
+            fieldAppliesToTask(val, props.task)
         );
     });
 
@@ -217,6 +228,15 @@
             });
         }
         isInitialLoading.value = false;
+        askForMissingNumbers();
+    };
+
+    const askedFor = new Set();
+    const askForMissingNumbers = () => {
+        const taskId = props.task?._id;
+        if (!taskId || askedFor.has(taskId) || !neverComputed(props.task, filteredCustomFields.value)) return;
+        askedFor.add(taskId);
+        recomputeCustomFields({ taskIds: [taskId], projectId: props.task.ProjectID || '' });
     };
 
     const handleInputUpdate = (item, value) => {
@@ -229,11 +249,29 @@
         }
     };
 
+    const handleFieldValue = (item, value) => {
+        emit('fieldValue', item, value);
+        requestRecompute();
+    };
+
     const handleEdit = (val) => {
         emit("editCustomField",val);
     };
     const handleUpdate = (value,detail,id) => {
         emit('blurUpdate',value,detail,id,true);
+        requestRecompute();
+    };
+
+    // Formula and rollup values are evaluated on the server and stored on the
+    // task, so a changed input has to ask for a fresh computation.
+    let recomputeTimer = null;
+    const requestRecompute = () => {
+        const hasComputed = processedCustomFieldList.value.some(item => ['formula','rollup'].includes(item?.fieldType));
+        if (!hasComputed || !props.task?._id) return;
+        clearTimeout(recomputeTimer);
+        recomputeTimer = setTimeout(() => {
+            recomputeCustomFields({ taskIds: [props.task._id], projectId: props.task.projectId || '' });
+        }, 400);
     };
 
     const getView = (fieldType) => {
@@ -252,6 +290,7 @@
             }
         }
         emit('blurUpdate',value,detail,id);
+        requestRecompute();
     };
 
     // Lifecycle hooks

@@ -17,15 +17,42 @@ const { addCommentCollection, updateCommentCollection } = require('../../../Comm
 const { updateMainChat } = require('../../../MainChats/controller');
 const { replaceObjectKey } = require("../../../Auth/helper");
 const { emitListener } = require("../../../Company/eventController.js");
-const { createCustomFields } = require("../helper.js");
+const { hasFieldColumns, fieldsFromColumns } = require('../importedFields');
 const { removeCache } = require('../../../../utils/commonFunctions.js');
 const { updateRemainingTime } = require('../../../LogTime/controllerV2.js');
+const { TaskWriteRefusal } = require('../taskWriteFields');
+const { REFUSALS, PLACEMENT_FIELDS, slotUnder, levelRows } = require('../taskTree');
+const { importMarkOf } = require('../importMark');
+
+const treeRefusal = (code) => new TaskWriteRefusal(code === 'PARENT_NOT_FOUND' ? 404 : 400, REFUSALS[code], code);
+
+/* The chain and the placement of a new row come from the stored parent and its root, never from
+ * the caller. The caller's permission was judged in data.ProjectID, so a parent that would place
+ * the row in another project answers as if it did not exist. */
+const placeInTree = async (companyId, data) => {
+    if (data.mainChat || !data.ParentTaskId) {
+        data.ancestors = [];
+        return;
+    }
+    const slot = await slotUnder(companyId, data.ParentTaskId);
+    if (!slot.ok) throw treeRefusal(slot.code);
+    if (String(slot.placement.ProjectID) !== String(data.ProjectID)) throw treeRefusal('PARENT_NOT_FOUND');
+    PLACEMENT_FIELDS.forEach((field) => { delete data[field]; });
+    Object.assign(data, slot.placement, { ancestors: slot.ancestors, isParentTask: false });
+};
+
+const importedDetails = (task) => ({
+    ...(Array.isArray(task.tagsArray) && task.tagsArray.length ? { tagsArray: task.tagsArray } : {}),
+    ...(Number.isFinite(task.totalEstimatedTime) && task.totalEstimatedTime > 0 ? { totalEstimatedTime: task.totalEstimatedTime } : {}),
+});
+
 module.exports = {
-    create({data, user, projectData ,indexObj, setNotif}) {
+    /* `importMark` is handed over by the importers alone; the task routes drop it from a body. */
+    create({data, user, projectData ,indexObj, setNotif, importMark = null}) {
         return new Promise((resolve,reject) => {
             try {
-                // CHECK VALIDATION IF ANY
-                HandleTask(projectData.CompanyId, data, false, data.id || null, user , indexObj)
+                placeInTree(projectData.CompanyId, data)
+                .then(() => HandleTask(projectData.CompanyId, data, false, data.id || null, user, { importMark }))
                 .then((taskResult) => {
                     if(taskResult.status){
                         resolve(taskResult);
@@ -73,7 +100,7 @@ module.exports = {
                             }
     
                             MongoDbCrudOpration(projectData.CompanyId, objSchema, 'findOneAndUpdate').then((result)=>{
-                                socketEmitter.emit('update', { type: "update", data: result , updatedFields: {subTasks: result.subTasks}, module: 'task' });
+                                socketEmitter.emit('update', { type: "update", data: result , updatedFields: {subTasks: result.subTasks}, module: 'task', companyId: projectData.CompanyId });
                             }).catch(error => {
                                 logger.error(`ERROR in update parent task: ${projectData?._id||data?.ProjectID}> ${data.id} : ${error.message}`);
                             })
@@ -176,31 +203,22 @@ module.exports = {
                     }
                     tasksArray.push(obj);
                 });
-                resolve(tasksArray);
-                let count = 0;
-                const countFun = (obj) => {
-                    if(count >= tasksArray.length) {
-                        return;
-                    } else {
-                        let indexObj;
-                        indexObj = {
-                            indexName : "groupByStatusIndex",
-                            searchKey : "statusKey",
-                            searchValue : "1"
+                const indexObj = { indexName: "groupByStatusIndex", searchKey: "statusKey", searchValue: "1" };
+                // Answer once every task is written and name only those, so a caller can undo by the ids it gets back.
+                const createAll = async () => {
+                    const created = [];
+                    for (const obj of tasksArray) {
+                        try {
+                            await this.create({data: obj, user: userData, projectData, indexObj});
+                            created.push(obj);
+                        } catch (error) {
+                            if (error instanceof TaskWriteRefusal) throw error;
+                            logger.error(`ERROR in create task: ${error && error.message}`);
                         }
-                        this.create({data: obj, user: userData, projectData, indexObj})
-                        .then(() => {
-                            count++;
-                            countFun(tasksArray[count]);
-                        })
-                        .catch((error) => {
-                            console.error("ERROR in create task: ", error);
-                            count++;
-                            countFun(tasksArray[count]);
-                        })
                     }
-                }
-                countFun(tasksArray[count]);
+                    return created;
+                };
+                createAll().then(resolve).catch(reject);
             } catch (error) {
                 logger.error(`ERROR in create sub task : ${error.message}`);
                 reject(error);
@@ -208,16 +226,15 @@ module.exports = {
         })
     },
 
-    createMultipleTasks({ tasks, userData, projectData, indexObj, statusArray, sprint, eventId }) {
+    /* `importMark` and `storedParents` come from the importers alone; the task routes drop both from a body.
+     * `storedParents` maps an id a row may name as its parent to a task already stored, so a row can go under it. */
+    createMultipleTasks({ tasks, userData, projectData, indexObj, statusArray, sprint, eventId, importMark = null, storedParents = new Map() }) {
         return new Promise((resolve, reject) => {
-            // Check if any task contains a custom field
-            const hasCustomFields = tasks.some(task => Object.keys(task).some(key => key.startsWith("custom_")));
             let createdCustomFields;
-            // Function to handle actual task creation logic
+            let skippedFields = [];
             const processTasks = (tasks) => {
-                const parentTasks = tasks.filter(task => !task.ParentTaskId || task.ParentTaskId === "");
-                const subtasks = tasks.filter(task => task.ParentTaskId && task.ParentTaskId !== "");
-                const totalTasks = parentTasks.length + subtasks.length;
+                const { levels: [parentTasks, ...subtaskLevels], parentIdOf, storedParentOf, adjusted } = levelRows(tasks, storedParents);
+                const totalTasks = tasks.length;
     
                 const idMapping = {};
                 const statusMapping = statusArray.reduce((acc, status) => {
@@ -226,7 +243,8 @@ module.exports = {
                 }, {});
     
                 let completedTasks = 0;
-    
+                let droppedFieldValues = 0;
+
                 const updateProgress = () => {
                     const progress = Math.round((completedTasks / totalTasks) * 100);
                     emitListener(eventId, { step: progress });
@@ -265,6 +283,7 @@ module.exports = {
                         'rawDescription': task.rawDescription || '',
                         'checklistArray': task.checklistArray || [],
                         'attachments': task.attachments || [],
+                        ...importedDetails(task),
                     };
                     if(sprint.folderId) {
                         parentTaskObj.folderObjId = sprint.folderId;
@@ -275,17 +294,18 @@ module.exports = {
                         user: userData,
                         projectData,
                         indexObj,
-                        setNotif: true
+                        setNotif: true,
+                        importMark: importMarkOf(importMark, task),
                     }).then(taskResult => {
                         idMapping[task._id] = taskResult.id;
                         task.createdTaskId = taskResult.id;
+                        droppedFieldValues += taskResult.droppedFieldValues || 0;
                         completedTasks++;
                         updateProgress();
                     })
                 });
     
-                Promise.all(parentPromises).then(() => {
-                    const subtaskPromises = subtasks.map((task) => {
+                const createSubtask = (task) => {
                         const statusDetails = statusMapping[task.status];
                         const subTaskObj = {
                             'TaskName': task.TaskName.trim(),
@@ -297,7 +317,7 @@ module.exports = {
                             'dueDateDeadLine': task.dueDateDeadLine || [],
                             'TaskType': task.TaskType || "task",
                             'TaskTypeKey': task.TaskTypeKey || 1,
-                            'ParentTaskId': idMapping[task.ParentTaskId] || "",
+                            'ParentTaskId': storedParentOf.get(task) || idMapping[parentIdOf.get(task)] || "",
                             'ProjectID': projectData._id,
                             'CompanyId': projectData.CompanyId,
                             'status': {
@@ -315,6 +335,9 @@ module.exports = {
                             'sprintArray': sprint,
                             'customField': task.customField || {},
                             'descriptionBlock': task.descriptionBlock || {},
+                            'rawDescription': task.rawDescription || '',
+                            'checklistArray': task.checklistArray || [],
+                            ...importedDetails(task),
                         };
                         if(sprint.folderId) {
                             subTaskObj.folderObjId = sprint.folderId;
@@ -325,16 +348,21 @@ module.exports = {
                             user: userData,
                             projectData,
                             indexObj,
-                            setNotif: true
-                        }).then(() => {
+                            setNotif: true,
+                            importMark: importMarkOf(importMark, task),
+                        }).then((taskResult) => {
+                            idMapping[task._id] = taskResult.id;
+                            task.createdTaskId = taskResult.id;
+                            droppedFieldValues += taskResult.droppedFieldValues || 0;
                             completedTasks++;
                             updateProgress();
                         })
-                    });
-    
-                    return Promise.all(subtaskPromises);
-                }).then(() => {
-                    resolve({ status: true, statusText: "Tasks created successfully", createdTasks: tasks, customFields: createdCustomFields });
+                };
+
+                Promise.all(parentPromises)
+                .then(() => subtaskLevels.reduce((created, level) => created.then(() => Promise.all(level.map(createSubtask))), Promise.resolve()))
+                .then(() => {
+                    resolve({ status: true, statusText: "Tasks created successfully", createdTasks: tasks, customFields: createdCustomFields, adjusted, droppedFieldValues, ...(skippedFields.length ? { skippedFields } : {}) });
                     emitListener(eventId, { step: "STOP" });
                 }).catch(error => {
                     console.error("Error while creating tasks:", error);
@@ -342,10 +370,11 @@ module.exports = {
                 });
             };
     
-            if (hasCustomFields) {
-                createCustomFields({ tasks, userData, projectData })
+            if (hasFieldColumns(tasks)) {
+                fieldsFromColumns({ tasks, userData, projectData })
                     .then(response => {
                         createdCustomFields = response.customFields;
+                        skippedFields = response.skippedFields || [];
                         processTasks(response.tasks)
                     })
                     .catch(error => {

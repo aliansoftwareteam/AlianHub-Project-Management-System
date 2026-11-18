@@ -1,0 +1,297 @@
+import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { flushPromises, mount } from '@vue/test-utils';
+import { createStore } from 'vuex';
+import { ref } from 'vue';
+
+const { apiRequest, toast, echo } = vi.hoisted(() => ({
+    apiRequest: vi.fn(),
+    toast: { success: vi.fn(), error: vi.fn() },
+    echo: (key, params) => (params ? `${key} ${JSON.stringify(params)}` : key)
+}));
+
+vi.mock('@/services', () => ({ apiRequest }));
+vi.mock('@/locales/main', () => ({ i18n: { global: { t: (key) => `t:${key}` } } }));
+vi.mock('@/components/organisms/Shell/shellState', () => ({ shellState: { agentsRunning: 0 } }));
+vi.mock('vue-toast-notification', () => ({ useToast: () => toast }));
+vi.mock('vue-i18n', async (importOriginal) => ({ ...(await importOriginal()), useI18n: () => ({ t: echo }) }));
+vi.mock('vue-router', () => ({ useRoute: () => ({ params: { id: 'run-1', cid: 'c1' } }) }));
+
+import WorkflowRunView from '@/views/Ai/WorkflowRunView.vue';
+
+const OWNER = 1;
+const MEMBER = 3;
+
+const step = (over = {}) => ({
+    stepId: 's1', index: 0, type: 'tool_call', status: 'success', attempts: 1, maxAttempts: 3,
+    startedAt: '2026-09-01T10:00:00.000Z', finishedAt: '2026-09-01T10:00:02.000Z', output: {}, ...over
+});
+
+const storeFor = (roleType) => createStore({ modules: { settings: { namespaced: true, getters: { companyUserDetail: () => ({ roleType }) } } } });
+
+const mountView = async ({ run, steps, roleType = OWNER, status = true, httpStatus = 200 } = {}) => {
+    apiRequest.mockImplementation(() => {
+        if (!status) return Promise.reject({ response: { status: httpStatus, data: { statusText: 'nope' } } });
+        return Promise.resolve({ data: { status: true, data: { run, steps } } });
+    });
+    const wrapper = mount(WorkflowRunView, {
+        global: {
+            plugins: [storeFor(roleType)],
+            provide: { $userId: ref('u1'), $companyId: ref('c1') },
+            mocks: { $t: echo },
+            stubs: {
+                AiSidebar: true,
+                RouterLink: { props: ['to'], template: '<a><slot /></a>' },
+                EmptyState: { props: ['title', 'message'], template: '<div class="empty" :data-title="title"></div>' }
+            }
+        }
+    });
+    await flushPromises();
+    return wrapper;
+};
+
+const run = (over = {}) => ({ _id: 'run-1', workflowId: 'wf', name: 'Nightly sweep', status: 'running', ...over });
+
+describe('WorkflowRunView', () => {
+    beforeEach(() => {
+        apiRequest.mockReset();
+        toast.success.mockReset();
+        toast.error.mockReset();
+    });
+
+    it('shows the engine-off state rather than an error when the flag is off', async () => {
+        const wrapper = await mountView({ status: false, httpStatus: 503 });
+        expect(wrapper.find('[data-test="engine-off"]').exists()).toBe(true);
+        expect(wrapper.find('[data-test="error"]').exists()).toBe(false);
+        expect(wrapper.find('[data-test="graph"]').exists()).toBe(false);
+    });
+
+    it('groups a fan-out into one node with a tally instead of a box per child', async () => {
+        const children = Array.from({ length: 50 }, (_, i) => step({
+            stepId: `sFan#${i + 1}`, index: 1 + (i + 1) / 51, parentStepId: 'sFan', type: 'agent_run',
+            status: i === 7 ? 'failed' : (i === 8 ? 'running' : 'success'),
+            ...(i === 7 ? { failure: { deterministic: false }, error: 'timed out' } : {})
+        }));
+        const wrapper = await mountView({
+            run: run(),
+            steps: [step({ stepId: 'sFan', index: 1, type: 'fan_out', output: { count: 50 } }), ...children]
+        });
+        expect(wrapper.findAll('.wf-graph__node')).toHaveLength(1);
+        expect(wrapper.find('[data-test="fan-tally"]').text()).toContain('"n":50');
+        // Only the child a person can act on and the one still working are drawn.
+        expect(wrapper.findAll('.wf-graph__children [data-test="step"]')).toHaveLength(2);
+
+        await wrapper.find('[data-test="fan-toggle"]').trigger('click');
+        expect(wrapper.findAll('.wf-graph__children [data-test="step"]')).toHaveLength(50);
+    });
+
+    it('names why a blocked run is blocked, and at which step', async () => {
+        const wrapper = await mountView({
+            run: run({ status: 'blocked', blocked: { code: 'budget_exhausted', reason: "the run's budget of $5.00 is spent", stepId: 's2' } }),
+            steps: [step()]
+        });
+        const blocked = wrapper.find('[data-test="blocked"]');
+        expect(blocked.exists()).toBe(true);
+        expect(wrapper.find('[data-test="blocked-code"]').text()).toBe('Workflows.blocked_budget_exhausted');
+        expect(wrapper.find('[data-test="blocked-reason"]').text()).toContain('$5.00 is spent');
+        expect(wrapper.find('[data-test="blocked-step"]').text()).toContain('"stepId":"s2"');
+    });
+
+    it('names what a waiting run is waiting on, and how many others wait behind it', async () => {
+        const wrapper = await mountView({
+            run: run(),
+            steps: [
+                step({ stepId: 's1', status: 'pending', waitReason: 'an approval from the owner', waitUntil: '2026-09-02T10:00:00.000Z', type: 'human_approval' }),
+                step({ stepId: 's2', index: 1, status: 'pending', waitReason: 'iteration 2 of at most 5', type: 'loop' })
+            ]
+        });
+        expect(wrapper.find('[data-test="blocked-reason"]').text()).toBe('an approval from the owner');
+        expect(wrapper.find('[data-test="blocked-also"]').text()).toContain('"n":1');
+    });
+
+    const waitingOn = async (over) => (await mountView({ run: run(), steps: [step({ status: 'pending', finishedAt: null, ...over })] })).find('[data-test="blocked"]');
+
+    it('names the person an approval waits for instead of their user id', async () => {
+        const banner = await waitingOn({
+            type: 'human_approval', approvalId: 'ap1', waitReason: 'waiting for user 6ad3295d1e45ee45ed4270e3 to approve',
+            waitingFor: { kind: 'approval', name: 'Asha Rao', role: null, escalated: false }
+        });
+        expect(banner.find('[data-test="blocked-reason"]').text()).toBe('Workflows.waiting_approval_person {"name":"Asha Rao"}');
+        expect(banner.text()).not.toContain('6ad3295d1e45ee45ed4270e3');
+        expect(banner.find('[data-test="blocked-escalated"]').exists()).toBe(false);
+    });
+
+    it('says an escalated approval was escalated, and names the owning role or nobody when there is no person', async () => {
+        const escalated = await waitingOn({ type: 'human_approval', waitReason: 'waiting for user x to approve (escalated)', waitingFor: { kind: 'approval', name: 'Ravi', role: null, escalated: true } });
+        expect(escalated.find('[data-test="blocked-escalated"]').text()).toBe('Workflows.approval_escalated');
+
+        const role = await waitingOn({ type: 'human_approval', waitReason: 'waiting for marketing lead to approve', waitingFor: { kind: 'approval', name: null, role: 'marketing lead', escalated: false } });
+        expect(role.find('[data-test="blocked-reason"]').text()).toBe('Workflows.waiting_approval_role {"role":"marketing lead"}');
+
+        const left = await waitingOn({ type: 'human_approval', waitReason: 'waiting for user 6ad3295d1e45ee45ed4270e3 to approve', waitingFor: { kind: 'approval', name: null, role: null, escalated: false } });
+        expect(left.find('[data-test="blocked-reason"]').text()).toContain('Workflows.waiting_approval_anyone');
+        expect(left.text()).not.toContain('6ad3295d1e45ee45ed4270e3');
+    });
+
+    it('names the role a hand-over waits for by its display name, not its key', async () => {
+        const finishing = await waitingOn({
+            type: 'role_handoff', waitReason: 'waiting for it-company/tech-lead to finish',
+            waitingFor: { kind: 'role', why: 'finish', role: 'it-company/tech-lead', name: 'Tech Lead' }
+        });
+        expect(finishing.find('[data-test="blocked-reason"]').text()).toBe('Workflows.waiting_role_finish {"role":"Tech Lead"}');
+
+        const paused = await waitingOn({
+            type: 'role_handoff', waitReason: 'waiting for agents to be switched on again; it-company/tech-lead holds the task',
+            waitingFor: { kind: 'role', why: 'agents_off_held', role: 'it-company/tech-lead', name: 'Tech Lead' }
+        });
+        expect(paused.find('[data-test="blocked-reason"]').text()).toBe('Workflows.waiting_role_agents_off_held {"role":"Tech Lead"}');
+    });
+
+    it('falls back to the engine’s reason for a wait it cannot name', async () => {
+        const banner = await waitingOn({ type: 'role_handoff', waitReason: 'waiting for something new', waitingFor: { kind: 'role', why: 'something_new', role: 'x/y', name: 'Y' } });
+        expect(banner.find('[data-test="blocked-reason"]').text()).toBe('waiting for something new');
+    });
+
+    it('offers only skip on a deterministic failure, and retry with its backoff on a transient one', async () => {
+        const deterministic = await mountView({
+            run: run({ status: 'failed' }),
+            steps: [step({ status: 'failed', error: 'no such action', failure: { deterministic: true, code: 'ValidationError' }, attempts: 1 })]
+        });
+        expect(deterministic.find('[data-test="failure-kind"]').text()).toBe('Workflows.failure_deterministic');
+        expect(deterministic.find('[data-test="control-skip"]').exists()).toBe(true);
+        expect(deterministic.find('[data-test="control-retry"]').exists()).toBe(false);
+        expect(deterministic.find('[data-test="failure-backoff"]').exists()).toBe(false);
+
+        const transient = await mountView({
+            run: run({ status: 'running' }),
+            steps: [step({
+                status: 'failed', error: 'socket hang up', attempts: 2, maxAttempts: 3,
+                failure: { deterministic: false, code: 'MongoNetworkError', retryAfterMs: 120000 },
+                nextAttemptAt: new Date(Date.now() + 120000).toISOString()
+            })]
+        });
+        expect(transient.find('[data-test="control-retry"]').exists()).toBe(true);
+        expect(transient.find('[data-test="control-skip"]').exists()).toBe(false);
+        expect(transient.find('[data-test="failure-attempts"]').text()).toContain('"n":2,"max":3');
+        expect(transient.find('[data-test="failure-backoff"]').text()).toContain('Workflows.backoff_at');
+    });
+
+    it('offers compensate beside the recovery control when the step started an agent run', async () => {
+        const wrapper = await mountView({
+            run: run({ status: 'failed' }),
+            steps: [step({ type: 'agent_run', status: 'failed', error: 'boom', failure: { deterministic: false }, output: { agentRunId: 'ar1' } })]
+        });
+        expect(wrapper.find('[data-test="control-compensate"]').exists()).toBe(true);
+
+        apiRequest.mockClear();
+        await wrapper.find('[data-test="control-compensate"]').trigger('click');
+        await flushPromises();
+        expect(apiRequest).toHaveBeenCalledWith('post', '/api/v2/workflows/runs/run-1/steps/s1/compensate', { reason: '' });
+        expect(toast.success).toHaveBeenCalledWith('Workflows.applied_compensate', { position: 'top-right' });
+    });
+
+    it('shows a loop’s iterations and budget, and stops it by skipping the step', async () => {
+        const wrapper = await mountView({
+            run: run(),
+            steps: [step({ type: 'loop', status: 'pending', iteration: 4, budgetUsedUsd: 1.5, waitReason: 'iteration 4 of at most 10', config: { maxIterations: 10, budgetUsd: 6 } })]
+        });
+        expect(wrapper.find('[data-test="loop-iterations"]').text()).toContain('"n":4,"max":10');
+        expect(wrapper.find('[data-test="loop-budget"]').text()).toContain('"used":"1.50","cap":"6.00"');
+
+        apiRequest.mockClear();
+        await wrapper.find('[data-test="loop-stop"]').trigger('click');
+        await flushPromises();
+        expect(apiRequest).toHaveBeenCalledWith('post', '/api/v2/workflows/runs/run-1/steps/s1/skip', { reason: 'Workflows.loop_stop_reason' });
+    });
+
+    it('names the agent and the hour when a loop stopped at the run limit', async () => {
+        const wrapper = await mountView({
+            run: run({ status: 'success' }),
+            steps: [step({
+                type: 'loop', status: 'success',
+                output: { iterations: 3, cap: 10, budgetUsedUsd: 0.4, stoppedBy: 'run_limit', runLimit: { agentId: 'a1', limit: 500, used: 500, resetsAt: '2026-09-01T11:00:00.000Z' } }
+            })]
+        });
+        const stopped = wrapper.find('[data-test="loop-stopped-by"]').text();
+        expect(stopped).toContain('Workflows.loop_stopped_run_limit_detail');
+        expect(stopped).toContain('"used":500,"limit":500');
+        expect(wrapper.find('[data-test="loop-stop"]').exists()).toBe(false);
+    });
+
+    it('gives a member the run read-only, with no control anywhere', async () => {
+        const wrapper = await mountView({
+            roleType: MEMBER,
+            run: run({ status: 'failed' }),
+            steps: [
+                step({ type: 'agent_run', status: 'failed', error: 'boom', failure: { deterministic: false }, output: { agentRunId: 'ar1' } }),
+                step({ stepId: 's2', index: 1, type: 'loop', status: 'pending', iteration: 2, config: { maxIterations: 5 } })
+            ]
+        });
+        expect(wrapper.find('[data-test="failure"]').exists()).toBe(true);
+        expect(wrapper.find('[data-test="loop"]').exists()).toBe(true);
+        expect(wrapper.findAll('[data-test^="control-"]')).toHaveLength(0);
+        expect(wrapper.find('[data-test="loop-stop"]').exists()).toBe(false);
+        expect(wrapper.find('[data-test="run-read-only"]').exists()).toBe(true);
+    });
+
+    it('shows the outside agent session an external_agent step waits on, with its latest activities', async () => {
+        const wrapper = await mountView({
+            run: run(),
+            steps: [step({
+                type: 'external_agent', status: 'pending', finishedAt: null,
+                agentSession: {
+                    id: 'sess-1', state: 'active', clientName: 'Coder', reason: '', createdAt: '2026-09-01T10:00:00.000Z', firstActivityAt: '2026-09-01T10:00:03.000Z',
+                    activities: [{ type: 'thought', text: 'Reading the brief', at: '2026-09-01T10:00:03.000Z' }, { type: 'action', text: 'Running the tests', at: '2026-09-01T10:00:09.000Z' }]
+                }
+            })]
+        });
+        expect(wrapper.find('[data-test="step-type"]').text()).toBe('Workflows.type_external_agent');
+        const strip = wrapper.find('[data-test="step-session"]');
+        expect(strip.exists()).toBe(true);
+        expect(strip.text()).toContain('Coder');
+        expect(strip.text()).toContain('TaskPanel.agent_session_active');
+        expect(strip.text()).toContain('Running the tests');
+        expect(strip.text()).toContain('Reading the brief');
+    });
+
+    it('names why a revoked session stopped its step', async () => {
+        const wrapper = await mountView({
+            run: run({ status: 'failed' }),
+            steps: [step({ type: 'external_agent', status: 'failed', agentSession: { id: 'sess-1', state: 'revoked', clientName: 'Coder', reason: 'the grant behind this session was revoked', activities: [] } })]
+        });
+        expect(wrapper.find('[data-test="step-session"]').text()).toContain('the grant behind this session was revoked');
+    });
+
+    it('shows status, duration and cost for every step', async () => {
+        const wrapper = await mountView({
+            run: run({ status: 'success' }),
+            steps: [step({ type: 'agent_run', output: { costUsd: 0.42 } })]
+        });
+        const row = wrapper.find('[data-test="step"]');
+        expect(row.find('[data-test="step-status"]').text()).toBe('Workflows.status_success');
+        expect(row.find('[data-test="step-duration"]').text()).toContain('Workflows.duration_s');
+        expect(row.find('[data-test="step-cost"]').text()).toContain('"usd":"0.42"');
+        expect(wrapper.find('[data-test="run-cost"]').text()).toContain('"usd":"0.42"');
+    });
+
+    it('names a hand-over to a role and who finished it, and labels a simulated run and step', async () => {
+        const wrapper = await mountView({
+            run: run({ simulated: true }),
+            steps: [
+                step({ stepId: 'sFile', type: 'role_handoff', simulated: true, output: { role: 'it-company/bug-triager', taskId: 't1', outcome: 'finished', finishedBy: 'Bug Triager' } }),
+                step({ stepId: 'sOk', index: 1, type: 'human_approval', status: 'pending', finishedAt: null, output: {} }),
+            ]
+        });
+        const [handOver, approval] = wrapper.findAll('[data-test="step"]');
+        expect(handOver.find('[data-test="step-type"]').text()).toBe('Workflows.type_role_handoff');
+        expect(handOver.find('[data-test="step-finished-by"]').text()).toBe('Workflows.handoff_finished_by {"name":"Bug Triager"}');
+        expect(handOver.find('[data-test="simulated-chip"]').exists()).toBe(true);
+        expect(approval.find('[data-test="simulated-chip"]').exists()).toBe(false);
+        expect(approval.find('[data-test="step-finished-by"]').exists()).toBe(false);
+        expect(wrapper.find('[data-test="run-head"] [data-test="simulated-chip"]').exists()).toBe(true);
+    });
+
+    it('leaves a run that really ran unlabelled', async () => {
+        const wrapper = await mountView({ run: run(), steps: [step()] });
+        expect(wrapper.find('[data-test="simulated-chip"]').exists()).toBe(false);
+    });
+});

@@ -1,5 +1,8 @@
 const ctrl = require('./controller');
+const { chatGuard } = require('../Agents/guard');
+const { reactedTo } = require('../Comments/helpers/namedThread');
+const { asked, every } = require('../Comments/helpers/askedWrites');
 
 exports.init = (app) => {
-    app.post('/api/v2/reactions', ctrl.toggleReaction);
+    app.post('/api/v2/reactions', chatGuard(reactedTo), asked(reactedTo, every('reaction.set')), ctrl.toggleReaction);
 }

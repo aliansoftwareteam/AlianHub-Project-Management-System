@@ -4,3 +4,13 @@
 
 # Shell scripts are run by bash; CRLF breaks the shebang/`set` line on Windows.
 *.sh text eol=lf
+
+# Generated docs and convention baselines are compared byte-for-byte against an LF
+# render, so autocrlf must not rewrite them to CRLF on a Windows checkout.
+scripts/*-baseline.json text eol=lf
+scripts/i18n-allowlist.json text eol=lf
+scripts/*-doc.meta.json text eol=lf
+tests/conventions/*.baseline.json text eol=lf
+docs/API.md text eol=lf
+docs/ENV.md text eol=lf
+docs/api/openapi.json text eol=lf

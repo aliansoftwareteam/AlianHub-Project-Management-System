@@ -1,0 +1,42 @@
+/* .ah-label and the card headings that read --text-label: on Home a label is set in the UI font. */
+.home { --text-label: 600 var(--fs-xs, 10.5px)/var(--lh-tight, 1.2) var(--font-ui); }
+.home__content { display: flex; flex-direction: column; gap: var(--gap-stack, 16px); }
+.home__grid { display: grid; grid-template-columns: 1.1fr .9fr; gap: var(--gap-stack, 16px); min-width: 0; align-items: start; }
+.home__side { display: flex; flex-direction: column; gap: var(--gap-stack, 16px); min-height: 0; min-width: 0; }
+.home__sidebar-toggle { display: none; }
+.home__date-input { position: absolute; width: 1px; height: 1px; opacity: 0; pointer-events: none; bottom: 0; left: 0; }
+.home .hc-mywork { min-height: 320px; }
+
+@media (max-width: 1279px) {
+    .home__sidebar-toggle { display: inline-flex; }
+}
+@media (min-width: 768px) and (max-width: 1023px) {
+    /* The open planner takes 300px, which leaves the content phone-narrow here. */
+    .home:has(.home__planner) .hc-setup { flex-wrap: wrap; gap: 10px 12px; }
+    .home:has(.home__planner) .hc-setup__ring { order: 1; }
+    .home:has(.home__planner) .hc-setup__body { flex: 1 1 calc(100% - 50px); order: 2; }
+    .home:has(.home__planner) .hc-setup__cta { order: 3; }
+    .home:has(.home__planner) .hc-setup__dismiss { order: 4; }
+    .home:has(.home__planner) .hc-setup__alt { order: 5; }
+    .home:has(.home__planner) .hc-setup__steps { order: 5; }
+    .home:has(.home__planner) .hc-setup__sample { order: 6; }
+}
+@media (max-width: 991px) {
+    .home__grid { grid-template-columns: 1fr; }
+}
+@media (max-width: 767px) {
+    .ah-page__content { padding: 14px 12px; }
+    .ah-page .ah-toolbar { padding: 0 12px; gap: 8px; }
+    .ah-toolbar__date { display: none; }
+    .ah-tbtn { height: var(--hit-min); }
+    /* The dense toolbar is as tall as a phone button: the row grows so the buttons do not touch its edges. */
+    .home .ah-toolbar { height: auto; min-height: calc(var(--hit-min) + 2 * var(--sp-3, 6px)); }
+    .hc-row { min-height: 44px; }
+    /* Beside the content the planner leaves a phone no room, so it follows My Work and the agenda. */
+    .home .ah-page__body { flex-direction: column; overflow-y: auto; }
+    .home .ah-page__content { flex: none; overflow: visible; }
+    .home__planner { position: static; width: 100%; height: 480px; box-shadow: none; border-left: 0; border-top: 1px solid var(--hairline); }
+    .home .ah-toolbar__title { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; display: block; }
+}
+
+.home__admin-only { margin: var(--sp-2, 4px); max-width: 260px; }

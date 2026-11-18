@@ -33,4 +33,10 @@ const retentionCutoff = (now, retentionDays = RETENTION_DEFAULT_DAYS) => {
     return d;
 };
 
-module.exports = { normalizeAuditEntry, retentionCutoff, RETENTION_DEFAULT_DAYS };
+const retentionDaysAtLeast = (requestedDays, minimumDays) => {
+    const days = Number(requestedDays);
+    const requested = Number.isFinite(days) && days > 0 ? days : RETENTION_DEFAULT_DAYS;
+    return requested < minimumDays ? { days: minimumDays, requested, clamped: true } : { days: requested, requested, clamped: false };
+};
+
+module.exports = { normalizeAuditEntry, retentionCutoff, retentionDaysAtLeast, RETENTION_DEFAULT_DAYS };

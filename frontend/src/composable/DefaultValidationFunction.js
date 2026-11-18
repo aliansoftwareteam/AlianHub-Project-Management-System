@@ -64,9 +64,9 @@ export const ValidationFunction = {
     },
     //
     isValueExistInArray(arrayObject, value, cb){
-      var arr = arrayObject.map((v) => v.replace(" ", "_").toLowerCase());
+      var arr = arrayObject.map((v) => v.replaceAll(" ", "_").toLowerCase());
       var result = arr.includes(
-        value.replace(" ", "_").toLowerCase()
+        value.replaceAll(" ", "_").toLowerCase()
       );
       cb(result);
     },

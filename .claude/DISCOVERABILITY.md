@@ -328,7 +328,7 @@ Paste these into the `<head>` of your homepage and key landing pages.
 > **Spec:** 1200×630 px, PNG, under 1 MB.
 >
 > **Quick way to create one:**
-> 1. Take the existing `AlianHub_Main.png` hero screenshot as the base
+> 1. Take the `.gitbook/assets/screenshots/home-light.png` screenshot as the base
 > 2. Crop/resize the canvas to exactly 1200×630
 > 3. Overlay the AlianHub logo (top-left corner, ~120×40 px)
 > 4. Overlay the tagline "Open-source project management you can self-host" (large, centered-bottom)
@@ -364,7 +364,7 @@ Paste these into the `<head>` of your homepage and key landing pages.
     "name": "Alian Software",
     "url": "https://aliansoftware.net"
   },
-  "screenshot": "https://raw.githubusercontent.com/aliansoftwareteam/AlianHub-Project-Management-System/main/.gitbook/assets/screenshots/dashboard.png",
+  "screenshot": "https://raw.githubusercontent.com/aliansoftwareteam/AlianHub-Project-Management-System/main/.gitbook/assets/screenshots/dashboard-light.png",
   "featureList": [
     "Kanban board view",
     "List view with bulk actions",

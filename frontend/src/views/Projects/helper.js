@@ -8,6 +8,20 @@ import { i18n } from "@/locales/main";
 const t = i18n.global.t;
 import * as env from '@/config/env';
 import { apiRequest } from '../../services';
+import { isOwnerOrAdmin } from "@/utils/roles";
+import { isFavourite } from "@/composable/favourites";
+import { assigneeCondition, assigneeGroups, dueDateBuckets, dueDateCondition, restoreGroupState, sprintToLoad } from "./taskGroups";
+import { customFieldGroups, customFieldIdOf, customGroupUpdate, needsProjectRange, numberRangeStages, rangeFromRows } from "./composables/customFieldQuery";
+import { activeMemberIds } from "@/plugins/customFieldView/fieldTypes/people";
+import { flatTasks } from "./composables/projectCustomFields";
+import { AGENT_WORK_GROUP } from "@viewSettings";
+import { agentWorkIn } from "./composables/agentWork";
+import { agentWorkGroups } from "./composables/agentWorkQuery";
+
+/* The bands of a number group are cut from the project's own values; if the range cannot be read, the loaded tasks stand in. */
+const projectNumberRange = (def, projectId) => apiRequest("post", `${env.TASK}/find`, { findQuery: numberRangeStages(def, projectId) })
+    .then((result) => rangeFromRows(result?.data))
+    .catch(() => null);
 
 const projectsList = ref([]);
 const filterdProjects = ref([]);
@@ -47,8 +61,8 @@ export function useProjectsHelper() {
                 };
     
                 const filterFavoritesAndSort = (projects) => {
-                    const favourites = projects.filter((x) => x.favouriteTasks?.some((y) => y.userId === userId.value));
-                    const others = projects.filter((x) => !x.favouriteTasks?.some((y) => y.userId === userId.value));
+                    const favourites = projects.filter((x) => isFavourite('project', x._id));
+                    const others = projects.filter((x) => !isFavourite('project', x._id));
                     return [...sortProjects(favourites), ...sortProjects(others)];
                 };
     
@@ -106,7 +120,7 @@ export function useProjectsHelper() {
 
         if(object.sprintsObj && Object.keys(object.sprintsObj).length) {
             Object.values(object.sprintsObj).forEach((sprint) => {
-                if(sprint.deletedStatusKey !== 1 && (companyUserDetail.value.roleType === 1 || companyUserDetail.value.roleType === 2) || (!sprint?.private || sprint?.AssigneeUserId?.includes(userId.value))) {
+                if(sprint.deletedStatusKey !== 1 && isOwnerOrAdmin(companyUserDetail.value.roleType) || (!sprint?.private || sprint?.AssigneeUserId?.includes(userId.value))) {
                     if(!showArchived) {
                         if(!sprint.deletedStatusKey && sprint._id) {
                             sprints[sprint.id] = sprint;
@@ -121,8 +135,8 @@ export function useProjectsHelper() {
 
             let tmp = {};
             if(filterFavorites) {
-                const favourites = Object.values(sprints).filter(x => x.favouriteTasks?.length && x.favouriteTasks.filter((y) => y.userId === userId.value).length).sort((a,b) => new Date(a?.createdAt) > new Date(b?.createdAt) ? -1 : 1)
-                const others = Object.values(sprints).filter(x => !x.favouriteTasks?.length || !x.favouriteTasks.filter((y) => y.userId === userId.value).length).sort((a,b) => new Date(a?.createdAt) > new Date(b?.createdAt) ? -1 : 1)
+                const favourites = Object.values(sprints).filter(x => isFavourite('sprint', x._id || x.id)).sort((a,b) => new Date(a?.createdAt) > new Date(b?.createdAt) ? -1 : 1)
+                const others = Object.values(sprints).filter(x => !isFavourite('sprint', x._id || x.id)).sort((a,b) => new Date(a?.createdAt) > new Date(b?.createdAt) ? -1 : 1)
                 let arr = [...favourites, ...others]
                 arr.forEach((sprint) => {
                     tmp[sprint.id] = sprint;
@@ -143,8 +157,8 @@ export function useProjectsHelper() {
 
                 let tmp = {};
                 if(filterFavorites && folder?.sprintsObj) {
-                    const favourites = Object.values(folder.sprintsObj).filter(x => x.favouriteTasks?.length && x.favouriteTasks.filter((y) => y.userId === userId.value).length).sort((a,b) => a?.createdAt?.seconds > b?.createdAt?.seconds ? -1 : 1)
-                    const others = Object.values(folder.sprintsObj).filter(x => !x.favouriteTasks?.length || !x.favouriteTasks.filter((y) => y.userId === userId.value).length).sort((a,b) => a?.createdAt?.seconds > b?.createdAt?.seconds ? -1 : 1)
+                    const favourites = Object.values(folder.sprintsObj).filter(x => isFavourite('sprint', x._id || x.id)).sort((a,b) => a?.createdAt?.seconds > b?.createdAt?.seconds ? -1 : 1)
+                    const others = Object.values(folder.sprintsObj).filter(x => !isFavourite('sprint', x._id || x.id)).sort((a,b) => a?.createdAt?.seconds > b?.createdAt?.seconds ? -1 : 1)
                     let arr = [...favourites, ...others]
                     arr.forEach((sprint) => {
                         tmp[sprint.id] = sprint;
@@ -301,8 +315,8 @@ export function useProjectsHelper() {
                     })
     
                     if(filterFavorites) {
-                        const favourites = tmp.value.filter(x => x.favouriteTasks?.length && x.favouriteTasks.filter((y) => y.userId === userId.value).length)?.sort((a,b) => new Date(a.createdAt).getTime() > new Date(b.createdAt).getTime() ? -1 : 1)
-                        const others = tmp.value.filter(x => !x.favouriteTasks?.length || !x.favouriteTasks.filter((y) => y.userId === userId.value).length)?.sort((a,b) => new Date(a.createdAt).getTime() > new Date(b.createdAt).getTime() ? -1 : 1)
+                        const favourites = tmp.value.filter(x => isFavourite('project', x._id))?.sort((a,b) => new Date(a.createdAt).getTime() > new Date(b.createdAt).getTime() ? -1 : 1)
+                        const others = tmp.value.filter(x => !isFavourite('project', x._id))?.sort((a,b) => new Date(a.createdAt).getTime() > new Date(b.createdAt).getTime() ? -1 : 1)
                         tmp.value = [...favourites, ...others];
                     } else {
                         tmp.value = tmp.value.sort((a, b) => new Date(a?.createdAt).getTime() > new Date(b?.createdAt).getTime() ? -1 : 1);
@@ -380,7 +394,7 @@ export function useProjectsHelper() {
                         let publicQuery = {
                             isPrivateSpace:false
                         }
-                        if(companyUserDetail.value.roleType !== 1 && companyUserDetail.value.roleType !== 2 && !getters["settings/rules"].toggle?.showAllProjects) {
+                        if(!isOwnerOrAdmin(companyUserDetail.value.roleType) && !getters["settings/rules"].toggle?.showAllProjects) {
                             publicQuery.AssigneeUserId = {
                                 $in:[uid]
                             }
@@ -394,7 +408,7 @@ export function useProjectsHelper() {
                         let privateQuery = {
                             isPrivateSpace:true
                         }
-                        if(companyUserDetail.value.roleType !== 1 && companyUserDetail.value.roleType !== 2) {
+                        if(!isOwnerOrAdmin(companyUserDetail.value.roleType)) {
                             if (privatePermission === 1) { 
                                     privateQuery.AssigneeUserId = {
                                     $in: [uid]
@@ -445,7 +459,7 @@ export function useProjectsHelper() {
     }
 }
 
-export function useUpdateTasks() {
+export function useUpdateTasks(project) {
     const $toast = useToast();
     const {getTaskStatus, getUser, getPriority, getTaskType} = useGetterFunctions();
     const {changeDateFormate} = useMoment();
@@ -453,7 +467,9 @@ export function useUpdateTasks() {
     const userId = inject("$userId");
     const companyId = inject("$companyId")
     const dateFormat = inject('$dateFormat');
-    const projectData = inject("selectedProject");
+    // The task detail overlay mounts beside router-view, so no ancestor provides
+    // selectedProject; callers outside a project route pass their own.
+    const projectData = project || inject("selectedProject");
 
     function returnMethodByGroupType(groupType) {
         switch (groupType) {
@@ -470,7 +486,14 @@ export function useUpdateTasks() {
         }
     }
 
+    function updateCustomFieldGroup(task, group) {
+        const updateDetail = customGroupUpdate(group);
+        if (!updateDetail) return Promise.reject(new Error("This group cannot take a dropped task"));
+        return taskClass.updateTaskCustomField({ companyId: companyId.value, taskId: task._id, customFieldId: updateDetail._id, updateDetail, taskObj: task });
+    }
+
     function updateTaskByGroup(task, updateTo, groupType, assigneeType = null ,isUpdateTask = true) {
+        if (customFieldIdOf(groupType)) return updateCustomFieldGroup(task, updateTo).then(() => true);
         return new Promise((resolve, reject) => {
             try {
                 if(groupType === undefined || groupType === null) return reject(new Error(`No group type found`));
@@ -528,7 +551,7 @@ export function useUpdateTasks() {
                     ProjectName: projectData.value.ProjectName,
                     ProjectCode: projectData.value.ProjectCode
                 }
-                taskClass.updateStatus({ newStatus, prevStatus: prevStatusObj, projectData: project, task: task, userData , isUpdateTask : isUpdateTask})
+                taskClass.updateStatus({ newStatus, prevStatus: prevStatusObj, projectData: project, task: task, userData , isUpdateTask : isUpdateTask, announce: true})
                 .then(() => {
                     $toast.success(t(`Toast.Status_changed_successfully`), {position: "top-right"})
                     resolve();
@@ -544,44 +567,45 @@ export function useUpdateTasks() {
     }
     const updatePriority = (task, newPriority,assigneeType,isUpdateTask) => {
         return new Promise((resolve, reject) => {
-            (async () => {  
-                try {
-                    const userData = getUserData();
-    
-                    let updateObj = {
-                        Task_Priority : newPriority.value
-                    }
-    
-                    let project = {
-                        '_id': projectData.value._id ? projectData.value._id : "",
-                        'ProjectName' : projectData.value.ProjectName,
-                        "CompanyId": companyId.value,
-                    }
-    
-                    const priority = getPriority(task.Task_Priority)
-                    let priorityObj = {
-                        'statusImage' : await getWasabiImageLink(projectData.value.CompanyId,priority.image),
-                        'priorityName' : priority.value,
-                        'taskId': task._id,
-                        'taskName': task.TaskName,
-                        'userName' : userData.Employee_Name,
-                        'newStatusImage' : await getWasabiImageLink(projectData.value.CompanyId,newPriority.image),
-                        'newPriorityName' : newPriority.value
-                    }
-    
-                    taskClass.updatePriority({firebaseObj: updateObj, projectData: project, taskData: task, priorityObj, userData, isUpdateTask : isUpdateTask})
-                    .then(() => {
-                        $toast.success(t(`Toast.Task_updated_successfully`), {position: "top-right"})
-                        resolve();
-                    })
-                    .catch((error) => {
-                        console.error("ERROR in update priority: ", error);
-                        reject(error);
-                    })
-                } catch (error) {
-                    reject(error);
+            try {
+                const userData = getUserData();
+
+                let updateObj = {
+                    Task_Priority : newPriority.value
                 }
-            })();
+
+                let project = {
+                    '_id': projectData.value._id ? projectData.value._id : "",
+                    'ProjectName' : projectData.value.ProjectName,
+                    "CompanyId": companyId.value,
+                }
+
+                const priority = getPriority(task.Task_Priority)
+                const priorityObj = Promise.all([
+                    getWasabiImageLink(projectData.value.CompanyId,priority.image),
+                    getWasabiImageLink(projectData.value.CompanyId,newPriority.image)
+                ]).then(([statusImage, newStatusImage]) => ({
+                    'statusImage' : statusImage,
+                    'priorityName' : priority.value,
+                    'taskId': task._id,
+                    'taskName': task.TaskName,
+                    'userName' : userData.Employee_Name,
+                    'newStatusImage' : newStatusImage,
+                    'newPriorityName' : newPriority.value
+                }));
+
+                taskClass.updatePriority({firebaseObj: updateObj, projectData: project, taskData: task, priorityObj, userData, isUpdateTask : isUpdateTask, announce: true})
+                .then(() => {
+                    $toast.success(t(`Toast.Task_updated_successfully`), {position: "top-right"})
+                    resolve();
+                })
+                .catch((error) => {
+                    console.error("ERROR in update priority: ", error);
+                    reject(error);
+                })
+            } catch (error) {
+                reject(error);
+            }
         })
     }
     const updateDueDate = (task, newDueDate,assigneeType,isUpdateTask) => {
@@ -643,7 +667,8 @@ export function useUpdateTasks() {
                     task: task,
                     obj: notificationObj,
                     userData,
-                    isUpdateTask: isUpdateTask
+                    isUpdateTask: isUpdateTask,
+                    announce: true
                 }
 
                 taskClass.updateDueDate(object).then(() => {
@@ -692,7 +717,8 @@ export function useUpdateTasks() {
                     employeeName: employeeName,
                     type: assigneeType ? assigneeType : "replace",
                     userData,
-                    isUpdateTask
+                    isUpdateTask,
+                    announce: true
                 })
                 .then(() => {
                     $toast.success(t(`Toast.Assignee_changed_successfully`), {position: "top-right"})
@@ -711,7 +737,9 @@ export function useUpdateTasks() {
     const updateTaskType = (task, newTaskType, type,isUpdateTask) => {
         return new Promise(async(resolve, reject) => {
             try {
-                let prevStatus = getTaskType(task.TaskTypeKey)
+                // Without the project this falls back to a getter only the project view sets,
+                // so the overlay opened from Home or search read the wrong project's types.
+                let prevStatus = getTaskType(task.TaskTypeKey, projectData.value)
                 const userData = getUserData()
                 let newTaskTypeImage = await getWasabiImageLink(projectData.value.CompanyId,newTaskType.taskImage);
                 let oldTaskTypeImage = await getWasabiImageLink(projectData.value.CompanyId,prevStatus.taskImage);
@@ -756,10 +784,9 @@ export function taskListHelper() {
     const indexKey= ref("");
     const expandedSprint = ref("");
     const priorities = computed(() => getters["settings/companyPriority"])
-    const weekDays= ref(["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"])
     const project = inject('selectedProject');
     const permit = checkPermission("task.show_tasks",project?.value?.isGlobalPermission);
-    function getSprintTasks({projectId, sprintId, item, fetchNew = false, projectData ,indexName,parentId = '',groupType,resetTable}) {
+    function getSprintTasks({projectId, sprintId, item, fetchNew = false, projectData ,indexName,parentId = '',groupType,resetTable,skip,firstPageOnly = false}) {
         return new Promise((resolve, reject) => {
             try {
                 if(permit === null && projectData.isGlobalPermission === false) {
@@ -795,7 +822,9 @@ export function taskListHelper() {
                         userId: userId.value,
                         showAllTasks: projectData.isGlobalPermission === false ? permit : true,
                         indexName: indexName,
-                        parentId : parentId
+                        parentId : parentId,
+                        skip,
+                        firstPageOnly
                     })
                     .then(() => {
                         resolve();
@@ -809,6 +838,18 @@ export function taskListHelper() {
                 console.error("ERROR: ", error);
             }
         })
+    }
+    function getGroupCounts({projectId, sprintId, items, projectData, totals = [], table = false}) {
+        if(permit === null && projectData.isGlobalPermission === false) return Promise.resolve();
+        return dispatch("projectData/refreshGroupCounts", {
+            pid: projectId,
+            sprintId,
+            items,
+            totals,
+            table,
+            userId: userId.value,
+            showAllTasks: projectData.isGlobalPermission === false ? permit : true
+        });
     }
     // FIREBASE
     function getMongoDBUpdate({projectId, sprintId,projectData, groupBy: groupByValue, currentView})
@@ -830,11 +871,7 @@ export function taskListHelper() {
         })
     }
 
-    function updateTaskKanbanIndex() {
-        return;
-    }
-
-    async function groupBy(type, refetch = false,project,sprintData,groupedTasks,isBoard,lView='list',resetTable=false,fetchTask = true,cb) {
+    async function groupBy(type, refetch = false,project,sprintData,groupedTasks,isBoard,lView='list',resetTable=false,fetchTask = true,cb,{firstPageOnly = false} = {}) {
         try {
             if(!project || !Object.keys(project).length) {
                 cb([])
@@ -881,72 +918,22 @@ export function taskListHelper() {
             } else if(type === 1) {
                 indexKey.value = "assigneeIndex";
 
-                // await getCollectionData({
-                //     collectionName: `${companyId.value}_${dbCollections.TASKS}`,
-                //     search: {
-                //         q:"*",
-                //         "group_by": "AssigneeUserId",
-                //         "filter_by": `ProjectID:=${project.value._id}`,
-                //         "group_limit": 1,
-                //         "per_page": 250
-                //     }
-                // })
-                // .then((result) => {
-                    let assigneeGroups = [].grouped_hits.map((x) => x.group_key[0]).map((x) => x.sort((a,b) => a > b ? 1 : -1));
-                    assigneeGroups.forEach((group => {
-                        let assignees = group.sort((a,b) => a > b ? 1 : -1)
-                        if(!arr.filter((x) => x.value === assignees.join("_")).length) {
-                            arr.push({
-                                isExpanded: true,
-                                name: "Assignee",
-                                users: assignees.length ? assignees.map((x) => getUser(x)) : [],
-                                value: assignees.join("_")
-                            })
-                        }
-                    }))
-
-                    if(!arr.length) {
-                        arr.push({
-                            isExpanded: true,
-                            name: "Assignee",
-                            users: [],
-                            value: ""
-                        })
-                    }
-
-                    arr = arr.sort((a,b) => a.users.length < b.users.length ? 1 : -1)
+                // Groups used to come from a typesense group_by; with search gone they come from the company seats instead.
+                arr = assigneeGroups(activeMemberIds(getters["settings/companyUsers"]), getUser, t("Projects.unassigned"), getters["settings/teams"]);
 
                     sprints.forEach((sprint, index) => {
                         sprint.isExpanded = false;
-                        let tmp = []
-                        arr.forEach((x, arrIndex) => {
-                            tmp.push({
-                                key: `${index}_${arrIndex}_${x.name}`,
-                                ...x,
-                                tasksArray: tasks,
-
-                                conditions: [
-                                    {
-                                        AssigneeUserId: {$in: x.users}
-                                    }
-                                ],
-
-                                searchKey: "AssigneeUserId",
-                                indexName: "groupByAssigneeIndex",
-                                searchCondition: ":",
-                                searchValue: x.value.length ? x.value.split("_") : '[]'
-                            });
-                        })
-
-                        // sprint.items = tmp.filter((x) => x.tasksArray.length || !x.users.length).sort((a, b) => a.users.length < b.users.length ? 1 : -1);
-                        sprint.items = tmp;
+                        sprint.items = arr.map((x, arrIndex) => ({
+                            key: `${index}_${arrIndex}_${x.name}`,
+                            ...x,
+                            tasksArray: tasks,
+                            conditions: [assigneeCondition(x.value, x.teamIds)],
+                            searchKey: "AssigneeUserId",
+                            indexName: "groupByAssigneeIndex",
+                            searchCondition: ":",
+                            searchValue: x.value ? [x.value] : '[]'
+                        }));
                     })
-                    return;
-                // })
-                // .catch((error) => {
-                //     console.error("ERROR in get groups: ", error);
-                //     return;
-                // })
             } else if(type === 2) {
                 // PRIOTITIES
                 indexKey.value = "priorityIndex";
@@ -976,209 +963,71 @@ export function taskListHelper() {
 
                     sprint.items = tmp;
                 })
-            } else if(type === 3) {
-                // DUE DATE
-                indexKey.value = "dueDateIndex";
-                let dt = new Date();
-                let todayS = new Date(dt.getFullYear(), dt.getMonth(), dt.getDate()).getTime() / 1000;
-                let currentDay = new Date(dt.getFullYear(), dt.getMonth(), dt.getDate()).getDay();
-                let daysRemaining = 6 - currentDay
-                let dayHrs = 24 * 60 * 60 * 1000;
-    
-                let items = [];
-    
-                for (let i = 0; i <= daysRemaining; i++) {
-                    let dateSeconds = (todayS * 1000) + (i * dayHrs);
-                    let dayName = (dateSeconds/1000) === todayS ? "Today" : weekDays.value[new Date(dateSeconds).getDay()];
-    
-                    items.push({
-                        name: dayName,
-                        value: dayName.toUpperCase(),
-                        operation: "eq",
-                        searchCondition: ":=",
-                        isExpanded: true,
-                        seconds: dateSeconds / 1000
-                    })
-                }
-    
-                items.splice(1, 0, {
-                    name: "Overdue",
-                    textColor: "red",
-                    value: "OVERDUE",
-                    operation: "lt",
-                    searchCondition: ":>",
-                    isExpanded: true,
-                    seconds: todayS-1
-                });
-    
-                items = [
-                    ...items,
-                    {
-                        name: "Next",
-                        value: "NEXT",
-                        operation: "gt",
-                        searchCondition: ":<",
-                        isExpanded: true,
-                        seconds: ((todayS * 1000) + ((daysRemaining + 1) * dayHrs)) / 1000
-                    },
-                    {
-                        name: "No Due Date",
-                        value: "NO_DUE_DATE",
-                        operation: "non",
-                        searchCondition: ":=",
-                        isExpanded: true,
-                        seconds: 0
-                    }
-                ]
-
-                arr = items;
-
-                let checkCase = (op, key, seconds, dateFormat = false) => {
-                    switch(op) {
-                        case "eq":
-                            if (dateFormat) {
-                                return {
-                                    [key]: {
-                                        dbDate: {
-                                            $gte: new Date(seconds * 1000),
-                                            $lte: new Date(new Date(seconds * 1000).setHours(23,59,59))
-                                        }
-                                    }
-                                }
-                            } else {
-                                return {
-                                    [key]: {
-                                        dbDate: {
-                                            $gte: seconds,
-                                            $lte: seconds + dayHrs
-                                        }
-                                    }
-                                }
-                            }
-                            // return `${key} :>= ${seconds} && ${key} :<= ${seconds + dayHrs}`
-
-                        case "lt":
-                            if (dateFormat) {
-                                return {
-                                    [key]: {
-                                        dbDate: {
-                                            $lte: seconds,
-                                        }
-                                    }
-                                }
-                            } else {
-                                return {
-                                    [key]: {
-                                        dbDate: {
-                                            $$lte: seconds,
-                                        }
-                                    }
-                                }
-                            }
-                            // return `${key} :<= ${seconds + dayHrs}`
-
-                        case "gt":
-                            if (dateFormat) {
-                                return {
-                                    [key]: {
-                                        dbDate: {
-                                            $gte: seconds,
-                                        }
-                                    }
-                                }
-                            } else {
-                                return {
-                                    [key]: {
-                                        dbDate: {
-                                            $gte: seconds,
-                                        }
-                                    }
-                                }
-                            }
-                            // return `${key} :>= ${seconds}`
-
-                        default:
-                            return {[key]: null}
-                    }
-                }
+            } else if(customFieldIdOf(type)) {
+                indexKey.value = "groupByStatusIndex";
+                const fieldId = customFieldIdOf(type);
+                const def = (getters["settings/finalCustomFields"] || []).find((field) => String(field?._id) === fieldId);
+                const people = def?.fieldType === "people"
+                    ? activeMemberIds(getters["settings/companyUsers"]).map((id) => ({ id, name: getUser(id).Employee_Name }))
+                    : [];
+                const range = needsProjectRange(def) ? await projectNumberRange(def, project._id) : null;
+                const loaded = needsProjectRange(def) && !range
+                    ? flatTasks([getters["projectData/tasks"], getters["projectData/tableTasks"]], project._id)
+                    : [];
+                arr = customFieldGroups(def, { t, people, range, tasks: loaded });
 
                 sprints.forEach((sprint, index) => {
                     sprint.isExpanded = false;
-                    let tmp = [];
-                    arr.forEach((x, arrIndex) => {
-                        let conditions = [checkCase(x.operation, "DueDate", x.seconds)].filter((x) => x);
-                        let mongoConditions = [checkCase(x.operation, "DueDate", x.seconds, true)].filter((x) => x);
-                        let obj = {
-                            key: `${index}_${arrIndex}_${x.name}`,
-                            ...x,
-                            tasksArray: tasks,
-    
-                            searchKey: "DueDate",
-                            indexName: "groupByDueDateIndex",
-                            searchValue: x.value === "NO_DUE_DATE" ? 0 : x.seconds,
-                        }
-                        if(conditions?.length) {
-                            obj.conditions = conditions;
-                            obj.mongoConditions = mongoConditions;
-                        }
-                        tmp.push({...obj})
-                    })
-    
-                    sprint.items = tmp;
+                    sprint.items = arr.map((x, arrIndex) => ({ ...x, key: `${index}_${arrIndex}_${x.searchValue}`, tasksArray: tasks }));
+                })
+            } else if(type === AGENT_WORK_GROUP) {
+                indexKey.value = "groupByStatusIndex";
+                arr = agentWorkGroups(agentWorkIn(project._id), t("AgentWork.group_none"));
+
+                sprints.forEach((sprint, index) => {
+                    sprint.isExpanded = false;
+                    sprint.items = arr.map((x) => ({ ...x, key: `${index}_${x.searchKey}_${x.searchValue}`, tasksArray: tasks }));
+                })
+            } else if(type === 3) {
+                // DUE DATE
+                indexKey.value = "dueDateIndex";
+                arr = dueDateBuckets(new Date(), t);
+
+                sprints.forEach((sprint, index) => {
+                    sprint.isExpanded = false;
+                    sprint.items = arr.map((x, arrIndex) => ({
+                        key: `${index}_${arrIndex}_${x.value}`,
+                        ...x,
+                        tasksArray: tasks,
+
+                        searchKey: "DueDate",
+                        indexName: "groupByDueDateIndex",
+                        searchValue: x.value === "NO_DUE_DATE" ? 0 : x.seconds,
+                        mongoConditions: [dueDateCondition(x, "DueDate")]
+                    }));
                 })
             }
 
-            // MAINTAIN PREVIOUSLY EXPANDED
             if (!isBoard) {
-                sprints.forEach((sprint) => {
-                    groupedTasks.value.forEach((sprint2) => {
-                        if(sprint.id === sprint2.id) {
-                            sprint.isExpanded = false;
-                            sprint.items.forEach((item) => {
-                                sprint2.items.forEach((item2) => {
-                                    if(item.name === item2.name) {
-                                        item.isExpanded = item2.isExpanded;
-    
-                                        item.tasksArray = item.tasksArray.sort((x, y) => x[indexKey.value] > y[indexKey.value] ? 1 : -1);
-                                        item.tasksArray.forEach((task, index) => {
-                                            if(task[indexKey.value] === undefined) {
-                                                task[indexKey.value] = index;
-                                                updateTaskKanbanIndex(indexKey.value ,task, index);
-                                            }
-                                            item2.tasksArray.forEach((task2) => {
-                                                if(task.id === task2.id) {
-                                                    task.isExpanded = task2.isExpanded;
-    
-                                                    task.subtaskArray = task.subtaskArray.sort((x, y) => x[indexKey.value] > y[indexKey.value] ? 1 : -1);
-                                                    task.subtaskArray.forEach((subTask, index2) => {
-                                                        if(subTask[indexKey.value] === undefined) {
-                                                            subTask[indexKey.value] = index2;
-                                                            updateTaskKanbanIndex(indexKey.value ,subTask, index2);
-                                                        }
-                                                    })
-                                                }
-                                            })
-                                        })
-                                    }
-                                })
-                            })
-    
-                        }
-                    })
-                })
+                restoreGroupState(sprints, groupedTasks.value, indexKey.value);
             }
+
+            dispatch("projectData/keepRequestsOfGroups", {
+                pid: project._id,
+                groups: Object.fromEntries(sprints.filter((sprint) => Array.isArray(sprint.items)).map((sprint) => [String(sprint.id || sprint._id), sprint.items.map((item) => item.key)]))
+            });
 
             if(sprints && sprints.length) {
-                if((sprints[0].deletedStatusKey === undefined || sprints[0].deletedStatusKey === 0) && fetchTask === true) {
-                    sprints[0].isExpanded = true;
-                    expandedSprint.value = sprints[0].id;
+                const openSprint = sprintToLoad(sprints, fetchTask === true);
+                if(openSprint?.isExpanded) {
+                    expandedSprint.value = openSprint.id;
                 }
 
                 if(refetch === true && fetchTask === true) {
                     let promises = [];
-                    sprints[0].items.forEach((item) => {
+                    openSprint.items.forEach((item) => {
                         promises.push(
-                            getSprintTasks({projectId: project._id, sprintId:sprints[0]?.id ? sprints[0]?.id : sprints[0]?._id, item, fetchNew: lView == 'table' ? refetch : true,projectData: project, indexName: item.indexName, groupType: lView,resetTable:resetTable})
+                            getSprintTasks({projectId: project._id, sprintId:openSprint?.id ? openSprint?.id : openSprint?._id, item, fetchNew: lView == 'table' ? refetch : true,projectData: project, indexName: item.indexName, groupType: lView,resetTable:resetTable, firstPageOnly})
                         )
                     })
                     Promise.allSettled(promises)
@@ -1187,13 +1036,11 @@ export function taskListHelper() {
                         cb(groupedTasks.value)
                         // getTaskArray();
 
-                        const sprintData = sprints[0];
-
                         getMongoDBUpdate({
                             projectId: project._id,
-                            sprintId: sprintData.id ? sprintData.id : sprintData._id,
+                            sprintId: openSprint.id ? openSprint.id : openSprint._id,
                             projectData: project,
-                            groupBy: {type: type,items: sprintData.items?.map((x) => ({key: `${x.searchKey}_${x.searchValue}`, value: x.searchValue, name: x.name}))},
+                            groupBy: {type: type,items: openSprint.items?.map((x) => ({key: `${x.searchKey}_${x.searchValue}`, value: x.searchValue, name: x.matchName || x.name}))},
                             currentView: lView == 'table' ? 'tableTasks' : 'tasks'
                         });
                     })
@@ -1271,10 +1118,9 @@ export function taskListHelper() {
         groupBy,
         checkCase,
         getSprintTasks,
+        getGroupCounts,
         getMongoDBUpdate,
         searchMongoDBTasks
     }
 }
-
-export const clearFilterSignal = ref(0);
 

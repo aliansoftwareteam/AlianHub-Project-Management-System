@@ -67,14 +67,14 @@
     border-radius: 15px;
 }
 .user_name_minute_family {
-    font-family: 'Roboto';
+    font-family: var(--font-ui);
     font-size: 13px;
     font-style: normal;
     font-weight: 400;
     line-height: normal;
 }
 .user_name_family {
-    font-family: 'Roboto';
+    font-family: var(--font-ui);
     font-size: 14px;
     font-style: normal;
     font-weight: 400;

@@ -3,7 +3,7 @@
     margin: 0px;
 }
 .audio_files-content ul li {
-    border: 1px solid #DFE1E6;
+    border: 1px solid var(--hairline);
     border-radius: 4px;
     padding: 10px 10px 2px !important;
     margin-bottom: 10px !important;
@@ -18,7 +18,7 @@
 .audio__user-sidebar input[type="checkbox"] {
     width: 15px !important;
     height: 15px !important;
-    border: 1px solid #DFE1E6 !important;
+    border: 1px solid var(--hairline) !important;
     margin: 0 0 0 0;
     min-width: 15px;
     position: relative;
@@ -33,8 +33,8 @@
     top: 2px;
 }
 .audio__user-sidebar input[type="checkbox"]:checked {
-    background-color: #2F3990 !important;
-    border: 1px solid #2F3990 !important;
+    background-color: var(--brand) !important;
+    border: 1px solid var(--brand) !important;
 }
 .audio__user-sidebar input[type=checkbox]:before {
     content: '';
@@ -43,7 +43,7 @@
     top: 47%;
     width: 4px;
     height: 9px;
-    border: solid #FFF;
+    border: solid var(--on-brand);
     border-width: 0 1px 1px 0;
     margin: -1px -1px 0 -1px;
     transform: rotate(45deg) translate(-50%, -50%);
@@ -61,8 +61,8 @@
     padding: 8px !important;
 }
 .checkboxBlueFileLink {
-    background-color: #2F3990 !important;
-    border: 1px solid #2F3990 !important;
+    background-color: var(--brand) !important;
+    border: 1px solid var(--brand) !important;
 }
 .checkboxBlueFileLink:before {
     opacity: 1 !important;
@@ -96,10 +96,10 @@
     width: 30px !important;
     height: 30px !important; 
     border-radius: 30px !important;
-    border: 2px solid #fff;
+    border: 2px solid var(--surface);
 }
 .li__equal-four .audio__user-sidebar .profile-image , .li__equal-three .profile-image{
-    border: 2px solid rgb(47, 57, 144) !important; 
+    border: 2px solid var(--brand) !important; 
     font-size: 14px !important; 
     width: 30px !important;
     height: 30px !important;
@@ -124,7 +124,7 @@
 }
 .user__employename{
     max-width: 120px;
-    color: #3b3b3b !important;
+    color: var(--ink-label) !important;
  }
  .file__ascedesc-wrapper{
     padding: 4.5px 9px 4.5px !important;

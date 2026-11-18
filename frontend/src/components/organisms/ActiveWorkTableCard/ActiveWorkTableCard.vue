@@ -3,7 +3,7 @@
         <CardSkeleton v-if="loading && !rows.length" :rows="5" />
         <template v-else>
             <div class="lwt-head">
-                <span class="lwt-count">{{ rows.length }} {{ rows.length === 1 ? 'person' : 'people' }} working now</span>
+                <span class="lwt-count">{{ $t('dashboardCard.lwt_people_working_now', { n: rows.length }, rows.length) }}</span>
             </div>
             <div v-if="!rows.length" class="lwt-msg">{{ $t('dashboardCard.no_one_working_now') }}</div>
             <div v-else class="lwt-table-wrap">
@@ -22,7 +22,7 @@
                             <td class="lwt-user">{{ r.user }}</td>
                             <td class="lwt-task">
                                 <div class="lwt-task-line">
-                                    <span class="lwt-running" title="Tracker running">●</span>
+                                    <span class="lwt-running" :title="$t('dashboardCard.lwt_tracker_running')">●</span>
                                     <span class="lwt-task-name" :title="r.task">{{ r.task }}</span>
                                 </div>
                                 <div v-if="r.comment" class="lwt-comment" :title="r.comment">{{ r.comment }}</div>
@@ -50,6 +50,7 @@ import * as env from '@/config/env';
 import { teamIdToUserId, buildFilterQuery } from '@/composable/commonFunction';
 import { resolveIsoRange, formatMinutes } from '@/composable/useResourceWorkload';
 import CardSkeleton from '@/components/atom/CardSkeleton/CardSkeleton.vue';
+import { ROLE_GUEST } from "@/utils/roles";
 
 // Resource Utilization card #4 — the "Live Work Table". Reuses the
 // employee-workload resolver in `currentOnly` mode (employees with a tracker
@@ -86,7 +87,7 @@ const load = async () => {
             dateTo,
             currentOnly: true,
             callerUserId: userId && userId.value ? String(userId.value) : '',
-            callerRoleType: props.companyUserDetail?.roleType || 3,
+            callerRoleType: props.companyUserDetail?.roleType ?? ROLE_GUEST,
             // Advanced "Add filter" builder → task-field match (buildFilterQuery).
             taskMatch: (() => {
                 const fd = Array.isArray(props.filterData) ? props.filterData : Object.values(props.filterData || {});
@@ -129,22 +130,22 @@ onMounted(load);
 
 <style scoped>
 .lwt { height: 100%; width: 100%; padding: 8px 10px; overflow: auto; display: flex; flex-direction: column; gap: 6px; }
-.lwt-msg { color: #9aa0b4; font-size: 12px; padding: 10px 0; }
+.lwt-msg { color: var(--ink-2); font-size: 12px; padding: 10px 0; }
 .lwt-head { font-size: 12px; font-weight: 600; color: #0d9488; }
 .lwt-table-wrap { overflow: auto; }
 .lwt-table { width: 100%; border-collapse: collapse; font-size: 12px; }
-.lwt-table th { text-align: left; color: #6b7280; font-weight: 600; padding: 4px 6px; border-bottom: 1px solid #eef0f6; position: sticky; top: 0; background: #fff; }
+.lwt-table th { text-align: left; color: var(--ink-2); font-weight: 600; padding: 4px 6px; border-bottom: 1px solid var(--hairline); position: sticky; top: 0; background: var(--surface); }
 /* Numeric column headers must right-align to line up with their right-aligned
    values (the element+class rule above otherwise wins over .lwt-num). */
 .lwt-table th.lwt-num { text-align: right; }
-.lwt-table td { padding: 5px 6px; border-bottom: 1px solid #f4f5f9; color: #3a3f52; }
+.lwt-table td { padding: 5px 6px; border-bottom: 1px solid var(--hairline); color: var(--ink-label); }
 .lwt-num { text-align: right; white-space: nowrap; min-width: 66px; }
 .lwt-user { font-weight: 600; white-space: nowrap; }
 .lwt-proj { max-width: 180px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .lwt-task { max-width: 260px; }
 .lwt-task-line { display: flex; align-items: center; overflow: hidden; }
 .lwt-task-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.lwt-comment { font-size: 10px; color: #9aa0b4; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; margin-top: 1px; }
-.lwt-running { color: #16a34a; margin-right: 5px; font-size: 10px; flex: none; }
+.lwt-comment { font-size: 10px; color: var(--ink-2); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; margin-top: 1px; }
+.lwt-running { color: var(--ok); margin-right: 5px; font-size: 10px; flex: none; }
 .lwt-day { font-weight: 600; color: #0f766e; }
 </style>

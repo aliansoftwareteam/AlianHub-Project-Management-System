@@ -25,5 +25,14 @@ export default [
             requiresAuth: true
         },
         component: () => import(/* webpackChunkName: "project" */ '@/views/Chat/Chat.vue'),
+    },
+    {
+        path: '/:cid/chat-notes/:noteId',
+        name: 'chat_call_notes',
+        meta: {
+            title: "Meeting notes",
+            requiresAuth: true
+        },
+        component: () => import(/* webpackChunkName: "project" */ '@/views/Chat/CallNotes.vue'),
     }
 ]

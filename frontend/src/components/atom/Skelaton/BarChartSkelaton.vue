@@ -31,13 +31,13 @@ defineComponent({
     height: 300px;
     max-width: 600px;
     margin: 20px auto;
-    border-bottom: 1px solid #ddd;
+    border-bottom: 1px solid var(--border);
 }
 
 .skeleton-bar {
     width: 40px;
     /* Adjust width as needed */
-    background: linear-gradient(180deg, #f0f0f0 25%, #e0e0e0 50%, #f0f0f0 75%);
+    background: linear-gradient(180deg, var(--fill) 25%, var(--track) 50%, var(--fill) 75%);
     background-size: 400% 400%;
     animation: loading 1.5s infinite ease-in-out;
 }
@@ -83,7 +83,7 @@ defineComponent({
     width: 80px;
     height: 14px;
     border-radius: 5px;
-    background: linear-gradient(90deg, #f0f0f0 25%, #e0e0e0 50%, #f0f0f0 75%);
+    background: linear-gradient(90deg, var(--fill) 25%, var(--track) 50%, var(--fill) 75%);
     background-size: 400% 400%;
     animation: loading 1.5s infinite ease-in-out;
 }

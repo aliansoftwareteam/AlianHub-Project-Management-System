@@ -2,9 +2,11 @@ const fs = require('fs');
 const path = require('path');
 var brandSettings = null; 
 const { APIURL } = require('../../Config/config');
+const { escapeHtml, textHtml, subjectText } = require('./emailText');
 const filePath = path.join(__dirname, '../../brandSettings.json');
 
-const sendEmailPasswordExpiredMail = function(email, link, brandName=''){
+/* `lead` replaces the opening sentence; without it the mail says the password expired. */
+const sendEmailPasswordExpiredMail = function(email, link, brandName='', { lead = 'Your password has expired, and your account requires a new password to continue.' } = {}){
     if (fs.existsSync(filePath)) {
         const fileContent = fs.readFileSync(filePath, 'utf-8');
         brandSettings = fileContent ? JSON.parse(fileContent) : null;
@@ -12,7 +14,7 @@ const sendEmailPasswordExpiredMail = function(email, link, brandName=''){
     brandName = brandName == '' ? (`${brandSettings && brandSettings.productName ? brandSettings.productName : (`${process.env.APP_NAME ? process.env.APP_NAME : 'Alian Hub'}`)}`): brandName
     const imageUrl = APIURL + "api/v1/getlogo?key=logo&type=emailTemplateLogo" || 'https://firebasestorage.googleapis.com/v0/b/alianerphubdev.appspot.com/o/beta_logo.png?alt=media&token=7f601008-28eb-4fd9-a62a-3ef577fa4bd0';
     return {
-  subject: `Set New Password | ${brandName}`,
+  subject: subjectText(`Set New Password | ${brandName}`),
   mail: `<head>
         <meta charset="utf-8">
         <meta http-equiv="x-ua-compatible" content="ie=edge">
@@ -79,13 +81,13 @@ const sendEmailPasswordExpiredMail = function(email, link, brandName=''){
                             <tbody>
                                 <tr>
                                     <td align="left" valign="top" style="border-collapse:collapse!important;word-break:break-word;padding:30px 40px">
-                                        <p>Your password has expired, and your account requires a new password to continue. </p>
+                                        <p>${textHtml(lead)} </p>
                                         <p> Please set your new password by clicking the button below: </p>
                                         <table border="0" cellpadding="0" cellspacing="0" width="100%" style="border-collapse:collapse;border-spacing:0;table-layout:auto;padding:0">
                                             <tbody>
                                                 <tr>
                                                     <td align="center" valign="middle" style="border-collapse:collapse!important;word-break:break-word;padding:30px 0 30px">
-                                                        <a href="${link}"
+                                                        <a href="${escapeHtml(link)}"
                                                             style="cursor:pointer; border-radius: 10px;padding: 10px 20px 10px;color:#fff!important;display:block;font-size:15px;font-weight:700;text-decoration:none;background-color:#253d98;"
                                                             tagret="_blank">
                                                             Click here to set new password
@@ -106,7 +108,7 @@ const sendEmailPasswordExpiredMail = function(email, link, brandName=''){
                             <tbody>
                                 <tr>
                                     <td align="center" style="border-collapse:collapse!important;word-break:break-word;color:#8d8c9f;font-size:11px;padding:0">
-                                        <p style="font-size:14px;padding-bottom:10px;margin:0">Copyright ${new Date().getFullYear()} © ${brandName}, All Rights Reserved.</p>
+                                        <p style="font-size:14px;padding-bottom:10px;margin:0">Copyright ${new Date().getFullYear()} © ${textHtml(brandName)}, All Rights Reserved.</p>
                                     </td>
                                 </tr>
                             </tbody>

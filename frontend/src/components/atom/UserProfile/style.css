@@ -1,5 +1,5 @@
 .asignee-profile {
-    border: 2px solid white;
+    border: 2px solid var(--surface);
 }
 .user-status {
     position: absolute;
@@ -11,7 +11,7 @@ span.onoffDot {
     height: 5px!important;
     width: 5px!important;
     position: absolute!important;
-    border: 1px solid #fff!important;
+    border: 1px solid var(--surface)!important;
     border-radius: 5px!important;
     right: 1px!important;
     bottom: 5px!important;
@@ -21,7 +21,7 @@ span.onoffDot.online {
     background-color: #4dd966;
 }
 .converted__subtask-image .profile-image {
-    border: 2px solid #fff !important;
+    border: 2px solid var(--surface) !important;
 }
 .Assignee-component .setting_project-owner{
     min-width: 30px;
@@ -39,7 +39,7 @@ span.onoffDot.online {
     border: 2px solid blue !important;
 }
 @media(max-width: 767px){
-    .task-detail-right-side-label .asignee-profile {border: 2px solid white !important;}
+    .task-detail-right-side-label .asignee-profile {border: 2px solid var(--surface) !important;}
 }
 @media(max-width: 412px){
     .setting_project-owner{

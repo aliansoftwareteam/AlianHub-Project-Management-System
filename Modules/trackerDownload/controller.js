@@ -130,22 +130,40 @@ exports.updateTracker = async (req, res) => {
     }
 };
 
+/* Anyone can read this list, signed in or not, so it carries the download links and
+ * nothing about who uploaded them. */
+const DOWNLOAD_FIELDS = ['title', 'type', 'version', 'downloadUrl', 'description'];
+const SORTABLE_FIELDS = [...DOWNLOAD_FIELDS, 'createdAt', '_id'];
+
+const sortFrom = (raw) => {
+    let asked;
+    try {
+        asked = JSON.parse(raw);
+    } catch {
+        return {};
+    }
+    if (!asked || typeof asked !== 'object' || Array.isArray(asked)) return {};
+    return Object.fromEntries(Object.entries(asked).filter(([field, direction]) => SORTABLE_FIELDS.includes(field) && (direction === 1 || direction === -1)));
+};
+
+const positiveInt = (raw) => {
+    const value = parseInt(raw, 10);
+    return Number.isInteger(value) && value > 0 ? value : null;
+};
+
 exports.getTracker = async (req, res) => {
     try {
         let { currentPage = 1, batchSize, search = '', sort = '{}', source = '' } = req.query;
+        batchSize = positiveInt(batchSize);
+        search = typeof search === 'string' ? search : '';
 
-        // Determine the cache key based on the presence of the X-Source header
         const trackerCacheKey = source === 'front' ? 'trackers:frontend' : '';
 
         let trackers = myCache.get(trackerCacheKey);
 
-        // Calculate skips based on currentPage
-        const skips = (parseInt(currentPage) - 1) * (batchSize ? parseInt(batchSize) : 1); // Default to 1 to avoid skipping all records
-        const sortObj = JSON.parse(sort);
+        const skips = ((positiveInt(currentPage) || 1) - 1) * (batchSize || 1);
+        const sortObj = sortFrom(sort);
 
-
-
-        // If no data in cache, fetch from the database
         if (!trackers || source == '') {
             const data = {
                 type: dbCollections.TIMETRACKER_DOWNLOAD,
@@ -158,28 +176,13 @@ exports.getTracker = async (req, res) => {
                         },
                     },
                     {
-                        $lookup: {
-                            from: dbCollections.USERS,
-                            localField: 'userId',
-                            foreignField: '_id',
-                            as: 'user_data',
-                            pipeline: [
-                                {
-                                    $project: {
-                                        Employee_profileImage: 1,
-                                        Employee_Name: 1,
-                                    },
-                                },
-                            ],
-                        },
-                    },
-                    {
                         $facet: {
                             metadata: [{ $count: 'total' }],
                             data: [
                                 { $sort: Object.keys(sortObj).length ? sortObj : { createdAt: -1, _id: 1 } },
                                 { $skip: skips },
-                                ...(batchSize ? [{ $limit: parseInt(batchSize) }] : []), // Only apply $limit if batchSize is provided
+                                ...(batchSize ? [{ $limit: batchSize }] : []),
+                                { $project: Object.fromEntries(DOWNLOAD_FIELDS.map((field) => [field, 1])) },
                             ],
                         },
                     },
@@ -191,20 +194,18 @@ exports.getTracker = async (req, res) => {
                 const metadata = response[0].metadata[0] || { total: 1 };
                 const totalRecords = metadata.total || 0;
 
-                // Send response
                 res.send({
                     status: true,
                     statusText: 'Data fetched successfully',
                     data: response[0].data,
                     metadata: {
                         total: totalRecords,
-                        totalPages: batchSize ? Math.ceil(totalRecords / parseInt(batchSize)) : 1, // If no batchSize, assume all records fit on one page
+                        totalPages: batchSize ? Math.ceil(totalRecords / batchSize) : 1,
                     },
                 });
 
-                // Store the response in the appropriate cache
                 if (source === 'front') {
-                    myCache.set(trackerCacheKey, response, 604800); // Cache for 7 days
+                    myCache.set(trackerCacheKey, response, 604800);
                 }
             } else {
                 res.send({
@@ -215,7 +216,6 @@ exports.getTracker = async (req, res) => {
                 });
             }
         } else {
-            // If data is found in cache, return it
             const metadata = trackers[0].metadata[0] || { total: 1 };
             const totalRecords = metadata.total || 0;
             res.send({
@@ -224,7 +224,7 @@ exports.getTracker = async (req, res) => {
                 data: trackers[0].data,
                 metadata: {
                     total: totalRecords,
-                    totalPages: batchSize ? Math.ceil(totalRecords / parseInt(batchSize)) : 1, // If no batchSize, assume all records fit on one page
+                    totalPages: batchSize ? Math.ceil(totalRecords / batchSize) : 1,
                 },
             });
         }

@@ -30,7 +30,8 @@
             :placeholder="$t('errorPage.select_a_date')"
             @range-end="onRangeEnd"
             @range-start="onRangeStart"
-            @open="handleOpen"
+            @open="handleOpen(); menuOpen = true"
+            @closed="menuOpen = false"
             :title="dateValue ? dateValue.length === 2 ? `${convertDateFormat(dateValue[0],props.format ? props.format : '',{showDayName: false})} - ${convertDateFormat(dateValue[1],props.format ? props.format : '',{showDayName: false})}` : convertDateFormat(dateValue,props.format ? props.format : '',{showDayName: false}) : ''"
         >
             <!-- for range picker -->
@@ -56,54 +57,81 @@
             </template>
             <!-- for simple date picker -->
             <template #trigger v-if="range === false">
-                <div v-if="!isShowDateAndicon" class="d-flex">
+                <slot name="trigger" :value="dateValue">
+                <component
+                    :is="buttonLabel ? 'button' : 'div'"
+                    v-if="!isShowDateAndicon"
+                    :type="buttonLabel ? 'button' : null"
+                    class="d-flex calendar-trigger"
+                    :class="{ 'calendar-trigger--button': buttonLabel }"
+                    :role="buttonLabel ? null : 'button'"
+                    :tabindex="buttonLabel ? null : 0"
+                    :aria-label="buttonLabel || ariaLabel || $t('errorPage.select_a_date')"
+                    @keydown.enter.self.prevent="openCalendar"
+                    @keydown.space.self.prevent="openCalendar"
+                >
                     <span :title="convertDateFormat(dateValue,props.format ? props.format : '',{showDayName: false})" v-if="dateValue != ''" class="cursor-pointer due_date-listing" :style="[{'color':(typeof dateValue == 'string' ? new Date(dateValue).getTime() < new Date().setHours(0, 0, 0, 0) : dateValue < new Date().setHours(0, 0, 0, 0)) && overdue ? 'red' :'black'}]">
                         {{convertDateFormat(dateValue,props.format ? props.format : '',{showDayName: false})}}
                     </span>
                     <img v-else :src="isWithoutBorderImage ? withoutBorderImageIcon : dateImage" class="cursor-pointer" alt="dateImage">
-                </div>
+                </component>
                 <div v-if="isShowDateAndicon">
                     <div v-if="!showTimeFormate">
                         <input
                             v-if="dateValue != ''"
                             readonly 
-                            class="date_format_cal font-roboto-sans"
-                            :class="[{'calendar-comp':!calenderImage,'calendar-comp-white':calenderImage}]"
+                            class="date_format_cal font-ui"
+                            :class="[{'calendar-comp':!calenderImage,'calendar-comp-white':calenderImage,'date_format_cal--value':valueAsText}]"
                             type="text"
-                            :placeholder="convertDateFormat(dateValue,props.format ? props.format : '',{showDayName: false})"
+                            :value="valueAsText ? convertDateFormat(dateValue,props.format ? props.format : '',{showDayName: false}) : null"
+                            :placeholder="valueAsText ? null : convertDateFormat(dateValue,props.format ? props.format : '',{showDayName: false})"
                             :id="inputId"
+                            :aria-label="ariaLabel || null"
+                            @keydown.enter.prevent="openCalendar"
+                            @keydown.space.prevent="openCalendar"
                         >
                         <input
                             v-else
-                            class="date_format_cal font-roboto-sans"
+                            class="date_format_cal font-ui"
                             readonly
                             type="text"
                             :class="[{'calendar-comp':!calenderImage,'calendar-comp-white':calenderImage}]"
-                            :placeholder="props.format ? props.format : settingDateFormat"
+                            :placeholder="emptyText || (props.format ? props.format : settingDateFormat)"
                             :id="inputId"
+                            :aria-label="ariaLabel || null"
+                            @keydown.enter.prevent="openCalendar"
+                            @keydown.space.prevent="openCalendar"
                         >
                     </div>
                     <div v-else>
                         <input
                             v-if="dateValue != ''"
                             readonly 
-                            class="date_format_cal font-roboto-sans"
-                            :class="[{'bg-transparent border-0 cursor-pointer':!calenderImage,'calendar-comp-white':calenderImage,'text-ellipse':isEllipsis,'d-block':isEllipsis,'mw-150px':isEllipsis,'date_mw':isTask}]"
+                            class="date_format_cal font-ui"
+                            :class="[{'bg-transparent border-0 cursor-pointer':!calenderImage,'calendar-comp-white':calenderImage,'text-ellipse':isEllipsis,'d-block':isEllipsis,'mw-150px':isEllipsis,'date_mw':isTask,'date_format_cal--value':valueAsText}]"
                             type="text"
-                            :placeholder="convertDateAndTime(timeFormate,dateValue,props.format)"
+                            :value="valueAsText ? convertDateAndTime(timeFormate,dateValue,props.format) : null"
+                            :placeholder="valueAsText ? null : convertDateAndTime(timeFormate,dateValue,props.format)"
                             :id="inputId"
+                            :aria-label="ariaLabel || null"
+                            @keydown.enter.prevent="openCalendar"
+                            @keydown.space.prevent="openCalendar"
                         >
                         <input
                             v-else
-                            class="date_format_cal font-roboto-sans"
+                            class="date_format_cal font-ui"
                             readonly
                             type="text"
                             :class="[{'bg-transparent border-0 cursor-pointer':!calenderImage,'calendar-comp-white':calenderImage,'text-ellipse':isEllipsis,'d-block':isEllipsis,'mw-150px':isEllipsis,'date_mw':isTask}]"
-                            :placeholder="`${props.format} , ${timeFormate?'24 Hour':'AM/PM'}`"
+                            :placeholder="emptyText || `${props.format} , ${timeFormate?'24 Hour':'AM/PM'}`"
                             :id="inputId"
+                            :aria-label="ariaLabel || null"
+                            @keydown.enter.prevent="openCalendar"
+                            @keydown.space.prevent="openCalendar"
                         >
                     </div>
                 </div>
+                </slot>
             </template>
         </VueDatePicker>
         <!-- <VueDatePicker
@@ -129,6 +157,7 @@ import {useConvertDate} from '@/composable/index';
 import { useStore } from "vuex";
 const { getters } = useStore();
 import moment from 'moment';
+import { useEscapeLayer } from '@/composable/useEscapeLayer';
 import { useI18n } from "vue-i18n";
 const { t } = useI18n();
 //Define Emits, Props, & Refs
@@ -164,6 +193,11 @@ const props = defineProps({
         type: [Date, String],
         default: ''
     },
+    /* The chosen date is the input's value, which a screen reader and a copy can reach, rather than its placeholder. */
+    valueAsText: {
+        type: Boolean,
+        default: false
+    },
     isShowDateAndicon: {
         type: Boolean,
         default: false
@@ -195,6 +229,19 @@ const props = defineProps({
     calenderImage: {
         type: Boolean,
         default: false
+    },
+    ariaLabel: {
+        type: String,
+        default: ''
+    },
+    /** When set, the icon or date trigger is a real button with this accessible name. */
+    buttonLabel: {
+        type: String,
+        default: ''
+    },
+    emptyText: {
+        type: String,
+        default: ''
     },
     inputId: {
         type: String,
@@ -252,6 +299,9 @@ const props = defineProps({
 const dateValue = ref(props.modelValue);
 const prevaldate = ref(null);
 const datePicker = ref('');
+const menuOpen = ref(false);
+useEscapeLayer(menuOpen, () => datePicker.value?.closeMenu());
+const openCalendar = () => datePicker.value?.openMenu?.();
 const startDateVal = ref('');
 const endDateVal = ref('');
 const dateImage = require('@/assets/images/svg/date_cion.svg');

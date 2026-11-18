@@ -37,7 +37,7 @@
                             :aria-label="$t ? ($t('Projects.close') || 'Close') : 'Close'"
                             @click.prevent="closeModal()"
                         >
-                            <img :src="cancelIcon" class="cancel__icon-img" alt="">
+                            <span class="ah-mask-icon cancel__icon-img" :style="maskOf(cancelIcon)" aria-hidden="true"></span>
                         </button>
                     </slot>
                 </div>
@@ -47,8 +47,8 @@
                 <div class="modal-footer" v-if="footer">
                     <slot class="modal-footer" name="footer">
                         <div class="d-flex justify-content-end">
-                            <button class="outline-secondary" @click="closeModal()" v-if="cancelButton">{{cancelButtonText === "Cancel" ? $t('Projects.cancel') : cancelButtonText}}</button>
-                            <button class="btn-primary ml-10px" @click="$emit('accept', true)" v-if="acceptButton">{{acceptButtonText}}</button>
+                            <button type="button" class="ah-btn ah-btn--secondary ah-btn--sm" @click="closeModal()" v-if="cancelButton">{{cancelButtonText === "Cancel" ? $t('Projects.cancel') : cancelButtonText}}</button>
+                            <button type="button" class="ah-btn ah-btn--primary ah-btn--sm ml-10px" @click="$emit('accept', true)" v-if="acceptButton">{{acceptButtonText}}</button>
                         </div>
                     </slot>
                 </div>
@@ -61,6 +61,7 @@
 // PACKAGES
 import { useCustomComposable } from "@/composable";
 import { computed, defineComponent, defineEmits, defineProps, nextTick, onBeforeUnmount, onMounted, ref, watch } from "vue"
+import { maskOf } from "@/utils/iconMask";
 
 // UTILS
 const {makeUniqueId} = useCustomComposable();

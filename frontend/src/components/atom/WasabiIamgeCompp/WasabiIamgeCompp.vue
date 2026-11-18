@@ -1,10 +1,10 @@
 <template>
-    <ImageIcon :src="imgUrl" :title="data.title" :alt="data.filename ? data.filename : ''" :extension="data.extension" v-if="!loading && imgUrl!== ''" :style="style" :class="props.class" :userImage="userImage" :imageErrorOccured="imageLoadError"/>
+    <ImageIcon :src="imgUrl" :title="data.title" :alt="altText" :extension="data.extension" v-if="!loading && imgUrl!== ''" :style="style" :class="props.class" :userImage="userImage" :imageErrorOccured="imageLoadError"/>
     <SkelatonVue v-else :style="style" :class="props.class"/>
 </template>
 
 <script setup>
-    import { onMounted, defineProps, inject, ref, defineEmits, watch } from 'vue';
+    import { computed, onMounted, defineProps, inject, ref, defineEmits, watch } from 'vue';
     import ImageIcon from "@/components/atom/ImageIcon/ImageIcon.vue"
     import * as env from '@/config/env';
     import isEqual from "lodash/isEqual"
@@ -37,8 +37,15 @@
         fromWhere: {
             type: String,
             default: ""
+        },
+        alt: {
+            type: String,
+            default: null
         }
     });
+
+    /* A person's picture is stored as a data URL, whose last path segment is the tail of the data, not a name. */
+    const altText = computed(() => props.alt ?? (props.userImage ? '' : (props.data.filename || '')));
 
     const emit = defineEmits(["downloadUrl"]);
     const imageObject = ref();

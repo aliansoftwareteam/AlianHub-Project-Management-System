@@ -1,199 +1,192 @@
 <template>
     <div class="kanban-card-wrapper">
-        <!-- Multi-select checkbox: top-left of card. Visible on card hover OR when this card is selected. -->
-        <label
-            v-if="canCardMultiSelect"
-            class="kanban-card-multi-select"
-            :class="{ 'kanban-card-multi-select--active': isCardSelected }"
-            @click.stop
-            @mousedown.stop
-        >
-            <input
-                type="checkbox"
-                :checked="isCardSelected"
-                @click.stop
-                @mousedown.stop
-                @change="handleCardCheckboxChange($event)"
-                aria-label="Select task"
-            />
-        </label>
         <div @click.stop.prevent="!showArchiveVar ? toggleTaskDetail(element) : ''">
             <div>
-                <div class="d-flex justify-content-between">
-                    <div class="d-flex align-items-center mw-82">
-                        <!-- Task type removed from the Kanban card. This spacer keeps the
-                             top-left slot for the absolute multi-select checkbox so the
-                             title never sits underneath it. -->
-                        <span class="kanban-card-checkbox-space" aria-hidden="true"></span>
-                        <div class="list-group-kanban-item__taskName text-ellipsis font-weight-500 font-size-14 ml-5px black" :title="element.TaskName">
-                            <img v-if="element.deletedStatusKey === 2" :src="inventoryIcon" alt="inventory" class="ml-5px" />
-                            <img v-if="element.deletedStatusKey === 1" :src="deleteIcon" alt="delete" class="ml-5px" />
+                <div class="card-head">
+                    <div class="card-title-row">
+                        <label
+                            v-if="canCardMultiSelect"
+                            class="kanban-card-multi-select"
+                            :class="{ 'kanban-card-multi-select--active': isCardSelected }"
+                            @click.stop
+                            @mousedown.stop
+                        >
+                            <input
+                                type="checkbox"
+                                :checked="isCardSelected"
+                                @click.stop="handleCardCheckboxChange($event)"
+                                @keydown.shift.stop="handleCardCheckboxChange($event)"
+                                @mousedown.stop
+                                :aria-label="$t('Common.select_task_named', { name: element.TaskName })"
+                            />
+                        </label>
+                        <input
+                            v-if="renaming"
+                            ref="renameInput"
+                            v-model="renameDraft"
+                            type="text"
+                            class="card-rename"
+                            maxlength="250"
+                            :aria-label="$t('List.rename_label')"
+                            @click.stop
+                            @mousedown.stop
+                            @pointerdown.stop
+                            @keydown.enter.prevent="saveRename"
+                            @keydown.esc.stop.prevent="endRename"
+                            @blur="saveRename"
+                        />
+                        <div
+                            v-else
+                            ref="titleEl"
+                            class="card-title"
+                            :title="element.TaskName"
+                            role="button"
+                            tabindex="0"
+                            @keydown.enter.self.prevent="!showArchiveVar ? toggleTaskDetail(element) : ''"
+                            @keydown.space.self.prevent="!showArchiveVar ? toggleTaskDetail(element) : ''"
+                        >
+                            <span v-if="taskKey" class="card-key">{{ taskKey }}</span>
+                            <TaskHomeMark v-if="!isSubTask" :task="element" :list="viewedList" />
+                            <img v-if="element.deletedStatusKey === 2" :src="inventoryIcon" alt="inventory" class="card-title__state" />
+                            <img v-if="element.deletedStatusKey === 1" :src="deleteIcon" alt="delete" class="card-title__state" />
                             {{ element.TaskName }}
                         </div>
                     </div>
-                    <Transition>
-                        <div class="option-list" id="modelListComponent">
-                            <DropDown :title="element.TaskName" v-if="showArchiveVar ? element.deletedStatusKey === 2 : element.deletedStatusKey === 0">
-                                <template #button>
-                                    <img :ref="element.id+'options'" :src="horizontalDots" alt="horizontalDots">
-                                </template>
-                                <template #options>
-                                    <DropDownOption @click="$refs[element.id+`options`].click(),copyTaskLink()">
-                                        <div class="d-flex align-items-center">
-                                            <img :src="linkIcon" alt="inventoryIcon" class="mr-10px">
-                                            {{$t('ProjectDetails.copy_task_link')}}
-                                        </div>
-                                    </DropDownOption>
-                                    <DropDownOption @click="$refs[element.id+`options`].click(),copyTaskKey()">
-                                        <div class="d-flex align-items-center">
-                                            <img :src="splitScreen" alt="inventoryIcon" class="mr-10px">
-                                            {{$t('ProjectDetails.copy_task_key')}}
-                                        </div>
-                                    </DropDownOption>
-                                    <DropDownOption v-if="element.deletedStatusKey === undefined || element.deletedStatusKey === 0 && checkPermission('task.task_archive',projectData.isGlobalPermission) == true" @click="$refs[element.id+`options`].click(), showSidebar = true, archive = true">
-                                        <div class="d-flex align-items-center">
-                                            <img :src="inventoryIcon" alt="inventoryIcon" class="mr-10px">
-                                            {{$t('Projects.archive')}}
-                                        </div>
-                                    </DropDownOption>
-                                    <DropDownOption v-if="element.deletedStatusKey === 2" @click="$refs[element.id+`options`].click(), updateTask(0)">
-                                        <div class="d-flex align-items-center">
-                                            <img :src="inventoryIcon" alt="restoreInventoryIcon" class="mr-10px">
-                                            {{$t('Projects.restore')}}
-                                        </div>
-                                    </DropDownOption>
-                                    <DropDownOption
-                                        @click="$refs[element.id+`options`].click(), showSidebar = true, archive = false"
-                                        v-if="checkPermission('task.task_delete',projectData.isGlobalPermission) == true">
-                                        <div class="d-flex align-items-center">
-                                            <img :src="deleteIcon" alt="deleteIcon" class="mr-10px">
-                                            {{$t("Projects.delete")}}
-                                        </div>
-                                    </DropDownOption>
-                                    <DropDownOption @click="$refs[element.id+`options`].click(),convertToSubTask()" v-if="checkPermission('task.sub_task_create',projectData.isGlobalPermission) === true && !showArchiveVar && task?.isParentTask && checkPermission('task.task_convert_to_subtask',projectData.isGlobalPermission) === true">
-                                        <div class="d-flex align-items-center">
-                                            <img :src="subTaskIcon" alt="deleteIcon" class="mr-10px">
-                                            {{$t('ProjectDetails.convert_subtask')}}
-                                        </div>
-                                    </DropDownOption>
-                                    <DropDownOption @click="$refs[element.id+`options`].click(),convertToList()" v-if="checkPermission('project.project_sprint_create',projectData.isGlobalPermission) === true && !showArchiveVar && checkPermission('task.task_convert_to_list',projectData.isGlobalPermission) === true">
-                                        <div>
-                                            <img :src="combinedIcon" />
-                                            <span class="dropdown-label">{{$t('ProjectDetails.convert_list')}}</span>
-                                        </div>
-                                    </DropDownOption>
-                                    <DropDownOption @click="$refs[element.id+`options`].click(),duplicateTask()" v-if="!showArchiveVar && checkPermission('task.task_duplicate',projectData.isGlobalPermission) == true">
-                                        <div>
-                                            <img :src="copyIcon" class="copyIcon"/>
-                                            <span class="dropdown-label">{{$t('Projects.duplicate')}}</span>
-                                        </div>
-                                    </DropDownOption>
-                                    <DropDownOption @click="$refs[element.id+`options`].click(),moveTask()" v-if="!showArchiveVar && checkPermission('task.task_move',projectData.isGlobalPermission) == true">
-                                        <div>
-                                            <img :src="moveIcon" />
-                                            <span class="dropdown-label">{{$t('ProjectDetails.move')}}</span>
-                                        </div>
-                                    </DropDownOption>
-                                    <DropDownOption @click="$refs[element.id+`options`].click(),mergeTask()" v-if="!showArchiveVar && checkPermission('task.task_merge',projectData.isGlobalPermission) == true">
-                                        <div>
-                                            <img :src="mergeIcon" />
-                                            <span class="dropdown-label">{{$t('ProjectDetails.merge')}}</span>
-                                        </div>
-                                    </DropDownOption>
-                                </template>
-                            </DropDown>
-                        </div>
-                    </Transition>
-                </div>
-                <div class="d-flex mt-10px align-items-center" :class="{'ml--5px' :tagChipArray?.length}" v-if="!showArchiveVar && tagChipArray.length && checkApps('tags')">
-                    <!-- Tags -->
-                    <div v-for="(item, index) in tagChipArray" :key="index" @click.stop.prevent="">
-                        <div v-if="(index < chipCount)" class="tagList">
-                            <TagChip  :data="item" :isBorder="false" :prjectGlobalPermission="projectData?.isGlobalPermission"  :ids="ids" :tagsArray="projectData.tagsArray"/>
-                        </div>
-                        <div v-if="index == chipCount" class="tagcount"> +{{tagChipArray.length - chipCount}} </div>         
-                    </div>
-                    <div v-if="checkPermission('task.task_tag',projectData?.isGlobalPermission) !== null">
-                        <CreateTagPopup :task="element" @send:tagChipArray="(val)=>tagChipArray = val" @send:ids="(val)=>ids = val" :project="projectData" :chipCount="chipCount" :isTaskList="false" />
-                    </div>
-                </div>
-                <div class="d-flex justify-content-between mt-10px" :class="{'ml-5px': element.AssigneeUserId.length > 0}">
-                    <!-- Assignee -->
-                    <div v-if="checkPermission('task.task_assignee',projectData?.isGlobalPermission) !== null && (groupValue !== 1 || isSubTask)">
-                        <Assignee
-                            v-if="checkPermission('task.task_assignee',projectData?.isGlobalPermission) === true && checkPermission('task.task_list',projectData?.isGlobalPermission) == true"
-                            :users="element.AssigneeUserId"
-                            :options="permittedOptions"
-                            :num-of-users="1"
-                            imageWidth="25px"
-                            :addUser="!showArchiveVar"
-                            @selected="changeAssignee(checkApps('MultipleAssignees',projectData) ? 'add' : 'replace', $event)"
-                            @removed="changeAssignee('remove', $event)"
-                            :isDisplayTeam="true"
-                            :multiSelect="checkApps('MultipleAssignees')"
-                        />
-                        <Assignee
-                            v-else
-                            :users="element.AssigneeUserId"
-                            :options="nonPermittedOptions"
-                            :num-of-users="1"
-                            imageWidth="25px"
-                            :addUser="!showArchiveVar"
-                            @selected="changeAssignee(checkApps('MultipleAssignees',projectData) ? 'add' : 'replace', $event)"
-                            @removed="changeAssignee('remove', $event)"
-                            :isDisplayTeam="true"
-                            :multiSelect="checkApps('MultipleAssignees')"
-                            class=""
-                        />
-                    </div>
-                    <div class="d-flex align-items-center board-view-action-wrapper">
-                        <span class="mr-5px date-picker d-flex align-items-center"
-                            v-if="checkPermission('task.task_due_date', projectData?.isGlobalPermission) !== null && (groupValue !== 3 || isSubTask)"
-                            :class="(myCounts || myParentCounts) > 0 ? 'mr-5px' : ''"
-                            :style="`border-radius: ${element?.DueDate ? '5px' : '50%'}; padding: ${element?.DueDate ? '3px 6px' : '6px'};`"
+                    <div v-show="!renaming" class="option-list" id="modelListComponent">
+                        <TaskMenuPopup
+                            v-if="showArchiveVar ? element.deletedStatusKey === 2 : element.deletedStatusKey === 0"
+                            :items="menuItems"
+                            :label="$t('Projects.task_actions')"
+                            trigger-class="option-list__trigger"
+                            @choose="runMenu"
                         >
-                            <img class="mr-5px" v-if="element?.DueDate" src="@/assets/images/svg/component-inactive-icons/comp_calender_inactive.svg" />
-                            <DueDateCompo
-                                v-if="!showArchiveVar && checkPermission('task.task_due_date',projectData?.isGlobalPermission) === true && checkPermission('task.task_list',projectData?.isGlobalPermission) === true && showArchiveVar === false" 
-                                id="due-date-task"
-                                class="d-flex align-items-center"
-                                :displyDate="dueDate? new Date(dueDate) : ''"
-                                :disabledDates="element.dueDateDeadLine"
-                                @SelectedDate="($event) => updateDueDate($event)"
-                                :isWithoutBorderImage="true"
-                            />
-                            <template v-else>
-                                <span>{{convertDateFormat(element.DueDate, '', { showDayName: false })}}</span>
+                            <span class="ah-mask-icon option-list__dots" :style="maskOf(horizontalDots)" aria-hidden="true"></span>
+                        </TaskMenuPopup>
+                    </div>
+                </div>
+                <div
+                    v-if="!showArchiveVar && taskTags.length && checkApps('tags') && checkPermission('task.task_tag',projectData?.isGlobalPermission) !== null"
+                    class="card-tags"
+                >
+                    <div v-for="item in taskTags.slice(0, TAG_CHIP_LIMIT)" :key="item.uid" class="tagList" @click.stop>
+                        <TagChip :data="item" :isBorder="false" :prjectGlobalPermission="projectData?.isGlobalPermission" :ids="tagIds" :tagsArray="projectData.tagsArray"/>
+                    </div>
+                    <div v-if="taskTags.length > TAG_CHIP_LIMIT" class="tagcount">+{{ taskTags.length - TAG_CHIP_LIMIT }}</div>
+                    <CreateTagPopup :task="element" :project="projectData" :isTaskList="false" @send:ids="(val) => tagIds = val" />
+                </div>
+                <div v-if="agentRun" class="agent-strip">
+                    <span class="agent-strip__dot"></span>
+                    <span class="agent-strip__name">{{ agentRun.agentName }} · {{ runClock }}</span>
+                    <span v-if="agentRun.skill" class="agent-strip__meta">{{ skillLabel(t, agentRun.skill) }}</span>
+                </div>
+                <div v-else-if="agentProposal" class="agent-proposal">
+                    <span class="agent-proposal__who">✦ {{ agentProposal.agentName }}:</span> {{ proposalTitle(t, agentProposal) }}
+                    <button type="button" class="agent-proposal__review" @click.stop="openAiInbox()">{{ $t('Projects.review') }}</button>
+                </div>
+                <div v-if="!agentRun && heldByAgent" class="card-agent-mark">
+                    <TaskAgentMark :task-id="String(element._id)" />
+                </div>
+                <dl v-if="cardFieldValues.length" class="card-fields">
+                    <div v-for="entry in cardFieldValues" :key="entry.id" class="card-field">
+                        <dt class="card-field__name" :title="entry.label">{{ entry.label }}</dt>
+                        <dd class="card-field__value" :title="entry.text">
+                            <component :is="fieldTypeUi(entry.field.fieldType).value" v-if="fieldTypeUi(entry.field.fieldType)" compact :def="entry.field" :value="entry.value" :label="entry.label" v-bind="taskPropFor(entry.field.fieldType, element)" />
+                            <template v-else-if="entry.choices.length">
+                                <span v-for="option in entry.choices" :key="option.id" class="card-field__chip ah-status-ink" :style="choiceStyle(option)">{{ option.label || option.value }}</span>
                             </template>
-                        </span>
-                        <span class="priority__compo" v-if="groupValue !== 2 || isSubTask" :class="((element?.subTasks) || (myCounts || myParentCounts) > 0) ? 'mr-5px' : ''">
-                            <div
-                                v-if="checkPermission('task.task_priority',projectData?.isGlobalPermission) !== null && checkApps('Priority')">
-                                <Priority
-                                    :priorityVal="element.Task_Priority"
-                                    @select="updatePriority"
-                                    :permission="!showArchiveVar && checkPermission('task.task_priority',projectData?.isGlobalPermission) === true"
-                                    :showName="false"
-                                />
-                            </div>
-                        </span>
-                        <span v-if="!isSubTask && element?.subTasks" class="d-flex align-items-center task-count-section" :class="myCounts > 0 ? 'mr-5px' : ''">
-                            <img class="mr-5px" src="@/assets/images/png/subTaskShape.png" />
-                            <span class="font-size-12" :style="{'color': (element.isExpanded && element?.subtaskArray?.length > 0) ? '#2F3990' : ''}">
-                                {{(showArchiveVar || searchedTask) ? element?.subtaskArray?.length : element?.subTasks}}
+                            <template v-else>{{ entry.text }}</template>
+                        </dd>
+                    </div>
+                </dl>
+                <div v-if="isTiming || showSplitBadge || cardPoints !== null" class="card-meta">
+                    <span v-if="cardPoints !== null" class="card-points" :title="$t('ViewColumns.col_points')">{{ $t('ViewColumns.points_total', { n: cardPoints }) }}</span>
+                    <span v-if="isTiming" class="card-timer">● {{ timerClock }}</span>
+                    <ProvenanceBadge v-if="showSplitBadge" :task="element" />
+                </div>
+                <div class="card-foot">
+                    <div class="card-assignee" :class="{ 'card-assignee--agent': !!agentRun }" v-if="checkPermission('task.task_assignee',projectData?.isGlobalPermission) !== null && (groupValue !== 1 || isSubTask)">
+                        <span v-if="agentRun" class="card-assignee__agent" :title="agentRun.agentName" aria-hidden="true">◉</span>
+                        <Assignee
+                            :users="element.AssigneeUserId"
+                            :options="canAssignOthers ? permittedOptions : nonPermittedOptions"
+                            :num-of-users="1"
+                            imageWidth="var(--avatar-size)"
+                            :addUser="!showArchiveVar"
+                            :buttonLabel="assigneeNames ? $t('List.cell_change', { field: $t('List.assignee'), value: assigneeNames }) : $t('List.cell_set', { field: $t('List.assignee') })"
+                            @selected="changeAssignee(checkApps('MultipleAssignees',projectData) ? 'add' : 'replace', $event)"
+                            @removed="changeAssignee('remove', $event)"
+                            :isDisplayTeam="true"
+                            :multiSelect="checkApps('MultipleAssignees')"
+                        />
+                    </div>
+                    <div class="card-foot__actions board-view-action-wrapper">
+                        <span v-if="showDueDateChip" class="date-picker">
+                            <CalenderCompo
+                                v-if="canEditDueDate"
+                                :modelValue="duePickerValue"
+                                :hideExtraLayouts="['time', 'minutes', 'hours', 'seconds']"
+                                menuClass="calender-menu-class-duedate"
+                                @click.stop
+                                @update:modelValue="(dateVal) => updateDueDate({ dateVal })"
+                            >
+                                <template #trigger>
+                                    <button
+                                        type="button"
+                                        class="calendar-trigger calendar-trigger--button card-chip"
+                                        :class="{ 'card-chip--icon': !dueDateText }"
+                                        aria-haspopup="dialog"
+                                        :aria-label="dueDateText ? $t('List.cell_change', { field: $t('List.due_date'), value: dueDateText }) : $t('List.cell_set', { field: $t('List.due_date') })"
+                                        :title="dueDateFull || null"
+                                    >
+                                        <span class="ah-mask-icon card-icon card-icon--calendar" :style="maskOf(calendarIcon)" aria-hidden="true"></span>
+                                        <template v-if="dueDateText">{{ dueDateText }}</template>
+                                    </button>
+                                </template>
+                            </CalenderCompo>
+                            <span v-else class="card-chip" :title="dueDateFull">
+                                <span class="ah-mask-icon card-icon card-icon--calendar" :style="maskOf(calendarIcon)" aria-hidden="true"></span>
+                                {{ dueDateText }}
                             </span>
-                            <span v-if="myParentCounts > 0" class="sub-task-count">{{myParentCounts > 99 ? "+99" : myParentCounts}}</span>
                         </span>
-                        <span class="d-flex align-items-center board-task-comment-count position-re cursor-pointer"
+                        <span
+                            v-if="(groupValue !== 2 || isSubTask) && checkPermission('task.task_priority',projectData?.isGlobalPermission) !== null && checkApps('Priority')"
+                            class="priority__compo"
+                        >
+                            <Priority
+                                :priorityVal="element.Task_Priority"
+                                @select="updatePriority"
+                                :permission="!showArchiveVar && checkPermission('task.task_priority',projectData?.isGlobalPermission) === true"
+                                :showName="true"
+                                :buttonLabel="priorityName ? $t('List.cell_change', { field: $t('List.priority'), value: priorityName }) : $t('List.cell_set', { field: $t('List.priority') })"
+                            />
+                        </span>
+                        <button
+                            v-if="subtaskCount"
+                            type="button"
+                            class="card-chip card-subtasks-toggle"
+                            :aria-expanded="subtasksOpen"
+                            :aria-label="subtaskLabel"
+                            :title="subtaskLabel"
+                            @click.stop="subtaskTree?.toggle(element, itemData)"
+                        >
+                            <span class="ah-mask-icon card-icon card-icon--subtasks" :style="maskOf(subtaskIcon)" aria-hidden="true"></span>
+                            <span>{{ subtaskText }}</span>
+                            <span v-if="myParentCounts > 0" class="sub-task-count">{{ myParentCounts > 99 ? "+99" : myParentCounts }}</span>
+                        </button>
+                        <button
+                            type="button"
+                            class="board-task-comment-count"
                             v-if="projectData.viewColumn?.find((x)=> x.key === 'commentCounts')?.show && myCounts > 0"
+                            :aria-label="$t('Projects.unread_comments_open', { n: myCounts })"
                             @click.stop="!showArchiveVar ? changeRoute() : ''"
                         >
-                            <img class="mr-5px" src="@/assets/images/svg/ChatIcon.svg" alt="chatIcon" />
-                            <span class="parent-task-count">{{myCounts > 99 ? "+99" : myCounts}}</span>
-                        </span>
+                            <span class="ah-mask-icon card-icon card-icon--comments" :style="maskOf(commentIcon)" aria-hidden="true"></span>
+                            <span class="parent-task-count" aria-hidden="true">{{myCounts > 99 ? "+99" : myCounts}}</span>
+                        </button>
                     </div>
                 </div>
             </div>
+            <BoardCardSubtasks v-if="subtasksOpen" :parent="element" :depth="1" :column="itemData" />
             <BoardViewTaskCreate
                 v-if="isSubtaskCreate && !showArchiveVar"
                 :sprintData="element.sprintArray"
@@ -205,51 +198,69 @@
             />
             <ConfirmationSidebar
                 v-model="showSidebar"
-                :title="`${archive ? $t('Projects.archive') : $t('Projects.delete')} Task`"
-                :message="archive ? $t('conformationmsg.archive') : $t('conformationmsg.delete')"
-                :confirmationString="`${archive ? 'archive' : 'delete'}`"
+                :title="archive ? $t('Projects.archive_task') : $t('Projects.delete_task')"
+                :message="$t(taskRemovalMessageKey(props.data, archive))"
+                :confirmationString="archive ? $t('Projects.confirm_word_archive') : $t('Projects.confirm_word_delete')"
                 :acceptButtonClass="archive ? 'btn-primary': 'btn-danger'"
                 :acceptButton="`${archive ? $t('Projects.archive') : $t('Projects.delete')}`"
                 @confirm="updateTask(), showSidebar = false"
             />
-            <ConvertToSubTaskSidebar 
-                v-if="openConvertSubTaskSidebar === true" :closeSideBar="openConvertSubTaskSidebar"
-                @isConvertSubtaskOPen="(val) => {sidebarOPen(val)}" :isMoveTask="openMoveSidebar" 
-                :openMoveSubTask="openMoveSubTask" :isMergeTask="openMergeTask" :isDuplicate="duplicateTaskSidebar" 
-                :task="element" :isOpenSubTask="openSubTaskSideabr"/>
-            <ConvertToList v-if="converrtToListSidebar === true" :openSidebar="converrtToListSidebar" @closeSidebar="(val) => {converrtToListSidebar = val}" :task="element" />
-        </div> 
+            <TaskMenuSidebars :mode="sidebarMode" :task="element" @close="sidebarMode = null" />
+        </div>
     </div>
 </template>
 <script setup>
-    import {ref,inject,computed,watch,onMounted} from "vue";
+    import {ref,inject,computed,watch,nextTick,onMounted,onUnmounted} from "vue";
     import { useStore } from "vuex";
     import { useToast } from "vue-toast-notification";
     import { useRoute, useRouter } from "vue-router"
+    import { openTask } from '@/components/organisms/TaskDetailOverlay/useTaskOverlay';
+    import ProvenanceBadge from '@/components/molecules/Provenance/ProvenanceBadge.vue';
+    import { taskPoints } from '@/views/Projects/composables/taskPoints';
+    import { shownFieldValues } from '@/views/Projects/composables/projectCustomFields';
+    import { fieldTypeUi, taskPropFor } from '@/plugins/customFieldView/fieldTypes';
+    import { statusChipStyle } from '@/utils/statusChipColors';
+    import { isAgentWork } from '@/components/molecules/Provenance/provenance';
+    import { agentWorkFor } from '@/views/Projects/composables/agentWork';
+    import TaskAgentMark from '@/views/Projects/components/TaskAgentMark.vue';
     import { useUpdateTasks } from "@/views/Projects/helper"
     import TagChip from '@/components/atom/TagChip/TagChip.vue'
     import Priority from "@/components/molecules/PriorityCompo/PriorityComp.vue"
     import taskClass from "@/utils/TaskOperations";
     import BoardViewTaskCreate from "@/views/Projects/Kanban/BoardViewTaskCreate.vue"
+    import BoardCardSubtasks from "@/views/Projects/Kanban/BoardCardSubtasks.vue"
+    import { MAX_DEPTH, depthOf } from "@taskTreeRules";
     import Assignee from "@/components/molecules/Assignee/Assignee.vue"
     import {useConvertDate,useCustomComposable,useGetterFunctions } from "@/composable";
     import { useTaskSelection } from "@/composable/useTaskSelection.js";
     import CreateTagPopup from "@/components/molecules/TagList/CreateTagPopup.vue";
-    import DropDown from '@/components/molecules/DropDown/DropDown.vue'
-    import DropDownOption from '@/components/molecules/DropDownOption/DropDownOption.vue'
+    import { taskTagChips } from "@/components/molecules/TagList/helper.js";
     import ConfirmationSidebar from "@/components/molecules/ConfirmationSidebar/ConfirmationSidebar.vue"
-    import ConvertToSubTaskSidebar from '@/components/molecules/ConvertToSubTaskSidebar/ConvertToSubTaskSidebar.vue';
-    import ConvertToList from '@/components/molecules/ConvertToList/ConvertToList.vue';
-    import DueDateCompo from '@/components/molecules/DueDateCompo/DueDateCompo.vue';
+    import { taskRemovalMessageKey } from "@/utils/taskRemovalWords";
+    import TaskMenuSidebars from '@/views/Projects/components/taskMenu/TaskMenuSidebars.vue';
+    import TaskMenuPopup from '@/views/Projects/components/taskMenu/TaskMenuPopup.vue';
+    import { taskMenuItems } from '@/views/Projects/composables/taskMenu';
+    import TaskHomeMark from '@/views/Projects/components/TaskHomeMark.vue';
+    import { taskUrl } from '@/views/Projects/composables/taskLink';
+    import { openTemplateDialog } from '@/components/molecules/TaskTemplates/taskTemplates';
+    import CalenderCompo from '@/components/atom/CalenderCompo/CalenderCompo.vue';
+    import { dueLabel } from '@/components/molecules/Home/homeFormat';
     import { useI18n } from "vue-i18n";
+    import { proposalTitle, skillLabel } from "@/views/Ai/plainLabels";
+    import { useTimer } from "@/components/molecules/Home/useTimer";
+    import { maskOf } from "@/utils/iconMask";
+    import { permittedAssignees, selfAssignable } from "@/utils/assigneeOptions";
     const { t } = useI18n();
-    const router = useRouter()
     const props = defineProps({
         data: Object,
-        groupValue: Number,
+        groupValue: [Number, String],
         itemData: Object,
         isSubTask: Boolean,
-        parentAssignee: Array
+        parentAssignee: Array,
+        // 28b: the open run / pending proposal for THIS task, resolved once per
+        // board by KanbanBoard so every card does not poll on its own.
+        agentRun: { type: Object, default: null },
+        agentProposal: { type: Object, default: null }
     })
 
     const {checkPermission,checkApps} = useCustomComposable();
@@ -260,50 +271,120 @@
     const companyId = inject("$companyId");
     const {getters,commit} = useStore();
     const isSubtaskCreate = ref(false);
-    const {getUser} = useGetterFunctions();
+    const {getUser, getTeam, getPriorities} = useGetterFunctions();
     const projectData = inject("selectedProject");
     const $toast = useToast()
-    const tagChipArray = ref([])
     const element = ref(props.data)
+    const heldByAgent = computed(() => Boolean(agentWorkFor(element.value?._id)));
+    const TAG_CHIP_LIMIT = 4
+    const taskTags = computed(() => taskTagChips(projectData.value?.tagsArray, element.value?.tagsArray))
+    // TagChip requires ids, and the row's tag picker only reports them after the chips first render.
+    const tagIds = ref({})
     const {updateTaskByGroup} = useUpdateTasks();
 
-    // Multi-select on Kanban cards: checkbox renders on card hover OR when
-    // THIS card is selected. Permission-gated. Click/mousedown propagation
-    // stopped so it doesn't open the task detail or start a drag.
     const cardSelection = useTaskSelection();
     const canCardMultiSelect = computed(() => checkPermission('task.task_status', projectData.value?.isGlobalPermission) === true
         && !showArchiveVar.value);
     const isCardSelected = computed(() => cardSelection.isSelected(props.data?._id));
+    // A click, not change: only the click event says whether Shift was held.
+    // A card is ticked alone, as a List row is: the server carries its subtasks with it.
     const handleCardCheckboxChange = (evt) => {
         if (!props.data?._id) return;
-        if (evt) evt.stopPropagation();
-        // Parent ↔ subtask cascade (mirrors list/table view behavior).
-        cardSelection.toggleAndCascade(props.data, evt);
+        cardSelection.selectFromEvent(props.data, evt, '.kanban-cards', { rowsAlone: true });
     };
-    const chipCount = ref(4)
     const showSidebar = ref(false);
     const archive = ref(false);
     const horizontalDots = require("@/assets/images/svg/horizontalDots.svg");
-    const linkIcon = require("@/assets/images/png/link.png");
-    const splitScreen = require("@/assets/images/png/splitscreen.png");
+    const calendarIcon = require("@/assets/images/svg/component-inactive-icons/comp_calender_inactive.svg");
+    const subtaskIcon = require("@/assets/images/png/subTaskShape.png");
+    const commentIcon = require("@/assets/images/svg/ChatIcon.svg");
     const inventoryIcon = require("@/assets/images/inventory_2.png");
     const deleteIcon = require("@/assets/images/DeleteIcon.png");
-    const moveIcon = require("@/assets/images/png/moveIcon.png");
-    const mergeIcon = require("@/assets/images/png/mergeIcon.png");
-    const combinedIcon = require("@/assets/images/png/Combined_shape.png");
-    const subTaskIcon = require("@/assets/images/png/subTaskIcon.png");
-    const copyIcon = require("@/assets/images/copy.png");
     const route = useRoute()
     const searchedTask = inject('searchedTask');
-    const openConvertSubTaskSidebar = ref(false);
-    const converrtToListSidebar = ref(false);
-    const openMoveSubTask = ref(false);
-    const openMoveSidebar = ref(false);
     const taskCollapsed = inject("taskCollapsed");
-    const openMergeTask = ref(false);
-    const duplicateTaskSidebar = ref(false);
-    const openSubTaskSideabr = ref(false)
-    const dueDate = computed(() => element.value.DueDate)
+    const boardMenu = inject("boardTaskMenu", null);
+    const viewedList = computed(() => ({ sprintId: props.itemData?.sprintId, projectId: projectData.value?._id }));
+    const menuItems = computed(() => taskMenuItems(element.value, boardMenu?.rights.value, { canNest: depthOf(element.value) < MAX_DEPTH, listId: viewedList.value.sprintId }));
+    const subtaskTree = inject("boardSubtaskTree", null);
+    const subtasksOpen = computed(() => Boolean(subtaskTree?.isExpanded(element.value?._id)));
+    const subtaskProgress = computed(() => (subtaskTree ? subtaskTree.progressFor(element.value) : null));
+    const subtaskCount = computed(() => {
+        if (subtaskTree) return subtaskTree.totalFor(element.value);
+        return (showArchiveVar.value || searchedTask.value ? element.value?.subtaskArray?.length : element.value?.subTasks) || 0;
+    });
+    const subtaskText = computed(() => (subtaskProgress.value ? `${subtaskProgress.value.done}/${subtaskProgress.value.total}` : String(subtaskCount.value)));
+    const subtaskLabel = computed(() => (subtaskProgress.value
+        ? t('Projects.subtasks_progress', subtaskProgress.value)
+        : t('Projects.subtasks_total', { n: subtaskCount.value })));
+    const sidebarMode = ref(null);
+    const renaming = ref(false);
+    const renameDraft = ref("");
+    const renameInput = ref(null);
+    const titleEl = ref(null);
+    const duePickerValue = computed(() => (element.value.DueDate ? new Date(element.value.DueDate) : ''))
+    const dueDateText = computed(() => dueLabel(element.value.DueDate, t))
+    const dueDateFull = computed(() => (element.value.DueDate ? convertDateFormat(element.value.DueDate, '', { showDayName: false }) : ''))
+    const assigneeNames = computed(() => (element.value.AssigneeUserId || [])
+        .map((id) => (String(id).startsWith('tId_') ? getTeam(String(id).slice(4))?.name : getUser(id)?.Employee_Name))
+        .filter(Boolean)
+        .join(', '))
+    const priorityName = computed(() => {
+        const found = getPriorities().find((priority) => priority.value === element.value.Task_Priority);
+        return found?.name && found.name !== 'N/A' ? found.name : '';
+    })
+
+    const router = useRouter();
+    const { timer, elapsedMs, isTracking } = useTimer();
+    const now = ref(Date.now());
+    let runTicker = null;
+
+    const taskKey = computed(() => (element.value?.TaskKey && element.value.TaskKey !== '--' ? element.value.TaskKey : ''));
+    const isTiming = computed(() => Boolean(timer.active?.running) && isTracking(element.value?._id));
+
+    /* The card only carries the split label when it says something: HUMAN is
+     * what every task without a matching agent gets, so on a board it is noise.
+     * The full badge stays on the list row and in the task detail. */
+    const showSplitBadge = computed(() => isAgentWork(element.value));
+    const cardFields = inject("boardCardFields", null);
+    const cardPoints = computed(() => (cardFields?.value?.some((field) => field.id === "points") ? taskPoints(element.value) : null));
+    const fieldTasks = inject("boardFieldTasks", ref([]));
+    const dateFormat = inject("$dateFormat", ref("DD/MM/YYYY"));
+    const cardFieldValues = computed(() => shownFieldValues(cardFields?.value, element.value, {
+        allTasks: fieldTasks.value || [], dateFormat: dateFormat.value, userName: (id) => getUser(id)?.Employee_Name
+    }));
+    const choiceStyle = (option) => (option.color ? statusChipStyle({ textColor: option.color }) : {});
+
+    const canEditDueDate = computed(() => showArchiveVar.value === false
+        && checkPermission('task.task_due_date', projectData.value?.isGlobalPermission) === true
+        && checkPermission('task.task_list', projectData.value?.isGlobalPermission) === true);
+    const showDueDateChip = computed(() => checkPermission('task.task_due_date', projectData.value?.isGlobalPermission) !== null
+        && (props.groupValue !== 3 || props.isSubTask)
+        && (Boolean(element.value?.DueDate) || canEditDueDate.value));
+
+    const clock = (ms) => {
+        const total = Math.floor(Math.max(0, ms) / 1000);
+        const h = Math.floor(total / 3600);
+        const m = Math.floor((total % 3600) / 60);
+        const sec = total % 60;
+        return h > 0
+            ? `${h}:${String(m).padStart(2, '0')}:${String(sec).padStart(2, '0')}`
+            : `${String(m).padStart(2, '0')}:${String(sec).padStart(2, '0')}`;
+    };
+
+    const timerClock = computed(() => clock(elapsedMs.value));
+    const runClock = computed(() => clock(now.value - new Date(props.agentRun?.startedAt || now.value).getTime()));
+
+    watch(() => props.agentRun, (run) => {
+        if (runTicker) { clearInterval(runTicker); runTicker = null; }
+        if (run) runTicker = setInterval(() => { now.value = Date.now(); }, 1000);
+    }, { immediate: true });
+
+    onUnmounted(() => { if (runTicker) clearInterval(runTicker); });
+
+    function openAiInbox() {
+        router.push({ name: 'AiInbox', params: { cid: companyId.value } }).catch(() => {});
+    }
 
     const myCounts = computed(() => {
         let total = 0;
@@ -332,61 +413,17 @@
         }
         return sprintData || null;
     })
-    const permittedOptions = computed(() => {
-        let users = [];
-        if(sprintData.value) {
-            if(element.value?.isParentTask) {
-                if(sprintData.value?.private) {
-                    users = sprintData.value?.AssigneeUserId || [];
-                } else {
-                    if(projectData.value?.isPrivateSpace) {
-                        users = projectData.value?.AssigneeUserId || [];
-                    } else {
-                        users = companyUsers.value;
-                    }
-                }
-            } else {
-                if(sprintData.value?.private) {
-                    users = (props.parentAssignee || []).filter((x) => sprintData.value?.AssigneeUserId?.includes(x))
-                } else {
-                    users = (props.parentAssignee || [])
-                }
-            }
-        }
-        if(projectData.value?.isPrivateSpace) {
-            users = users.filter((x) => projectData.value?.AssigneeUserId.includes(x));
-            return Array.from(new Set([...users, ...(props.data?.AssigneeUserId || [])]));
-        } else {
-            return users;
-        }
-    })
-    const nonPermittedOptions = computed(() => {
-        let users = [];
-        if(sprintData.value) {
-            if(element.value?.isParentTask) {
-                if(sprintData.value?.private) {
-                    users = (sprintData.value?.AssigneeUserId || []).filter((x) => x === userId.value);
-                } else {
-                    if(projectData.value?.isPrivateSpace) {
-                        users = (projectData.value?.AssigneeUserId || []).filter((x) => x === userId.value);
-                    } else {
-                        users = [userId.value];
-                    }
-                }
-            } else {
-                users = (props.parentAssignee || [])?.filter((x) => x === userId.value)
-                if(sprintData.value?.private) {
-                    users = users.filter((x) => sprintData.value?.AssigneeUserId?.includes(x))
-                }
-            }
-        }
-        if(projectData.value?.isPrivateSpace) {
-            users = users.filter((x) => projectData.value?.AssigneeUserId.includes(x));
-            return users;
-        } else {
-            return users;
-        }
-    })
+    const assigneeInput = computed(() => ({
+        task: element.value,
+        sprint: sprintData.value,
+        project: projectData.value,
+        parentAssignees: props.parentAssignee,
+        companyUsers: companyUsers.value
+    }))
+    const permittedOptions = computed(() => permittedAssignees(assigneeInput.value))
+    const canAssignOthers = computed(() => checkPermission('task.task_assignee', projectData.value?.isGlobalPermission) === true
+        && checkPermission('task.task_list', projectData.value?.isGlobalPermission) == true)
+    const nonPermittedOptions = computed(() => selfAssignable({ ...assigneeInput.value, userId: userId.value }))
 
     const emit = defineEmits(["subtaskOpen"]);
 
@@ -403,7 +440,7 @@
     })
     function updatePriority(val = null) {
         if(!val) return;
-        updateTaskByGroup(element.value, val, 2);
+        updateTaskByGroup(element.value, val, 2).catch((error) => console.error("ERROR in updatePriority: ", error));
     }
     function getUserData() {
         const user = getUser(userId.value);
@@ -445,14 +482,12 @@
             taskData: props.data,
             employeeName: getUser(value.id).Employee_Name,
             type: operation,
-            userData
+            userData,
+            announce: true
         })
         .then(() => {
             if(operation === "assigneRemove"){
-                let taskData = props.data;
-                let index = taskData.AssigneeUserId.findIndex((x) => x === value.id);
-                taskData.AssigneeUserId.splice(index,1);
-                commit("projectData/mutateSearchTask", {op:"modified", data: [taskData]});
+                commit("projectData/mutateSearchTask", {op:"modified", data: [{...props.data, AssigneeUserId: (props.data.AssigneeUserId || []).filter((x) => x !== value.id)}]});
             }
             $toast.success(t(`Toast.Assignee ${type === "add" || type === "replace" ? 'added' : 'removed'} successfully`), {position: "top-right"})
         })
@@ -499,8 +534,7 @@
     const updateDueDate = (event) => {
         try {
             if(!event?.dateVal) return;
-            element.value.DueDate = event?.dateVal;
-            updateTaskByGroup(props.data, {seconds: new Date(event.dateVal).getTime()/1000}, 3);
+            updateTaskByGroup(props.data, {seconds: new Date(event.dateVal).getTime()/1000}, 3).catch((error) => console.error("ERROR in updateDueDate: ", error));
         } catch (error) {
             console.error("ERROR in updateDueDate: ", error);
         }
@@ -542,34 +576,56 @@
             console.error(err);
         })
     }
-    const convertToSubTask = () => {
-        openConvertSubTaskSidebar.value = true;
-        openSubTaskSideabr.value = true;
+    function startRename() {
+        renameDraft.value = element.value.TaskName || "";
+        renaming.value = true;
+        nextTick(() => {
+            renameInput.value?.focus();
+            renameInput.value?.select();
+        });
     }
-    const sidebarOPen = (val) => {
-        openConvertSubTaskSidebar.value = val;
-        openMoveSubTask.value = false;
-        openMoveSidebar.value = false;
-        duplicateTaskSidebar.value = false;
+    function endRename() {
+        renaming.value = false;
+        nextTick(() => titleEl.value?.focus());
     }
-    const convertToList = () => {
-        converrtToListSidebar.value = true;
+    function saveRename() {
+        if (!renaming.value) return;
+        endRename();
+        boardMenu.rename(element.value, renameDraft.value);
     }
-    const moveTask = () => {
-        if(props.data?.isParentTask === true){
-            openMoveSidebar.value = true;
-        }else if(props.data?.isParentTask === false){
-            openMoveSubTask.value = true;
-        }
-        openConvertSubTaskSidebar.value = true;
+    function openInNewTab() {
+        const href = taskUrl(router, { companyId: companyId.value, project: projectData.value, task: element.value });
+        if (href) window.open(href, "_blank", "noopener");
     }
-    const mergeTask= () => {
-        openConvertSubTaskSidebar.value = true;
-        openMergeTask.value = true;
+    function confirmRemoval(archiving) {
+        archive.value = archiving;
+        showSidebar.value = true;
     }
-    const duplicateTask = () => {
-        openConvertSubTaskSidebar.value = true;
-        duplicateTaskSidebar.value = true;
+    function runMenu(id) {
+        const viaSidebar = () => { sidebarMode.value = id; };
+        const actions = {
+            rename: startRename,
+            subtask: () => {
+                isSubtaskCreate.value = true;
+                subtaskTree?.expand(element.value, props.itemData);
+            },
+            "copy-link": copyTaskLink,
+            "copy-key": copyTaskKey,
+            "new-tab": openInNewTab,
+            open: () => toggleTaskDetail(element.value),
+            "save-template": () => openTemplateDialog({ mode: "save", task: element.value, project: projectData.value }),
+            "convert-subtask": viaSidebar,
+            "convert-list": viaSidebar,
+            move: viaSidebar,
+            "remove-from-list": () => boardMenu.removeFromList(element.value, viewedList.value.sprintId),
+            duplicate: viaSidebar,
+            "duplicate-subtasks": () => boardMenu.duplicate(element.value, { withSubtasks: true }),
+            merge: viaSidebar,
+            archive: () => confirmRemoval(true),
+            restore: () => updateTask(0),
+            delete: () => confirmRemoval(false)
+        };
+        actions[id]?.();
     }
     function changeRoute() {
         const paramsObj = {
@@ -582,11 +638,6 @@
         if(element.value.folderObjId) {
             paramsObj.folderId = element.value.folderObjId;
         }
-        router.push({
-            name: element.value.folderObjId? 'ProjectFolderSprintTask' : 'ProjectSprintTask',
-            params: paramsObj,
-            query: {...route.query, detailTab: "comment"}
-        })
+        openTask({ ...paramsObj, companyId: paramsObj.cid, projectId: paramsObj.id, tab: 'activity' })
     }
 </script>
-<style src="./new-style.css" scoped />

@@ -1,0 +1,183 @@
+import { ref, computed } from 'vue';
+import { timerState, elapsedSeconds, startTimer, stopTimer, discardTimer, ensureTimerLoaded } from '@/components/organisms/TaskDetailOverlay/useTaskTimer';
+import Store from '@/store/index';
+import { apiRequest } from '@/services';
+import * as env from '@/config/env';
+import { PERIOD_LOCKED } from '@/composable/timeLogFailure';
+
+const OVERNIGHT_MS = 12 * 3600 * 1000;
+const MAX_ENTRY_MINUTES = 24 * 60 - 1;
+
+const sessions = ref([]);
+const lastStopped = ref(null);
+let reconciled = false;
+
+// The Time pages read the task panel's per-user timer, so a timer started anywhere shows here.
+const active = computed(() => {
+    const entry = timerState.entry;
+    if (!entry) return null;
+    return {
+        taskId: entry.taskId,
+        taskName: entry.taskName || '',
+        projectId: entry.projectId || '',
+        projectName: entry.projectName || '',
+        sprintId: entry.sprintId || '',
+        startedAt: entry.firstStartedAt,
+        note: entry.description || '',
+        billable: true,
+    };
+});
+const elapsed = elapsedSeconds;
+
+const pad2 = (n) => String(n).padStart(2, '0');
+export const formatClock = (seconds, withSeconds = false) => {
+    const s = Math.max(0, Math.floor(Number(seconds) || 0));
+    const h = Math.floor(s / 3600);
+    const m = Math.floor((s % 3600) / 60);
+    return withSeconds ? `${h}:${pad2(m)}:${pad2(s % 60)}` : `${h}:${pad2(m)}`;
+};
+export const formatMinutes = (minutes) => formatClock((Number(minutes) || 0) * 60);
+export const formatHm = (minutes) => {
+    const m = Math.round(Number(minutes) || 0);
+    const h = Math.floor(m / 60);
+    const r = m % 60;
+    if (!h) return `${r}m`;
+    return r ? `${h}h ${r}m` : `${h}h`;
+};
+export const isoDate = (d) => {
+    const x = new Date(d);
+    return `${x.getFullYear()}-${pad2(x.getMonth() + 1)}-${pad2(x.getDate())}`;
+};
+const hhmm = (d) => {
+    const x = new Date(d);
+    return `${pad2(x.getHours())}:${pad2(x.getMinutes())}`;
+};
+
+const currentUser = () => {
+    const g = Store.getters;
+    const id = localStorage.getItem('userId') || '';
+    const u = (g['users/users'] || []).find((x) => x._id === id) || {};
+    return {
+        id,
+        name: u.Employee_Name || '',
+        timeZone: u.Time_Zone || Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC',
+        timeFormat: u.Time_Format || '',
+        companyOwnerId: (g['settings/companyOwnerDetail'] || {})._id || '',
+        dateFormat: (g['settings/companyDateFormat'] || {}).dateFormat || 'DD/MM/YYYY',
+        companyId: localStorage.getItem('selectedCompany') || '',
+    };
+};
+
+/* Writes one manual entry of `minutes` on `task`, ending at `endAt` (default now)
+ * or at 18:00 for a past day, so a bare "2:30 on Tuesday" lands sensibly. */
+export async function logTime({ task, minutes, date, endAt, note, billable = true }) {
+    if (!task || !task.taskId) throw new Error('task_required');
+    const m = Math.min(MAX_ENTRY_MINUTES, Math.max(1, Math.round(Number(minutes) || 0)));
+    const user = currentUser();
+    const day = date || isoDate(endAt || Date.now());
+    let end = endAt ? new Date(endAt) : (day === isoDate(Date.now()) ? new Date() : new Date(`${day}T18:00:00`));
+    let start = new Date(end.getTime() - m * 60000);
+    if (isoDate(start) !== day) {
+        start = new Date(`${day}T00:00:00`);
+        end = new Date(Math.min(start.getTime() + m * 60000, new Date(`${day}T23:59:00`).getTime()));
+    }
+    const payload = {
+        logTimeDate: day,
+        description: note || task.taskName || 'Logged time',
+        startLogTime: hhmm(start),
+        endLogTime: hhmm(end),
+        timeDuration: formatClock(m * 60),
+        ticketId: task.taskId,
+        projectId: task.projectId,
+        companyId: user.companyId,
+        userId: user.id,
+        isEdit: false,
+        userName: user.name || 'User',
+        dateFormat: user.dateFormat,
+        timeSheetId: '',
+        sprintId: task.sprintId || 'none',
+        taskName: task.taskName || 'Task',
+        companyOwnerId: user.companyOwnerId,
+        projectName: task.projectName || 'Project',
+        previousLoggedTime: '',
+        timeZone: user.timeZone,
+        timeFormat: user.timeFormat,
+        billable: billable !== false,
+    };
+    const res = await apiRequest('post', env.ADD_TIMELOG, payload);
+    const body = (res && res.data) || {};
+    if (!body.status) throw Object.assign(new Error(body.statusText || 'log_failed'), { code: body.code });
+    return body.data;
+}
+
+/* `reconcile()` pulls open desktop-tracker sessions from the server so overnight timers
+ * can be trimmed; the browser timer itself is the shared one above. */
+export function useTimer() {
+    ensureTimerLoaded();
+    const running = computed(() => !!active.value);
+    const overnight = computed(() => !!active.value && timerState.now - Number(active.value.startedAt) >= OVERNIGHT_MS);
+
+    const stop = async ({ minutes } = {}) => {
+        const cur = active.value;
+        if (!cur) return null;
+        if (minutes == null) {
+            const ranMinutes = Math.max(1, Math.round(elapsed.value / 60));
+            const result = await stopTimer();
+            if (!result) return null;
+            if (result.tooShort) return { ...cur, minutes: 0, tooShort: true };
+            if (!result.logged) throw Object.assign(new Error(result.statusText || 'log_failed'), { code: result.code, timerKept: result.timerKept });
+            lastStopped.value = { ...cur, minutes: ranMinutes, stoppedAt: Date.now() };
+            return lastStopped.value;
+        }
+        const mins = Number(minutes);
+        try {
+            await logTime({ task: cur, minutes: mins, endAt: Number(cur.startedAt) + mins * 60000, note: cur.note, billable: cur.billable });
+        } catch (error) {
+            throw Object.assign(error, { timerKept: true });
+        }
+        discardTimer();
+        lastStopped.value = { ...cur, minutes: mins, stoppedAt: Date.now() };
+        return lastStopped.value;
+    };
+
+    const start = async (task, { note = '' } = {}) => {
+        if (!task || !task.taskId) return { stoppedPrevious: null };
+        if (active.value && active.value.taskId === task.taskId) return { stoppedPrevious: null };
+        const stoppedPrevious = await startTimer({
+            taskId: task.taskId,
+            taskName: task.taskName || '',
+            projectId: task.projectId || '',
+            projectName: task.projectName || '',
+            sprintId: task.sprintId || '',
+            description: note,
+        });
+        return { stoppedPrevious };
+    };
+
+    const discard = discardTimer;
+
+    const reconcile = async () => {
+        reconciled = true;
+        try {
+            const tz = encodeURIComponent(currentUser().timeZone);
+            const res = await apiRequest('get', `${env.TIMER_RUNNING}?timeZone=${tz}`);
+            const body = (res && res.data) || {};
+            sessions.value = body.status ? body.data || [] : [];
+        } catch (e) {
+            sessions.value = [];
+        }
+        return sessions.value;
+    };
+
+    const trim = async (session, minutes) => {
+        const res = await apiRequest('post', env.TIMER_TRIM, { timeSheetId: session.timeSheetId, minutes });
+        const body = (res && res.data) || {};
+        if (!body.status) throw Object.assign(new Error(body.statusText || 'trim_failed'), { code: body.code, timerKept: body.code === PERIOD_LOCKED });
+        sessions.value = sessions.value.filter((s) => s.timeSheetId !== session.timeSheetId);
+        return body.data;
+    };
+
+    if (!reconciled && localStorage.getItem('userId')) reconcile();
+
+    return { active, elapsed, running, overnight, sessions, lastStopped, start, stop, discard, reconcile, trim, logTime, formatClock, formatMinutes, formatHm, isoDate };
+}
