@@ -264,7 +264,7 @@ jobs:
 
             echo "♻️ Restarting PM2"
 
-            pm2 restart 20
+            pm2 restart 14
 
             # ---------------------------------
             # Post-restart health check + diagnostics
