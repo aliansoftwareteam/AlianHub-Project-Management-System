@@ -217,6 +217,25 @@ describe('the model\'s pick', () => {
         expect(safeFetch).not.toHaveBeenCalled();
     });
 
+    it('picks once more, shown what was read, when a call needs a value another call returns', async () => {
+        const chat = jest.fn()
+            .mockResolvedValueOnce({ content: JSON.stringify({ calls: [{ tool: 'fake.notes.list', arguments: { limit: 2 } }], more: true }), totalTokens: 1, model: 'm' })
+            .mockResolvedValueOnce({ content: JSON.stringify({ calls: [{ tool: 'fake.notes.list', arguments: { limit: 2 } }, { tool: 'fake.notes.list', arguments: { limit: 1 } }] }), totalTokens: 1, model: 'm' });
+        getProvider.mockReturnValue({ chat });
+        const out = await step('read the first note', ['fake']);
+        expect(chat).toHaveBeenCalledTimes(2);
+        expect(chat.mock.calls[1][0].messages[0].content).toContain('READ SO FAR:');
+        expect(chat.mock.calls[1][0].messages[0].content).toContain('Board meeting');
+        expect(safeFetch.mock.calls.map(([url]) => url)).toEqual(['https://api.fake.test/notes?limit=2', 'https://api.fake.test/notes?limit=1']);
+        expect(out.sources.map((s) => s.ref)).toEqual(['fake:1', 'fake:2']);
+    });
+
+    it('does not pick again unless the model asked for more', async () => {
+        const chat = model({ pick: { calls: [{ tool: 'fake.notes.list', arguments: { limit: 2 } }] } });
+        await step('my notes', ['fake']);
+        expect(picks(chat)).toHaveLength(1);
+    });
+
     it('says nothing was read when the model picks no call', async () => {
         const out = await step('hello there', ['fake']);
         expect(out.notes).toEqual([{ provider: 'fake', app: 'Fake', code: 'nothing_read', text: 'Nothing was read from Fake for this question.' }]);

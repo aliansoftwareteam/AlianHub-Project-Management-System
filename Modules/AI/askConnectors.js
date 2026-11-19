@@ -9,6 +9,7 @@ const egressContext = require('../Agents/engine/egressContext');
 const limits = require('../Agents/connectors/readLimits');
 const argsSchema = require('../Mcp/argsSchema');
 const connectorTools = require('../Connectors/tools');
+const lookup = require('../Connectors/available');
 const runner = require('../Connectors/toolRunner');
 const { withTimeout } = require('./withTimeout');
 
@@ -33,8 +34,13 @@ const CODE = Object.freeze({
     NOTHING_READ: 'nothing_read',
     CHAR_CAP: 'char_cap',
     NOT_ALLOWED: 'not_allowed',
+    NO_TOOLS: 'no_tools',
+    UNREACHABLE: 'unreachable',
+    LIVE_WRITE: 'live_write',
     FAILED: 'failed',
 });
+
+const CONNECTORS_PERMISSION = 'artificial_intelligence.ai_connectors';
 
 const SAID = Object.freeze({
     [CODE.PROVIDER_OFF]: (app) => `${app} is not switched on here.`,
@@ -46,16 +52,21 @@ const SAID = Object.freeze({
     [CODE.NOTHING_READ]: (app) => `Nothing was read from ${app} for this question.`,
     [CODE.CHAR_CAP]: (app) => `One question takes in at most ${MAX_CHARS} characters from connected apps, so a read from ${app} was left out.`,
     [CODE.NOT_ALLOWED]: (app) => `You cannot use ${app} from here.`,
+    [CODE.NO_TOOLS]: (app) => `None of your ${app} tools is turned on, so nothing was read from it. Turn one on in AI › Customize › Connectors.`,
+    [CODE.UNREACHABLE]: (app) => `${app} could not be reached just now, so nothing was read from it.`,
+    [CODE.LIVE_WRITE]: (app) => `A change to ${app} cannot be filed from the AI chat yet, so it was not made.`,
     [CODE.FAILED]: (app) => `${app} could not be read just now.`,
 });
 
 const PICK_SYSTEM = [
     'You choose the calls to the asker\'s own connected apps that answer their QUESTION.',
     'TOOLS lists every tool you may call: its name, its app, its kind and the arguments its input takes.',
-    'Answer with JSON only: {"calls":[{"tool":"<a name from TOOLS>","arguments":{}}]}.',
+    'Answer with JSON only: {"calls":[{"tool":"<a name from TOOLS>","arguments":{}}],"more":false}.',
     `- At most ${MAX_CALLS} calls. Use only names from TOOLS, and only the arguments its input lists, each of the type it states.`,
     '- A tool of kind "change" sends something to the app. Pick it only when the QUESTION asks for that change. It is not made now: it waits for the asker\'s approval.',
-    '- Take every value from the QUESTION or the EARLIER QUESTION. Never invent one. When no call fits, answer {"calls":[]}.',
+    '- Take every value from the QUESTION, the EARLIER QUESTION or READ SO FAR. Never invent one. When no call fits, answer {"calls":[]}.',
+    '- When a call the QUESTION needs takes a value (an id, a name) that only one of your calls will return, make that call now and add "more":true. You are then shown its result as READ SO FAR and pick again.',
+    '- READ SO FAR, when given, is what your earlier calls for this QUESTION returned. Pick only the calls still needed, never one already made.',
 ].join('\n');
 
 const ANSWER_SYSTEM = `
@@ -87,30 +98,25 @@ const pullRequestsIn = (question) => {
     return [...found.values()];
 };
 
-/* A reference an app owns is read with no model call to pick it; another app adds its own row. */
+/* A reference an app owns is read with no model call to pick it; another app adds its own row. The first of a
+ * rule's tools the asker's connection offers is the one read: GitHub's own server names it get_pull_request. */
 const RULES = Object.freeze([
-    { tool: 'github.pull_request.read', calls: pullRequestsIn },
+    { provider: 'github', tools: ['github.pull_request.read', 'github.get_pull_request'], calls: pullRequestsIn },
 ]);
-
-const providerOf = (key) => String(key || '').split('.')[0];
-
-const appsKnown = () => new Map(connectorTools.all().map((tool) => [tool.provider, tool.definition.name]));
 
 /* The connector chips of a question, as provider ids: an id no provider has is dropped without a word, as a
  * task id the asker cannot open is. */
 const appsAsked = (context) => {
     if (!Array.isArray(context)) return [];
-    const known = appsKnown();
+    const known = lookup.known();
     const ids = context
         .filter((ref) => ref && ref.kind === 'connector' && typeof ref.id === 'string' && PROVIDER_ID.test(ref.id) && known.has(ref.id))
         .map((ref) => ref.id);
     return [...new Set(ids)].slice(0, MAX_APPS);
 };
 
-const toolsOf = (provider) => connectorTools.all().filter((tool) => tool.provider === provider && connectorTools.isOn(tool));
-
-const ruleCalls = (app, question) => RULES.filter((rule) => providerOf(rule.tool) === app.provider).flatMap((rule) => {
-    const tool = app.tools.find((t) => t.key === rule.tool && t.kind === connectorTools.KIND.READ);
+const ruleCalls = (app, question) => RULES.filter((rule) => rule.provider === app.provider).flatMap((rule) => {
+    const tool = rule.tools.map((key) => app.tools.find((t) => t.key === key && t.kind === connectorTools.KIND.READ)).find(Boolean);
     if (!tool) return [];
     return rule.calls(question).filter((args) => !argsSchema.problemIn(tool.input, args)).map((args) => ({ tool, args }));
 });
@@ -119,12 +125,17 @@ const offeredOf = (tool) => ({
     name: tool.key,
     app: tool.definition.name,
     kind: tool.kind === connectorTools.KIND.READ ? 'read' : 'change',
-    description: tool.input.description,
+    description: tool.description || tool.input.description,
     input: { properties: tool.input.properties || {}, required: tool.input.required || [] },
 });
 
-const pickMessage = ({ tools, question, previous }) => [
+const READ_SO_FAR_CHARS = 3000;
+
+const readSoFar = (sources) => sources.map((source) => ({ tool: source.tool, arguments: source.args, result: clip(source.detail, READ_SO_FAR_CHARS) }));
+
+const pickMessage = ({ tools, question, previous, earlier = [] }) => [
     untrusted.wrap(`TOOLS: ${JSON.stringify(tools.map(offeredOf))}`),
+    ...(earlier.length ? ['', untrusted.wrap(`READ SO FAR: ${JSON.stringify(readSoFar(earlier))}`)] : []),
     ...(previous ? ['', 'EARLIER QUESTION (from the asker):', untrusted.escape(previous)] : []),
     '',
     'QUESTION (from the asker):',
@@ -136,11 +147,11 @@ const callsOf = (raw) => (isPlainObject(raw) && Array.isArray(raw.calls) ? raw.c
     .slice(0, PICKED_MAX)
     .map((call) => ({ tool: typeof call.tool === 'string' ? call.tool : '', args: call.arguments === undefined ? {} : call.arguments }));
 
-const askModel = async ({ companyId, userId, apps, question, previous }) => {
+const askModel = async ({ companyId, userId, apps, question, previous, earlier }) => {
     const tools = apps.flatMap((app) => app.tools);
     const result = await withTimeout(getProvider().chat({
         systemPrompt: untrusted.withNotice(PICK_SYSTEM),
-        messages: [{ role: 'user', content: pickMessage({ tools, question, previous }) }],
+        messages: [{ role: 'user', content: pickMessage({ tools, question, previous, earlier }) }],
         jsonMode: true,
         temperature: 0,
         maxTokens: PICK_TOKENS,
@@ -148,14 +159,14 @@ const askModel = async ({ companyId, userId, apps, question, previous }) => {
     }), PICK_TIMEOUT_MS, 'The AI request timed out.');
     const parsed = parseModelJson(result.content);
     if (!parsed.ok) throw new Error(parsed.error);
-    return callsOf(parsed.value);
+    return { calls: callsOf(parsed.value), more: isPlainObject(parsed.value) && parsed.value.more === true };
 };
 
 /* A refused call is reported by its code alone: what the model named is never shown or passed on. */
 const vetted = (calls, apps) => calls.map((call) => {
-    const tool = connectorTools.get(call.tool);
-    const app = tool && apps.find((a) => a.provider === tool.provider);
-    if (!app || !app.tools.includes(tool)) return { refused: CODE.UNKNOWN_TOOL, app: apps.length === 1 ? apps[0] : null };
+    const app = apps.find((a) => a.tools.some((t) => t.key === call.tool));
+    const tool = app && app.tools.find((t) => t.key === call.tool);
+    if (!tool) return { refused: CODE.UNKNOWN_TOOL, app: apps.length === 1 ? apps[0] : null };
     if (argsSchema.problemIn(tool.input, call.args)) return { refused: CODE.BAD_INPUT, app };
     return { tool, args: call.args, app };
 });
@@ -175,6 +186,7 @@ const titleOf = (args, app) => clip(Object.values(isPlainObject(args) ? args : {
 /* A change is filed exactly as far as an MCP call of the same tool is checked (Mcp/tools planned), and then as a
  * proposal only the asker, whose connection it uses, can approve. */
 const fileChange = async (ctx, { tool, args, app }) => {
+    if (tool.live) throw Object.assign(new Error(SAID[CODE.LIVE_WRITE](app.name)), { code: CODE.LIVE_WRITE, deterministic: true });
     const mcpTools = require('../Mcp/tools');
     const proposals = require('../Agents/proposals');
     const actions = require('../Agents/actions');
@@ -195,11 +207,20 @@ const fileChange = async (ctx, { tool, args, app }) => {
     return { proposalId: String(saved._id), provider: app.provider, app: app.name, tool: tool.key, label: tool.label };
 };
 
+/* A tool a server lists live has no registry entry, so the asker is held to the right every connector read needs. */
+const authorizeLive = async (ctx) => {
+    const { evaluatePermission, isReadable } = require('../../Config/permissionGuard');
+    if (!isReadable(await evaluatePermission(ctx.companyId, ctx.userId, CONNECTORS_PERMISSION, { projectId: null }))) {
+        throw Object.assign(new Error(''), { code: CODE.NOT_ALLOWED, deterministic: true });
+    }
+};
+
 /* The read is held to what an MCP read of the same tool is held to (the registry and the asker's own rights), then
  * run on the asker's connection, counted against the asker's own daily reads. */
 const readOne = async (ctx, { tool, args }) => {
     const actions = require('../Agents/actions');
-    await actions.authorizeRead({ companyId: ctx.companyId, actor: ctx.actor, action: tool.key, params: {}, ip: ctx.ip });
+    if (tool.live) await authorizeLive(ctx);
+    else await actions.authorizeRead({ companyId: ctx.companyId, actor: ctx.actor, action: tool.key, params: {}, ip: ctx.ip });
     return runner.read({ companyId: ctx.companyId, userId: ctx.userId, via: runner.VIA.CHAT, callerId: ASKER, key: tool.key, input: args });
 };
 
@@ -210,85 +231,120 @@ const codeOf = (error) => {
     return CODE.FAILED;
 };
 
-const EMPTY_STEP = Object.freeze({ sources: Object.freeze([]), notes: Object.freeze([]), proposals: Object.freeze([]) });
+/* An app the lookup could not use is said as what it is: off, unreachable, or what the asker has to do first. */
+const noteStatus = (note, app) => {
+    if (app.status === lookup.STATUS.OFF) return note(app, CODE.PROVIDER_OFF);
+    if (app.status === lookup.STATUS.UNREACHABLE) return note(app, CODE.UNREACHABLE);
+    const said = runner.MESSAGES[app.status];
+    return said ? note(app, app.status, said(app.name)) : note(app, CODE.FAILED);
+};
+
+const EMPTY_STEP =Object.freeze({ sources: Object.freeze([]), notes: Object.freeze([]), proposals: Object.freeze([]) });
 
 /* The connector step of one question. Runs inside the question's egress context: once anything was read, no web
  * fetch follows in it (FR-59). Never throws for what an app or the model did; each becomes a note the answer says. */
 const readStep = async ({ companyId, userId, question, previous = '', apps: asked = [], ip = '', viaToken = false }) => {
     if (!asked.length) return EMPTY_STEP;
-    const names = appsKnown();
     const step = { sources: [], notes: [], proposals: [] };
     const note = (app, code, text) => step.notes.push({ provider: app.provider, app: app.name, code, text: text || SAID[code](app.name) });
     const ctx = callerOf(companyId, userId, ip);
 
+    if (viaToken) {
+        const names = lookup.known();
+        asked.forEach((provider) => note({ provider, name: names.get(provider) || provider }, CODE.SESSION_ONLY));
+        return step;
+    }
+    let found;
+    try {
+        found = await lookup.available({ companyId, userId, provider: asked, purpose: lookup.PURPOSE.ASK });
+    } catch (error) {
+        logger.error(`ask connectors: lookup: ${(error && error.name) || 'Error'}`);
+        const names = lookup.known();
+        asked.forEach((provider) => note({ provider, name: names.get(provider) || provider }, CODE.FAILED));
+        return step;
+    }
     const ready = [];
-    for (const provider of asked) {
-        const app = { provider, name: names.get(provider) || provider, tools: toolsOf(provider) };
-        if (viaToken) { note(app, CODE.SESSION_ONLY); continue; }
-        if (!app.tools.length) { note(app, CODE.PROVIDER_OFF); continue; }
-        try {
-            // eslint-disable-next-line no-await-in-loop
-            await runner.connectionOf(app.tools[0], companyId, userId);
-            ready.push(app);
-        } catch (error) {
-            if (!(error && error.deterministic)) logger.error(`ask connectors: ${provider} connection: ${(error && error.name) || 'Error'}`);
-            note(app, error && error.deterministic ? codeOf(error) : CODE.FAILED, error && error.deterministic ? spokenOf(error) : '');
-        }
-    }
-
-    const ruled = ready.map((app) => ({ app, calls: ruleCalls(app, question).map((call) => ({ ...call, app })) }));
-    let calls = ruled.flatMap((entry) => entry.calls);
-    const unruled = ruled.filter((entry) => !entry.calls.length).map((entry) => entry.app);
-    if (unruled.length) {
-        try {
-            const picked = vetted(await askModel({ companyId, userId, apps: unruled, question, previous }), unruled);
-            picked.filter((p) => p.refused).forEach((p) => p.app && note(p.app, p.refused));
-            calls = calls.concat(picked.filter((p) => !p.refused));
-        } catch (error) {
-            logger.error(`ask connectors: pick: ${error.message}`);
-            unruled.forEach((app) => note(app, CODE.PICK_FAILED));
-        }
-    }
-    calls.slice(MAX_CALLS).forEach((call) => note(call.app, CODE.TOO_MANY));
+    found.apps.forEach((app) => {
+        if (app.status === lookup.STATUS.OK && app.tools.length) ready.push(app);
+        else if (app.status === lookup.STATUS.OK) note(app, CODE.NO_TOOLS);
+        else noteStatus(note, app);
+    });
 
     let chars = 0;
+    let made = 0;
     const counted = new Map();
-    for (const call of calls.slice(0, MAX_CALLS)) {
-        const { tool, args, app } = call;
+    const read = [];
+    const done = new Set();
+    const keyOfCall = (call) => `${call.tool.key}:${JSON.stringify(call.args)}`;
+
+    const pick = async (apps, earlier = []) => {
         try {
-            if (tool.kind !== connectorTools.KIND.READ) {
-                // eslint-disable-next-line no-await-in-loop
-                step.proposals.push(await fileChange(ctx, call));
-            } else if (chars >= MAX_CHARS) {
-                note(app, CODE.CHAR_CAP);
-            } else {
-                // eslint-disable-next-line no-await-in-loop
-                const out = await readOne(ctx, call);
-                egressContext.noteConnectorRead(tool.provider);
-                const text = String(out.text || '').slice(0, MAX_CHARS - chars);
-                chars += text.length;
-                const n = (counted.get(app.provider) || 0) + 1;
-                counted.set(app.provider, n);
-                step.sources.push({
-                    kind: 'connector',
-                    id: (out.taint && out.taint[0] && out.taint[0].ref) || `${app.provider}:${n}`,
-                    ref: `${app.provider}:${n}`,
-                    title: titleOf(args, app),
-                    project: app.name,
-                    projectId: '',
-                    detail: text,
-                    matchedBy: 'connector',
-                    provider: app.provider,
-                    tool: tool.key,
-                    label: tool.label,
-                });
-            }
+            const answer = await askModel({ companyId, userId, apps, question, previous, earlier });
+            const picked = vetted(answer.calls, apps);
+            picked.filter((p) => p.refused).forEach((p) => p.app && note(p.app, p.refused));
+            return { calls: picked.filter((p) => !p.refused && !done.has(keyOfCall(p))), more: answer.more };
         } catch (error) {
-            const known = error && (error.deterministic || error.name === 'RefusedError' || error.code === -32602);
-            if (!known) logger.error(`ask connectors: ${tool.key}: ${(error && error.message) || 'Error'}`);
-            const code = known ? codeOf(error) : CODE.FAILED;
-            note(app, code, known && code !== CODE.BAD_INPUT ? spokenOf(error) : '');
+            logger.error(`ask connectors: pick: ${error.message}`);
+            apps.forEach((app) => note(app, CODE.PICK_FAILED));
+            return { calls: [], more: false };
         }
+    };
+
+    const run = async (calls) => {
+        calls.slice(MAX_CALLS - made).forEach((call) => note(call.app, CODE.TOO_MANY));
+        for (const call of calls.slice(0, MAX_CALLS - made)) {
+            const { tool, args, app } = call;
+            made += 1;
+            done.add(keyOfCall(call));
+            try {
+                if (tool.kind !== connectorTools.KIND.READ) {
+                    // eslint-disable-next-line no-await-in-loop
+                    step.proposals.push(await fileChange(ctx, call));
+                } else if (chars >= MAX_CHARS) {
+                    note(app, CODE.CHAR_CAP);
+                } else {
+                    // eslint-disable-next-line no-await-in-loop
+                    const out = await readOne(ctx, call);
+                    egressContext.noteConnectorRead(tool.provider);
+                    const text = String(out.text || '').slice(0, MAX_CHARS - chars);
+                    chars += text.length;
+                    const n = (counted.get(app.provider) || 0) + 1;
+                    counted.set(app.provider, n);
+                    read.push({ tool: tool.key, args, detail: text, app });
+                    step.sources.push({
+                        kind: 'connector',
+                        id: (out.taint && out.taint[0] && out.taint[0].ref) || `${app.provider}:${n}`,
+                        ref: `${app.provider}:${n}`,
+                        title: titleOf(args, app),
+                        project: app.name,
+                        projectId: '',
+                        detail: text,
+                        matchedBy: 'connector',
+                        provider: app.provider,
+                        tool: tool.key,
+                        label: tool.label,
+                    });
+                }
+            } catch (error) {
+                const known = error && (error.deterministic || error.name === 'RefusedError' || error.code === -32602);
+                if (!known) logger.error(`ask connectors: ${tool.key}: ${(error && error.message) || 'Error'}`);
+                const code = known ? codeOf(error) : CODE.FAILED;
+                note(app, code, known && code !== CODE.BAD_INPUT ? spokenOf(error) : '');
+            }
+        }
+    };
+
+    const ruled = ready.map((app) => ({ app, calls: ruleCalls(app, question).map((call) => ({ ...call, app })) }));
+    const unruled = ruled.filter((entry) => !entry.calls.length).map((entry) => entry.app);
+    const first = unruled.length ? await pick(unruled) : { calls: [], more: false };
+    await run([...ruled.flatMap((entry) => entry.calls), ...first.calls]);
+
+    /* A tool that needs an id another tool returns (Supabase's list_extensions after list_projects) gets one more pick,
+     * shown what was read; the question's call cap still holds. */
+    const followed = unruled.filter((app) => read.some((entry) => entry.app.provider === app.provider));
+    if (first.more && followed.length && made < MAX_CALLS && chars < MAX_CHARS) {
+        const second = await pick(followed, read.filter((entry) => followed.includes(entry.app)));
+        await run(second.calls);
     }
 
     ready.filter((app) => ![...step.sources, ...step.proposals, ...step.notes].some((entry) => entry.provider === app.provider))

@@ -176,14 +176,20 @@ const runnable = (definition, row) => Object.freeze({
     definition,
     live: true,
     label: row.tool,
+    description: row.description || '',
     kind: row.access,
     product: 'server',
+    changed: Boolean(row.changed),
     input: row.inputSchema,
     caps: Object.freeze(capsOf(definition, row.access)),
     mcp: Object.freeze({ tool: row.tool }),
     permission: row.permission || defaultPermission(row.access),
     run: async ({ input, connection }) => connection.mcp(row.tool, input),
     card: (input) => ({ target: definition.name, title: row.tool, text: JSON.stringify(input, null, 2), rows: [{ label: 'Connectors.card.customTool', value: row.tool }] }),
+});
+
+const runnableOfView = (definition, view) => runnable(definition, {
+    tool: view.tool, access: view.access, inputSchema: view.outside.inputSchema, description: view.outside.description, permission: view.permission, changed: view.changed,
 });
 
 const findRow = async (companyId, connectionId, tool) => plain(await db(companyId, [{ companyId: String(companyId), connectionId: String(connectionId), tool: String(tool) }], 'findOne'));
@@ -236,4 +242,4 @@ const noteGone = async ({ companyId, connectionId, tool }) => {
     await db(companyId, [{ companyId: String(companyId), connectionId: String(connectionId), tool: String(tool) }, { $set: { gone: true } }], 'updateOne').catch(() => {});
 };
 
-module.exports = { ACCESS, PERMISSION, STATUS, LIST_TIMEOUT_MS, keyOf, splitKey, liveDefinition, defaultPermission, listFor, listMine, toolFor, change, noteCalled, noteGone };
+module.exports = { ACCESS, PERMISSION, STATUS, LIST_TIMEOUT_MS, keyOf, splitKey, liveDefinition, defaultPermission, listFor, listMine, toolFor, runnableOfView, change, noteCalled, noteGone };

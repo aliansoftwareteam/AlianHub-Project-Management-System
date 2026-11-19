@@ -246,17 +246,34 @@ const localRead = async ({ tool, companyId, userId, via }) => {
     return { text, chars: text.length, truncated: whole.length > text.length, taint: [source] };
 };
 
-/* An agent's read is refused unless the agent has the tool ticked; `agentConnectors` left out ticks nothing. */
+/* A ticked tool the app no longer offers is refused with the tick named, so the agent's owner knows what to remove. */
+const ticked = async (work, key, agentConnectors) => {
+    const agents = require('../Agents/agentConnectors');
+    let tool;
+    try {
+        tool = await work();
+    } catch (error) {
+        if (error && error.code === 'tool_missing') throw refusal('tool_missing', agents.missingReason(key));
+        throw error;
+    }
+    const removedFromCatalog = !tool && agents.isTicked(agentConnectors, key) && !connectionTools.liveDefinition(connectionTools.splitKey(key).provider);
+    if (removedFromCatalog) throw refusal('tool_missing', agents.missingReason(key));
+    return tool;
+};
+
+/* An agent's read is refused unless the agent has the tool ticked, before any app is asked; `agentConnectors` left out ticks nothing. */
 const readAdmitted = async ({ companyId, userId, via, runId, callerId, agentConnectors, key, input }, trace) => {
-    const generic = tools.get(key) || await liveTool({ companyId, userId, via, key });
+    const byAgent = via === VIA.AGENT;
+    const notTicked = byAgent ? require('../Agents/agentConnectors').refusalFor(agentConnectors, key) : '';
+    if (notTicked) throw refusal('agent_not_allowed', notTicked);
+    const found = async () => tools.get(key) || liveTool({ companyId, userId, via, key });
+    const generic = byAgent && userId ? await ticked(found, key, agentConnectors) : await found();
     if (!generic || (generic.custom && generic.kind !== tools.KIND.READ) || !tools.isOn(generic)) throw refusal('tool_off', `${key} is not available here.`);
     if (!userId) throw refusal('no_person', 'This read names no person, so no connection can be used.');
     const { connectionId: asked, ...given } = input || {};
     const problem = argsSchema.problemIn(generic.input, given);
     if (problem) throw refusal('bad_input', `${key}: ${problem}`);
-    if (via === VIA.AGENT && !runId) throw refusal('run_required', 'A connected app can be read only while an agent is running.');
-    const notTicked = via === VIA.AGENT ? require('../Agents/agentConnectors').refusalFor(agentConnectors, key) : '';
-    if (notTicked) throw refusal('agent_not_allowed', notTicked);
+    if (byAgent && !runId) throw refusal('run_required', 'A connected app can be read only while an agent is running.');
     if (generic.local) {
         const out = await localRead({ tool: generic, companyId, userId, via });
         trace.chars = out.chars;
@@ -314,4 +331,4 @@ const read = ({ companyId, userId, via, runId = null, callerId = '', agentConnec
     (trace) => readAdmitted({ companyId, userId, via, runId, callerId, agentConnectors, key, input }, trace),
 );
 
-module.exports = { VIA, STATE, read, admitWrite, write, plain, connectionOf };
+module.exports = { VIA, STATE, MESSAGES, read, admitWrite, write, plain, connectionOf };

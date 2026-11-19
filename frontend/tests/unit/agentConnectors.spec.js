@@ -19,7 +19,7 @@ vi.mock('vue-toast-notification', () => ({ useToast: () => toast }));
 
 import AgentSettings from '@/views/Ai/AgentSettings.vue';
 import SkillEditor from '@/views/Ai/SkillEditor.vue';
-import { notOffered, tickCount, ticksOf, withProvider, withTool } from '@/views/Ai/agentConnectorTicks';
+import { missingTicks, notOffered, tickCount, ticksOf, withProvider, withTool } from '@/views/Ai/agentConnectorTicks';
 import { formatValue } from '@/views/Ai/revisionDiff';
 import en from '@/locales/en';
 
@@ -97,6 +97,14 @@ describe('the ticks an agent keeps', () => {
         expect(notOffered([{ provider: 'fake', tools: [READ] }, { provider: 'slack', tools: ['slack.channel.read'] }], [FAKE])).toEqual([{ provider: 'slack', tools: ['slack.channel.read'] }]);
     });
 
+    it('name a tick the app no longer lists as missing, with why, only once a live app could be listed', () => {
+        const live = { provider: 'notes', name: 'Notes', live: true, status: 'ok', tools: [{ key: 'notes.search', kind: 'read', label: 'search', live: true }], leftOut: [{ key: 'notes.archive', kind: 'read', reason: 'changed' }] };
+        const ticks = [{ provider: 'notes', tools: ['notes.search', 'notes.archive', 'notes.old'] }];
+        expect(missingTicks(ticks, live)).toEqual([{ key: 'notes.archive', reason: 'changed' }, { key: 'notes.old', reason: 'gone' }]);
+        expect(missingTicks(ticks, { ...live, status: 'unreachable', tools: [] })).toEqual([]);
+        expect(missingTicks([{ provider: 'fake', tools: [READ, 'fake.notes.gone'] }], { ...FAKE, status: 'not_connected' })).toEqual([{ key: 'fake.notes.gone', reason: 'gone' }]);
+    });
+
     it('read as words in a revision', () => {
         expect(formatValue('connectors', [{ provider: 'fake', tools: [READ, WRITE] }])).toBe(`fake: ${READ}, ${WRITE}`);
         expect(formatValue('connectors', [], (key) => key)).toBe('Ai.revision_value_empty');
@@ -131,6 +139,27 @@ describe('the Connectors tab of agent settings', () => {
         const wrapper = await mountSettings();
         expect(wrapper.find(`[data-test="connector-used-${READ}"]`).exists()).toBe(true);
         expect(wrapper.find(`[data-test="connector-used-${WRITE}"]`).exists()).toBe(false);
+    });
+
+    it('shows a ticked tool the app no longer offers as missing, and removing it saves the agent without it', async () => {
+        const NOTES = { provider: 'notes', name: 'Notes', live: true, status: 'ok', tools: [{ key: 'notes.search', kind: 'read', label: 'search', live: true, description: 'Search notes.' }], leftOut: [] };
+        serve({ providers: [NOTES], listed: [{ ...agent, connectors: [{ provider: 'notes', tools: ['notes.old', 'notes.search'] }] }] });
+        const wrapper = await mountSettings();
+        const missing = wrapper.find('[data-test="connector-missing-notes"]');
+        expect(missing.text()).toContain('notes.old');
+        expect(missing.text()).toContain('AgentConnectors.missing_gone');
+        expect(wrapper.find('[data-test="connector-tool-notes.search"]').element.checked).toBe(true);
+        await wrapper.find('[data-test="connector-remove-notes.old"]').trigger('click');
+        expect(wrapper.find('[data-test="connector-missing-notes"]').exists()).toBe(false);
+        await wrapper.find('[data-test="save"]').trigger('click');
+        await flushPromises();
+        expect(puts()[0][2]).toEqual({ _id: 'a1', connectors: [{ provider: 'notes', tools: ['notes.search'] }] });
+    });
+
+    it('says why an app\'s tools cannot be listed', async () => {
+        serve({ providers: [{ provider: 'notes', name: 'Notes', live: true, status: 'unreachable', tools: [], leftOut: [] }] });
+        const wrapper = await mountSettings();
+        expect(wrapper.find('[data-test="connector-status-notes"]').text()).toBe('Notes could not be reached just now, so its tools cannot be checked.');
     });
 
     it('saves only the ticks the person changed', async () => {

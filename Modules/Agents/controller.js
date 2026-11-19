@@ -200,7 +200,7 @@ exports.getConnectors = async (req, res) => {
         if (!companyId) return fail(res, 'companyId is required.');
         const caller = await callerOf(req, companyId);
         if (!caller.human) return fail(res, 'Agents cannot read which apps agents may use.', 403);
-        return res.send({ status: true, statusText: 'Connectors fetched.', data: { providers: await agentConnectors.offered(companyId) } });
+        return res.send({ status: true, statusText: 'Connectors fetched.', data: { providers: await agentConnectors.offered(companyId, caller.actor.userId) } });
     } catch (e) { logger.error(`getConnectors: ${e.message}`); return fail(res, 'Something went wrong.', 500); }
 };
 
