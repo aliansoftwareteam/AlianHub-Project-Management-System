@@ -1121,6 +1121,13 @@
     "required": false,
     "managed": "bootstrap"
   },
+  "MONGODB_DNS_SERVERS": {
+    "group": "general",
+    "description": "DNS servers, separated by commas, that Node uses to look up the database address. Set it when the machine's own resolver cannot resolve a mongodb+srv:// address.",
+    "secret": false,
+    "required": false,
+    "managed": "bootstrap"
+  },
   "MONGODB_URL": {
     "group": "general",
     "description": "mongo connection string (no trailing slash)",
