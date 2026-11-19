@@ -39,12 +39,12 @@ const genericRoutes = (app) => {
     app.post('/api/v2/connectors/:provider/complete', agentsRefused('connector.connect'), providerLimiter, providers.complete);
     app.post('/api/v2/connectors/:provider/token', agentsRefused('connector.connect'), providerLimiter, providers.saveToken);
     app.put('/api/v2/connectors/connections/:id/products', agentsRefused('connector.products_changed'), providerLimiter, providers.setProducts);
-    app.put('/api/v2/connectors/connections/:id/tools', agentsRefused('connector.tools_changed'), switchLimiter, providers.setToolsOff);
+    // Listing reads the app's server through the person's own connection, so it is limited like a provider call.
+    app.get('/api/v2/connectors/connections/:id/tools', providerLimiter, providers.connectionTools);
+    // An agent never sets how its own tools may be used.
+    app.put('/api/v2/connectors/connections/:id/tools/:key', agentsRefused('connector.tool_permission_changed'), switchLimiter, providers.setTool);
     app.delete('/api/v2/connectors/connections/:id', agentsRefused('connector.revoke'), providerLimiter, providers.disconnect);
-    app.get('/api/v2/connectors/:provider/tools', providers.memberTools);
-    // Owners and admins look again at a tool an app changed; an agent never approves its own tools.
-    app.get('/api/v2/connectors/admin/tools/:provider', providers.tools);
-    app.put('/api/v2/connectors/admin/tools/:provider/:tool', agentsRefused('connector.tool_reviewed'), providerLimiter, providers.reviewTool);
+    app.put('/api/v2/connectors/switches/:provider', agentsRefused('connector.app_switched'), switchLimiter, providers.setSwitch);
 };
 
 /* A workspace's own MCP servers (096). `servers` is a literal segment, like `connections` and `apps`; members connect

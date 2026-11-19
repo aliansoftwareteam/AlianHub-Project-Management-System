@@ -6,6 +6,7 @@ const tools = require('./tools');
 const runner = require('./toolRunner');
 const quotas = require('./quotas');
 const callAudit = require('./callAudit');
+const connectionTools = require('./connectionTools');
 
 /* A write to a connected app is filed as a proposal that only the connection's owner approves, and is sent once,
  * with exactly the params that owner saw on its card (FR-21 to FR-23 of task 056). */
@@ -33,7 +34,13 @@ const refuse = (message, code, status = 403) => Object.assign(new Error(message)
 /* The runner's messages open with a code and a tool key for the model that called it; a person reads what follows. */
 const spoken = (message) => String(message || '').replace(/^[a-z_]+: /, '').replace(/^[a-z0-9_]+(\.[a-z0-9_]+)+: /, '');
 
-const isWrite = (action) => tools.isWrite(action);
+/* Every call that waits on its owner's card: a catalog write, a REST app's read set to Needs approval, and any tool an
+ * MCP app's server lists, whose kind is known only once its owner's connection is looked up. */
+const isWrite = (action) => {
+    const tool = tools.get(action);
+    if (tool) return tool.kind === tools.KIND.WRITE || !tool.custom;
+    return Boolean(connectionTools.liveDefinition(connectionTools.splitKey(action).provider));
+};
 const hasWrite = (changes) => (Array.isArray(changes) ? changes : []).some((c) => c && isWrite(c.action));
 
 const line = (value) => String(value === undefined || value === null ? '' : value).replace(/\s+/g, ' ').trim();
@@ -57,8 +64,10 @@ const rowOf = (row) => {
     return { label: row.label, ...(row.valueLabel === undefined ? { value: runner.plain(row.value) } : { valueLabel: row.valueLabel }) };
 };
 
+const plainCard = (tool, args) => ({ target: tool.definition.name, title: tool.key, text: JSON.stringify(args, null, 2) });
+
 const cardOf = (tool, args) => {
-    const shown = tool.card(args) || {};
+    const shown = (typeof tool.card === 'function' ? tool.card(args) : plainCard(tool, args)) || {};
     const card = {
         provider: tool.provider,
         tool: tool.key,

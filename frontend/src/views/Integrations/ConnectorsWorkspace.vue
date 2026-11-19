@@ -14,13 +14,7 @@
 
         <AdminConnections v-if="registry" />
 
-        <section v-if="registry" class="ah-card cx-ws__card" data-test="cx-ws-reviews">
-            <div class="ah-card__body">
-                <p v-if="loadError" class="ah-field__error" role="alert">{{ loadError }}</p>
-                <ConnectorToolReviews v-else-if="providers.length" :providers="providers" />
-                <p v-else-if="loaded" class="ah-small">{{ $t('Connectors.review.none') }}</p>
-            </div>
-        </section>
+        <WorkspaceApps v-if="registry" />
 
         <CompanyApps v-if="apps" />
 
@@ -31,46 +25,26 @@
 </template>
 
 <script setup>
-import { ref, watch } from "vue";
-import { useI18n } from "vue-i18n";
+import { ref } from "vue";
 import AdminConnections from "./AdminConnections.vue";
 import CompanyApps from "./CompanyApps.vue";
 import ConnectorQuotas from "./ConnectorQuotas.vue";
-import ConnectorToolReviews from "./ConnectorToolReviews.vue";
-import { connectorApi } from "./connectorApi";
+import WorkspaceApps from "./WorkspaceApps.vue";
 
 defineOptions({ name: "ConnectorsWorkspace" });
 
-const props = defineProps({
+defineProps({
     registry: { type: Boolean, default: false },
     apps: { type: Boolean, default: false },
     limits: { type: Boolean, default: false }
 });
 
-const { t } = useI18n();
-const providers = ref([]);
-const loaded = ref(false);
-const loadError = ref("");
 const limitsAt = ref(null);
-
-const loadProviders = async () => {
-    loadError.value = "";
-    try {
-        const data = await connectorApi.list();
-        providers.value = (data?.providers || []).map((entry) => entry.provider);
-    } catch (e) {
-        loadError.value = e.message || t("Connectors.review.load_failed");
-    } finally {
-        loaded.value = true;
-    }
-};
 
 const toLimits = () => {
     limitsAt.value?.scrollIntoView({ behavior: "smooth", block: "start" });
     limitsAt.value?.focus({ preventScroll: true });
 };
-
-watch(() => props.registry, (on) => { if (on && !loaded.value) loadProviders(); }, { immediate: true });
 </script>
 
 <style scoped>
@@ -78,7 +52,6 @@ watch(() => props.registry, (on) => { if (on && !loaded.value) loadProviders(); 
 .cx-ws__head { display: flex; flex-wrap: wrap; align-items: flex-start; justify-content: space-between; gap: 10px 16px; }
 .cx-ws__intro { display: flex; flex-direction: column; gap: 4px; min-width: 0; max-width: 680px; }
 .cx-ws__lead { margin: 0; font: var(--text-body); color: var(--ink-2); }
-.cx-ws__card { max-width: 900px; }
 .cx-ws__limits { outline: none; scroll-margin-top: 12px; }
-.cx-ws :deep(.ac), .cx-ws :deep(.ca), .cx-ws :deep(.cq) { margin-bottom: 0; }
+.cx-ws :deep(.ac), .cx-ws :deep(.ca), .cx-ws :deep(.cq), .cx-ws :deep(.wa) { margin-bottom: 0; }
 </style>

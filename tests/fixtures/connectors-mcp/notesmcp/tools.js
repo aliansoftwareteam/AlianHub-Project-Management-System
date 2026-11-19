@@ -1,4 +1,10 @@
-const { mcpTool } = require('../../../../Modules/Connectors/mcpTools');
+/* A tool pinned to the shape a server describes, the form the catalog's MCP tools had before they were listed live
+ * (task 109); the MCP plumbing is still tested through it. */
+const mcpTool = ({ tool, shape = null, args = (input) => input, ...definition }) => Object.freeze({
+    ...definition,
+    mcp: Object.freeze({ tool, shape }),
+    run: async ({ input, connection }) => connection.mcp(tool, args(input)),
+});
 const { shapeOfTool } = require('../../fakeMcpServer');
 
 const query = { type: 'string', maxLength: 200, description: 'Words to look for.' };

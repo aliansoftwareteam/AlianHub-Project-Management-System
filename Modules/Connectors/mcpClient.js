@@ -8,7 +8,6 @@ const LOG = '[connectors]';
 const CLIENT_INFO = Object.freeze({ name: 'AlianHub', version: '1.0.0' });
 const TIMEOUT_MS = 15000;
 const MAX_BYTES = 512 * 1024;
-const LISTING_TTL_MS = 10 * 60 * 1000;
 const MAX_PAGES = 10;
 const NO_BODY = Object.freeze([101, 103, 204, 205, 304]);
 const SHAPE = /^[a-f0-9]{64}$/;
@@ -96,38 +95,29 @@ const listAll = async (client, options) => {
     return tools;
 };
 
-const listings = new Map();
+/* Every tool the server offers, with the shape it has now and whether the server says it only reads. */
+const listTools = (call) => withSession(call, async (client, options) => (await listAll(client, options)).map((tool) => ({
+    name: String(tool.name),
+    description: String(tool.description || ''),
+    inputSchema: tool.inputSchema || {},
+    readOnly: Boolean(tool.annotations && tool.annotations.readOnlyHint === true),
+    shape: shapeOf(tool),
+})));
 
-const remember = (provider, tools, now) => {
-    const shapes = new Map(tools.map((tool) => [String(tool.name), shapeOf(tool)]));
-    listings.set(provider, { at: now, shapes });
-    return shapes;
-};
-
-const fresh = (provider, now) => {
-    const listing = listings.get(provider);
-    return listing && now - listing.at < LISTING_TTL_MS ? listing.shapes : null;
-};
-
-/* Every tool the server offers, with the shape it has now: what an owner or admin reviews before turning one on. */
-const listTools = (call, now = Date.now()) => withSession(call, async (client, options) => {
-    const tools = await listAll(client, options);
-    remember(call.provider, tools, now);
-    return tools.map((tool) => ({ name: String(tool.name), description: String(tool.description || ''), inputSchema: tool.inputSchema || {}, shape: shapeOf(tool) }));
-});
-
-/* A tool is called only while the server still describes it as it was reviewed. The listing is kept a few minutes per
- * provider and read again when the tool is not in it, so a changed or withdrawn tool is caught before it is sent. */
-const callTool = (call, now = Date.now()) => withSession(call, async (client, options) => {
-    const { provider, name, args, shape } = call;
-    if (!SHAPE.test(String(shape || ''))) throw refusal('tool_unreviewed', `${name} has not been reviewed, so it was not called.`);
-    let shapes = fresh(provider, now);
-    if (!shapes || !shapes.has(name)) shapes = remember(provider, await listAll(client, options), now);
-    if (!shapes.has(name)) throw refusal('tool_missing', `The app no longer offers ${name}, so it was not called.`);
-    if (shapes.get(name) !== shape) {
+/* Every call reads the server's listing first, so a tool it withdrew is never sent. A reviewed tool (`shape`) is called
+ * only while the server still describes it as reviewed; a live tool (`live`) is called as it is now, and `onListed`
+ * hears the shape it has. */
+const callTool = (call) => withSession(call, async (client, options) => {
+    const { provider, name, args, shape, live, onListed } = call;
+    if (!live && !SHAPE.test(String(shape || ''))) throw refusal('tool_unreviewed', `${name} has not been reviewed, so it was not called.`);
+    const listed = (await listAll(client, options)).find((tool) => String(tool.name) === name);
+    if (!listed) throw refusal('tool_missing', `The app no longer offers ${name}, so it was not called.`);
+    const current = shapeOf(listed);
+    if (!live && current !== shape) {
         logger.error(`${LOG} ${provider} tool ${name} changed since it was reviewed; it stays off until it is reviewed again`);
-        throw Object.assign(refusal('tool_changed', `The app changed ${name} since it was reviewed, so it was not called. An owner or admin reviews it again first.`), { current: shapes.get(name) });
+        throw Object.assign(refusal('tool_changed', `The app changed ${name} since it was reviewed, so it was not called. An owner or admin reviews it again first.`), { current });
     }
+    if (live && onListed) await onListed(current);
     return client.callTool({ name, arguments: args || {} }, undefined, options);
 });
 
@@ -140,6 +130,4 @@ const textOf = (result) => (Array.isArray(result && result.content) ? result.con
     return `[${String(part.type || 'content')} left out]`;
 }).filter(Boolean).join('\n');
 
-const forget = () => listings.clear();
-
-module.exports = { shapeOf, listTools, callTool, textOf, forget, SHAPE, TIMEOUT_MS, MAX_BYTES };
+module.exports = { shapeOf, listTools, callTool, textOf, SHAPE, TIMEOUT_MS, MAX_BYTES };

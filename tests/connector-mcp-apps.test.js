@@ -1,5 +1,3 @@
-const fs = require('fs');
-const path = require('path');
 
 jest.mock('../Config/loggerConfig', () => ({ info: jest.fn(), error: jest.fn(), warn: jest.fn(), debug: jest.fn() }));
 jest.mock('../Modules/Agents/engine/safeFetch', () => ({
@@ -15,13 +13,12 @@ const providerApi = require('../Modules/Connectors/providerApi');
 const { accountFromToken } = require('../Modules/Connectors/tokenAccount');
 
 /* The apps reached through their own MCP servers (tasks 075, 094, 095): each a folder of data that validates, whose
- * tools stay off until a shape is pinned, and that signs in the way its server allows. */
+ * tools each connection lists from the server, and that signs in the way its server allows. */
 
 const MCP_APPS = ['notion', 'github', 'supabase', 'upwork', 'wisprflow', 'dropbox', 'hubspot', 'canva'];
 const SELF_REGISTERING = ['notion', 'supabase', 'upwork', 'wisprflow', 'canva'];
 const ENV_KEYS = ['CONNECTORS', 'AGENT_TAINT_ROUTING', 'CONNECTOR_GITHUB_CLIENT_ID', 'CONNECTOR_GITHUB_CLIENT_SECRET', 'HOSTING_MODE'];
 const before = Object.fromEntries(ENV_KEYS.map((k) => [k, process.env[k]]));
-const en = fs.readFileSync(path.join(__dirname, '..', 'frontend', 'src', 'locales', 'en.js'), 'utf8');
 
 beforeEach(() => {
     process.env.CONNECTORS = MCP_APPS.join(',');
@@ -44,25 +41,8 @@ describe('every app reached through its MCP server', () => {
         });
     });
 
-    it('has tools that load, each with words on screen, and none on before a shape is pinned', () => {
-        const tools = connectorTools.all().filter((tool) => MCP_APPS.includes(tool.provider));
-        expect(tools.length).toBeGreaterThanOrEqual(MCP_APPS.length * 2);
-        tools.forEach((tool) => {
-            expect(en).toContain(`${tool.label.replace('Connectors.tool.', '')}: "`);
-            expect(tool.mcp).toEqual({ tool: expect.any(String), shape: null });
-            expect(connectorTools.isOn(tool)).toBe(false);
-        });
-    });
-
-    it('gives the AI chat\'s pull request rule the input it sends', () => {
-        const read = connectorTools.get('github.pull_request.read');
-        expect(Object.keys(read.input.properties).sort()).toEqual(['owner', 'pullNumber', 'repo']);
-        expect(read.input.required.sort()).toEqual(['owner', 'pullNumber', 'repo']);
-    });
-
-    it('keeps writing out of the apps where only reads were asked for', () => {
-        const writes = connectorTools.all().filter((tool) => MCP_APPS.includes(tool.provider) && tool.kind === 'write').map((tool) => tool.key);
-        expect(writes.sort()).toEqual(['github.issue.comment', 'notion.page.create']);
+    it('ships no catalog tools: each connection lists its own from the server', () => {
+        expect(connectorTools.all().filter((tool) => MCP_APPS.includes(tool.provider))).toEqual([]);
     });
 });
 

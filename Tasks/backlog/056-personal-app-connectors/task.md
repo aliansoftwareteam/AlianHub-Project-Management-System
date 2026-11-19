@@ -89,7 +89,7 @@ Either returns as one catalog entry if it admits AlianHub.
 
 18. **MCP first.** AlianHub reaches an app through the app's own remote MCP server whenever that server admits AlianHub, and through a connector built against the app's API only where it does not. Both sit behind the same catalog, connections, approvals and tracking. Moving an app from built to MCP changes its catalog entry only.
 19. **First-stage apps** are the twelve in §2. ClickUp and Figma are dropped.
-20. **AlianHub's own tool names stay fixed.** Each catalog entry maps AlianHub's names (for example `github.pull_request.read`) to the provider's tools and holds the allow-list of tools offered, each marked read or write. AlianHub decides read or write; a server's own hints are never trusted. A provider tool that is new, or whose shape changed since it was reviewed, stays hidden until an owner or admin turns it on. Agents, the AI chat and skills use only AlianHub's names, so a provider renaming a tool, or an app moving from built to MCP, breaks none of them.
+20. **Tool names come from the server.** A connection's tools are listed live from its server with that connection's token (107). Each tool carries a permission set by the connection's owner (Always allow, Needs approval or Off) and read or write, taken from the server's `readOnlyHint` (write when there is no hint) and changeable by the owner. A tool the server changed keeps working with a "changed" warning until the owner looks at it again; agents skip it meanwhile. A saved agent or skill tick whose tool the server renamed or removed shows as missing, never dropped silently.
 21. **Hosted instances share one sign-in address.** Alian registers each app that needs a registered app once, with one callback on an Alian-owned address (for example `connect.alianhub.com`). The service forwards each sign-in to the instance named in the signed state. It exchanges codes and refreshes tokens with the app secret, which never leaves it, and it stores no tokens; instances store their members' tokens. Self-hosted installs register their own app once per app (the screen shows the callback to copy), use a personal token where the app offers one, or use apps that register themselves. A company that wants its own brand on the consent screen registers its own app (decision 3). The service is built in the alianhub-cloud repo.
 22. **Personal tokens** are a sign-in kind where an app offers them (GitHub, custom servers): each member pastes their own, and it is kept and used like an OAuth token. *Proposed during planning and accepted with the plan on 2026-11-12; confirm at review.*
 23. **Custom MCP servers.** A person holding the new "Add custom apps" right (owners and admins by default) adds an MCP server by its address for the workspace; each member connects their own account to it. Every tool starts hidden until that person or an owner/admin turns it on and marks it read or write. Hosted plans may switch it on per plan; an instance admin may switch it off.
@@ -187,7 +187,7 @@ Not built, and needed by v2.0:
 
 ### 7.1 Catalog
 
-- **FR-1** *(v2)* A catalog entry is one definition file: id, display name, one-line description, category, logo, kind (`mcp` or `built`), the sign-in kinds it accepts (`self_register`, `registered_app`, `personal_token`), the hosts it calls (for egress), rate-limit signals, and its tools under AlianHub names. An `mcp` entry adds the server address and the allow-list: each AlianHub tool mapped to the provider's tool, marked read or write, with the shape it was reviewed against. A `built` entry adds authorize and token endpoints, PKCE, extra parameters, scopes per product and per tool, account id and label reader, refresh, revoke, and the tool handlers.
+- **FR-1** *(v2)* A catalog entry is one definition file: id, display name, one-line description, category, logo, kind (`mcp` or `built`), the sign-in kinds it accepts (`self_register`, `registered_app`, `personal_token`), the hosts it calls (for egress), rate-limit signals, and its tools under AlianHub names. An `mcp` entry adds the server address only; its tools are listed live (FR-44). A `built` entry adds authorize and token endpoints, PKCE, extra parameters, scopes per product and per tool, account id and label reader, refresh, revoke, and the tool handlers.
 - **FR-2** *(v2)* Adding an entry needs no new route, collection, screen or registry file. An entry is offered only when it is named in `CONNECTORS` and can sign in on this install: it registers itself, takes personal tokens, or has an app (company, hosted service or instance default).
 - **FR-3** Providers with products (Google) expose them as ticks on one connection; scopes are the union of the ticked products' scopes.
 
@@ -258,8 +258,8 @@ Not built, and needed by v2.0:
 ### 7.10 MCP transport
 
 - **FR-43** AlianHub calls a remote MCP server over Streamable HTTP with the member's token, using the `@modelcontextprotocol/sdk` client with its requests going through `agentFetch` (FR-24). HTTPS only. A local (stdio) server is never started.
-- **FR-44** Before a server's tools are offered, AlianHub lists them and compares each with its reviewed shape (a hash of name, description and input schema). A tool that is new or changed is hidden, and the workspace's owners and admins are told; one of them turns it on and marks it read or write (write by default). Catalog entries ship reviewed shapes, and a release refreshes them.
-- **FR-45** A model is shown only the description the reviewer accepted, never one fresh from the server; the server's own text is shown to the reviewer as outside content.
+- **FR-44** The tools of an `mcp` entry or custom server are listed live from the server, per connection, with that connection's token; nothing is cached. Each tool keeps, per connection, its permission (Always allow, Needs approval or Off; the owner sets it), read or write (from `readOnlyHint`, write when absent, owner can change it), and the shape last looked at (a hash of name, description and input schema). A tool whose shape differs is flagged "changed", the owner is told once, it keeps working in AI chat, and agents skip it until the owner looks at it again. Owners and admins can turn an app off for the whole workspace; there is no per-tool admin review.
+- **FR-45** A server's tool names and descriptions are outside content: shown as the app's own text, never through `$t()`, and never trusted as instructions. A saved agent or skill tick stores provider and server tool name; if the server renamed or removed it, the tick shows as missing in the agent's settings.
 - **FR-46** Results are text only, capped and tainted (FR-20), and never followed as instructions.
 - **FR-47** A server error, timeout or rate limit fails that one call, with backoff per server (FR-29); it never marks the connection broken unless sign-in itself fails.
 
@@ -274,7 +274,7 @@ Not built, and needed by v2.0:
 
 - **FR-52** A person holding "Add custom apps" (a new row in Security & Permissions, `Config/aiRights.js`; owners and admins by default) adds a server by name and address. AlianHub reads its sign-in metadata: if the server registers itself, nothing more is needed; if it needs a registered app, the person enters client id and secret (secret to the secrets store); if it takes personal tokens, each member pastes their own.
 - **FR-53** The address must be HTTPS and must not resolve to a private, loopback or link-local address (`safeFetch.js`); its host is added to the workspace egress list on save.
-- **FR-54** Every tool starts hidden. The person who added the server, or an owner or admin, turns tools on and marks each read or write; FR-44 applies to every later change.
+- **FR-54** A custom server's tools follow the same per-connection model as FR-44; a write tool with Needs approval goes through the approval card.
 - **FR-55** `CONNECTORS_CUSTOM=off` turns custom servers off for the install; on hosted, custom servers are a plan feature (`Modules/Entitlements`). Removing a server ends every connection to it.
 
 ### 7.13 AI chat
@@ -295,7 +295,7 @@ Not built, and needed by v2.0:
 - **FR-63** One place: the AI sidebar's **Customize** entry replaces Connections and Connect your AI. It opens Customize with the tabs **Connectors** (default) and **Connect your AI**. The old Connections route redirects to it; the App connections route leads to the Integrations page (FR-38).
 - **FR-64** **Your connectors**: each connected app with logo, account label (shown to its owner only), status dot and last used. A connector that needs attention comes first, with Reconnect.
 - **FR-65** **Browse**: every available entry as a card with logo, name, one line and category; search and category filter; Connect on the card. An entry this install cannot sign in to says why to members ("Your admin needs to set up Google") and links owners and admins to its setup.
-- **FR-66** **Add custom connector** (with the right): name and address, then the sign-in step that server needs, then its tool review list (FR-52, FR-54).
+- **FR-66** **Add custom connector** (with the right): name and address, then the sign-in step that server needs, then its tool list (FR-52, FR-54).
 - **FR-67** **Connector detail** (side panel): account, products (Google), status, usage this week, the tools with read/write labels and an on/off per tool for the member's own use, Disconnect. Owners and admins also see new or changed tools to review.
 - **FR-68** **Workspace** tab for owners and admins: members' connections (FR-30), company apps with the callback to copy (FR-32), custom servers, and the link to quotas (task 078).
 
@@ -313,7 +313,7 @@ All of 7.15 meets FR-34, works by keyboard and screen reader, and works at phone
 | `kind`, `signIn` | `mcp` or `built`; `self_register`, `registered_app` or `personal_token` |
 | `account { id, label }` | the provider's account id and a display label (shown to the owner only) |
 | `scopes[]` | as granted |
-| `toolsOff[]` | tools the owner turned off for their own use |
+| `toolPermissions[{ key, permission }]` | a REST tool's permission when the owner chose other than the default (task 110; an MCP tool keeps its own on `connector_connection_tools`) |
 | `status`, `lastError`, `brokenAt` | health |
 | `app { source: 'instance' \| 'company' \| 'hosted' \| 'registered', appId }` | which app issued it |
 | `handles { access, refresh }` | secrets store handles (a personal token is `access`) |
@@ -329,7 +329,7 @@ New:
 - `connector_usage`: `companyId`, `connectionId`, `userId`, caller (agent, MCP client or AI chat), day, counts; or counters on the row if 064 shows that is enough.
 - `connector_registrations`: `companyId`, `provider` or `serverId`, `clientId`, secret handle if any, method (`dcr` or `cimd`), registered at. One per workspace per server.
 - `connector_servers`: `companyId`, name, address, sign-in kind, client app (id, secret handle), added by, dates, status.
-- `connector_tools`: `companyId`, `provider` or `serverId`, provider tool, AlianHub name, label and description as reviewed, read or write, on/off, shape hash, reviewed by and at. Holds custom servers' tools and each workspace's review of catalog tools that are new or changed.
+- `connector_tools`: per connection, the provider tool name, permission, read or write, the shape last looked at, and a changed flag (107). Replaces the per-workspace review rows.
 - On the agent record, `connectors: [{ provider or serverId, tools[] }]`.
 
 Migrations for FR-35, FR-36 and FR-39, each safe to run twice.
@@ -453,7 +453,7 @@ Shopify and Gmail tasks are created once their decisions are made.
 - [ ] Two people in one workspace connect the same app with different accounts. Each person's AI chat, built-in runs and MCP client reach only their own account, and a person with no connection is refused with a clear reason.
 - [ ] Notion connects on a fresh install with no setup, and registers once per workspace, not per member or session.
 - [ ] A hosted instance on a new custom domain connects GitHub, Slack and HubSpot with nothing registered for that domain. The app secrets exist only in the sign-in service, and a suspended instance is refused.
-- [ ] A provider tool that is new or changed stays hidden until reviewed; AlianHub's tool names never change.
+- [ ] A tool the server changed keeps working, shows a changed warning, and agents skip it until looked at again.
 - [ ] No route, log, socket event or audit row contains a token or client secret (asserted in tests); nothing switches on without the secrets store.
 - [ ] Every outside write, from any caller, becomes a proposal only the connection's owner can approve; an admin's approval is refused; what is sent equals what was approved.
 - [ ] Every call writes one audit row; usage counts match the calls; a quota stops calls with a clear reason; an admin cannot set a quota above the instance ceiling.
@@ -480,9 +480,9 @@ Shopify and Gmail tasks are created once their decisions are made.
 - **Provider review and listing:** Google's review for Calendar and Drive scopes, a possible Slack Marketplace listing, and HubSpot and Canva app approval can hold an app back regardless of the build; 061 starts them in Phase 0.
 - **Servers that close to AlianHub:** an app may add an approved-client list as ClickUp and Figma did. Its entry then falls back to built or is removed.
 - **Preview servers:** Google and Microsoft MCP servers are previews; AlianHub stays on built connectors for them until they are generally available.
-- **Provider tool changes:** a changed tool goes quiet until reviewed (FR-44). This is safe but visible, so admins are told at once.
+- **Provider tool changes:** a changed tool keeps working with a warning and agents skip it until the owner looks at it again (FR-44).
 - **The shared sign-in service** sits in the sign-in and Google-refresh path of every hosted instance; an outage stops new connections and Google refreshes.
-- **Tool poisoning** through a custom or compromised server: reviewed descriptions only, taint, caps, no web fetch after a read, and approval for every write.
+- **Tool poisoning** through a custom or compromised server: descriptions shown as outside content, taint, caps, no web fetch after a read, and the owner's per-tool permission with approval for writes set to Needs approval.
 - **Gmail for personal accounts:** until the hosted app is verified, people on personal @gmail.com addresses on the hosted instance have no Gmail connector.
 - **Picker migration:** members who used the old picker must reconnect once if their grant cannot be carried over.
 - **Two GitHub jobs:** the workspace sync and the personal connector both touch pull requests; the cards must make clear which one links automatically and which one AI uses, so nobody expects one to do the other's job.

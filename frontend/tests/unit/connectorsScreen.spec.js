@@ -14,8 +14,9 @@ vi.mock('@/components/organisms/Shell/ShellIcon.vue', () => ({ default: { name: 
 vi.mock('@/views/Integrations/connectorApi', async (original) => ({ ...(await original()), goToConsent }));
 
 import ConnectorsTab from '@/views/Integrations/ConnectorsTab.vue';
+import WorkspaceApps from '@/views/Integrations/WorkspaceApps.vue';
 import {
-    ALL_CATEGORIES, asksBeforeConnect, categoryOf, connectorRows, filterBrowse, initialsOf, needsAttention, sortMine, toolsOffAfter,
+    ALL_CATEGORIES, asksBeforeConnect, categoryOf, connectorRows, filterBrowse, groupTools, initialsOf, needsAttention, sortMine,
 } from '@/views/Integrations/connectorCatalog';
 import en from '@/locales/en.js';
 
@@ -30,7 +31,7 @@ const refused = (statusText, code) => Promise.resolve({ data: { status: false, s
 
 const connection = (provider, over = {}) => ({
     provider, connectionId: `conn-${provider}`, connected: true, status: 'connected', account: { label: `maya@${provider}.test` },
-    signIn: 'registered_app', products: [], scopes: [], toolsOff: [], connectedAt: '2026-11-01T09:00:00.000Z', lastUsedAt: null, ...over,
+    signIn: 'registered_app', products: [], scopes: [], toolPermissions: [], connectedAt: '2026-11-01T09:00:00.000Z', lastUsedAt: null, ...over,
 });
 
 const LIST = {
@@ -49,20 +50,23 @@ const LIST = {
     unavailable: [{ provider: 'canva' }],
 };
 
+const tool = (key, label, access, over = {}) => ({
+    key, tool: key, live: false, label, usable: true, access, accessByOwner: false, permission: access === 'read' ? 'allow' : 'approval', changed: false, gone: false, on: true, ...over,
+});
 const GOOGLE_TOOLS = [
-    { key: 'google.calendar.events.list', label: 'Connectors.tool.googleCalendarEventsList', kind: 'read', on: true },
-    { key: 'google.calendar.events.create', label: 'Connectors.tool.googleCalendarEventsCreate', kind: 'write', on: true },
-    { key: 'google.drive.files.read', label: 'Connectors.tool.googleDriveFilesRead', kind: 'read', on: false },
+    tool('google.calendar.events.list', 'Connectors.tool.googleCalendarEventsList', 'read'),
+    tool('google.calendar.events.create', 'Connectors.tool.googleCalendarEventsCreate', 'write'),
+    tool('google.drive.files.read', 'Connectors.tool.googleDriveFilesRead', 'read', { on: false }),
 ];
+const toolsAnswer = (tools, over = {}) => ok({ provider: 'google', status: 'ok', connectionId: 'conn-google', tools, ...over });
 
 const serve = (answers = {}) => {
     apiRequest.mockImplementation((method, url, body) => {
         const key = `${method} ${url.slice(BASE.length)}`;
         if (answers[key]) return answers[key](body);
         if (key === 'get ') return ok(LIST);
-        if (key === 'get /google/tools') return ok({ tools: GOOGLE_TOOLS });
+        if (key === 'get /connections/conn-google/tools') return toolsAnswer(GOOGLE_TOOLS);
         if (key === 'get /servers') return ok({ servers: [], mayAdd: false });
-        if (key.startsWith('get /admin/tools/')) return ok({ tools: [] });
         return Promise.reject(new Error(`unexpected ${method} ${url}`));
     });
 };
@@ -133,10 +137,18 @@ describe('sorting and filtering the connectors', () => {
         expect(asksBeforeConnect({ products: ['workspace'], signIn: ['oauth'] })).toBe(false);
     });
 
-    it('turns one tool off or back on without touching the others', () => {
-        expect(toolsOffAfter([], 'a.b.c', false)).toEqual(['a.b.c']);
-        expect(toolsOffAfter(['x.y.z', 'a.b.c'], 'a.b.c', true)).toEqual(['x.y.z']);
-        expect(toolsOffAfter(['a.b.c'], 'a.b.c', false)).toEqual(['a.b.c']);
+    it('groups tools into read, write and no longer offered', () => {
+        const grouped = groupTools([tool('a.read', '', 'read'), tool('a.write', '', 'write'), tool('a.old', '', 'read', { gone: true })]);
+        expect(grouped.read.map((t) => t.key)).toEqual(['a.read']);
+        expect(grouped.write.map((t) => t.key)).toEqual(['a.write']);
+        expect(grouped.gone.map((t) => t.key)).toEqual(['a.old']);
+    });
+
+    it('marks an app an owner or admin turned off for the workspace', () => {
+        const rows = connectorRows({ ...LIST, workspaceOff: ['google', 'notion'] });
+        expect(rows.mine.find((row) => row.provider === 'google').switchedOff).toBe(true);
+        expect(rows.browse.find((row) => row.provider === 'notion').switchedOff).toBe(true);
+        expect(rows.browse.find((row) => row.provider === 'hubspot').switchedOff).toBe(false);
     });
 
     it('draws initials for an app with no logo', () => {
@@ -344,38 +356,63 @@ describe('the connector detail panel', () => {
         return wrapper;
     };
 
-    it('shows the account, the products and each tool with read or write', async () => {
+    it('shows the account, the products and each tool grouped read and write with its permission', async () => {
         const panel = (await openGoogle()).find('[data-test="cx-detail"]');
         expect(panel.find('[data-test="cx-detail-account"]').text()).toBe('maya@google.test');
         expect(panel.find('[data-test="cx-detail-product-calendar"]').element.checked).toBe(true);
         expect(panel.find('[data-test="cx-detail-product-meet"]').element.checked).toBe(false);
-        const create = panel.find('[data-test="cx-tool-google.calendar.events.create"]');
-        expect(create.text()).toContain(t('Connectors.tool.googleCalendarEventsCreate'));
-        expect(create.text()).toContain(t('Connectors.detail.kind_write'));
+        const writes = panel.find('[data-test="cx-tools-write"]');
+        expect(writes.text()).toContain(t('Connectors.detail.group_write'));
+        expect(writes.find('[data-test="cx-tool-google.calendar.events.create"]').text()).toContain(t('Connectors.tool.googleCalendarEventsCreate'));
+        expect(panel.find('[data-test="cx-tool-permission-google.calendar.events.create"]').element.value).toBe('approval');
+        expect(panel.find('[data-test="cx-tool-permission-google.calendar.events.list"]').element.value).toBe('allow');
+        expect(panel.find('[data-test="cx-tool-access-google.calendar.events.list"]').exists()).toBe(false);
     });
 
-    it('turns a tool off and on for the person\'s own use, sending the whole list each time', async () => {
+    it('saves a tool\'s permission for the person\'s own use', async () => {
         const sent = [];
         const wrapper = await openGoogle({
-            'put /connections/conn-google/tools': (body) => { sent.push(body); return ok(connection('google', { products: ['calendar'], toolsOff: body.toolsOff })); },
+            'put /connections/conn-google/tools/google.calendar.events.create': (body) => {
+                sent.push(body);
+                return ok({ ...GOOGLE_TOOLS[1], permission: body.permission });
+            },
         });
-        const switchOf = () => wrapper.find('[data-test="cx-tool-switch-google.calendar.events.create"]');
-        expect(switchOf().attributes('aria-checked')).toBe('true');
-        await switchOf().trigger('click');
+        const select = wrapper.find('[data-test="cx-tool-permission-google.calendar.events.create"]');
+        await select.setValue('off');
         await flushPromises();
-        expect(switchOf().attributes('aria-checked')).toBe('false');
-        await switchOf().trigger('click');
-        await flushPromises();
-        expect(sent).toEqual([{ toolsOff: ['google.calendar.events.create'] }, { toolsOff: [] }]);
-        expect(switchOf().attributes('aria-checked')).toBe('true');
+        expect(sent).toEqual([{ permission: 'off' }]);
+        expect(wrapper.find('[data-test="cx-tool-permission-google.calendar.events.create"]').element.value).toBe('off');
     });
 
-    it('keeps a tool the workspace turned off switched off and out of reach', async () => {
+    it('marks a tool this install has not switched on', async () => {
         const wrapper = await openGoogle();
-        const off = wrapper.find('[data-test="cx-tool-switch-google.drive.files.read"]');
-        expect(off.attributes('aria-checked')).toBe('false');
-        expect(off.attributes('disabled')).toBeDefined();
-        expect(wrapper.find('[data-test="cx-tool-workspace-off-google.drive.files.read"]').exists()).toBe(true);
+        expect(wrapper.find('[data-test="cx-tool-unavailable-google.drive.files.read"]').exists()).toBe(true);
+        expect(wrapper.find('[data-test="cx-tool-unavailable-google.calendar.events.list"]').exists()).toBe(false);
+    });
+
+    it('shows a changed tool with its warning, lets its owner say they looked at it, and lists gone tools apart', async () => {
+        const sent = [];
+        const live = [
+            tool('google.events_list', '', 'read', { tool: 'events_list', live: true, changed: true, outside: { description: 'Lists events.' } }),
+            tool('google.old_tool', '', 'read', { tool: 'old_tool', live: true, gone: true }),
+        ];
+        const wrapper = await openGoogle({
+            'get /connections/conn-google/tools': () => toolsAnswer(live),
+            'put /connections/conn-google/tools/google.events_list': (body) => { sent.push(body); return ok({ ...live[0], changed: false }); },
+        });
+        expect(wrapper.find('[data-test="cx-tool-google.events_list"]').text()).toContain('Lists events.');
+        expect(wrapper.find('[data-test="cx-tool-access-google.events_list"]').exists()).toBe(true);
+        expect(wrapper.find('[data-test="cx-tools-gone"]').text()).toContain('old_tool');
+        await wrapper.find('[data-test="cx-tool-looked-google.events_list"]').trigger('click');
+        await flushPromises();
+        expect(sent).toEqual([{ lookedAt: true }]);
+        expect(wrapper.find('[data-test="cx-tool-changed-google.events_list"]').exists()).toBe(false);
+    });
+
+    it('says when an owner or admin turned the app off for the workspace', async () => {
+        const wrapper = await openGoogle({ 'get /connections/conn-google/tools': () => toolsAnswer([], { status: 'app_off' }) });
+        expect(wrapper.find('[data-test="cx-detail-app-off"]').text()).toBe(t('Connectors.detail.app_off', { provider: 'Google' }));
+        expect(wrapper.find('[data-test="cx-tools-read"]').exists()).toBe(false);
     });
 
     it('disconnects only after the person confirms, then closes and says so', async () => {
@@ -395,29 +432,30 @@ describe('the connector detail panel', () => {
         expect(wrapper.find('[data-test="cx-detail"]').exists()).toBe(false);
     });
 
-    it('shows an owner or admin the tools an app changed, and lets them approve one', async () => {
-        const reviewed = [];
-        const changed = { key: 'google.calendar.events.list', tool: 'events_list', kind: 'read', label: 'Connectors.tool.googleCalendarEventsList', state: 'changed', on: false, seenAt: null };
-        const wrapper = await open({
-            props: { privileged: true },
-            answers: {
-                'get /admin/tools/google': () => ok({ tools: [changed] }),
-                'put /admin/tools/google/events_list': (body) => { reviewed.push(body); return ok({ tools: [{ ...changed, state: 'reviewed', on: true }] }); },
-            },
-        });
-        await wrapper.find('[data-test="cx-open-google"]').trigger('click');
-        await flushPromises();
-        await wrapper.find('[data-test="cx-review-approve-events_list"]').trigger('click');
-        await flushPromises();
-        expect(reviewed).toEqual([{ enabled: true }]);
-        expect(wrapper.find('[data-test="cx-review-approve-events_list"]').exists()).toBe(false);
+    it('offers no Connect on an app turned off for the workspace', async () => {
+        const wrapper = await open({ answers: { 'get ': () => ok({ ...LIST, workspaceOff: ['notion'] }) } });
+        expect(wrapper.find('[data-test="cx-connect-notion"]').exists()).toBe(false);
+        expect(wrapper.find('[data-test="cx-switched-off-notion"]').text()).toBe(t('Connectors.screen.switched_off', { provider: 'Notion' }));
     });
+});
 
-    it('shows a member no tools to review', async () => {
-        const wrapper = await open();
-        await wrapper.find('[data-test="cx-open-google"]').trigger('click');
+describe('the apps of the workspace, for an owner or admin', () => {
+    it('lists each app with its switch, and turns one off for everyone', async () => {
+        const sent = [];
+        serve({
+            'get ': () => ok({ ...LIST, workspaceOff: ['notion'] }),
+            'put /switches/google': (body) => { sent.push(body); return ok({ off: ['google', 'notion'] }); },
+        });
+        const wrapper = mount(WorkspaceApps, { global: { mocks: { $t: t } } });
         await flushPromises();
-        expect(wrapper.find('[data-test="cx-tool-reviews"]').exists()).toBe(false);
-        expect(apiRequest.mock.calls.some(([, url]) => url.includes('/admin/'))).toBe(false);
+        expect(wrapper.find('[data-test="wa-switch-notion"]').attributes('aria-checked')).toBe('false');
+        expect(wrapper.find('[data-test="wa-switch-canva"]').exists()).toBe(true);
+        const google = () => wrapper.find('[data-test="wa-switch-google"]');
+        expect(google().attributes('aria-checked')).toBe('true');
+        await google().trigger('click');
+        await flushPromises();
+        expect(sent).toEqual([{ on: false }]);
+        expect(google().attributes('aria-checked')).toBe('false');
+        wrapper.unmount();
     });
 });

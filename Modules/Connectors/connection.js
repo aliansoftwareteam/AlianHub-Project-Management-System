@@ -56,6 +56,7 @@ const stateSecret = () => {
 const companyAppsOf = (companyId) => apps.companyProviders(companyId).then((list) => ({ companyApps: list }));
 const definitionOf = (provider) => registry.get(provider);
 const custom = () => require('./customServers');
+const switches = () => require('./appSwitches');
 
 /* A catalog provider's definition is fixed at boot; a custom server's is built from its workspace's row (096). */
 const definitionFor = async (companyId, provider) => definitionOf(provider) || (custom().isCustomId(provider) ? custom().definitionFor(companyId, provider) : null);
@@ -72,6 +73,11 @@ const isOffered = async (companyId, provider) => {
     if (registry.isOffered(provider, { companyApps: [] })) return true;
     const { companyApps } = await companyAppsOf(companyId);
     return companyApps.includes(String(provider));
+};
+
+const SWITCHED_OFF = 'An owner or admin turned this app off for the workspace.';
+const refuseSwitchedOff = async (companyId, provider) => {
+    if (await switches().isOff(companyId, provider)) throw new ConnectionError(409, SWITCHED_OFF, 'app_off');
 };
 
 const live = (userId, provider) => ({ provider: String(provider), userId: String(userId), deletedStatusKey: { $ne: 1 } });
@@ -137,7 +143,7 @@ const view = (provider, row) => {
         signIn: connected ? row.signIn || SIGN_IN.REGISTERED_APP : null,
         products: connected ? [...(row.products || [])] : [],
         scopes: connected ? [...(row.scopes || [])] : [],
-        toolsOff: connected ? [...(row.toolsOff || [])] : [],
+        toolPermissions: connected ? (row.toolPermissions || []).map(({ key, permission }) => ({ key: String(key), permission: String(permission) })) : [],
         connectedAt: connected ? row.connectedAt || null : null,
         lastUsedAt: connected ? row.lastUsedAt || null : null,
         brokenReason: broken ? row.lastError || '' : '',
@@ -198,6 +204,7 @@ const start = async ({ companyId, userId, sessionId, provider, products, origin 
     if (!sessionId) throw new ConnectionError(403, 'Sign in again before connecting an account.', 'no_session');
     if (!apiBase()) throw new ConnectionError(409, 'APIURL is not set on the server, so the provider cannot be told where to return.', 'apiurl_missing');
     if (!(await isOffered(companyId, provider))) throw new ConnectionError(404, 'This connector is not available.', 'provider_off');
+    await refuseSwitchedOff(companyId, provider);
     const definition = await definitionFor(companyId, provider);
     let scopes;
     try {
@@ -218,6 +225,7 @@ const start = async ({ companyId, userId, sessionId, provider, products, origin 
 const setProducts = async ({ companyId, userId, sessionId, provider, connectionId, products, origin }) => {
     if (!sessionId) throw new ConnectionError(403, 'Sign in again before changing products.', 'no_session');
     if (!(await isOffered(companyId, provider))) throw new ConnectionError(404, 'This connector is not available.', 'provider_off');
+    await refuseSwitchedOff(companyId, provider);
     const row = await find(companyId, userId, provider);
     if (!row || String(row._id) !== String(connectionId) || !holdsToken(row)) throw new ConnectionError(404, 'There is no such connection.', 'not_connected');
     const definition = await definitionFor(companyId, provider);
@@ -438,6 +446,7 @@ const endOne = async ({ companyId, row, actor, by }) => {
 const saveToken = async ({ companyId, userId, sessionId, provider, token, actor }) => {
     if (!sessionId) throw new ConnectionError(403, 'Sign in again before connecting an account.', 'no_session');
     if (!(await isOffered(companyId, provider))) throw new ConnectionError(404, 'This connector is not available.', 'provider_off');
+    await refuseSwitchedOff(companyId, provider);
     const definition = await definitionFor(companyId, provider);
     if (definition.auth.personalToken !== true) throw new ConnectionError(409, `${definition.name} is connected by signing in, not with a pasted token.`, 'oauth_only');
     const given = typeof token === 'string' ? token.trim() : '';
@@ -473,13 +482,16 @@ const saveToken = async ({ companyId, userId, sessionId, provider, token, actor 
     return view(provider, saved);
 };
 
-/* The caller has checked that `toolsOff` names only tools of the row's provider and that the row is the person's own. */
-const setToolsOff = async ({ companyId, row, toolsOff, actor }) => {
+/* A REST app's tool permission. The caller has checked the key is a tool of the row's provider and the row is the
+ * person's own. Only a choice that differs from the default is kept, so a default changed later reaches everyone else. */
+const setToolPermission = async ({ companyId, row, key, permission, isDefault, actor }) => {
     if (!holdsToken(row)) throw new ConnectionError(404, 'There is no such connection.', 'not_connected');
-    const saved = await update(companyId, row, { $set: { toolsOff: [...toolsOff], updatedBy: String(actorOf(actor).id || '') } });
-    audit(companyId, actor, 'connector.tools_changed', row.provider, { userId: String(row.userId), connectionId: String(row._id), toolsOff: [...toolsOff] });
+    const kept = (row.toolPermissions || []).filter((entry) => entry && entry.key !== key);
+    const next = isDefault ? kept : [...kept, { key: String(key), permission: String(permission) }];
+    const saved = await update(companyId, row, { $set: { toolPermissions: next, updatedBy: String(actorOf(actor).id || '') } });
+    audit(companyId, actor, 'connector.tool_permission_changed', row.provider, { userId: String(row.userId), connectionId: String(row._id), tool: String(key), permission: String(permission) });
     announce(companyId, row.userId, row.provider, 'tools_changed');
-    return view(row.provider, saved);
+    return saved;
 };
 
 const markBroken = async (companyId, row, reason) => {
@@ -493,6 +505,7 @@ const markBroken = async (companyId, row, reason) => {
 const findUsable = async ({ companyId, userId, provider }) => {
     const none = (reason) => ({ row: null, reason });
     if (!(await isOffered(companyId, provider))) return none('off');
+    if (await switches().isOff(companyId, provider)) return none('app_off');
     if (!(await hasSeat(companyId, userId))) return none('no_seat');
     const row = await find(companyId, userId, provider);
     if (!holdsToken(row)) return none('not_connected');
@@ -590,6 +603,7 @@ const list = async (companyId, userId) => {
         ],
         connections,
         unavailable,
+        workspaceOff: await switches().offList(companyId),
     };
 };
 
@@ -660,6 +674,6 @@ const sweepCompany = async (companyId) => {
 module.exports = {
     STATUS, BY, SIGN_IN, STATE_TTL_SECONDS, SECRET_KIND, ConnectionError,
     isOffered, definitionFor, fallbackOrigin, redirectUri, callbackPath, byId,
-    describe, list, membersWithConnections, start, setProducts, setToolsOff, returnFor, complete, disconnect, endOne, saveToken,
+    describe, list, membersWithConnections, start, setProducts, setToolPermission, announce, returnFor, complete, disconnect, endOne, saveToken,
     findUsable, accessTokenFor, markBrokenById, markBackoff, recordHealth, endForMember, sweepCompany,
 };

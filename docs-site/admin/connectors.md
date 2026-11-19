@@ -73,11 +73,11 @@ On an instance hosted by AlianHub Cloud (`HOSTING_MODE=managed`), members connec
 
 AlianHub refuses private and local addresses, and every tool of a custom app stays off until someone in the workspace checks it and turns it on. Each member connects their own account to it.
 
-## Tools that change
+## Tools and permissions
 
-AlianHub offers an app's tool only once it has been reviewed: a hash of the tool's name, description and input is pinned in the connector catalog. If an app later changes a tool, AlianHub stops using it, tells owners and admins in the Inbox, and lists it under **Tools to review** until one of them approves it again or keeps it off.
+An app's tools come live from its server, through each member's own connection. If an app changes a tool, AlianHub keeps using it in AI chat, tells the connection's owner once in the Inbox, and agents skip it until the owner looks at it again. A tool the app removed is marked as gone.
 
-Tools that have not been pinned yet stay off. Maintainers pin them with `scripts/connector-tool-shapes.js` against a test account; `CONNECTOR_REVIEW_TOKEN` is only for that script and never belongs on a running server.
+Each member sets every tool of their own connection to **Always allow**, **Needs approval** or **Off**. Owners and admins can turn an app off for the whole workspace on the **Workspace** tab, under **Apps in this workspace**: its tools leave every AI list and its calls are refused until it is turned back on.
 
 ## Limits
 

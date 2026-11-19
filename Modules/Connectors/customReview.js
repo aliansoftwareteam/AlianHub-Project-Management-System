@@ -1,9 +1,10 @@
 const { SCHEMA_TYPE } = require('../../Config/schemaType');
+const { Notification_key: { CONNECTOR_TOOL_CHANGED } } = require('../../Config/notificationKey');
 const { MongoDbCrudOpration } = require('../../utils/mongo-handler/mongoQueries');
+const logger = require('../../Config/loggerConfig');
 const { recordAudit } = require('../Audit/recorder');
 const egressContext = require('../Agents/engine/egressContext');
 const mcpClient = require('./mcpClient');
-const toolReviews = require('./toolReviews');
 const custom = require('./customServers');
 
 /* Every tool of a custom server is hidden until someone who may manage the server reviews it: turns it on, says
@@ -22,6 +23,8 @@ const SCHEMA_PROPERTIES_MAX = 100;
 const ENUM_MAX = 100;
 const TYPES = Object.freeze(['string', 'integer', 'number', 'boolean', 'array', 'object', 'null']);
 const NUMBER_KEYS = Object.freeze(['minLength', 'maxLength', 'minimum', 'maximum', 'minItems', 'maxItems']);
+const STATE = Object.freeze({ NEW: 'new', CHANGED: 'changed', REVIEWED: 'reviewed' });
+const NOTICE_SCOPE = 'connectors';
 
 class ReviewError extends Error {
     constructor(status, code, message) { super(message); this.name = 'ReviewError'; this.status = status; this.code = code; }
@@ -29,6 +32,34 @@ class ReviewError extends Error {
 
 const plain = (doc) => (doc && typeof doc.toObject === 'function' ? doc.toObject() : doc);
 const tools = (companyId, data, method) => MongoDbCrudOpration(String(companyId), { type: SCHEMA_TYPE.CONNECTOR_TOOLS, data }, method);
+const find = async (companyId, provider, tool) => plain(await tools(companyId, [{ companyId: String(companyId), provider: String(provider), tool: String(tool) }], 'findOne'));
+
+/* A call or a listing found a reviewed tool different from what was reviewed. The tool is off until someone who may
+ * manage the server looks again, and owners and admins are told once per change, not once per call. Never fails the
+ * call that found it. */
+const noteChanged = async ({ companyId, definition, tool, shape }) => {
+    try {
+        const existing = await find(companyId, definition.id, tool);
+        const alreadyKnown = existing && existing.shape === shape && (existing.state === STATE.CHANGED || existing.reviewedShape === shape);
+        if (alreadyKnown) return false;
+        await tools(companyId, [
+            { companyId: String(companyId), provider: definition.id, tool: String(tool) },
+            { $set: { shape, state: STATE.CHANGED, enabled: false, seenAt: new Date() }, $setOnInsert: { reviewedShape: '', access: 'write' } },
+            { upsert: true },
+        ], 'updateOne');
+        const { ownersAndAdmins, sendNotice } = require('../Inbox/helpers/workspaceNotice');
+        await sendNotice(String(companyId), await ownersAndAdmins(companyId), {
+            key: CONNECTOR_TOOL_CHANGED, type: NOTICE_SCOPE, scope: NOTICE_SCOPE, label: 'connector tool changed',
+            message: `${definition.name} changed one of its tools, so AlianHub stopped using it. An owner or admin can look at it again on the Connectors screen.`,
+            changeData: { provider: definition.id, name: definition.name, tool: String(tool) },
+        });
+        return true;
+    } catch (e) {
+        logger.warn(`a changed tool of ${definition.id} was not recorded: ${(e && e.name) || 'Error'}`);
+        return false;
+    }
+};
+
 const isObject = (value) => value !== null && typeof value === 'object' && !Array.isArray(value);
 // eslint-disable-next-line no-control-regex
 const words = (value, max) => String(value === undefined || value === null ? '' : value).replace(/[\u0000-\u0008\u000b-\u001f\u007f]/g, ' ').trim().slice(0, max);
@@ -66,8 +97,8 @@ const inputSchemaOf = (tool) => {
 const rowsOf = async (companyId, provider) => ((await tools(companyId, [{ companyId: String(companyId), provider }], 'find')) || []).map(plain);
 
 const stateOf = (row, shape) => {
-    if (!row) return toolReviews.STATE.NEW;
-    return row.state === toolReviews.STATE.REVIEWED && row.reviewedShape === shape ? toolReviews.STATE.REVIEWED : toolReviews.STATE.CHANGED;
+    if (!row) return STATE.NEW;
+    return row.state === STATE.REVIEWED && row.reviewedShape === shape ? STATE.REVIEWED : STATE.CHANGED;
 };
 
 const refusedBy = (error) => {
@@ -101,9 +132,9 @@ const hideDrift = async (companyId, definition, found, rows) => {
     for (const row of rows.filter((r) => r.enabled)) {
         const shape = shapes.get(row.tool);
         // eslint-disable-next-line no-await-in-loop
-        if (shape && shape !== row.reviewedShape) await toolReviews.noteChanged({ companyId, definition, tool: row.tool, shape });
+        if (shape && shape !== row.reviewedShape) await noteChanged({ companyId, definition, tool: row.tool, shape });
         // eslint-disable-next-line no-await-in-loop
-        else if (!shape) await tools(companyId, [{ _id: row._id }, { $set: { enabled: false, state: toolReviews.STATE.CHANGED } }], 'updateOne');
+        else if (!shape) await tools(companyId, [{ _id: row._id }, { $set: { enabled: false, state: STATE.CHANGED } }], 'updateOne');
     }
 };
 
@@ -117,7 +148,7 @@ const viewOf = (tool, row) => {
         outside: { name: words(tool.name, 200), description: words(tool.description, OUTSIDE_MAX), inputSchema: schema },
         review: {
             state,
-            enabled: state === toolReviews.STATE.REVIEWED && Boolean(row.enabled),
+            enabled: state === STATE.REVIEWED && Boolean(row.enabled),
             access: row && row.access === ACCESS.READ ? ACCESS.READ : ACCESS.WRITE,
             label: row && row.label ? row.label : line(tool.name, LABEL_MAX),
             description: row && row.description !== undefined ? row.description : line(tool.description, DESCRIPTION_MAX),
@@ -150,7 +181,7 @@ const review = async ({ companyId, row, reviewer, tool: name, body = {} }) => {
     await tools(companyId, [
         { companyId: String(companyId), provider: definition.id, tool: tool.name },
         { $set: {
-            shape: tool.shape, reviewedShape: tool.shape, state: toolReviews.STATE.REVIEWED, enabled, access, label, description,
+            shape: tool.shape, reviewedShape: tool.shape, state: STATE.REVIEWED, enabled, access, label, description,
             inputSchema: schema || { type: 'object', properties: {} }, reviewedBy: String(reviewer.id), reviewedAt: now, seenAt: now,
         } },
         { upsert: true },
@@ -167,14 +198,14 @@ const review = async ({ companyId, row, reviewer, tool: name, body = {} }) => {
 const offeredTools = async (companyId) => {
     const servers = await custom.offered(companyId);
     if (!servers.length) return [];
-    const rows = ((await tools(companyId, [{ companyId: String(companyId), provider: { $in: servers.map((s) => s.id) }, state: toolReviews.STATE.REVIEWED, enabled: true }], 'find')) || []).map(plain);
+    const rows = ((await tools(companyId, [{ companyId: String(companyId), provider: { $in: servers.map((s) => s.id) }, state: STATE.REVIEWED, enabled: true }], 'find')) || []).map(plain);
     return servers.map((definition) => ({ definition, tools: rows.filter((r) => r.provider === definition.id && r.reviewedShape === r.shape) }))
         .filter((entry) => entry.tools.length);
 };
 
 const reviewedTool = async (companyId, provider, name) => {
     const row = plain(await tools(companyId, [{ companyId: String(companyId), provider, tool: String(name) }], 'findOne'));
-    return row && row.state === toolReviews.STATE.REVIEWED && row.enabled && row.reviewedShape === row.shape ? row : null;
+    return row && row.state === STATE.REVIEWED && row.enabled && row.reviewedShape === row.shape ? row : null;
 };
 
-module.exports = { ACCESS, TOOL_NAME, ReviewError, schemaOf, forReview, review, offeredTools, reviewedTool };
+module.exports = { ACCESS, STATE, TOOL_NAME, noteChanged, ReviewError, schemaOf, inputSchemaOf, forReview, review, offeredTools, reviewedTool };

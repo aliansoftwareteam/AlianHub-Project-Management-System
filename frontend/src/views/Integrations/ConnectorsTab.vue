@@ -107,7 +107,10 @@
                             </div>
                             <p class="cx-card__line">{{ line(row.provider) }}</p>
                             <div class="cx-card__foot">
-                                <template v-if="row.unavailable">
+                                <p v-if="row.switchedOff" class="ah-small cx-card__why" :data-test="`cx-switched-off-${row.provider}`">
+                                    {{ $t('Connectors.screen.switched_off', { provider: name(row.provider) }) }}
+                                </p>
+                                <template v-else-if="row.unavailable">
                                     <p class="ah-small cx-card__why" :data-test="`cx-why-${row.provider}`">
                                         {{ privileged ? $t('Connectors.screen.setup_admin', { provider: name(row.provider) }) : $t('Connectors.screen.setup_member', { provider: name(row.provider) }) }}
                                     </p>
@@ -145,7 +148,6 @@
             :name="name(detailRow.provider)"
             :privileged="privileged"
             @close="detailProvider = ''"
-            @changed="onChanged"
             @disconnected="onDisconnected"
             @reconnect="reconnect"
         />
@@ -200,7 +202,10 @@ const line = (provider) => {
     return te(key) ? t(key) : t("Connectors.catalog.default_line", { provider: name(provider) });
 };
 const categoryName = (key) => t(`Connectors.catalog.category_${key}`);
-const statusText = (row) => (needsAttention(row) ? statusLabel(t, te, row.connection.status) : t("Connectors.conn.status_connected"));
+const statusText = (row) => {
+    if (row.switchedOff) return t("Connectors.screen.status_switched_off");
+    return needsAttention(row) ? statusLabel(t, te, row.connection.status) : t("Connectors.conn.status_connected");
+};
 const usedText = (row) => (row.connection.lastUsedAt ? t("Connectors.conn.last_used", { date: formatDate(row.connection.lastUsedAt) }) : t("Connectors.conn.never_used"));
 
 const mine = computed(() => sortMine(rows.value.mine, name));
@@ -254,11 +259,6 @@ const onTokenConnected = async () => {
     signingIn.value = null;
     notice.value = t("Connectors.conn.return_ok", { provider: name(provider) });
     await load();
-};
-
-const onChanged = (view) => {
-    if (!view || !view.provider) return;
-    rows.value = { ...rows.value, mine: rows.value.mine.map((row) => (row.provider === view.provider ? { ...row, connection: view } : row)) };
 };
 
 const onDisconnected = async (provider) => {
