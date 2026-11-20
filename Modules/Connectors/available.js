@@ -8,7 +8,7 @@ const toolPermissions = require('./toolPermissions');
  * connection of each app, REST or MCP, after the workspace switch and the tool's permission. */
 
 const PURPOSE = Object.freeze({ ASK: 'ask', AGENT: 'agent' });
-const LEFT_OUT = Object.freeze({ OFF: 'off', CHANGED: 'changed', GONE: 'gone', UNUSABLE: 'unusable' });
+const LEFT_OUT = Object.freeze({ OFF: 'off', CHANGED: 'changed', GONE: 'gone', UNUSABLE: 'unusable', APPROVAL: 'approval' });
 const { STATUS, PERMISSION } = connectionTools;
 
 const catalogOf = (provider) => tools.all().filter((tool) => tool.provider === provider);
@@ -27,7 +27,11 @@ const isOn = (provider) => (isLive(provider) ? tools.providerOn(provider) : cata
 
 const appOf = (provider, name, status, extra = {}) => ({ provider, name, status, connectionId: '', tools: [], leftOut: [], ...extra });
 
-const catalogApp = async ({ companyId, userId, provider, name }) => {
+/* AI chat answers from what it reads at once, and a read that waits for its owner's card brings nothing back to the
+ * answer, so the chat leaves it out and says so; an agent run still files it. */
+const waitsForOwner = (kind, permission, purpose) => purpose === PURPOSE.ASK && kind === tools.KIND.READ && permission === PERMISSION.APPROVAL;
+
+const catalogApp = async ({ companyId, userId, provider, name, purpose }) => {
     let connection;
     try {
         connection = await connections.resolveConnection({ companyId: String(companyId), userId: String(userId), provider });
@@ -40,6 +44,7 @@ const catalogApp = async ({ companyId, userId, provider, name }) => {
     catalogOf(provider).filter(tools.isOn).forEach((tool) => {
         const permission = toolPermissions.permissionOf(tool, connection);
         if (permission === PERMISSION.OFF) leftOut.push({ key: tool.key, kind: tool.kind, reason: LEFT_OUT.OFF });
+        else if (waitsForOwner(tool.kind, permission, purpose)) leftOut.push({ key: tool.key, kind: tool.kind, reason: LEFT_OUT.APPROVAL });
         else usable.push(Object.freeze({ ...tool, permission }));
     });
     return appOf(provider, name, STATUS.OK, { connectionId: String(connection.connectionId), tools: usable, leftOut });
@@ -50,6 +55,7 @@ const reasonLeftOut = (view, purpose) => {
     if (!view.usable) return LEFT_OUT.UNUSABLE;
     if (view.permission === PERMISSION.OFF) return LEFT_OUT.OFF;
     if (purpose === PURPOSE.AGENT && view.changed) return LEFT_OUT.CHANGED;
+    if (waitsForOwner(view.access, view.permission, purpose)) return LEFT_OUT.APPROVAL;
     return '';
 };
 
@@ -76,7 +82,8 @@ const providersAsked = (provider, names) => {
 
 /* `provider` is one app or a list of them; left out, every app switched on here. Each app says its status, so an
  * app that is unreachable, not connected or turned off is reported as that, never as having no tools. `leftOut`
- * names the tools held back and why (Off, changed for an agent, gone from the server, not checkable). */
+ * names the tools held back and why (Off, changed for an agent, gone from the server, not checkable, or a read that
+ * waits for approval, which AI chat cannot answer from). */
 const available = async ({ companyId, userId, kind, provider, product, purpose = PURPOSE.ASK, timeoutMs = connectionTools.LIST_TIMEOUT_MS } = {}) => {
     const names = known();
     const apps = await Promise.all(providersAsked(provider, names).map((id) => {
@@ -85,7 +92,7 @@ const available = async ({ companyId, userId, kind, provider, product, purpose =
         if (!userId) return appOf(id, name, STATUS.NOT_CONNECTED);
         return isLive(id)
             ? liveApp({ companyId, userId, provider: id, name, purpose, timeoutMs })
-            : catalogApp({ companyId, userId, provider: id, name });
+            : catalogApp({ companyId, userId, provider: id, name, purpose });
     }));
     const keep = fits({ kind, product });
     const narrowed = apps.map((app) => ({ ...app, tools: app.tools.filter(keep), leftOut: app.leftOut.filter((entry) => !kind || entry.kind === kind) }));

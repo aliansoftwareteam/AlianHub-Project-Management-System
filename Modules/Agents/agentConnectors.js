@@ -73,10 +73,15 @@ const refusalFor = (connectors, key) => {
 };
 
 /* What a run says about a ticked tool the app no longer offers: never dropped silently (decision 8 of task 107). */
-const missingReason = (key) => {
+/* A live app lists tools per connection, so a tool missing from the run person's listing may still be offered to
+ * others: only a tool AlianHub itself dropped is certainly gone for everyone. */
+const missingReason = (key, { everyone = false } = {}) => {
     const { provider, tool } = connectionTools.splitKey(key);
     const app = appOfKey(key) || { name: provider || String(key) };
-    return `This agent is ticked for ${tool || key} on ${app.name}, but ${app.name} no longer offers it. Remove the tick in the agent's settings.`;
+    const name = tool || key;
+    return everyone
+        ? `This agent is ticked for ${name} on ${app.name}, but ${app.name} no longer offers it. Remove the tick in the agent's settings.`
+        : `This agent is ticked for ${name} on ${app.name}, but the ${app.name} connection this run uses does not offer it. If ${app.name} no longer offers it to anyone, remove the tick in the agent's settings.`;
 };
 
 const listOf = (value) => (Array.isArray(value) ? value : []);

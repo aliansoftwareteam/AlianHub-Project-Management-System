@@ -257,7 +257,7 @@ const ticked = async (work, key, agentConnectors) => {
         throw error;
     }
     const removedFromCatalog = !tool && agents.isTicked(agentConnectors, key) && !connectionTools.liveDefinition(connectionTools.splitKey(key).provider);
-    if (removedFromCatalog) throw refusal('tool_missing', agents.missingReason(key));
+    if (removedFromCatalog) throw refusal('tool_missing', agents.missingReason(key, { everyone: true }));
     return tool;
 };
 

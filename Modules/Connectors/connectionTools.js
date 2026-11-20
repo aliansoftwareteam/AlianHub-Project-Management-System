@@ -114,6 +114,12 @@ const viewOf = (row) => ({
 
 const failedListing = (provider, status) => ({ provider, status, tools: [] });
 
+const LISTING_FAILED = (name, tool, status) => {
+    if (status === STATUS.UNREACHABLE) return `${name} could not be reached just now, so ${tool} was not used.`;
+    if (status === STATUS.BROKEN) return `${name} is no longer accepting your connection. Reconnect ${name} on Connectors, then ask again.`;
+    return `${name} cannot be used on this connection just now, so ${tool} was not used.`;
+};
+
 /* One app's tools, listed live with the member's own connection. A server that cannot be reached is said to be
  * unreachable, never unconnected. */
 const listFor = async ({ companyId, userId, provider }) => {
@@ -216,7 +222,9 @@ const toolFor = async ({ companyId, userId, connectionId, key, agent = false }) 
     if (!definition) return null;
     let row = await findRow(companyId, connectionId, tool);
     if (!row) {
-        await listFor({ companyId, userId, provider });
+        // A listing that failed says nothing about the tool, so it is reported as what happened, never as missing.
+        const listing = await listFor({ companyId, userId, provider });
+        if (listing.status !== STATUS.OK) throw refusal(listing.status, LISTING_FAILED(definition.name, tool, listing.status));
         row = await findRow(companyId, connectionId, tool);
     }
     if (!row || row.gone) throw refusal('tool_missing', `${definition.name} does not offer ${tool}.`);

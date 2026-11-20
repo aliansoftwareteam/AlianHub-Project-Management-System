@@ -168,8 +168,40 @@ describe('an agent and a live app\'s tools', () => {
         await find({ provider: P });
         await expect(agentRead([{ provider: P, tools: [SEARCH] }])).rejects.toMatchObject({
             code: 'tool_missing',
-            message: expect.stringContaining('no longer offers it. Remove the tick in the agent\'s settings.'),
+            message: expect.stringContaining('the Notes connection this run uses does not offer it'),
         });
+    });
+
+    it('says a server it could not reach is unreachable, not that the tool is gone', async () => {
+        await connect(SLOW);
+        const key = `${SLOW}.search_notes`;
+        const read = runner.read({ companyId: C, userId: MAYA, via: runner.VIA.AGENT, callerId: 'agent-1', runId: 'run-1', agentConnectors: [{ provider: SLOW, tools: [key] }], key, input: { query: 'bank' } });
+        await expect(read).rejects.toMatchObject({ code: 'unreachable', message: expect.stringContaining('could not be reached') });
+    });
+});
+
+describe('a read that waits for its owner\'s approval', () => {
+    const setPermission = async (row, tool, permission) => connectionTools.change({ companyId: C, connectionId: String(row._id), tool, fields: { permission } });
+
+    it('is left out of AI chat, which cannot answer from it, and kept for agents', async () => {
+        const row = await connect();
+        await find({ provider: P });
+        await setPermission(row, 'search_notes', 'approval');
+        const forAsk = await find({ provider: P, purpose: 'ask' });
+        expect(keysOf(forAsk)).not.toContain(SEARCH);
+        expect(appOf(forAsk).leftOut).toEqual([{ key: SEARCH, kind: 'read', reason: 'approval' }]);
+        expect(keysOf(await find({ provider: P, purpose: 'agent' }))).toContain(SEARCH);
+    });
+
+    it('is said to the asker when it leaves AI chat nothing to read', async () => {
+        const row = await connect();
+        await find({ provider: P });
+        await setPermission(row, 'search_notes', 'approval');
+        await setPermission(row, 'archive_notes', 'approval');
+        await setPermission(row, 'create_note', 'off');
+        const out = await egressContext.run({ companyId: C, actor: MAYA }, () => askConnectors.readStep({ companyId: C, userId: MAYA, question: 'find the bank notes', apps: [P] }));
+        expect(out.notes).toEqual([expect.objectContaining({ provider: P, code: 'needs_approval', text: expect.stringContaining('wait for your approval') })]);
+        expect(getProvider).not.toHaveBeenCalled();
     });
 });
 

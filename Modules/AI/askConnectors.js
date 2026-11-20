@@ -35,6 +35,7 @@ const CODE = Object.freeze({
     CHAR_CAP: 'char_cap',
     NOT_ALLOWED: 'not_allowed',
     NO_TOOLS: 'no_tools',
+    NEEDS_APPROVAL: 'needs_approval',
     UNREACHABLE: 'unreachable',
     LIVE_WRITE: 'live_write',
     FAILED: 'failed',
@@ -53,6 +54,7 @@ const SAID = Object.freeze({
     [CODE.CHAR_CAP]: (app) => `One question takes in at most ${MAX_CHARS} characters from connected apps, so a read from ${app} was left out.`,
     [CODE.NOT_ALLOWED]: (app) => `You cannot use ${app} from here.`,
     [CODE.NO_TOOLS]: (app) => `None of your ${app} tools is turned on, so nothing was read from it. Turn one on in AI › Customize › Connectors.`,
+    [CODE.NEEDS_APPROVAL]: (app) => `Your ${app} tools that read wait for your approval each time, so AI chat does not read them. Set one to Always allow in AI › Customize › Connectors to read it here.`,
     [CODE.UNREACHABLE]: (app) => `${app} could not be reached just now, so nothing was read from it.`,
     [CODE.LIVE_WRITE]: (app) => `A change to ${app} cannot be filed from the AI chat yet, so it was not made.`,
     [CODE.FAILED]: (app) => `${app} could not be read just now.`,
@@ -266,7 +268,7 @@ const readStep = async ({ companyId, userId, question, previous = '', apps: aske
     const ready = [];
     found.apps.forEach((app) => {
         if (app.status === lookup.STATUS.OK && app.tools.length) ready.push(app);
-        else if (app.status === lookup.STATUS.OK) note(app, CODE.NO_TOOLS);
+        else if (app.status === lookup.STATUS.OK) note(app, app.leftOut.some((entry) => entry.reason === lookup.LEFT_OUT.APPROVAL) ? CODE.NEEDS_APPROVAL : CODE.NO_TOOLS);
         else noteStatus(note, app);
     });
 
