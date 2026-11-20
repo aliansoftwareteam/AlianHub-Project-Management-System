@@ -118,8 +118,9 @@ const load = (dir) => Object.freeze(createRegistry({ dir }).list()
 const providerOn = (provider) => require('../Agents/connectors/flag').named().includes(provider) && require('../Agents/taint').enabled();
 
 /* An MCP tool nobody has reviewed is offered nowhere: not registered for agents, MCP or skills, and refused if named.
- * `all()` still holds it, so owners and admins can see it waiting for review. */
-const reviewed = (tool) => !tool.mcp || SHAPE.test(String(tool.mcp.shape || ''));
+ * `all()` still holds it, so owners and admins can see it waiting for review. A tool listed live from a member's own
+ * connection (connectionTools.js) is checked against the server on every call instead. */
+const reviewed = (tool) => !tool.mcp || tool.live === true || SHAPE.test(String(tool.mcp.shape || ''));
 
 /* The three generic tools of a workspace's custom servers (customTools.js) sit beside the catalog's from boot, so the
  * agent registry and the MCP server hold them like any other; they are on only while custom servers are. */
@@ -142,4 +143,4 @@ const bound = async (tool, { companyId, input }) => (typeof tool.bind === 'funct
 
 const WRITE_GATE = 'connection_owner';
 
-module.exports = { KIND, WRITE_GATE, problemsOf, make, bound, ...make(DIR, { custom: true }) };
+module.exports = { KIND, WRITE_GATE, problemsOf, make, bound, providerOn, ...make(DIR, { custom: true }) };

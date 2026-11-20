@@ -9,7 +9,8 @@ const aiRights = require('../../Config/aiRights');
 const registry = require('./registry');
 const apps = require('./apps');
 const connection = require('./connection');
-const toolReviews = require('./toolReviews');
+const toolPermissions = require('./toolPermissions');
+const appSwitches = require('./appSwitches');
 
 const refuse = (res, code, statusText, extra = {}) => res.status(code).send({ status: false, statusText, ...extra });
 
@@ -140,60 +141,35 @@ exports.callback = async (req, res) => {
     return res.redirect(302, `${target.origin}/#${target.path}?${new URLSearchParams(target.query)}`);
 };
 
-const managerOrRefuse = (run) => async (who, req, res) => {
-    if (who.manager) return run(who, req, res);
-    refuse(res, 403, 'Only an owner or admin can review the tools of a connected app.');
-    return undefined;
+const ownConnectionOrRefuse = async (who, req, res) => {
+    const row = await connection.byId(who.companyId, String((req.params || {}).id || ''));
+    if (!row || String(row.userId) !== who.userId) { refuse(res, 404, 'There is no such connection.'); return null; }
+    return row;
 };
 
-const catalogToolsOf = (provider) => require('./tools').all().filter((tool) => tool.provider === provider);
-
-/* Any member: what each tool of an app does and whether it is on here. Never the app's own words or input shapes. */
-exports.memberTools = handle('list a connector\'s tools', 'Tools fetched.', (who, req, res) => {
-    const provider = providerOf(req, res);
-    if (!provider) return undefined;
-    const { isOn } = require('./tools');
-    return { tools: catalogToolsOf(provider).map((tool) => ({ key: tool.key, label: tool.label, kind: tool.kind, on: isOn(tool) })) };
+/* Only the connection's owner: every tool of it with its permission. An MCP app's tools are listed live from its
+ * server, and the server's own words travel as outside content. */
+exports.connectionTools = handle('list a connection\'s tools', 'Tools fetched.', async (who, req, res) => {
+    const row = await ownConnectionOrRefuse(who, req, res);
+    return row ? toolPermissions.listFor({ companyId: who.companyId, userId: who.userId, row }) : undefined;
 });
 
-/* Only the connection's owner turns its tools off for their own use. It can only narrow what the connection already
- * allows, so unlike the products it is not a row of Security & Permissions. */
-exports.setToolsOff = handle('change a connection\'s tools', 'Tools updated.', async (who, req, res) => {
-    const connectionId = String((req.params || {}).id || '');
-    const row = await connection.byId(who.companyId, connectionId);
-    if (!row || String(row.userId) !== who.userId) { refuse(res, 404, 'There is no such connection.'); return undefined; }
-    const given = (req.body || {}).toolsOff;
-    const keys = catalogToolsOf(row.provider).map((tool) => tool.key);
-    if (!Array.isArray(given) || given.some((key) => !keys.includes(key))) {
-        refuse(res, 400, 'Those are not tools of this connector.', { code: 'unknown_tool' });
-        return undefined;
-    }
-    return connection.setToolsOff({ companyId: who.companyId, row, toolsOff: [...new Set(given)], actor: who.actor });
+/* Only the connection's owner sets how each tool of it may be used. */
+exports.setTool = handle('change a connection\'s tool', 'Tool updated.', async (who, req, res) => {
+    const row = await ownConnectionOrRefuse(who, req, res);
+    if (!row) return undefined;
+    return toolPermissions.change({ companyId: who.companyId, row, key: String((req.params || {}).key || ''), body: req.body, actor: who.actor });
 });
 
-/* A custom server's tools are reviewed on its own routes (customController.js), so these take catalog ids only. */
-const catalogProviderOf = (req, res) => {
+/* Owners and admins turn a catalog app off, or back on, for the whole workspace. */
+exports.setSwitch = handle('switch an app for the workspace', 'App switched.', async (who, req, res) => {
+    if (!who.manager) { refuse(res, 403, 'Only an owner or admin can turn an app off for the workspace.'); return undefined; }
     const provider = String((req.params || {}).provider || '');
-    if (!registry.get(provider)) { refuse(res, 404, 'This connector is not available.'); return ''; }
-    return provider;
-};
-
-/* Owner/admin: each tool of an MCP app, and whether the app changed it since it was reviewed. */
-exports.tools = handle('list a connector\'s tools', 'Tools fetched.', managerOrRefuse(async (who, req, res) => {
-    const provider = catalogProviderOf(req, res);
-    return provider ? { tools: await toolReviews.listFor(who.companyId, registry.get(provider), catalogToolsOf(provider)) } : undefined;
-}));
-
-/* Owner/admin: approve a changed tool as the app describes it now, or keep it off. */
-exports.reviewTool = handle('review a connector\'s tool', 'Tool reviewed.', managerOrRefuse(async (who, req, res) => {
-    const provider = catalogProviderOf(req, res);
-    if (!provider) return undefined;
-    const tool = String((req.params || {}).tool || '');
-    if (!catalogToolsOf(provider).some((t) => t.mcp && t.mcp.tool === tool)) { refuse(res, 404, 'This app has no such tool.'); return undefined; }
-    const out = await toolReviews.review({ companyId: who.companyId, definition: registry.get(provider), tool, enabled: (req.body || {}).enabled === true, actor: who.actor });
-    if (!out.ok) { refuse(res, 409, 'This tool has not changed since it was reviewed, so there is nothing to look at again.', { code: out.code }); return undefined; }
-    return { tools: await toolReviews.listFor(who.companyId, registry.get(provider), catalogToolsOf(provider)) };
-}));
+    if (!registry.get(provider)) { refuse(res, 404, 'This connector is not available.'); return undefined; }
+    const on = (req.body || {}).on;
+    if (typeof on !== 'boolean') { refuse(res, 400, 'Say on: true or on: false.', { code: 'bad_switch' }); return undefined; }
+    return appSwitches.set({ companyId: who.companyId, provider, on, actor: who.actor });
+});
 
 /* Owner/admin: the connections members hold, without whose account or any handle. */
 exports.members = async (req, res) => {

@@ -165,6 +165,12 @@ const NOTE_KEYS = Object.freeze({
     pick_failed: "Ask.connector_pick_failed",
     nothing_read: "Ask.connector_nothing_read",
     not_allowed: "Ask.connector_not_allowed",
+    no_tools: "Ask.connector_no_tools",
+    needs_approval: "Ask.connector_needs_approval",
+    unreachable: "Ask.connector_unreachable",
+    live_write: "Ask.connector_live_write",
+    app_off: "Ask.connector_app_off",
+    not_member: "Ask.connector_not_member",
     failed: "Ask.connector_failed"
 });
 

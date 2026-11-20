@@ -425,6 +425,10 @@ const connectorRegistrationsSchema = new Schema(schema.connectorRegistrations, {
 connectorRegistrationsSchema.index({ companyId: 1, provider: 1 }, { unique: true, name: 'one_per_provider' });
 const connectorToolsSchema = new Schema(schema.connectorTools, {strict: true, timestamps: false});
 connectorToolsSchema.index({ companyId: 1, provider: 1, tool: 1 }, { unique: true, name: 'one_per_tool' });
+const connectionToolsSchema = new Schema(schema.connectionTools, {strict: true, timestamps: false});
+connectionToolsSchema.index({ companyId: 1, connectionId: 1, tool: 1 }, { unique: true, name: 'one_per_connection_tool' });
+const connectorSwitchesSchema = new Schema(schema.connectorSwitches, {strict: true, timestamps: false});
+connectorSwitchesSchema.index({ companyId: 1, provider: 1 }, { unique: true, name: 'one_per_provider' });
 const connectorServersSchema = new Schema(schema.connectorServers, {strict: true, timestamps: false});
 connectorServersSchema.index({ companyId: 1, url: 1 }, { unique: true, name: 'one_per_address' });
 const connectorQuotasSchema = new Schema(schema.connectorQuotas, {strict: true, timestamps: false});
@@ -665,6 +669,8 @@ module.exports = {
     connectorQuotasSchema,
     connectorRegistrationsSchema,
     connectorToolsSchema,
+    connectionToolsSchema,
+    connectorSwitchesSchema,
     connectorServersSchema,
     instructionPatternsSchema,
     agentSessionsSchema,

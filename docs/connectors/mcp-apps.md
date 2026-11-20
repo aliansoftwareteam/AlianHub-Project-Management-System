@@ -1,6 +1,6 @@
 # Apps reached through their own MCP servers
 
-Notion, GitHub, Supabase, Upwork, Wispr Flow, Dropbox (AI tools), HubSpot and Canva each run an MCP server. AlianHub calls it as the member, with that member's own token, and offers only tools that were reviewed. Every write waits in the member's Inbox until they approve it. Google ([google.md](google.md)), Slack ([slack.md](slack.md)) and Outlook are built connectors and have their own pages.
+Notion, GitHub, Supabase, Upwork, Wispr Flow, Dropbox (AI tools), HubSpot and Canva each run an MCP server. AlianHub calls it as the member, with that member's own token, and offers the tools that server lists for that member's connection. Every write waits in the member's Inbox until they approve it. Google ([google.md](google.md)), Slack ([slack.md](slack.md)) and Outlook are built connectors and have their own pages.
 
 ## What an install sets
 
@@ -19,20 +19,27 @@ On AlianHub Cloud, apps that need a registered app are signed in through the sha
 
 Every app also needs `SECRETS_STORE` with a usable `SECRETS_KEY`, and `AGENT_TAINT_ROUTING` on. When `AGENT_EGRESS_ALLOWLIST` is on, the app's hosts must be on the workspace's egress list: they are listed in each `Modules/Connectors/providers/<id>/index.js` as `egressHosts`.
 
-## Pinning tool shapes
+## Tools
 
-AlianHub offers a tool only once it has been reviewed. A tool's shape is a hash of its name, description and input schema, recorded when someone read them and judged the tool safe for what AlianHub says it does. A tool the app later changes is refused and stays off until it is reviewed again. Owners and admins are told, and may approve the changed tool for their workspace.
+An app's tools are listed live from its server, through each member's own connection, so two members can see different tools. Nothing is cached: every listing and every call reads the server again. A connection's tools are kept per connection in `connector_connection_tools`:
 
-The catalog ships with `shape: null`, which means off, until a maintainer pins each tool:
+- **Read or write** comes from the server's `readOnlyHint`; a tool with no hint is a write. The connection's owner can change it.
+- **Changed**: a tool whose name, description or input differs from what its owner last looked at is flagged and its owner told once. It keeps working in AI chat; agents skip it until it is looked at again.
+- **Gone**: a tool the server stopped listing is marked gone, not deleted, so an agent's tick of it can show as missing.
+- A server that does not answer is reported as unreachable, never as not connected. Apps are listed in parallel, each with its own time limit.
 
-1. Connect a **test account** at the app and take its access token.
-2. Run:
-   ```
-   CONNECTOR_REVIEW_TOKEN=<token> node scripts/connector-tool-shapes.js <provider>
-   ```
-   It prints every tool the server offers now, with its description, input and shape, and marks it as pinned and unchanged, changed since pinned, not reviewed, or not in the catalog.
-3. Read each description and input. If the tool does what its AlianHub key says, and nothing that leaves the app unasked, copy the shape into `providers/<provider>/tools.js`. Correct `tool` and `args` where the server's names differ from the catalog's guess.
-4. Mark as `kind: 'write'` any tool that changes anything outside AlianHub, whatever the server's own hints say.
-5. A pinned tool joins the agent registry, so give it its words in `frontend/src/locales/en.js`: `AgentActions.<key with dots as underscores>` (the convention test `agent-action-labels` asks for it), then run `npm run i18n:backfill`.
+The owner lists their connection's tools at `GET /api/v2/connectors/connections/:id/tools`. What a server says about its tools is outside content: shown as the app's own words, never translated, never followed as instructions.
 
-The tool names for Upwork, Wispr Flow, Dropbox and Canva are not published; their catalog entries are placeholders until step 3.
+## Permissions
+
+Each tool of a connection has a permission its owner sets on the connection's panel under **AI › Customize › Connectors**: **Always allow**, **Needs approval** or **Off**. Reads start as Always allow and writes as Needs approval. Only the connection's owner changes it (`PUT /api/v2/connectors/connections/:id/tools/:key`), never another member, an owner or admin, or an agent.
+
+- **Off**: every call of the tool is refused.
+- **Needs approval**: the tool is not called directly. It is filed as a proposal, and its owner approves it on the Inbox card first.
+- **Always allow**: the tool runs. A write runs directly from AI chat and the person's own AI client; an agent run still files every write for approval.
+
+The same panel clears a changed warning (**Looked at**), sets an MCP tool's read or write, and lists tools the app no longer offers. A REST app's tools (Google, Slack, Outlook) take permissions the same way; whether they read or write is fixed by AlianHub.
+
+## Turning an app off for the workspace
+
+Owners and admins turn an app off for everyone on the **Workspace** tab, under **Apps in this workspace**. While it is off, its tools leave AI chat and agents, every call to it is refused, and nobody can connect it. Members' connections and their permissions are kept, so turning it back on restores everything. Each change is in the audit log.

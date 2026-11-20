@@ -6,6 +6,7 @@ const CODE = Object.freeze({
     BROKEN: 'broken',
     SCOPE_MISSING: 'scope_missing',
     PROVIDER_OFF: 'provider_off',
+    APP_OFF: 'app_off',
 });
 
 class ConnectorError extends Error {
@@ -21,6 +22,7 @@ class ConnectorError extends Error {
  * company app changed under the connection, so the person reconnects: that is `broken` to the tool. */
 const CODE_OF = Object.freeze({
     off: CODE.PROVIDER_OFF,
+    app_off: CODE.APP_OFF,
     no_seat: CODE.NOT_MEMBER,
     not_connected: CODE.NOT_CONNECTED,
     broken: CODE.BROKEN,
@@ -38,7 +40,7 @@ const resolveConnection = async ({ companyId, userId, provider } = {}) => {
     return {
         connectionId: String(row._id),
         scopes: [...(row.scopes || [])],
-        toolsOff: [...(row.toolsOff || [])],
+        toolPermissions: (row.toolPermissions || []).map(({ key, permission }) => ({ key: String(key), permission: String(permission) })),
         getAccessToken: async () => {
             const { token, reason } = await connection.accessTokenFor({ companyId: String(companyId), userId: String(userId), provider });
             if (token) return token;

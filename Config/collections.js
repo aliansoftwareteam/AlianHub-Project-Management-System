@@ -142,6 +142,8 @@ const dbCollections = {
     CONNECTOR_QUOTAS: "connector_quotas",
     CONNECTOR_REGISTRATIONS: "connector_registrations",
     CONNECTOR_TOOLS: "connector_tools",
+    CONNECTION_TOOLS: "connector_connection_tools",
+    CONNECTOR_SWITCHES: "connector_switches",
     CONNECTOR_SERVERS: "connector_servers",
     INSTRUCTION_PATTERNS: "instruction_patterns",
     SECRETS: "secrets",

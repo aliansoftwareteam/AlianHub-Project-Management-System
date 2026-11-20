@@ -145,6 +145,8 @@ const {
     connectorQuotasSchema,
     connectorRegistrationsSchema,
     connectorToolsSchema,
+    connectionToolsSchema,
+    connectorSwitchesSchema,
     connectorServersSchema,
     instructionPatternsSchema,
     agentSessionsSchema,
@@ -454,6 +456,10 @@ exports.checkType = (type) => {
             return connectorRegistrationsSchema
         case SCHEMA_TYPE.CONNECTOR_TOOLS:
             return connectorToolsSchema
+        case SCHEMA_TYPE.CONNECTION_TOOLS:
+            return connectionToolsSchema
+        case SCHEMA_TYPE.CONNECTOR_SWITCHES:
+            return connectorSwitchesSchema
         case SCHEMA_TYPE.CONNECTOR_SERVERS:
             return connectorServersSchema
         case SCHEMA_TYPE.INSTRUCTION_PATTERNS:
@@ -788,6 +794,10 @@ exports.tableType = (type) => {
                 return `${dbCollections.CONNECTOR_REGISTRATIONS}`
         case SCHEMA_TYPE.CONNECTOR_TOOLS:
                 return `${dbCollections.CONNECTOR_TOOLS}`
+        case SCHEMA_TYPE.CONNECTION_TOOLS:
+                return `${dbCollections.CONNECTION_TOOLS}`
+        case SCHEMA_TYPE.CONNECTOR_SWITCHES:
+                return `${dbCollections.CONNECTOR_SWITCHES}`
         case SCHEMA_TYPE.CONNECTOR_SERVERS:
                 return `${dbCollections.CONNECTOR_SERVERS}`
         case SCHEMA_TYPE.INSTRUCTION_PATTERNS:

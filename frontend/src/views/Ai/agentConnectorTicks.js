@@ -25,5 +25,14 @@ export const withTool = (connectors, provider, key, on) => {
 
 export const tickCount = (connectors) => ticksOf(connectors).reduce((n, entry) => n + entry.tools.length, 0);
 
+/* A tick the app's listing no longer holds, with why: a REST app's tools are known without a connection, a live app's
+ * only from one that listed them. */
+export const missingTicks = (connectors, app) => {
+    if (!app || (app.live && app.status !== "ok")) return [];
+    const listed = new Set((app.tools || []).map((tool) => tool.key));
+    const leftOut = new Map((app.leftOut || []).map((entry) => [entry.key, entry.reason]));
+    return toolsTicked(connectors, app.provider).filter((key) => !listed.has(key)).map((key) => ({ key, reason: leftOut.get(key) || "gone" }));
+};
+
 /* Ticks on an app this workspace does not offer now stay on the agent, so switching the app back on restores them. */
 export const notOffered = (connectors, offered) => ticksOf(connectors).filter((entry) => !(offered || []).some((app) => app.provider === entry.provider));

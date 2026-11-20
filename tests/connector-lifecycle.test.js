@@ -545,7 +545,8 @@ describe('the remaining branches have coverage', () => {
         expect(refusesAs('POST /api/v2/connectors/:provider/connect')).toBe('connector.connect');
         expect(refusesAs('POST /api/v2/connectors/:provider/complete')).toBe('connector.connect');
         expect(refusesAs('PUT /api/v2/connectors/connections/:id/products')).toBe('connector.products_changed');
-        expect(refusesAs('PUT /api/v2/connectors/connections/:id/tools')).toBe('connector.tools_changed');
+        expect(refusesAs('PUT /api/v2/connectors/connections/:id/tools/:key')).toBe('connector.tool_permission_changed');
+        expect(refusesAs('PUT /api/v2/connectors/switches/:provider')).toBe('connector.app_switched');
         expect(refusesAs('DELETE /api/v2/connectors/connections/:id')).toBe('connector.revoke');
         expect(refusesAs('GET /api/v2/connectors')).toBeUndefined();
     });
@@ -565,8 +566,8 @@ describe('the routes register only when a provider is offered', () => {
             'GET /api/v1/connector-oauth/:provider/callback',
             'GET /api/v2/connectors', 'GET /api/v2/connectors/members',
             'POST /api/v2/connectors/:provider/connect', 'POST /api/v2/connectors/:provider/complete', 'POST /api/v2/connectors/:provider/token',
-            'PUT /api/v2/connectors/connections/:id/products', 'PUT /api/v2/connectors/connections/:id/tools', 'DELETE /api/v2/connectors/connections/:id',
-            'GET /api/v2/connectors/:provider/tools',
+            'PUT /api/v2/connectors/connections/:id/products', 'GET /api/v2/connectors/connections/:id/tools', 'PUT /api/v2/connectors/connections/:id/tools/:key',
+            'DELETE /api/v2/connectors/connections/:id', 'PUT /api/v2/connectors/switches/:provider',
             'GET /api/v2/connectors/picker/:source/token',
             'GET /api/v2/connectors/picker/:source/thumbnail',
             'POST /api/v2/connectors/picker/:source/import',

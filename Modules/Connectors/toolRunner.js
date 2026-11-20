@@ -12,7 +12,8 @@ const health = require('./health');
 const callAudit = require('./callAudit');
 const providerApi = require('./providerApi');
 const mcpClient = require('./mcpClient');
-const toolReviews = require('./toolReviews');
+const connectionTools = require('./connectionTools');
+const toolPermissions = require('./toolPermissions');
 
 const VIA = Object.freeze({ AGENT: 'agent', MCP: 'mcp', CHAT: 'chat', APPROVED: 'approved' });
 const STATE = Object.freeze({ PENDING: 'pending', APPLIED: 'applied', FAILED: 'failed', REFUSED: 'refused' });
@@ -27,6 +28,7 @@ const MESSAGES = Object.freeze({
     not_member: () => 'This is not available to you.',
     broken: (name) => `${name} is no longer accepting your connection. Reconnect ${name} on Connectors, then ask again.`,
     provider_off: (name) => `${name} is not switched on here.`,
+    app_off: (name) => `An owner or admin turned ${name} off for this workspace, so it was not used.`,
 });
 
 const spoken = (tool, companyId, userId) => async (e) => {
@@ -153,17 +155,20 @@ const mcpRefusal = async (call, error) => {
 const mcpCallerFor = (call) => async (name, args) => {
     const { tool, companyId, userId, connection, trace } = call;
     if (name !== tool.mcp.tool) throw refusal('tool_off', `${tool.key} can only call ${tool.mcp.tool}.`);
-    const shape = await toolReviews.approvedShape(companyId, tool.provider, name, tool.mcp.shape);
+    const checked = tool.live
+        ? { live: true, onListed: (shape) => connectionTools.noteCalled({ companyId, connectionId: connection.connectionId, definition: tool.definition, tool: name, shape }) }
+        : { shape: tool.mcp.shape };
     const token = await connection.getAccessToken().catch(spoken(tool, companyId, userId));
     trace.called = true;
     let result;
     try {
         result = await mcpClient.callTool({
             provider: tool.provider, url: tool.definition.mcp.url, hosts: tool.definition.egressHosts, token,
-            name, args, shape, timeoutMs: TIMEOUT_MS, maxBytes: MAX_BYTES,
+            name, args, ...checked, timeoutMs: TIMEOUT_MS, maxBytes: MAX_BYTES,
         });
     } catch (error) {
-        if (error && error.code === 'tool_changed') await toolReviews.noteChanged({ companyId, definition: tool.definition, tool: name, shape: error.current });
+        if (!tool.live && error && error.code === 'tool_changed') await require('./customReview').noteChanged({ companyId, definition: tool.definition, tool: name, shape: error.current });
+        if (tool.live && error && error.code === 'tool_missing') await connectionTools.noteGone({ companyId, connectionId: connection.connectionId, tool: name });
         throw await mcpRefusal(call, error);
     }
     if (result && result.isError) throw refusal('provider_refused', `${tool.definition.name} said this could not be done, so it did not go through.`);
@@ -182,17 +187,28 @@ const ownConnection = async (tool, companyId, userId, asked) => {
     if (tool.scope && !(connection.scopes || []).includes(tool.scope)) {
         throw refusal('scope_missing', `Tick ${tool.product} on your ${tool.definition.name} connection in Connectors, then ask again.`);
     }
-    if ((connection.toolsOff || []).includes(tool.key)) {
+    if (toolPermissions.permissionOf(tool, connection) === connectionTools.PERMISSION.OFF) {
         throw refusal('tool_turned_off', `You turned this ${tool.definition.name} tool off for yourself, so it was not used. Turn it back on in AI › Customize › Connectors, then ask again.`);
     }
     return connection;
 };
 
+const needsApproval = (tool) => refusal('needs_approval', `${tool.definition.name} asks its owner to approve ${tool.key} first, so file it as a proposal for its approval card.`);
+
+/* A key no catalog tool has may name a tool a built-in MCP app's server lists for this member's connection. */
+const liveTool = async ({ companyId, userId, via, key }) => {
+    const { provider } = connectionTools.splitKey(key);
+    const definition = connectionTools.liveDefinition(provider);
+    if (!definition || !userId || !tools.providerOn(provider)) return null;
+    const connection = await connectionOf({ provider, definition }, companyId, userId);
+    return connectionTools.toolFor({ companyId, userId, connectionId: connection.connectionId, key, agent: via === VIA.AGENT });
+};
+
 /* The stored params keep the connection's id, so a later send through any other is refused. */
 const admitWrite = async ({ companyId, userId, key, input = {} }) => {
-    const generic = tools.get(key);
-    if (!generic || generic.kind !== tools.KIND.WRITE || !tools.isOn(generic)) throw refusal('tool_off', `${key} is not available here.`);
     if (!userId) throw refusal('no_person', 'This write names no person, so no connection can be used.');
+    const generic = tools.get(key) || await liveTool({ companyId, userId, via: VIA.APPROVED, key });
+    if (!generic || (generic.custom && generic.kind !== tools.KIND.WRITE) || !tools.isOn(generic)) throw refusal('tool_off', `${key} is not available here.`);
     const { connectionId: asked, ...given } = input || {};
     const problem = argsSchema.problemIn(generic.input, given);
     if (problem) throw refusal('bad_input', `${key}: ${problem}`);
@@ -230,17 +246,34 @@ const localRead = async ({ tool, companyId, userId, via }) => {
     return { text, chars: text.length, truncated: whole.length > text.length, taint: [source] };
 };
 
-/* An agent's read is refused unless the agent has the tool ticked; `agentConnectors` left out ticks nothing. */
+/* A ticked tool the app no longer offers is refused with the tick named, so the agent's owner knows what to remove. */
+const ticked = async (work, key, agentConnectors) => {
+    const agents = require('../Agents/agentConnectors');
+    let tool;
+    try {
+        tool = await work();
+    } catch (error) {
+        if (error && error.code === 'tool_missing') throw refusal('tool_missing', agents.missingReason(key));
+        throw error;
+    }
+    const removedFromCatalog = !tool && agents.isTicked(agentConnectors, key) && !connectionTools.liveDefinition(connectionTools.splitKey(key).provider);
+    if (removedFromCatalog) throw refusal('tool_missing', agents.missingReason(key, { everyone: true }));
+    return tool;
+};
+
+/* An agent's read is refused unless the agent has the tool ticked, before any app is asked; `agentConnectors` left out ticks nothing. */
 const readAdmitted = async ({ companyId, userId, via, runId, callerId, agentConnectors, key, input }, trace) => {
-    const generic = tools.get(key);
-    if (!generic || generic.kind !== tools.KIND.READ || !tools.isOn(generic)) throw refusal('tool_off', `${key} is not available here.`);
+    const byAgent = via === VIA.AGENT;
+    const notTicked = byAgent ? require('../Agents/agentConnectors').refusalFor(agentConnectors, key) : '';
+    if (notTicked) throw refusal('agent_not_allowed', notTicked);
+    const found = async () => tools.get(key) || liveTool({ companyId, userId, via, key });
+    const generic = byAgent && userId ? await ticked(found, key, agentConnectors) : await found();
+    if (!generic || (generic.custom && generic.kind !== tools.KIND.READ) || !tools.isOn(generic)) throw refusal('tool_off', `${key} is not available here.`);
     if (!userId) throw refusal('no_person', 'This read names no person, so no connection can be used.');
     const { connectionId: asked, ...given } = input || {};
     const problem = argsSchema.problemIn(generic.input, given);
     if (problem) throw refusal('bad_input', `${key}: ${problem}`);
-    if (via === VIA.AGENT && !runId) throw refusal('run_required', 'A connected app can be read only while an agent is running.');
-    const notTicked = via === VIA.AGENT ? require('../Agents/agentConnectors').refusalFor(agentConnectors, key) : '';
-    if (notTicked) throw refusal('agent_not_allowed', notTicked);
+    if (byAgent && !runId) throw refusal('run_required', 'A connected app can be read only while an agent is running.');
     if (generic.local) {
         const out = await localRead({ tool: generic, companyId, userId, via });
         trace.chars = out.chars;
@@ -250,6 +283,9 @@ const readAdmitted = async ({ companyId, userId, via, runId, callerId, agentConn
 
     const connection = await ownConnection(tool, companyId, userId, asked);
     trace.connectionId = connection.connectionId;
+    const writing = tool.kind === tools.KIND.WRITE;
+    // An agent's write always waits for its owner: taint routing holds whatever a run read from outside.
+    if (toolPermissions.permissionOf(tool, connection) === connectionTools.PERMISSION.APPROVAL || (writing && via === VIA.AGENT)) throw needsApproval(tool);
     await refuseWhileHeld(tool, companyId, connection);
 
     const quota = await quotas.claimRead(companyId, { connectionId: connection.connectionId, userId, actor: { type: via, id: callerId } });
@@ -267,7 +303,7 @@ const readAdmitted = async ({ companyId, userId, via, runId, callerId, agentConn
     try {
         raw = await egressContext.run(
             { companyId: String(companyId), actor: String(userId) },
-            () => tool.run({ input: args, connection: handedTo({ tool, companyId, userId, connection, trace }), caps: { maxItems: tool.caps.maxItems, maxChars } }),
+            () => tool.run({ input: args, connection: handedTo({ tool, companyId, userId, connection, trace }, { write: writing }), caps: { maxItems: tool.caps.maxItems, maxChars } }),
         );
     } catch (error) {
         if (claim) await claim.settle({ state: STATE.FAILED, chars: 0 });
@@ -295,4 +331,4 @@ const read = ({ companyId, userId, via, runId = null, callerId = '', agentConnec
     (trace) => readAdmitted({ companyId, userId, via, runId, callerId, agentConnectors, key, input }, trace),
 );
 
-module.exports = { VIA, STATE, read, admitWrite, write, plain, connectionOf };
+module.exports = { VIA, STATE, MESSAGES, read, admitWrite, write, plain, connectionOf };

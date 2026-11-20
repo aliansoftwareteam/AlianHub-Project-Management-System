@@ -30,11 +30,10 @@ export const connectorApi = {
     complete: (provider, state, code) => send("post", `${base()}/${provider}/complete`, { state, code }),
     saveToken: (provider, token) => send("post", `${base()}/${provider}/token`, { token }),
     setProducts: (connectionId, products) => send("put", `${base()}/connections/${connectionId}/products`, { products }),
-    setToolsOff: (connectionId, toolsOff) => send("put", `${base()}/connections/${connectionId}/tools`, { toolsOff }),
     disconnect: (connectionId) => send("delete", `${base()}/connections/${connectionId}`),
-    tools: (provider) => send("get", `${base()}/${provider}/tools`),
-    toolsToReview: (provider) => send("get", `${base()}/admin/tools/${provider}`),
-    reviewTool: (provider, tool, enabled) => send("put", `${base()}/admin/tools/${provider}/${encodeURIComponent(tool)}`, { enabled }),
+    connectionTools: (connectionId) => send("get", `${base()}/connections/${connectionId}/tools`),
+    setTool: (connectionId, key, change) => send("put", `${base()}/connections/${connectionId}/tools/${encodeURIComponent(key)}`, change),
+    setSwitch: (provider, on) => send("put", `${base()}/switches/${provider}`, { on }),
 };
 
 export const goToConsent = (url) => { if (url) window.location.assign(url); };

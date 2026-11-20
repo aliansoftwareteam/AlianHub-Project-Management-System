@@ -146,7 +146,7 @@ describe('the apps offered for ticking', () => {
     it('are the workspace\'s offered apps with their turned-on reads and writes', async () => {
         const r = await list(INSIDER);
         expect(r.body.data.providers).toEqual([{
-            provider: 'fake', name: 'Fake',
+            provider: 'fake', name: 'Fake', status: 'not_connected', live: false, leftOut: [],
             tools: [
                 expect.objectContaining({ key: READ, kind: 'read', label: 'Connectors.tool.fakeNotesList' }),
                 expect.objectContaining({ key: WRITE, kind: 'write', label: 'Connectors.tool.fakeNotesCreate' }),

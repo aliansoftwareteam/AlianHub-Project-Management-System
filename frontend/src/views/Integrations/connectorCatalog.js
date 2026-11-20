@@ -22,16 +22,18 @@ export const categoryOf = (provider) => CATEGORY_OF[provider] || OTHER_CATEGORY;
 const ATTENTION = ["broken", "reauth_required"];
 export const needsAttention = (row) => Boolean(row && row.connection && ATTENTION.includes(row.connection.status));
 
-export const statusDot = (row) => (needsAttention(row) ? "ah-dot--warn" : "ah-dot--ok");
+export const statusDot = (row) => (needsAttention(row) || (row && row.switchedOff) ? "ah-dot--warn" : "ah-dot--ok");
 
 export const connectorRows = (data = {}) => {
     const held = new Map((data.connections || []).filter((conn) => conn && conn.connected).map((conn) => [conn.provider, conn]));
+    const switchedOff = new Set(data.workspaceOff || []);
     // A workspace's custom apps are listed, connected and reviewed on their own card (CustomServers.vue).
     const offered = (data.providers || []).filter((entry) => !entry.custom).map((entry) => ({
         provider: entry.provider,
         products: entry.products || [],
         signIn: entry.signIn || [],
         connection: held.get(entry.provider) || null,
+        switchedOff: switchedOff.has(entry.provider),
     }));
     return {
         mine: offered.filter((row) => row.connection),
@@ -69,7 +71,11 @@ export const takesOauth = (row) => (row.signIn || []).includes(SIGN_IN.OAUTH);
 
 export const asksBeforeConnect = (row) => takesToken(row) || (takesOauth(row) && (row.products || []).length > 1);
 
-export const toolsOffAfter = (current, key, on) => {
-    const without = (current || []).filter((value) => value !== key);
-    return on ? without : [...without, key];
-};
+export const PERMISSIONS = Object.freeze(["allow", "approval", "off"]);
+
+/* A tool the server no longer lists is kept apart, so its permission survives if it comes back. */
+export const groupTools = (tools = []) => ({
+    read: tools.filter((tool) => !tool.gone && tool.access === "read"),
+    write: tools.filter((tool) => !tool.gone && tool.access !== "read"),
+    gone: tools.filter((tool) => tool.gone),
+});

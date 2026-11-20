@@ -41,7 +41,6 @@ beforeEach(() => {
     Object.assign(process.env, ENV);
     Object.keys(mockDb.store).forEach((k) => { mockDb.store[k].length = 0; });
     jest.clearAllMocks();
-    mcpClient.forget();
     server = fakeMcpServer.create();
     safeFetch.mockImplementation((url, opts) => server.handle(url, opts));
     connections.resolveConnection.mockResolvedValue({ connectionId: 'conn-prisha-notes', scopes: [], getAccessToken: async () => 'prisha-notes-token' });

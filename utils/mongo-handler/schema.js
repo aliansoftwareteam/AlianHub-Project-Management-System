@@ -2184,6 +2184,9 @@ const schema = {
         // { email, sub } on older ones
         scopes: { type: [String], default: undefined, required: false },
         account: { type: Object, required: false },
+        // [{ key, permission }] for a REST app's tools whose owner chose other than the default (task 110)
+        toolPermissions: { type: Array, default: undefined, required: false },
+        // Retired by task 110; kept declared so migration 088 can find and unset it under strict queries
         toolsOff: { type: [String], default: undefined, required: false },
         // { source: 'instance' | 'company', appId }: appId is the connector_apps id, null for the instance app
         app: { type: Object, required: false },
@@ -2263,6 +2266,36 @@ const schema = {
         reviewedBy: { type: String, default: '', required: false },
         reviewedAt: { type: Date, required: false },
         seenAt: { type: Date, required: true },
+    },
+    // One tool of one member's connection to a built-in MCP app, as its server last listed it (task 109)
+    connectionTools: {
+        companyId: { type: String, required: true },
+        connectionId: { type: String, required: true },
+        userId: { type: String, required: true },
+        provider: { type: String, required: true },
+        tool: { type: String, required: true },
+        // The server's own words, shown as outside content
+        description: { type: String, default: '', required: false },
+        inputSchema: { type: Object, required: false },
+        usable: { type: Boolean, default: true, required: false },
+        shape: { type: String, required: true },
+        // The shape the connection's owner last looked at; the tool is changed while it differs from shape
+        seenShape: { type: String, required: true },
+        changed: { type: Boolean, default: false, required: false },
+        noticedShape: { type: String, default: '', required: false },
+        gone: { type: Boolean, default: false, required: false },
+        // read | write, from the server's readOnlyHint until the owner sets it
+        access: { type: String, required: true },
+        accessByOwner: { type: Boolean, default: false, required: false },
+        // allow | approval | off
+        permission: { type: String, required: true },
+    },
+    // A catalog app an owner or admin turned off for the whole workspace (task 110); no row means on
+    connectorSwitches: {
+        companyId: { type: String, required: true },
+        provider: { type: String, required: true },
+        setBy: { type: String, required: true },
+        setAt: { type: Date, required: true },
     },
     // A workspace's own MCP server, added by its address (task 096); members connect to it as `custom_<_id>`.
     connectorServers: {
