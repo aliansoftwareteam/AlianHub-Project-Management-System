@@ -9,8 +9,6 @@ const bodyParser = require("body-parser");
 const config =  require('./Config/config.js');
 const { loadDotEnv, applyEnvMap } = require('./Config/applyEnv.js');
 loadDotEnv();
-// A local resolver that refuses SRV lookups breaks mongodb+srv:// URLs (querySrv ECONNREFUSED).
-if (process.env.MONGODB_DNS_SERVERS) require('dns').setServers(process.env.MONGODB_DNS_SERVERS.split(',').map((s) => s.trim()).filter(Boolean));
 require('./Config/hostingMode').refuseBadBoot();
 const { makeDefaultBrandSettings } = require("./Modules/Admin/common/controller.js");
 const { installCors } = require('./utils/cors.js');

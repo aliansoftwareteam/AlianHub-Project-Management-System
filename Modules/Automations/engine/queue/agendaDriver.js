@@ -1,7 +1,6 @@
 const { Agenda } = require('@hokify/agenda');
 const logger = require('../../../../Config/loggerConfig');
 const { RUN_LOCK_MS } = require('../../../Agents/engine/timeouts');
-const { withDatabase } = require('../../../../utils/mongo-handler/connectionString');
 
 // Agenda driver — ONE instance, on the global database.
 //
@@ -28,9 +27,9 @@ const createAgendaDriver = ({ mongoUrl, dbName = 'global', concurrency = DEFAULT
     const pendingDefinitions = new Map();
 
     const address = () => {
-        const base = String(mongoUrl || process.env.MONGODB_URL || '');
+        const base = String(mongoUrl || process.env.MONGODB_URL || '').replace(/\/+$/, '');
         if (!base) throw new Error('MONGODB_URL is not set — the agenda driver cannot connect');
-        return withDatabase(base, dbName);
+        return `${base}/${dbName}`;
     };
 
     return {

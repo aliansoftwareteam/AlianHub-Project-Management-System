@@ -5,7 +5,6 @@ const config = require('../../Config/config.js');
 const { mongoTimeoutOptions } = require('../../Modules/Agents/engine/timeouts');
 const { onFatal } = require('../../Config/processGuards');
 const { isDatabaseName } = require('../../middlewares/mongoConnector/databaseName');
-const { withDatabase } = require('./connectionString');
 
 // A connection closes asynchronously, so its last lifecycle events land after
 // the Jest suite that opened it has torn down; a console write there fails the
@@ -49,8 +48,11 @@ exports.connect = (db) => {
             return;
         }
         try {
-            // Atlas SRV TXT records supply authSource, so only a plain mongodb:// string needs it added.
-            const connStr = withDatabase(MONGODB_URL, db, { authSource: MONGODB_URL.startsWith('mongodb+srv') ? undefined : 'admin' });
+            const baseMongoUrl = MONGODB_URL.replace(/\/+$/, ''); // strip trailing slashes
+            // Note: do NOT append ?authSource=admin for mongodb+srv — Atlas SRV TXT records handle auth
+            const connStr = baseMongoUrl.startsWith('mongodb+srv')
+                ? `${baseMongoUrl}/${db}`
+                : `${baseMongoUrl}/${db}?authSource=admin`;
             // Phase 1 perf tuning (SOCKET-PERFORMANCE-PLAN #6, #13):
             //   - maxPoolSize 3 -> 10 (env-overridable). The previous cap of 3
             //     queued any 4th concurrent query per tenant; task-heavy flows
