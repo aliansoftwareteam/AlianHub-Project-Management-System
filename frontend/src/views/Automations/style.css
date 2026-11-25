@@ -1,6 +1,7 @@
 @import "@/views/Ai/parity.css";
 
 .au { background: var(--surface); min-height: 100%; }
+.ah-page.au { height: 100%; overflow: hidden; }
 .au__body { flex: 1; min-height: 0; overflow: auto; padding: 20px 22px; display: flex; flex-direction: column; gap: 14px; }
 
 .au__sentence {

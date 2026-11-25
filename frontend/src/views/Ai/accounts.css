@@ -2,6 +2,9 @@
    edge cases (27a-d), plus the CLI setup panel (26a). */
 
 .acct-page { display: flex; min-height: 100%; background: var(--canvas); }
+@media (min-width: 768px) {
+    .ah-page.acct-page { height: 100%; overflow: hidden; }
+}
 .acct-page__main { flex: 1; min-width: 0; display: flex; flex-direction: column; }
 .acct-page__body { flex: 1; min-height: 0; overflow: auto; padding: 20px 24px; display: flex; flex-direction: column; gap: 16px; }
 .acct-lead { font: var(--text-small); color: var(--ink-2); margin: 0; max-width: 720px; }

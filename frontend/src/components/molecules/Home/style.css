@@ -20,8 +20,9 @@
     --home-block-neutral-edge: rgba(255, 255, 255, .35);
 }
 
-/* ---------- page frame ---------- */
-.ah-page { display: flex; height: 100%; min-height: 0; position: relative; overflow: hidden; background: var(--canvas); color: var(--ink); font-family: var(--font-ui); }
+/* This file stays in the document once the Home chunk loads, so the clipping frame is limited to
+   the views that scroll .ah-page__content; every other .ah-page scrolls in .ah-app__view. */
+.ah-page.home, .ah-page.personal, .ah-page.planner { display: flex; height: 100%; min-height: 0; position: relative; overflow: hidden; background: var(--canvas); color: var(--ink); font-family: var(--font-ui); }
 .ah-page__main { flex: 1; min-width: 0; display: flex; flex-direction: column; min-height: 0; }
 .ah-page__body { flex: 1; min-height: 0; display: flex; }
 .ah-page__content { flex: 1; min-width: 0; min-height: 0; overflow: auto; padding: var(--page-pad-y, 20px) var(--page-pad-x, 22px); }

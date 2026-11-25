@@ -28,6 +28,9 @@
 .member-row__active { color: var(--ink-2); }
 
 .parity-page { display: flex; min-height: 100%; background: var(--canvas); }
+@media (min-width: 768px) {
+    .ah-page.parity-page { height: 100%; overflow: hidden; }
+}
 .parity-page__main { flex: 1; min-width: 0; display: flex; flex-direction: column; }
 .parity-page__body { flex: 1; min-height: 0; overflow: auto; padding: 20px 24px; display: flex; flex-direction: column; gap: 16px; }
 .parity-lead { font: var(--text-small); color: var(--ink-2); margin: 0; max-width: 680px; }
