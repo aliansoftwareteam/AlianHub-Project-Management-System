@@ -34,7 +34,6 @@ const catalogView = (tool, row) => ({
     on: tools.isOn(tool),
 });
 
-/* The owner's own connection, REST or MCP, with each tool's permission. */
 const listFor = async ({ companyId, userId, row }) => {
     const catalog = catalogToolsOf(row.provider);
     if (!catalog.length && connectionTools.liveDefinition(row.provider)) return connectionTools.listFor({ companyId, userId, provider: row.provider });

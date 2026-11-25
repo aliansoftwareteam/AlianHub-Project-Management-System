@@ -115,7 +115,16 @@ beforeEach(() => {
     model();
 });
 
-afterAll(() => Object.entries(before).forEach(([k, v]) => { if (v === undefined) delete process.env[k]; else process.env[k] = v; }));
+/* The rule names GitHub's MCP tool, github.pull_request_read. A catalog key needs three parts, so the REST fixture that
+ * stands in for that server is github.pull_request.read, and the rule is pointed at it here. */
+const pullRule = askConnectors.RULES.find((rule) => rule.provider === 'github');
+const ruleTools = pullRule.tools;
+beforeAll(() => { pullRule.tools = ['github.pull_request.read']; });
+
+afterAll(() => {
+    pullRule.tools = ruleTools;
+    Object.entries(before).forEach(([k, v]) => { if (v === undefined) delete process.env[k]; else process.env[k] = v; });
+});
 
 describe('which apps a question names', () => {
     it('keeps each connector chip of a provider once, and drops anything else without a word', () => {
@@ -137,6 +146,8 @@ describe('the pull request rule', () => {
         expect(askConnectors.pullRequestsIn(`status of ${PR_LINK}?`)).toEqual([{ owner: 'acme', repo: 'web', pullNumber: 482 }]);
         expect(askConnectors.pullRequestsIn('is acme/web#482 merged, and acme/api#7.')).toEqual([{ owner: 'acme', repo: 'web', pullNumber: 482 }, { owner: 'acme', repo: 'api', pullNumber: 7 }]);
         expect(askConnectors.pullRequestsIn("what's the status of PR 482 in acme/web")).toEqual([{ owner: 'acme', repo: 'web', pullNumber: 482 }]);
+        expect(ruleTools).toEqual(['github.pull_request_read']);
+        expect(pullRule.calls(`status of ${PR_LINK}?`)).toEqual([{ method: 'get', owner: 'acme', repo: 'web', pullNumber: 482 }]);
         expect(askConnectors.pullRequestsIn(`${PR_LINK} and acme/web#482`)).toHaveLength(1);
         expect(askConnectors.pullRequestsIn('the roadmap page in Notion')).toEqual([]);
     });

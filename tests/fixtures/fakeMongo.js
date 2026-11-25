@@ -2,7 +2,7 @@
 // language for the agent modules (equality including null as missing, array-element equality, a word-match $text, $nor, $expr with $eq/$ne of two operands, $in/$nin (any element of a stored array)/$eq/$ne/$gt(e)/$lt(e)/$exists/$type/$size/$elemMatch, $set/$inc/$push (with $each and $slice)/$addToSet/$pull,
 // conditional findOneAndUpdate answering the old document unless asked for the new one (null after an upsert insert, as
 // the driver does), updateOne and findOneAndUpdate with upsert and $setOnInsert and a unique _id, findOneAndDelete, deleteOne, deleteMany,
-// insertMany with a unique _id, bulkWrite of insertOne/updateOne/updateMany, sort/skip/limit on find, sort on findOneAndUpdate, $type 'date'/'string'/'objectId' on the stored value, $match/$unwind (a top-level array)/$project (inclusion or exclusion)/$addFields ($toString, $ifNull, $size, $strLenBytes, $convert to a number, $cond with $in)/$group (a field, a compound or a $dateToString '%Y-%m-%d' day _id)/$replaceRoot/$count/$facet/$lookup aggregate with a word-count textScore, declared unique indexes that
+// insertMany with a unique _id, bulkWrite of insertOne/updateOne/updateMany (with upsert), sort/skip/limit on find, sort on findOneAndUpdate, $type 'date'/'string'/'objectId' on the stored value, $match/$unwind (a top-level array)/$project (inclusion or exclusion)/$addFields ($toString, $ifNull, $size, $strLenBytes, $convert to a number, $cond with $in)/$group (a field, a compound or a $dateToString '%Y-%m-%d' day _id)/$replaceRoot/$count/$facet/$lookup aggregate with a word-count textScore, declared unique indexes that
 // reject a duplicate save or upsert with E11000, declared text indexes that bound $text to their fields) so a test can assert on what was written.
 
 let seq = 1;
@@ -330,6 +330,7 @@ const create = ({ mongooseCasting = false } = {}) => {
                 if (kind === 'insertOne') { list.push({ _id: nextId(), ...spec.document }); counts.insertedCount += 1; return; }
                 if (kind !== 'updateOne' && kind !== 'updateMany') throw new Error(`fakeMongo: unsupported bulkWrite ${kind}`);
                 const hit = list.filter((d) => matches(d, spec.filter, textFields)).slice(0, kind === 'updateOne' ? 1 : undefined);
+                if (!hit.length && spec.upsert) { insertUpserted(type, spec.filter, spec.update); counts.upsertedCount = (counts.upsertedCount || 0) + 1; return; }
                 hit.forEach((d) => apply(d, spec.update));
                 counts.matchedCount += hit.length;
                 counts.modifiedCount += hit.length;

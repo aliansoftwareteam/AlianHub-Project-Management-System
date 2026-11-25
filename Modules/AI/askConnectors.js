@@ -100,10 +100,10 @@ const pullRequestsIn = (question) => {
     return [...found.values()];
 };
 
-/* A reference an app owns is read with no model call to pick it; another app adds its own row. The first of a
- * rule's tools the asker's connection offers is the one read: GitHub's own server names it get_pull_request. */
+/* A reference an app owns is read with no model call to pick it. GitHub's server reads a pull request with
+ * pull_request_read, whose `method` picks what of it is read. */
 const RULES = Object.freeze([
-    { provider: 'github', tools: ['github.pull_request.read', 'github.get_pull_request'], calls: pullRequestsIn },
+    { provider: 'github', tools: ['github.pull_request_read'], calls: (question) => pullRequestsIn(question).map((args) => ({ method: 'get', ...args })) },
 ]);
 
 /* The connector chips of a question, as provider ids: an id no provider has is dropped without a word, as a
@@ -183,7 +183,8 @@ const callerOf = (companyId, userId, ip) => ({
 
 const spokenOf = (error) => String((error && error.message) || '').replace(/^[a-z_]+: /, '').replace(/^[a-z0-9_]+(\.[a-z0-9_]+)+: /, '');
 
-const titleOf = (args, app) => clip(Object.values(isPlainObject(args) ? args : {}).filter((v) => v !== '' && v !== undefined && v !== null).join(' · '), TITLE_MAX) || app.name;
+// GitHub's `method` picks how a thing is read, not which thing, so it is no part of the source's title.
+const titleOf = (args, app) => clip(Object.entries(isPlainObject(args) ? args : {}).filter(([k, v]) => k !== 'method' && v !== '' && v !== undefined && v !== null).map(([, v]) => v).join(' · '), TITLE_MAX) || app.name;
 
 /* A change is filed exactly as far as an MCP call of the same tool is checked (Mcp/tools planned), and then as a
  * proposal only the asker, whose connection it uses, can approve. */
@@ -241,7 +242,7 @@ const noteStatus = (note, app) => {
     return said ? note(app, app.status, said(app.name)) : note(app, CODE.FAILED);
 };
 
-const EMPTY_STEP =Object.freeze({ sources: Object.freeze([]), notes: Object.freeze([]), proposals: Object.freeze([]) });
+const EMPTY_STEP = Object.freeze({ sources: Object.freeze([]), notes: Object.freeze([]), proposals: Object.freeze([]) });
 
 /* The connector step of one question. Runs inside the question's egress context: once anything was read, no web
  * fetch follows in it (FR-59). Never throws for what an app or the model did; each becomes a note the answer says. */

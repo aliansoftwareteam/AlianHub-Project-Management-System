@@ -83,6 +83,27 @@ describe('a new agent', () => {
 });
 
 describe('saving the ticks', () => {
+    it('keeps a live app tick the agent already holds, and refuses a new one', async () => {
+        const connectionTools = require('../Modules/Connectors/connectionTools');
+        const live = jest.spyOn(connectionTools, 'liveDefinition').mockImplementation((provider) => (provider === 'oldlive' ? { id: 'oldlive', name: 'Old Live', transport: 'mcp' } : null));
+        const held = { provider: 'oldlive', tools: ['oldlive.pages.search'] };
+        const id = String((await create(OWNER)).body.data._id);
+        agentRow(id).connectors = [held];
+
+        const kept = await update(OWNER, id, { connectors: [{ provider: 'fake', tools: [READ] }, held] });
+        expect(kept.body.statusText).toBe('Agent updated.');
+        expect(agentRow(id).connectors).toEqual([{ provider: 'fake', tools: [READ] }, held]);
+
+        const added = await update(OWNER, id, { connectors: [{ provider: 'oldlive', tools: ['oldlive.pages.search', 'oldlive.pages.read'] }] });
+        expect(added.code).toBe(400);
+        expect(added.body.statusText).toMatch(/cannot use Old Live yet/);
+
+        const cleared = await update(OWNER, id, { connectors: [{ provider: 'fake', tools: [READ] }] });
+        expect(cleared.body.statusText).toBe('Agent updated.');
+        expect(agentRow(id).connectors).toEqual([{ provider: 'fake', tools: [READ] }]);
+        live.mockRestore();
+    });
+
     it('stores them, and the revision a run pins carries them', async () => {
         const id = String((await create(OWNER)).body.data._id);
         const r = await update(OWNER, id, { connectors: [{ provider: 'fake', tools: [READ] }] });

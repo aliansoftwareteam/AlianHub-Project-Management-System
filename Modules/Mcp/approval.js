@@ -112,7 +112,7 @@ const approverRefusal = async (companyId, userId, proposal, change) => {
     const own = await holderMayInEach(companyId, { kind: 'human', userId: String(userId) }, change.action, params);
     if (!own.allowed) return { error: `The approver may not make this change: ${own.reason}`, lacks: LACKS.RIGHT };
     // A connector write reaches the owner's own account at another app, nothing in this workspace.
-    if (connectorWrites.isWrite(change.action)) return null;
+    if (connectorWrites.isGated(change)) return null;
     if (!(await reachable(companyId, { userId: String(userId), projectIds: [] }, targetOf(params, change.action)))) {
         return { error: 'The approver cannot open what this change touches.', lacks: LACKS.SIGHT };
     }
@@ -135,7 +135,7 @@ const refusalFor = async (companyId, p, { decider, isPrivileged, edited, changes
         // eslint-disable-next-line no-await-in-loop
         const notApprovers = await approverRefusal(companyId, decider.userId, p, c);
         if (notApprovers) return refused(notApprovers.error);
-        if (connectorWrites.isWrite(c.action)) continue;
+        if (connectorWrites.isGated(c)) continue;
         const target = targetOf(c.params, c.action);
         // eslint-disable-next-line no-await-in-loop
         if (!(await reachable(companyId, { userId: p.requestedBy, projectIds: [] }, target))) return refused('The person behind the token (the requester) can no longer open what this change touches.');

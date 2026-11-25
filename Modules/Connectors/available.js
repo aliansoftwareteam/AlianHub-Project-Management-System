@@ -4,8 +4,7 @@ const connections = require('./resolveConnection');
 const connectionTools = require('./connectionTools');
 const toolPermissions = require('./toolPermissions');
 
-/* The one place AI chat and agents learn which connector tools a person can use right now (task 111): their own
- * connection of each app, REST or MCP, after the workspace switch and the tool's permission. */
+// The one place AI chat and agents learn which connector tools a person can use (task 111), so they never disagree.
 
 const PURPOSE = Object.freeze({ ASK: 'ask', AGENT: 'agent' });
 const LEFT_OUT = Object.freeze({ OFF: 'off', CHANGED: 'changed', GONE: 'gone', UNUSABLE: 'unusable', APPROVAL: 'approval' });
@@ -13,10 +12,8 @@ const { STATUS, PERMISSION } = connectionTools;
 
 const catalogOf = (provider) => tools.all().filter((tool) => tool.provider === provider);
 
-/* An app that has catalog tools keeps them; a built-in MCP app without any lists its tools from its server. */
 const isLive = (provider) => !catalogOf(provider).length && Boolean(connectionTools.liveDefinition(provider));
 
-/* Every app a person could name, switched on or not, with the name a person reads. */
 const known = () => {
     const names = new Map(tools.all().map((tool) => [tool.provider, tool.definition.name]));
     registry.list().filter((definition) => isLive(definition.id)).forEach((definition) => names.set(definition.id, definition.name));
@@ -80,10 +77,8 @@ const providersAsked = (provider, names) => {
     return [...new Set((Array.isArray(provider) ? provider : [provider]).map(String))].filter((id) => names.has(id));
 };
 
-/* `provider` is one app or a list of them; left out, every app switched on here. Each app says its status, so an
- * app that is unreachable, not connected or turned off is reported as that, never as having no tools. `leftOut`
- * names the tools held back and why (Off, changed for an agent, gone from the server, not checkable, or a read that
- * waits for approval, which AI chat cannot answer from). */
+/* `provider` left out means every app switched on here. An app that is unreachable, not connected or turned off is
+ * reported as that, never as having no tools. */
 const available = async ({ companyId, userId, kind, provider, product, purpose = PURPOSE.ASK, timeoutMs = connectionTools.LIST_TIMEOUT_MS } = {}) => {
     const names = known();
     const apps = await Promise.all(providersAsked(provider, names).map((id) => {

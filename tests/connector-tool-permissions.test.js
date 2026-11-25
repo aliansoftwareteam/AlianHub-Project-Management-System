@@ -186,19 +186,32 @@ describe('what a permission does when a tool would be called', () => {
         await connect(MAYA, { toolPermissions: [{ key: SEARCH, permission: 'approval' }] });
         await expect(read(MAYA)).rejects.toMatchObject({ code: 'needs_approval' });
         expect(server.calls).toEqual([]);
-        expect(writes.isWrite(SEARCH)).toBe(true);
-        const [filed] = await writes.prepareChanges(C, MAYA, [{ action: SEARCH, params: { query: 'bank' } }]);
+        expect(writes.isWrite(SEARCH)).toBe(false);
+        const [marked] = await writes.markApprovalReads(C, MAYA, [{ action: SEARCH, params: { query: 'bank' } }]);
+        expect(marked).toMatchObject({ approval: true });
+        expect(writes.hasWrite([marked])).toBe(true);
+        const [filed] = await writes.prepareChanges(C, MAYA, [marked]);
         expect(filed.card).toMatchObject({ provider: P, tool: SEARCH });
     });
 
-    it('Always allow: a write runs directly from the person\'s own client, but an agent run still files it', async () => {
+    it('Always allow: a read is no write, and a filer cannot mark it as one or take the mark off', async () => {
+        await connect(MAYA);
+        await connect(RAVI, { toolPermissions: [{ key: SEARCH, permission: 'approval' }] });
+        expect(writes.hasWrite([{ action: SEARCH, params: { query: 'bank' } }])).toBe(false);
+        const [mine] = await writes.markApprovalReads(C, MAYA, [{ action: SEARCH, params: { query: 'bank' }, approval: true }]);
+        expect(mine).not.toHaveProperty('approval');
+        const [theirs] = await writes.markApprovalReads(C, RAVI, [{ action: SEARCH, params: { query: 'bank' }, approval: false }]);
+        expect(theirs).toMatchObject({ approval: true });
+    });
+
+    it('Always allow: a write is never run as a read, by the person\'s own client or by an agent', async () => {
         await connect(MAYA, { toolPermissions: [{ key: CREATE, permission: 'allow' }] });
-        expect((await read(MAYA, { key: CREATE, input: NOTE })).text).toContain('Saved Hi');
+        await expect(read(MAYA, { key: CREATE, input: NOTE })).rejects.toMatchObject({ code: 'tool_off' });
         const agentRead = runner.read({
             companyId: C, userId: MAYA, via: runner.VIA.AGENT, callerId: 'agent-1', runId: 'run-1', agentConnectors: [{ provider: P, tools: [CREATE] }], key: CREATE, input: NOTE,
         });
-        await expect(agentRead).rejects.toMatchObject({ code: 'needs_approval' });
-        expect(server.calls.map((c) => c.name)).toEqual(['create_note']);
+        await expect(agentRead).rejects.toMatchObject({ code: 'tool_off' });
+        expect(server.calls).toEqual([]);
     });
 
     it('stays as it was for another tool, and for another member', async () => {
@@ -265,5 +278,14 @@ describe('migration 088', () => {
         expect(rowOf(other._id).toolPermissions).toBeUndefined();
         expect(await migration.moveCompany(ctx(), C)).toEqual({ moved: 0 });
         await expect(read(MAYA)).rejects.toMatchObject({ code: 'tool_turned_off' });
+    });
+
+    it('writes an old built-in MCP key as the server tool it called, so it matches when that tool is listed', async () => {
+        const row = await connect(MAYA, { toolsOff: ['notion.pages.search', 'github.pull_request.read', 'github.pull_request.checks'] });
+        await migration.moveCompany(ctx(), C);
+        expect(rowOf(row._id).toolPermissions).toEqual([
+            { key: 'notion.notion-search', permission: 'off' },
+            { key: 'github.pull_request_read', permission: 'off' },
+        ]);
     });
 });

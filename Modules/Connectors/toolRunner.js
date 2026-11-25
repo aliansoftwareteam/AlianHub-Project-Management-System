@@ -268,7 +268,8 @@ const readAdmitted = async ({ companyId, userId, via, runId, callerId, agentConn
     if (notTicked) throw refusal('agent_not_allowed', notTicked);
     const found = async () => tools.get(key) || liveTool({ companyId, userId, via, key });
     const generic = byAgent && userId ? await ticked(found, key, agentConnectors) : await found();
-    if (!generic || (generic.custom && generic.kind !== tools.KIND.READ) || !tools.isOn(generic)) throw refusal('tool_off', `${key} is not available here.`);
+    // A write is sent only through admitWrite, after its owner approved it; here it would skip the card and the write quota.
+    if (!generic || generic.kind !== tools.KIND.READ || !tools.isOn(generic)) throw refusal('tool_off', `${key} is not available here.`);
     if (!userId) throw refusal('no_person', 'This read names no person, so no connection can be used.');
     const { connectionId: asked, ...given } = input || {};
     const problem = argsSchema.problemIn(generic.input, given);
@@ -283,9 +284,7 @@ const readAdmitted = async ({ companyId, userId, via, runId, callerId, agentConn
 
     const connection = await ownConnection(tool, companyId, userId, asked);
     trace.connectionId = connection.connectionId;
-    const writing = tool.kind === tools.KIND.WRITE;
-    // An agent's write always waits for its owner: taint routing holds whatever a run read from outside.
-    if (toolPermissions.permissionOf(tool, connection) === connectionTools.PERMISSION.APPROVAL || (writing && via === VIA.AGENT)) throw needsApproval(tool);
+    if (toolPermissions.permissionOf(tool, connection) === connectionTools.PERMISSION.APPROVAL) throw needsApproval(tool);
     await refuseWhileHeld(tool, companyId, connection);
 
     const quota = await quotas.claimRead(companyId, { connectionId: connection.connectionId, userId, actor: { type: via, id: callerId } });
@@ -303,7 +302,7 @@ const readAdmitted = async ({ companyId, userId, via, runId, callerId, agentConn
     try {
         raw = await egressContext.run(
             { companyId: String(companyId), actor: String(userId) },
-            () => tool.run({ input: args, connection: handedTo({ tool, companyId, userId, connection, trace }, { write: writing }), caps: { maxItems: tool.caps.maxItems, maxChars } }),
+            () => tool.run({ input: args, connection: handedTo({ tool, companyId, userId, connection, trace }), caps: { maxItems: tool.caps.maxItems, maxChars } }),
         );
     } catch (error) {
         if (claim) await claim.settle({ state: STATE.FAILED, chars: 0 });

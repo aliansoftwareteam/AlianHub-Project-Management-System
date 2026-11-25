@@ -83,6 +83,8 @@ const read = (userId, via = runner.VIA.CHAT) => runner.read({
     companyId: C, userId, via, callerId: via === runner.VIA.AGENT ? 'agent-1' : 'ask', runId: via === runner.VIA.AGENT ? 'run-1' : null,
     agentConnectors: [{ provider: P, tools: [SEARCH] }], key: SEARCH, input: { query: 'bank' },
 });
+// A new live tool starts at Needs approval, so a test that reads one first sets what its owner would.
+const allowSearch = (userId = MAYA) => { rowOf(userId, 'search_notes').permission = 'allow'; };
 const tokenOf = (opts) => String(Object.entries((opts && opts.headers) || {}).find(([k]) => k.toLowerCase() === 'authorization')?.[1] || '');
 
 beforeEach(() => {
@@ -112,12 +114,12 @@ describe('a built-in MCP app ships no tools of its own', () => {
 });
 
 describe('listing a connection\'s tools', () => {
-    it('shows the tools the server lists, read from readOnlyHint and write without it', async () => {
+    it('shows the tools the server lists, read from readOnlyHint and write without it, each waiting for approval', async () => {
         await connect(MAYA);
         const out = await list(MAYA);
         expect(out.status).toBe('ok');
         expect(out.tools.map((tool) => tool.key).sort()).toEqual(['notesmcp.archive_notes', 'notesmcp.create_note', 'notesmcp.search_notes']);
-        expect(out.tools.find((tool) => tool.tool === 'search_notes')).toMatchObject({ access: 'read', permission: 'allow', changed: false });
+        expect(out.tools.find((tool) => tool.tool === 'search_notes')).toMatchObject({ access: 'read', permission: 'approval', changed: false });
         expect(out.tools.find((tool) => tool.tool === 'create_note')).toMatchObject({ access: 'write', permission: 'approval', changed: false });
         expect(rowOf(MAYA, 'search_notes')).toMatchObject({ companyId: C, provider: P, access: 'read', gone: false });
     });
@@ -180,6 +182,7 @@ describe('a tool the server changed', () => {
     it('still works in AI chat, and agents skip it', async () => {
         await connect(MAYA);
         await list(MAYA);
+        allowSearch();
         servers[MAYA].tools.search_notes.description = 'Search notes, now with tags.';
         await list(MAYA);
         const out = await read(MAYA);
@@ -191,6 +194,7 @@ describe('a tool the server changed', () => {
     it('is caught by the call that meets it, which still goes through', async () => {
         await connect(MAYA);
         await list(MAYA);
+        allowSearch();
         servers[MAYA].tools.search_notes.inputSchema.properties.tag = { type: 'string' };
         await read(MAYA);
         expect(servers[MAYA].calls).toHaveLength(1);
@@ -214,6 +218,7 @@ describe('a tool the server stopped listing', () => {
     it('is marked gone by a call that finds it withdrawn', async () => {
         await connect(MAYA);
         await list(MAYA);
+        allowSearch();
         delete servers[MAYA].tools.search_notes;
         await expect(read(MAYA)).rejects.toMatchObject({ code: 'tool_missing' });
         expect(rowOf(MAYA, 'search_notes')).toMatchObject({ gone: true });
@@ -269,7 +274,7 @@ describe('the owner’s choices on a live tool (task 110)', () => {
         await list(MAYA);
         expect((await setTool(RAVI, mine, SEARCH, { permission: 'off' })).code).toBe(404);
         expect((await setTool(MAYA, mine, 'notesmcp.drop_everything', { permission: 'off' })).body.code).toBe('unknown_tool');
-        expect(rowOf(MAYA, 'search_notes')).toMatchObject({ permission: 'allow' });
+        expect(rowOf(MAYA, 'search_notes')).toMatchObject({ permission: 'approval' });
     });
 
     it('keeps the owner’s read or write over the server’s hint on the next listing', async () => {
@@ -278,6 +283,32 @@ describe('the owner’s choices on a live tool (task 110)', () => {
         await setTool(MAYA, mine, SEARCH, { access: 'write' });
         await list(MAYA);
         expect(rowOf(MAYA, 'search_notes')).toMatchObject({ access: 'write', accessByOwner: true });
+    });
+
+    it('flags a tool whose readOnlyHint flips, since that moves it between Read and Write', async () => {
+        await connect(MAYA);
+        await list(MAYA);
+        servers[MAYA].tools.search_notes.annotations = { readOnlyHint: false };
+        expect((await list(MAYA)).tools.find((tool) => tool.tool === 'search_notes')).toMatchObject({ access: 'write', changed: true });
+        expect((await list(MAYA)).tools.find((tool) => tool.tool === 'search_notes')).toMatchObject({ changed: true });
+    });
+
+    it('does not flag a row stored before the hint was kept', async () => {
+        await connect(MAYA);
+        await list(MAYA);
+        delete rowOf(MAYA, 'search_notes').hinted;
+        expect((await list(MAYA)).tools.find((tool) => tool.tool === 'search_notes')).toMatchObject({ changed: false });
+        expect(rowOf(MAYA, 'search_notes')).toMatchObject({ hinted: 'read' });
+    });
+
+    it('moves a permission still at its default when the owner changes read or write, and keeps one the owner chose', async () => {
+        const mine = await connect(MAYA);
+        await list(MAYA);
+        await setTool(MAYA, mine, CREATE, { access: 'read' });
+        expect(rowOf(MAYA, 'create_note')).toMatchObject({ access: 'read', permission: 'allow' });
+        await setTool(MAYA, mine, SEARCH, { permission: 'off' });
+        await setTool(MAYA, mine, SEARCH, { access: 'write' });
+        expect(rowOf(MAYA, 'search_notes')).toMatchObject({ access: 'write', permission: 'off' });
     });
 
     it('records the current shape as looked at, which clears the warning and lets agents use it again', async () => {

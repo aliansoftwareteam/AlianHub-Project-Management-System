@@ -7,8 +7,7 @@ const registry = require('./registry');
 const connections = require('./resolveConnection');
 const mcpClient = require('./mcpClient');
 
-/* A built-in MCP app's tools come from its server, listed with each member's own connection (task 107). What the
- * server says about a tool is outside content: kept bounded, shown as the app's own words, never trusted. */
+// What a server says about a tool is outside content: kept bounded, shown as the app's own words, never trusted.
 
 const ACCESS = Object.freeze({ READ: 'read', WRITE: 'write' });
 const PERMISSION = Object.freeze({ ALLOW: 'allow', APPROVAL: 'approval', OFF: 'off' });
@@ -43,7 +42,7 @@ const defaultPermission = (access) => (access === ACCESS.READ ? PERMISSION.ALLOW
 
 const rowsOf = async (companyId, connectionId) => ((await db(companyId, [{ companyId: String(companyId), connectionId: String(connectionId) }], 'find')) || []).map(plain);
 
-/* The owner is told once per shape, never once per listing or call. Never fails what found the change. */
+// Told once per shape, never once per listing or call, and never fails what found the change.
 const tellChanged = async ({ companyId, definition, row }) => {
     if (!row.changed || row.noticedShape === row.shape) return;
     try {
@@ -64,12 +63,15 @@ const fieldsOf = (found) => {
     return { description: words(found.description), inputSchema: inputSchema || { type: 'object', properties: {} }, usable: Boolean(inputSchema), shape: found.shape };
 };
 
-/* Only what differs is written, so listing on every request costs a read when nothing changed. */
+/* Only what differs is written, so listing on every request costs a read when nothing changed. readOnlyHint is the
+ * server's own claim, so it sorts a new tool into Read or Write but never lets it run without approval: the owner
+ * relaxes that. A row stored before `hinted` was kept has nothing to compare, so it is not flagged for it. */
 const sync = async ({ companyId, userId, definition, connectionId, found, carried = [] }) => {
     const rows = await rowsOf(companyId, connectionId);
     const byTool = new Map(rows.map((row) => [row.tool, row]));
     const listed = new Set();
     const out = [];
+    const ops = [];
     for (const tool of found.filter((t) => review().TOOL_NAME.test(t.name))) {
         listed.add(tool.name);
         const row = byTool.get(tool.name);
@@ -79,24 +81,28 @@ const sync = async ({ companyId, userId, definition, connectionId, found, carrie
         if (!row) {
             next = {
                 companyId: String(companyId), connectionId: String(connectionId), userId: String(userId), provider: definition.id, tool: tool.name,
-                ...fieldsOf(tool), seenShape: tool.shape, changed: false, noticedShape: '', gone: false, access: hinted, accessByOwner: false, permission: chosen ? chosen.permission : defaultPermission(hinted),
+                ...fieldsOf(tool), seenShape: tool.shape, changed: false, noticedShape: '', gone: false, access: hinted, hinted, accessByOwner: false, permission: chosen ? chosen.permission : PERMISSION.APPROVAL,
             };
         } else {
-            next = { ...row, ...(row.shape === tool.shape ? {} : fieldsOf(tool)), gone: false, changed: row.seenShape !== tool.shape, access: row.accessByOwner ? row.access : hinted };
+            const hintFlipped = row.hinted !== undefined && row.hinted !== hinted;
+            next = {
+                ...row, ...(row.shape === tool.shape ? {} : fieldsOf(tool)), gone: false, hinted,
+                changed: row.seenShape !== tool.shape || hintFlipped || Boolean(row.changed), access: row.accessByOwner ? row.access : hinted,
+            };
         }
-        const dirty = !row || ['shape', 'gone', 'changed', 'access'].some((field) => row[field] !== next[field]);
+        const dirty = !row || ['shape', 'gone', 'changed', 'access', 'hinted'].some((field) => row[field] !== next[field]);
         if (dirty) {
             const { _id, ...fields } = next;
-            // eslint-disable-next-line no-await-in-loop
-            await db(companyId, [{ companyId: String(companyId), connectionId: String(connectionId), tool: tool.name }, { $set: fields }, { upsert: true }], 'updateOne');
-            // eslint-disable-next-line no-await-in-loop
-            if (next.changed) await tellChanged({ companyId, definition, row: plain(await db(companyId, [{ companyId: String(companyId), connectionId: String(connectionId), tool: tool.name }], 'findOne')) });
+            ops.push({ updateOne: { filter: { companyId: String(companyId), connectionId: String(connectionId), tool: tool.name }, update: { $set: fields }, upsert: true } });
         }
         out.push(next);
     }
-    const withdrawn = rows.filter((row) => !listed.has(row.tool) && !row.gone);
-    if (withdrawn.length) await db(companyId, [{ companyId: String(companyId), connectionId: String(connectionId), tool: { $in: withdrawn.map((row) => row.tool) } }, { $set: { gone: true } }], 'updateMany');
-    return out;
+    if (ops.length) await db(companyId, [ops], 'bulkWrite');
+    await Promise.all(out.filter((row) => row.changed && row._id).map((row) => tellChanged({ companyId, definition, row })));
+    const withdrawn = rows.filter((row) => !listed.has(row.tool));
+    const newlyGone = withdrawn.filter((row) => !row.gone);
+    if (newlyGone.length) await db(companyId, [{ companyId: String(companyId), connectionId: String(connectionId), tool: { $in: newlyGone.map((row) => row.tool) } }, { $set: { gone: true } }], 'updateMany');
+    return { rows: out, withdrawn };
 };
 
 const viewOf = (row) => ({
@@ -120,8 +126,7 @@ const LISTING_FAILED = (name, tool, status) => {
     return `${name} cannot be used on this connection just now, so ${tool} was not used.`;
 };
 
-/* One app's tools, listed live with the member's own connection. A server that cannot be reached is said to be
- * unreachable, never unconnected. */
+// A server that cannot be reached is said to be unreachable, never unconnected.
 const listFor = async ({ companyId, userId, provider }) => {
     const definition = liveDefinition(provider);
     if (!definition) throw new TypeError(`${provider} does not list its tools from an MCP server`);
@@ -147,10 +152,8 @@ const listFor = async ({ companyId, userId, provider }) => {
         }
         return failedListing(provider, STATUS.UNREACHABLE);
     }
-    const rows = await sync({ companyId, userId, definition, connectionId: connection.connectionId, found, carried: connection.toolPermissions || [] });
-    const listed = new Set(rows.map((row) => row.tool));
-    const gone = (await rowsOf(companyId, connection.connectionId)).filter((row) => !listed.has(row.tool));
-    return { provider, status: STATUS.OK, connectionId: connection.connectionId, tools: [...rows, ...gone.map((row) => ({ ...row, gone: true }))].map(viewOf) };
+    const { rows, withdrawn } = await sync({ companyId, userId, definition, connectionId: connection.connectionId, found, carried: connection.toolPermissions || [] });
+    return { provider, status: STATUS.OK, connectionId: connection.connectionId, tools: [...rows, ...withdrawn.map((row) => ({ ...row, gone: true }))].map(viewOf) };
 };
 
 const withinTime = (work, provider, timeoutMs) => {
@@ -162,7 +165,7 @@ const withinTime = (work, provider, timeoutMs) => {
     return Promise.race([work, late]).finally(() => clearTimeout(timer));
 };
 
-/* Every app at once, each held to its own time, so one slow server holds up none of the others. */
+// Each app is held to its own time, so one slow server holds up none of the others.
 const listMine = ({ companyId, userId, providers, timeoutMs = LIST_TIMEOUT_MS }) => Promise.all(providers.map((provider) => withinTime(
     listFor({ companyId, userId, provider }).catch((error) => {
         logger.warn(`tools of ${provider} were not listed: ${(error && error.name) || 'Error'}`);
@@ -174,8 +177,6 @@ const listMine = ({ companyId, userId, providers, timeoutMs = LIST_TIMEOUT_MS })
 
 const capsOf = (definition, access) => ({ ...DEFAULT_CAPS[access], ...((definition.toolCaps || {})[access] || {}) });
 
-/* A stored tool as the runner takes it: the connection's own read or write, the input the server describes (bounded),
- * and a caller of only that server tool. */
 const runnable = (definition, row) => Object.freeze({
     key: keyOf(definition.id, row.tool),
     provider: definition.id,
@@ -200,13 +201,15 @@ const runnableOfView = (definition, view) => runnable(definition, {
 
 const findRow = async (companyId, connectionId, tool) => plain(await db(companyId, [{ companyId: String(companyId), connectionId: String(connectionId), tool: String(tool) }], 'findOne'));
 
-/* The owner's choices on one tool. Looking at it again takes the shape the server describes now as seen, so the
- * changed warning clears and agents use it again. */
+/* Looking at a tool again takes its shape now as seen, so the changed warning clears and agents use it again. A
+ * permission still at the old default follows a change of read/write, so a tool made a read is not left waiting. */
 const change = async ({ companyId, connectionId, tool, fields }) => {
     const row = await findRow(companyId, connectionId, tool);
     if (!row) return null;
+    const followsDefault = fields.permission === undefined && fields.access !== undefined && row.permission === defaultPermission(row.access);
     const next = {
         ...(fields.permission === undefined ? {} : { permission: fields.permission }),
+        ...(followsDefault ? { permission: defaultPermission(fields.access) } : {}),
         ...(fields.access === undefined ? {} : { access: fields.access, accessByOwner: true }),
         ...(fields.lookedAt ? { seenShape: row.shape, changed: false, noticedShape: '' } : {}),
     };
@@ -214,8 +217,7 @@ const change = async ({ companyId, connectionId, tool, fields }) => {
     return viewOf({ ...row, ...next });
 };
 
-/* The tool a key names on the member's current connection. A connection never listed is listed first. An agent skips
- * a tool the server changed until its owner looks at it again (decision 3); AI chat still uses it. */
+// An agent skips a tool the server changed until its owner looks at it again (decision 3); AI chat still uses it.
 const toolFor = async ({ companyId, userId, connectionId, key, agent = false }) => {
     const { provider, tool } = splitKey(key);
     const definition = liveDefinition(provider);
@@ -233,7 +235,6 @@ const toolFor = async ({ companyId, userId, connectionId, key, agent = false }) 
     return runnable(definition, row);
 };
 
-/* A call read the server's listing: the tool's shape now is kept, and a change is flagged and told once. */
 const noteCalled = async ({ companyId, connectionId, definition, tool, shape }) => {
     try {
         const row = await findRow(companyId, connectionId, tool);

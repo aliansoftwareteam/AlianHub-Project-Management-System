@@ -2286,6 +2286,8 @@ const schema = {
         gone: { type: Boolean, default: false, required: false },
         // read | write, from the server's readOnlyHint until the owner sets it
         access: { type: String, required: true },
+        // What readOnlyHint last said, so a flip of it flags the tool as changed
+        hinted: { type: String, required: false },
         accessByOwner: { type: Boolean, default: false, required: false },
         // allow | approval | off
         permission: { type: String, required: true },

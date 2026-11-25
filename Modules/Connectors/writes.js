@@ -34,14 +34,34 @@ const refuse = (message, code, status = 403) => Object.assign(new Error(message)
 /* The runner's messages open with a code and a tool key for the model that called it; a person reads what follows. */
 const spoken = (message) => String(message || '').replace(/^[a-z_]+: /, '').replace(/^[a-z0-9_]+(\.[a-z0-9_]+)+: /, '');
 
-/* Every call that waits on its owner's card: a catalog write, a REST app's read set to Needs approval, and any tool an
- * MCP app's server lists, whose kind is known only once its owner's connection is looked up. */
+/* A tool an MCP app's server lists has its kind only on its owner's connection, so it is held as a write here. */
 const isWrite = (action) => {
     const tool = tools.get(action);
-    if (tool) return tool.kind === tools.KIND.WRITE || !tool.custom;
+    if (tool) return tool.kind === tools.KIND.WRITE;
     return Boolean(connectionTools.liveDefinition(connectionTools.splitKey(action).provider));
 };
-const hasWrite = (changes) => (Array.isArray(changes) ? changes : []).some((c) => c && isWrite(c.action));
+
+/* A read its owner set to Needs approval waits on their card like a write. `approval` is set only by markApprovalReads,
+ * never taken from what the filer sent, so a filer cannot drop a read's card or put one on anything else. */
+const isGated = (change) => Boolean(change) && (isWrite(change.action) || change.approval === true);
+const hasWrite = (changes) => (Array.isArray(changes) ? changes : []).some(isGated);
+
+const approvalRead = async (companyId, ownerId, action) => {
+    const tool = tools.get(action);
+    if (!ownerId || !tool || tool.custom || tool.kind !== tools.KIND.READ) return false;
+    const connection = await runner.connectionOf(tool, companyId, ownerId).catch(() => null);
+    return Boolean(connection) && require('./toolPermissions').permissionOf(tool, connection) === connectionTools.PERMISSION.APPROVAL;
+};
+
+const markApprovalReads = async (companyId, ownerId, changes) => {
+    if (!Array.isArray(changes)) return changes;
+    return Promise.all(changes.map(async (change) => {
+        if (!change || typeof change !== 'object') return change;
+        const rest = { ...change };
+        delete rest.approval;
+        return (await approvalRead(companyId, ownerId, rest.action)) ? { ...rest, approval: true } : rest;
+    }));
+};
 
 const line = (value) => String(value === undefined || value === null ? '' : value).replace(/\s+/g, ' ').trim();
 
@@ -93,7 +113,7 @@ const prepareChanges = async (companyId, ownerId, changes) => {
     if (!ownerId) throw refuse(REFUSAL.NO_OWNER, 'no_person', 400);
     const out = [];
     for (const change of list) {
-        if (!change || !isWrite(change.action)) { out.push(change); continue; }
+        if (!isGated(change)) { out.push(change); continue; }
         // eslint-disable-next-line no-await-in-loop
         const { tool, args, params } = await runner.admitWrite({ companyId, userId: String(ownerId), key: change.action, input: change.params });
         const card = cardOf(tool, args);
@@ -108,10 +128,10 @@ const prepareChanges = async (companyId, ownerId, changes) => {
 const fileChanges = async (companyId, ownerId, changes, { via, id, runId = null, refusalOf = null }, save) => {
     const list = Array.isArray(changes) ? changes : [];
     if (!hasWrite(list)) return save(list);
-    const audited = (state, reason = '', connectionOf = () => '') => list.filter((c) => c && isWrite(c.action)).forEach((c) => callAudit.record(companyId, {
+    const audited = (state, reason = '', connectionOf = () => '') => list.filter(isGated).forEach((c) => callAudit.record(companyId, {
         userId: ownerId, via, callerId: id, runId, key: c.action, tool: tools.get(c.action), phase: callAudit.PHASE.PROPOSE, input: c.params, connectionId: connectionOf(c), state, reason,
     }));
-    const notAllowed = typeof refusalOf === 'function' ? list.filter((c) => c && isWrite(c.action)).map((c) => refusalOf(c.action)).find(Boolean) : '';
+    const notAllowed = typeof refusalOf === 'function' ? list.filter(isGated).map((c) => refusalOf(c.action)).find(Boolean) : '';
     if (notAllowed) {
         audited(runner.STATE.REFUSED, 'agent_not_allowed');
         throw refuse(notAllowed, 'agent_not_allowed');
@@ -123,11 +143,11 @@ const fileChanges = async (companyId, ownerId, changes, { via, id, runId = null,
         audited(runner.STATE.REFUSED, String(error.code || 'error'));
         throw error;
     }
-    const connectionsByAction = new Map(prepared.filter((c) => c && isWrite(c.action)).map((c) => [c.action, c.params.connectionId]));
+    const connectionsByAction = new Map(prepared.filter(isGated).map((c) => [c.action, c.params.connectionId]));
     const connectionOf = (c) => connectionsByAction.get(c.action) || '';
     const claimed = [];
     try {
-        for (const change of prepared.filter((c) => c && isWrite(c.action))) {
+        for (const change of prepared.filter(isGated)) {
             // eslint-disable-next-line no-await-in-loop
             claimed.push(await quotas.claimWriteProposal(companyId, { connectionId: change.params.connectionId, userId: ownerId, actor: { type: via, id } }));
         }
@@ -189,7 +209,7 @@ const executorFor = (action) => (isWrite(action) ? (args) => send({ ...args, act
 
 const deliveryOf = (changes, applied) => (Array.isArray(changes) ? changes : [])
     .map((change, i) => ({ change, outcome: (applied || [])[i] || {} }))
-    .filter(({ change }) => change && isWrite(change.action))
+    .filter(({ change }) => isGated(change))
     .map(({ change, outcome }) => ({
         action: change.action, ok: Boolean(outcome.ok),
         connectionId: String((change.params || {}).connectionId || ''),
@@ -197,4 +217,4 @@ const deliveryOf = (changes, applied) => (Array.isArray(changes) ? changes : [])
         at: new Date(),
     }));
 
-module.exports = { GATE, REFUSAL, spoken, isWrite, hasWrite, cardOf, prepareChanges, fileChanges, gatedByOwner, approverRefusal, send, executorFor, deliveryOf };
+module.exports = { GATE, REFUSAL, spoken, isWrite, isGated, hasWrite, markApprovalReads, cardOf, prepareChanges, fileChanges, gatedByOwner, approverRefusal, send, executorFor, deliveryOf };

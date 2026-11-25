@@ -211,8 +211,8 @@ describe('a write through the app\'s MCP server', () => {
         expect(server.calls).toEqual([{ name: 'create_note', args: { title: 'Plan', body: 'Ship on Friday' }, authorization: 'Bearer prisha-notes-token' }]);
     });
 
-    it('waits for its owner to approve it instead of running directly', async () => {
-        await expect(read({ title: 'x', body: 'y' }, CREATE)).rejects.toMatchObject({ code: 'needs_approval' });
+    it('is never run as a read: only an approved proposal sends it', async () => {
+        await expect(read({ title: 'x', body: 'y' }, CREATE)).rejects.toMatchObject({ code: 'tool_off' });
         expect(server.calls).toEqual([]);
     });
 });

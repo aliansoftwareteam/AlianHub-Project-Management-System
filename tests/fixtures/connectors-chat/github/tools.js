@@ -13,8 +13,8 @@ module.exports = [{
     input: {
         type: 'object',
         description: 'One pull request the person can open: its state, checks and reviews.',
-        properties: pull,
-        required: ['owner', 'repo', 'pullNumber'],
+        properties: { method: { type: 'string', maxLength: 20 }, ...pull },
+        required: ['method', 'owner', 'repo', 'pullNumber'],
         additionalProperties: false,
     },
     caps: { maxItems: 1, maxChars: 4000 },

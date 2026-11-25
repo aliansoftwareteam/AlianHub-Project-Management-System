@@ -53,13 +53,16 @@ const before = Object.fromEntries(Object.keys(ENV).map((k) => [k, process.env[k]
 
 let server;
 
-const connect = async (provider = P) => {
+// A new live tool waits for its owner's approval, so the owner's choices are carried in as the member would have set them.
+const OWNER_CHOSE = Object.freeze([{ key: SEARCH, permission: 'allow' }, { key: ARCHIVE, permission: 'allow' }]);
+
+const connect = async (provider = P, { toolPermissions = OWNER_CHOSE } = {}) => {
     const actor = { id: MAYA };
     const keep = (value) => store.create({ companyId: C, name: `${provider} connection`, kind: 'connector', value, actor }).then((out) => out.handle);
     return mockDb.seed(SCHEMA_TYPE.CONNECTOR_CONNECTIONS, {
         companyId: C, userId: MAYA, provider, status: 'connected', signIn: 'registered_app', kind: 'mcp', account: { id: 'acc-maya', label: 'maya@notes.test' },
         handles: { refresh: await keep('refresh-maya'), access: await keep('access-maya') }, accessExpiresAt: new Date(Date.now() + 3600 * 1000),
-        products: ['notes'], scopes: [], deletedStatusKey: 0,
+        products: ['notes'], scopes: [], deletedStatusKey: 0, toolPermissions,
     });
 };
 
@@ -149,10 +152,9 @@ describe('the lookup', () => {
 });
 
 describe('an agent and a live app\'s tools', () => {
-    it('keeps a tick on a live tool, and refuses a tool name no server could list', () => {
-        expect(agentConnectors.toStore([{ provider: P, tools: [SEARCH] }])).toEqual([{ provider: P, tools: [SEARCH] }]);
-        expect(() => agentConnectors.toStore([{ provider: P, tools: ['slowmcp.search'] }])).toThrow(/not a tool of/);
-        expect(() => agentConnectors.toStore([{ provider: P, tools: ['notesmcp.bad name'] }])).toThrow(/not a tool of/);
+    it('refuses a tick on a live tool, which no run can read yet', () => {
+        expect(() => agentConnectors.toStore([{ provider: P, tools: [SEARCH] }])).toThrow(/cannot use Notes yet/);
+        expect(agentConnectors.toStore([{ provider: P, tools: [] }])).toEqual([]);
     });
 
     it('refuses an unticked live tool before the app is asked', async () => {
@@ -182,6 +184,13 @@ describe('an agent and a live app\'s tools', () => {
 
 describe('a read that waits for its owner\'s approval', () => {
     const setPermission = async (row, tool, permission) => connectionTools.change({ companyId: C, connectionId: String(row._id), tool, fields: { permission } });
+
+    it('is where every tool a server lists starts, whatever the server says it does', async () => {
+        await connect(P, { toolPermissions: [] });
+        const found = await find({ provider: P, purpose: 'ask', kind: 'read' });
+        expect(keysOf(found)).toEqual([]);
+        expect(appOf(found).leftOut).toEqual(expect.arrayContaining([{ key: SEARCH, kind: 'read', reason: 'approval' }, { key: ARCHIVE, kind: 'read', reason: 'approval' }]));
+    });
 
     it('is left out of AI chat, which cannot answer from it, and kept for agents', async () => {
         const row = await connect();

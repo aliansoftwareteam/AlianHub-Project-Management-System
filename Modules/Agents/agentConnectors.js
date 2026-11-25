@@ -1,8 +1,7 @@
 const connectorTools = require('../Connectors/tools');
 const connectionTools = require('../Connectors/connectionTools');
 
-// Which connected apps, and which of their tools, an agent may use (FR-61 of task 056). Nothing ticked means none:
-// an agent row without the field, or with an empty list, reads from and proposes to no app.
+// Nothing ticked means none: an agent row without the field, or with an empty list, reads from and proposes to no app.
 
 const MAX_ENTRIES = 100;
 const SERVER_TOOL = /^[A-Za-z0-9_.\-/]{1,128}$/;
@@ -11,12 +10,10 @@ const invalid = (message) => Object.assign(new Error(message), { status: 400 });
 
 const toolsOf = (provider) => connectorTools.all().filter((tool) => tool.provider === provider);
 
-/* A built-in MCP app's tools come from each member's connection, so any tool name its server could list is a tick. */
-const liveApp = (provider) => (toolsOf(provider).length ? null : connectionTools.liveDefinition(provider));
-
 const providerOfKey = (key) => connectionTools.splitKey(key).provider;
 
-/* What a connector key names: a catalog tool, or a tool a live app's server lists. Null for anything else. */
+const liveApp = (provider) => (toolsOf(provider).length ? null : connectionTools.liveDefinition(provider));
+
 const appOfKey = (key) => {
     const tool = connectorTools.get(key);
     if (tool) return { provider: tool.provider, name: tool.definition.name };
@@ -38,9 +35,10 @@ const grouped = (keys) => {
 };
 
 /* A provider or tool this server does not load is refused rather than stored as a tick that never matches. A tool
- * of a provider that is switched off may stay ticked: the run refuses it while it is off. A live app's tick is kept
- * even when the server no longer lists it, so its settings can show it as missing. */
-const toStore = (list) => {
+ * of a provider that is switched off may stay ticked: the run refuses it while it is off. A run has readers only for
+ * catalog tools, so a new tick on a live app's tool is refused too: it would never run. One the agent already holds
+ * is kept, or it would block every later save of the ticks. */
+const toStore = (list, { held = [] } = {}) => {
     if (!Array.isArray(list) || list.length > MAX_ENTRIES) throw invalid('connectors must be a list of { provider, tools }.');
     const keys = [];
     list.forEach((entry) => {
@@ -51,8 +49,8 @@ const toStore = (list) => {
         if (!live && !known.length) throw invalid(`"${provider.slice(0, 60)}" is not a connected app this server has.`);
         entry.tools.forEach((key) => {
             const text = String(key);
-            const fits = live ? providerOfKey(text) === provider && Boolean(appOfKey(text)) : known.some((tool) => tool.key === text);
-            if (!fits) throw invalid(`"${text.slice(0, 120)}" is not a tool of ${live ? live.name : known[0].definition.name}.`);
+            if (live && !(providerOfKey(text) === provider && isTicked(held, text))) throw invalid(`Agents cannot use ${live.name} yet, so its tools cannot be ticked.`);
+            if (!live && !known.some((tool) => tool.key === text)) throw invalid(`"${text.slice(0, 120)}" is not a tool of ${known[0].definition.name}.`);
             keys.push(text);
         });
     });
@@ -62,7 +60,7 @@ const toStore = (list) => {
 const isTicked = (connectors, key) => (Array.isArray(connectors) ? connectors : [])
     .some((entry) => entry && Array.isArray(entry.tools) && entry.tools.map(String).includes(String(key)) && String(key).startsWith(`${entry.provider}.`));
 
-/* '' when the agent may use the tool; otherwise what the person reads. A key that is no connector tool is not ours to refuse. */
+// A key that is no connector tool is not ours to refuse.
 const refusalFor = (connectors, key) => {
     const app = appOfKey(key);
     if (!app || isTicked(connectors, key)) return '';
@@ -72,9 +70,7 @@ const refusalFor = (connectors, key) => {
         : `This agent is not allowed to use ${app.name}. Tick it in the agent's settings.`;
 };
 
-/* What a run says about a ticked tool the app no longer offers: never dropped silently (decision 8 of task 107). */
-/* A live app lists tools per connection, so a tool missing from the run person's listing may still be offered to
- * others: only a tool AlianHub itself dropped is certainly gone for everyone. */
+// A live app lists tools per connection, so only a tool AlianHub itself dropped is certainly gone for everyone.
 const missingReason = (key, { everyone = false } = {}) => {
     const { provider, tool } = connectionTools.splitKey(key);
     const app = appOfKey(key) || { name: provider || String(key) };
@@ -86,7 +82,6 @@ const missingReason = (key, { everyone = false } = {}) => {
 
 const listOf = (value) => (Array.isArray(value) ? value : []);
 
-/* The connector tools a skill reads or proposes, from a stored document or a compiled built-in skill. */
 const keysOfSkill = (doc) => [
     ...listOf(doc && doc.gather).map((step) => step && step.reader),
     ...listOf(doc && doc.reads),
@@ -106,17 +101,13 @@ const toolView = (tool) => ({
 });
 
 /* A REST app's tools do not depend on a connection, so a viewer who has not connected it can still tick them. */
-const toolsShown = (app, lookup) => {
-    if (app.status === lookup.STATUS.OK || lookup.isLive(app.provider)) return app.tools;
-    return toolsOf(app.provider).filter(connectorTools.isOn);
-};
+const toolsShown = (app, lookup) => (app.status === lookup.STATUS.OK ? app.tools : toolsOf(app.provider).filter(connectorTools.isOn));
 
-/* The apps this workspace offers, each with the tools the viewer's own connection offers an agent (the one lookup of
- * task 111). An app that cannot be listed now says why; `leftOut` lets the settings say why a tick is missing. */
+/* A live app is left out until a run can read it (see toStore), so the settings never offer a tick that cannot run. */
 const offered = async (companyId, userId) => {
     const lookup = require('../Connectors/available');
     const companyApps = await require('../Connectors/apps').companyProviders(companyId);
-    const ids = require('../Connectors/registry').offered({ companyApps }).map((definition) => definition.id);
+    const ids = require('../Connectors/registry').offered({ companyApps }).map((definition) => definition.id).filter((id) => !lookup.isLive(id));
     const found = await lookup.available({ companyId, userId, provider: ids, purpose: lookup.PURPOSE.AGENT });
     return found.apps
         .filter((app) => app.status !== lookup.STATUS.OFF)

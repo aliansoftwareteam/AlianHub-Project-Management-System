@@ -139,7 +139,7 @@ const refuseAgentFields = async (res, companyId, caller, rights, set, before = {
     return null;
 };
 
-const fieldsOf = (body) => ({ ...agentPatchFields(body), ...audience.audienceFields(body) });
+const fieldsOf = (body, held) => ({ ...agentPatchFields(body, held), ...audience.audienceFields(body) });
 
 /* The fields a save actually changes; a form sends every field back. */
 const changedFields = (before, set) => Object.fromEntries(Object.entries(set).filter(([key, value]) => JSON.stringify(value) !== JSON.stringify(before[key])));
@@ -160,13 +160,13 @@ const roleNameOf = (key) => {
     return role ? role.name : '';
 };
 
-const agentPatchFields = (body) => {
+const agentPatchFields = (body, heldConnectors) => {
     const set = {};
     if (body.name !== undefined) set.name = String(body.name).trim().slice(0, 80);
     if (body.description !== undefined) set.description = String(body.description).slice(0, 1000);
     if (body.skills !== undefined && Array.isArray(body.skills)) set.skills = body.skills.slice(0, 20).map(normaliseSkill).filter(Boolean);
     if (body.allowedActions !== undefined && Array.isArray(body.allowedActions)) set.allowedActions = registry.allowedActionsToStore(body.allowedActions);
-    if (body.connectors !== undefined) set.connectors = agentConnectors.toStore(body.connectors);
+    if (body.connectors !== undefined) set.connectors = agentConnectors.toStore(body.connectors, { held: heldConnectors });
     if (body.projectIds !== undefined && Array.isArray(body.projectIds)) set.projectIds = body.projectIds.filter((id) => OBJECT_ID.test(String(id))).map(String);
     if (body.autonomy !== undefined) set.autonomy = autonomyOf(body.autonomy);
     if (body.spendCapUsd !== undefined) set.spendCapUsd = Math.max(0, Number(body.spendCapUsd) || 0);
@@ -291,9 +291,9 @@ exports.updateAgent = async (req, res) => {
         const rights = await agentRightsOf(companyId, caller);
         if (!rights.build) return fail(res, REFUSAL.BUILD, 403);
         const { actor } = caller;
-        const fields = fieldsOf(req.body || {});
-        if (!Object.keys(fields).length) return fail(res, 'Nothing to update.');
         const before = await runs.getAgent(companyId, req.params.id);
+        const fields = fieldsOf(req.body || {}, before && before.connectors);
+        if (!Object.keys(fields).length) return fail(res, 'Nothing to update.');
         if (!before) return fail(res, 'Agent not found.', 404);
         if (!canEditAgent(caller, rights, before)) return fail(res, REFUSAL.OWN_AGENT, 403);
         if (refuseBuiltInEdit(res, before, fields)) return undefined;
@@ -454,7 +454,7 @@ exports.createRevision = async (req, res) => {
         const ctx = await revisionAccess(req, res);
         if (!ctx) return undefined;
         const body = req.body || {};
-        const fields = agentPatchFields(body);
+        const fields = agentPatchFields(body, ctx.agent.connectors);
         if (refuseBuiltInEdit(res, ctx.agent, fields)) return undefined;
         if (await refuseSkills(res, ctx.companyId, fields)) return undefined;
         const row = await revisions.createDraft(ctx.companyId, ctx.agent, { fields, state: body.state, note: body.note, actor: ctx.actor });

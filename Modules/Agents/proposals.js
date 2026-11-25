@@ -169,11 +169,12 @@ const CALLER_OF_SOURCE = Object.freeze({ [SOURCE_MCP]: 'mcp', [SOURCE_ASK]: 'cha
 const create = async (companyId, { agent, runId, taskId, taskIds, projectId, what, why, changes, gate, priority, cost, taint: marker, source, requestedBy, tokenId, tokenProjectIds, allowedActions, oauthClientId, oauthGrantId, finding, connectionOwner }) => {
     const check = validateChanges(changes);
     if (!check.valid) throw Object.assign(new Error(check.reason), { status: 400 });
-    const owner = connectorWrites.hasWrite(changes) ? connectionOwnerOf(source, requestedBy, connectionOwner) : '';
+    const marked = await connectorWrites.markApprovalReads(companyId, connectionOwnerOf(source, requestedBy, connectionOwner), changes);
+    const owner = connectorWrites.hasWrite(marked) ? connectionOwnerOf(source, requestedBy, connectionOwner) : '';
     // An MCP client, the AI chat or a detached filing acts for a person, not for a workspace agent, so it has no ticks to keep to.
     const via = CALLER_OF_SOURCE[source] || 'agent';
     const refusalOf = via !== 'agent' || DETACHED.includes(source) ? null : (action) => agentConnectors.refusalFor(agent.connectors, action);
-    const saved = await connectorWrites.fileChanges(companyId, owner, changes, { via, id: String(agent._id), runId, refusalOf }, async (prepared) => {
+    const saved = await connectorWrites.fileChanges(companyId, owner, marked, { via, id: String(agent._id), runId, refusalOf }, async (prepared) => {
         const scopedProjectId = projectId || await projectOfTask(companyId, taskId);
         return MongoDbCrudOpration(companyId, {
             type: SCHEMA_TYPE.AGENT_PROPOSALS,
@@ -181,7 +182,7 @@ const create = async (companyId, { agent, runId, taskId, taskIds, projectId, wha
                 agentId: String(agent._id), agentName: proposalText.nameOf(agent.name), runId: runId || null, taskId: taskId || null, projectId: scopedProjectId || null,
                 ...(Array.isArray(taskIds) && taskIds.length ? { taskIds: taskIds.map(String) } : {}),
                 what: proposalText.titleOf(what, prepared), why: proposalText.reasonOf(why),
-                changes: prepared.map((c) => ({ action: c.action, params: planFiling.storedParams(c.action, c.params || {}), label: proposalText.labelOf(c), reversible: Boolean(registry.get(c.action) && registry.get(c.action).undoable), rating: c.rating || null, ...(c.remember ? { remember: c.remember } : {}), ...(c.card ? { card: c.card } : {}) })),
+                changes: prepared.map((c) => ({ action: c.action, params: planFiling.storedParams(c.action, c.params || {}), label: proposalText.labelOf(c), reversible: Boolean(registry.get(c.action) && registry.get(c.action).undoable), rating: c.rating || null, ...(c.remember ? { remember: c.remember } : {}), ...(c.approval ? { approval: true } : {}), ...(c.card ? { card: c.card } : {}) })),
                 status: STATUS.PENDING, gate: gateOf(changes, gate), priority: priority || 'normal', cost: cost || null, auditIds: [],
                 ...(owner ? { connectionOwner: owner } : {}),
                 ...(marker && marker.reason ? { taint: { sources: Array.isArray(marker.sources) ? marker.sources : [], reason: String(marker.reason).slice(0, 2000) } } : {}),
@@ -328,7 +329,7 @@ const reshowEdited = async (companyId, id, p, changes, { decider, ip }) => {
     try { ready = await connectorWrites.prepareChanges(companyId, p.connectionOwner, changes); } catch (e) { return { error: connectorWrites.spoken(e.message), status: e.status || 400 }; }
     const stored = ready.map((c) => ({
         action: c.action, params: planFiling.storedParams(c.action, c.params || {}), label: proposalText.labelOf(c),
-        reversible: Boolean(registry.get(c.action) && registry.get(c.action).undoable), rating: c.rating || actions.rating(c.action), ...(c.card ? { card: c.card } : {}),
+        reversible: Boolean(registry.get(c.action) && registry.get(c.action).undoable), rating: c.rating || actions.rating(c.action), ...(c.approval ? { approval: true } : {}), ...(c.card ? { card: c.card } : {}),
     }));
     const updated = await setStatus(companyId, id, { changes: stored, editedAt: new Date(), revision: (p.revision || 0) + 1 }, { onlyIf: STATUS.PENDING, matching: onSameCard(p) });
     if (!updated) return alreadyDecided(companyId, id);
@@ -374,7 +375,7 @@ const approve = async (companyId, id, { decider, isPrivileged, changes: edited, 
         if (!check.valid) return { error: check.reason, status: 400 };
         // The gate kept at filing was read from the changes as filed; an edit is held to what it would run.
         if (gateOf(edited, p.gate) === GATE_OWNER_ADMIN && !isPrivileged) return needsAdmin;
-        changes = edited.map((c) => ({ action: c.action, params: planFiling.storedParams(c.action, c.params || {}), label: c.label || c.action }));
+        changes = await connectorWrites.markApprovalReads(companyId, p.connectionOwner, edited.map((c) => ({ action: c.action, params: planFiling.storedParams(c.action, c.params || {}), label: c.label || c.action })));
         // An edited connector write is checked and shown to its owner again, never sent on the click that edited it.
         if (connectorWrites.hasWrite(changes)) return reshowEdited(companyId, id, p, changes, { decider, ip });
         status = STATUS.EDITED;
