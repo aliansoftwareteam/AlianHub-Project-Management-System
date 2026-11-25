@@ -15,19 +15,24 @@ tracker release (PR 4) reaches people.
 
 ### PR 1 — `feat(auth): workspace hint and tracker sign-in round trip` (AlianHub server + web) → `staging`
 - [x] Read how the `#/oauth2` route handles a signed-out visitor (`frontend/src/router/auth/index.js`): the query
-      (`code_challenge`, `state`, `scheme`) must survive the login redirect. Fix if it does not.
+      (`code_challenge`, `state`, `scheme`) must survive the login redirect. Fix if it does not. (Ticked before it was
+      true: it did not survive until 2026-11-25, see Log.)
 - [x] `Modules/Auth/helpers/workspaceHint.js` (pure): parse / merge (newest first, dedupe, cap 5) / remove a label;
       `hintFor(hostname, env)` → label or null (managed + host ends in `.${WORKSPACE_HINT_DOMAIN}`, one label deep).
 - [x] Call it from `finalizeSession` (every sign-in path ends there; confirm 2FA validate and SSO do) and from
       sign-out (`loginSession.js` ~264).
-- [x] `WORKSPACE_HINT_DOMAIN` in `.env.example`, `scripts/env-doc.meta.json`; managed stack template sets
-      `alianhub.com` (`deploy/managed/`).
+- [x] `WORKSPACE_HINT_DOMAIN` in `.env.example`, `scripts/env-doc.meta.json`.
+- [ ] Hosted instances get `WORKSPACE_HINT_DOMAIN`: the control plane's job since c402d85df, nothing in `deploy/managed/`
+      sets it, and alianhub-cloud `main` (b8b29b9) does not either (see Log, 2026-11-25). Until then no hosted workspace
+      writes `ah_ws` and the finder always asks for an address.
 - [x] Handshake: add `url` (canonical: `WEBURL` without trailing slash, else request origin). Update
-      `tests/` handshake test and `scripts/api-doc.meta.json` description.
+      `tests/` handshake test and `scripts/api-doc.meta.json` description (the description on 2026-11-25).
 - [x] `TrackerLogin.vue`: validate and pass `state`, add `workspace=` to the `authorize` link. Unit spec for the
       link builder (move it to `frontend/src/utils/trackerDeepLink.js` beside `buildTrackerConnectLink`).
 - [x] Tests: `tests/workspace-hint.test.js` (set/merge/cap/remove/off/custom domain/self-hosted),
-      handshake `url`, cookie flags on a managed login (integration).
+      handshake `url`, cookie flags on a managed login (integration:
+      `tests/integration/workspace-hint-cookie.int.test.js`, 2026-11-25).
+- [x] Privacy note for `ah_ws`: `docs-site/user-guide/time-tracker-app.md` and `docs-site/admin/security.md`.
 - [x] `npm run i18n:check`, `npm run style:check`, backend + frontend tests for touched files.
 
 ### PR 2 — finder page (alianhub-cloud) → `main` of alianhub-cloud
@@ -44,11 +49,14 @@ tracker release (PR 4) reaches people.
       AlianHub look via the same tokens as the portal, copied, not imported.
 - [x] Tests: validation, hint parsing, SSRF refusals, fallback choice by version, redirect URL building (no
       auto-redirect from a URL-supplied address).
-- [ ] Deploy: its own container/service, DNS `auth.alianhub.com`, TLS cert, uptime check.
+- [x] Deploy: its own service, DNS `auth.alianhub.com`, TLS cert (`/health` and `/tracker` answered over https,
+      2026-11-25).
+- [ ] Uptime check on `auth.alianhub.com` (none found or confirmed).
 
 ### PR 3 — `docs: 091 progress, beta log, api doc` → `staging`
-- [ ] After PR 0 and PR 1 merge: `npm run version:log`, `npm run api:doc` (handshake changed), commit
-      `docs/BETA-LOG.md`, `docs/API.md`, `docs/api/openapi.json`, tick this file.
+- [x] After PR 0 and PR 1 merge: `npm run version:log`, `npm run api:doc` (handshake changed), commit
+      `docs/BETA-LOG.md`, `docs/API.md`, `docs/api/openapi.json`, tick this file (73b45a55b, d79b6f244).
+- [ ] The same for the branch of 2026-11-25: the handshake's `url` reaches `docs/API.md` and `openapi.json` only then.
 
 ### PR 4 — `feat(tracker): sign in without typing the workspace` (tracker) → `staging`
 - [x] Main: replace `tracker:pkce` with `tracker:begin-sign-in` (`{ workspace|null }` → `{ challenge, state }`);
@@ -66,18 +74,24 @@ tracker release (PR 4) reaches people.
 
 ### Verification (after PR 1 is on staging, PR 2 deployed, PR 4 beta installed)
 - [ ] Run every acceptance criterion in `task.md` on Windows; spot-check macOS and Ubuntu (deep link + sign-in).
-- [ ] Old tracker 6.0 ↔ new server, new tracker ↔ old server (fallback path).
-- [ ] Promote tracker to stable; close the task.
+      Per criterion, see Log 2026-11-25: checked locally up to the installed app; not against a hosted workspace.
+- [ ] Old tracker 6.0 ↔ new server, new tracker ↔ old server (fallback path). Covered by tests on both sides, not run
+      with two real versions.
+- [x] Promote tracker to stable: tag `tracker-v6.1.0` (ef98c8cb6), release run 43888831081 green, and
+      `latest.yml`, `latest-mac.yml` and `latest-linux.yml` under `downloads.alianhub.com/tracker/stable/` all say 6.1.0
+      with the installers answering 200 (2026-11-25). The release run says macOS was built unsigned.
+- [ ] Close the task.
 
 ## Last step
 
-2026-11-05: PR 0, 1 and 4 committed on local branch `feat/tracker-finds-workspace` (from `origin/staging`);
-PR 2 committed on alianhub-cloud local branch `feat/tracker-workspace-finder`. Nothing pushed (owner's
-rule: no push without approval). Windows end-to-end: tracker half verified, browser click-through next.
+2026-11-25: gaps closed on local branch `claude/tracker-091-finish-9251c7` (from `origin/staging` 41893e722), not
+pushed: the cookie's integration test, the sign-in return path fix, the handshake's `url` in the API meta, the privacy
+note. Everything before it is merged (#1774, #1776, #1778, alianhub-cloud PR 60) and tracker 6.1.0 is on stable.
 
 ## Blockers
 
-- Open question 3 in `task.md` (hint lifetime) blocks PR 1's cookie Max-Age only; 400 days is the default.
+- Open question 3 in `task.md` (hint lifetime): 400 days until the owner decides; the privacy note says 400 days.
+- Hosted instances need `WORKSPACE_HINT_DOMAIN` from the control plane (alianhub-cloud change, owner's go-ahead).
 
 ## Log
 
@@ -144,3 +158,33 @@ rule: no push without approval). Windows end-to-end: tracker half verified, brow
   Windows, macOS and Linux (unsigned, beta channel; no signing secrets configured in this repo yet).
 - Not done: installing and running the beta build (Windows/macOS/Ubuntu), the deep-link and auto-update
   checks in the Verification section below, and the `BETA-LOG.md`/`version:log` docs follow-up for this merge.
+
+### 2026-11-25
+- Found and fixed: a browser that was not signed in lost the tracker sign-in. The router sends it to
+  `/login?redirect_url=/oauth2?code_challenge=…`, and the sign-in page compared `redirect.split("/")[1]`
+  (`oauth2?code_challenge=…`) with `oauth2`, so after login it opened Home and the person had to start over. The same
+  check was in the Google, GitHub and GitLab buttons, and the last two also dropped the path when the provider sent the
+  browser back to the origin. Now one rule in `frontend/src/utils/loginReturn.js`, with
+  `loginTrackerRedirect.spec.js` and `oauthTrackerReturn.spec.js`. Trackers already installed need no update.
+- Clicked through in Chromium: this branch's server in managed mode with a signed plan, the finder from alianhub-cloud
+  `main` (b8b29b9), `*.alianhub.localhost`, a fixture account. Typed `abb` signed out → login page → tracker page →
+  `alianhub-tracker://authorize` with the state and workspace; a wrong state and a second use were refused; the
+  tracker's own store handed over the verifier and the code redeemed (200). Then one hint → "Continue to abb"; a second
+  host → both, newest first; sign-out of one → only the other. The finder made no outside request. Without the fix the
+  same run stopped on Home. The web bundle was an older build (2026-11-12) with the one changed expression patched in,
+  because this machine had no memory for a full build; the deep link was read from the browser, not opened by the app.
+- The handshake and the entitlements agree now: Starter defaults answered `enabled: false` (the finder said "isn't part
+  of this workspace's plan") and a pushed plan turned it on within the handshake's minute, so the 2026-11-05 follow-up
+  needs nothing.
+- Live, read only: the finder's headers (`no-store`, `no-referrer`, nonce CSP with no outside source); `demo` answers a
+  handshake with `url`; `alian` is on 14.42.0-beta.1 without it, so it takes the `connect` fallback. Both say
+  `managed: false`, so neither will ever set `ah_ws`.
+- Control plane: `WORKSPACE_HINT_DOMAIN: adapters.domain()` belongs in the `env` object of `stackFiles`,
+  `server/modules/orchestrator/workflows/stack.js` after line 71 (`HOSTING_MODE`), with an expectation beside
+  `server/test/workflowEngine.test.js:270`. Running instances get it at their next re-render (upgrade, plan move, domain
+  change). Not changed here.
+- Tests: the new integration file 8 (each of four deliberate breaks of the code failed it); nine sign-in integration
+  files 121; finder 45. `api-doc.test.js` (path separator) and `plain-words` (line endings) fail on this Windows
+  checkout with or without the branch.
+- Not done: macOS and Ubuntu, the installed app against a hosted workspace, tracker 6.0 with the new server as two real
+  versions, 2FA and SSO in a browser.
