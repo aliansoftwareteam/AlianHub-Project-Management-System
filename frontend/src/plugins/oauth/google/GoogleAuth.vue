@@ -20,6 +20,7 @@ import { useI18n } from "vue-i18n";
 // Utilities
 import { apiRequestWithoutSecure, apiRequestWithoutCompnay, getAuth } from "@/services";
 import * as env from '@/config/env';
+import { returnsInto } from '@/utils/loginReturn';
 
 const props = defineProps({
     label: { type: String, default: "" },
@@ -159,8 +160,7 @@ const login = async (userInfo) => {
             if (route.query.redirect_url === "/") {
                 await router.replace(`${route.query.redirect_url}${cid}`);
             } else {
-                const tmpcid = route.query.redirect_url?.split("/")[1];
-                if ((tmpcid && uData.AssignCompany.includes(tmpcid)) || tmpcid === 'oauth2') {
+                if (returnsInto(route.query.redirect_url, uData.AssignCompany)) {
                     await router.replace(route.query.redirect_url);
                 } else {
                     await router.replace(`/${cid}`);
