@@ -32,6 +32,7 @@
                 <div class="pt-menu__card" role="dialog" aria-modal="true" :aria-label="mode === 'list' ? t('Projects.new_list') : t('Projects.new_subfolder')">
                     <h3 class="ah-h3 pt-menu__title">{{ mode === 'list' ? t('Projects.new_list_in', { folder: path }) : t('Projects.new_subfolder_in', { folder: folder.name }) }}</h3>
                     <SprintFolderInput
+                        dialog
                         :createSprint="mode === 'list'"
                         :createFolder="mode === 'subfolder'"
                         :project="project"
@@ -253,7 +254,7 @@ defineExpose({ open });
 .pt-menu__pop--up { top: auto; bottom: calc(100% + var(--sp-1)); }
 .pt-menu__danger, .pt-menu__danger:hover { color: var(--danger); }
 .pt-menu__overlay { position: fixed; inset: 0; background: rgba(0, 0, 0, .35); z-index: 1000; display: flex; align-items: center; justify-content: center; padding: var(--sp-7); }
-.pt-menu__card { background: var(--surface); color: var(--ink); border-radius: var(--r-card); width: min(420px, 100%); padding: 18px var(--sp-8) 26px; box-shadow: var(--shadow-pop); font-family: var(--font-ui); }
+.pt-menu__card { box-sizing: border-box; background: var(--surface); color: var(--ink); border-radius: var(--r-card); width: min(460px, 100%); padding: 18px var(--sp-8) 26px; box-shadow: var(--shadow-pop); font-family: var(--font-ui); }
 .pt-menu__title { margin: 0 0 var(--sp-5); overflow-wrap: anywhere; }
 .pt-menu__text { margin: 0 0 var(--sp-8); font-size: var(--fs-md, 13px); line-height: var(--lh-body, 1.5); color: var(--ink-2); overflow-wrap: anywhere; }
 .pt-menu__actions { display: flex; justify-content: flex-end; gap: var(--sp-4); }

@@ -1,35 +1,45 @@
 <template>
-	<div class="position-re d-flex align-items-center w-100" :class="[{'empty-error-text': listName.error}]">
-		<div class="position-re w-100">
+	<div class="sfi">
+		<div class="sfi__row">
 			<input
 				:id="id"
 				type="text"
-				class="form-control"
-				:style="[{padding : clientWidth <=767 ? '5px 10px' : '0px 10px'}]"
-				:max-length="50"
+				class="ah-input sfi__input"
+				:class="{ 'ah-input--error': listName.error }"
 				v-model.trim="listName.value"
-				:placeholder="createSprint ? $t('PlaceHolder.Enter_sprint_name') : $t('PlaceHolder.Enter_directory_name')"
-				@keypress.enter="createSprint ? createEditSprint($event.value) : createEditFolder($event.value)"
+				:placeholder="placeholder"
+				:aria-label="placeholder"
+				:aria-invalid="Boolean(listName.error)"
+				:aria-describedby="listName.error ? `${id}-error` : null"
+				@keypress.enter="submit"
+				@keydown.esc.stop="$emit('cancel')"
 				@keyup="checkErrors({'field':listName,
 				'name':listName.name,
 				'validations':listName.rules,
 				'type':listName.type,
 				'event':$event.event})"
-				:isDirectFocus="true"
 				:disabled="inProgress"
 			>
-			<span class="position-ab d-flex align-items-center bg-white pl-10px" :style="[{padding : clientWidth>767 ? '4px 10px' : '9px 10px', top : clientWidth>767 ? '4px' : '2px', right : clientWidth>767 ? '1px' : '5px'}]">
-				<img :src="greenMarkIcon" alt="greenMarkIcon" class="cursor-pointer mr-10px green__mark-icon" @click.stop="createSprint ? createEditSprint(listName.value) : createEditFolder(listName.value)">
-				<img :src="closeRedIcon" alt="closeRedIcon" class="cursor-pointer"  @click="$emit('cancel')">
-			</span>
-			<div class="red position-ab z-index-1 font-size-11 listname_error">{{listName.error}}</div>
+			<template v-if="!dialog">
+				<button type="button" class="sfi__btn sfi__btn--save" :title="$t('Projects.save')" :aria-label="$t('Projects.save')" :disabled="inProgress" @click.stop="submit">
+					<ShellIcon name="check" :size="16" />
+				</button>
+				<button type="button" class="sfi__btn" :title="$t('Projects.cancel')" :aria-label="$t('Projects.cancel')" @click.stop="$emit('cancel')">
+					<ShellIcon name="x" :size="16" />
+				</button>
+			</template>
+		</div>
+		<div v-if="listName.error" :id="`${id}-error`" class="ah-field__error sfi__error">{{listName.error}}</div>
+		<div v-if="dialog" class="sfi__actions">
+			<button type="button" class="ah-btn ah-btn--secondary" @click.stop="$emit('cancel')">{{ $t('Projects.cancel') }}</button>
+			<button type="button" class="ah-btn ah-btn--primary" :disabled="inProgress || !listName.value" @click.stop="submit">{{ $t('Projects.create') }}</button>
 		</div>
 	</div>
 </template>
 
 <script setup>
 // PACKAGE
-import { ref, defineEmits, defineProps, inject, onMounted, nextTick } from "vue";
+import { ref, computed, defineEmits, defineProps, inject, onMounted, nextTick } from "vue";
 import { useStore } from "vuex";
 import { useCustomComposable } from "@/composable";
 import { useValidation } from "@/composable/Validation";
@@ -39,21 +49,17 @@ import { apiRequest } from '../../../services';
 import { dbCollections } from "../../../utils/Collections";
 import { sprintPlanPermission } from "@/composable/commonFunction";
 import { useI18n } from "vue-i18n";
+import ShellIcon from "@/components/organisms/Shell/ShellIcon.vue";
 const { t } = useI18n();
 
 // UTILS
 const companyId = inject('$companyId');
-const clientWidth = inject("$clientWidth");
 const projectData = inject('selectedProject');
 const {commit} = useStore();
 const  { checkErrors , checkAllFields } = useValidation();
 const {makeUniqueId} = useCustomComposable();
 const $toast = useToast();
 const { checkPerProjectSprintPermission } = sprintPlanPermission();
-
-// IMAGES
-const greenMarkIcon = require("@/assets/images/svg/right_tick_green.svg");
-const closeRedIcon = require("@/assets/images/svg/delete_cross_icon.svg");
 
 const emit = defineEmits(["cancel","updateData"]);
 const id = makeUniqueId();
@@ -87,6 +93,10 @@ const props = defineProps({
 	project: {
 		type: Object,
 		default: null
+	},
+	dialog: {
+		type: Boolean,
+		default: false
 	}
 })
 
@@ -97,6 +107,9 @@ const folderProject = () => props.project || projectData?.value;
 const isSiblingOfNewList = (x) => x.deletedStatusKey !== 1 && !x.sprintsObj && String(x?.folderId || '') === String(props.folder?.folderId || '');
 
 const inProgress = ref(false);
+
+const placeholder = computed(() => t(props.createSprint ? 'PlaceHolder.Enter_sprint_name' : 'PlaceHolder.Enter_directory_name'));
+const submit = () => (props.createSprint ? createEditSprint() : createEditFolder());
 
 const listName = ref({
 	value: "",
@@ -301,20 +314,18 @@ function createEditFolder() {
 </script>
 
 <style scoped>
-.empty-error-text {
-    margin-bottom: 17px;
+.sfi { width: 100%; min-width: 0; }
+.sfi__row { display: flex; align-items: center; gap: var(--sp-2); }
+.sfi__input { flex: 1; min-width: 0; }
+.sfi__btn {
+	flex: none; display: inline-flex; align-items: center; justify-content: center;
+	width: var(--control-h); height: var(--control-h); min-width: var(--hit-min); min-height: var(--hit-min); padding: 0;
+	border: 0; border-radius: var(--r-input); background: transparent; color: var(--ink-2); cursor: pointer;
 }
-.listname_error{
-	bottom: -14px; 
-	left: 0px;
-}
-.green__mark-icon{
-	width: 15px !important;
-}
-
-@media(max-width: 767px){
-	.sprint-input-tag {height: auto !important;padding: 6px 15px;font-size: 16px;line-height: 26px;}
-	.sprint-input-tag::placeholder{font-size: 16px;}
-	.empty-error-text {margin-bottom: 10px;}
-}
+.sfi__btn:hover:not(:disabled) { background: var(--surface-hover); color: var(--ink); }
+.sfi__btn:focus-visible { outline: none; box-shadow: var(--focus); }
+.sfi__btn:disabled { opacity: .55; cursor: not-allowed; }
+.sfi__btn--save, .sfi__btn--save:hover:not(:disabled) { color: var(--brand); }
+.sfi__error { margin-top: var(--sp-2); }
+.sfi__actions { display: flex; justify-content: flex-end; gap: var(--sp-4); margin-top: var(--sp-8); }
 </style>
