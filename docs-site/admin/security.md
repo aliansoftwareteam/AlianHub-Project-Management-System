@@ -55,6 +55,7 @@ Good practice:
 - `SESSION_COOKIE_HTTPONLY=on` makes the session cookies `httpOnly`, so page JavaScript cannot read them; the web app then authenticates by cookie. The desktop tracker and API clients are unaffected.
 - Access tokens last `JWT_EXP` (24 hours); an idle session expires after `SESSIONEXPIREDTIME` (172800 seconds, two days). Refresh tokens rotate, and reusing an old one after `REFRESH_TOKEN_REUSE_GRACE_SECONDS` revokes the session.
 - Logging out ends the session for real-time connections too.
+- An instance hosted by AlianHub with `WORKSPACE_HINT_DOMAIN` set also writes a cookie named `ah_ws` on that parent domain at each web sign-in: the subdomain labels of the last five workspaces, newest first, never a user id, email or token. It is `HttpOnly`, `SameSite=Lax`, `Secure` in production, sent to every host under the domain, and lasts 400 days from the last sign-in. Logging out removes that workspace's label; a session that expires or is ended from elsewhere leaves it. A self-hosted instance and a custom domain never set it. See [Desktop time tracker](/user-guide/time-tracker-app#privacy).
 
 ## Rate limits
 

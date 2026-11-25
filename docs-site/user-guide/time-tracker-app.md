@@ -27,7 +27,7 @@ On macOS, the first start asks for screen recording permission. Allow it in Syst
 
 If you opened the tracker yourself, it asks you to **Connect to your workspace**.
 
-1. Type your **Workspace address**. On a hosted workspace, the short name is enough. "Self-hosted? Enter the full address." It must start with https://.
+1. Select **Sign in with your browser** and choose your workspace on the page that opens. Or type your **Workspace address** in the tracker: on a hosted workspace, the short name is enough. "Self-hosted? Enter the full address." It must start with https://.
 2. The tracker opens your browser on an **Authorize the desktop tracker** page. Select **Continue**.
 3. The browser hands you back to the tracker, signed in.
 
@@ -84,6 +84,11 @@ If your internet drops, the tracker says "Internet connection lost but we are st
 - **Who sees your screenshots** depends on roles. The **Tracker** screen can be set to "Own" (people see only their own recordings) or to everyone. Owners and admins can see all recordings.
 - **How long screenshots are kept** is set by an owner or admin. With **Auto-delete old screenshots** on, screenshots older than the chosen number of months are deleted every night.
 - **Screenshots are stored on your company's server**, or in the storage it uses, not by a third party you did not choose.
+- **On a workspace hosted at alianhub.com, your browser remembers the workspace's short name.** Signing in on the web saves it in a cookie called `ah_ws`, so **Sign in with your browser** in the tracker can offer your workspace without you typing its address.
+  - It holds short names only, for example `acme`, for the last five workspaces you signed in to. It never holds your name, your email or a way to sign in.
+  - Every alianhub.com address can read it, because the sign-in page that offers your workspaces is one of them. Scripts on a page cannot.
+  - It lasts 400 days after your last sign-in in that browser. Signing out of a workspace removes its name, and the cookie goes with the last one. Clearing your browser's cookies for alianhub.com removes it too.
+  - A self-hosted workspace, or one opened at its own domain, never sets it.
 
 ## Settings, updates and signing out
 
