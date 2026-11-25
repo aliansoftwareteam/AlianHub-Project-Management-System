@@ -32,6 +32,7 @@
                 <div class="nip__card" role="dialog" aria-modal="true">
                     <h3 class="ah-h3 nip__title">{{ title }}</h3>
                     <SprintFolderInput
+                        dialog
                         :createSprint="mode === 'sprint'"
                         :createFolder="mode !== 'sprint'"
                         :project="projectData"
@@ -146,6 +147,6 @@ onUnmounted(() => document.removeEventListener('click', closeMenu));
 .nip { position: relative; }
 .nip__pop { position: absolute; top: calc(100% + 6px); right: 0; z-index: 40; min-width: 170px; }
 .nip__overlay { position: fixed; inset: 0; background: rgba(0, 0, 0, .35); z-index: 1000; display: flex; align-items: center; justify-content: center; padding: 16px; }
-.nip__card { background: var(--surface); color: var(--ink); border-radius: 12px; width: min(420px, 100%); padding: 18px 20px 26px; box-shadow: var(--shadow-pop); font-family: var(--font-ui); }
+.nip__card { box-sizing: border-box; background: var(--surface); color: var(--ink); border-radius: 12px; width: min(460px, 100%); padding: 20px; box-shadow: var(--shadow-pop); font-family: var(--font-ui); }
 .nip__title { margin: 0 0 12px; }
 </style>
