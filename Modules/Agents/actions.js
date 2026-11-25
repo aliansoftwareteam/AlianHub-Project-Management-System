@@ -579,9 +579,11 @@ const perform = async ({ companyId, actor, action, params = {}, reason = '', cos
         const held = rule.decision === projectPolicy.DECISION.PROPOSE ? `${rule.reason}, so it waits for a person's approval` : rule.reason;
         throw await refusal(companyId, actor, { action, params, reason: held, ip, taint });
     }
-    if (!check.action.write) return { result: null, auditId: null, undo: null };
+    // A connector read its owner set to Needs approval is filed like a write, so once approved it runs like one.
+    const approvedRead = approved && Boolean(proposal && proposal.approvalRead) && require('../Connectors/writes').isApprovedRead(action, { approval: true });
+    if (!check.action.write && !approvedRead) return { result: null, auditId: null, undo: null };
     if (!require('../Entitlements/lifecycleGuard').writable()) throw await refusal(companyId, actor, { action, params, reason: INSTANCE_LOCKED, ip, taint });
-    const exec = executors[action] || require('../Connectors/writes').executorFor(action);
+    const exec = executors[action] || require('../Connectors/writes').executorFor(action, { approval: approvedRead });
     if (!exec) throw new tools.DeterministicError(`${action} is not ready to be used yet, so nothing was changed.`);
 
     const turn = await taskReads.turnFor({ companyId, actor, action, params, approved, edited: Boolean(proposal && proposal.edited) });

@@ -201,15 +201,15 @@ const runnableOfView = (definition, view) => runnable(definition, {
 
 const findRow = async (companyId, connectionId, tool) => plain(await db(companyId, [{ companyId: String(companyId), connectionId: String(connectionId), tool: String(tool) }], 'findOne'));
 
-/* Looking at a tool again takes its shape now as seen, so the changed warning clears and agents use it again. A
- * permission still at the old default follows a change of read/write, so a tool made a read is not left waiting. */
+/* Looking at a tool again takes its shape now as seen, so the changed warning clears and agents use it again. Moving a
+ * tool into Write takes Always allow away from it; moving one into Read never grants it, which stays the owner's choice. */
 const change = async ({ companyId, connectionId, tool, fields }) => {
     const row = await findRow(companyId, connectionId, tool);
     if (!row) return null;
-    const followsDefault = fields.permission === undefined && fields.access !== undefined && row.permission === defaultPermission(row.access);
+    const tightens = fields.permission === undefined && fields.access === ACCESS.WRITE && row.permission === PERMISSION.ALLOW;
     const next = {
         ...(fields.permission === undefined ? {} : { permission: fields.permission }),
-        ...(followsDefault ? { permission: defaultPermission(fields.access) } : {}),
+        ...(tightens ? { permission: PERMISSION.APPROVAL } : {}),
         ...(fields.access === undefined ? {} : { access: fields.access, accessByOwner: true }),
         ...(fields.lookedAt ? { seenShape: row.shape, changed: false, noticedShape: '' } : {}),
     };

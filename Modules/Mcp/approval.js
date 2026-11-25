@@ -15,7 +15,7 @@ const dashboards = require('../Agents/dashboardRequests');
 const planWork = require('../Agents/planWork');
 const timesheetWeek = require('../Agents/timesheetWeek');
 const connectorWrites = require('../Connectors/writes');
-const { WRITE_SCOPE: CONNECTOR_WRITE_SCOPE } = require('./connectorTools');
+const { WRITE_SCOPE: CONNECTOR_WRITE_SCOPE, READ_SCOPE: CONNECTOR_READ_SCOPE } = require('./connectorTools');
 
 // An approved MCP proposal runs as the token's person, not as the approver, so
 // approval re-asks everything the original call was asked and adds the
@@ -88,8 +88,12 @@ const tokenFiler = async (companyId, p, changes) => {
 const grantFiler = async (companyId, p, changes) => {
     const held = await require('./oauthAuth').standingOfGrant({ companyId, grantId: p.oauthGrantId, clientId: p.oauthClientId, userId: p.requestedBy });
     if (!held) return refused('The connection that filed this proposal has been revoked, has expired, or its app is no longer approved in this workspace.');
-    const grantOf = (action) => manageTools.grantOfAction(action) || workTools.filedUnder(action) || (connectorWrites.isWrite(action) ? CONNECTOR_WRITE_SCOPE : '');
-    const covered = changes.flatMap(actionsOf).every((action) => { const grant = grantOf(action); return Boolean(grant) && held.includes(grant); });
+    const connectorGrant = (action, change) => {
+        if (connectorWrites.isWrite(action)) return CONNECTOR_WRITE_SCOPE;
+        return connectorWrites.isApprovedRead(action, change) ? CONNECTOR_READ_SCOPE : '';
+    };
+    const grantOf = (action, change) => manageTools.grantOfAction(action) || workTools.filedUnder(action) || connectorGrant(action, change);
+    const covered = changes.every((change) => actionsOf(change).every((action) => { const grant = grantOf(action, change); return Boolean(grant) && held.includes(grant); }));
     if (!covered) return refused('The connection that filed this proposal no longer holds the grant this change needs.');
     return { tokenLists: [] };
 };

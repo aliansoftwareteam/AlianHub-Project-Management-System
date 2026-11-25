@@ -174,6 +174,12 @@ describe('slack.channel.read', () => {
         expect(resolveConnection).toHaveBeenCalledWith({ companyId: C, userId: PRISHA, provider: 'slack' });
     });
 
+    it('keeps its words, not its extra fields, when it runs once its owner approved it', async () => {
+        const out = await egressContext.run({ companyId: C }, () => require('../Modules/Connectors/toolRunner').write({ companyId: C, userId: PRISHA, key: 'slack.channel.read', params: { channel: '#general' } }));
+        expect(out.text).toMatch(/Who owns #releases?/);
+        expect(out.text).not.toContain('[object Object]');
+    });
+
     it('reads a private channel the person is in', async () => {
         expect((await mcpRead('slack.channel.read', { channel: 'G0LEADS001' })).text).toMatch(/Budget is approved/);
     });

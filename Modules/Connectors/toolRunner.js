@@ -227,9 +227,10 @@ const write = ({ companyId, userId, key, params = {}, beforeSend = async () => {
         await beforeSend();
         const raw = await egressContext.run(
             { companyId: String(companyId), actor: String(userId) },
-            () => tool.run({ input: args, connection: handedTo({ tool, companyId, userId, connection, trace }, { write: true }), caps: { ...tool.caps } }),
+            () => tool.run({ input: args, connection: handedTo({ tool, companyId, userId, connection, trace }, { write: tool.kind === tools.KIND.WRITE }), caps: { ...tool.caps } }),
         );
-        const text = plain(raw).slice(0, tool.caps.maxChars);
+        const answered = raw && typeof raw === 'object' ? raw : { text: raw };
+        const text = plain(answered.text).slice(0, tool.caps.maxChars);
         trace.chars = text.length;
         return { text, connectionId: String(connection.connectionId) };
     },

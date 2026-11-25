@@ -301,12 +301,21 @@ describe('the owner’s choices on a live tool (task 110)', () => {
         expect(rowOf(MAYA, 'search_notes')).toMatchObject({ hinted: 'read' });
     });
 
-    it('moves a permission still at its default when the owner changes read or write, and keeps one the owner chose', async () => {
+    it('never turns on Always allow when the owner moves a tool into Read', async () => {
         const mine = await connect(MAYA);
         await list(MAYA);
         await setTool(MAYA, mine, CREATE, { access: 'read' });
-        expect(rowOf(MAYA, 'create_note')).toMatchObject({ access: 'read', permission: 'allow' });
+        expect(rowOf(MAYA, 'create_note')).toMatchObject({ access: 'read', permission: 'approval' });
+    });
+
+    it('takes Always allow away from a tool moved into Write, and keeps any other choice', async () => {
+        const mine = await connect(MAYA);
+        await list(MAYA);
+        await setTool(MAYA, mine, SEARCH, { permission: 'allow' });
+        await setTool(MAYA, mine, SEARCH, { access: 'write' });
+        expect(rowOf(MAYA, 'search_notes')).toMatchObject({ access: 'write', permission: 'approval' });
         await setTool(MAYA, mine, SEARCH, { permission: 'off' });
+        await setTool(MAYA, mine, SEARCH, { access: 'read' });
         await setTool(MAYA, mine, SEARCH, { access: 'write' });
         expect(rowOf(MAYA, 'search_notes')).toMatchObject({ access: 'write', permission: 'off' });
     });

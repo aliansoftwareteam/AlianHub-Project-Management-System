@@ -18,6 +18,7 @@ const ATTACHMENTS_MAX = 20;
 const ROWS_MAX = 20;
 const CARD_KEY = /^Connectors\.card\.[A-Za-z0-9_]+$/;
 const ERROR_MAX = 300;
+const READ_ANSWER_MAX = 4000;
 const FILED = 'filed';
 const REFUSAL = Object.freeze({
     NOT_OWNER: 'Only the person whose connection this is can approve it. It stays waiting for them.',
@@ -46,11 +47,19 @@ const isWrite = (action) => {
 const isGated = (change) => Boolean(change) && (isWrite(change.action) || change.approval === true);
 const hasWrite = (changes) => (Array.isArray(changes) ? changes : []).some(isGated);
 
-const approvalRead = async (companyId, ownerId, action) => {
+const isCatalogRead = (action) => {
     const tool = tools.get(action);
-    if (!ownerId || !tool || tool.custom || tool.kind !== tools.KIND.READ) return false;
-    const connection = await runner.connectionOf(tool, companyId, ownerId).catch(() => null);
-    return Boolean(connection) && require('./toolPermissions').permissionOf(tool, connection) === connectionTools.PERMISSION.APPROVAL;
+    return Boolean(tool) && !tool.custom && tool.kind === tools.KIND.READ;
+};
+
+/* A connection that cannot be loaded refuses the filing: filed as an ordinary change, the read would skip its owner's card. */
+const approvalRead = async (companyId, ownerId, action) => {
+    if (!ownerId || !isCatalogRead(action)) return false;
+    const tool = tools.get(action);
+    const connection = await runner.connectionOf(tool, companyId, ownerId).catch((error) => {
+        throw error && error.deterministic ? refuse(spoken(error.message), error.code, 400) : error;
+    });
+    return require('./toolPermissions').permissionOf(tool, connection) === connectionTools.PERMISSION.APPROVAL;
 };
 
 const markApprovalReads = async (companyId, ownerId, changes) => {
@@ -205,7 +214,9 @@ const send = async ({ companyId, actor, action, params, proposal }) => {
     return { result: out, undo: null, entityType: 'connector_write', entityId: action, entityName: tool ? tool.definition.name : action };
 };
 
-const executorFor = (action) => (isWrite(action) ? (args) => send({ ...args, action }) : null);
+/* An approved read runs once, like a write, and what it read is kept on its proposal for its owner to see there. */
+const isApprovedRead = (action, change) => Boolean(change && change.approval === true) && isCatalogRead(action);
+const executorFor = (action, change) => (isWrite(action) || isApprovedRead(action, change) ? (args) => send({ ...args, action }) : null);
 
 const deliveryOf = (changes, applied) => (Array.isArray(changes) ? changes : [])
     .map((change, i) => ({ change, outcome: (applied || [])[i] || {} }))
@@ -213,8 +224,8 @@ const deliveryOf = (changes, applied) => (Array.isArray(changes) ? changes : [])
     .map(({ change, outcome }) => ({
         action: change.action, ok: Boolean(outcome.ok),
         connectionId: String((change.params || {}).connectionId || ''),
-        ...(outcome.ok ? { answer: String((outcome.result && outcome.result.text) || '').slice(0, ERROR_MAX) } : { error: String(outcome.error || 'not sent').replace(/^[a-z_]+: /, '').slice(0, ERROR_MAX) }),
+        ...(outcome.ok ? { answer: String((outcome.result && outcome.result.text) || '').slice(0, change.approval === true ? READ_ANSWER_MAX : ERROR_MAX) } : { error: String(outcome.error || 'not sent').replace(/^[a-z_]+: /, '').slice(0, ERROR_MAX) }),
         at: new Date(),
     }));
 
-module.exports = { GATE, REFUSAL, spoken, isWrite, isGated, hasWrite, markApprovalReads, cardOf, prepareChanges, fileChanges, gatedByOwner, approverRefusal, send, executorFor, deliveryOf };
+module.exports = { GATE, REFUSAL, spoken, isWrite, isGated, isApprovedRead, hasWrite, markApprovalReads, cardOf, prepareChanges, fileChanges, gatedByOwner, approverRefusal, send, executorFor, deliveryOf };

@@ -375,7 +375,12 @@ const approve = async (companyId, id, { decider, isPrivileged, changes: edited, 
         if (!check.valid) return { error: check.reason, status: 400 };
         // The gate kept at filing was read from the changes as filed; an edit is held to what it would run.
         if (gateOf(edited, p.gate) === GATE_OWNER_ADMIN && !isPrivileged) return needsAdmin;
-        changes = await connectorWrites.markApprovalReads(companyId, p.connectionOwner, edited.map((c) => ({ action: c.action, params: planFiling.storedParams(c.action, c.params || {}), label: c.label || c.action })));
+        try {
+            changes = await connectorWrites.markApprovalReads(companyId, p.connectionOwner, edited.map((c) => ({ action: c.action, params: planFiling.storedParams(c.action, c.params || {}), label: c.label || c.action })));
+        } catch (e) {
+            if (!e.status) throw e;
+            return { error: connectorWrites.spoken(e.message), status: e.status };
+        }
         // An edited connector write is checked and shown to its owner again, never sent on the click that edited it.
         if (connectorWrites.hasWrite(changes)) return reshowEdited(companyId, id, p, changes, { decider, ip });
         status = STATUS.EDITED;
@@ -414,11 +419,11 @@ const approve = async (companyId, id, { decider, isPrivileged, changes: edited, 
     for (const c of changes) {
         try {
             // eslint-disable-next-line no-await-in-loop
-            const out = await underTokenOf(p, () => actions.perform({ companyId, actor: agentActor, action: c.action, params: { ...c.params, __proposal: true }, reason: `approved proposal ${id} by ${decider.userId}`, ip, allowedActions: agent.allowedActions, depth, approved: true, approvedBy: decider.userId, proposal: { source: p.source || '', edited: editing, id: String(id), connectionOwner: p.connectionOwner || '' }, ...(marker ? { taint: marker } : {}) }));
+            const out = await underTokenOf(p, () => actions.perform({ companyId, actor: agentActor, action: c.action, params: { ...c.params, __proposal: true }, reason: `approved proposal ${id} by ${decider.userId}`, ip, allowedActions: agent.allowedActions, depth, approved: true, approvedBy: decider.userId, proposal: { source: p.source || '', edited: editing, id: String(id), connectionOwner: p.connectionOwner || '', approvalRead: c.approval === true }, ...(marker ? { taint: marker } : {}) }));
             if (out.auditId) auditIds.push(out.auditId, ...partAudits(out.result));
             applied.push({ action: c.action, ok: true, result: out.result });
         } catch (e) {
-            applied.push({ action: c.action, ok: false, error: connectorWrites.isWrite(c.action) ? connectorWrites.spoken(e.message) : e.message, ...(Array.isArray(e.parts) ? { parts: e.parts } : {}) });
+            applied.push({ action: c.action, ok: false, error: connectorWrites.isGated(c) ? connectorWrites.spoken(e.message) : e.message, ...(Array.isArray(e.parts) ? { parts: e.parts } : {}) });
         }
     }
     // A write that left for a connected app stays there, so no window is offered that could not take it back.

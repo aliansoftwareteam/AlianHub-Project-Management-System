@@ -383,3 +383,59 @@ describe('what is approved is what is sent, once', () => {
         expect(safeFetch).not.toHaveBeenCalled();
     });
 });
+
+describe('a read its owner set to Needs approval', () => {
+    const LIST = 'fake.notes.list';
+    const waiting = () => resolveConnection.mockResolvedValue({
+        connectionId: MINE, scopes: ['notes.read', 'notes.write'], getAccessToken: async () => 'secret-token', toolPermissions: [{ key: LIST, permission: 'approval' }],
+    });
+    const fileRead = () => proposals.create(C, {
+        agent: { _id: AGENT_ID, name: 'Digest', connectors: [{ provider: 'fake', tools: [KEY, LIST] }] }, projectId: PROJECT, what: 'Read the latest notes', why: 'The owner asked',
+        changes: [{ action: LIST, params: { limit: 3 } }], connectionOwner: PRISHA,
+    });
+    const reads = () => safeFetch.mock.calls.filter(([, options]) => options.method === 'get');
+
+    beforeEach(() => {
+        waiting();
+        safeFetch.mockImplementation(async (url, options) => ({
+            status: 200, headers: {}, body: JSON.stringify(options.method === 'get' ? { notes: [{ title: 'Budget' }, { title: 'Hiring' }] } : provider.body),
+        }));
+    });
+
+    it('is filed for its owner alone, and runs once on approval, keeping what it read on the proposal', async () => {
+        const p = await fileRead();
+        expect(proposalRow(p._id)).toMatchObject({ connectionOwner: PRISHA, changes: [expect.objectContaining({ action: LIST, approval: true })] });
+        expect(reads()).toEqual([]);
+        expect(await approveAs(p._id, ADMIN)).toMatchObject({ status: 403 });
+
+        const out = await approveAs(p._id, PRISHA);
+        expect(out.applied).toEqual([expect.objectContaining({ action: LIST, ok: true })]);
+        expect(reads()).toHaveLength(1);
+        expect(reads()[0][0]).toBe('https://api.fake.test/notes?limit=3');
+        expect(sent()).toEqual([]);
+        expect(proposalRow(p._id).delivery).toEqual([expect.objectContaining({ action: LIST, ok: true, connectionId: MINE, answer: '- Budget\n- Hiring' })]);
+    });
+
+    it('is refused at filing when its owner\'s connection cannot be loaded, never filed as an ordinary change', async () => {
+        resolveConnection.mockRejectedValue(Object.assign(new Error('no connection'), { name: 'ConnectorError', code: 'not_connected' }));
+        await expect(fileRead()).rejects.toMatchObject({ status: 400, code: 'not_connected' });
+        expect(mockDb.store[SCHEMA_TYPE.AGENT_PROPOSALS] || []).toEqual([]);
+    });
+
+    it('answers an edit with a plain refusal when the owner connection cannot be loaded, and runs nothing', async () => {
+        const p = await fileRead();
+        resolveConnection.mockRejectedValue(Object.assign(new Error('no connection'), { name: 'ConnectorError', code: 'not_connected' }));
+        const out = await approveAs(p._id, PRISHA, { changes: [{ action: LIST, params: { limit: 2 } }] });
+        expect(out).toMatchObject({ status: 400, error: expect.stringContaining('Connect') });
+        expect(proposalRow(p._id).status).toBe('pending');
+        expect(reads()).toEqual([]);
+    });
+
+    it('is not run by an approval of the same read filed without the mark', async () => {
+        connected();
+        const p = await fileRead();
+        expect(proposalRow(p._id).changes[0]).not.toHaveProperty('approval');
+        await approveAs(p._id, ADMIN);
+        expect(reads()).toEqual([]);
+    });
+});
