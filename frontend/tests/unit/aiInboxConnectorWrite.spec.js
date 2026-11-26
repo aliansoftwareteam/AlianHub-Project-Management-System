@@ -77,6 +77,16 @@ describe('a write to a connected app on the AI Inbox card', () => {
         expect(wrapper.find('[data-test="edit-then-approve"]').exists()).toBe(false);
     });
 
+    it('shows its owner what an approved read brought back, and anyone else only that it was read', () => {
+        const read = { action: 'fake.notes.list', ok: true, read: true };
+        const mine = mount(ConnectorWriteCard, { props: { change: write(), waiting: false, delivery: { ...read, answer: '- Budget\n- Hiring' } } });
+        expect(mine.find('[data-test="connector-card-answer"]').text()).toBe('- Budget\n- Hiring');
+        expect(mine.text()).not.toContain('Sent.');
+        const theirs = mount(ConnectorWriteCard, { props: { change: write(), waiting: false, delivery: { ...read, hidden: true } } });
+        expect(theirs.find('[data-test="connector-card-answer"]').exists()).toBe(false);
+        expect(theirs.find('[data-test="connector-card-read-hidden"]').text()).toBe(en.Connectors.approval.read_hidden);
+    });
+
     it('promises nothing about sending on a card no longer waiting', () => {
         const card = mount(ConnectorWriteCard, { props: { change: write(), waiting: false } });
         expect(card.text()).not.toContain(en.Connectors.approval.note);

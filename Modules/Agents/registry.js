@@ -136,14 +136,13 @@ const FLAGGED_BY_KEY = new Map(FLAGGED.map((f) => [f.action.key, f]));
 const active = () => [...ACTIONS, ...FLAGGED.filter((f) => f.enabled()).map((f) => f.action)];
 
 const SERVER_TOOL = /^[A-Za-z0-9_.\-/]{1,128}$/;
-const LIVE_WRITES = new Map();
 
+/* Built on each call, never cached: a key comes from callers (an MCP token's proposal), so a cache would grow without bound. */
 const liveWrite = (k) => {
     const { splitKey, liveDefinition } = require('../Connectors/connectionTools');
     const { provider, tool } = splitKey(k);
     if (!SERVER_TOOL.test(tool) || !require('../Connectors/available').isLive(provider) || !require('../Connectors/tools').providerOn(provider)) return null;
-    if (!LIVE_WRITES.has(k)) LIVE_WRITES.set(k, require('./registry/connectorTools').liveWriteOf(k, liveDefinition(provider).name));
-    return LIVE_WRITES.get(k);
+    return require('./registry/connectorTools').liveWriteOf(k, liveDefinition(provider).name);
 };
 
 const get = (key) => {

@@ -416,6 +416,31 @@ describe('a read its owner set to Needs approval', () => {
         expect(proposalRow(p._id).delivery).toEqual([expect.objectContaining({ action: LIST, ok: true, connectionId: MINE, answer: '- Budget\n- Hiring' })]);
     });
 
+    it('counts against its owner\'s daily reads, not their write proposals', async () => {
+        await fileRead();
+        const usage = mockDb.store[SCHEMA_TYPE.CONNECTOR_USAGE] || [];
+        expect(usage).toEqual([expect.objectContaining({ userId: PRISHA, reads: 1 })]);
+        expect(usage[0].writeProposals || 0).toBe(0);
+    });
+
+    it('shows what it read to its owner alone: never to another member, an agent or the workspace socket', async () => {
+        const socket = require('../event/socketEventEmitter');
+        const p = await fileRead();
+        socket.emit.mockClear();
+        await approveAs(p._id, PRISHA);
+        const row = proposalRow(p._id);
+
+        expect(writes.shownTo(row, PRISHA).delivery[0]).toMatchObject({ read: true, answer: '- Budget\n- Hiring' });
+        for (const viewer of [ADMIN, '']) {
+            const seen = writes.shownTo(row, viewer).delivery[0];
+            expect(seen).toMatchObject({ read: true, ok: true, hidden: true });
+            expect(seen.answer).toBeUndefined();
+        }
+        const emitted = JSON.stringify(socket.emit.mock.calls.map(([, payload]) => payload));
+        expect(emitted).toContain(String(p._id));
+        expect(emitted).not.toContain('Budget');
+    });
+
     it('is refused at filing when its owner\'s connection cannot be loaded, never filed as an ordinary change', async () => {
         resolveConnection.mockRejectedValue(Object.assign(new Error('no connection'), { name: 'ConnectorError', code: 'not_connected' }));
         await expect(fileRead()).rejects.toMatchObject({ status: 400, code: 'not_connected' });

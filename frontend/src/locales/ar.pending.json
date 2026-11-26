@@ -4270,6 +4270,8 @@
     "Connectors.approval.not_sent": "Not sent",
     "Connectors.approval.note": "Nothing goes out until the person whose connection this is approves it. Exactly this is sent, once.",
     "Connectors.approval.outside": "Leaves AlianHub",
+    "Connectors.approval.read_answer": "Read after your approval. What the app sent back, as the app wrote it:",
+    "Connectors.approval.read_hidden": "Read after approval. Only the person whose connection this is can see what it read.",
     "Connectors.approval.reshown": "Your edit was checked. Read the new card, then approve it to send.",
     "Connectors.approval.review_in_inbox": "Review in Inbox",
     "Connectors.approval.sent": "Sent. {answer}",

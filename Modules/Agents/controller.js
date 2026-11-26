@@ -825,8 +825,10 @@ const asCards = async (companyId, caller, listed, locks) => {
         : new Map());
     const [batches, previews] = await Promise.all([cards(intentPreview.forBatches, listed), cards(intentPreview.forProposals, listed.filter((p) => p.status === proposals.STATUS.PENDING))]);
     const { markOf } = require('./changeLabels');
+    const { shownTo } = require('../Connectors/writes');
+    const viewerId = caller.human ? String(caller.actor.userId || '') : '';
     return listed.map((p) => ({
-        ...p,
+        ...shownTo(p, viewerId),
         changes: (Array.isArray(p.changes) ? p.changes : []).map((change, at) => {
             const preview = (previews.get(String(p._id)) || [])[at];
             return { ...change, ...markOf(change), ...(preview ? { preview } : {}) };
@@ -908,7 +910,8 @@ const decide = (action, fn, heldTo = null) => async (req, res) => {
         if (held) return fail(res, held.error, held.status, refusalOf(held));
         const out = await fn(companyId, req.params.id, { decider: caller.actor, isPrivileged: caller.privileged, changes: req.body && req.body.changes, parts: req.body && req.body.parts, revision: req.body ? req.body.revision : undefined, reason: req.body && req.body.reason, ip: req.ip || '', always: Boolean(req.body) && req.body.always === true, viaToken: Boolean(req.apiToken) });
         if (out.error) return fail(res, out.error, out.status || 400, refusalOf(out));
-        return res.send({ status: true, statusText: action === 'proposal.approve' ? approvalText(out) : 'Done.', data: out });
+        const shown = out.proposal ? { ...out, proposal: require('../Connectors/writes').shownTo(out.proposal && typeof out.proposal.toObject === 'function' ? out.proposal.toObject() : out.proposal, caller.actor.userId) } : out;
+        return res.send({ status: true, statusText: action === 'proposal.approve' ? approvalText(out) : 'Done.', data: shown });
     } catch (e) { logger.error(`proposal decision: ${e.message}`); return fail(res, e.message, 500); }
 };
 

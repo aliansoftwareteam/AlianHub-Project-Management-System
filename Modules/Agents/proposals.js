@@ -99,7 +99,8 @@ const settleRun = async (companyId, p, { decision, applied, reason, outcome }) =
 };
 
 const emit = (companyId, proposal) => {
-    socketEmitter.emit('update', { type: 'update', module: 'agent', companyId: String(companyId), data: { kind: 'proposal', proposal }, updatedFields: { kind: 'proposal' }, actor: { kind: 'agent' }, depth: 1 });
+    const shown = connectorWrites.shownTo(proposal && typeof proposal.toObject === 'function' ? proposal.toObject() : proposal);
+    socketEmitter.emit('update', { type: 'update', module: 'agent', companyId: String(companyId), data: { kind: 'proposal', proposal: shown }, updatedFields: { kind: 'proposal' }, actor: { kind: 'agent' }, depth: 1 });
 };
 
 /* Validate the change list: every entry must be a registry action and pass the

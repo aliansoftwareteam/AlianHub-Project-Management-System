@@ -157,8 +157,9 @@ const fileChanges = async (companyId, ownerId, changes, { via, id, runId = null,
     const claimed = [];
     try {
         for (const change of prepared.filter(isGated)) {
+            const claim = change.approval === true ? quotas.claimRead : quotas.claimWriteProposal;
             // eslint-disable-next-line no-await-in-loop
-            claimed.push(await quotas.claimWriteProposal(companyId, { connectionId: change.params.connectionId, userId: ownerId, actor: { type: via, id } }));
+            claimed.push(await claim(companyId, { connectionId: change.params.connectionId, userId: ownerId, actor: { type: via, id } }));
         }
     } catch (error) {
         await Promise.all(claimed.map((claim) => claim.release()));
@@ -222,10 +223,19 @@ const deliveryOf = (changes, applied) => (Array.isArray(changes) ? changes : [])
     .map((change, i) => ({ change, outcome: (applied || [])[i] || {} }))
     .filter(({ change }) => isGated(change))
     .map(({ change, outcome }) => ({
-        action: change.action, ok: Boolean(outcome.ok),
+        action: change.action, ok: Boolean(outcome.ok), ...(change.approval === true ? { read: true } : {}),
         connectionId: String((change.params || {}).connectionId || ''),
         ...(outcome.ok ? { answer: String((outcome.result && outcome.result.text) || '').slice(0, change.approval === true ? READ_ANSWER_MAX : ERROR_MAX) } : { error: String(outcome.error || 'not sent').replace(/^[a-z_]+: /, '').slice(0, ERROR_MAX) }),
         at: new Date(),
     }));
 
-module.exports = { GATE, REFUSAL, spoken, isWrite, isGated, isApprovedRead, hasWrite, markApprovalReads, cardOf, prepareChanges, fileChanges, gatedByOwner, approverRefusal, send, executorFor, deliveryOf };
+/* What an approved read brought back is the owner's own data from their app, so no one else is sent it: not the
+ * workspace's socket, not another member's Inbox, not an agent. */
+const shownTo = (proposal, viewerId = '') => {
+    if (!proposal || !Array.isArray(proposal.delivery) || !proposal.delivery.some((entry) => entry && entry.read)) return proposal;
+    const owner = String(proposal.connectionOwner || '');
+    if (owner && viewerId && String(viewerId) === owner) return proposal;
+    return { ...proposal, delivery: proposal.delivery.map((entry) => (entry && entry.read ? { ...entry, answer: undefined, hidden: Boolean(entry.answer) } : entry)) };
+};
+
+module.exports = { GATE, REFUSAL, spoken, isWrite, isGated, isApprovedRead, hasWrite, markApprovalReads, cardOf, prepareChanges, fileChanges, gatedByOwner, approverRefusal, send, executorFor, deliveryOf, shownTo };

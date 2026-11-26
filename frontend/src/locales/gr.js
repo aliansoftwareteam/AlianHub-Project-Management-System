@@ -14380,7 +14380,9 @@ export default {
             "locked": "Their connection",
             "locked_note": "This goes out on another person's connected account, so only that person can approve it.",
             "sent": "Sent. {answer}",
-            "failed": "Not sent: {error}"
+            "failed": "Not sent: {error}",
+            "read_answer": "Read after your approval. What the app sent back, as the app wrote it:",
+            "read_hidden": "Read after approval. Only the person whose connection this is can see what it read."
         },
         "quota": {
             "title": "Limits for connected apps",

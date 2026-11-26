@@ -77,7 +77,14 @@
             <p class="ah-small cwc__note">{{ t('Connectors.approval.edit_note') }}</p>
         </div>
 
-        <p v-if="delivery" class="ah-small cwc__result" :class="{ 'ah-field__error': !delivery.ok }" data-test="connector-card-result">
+        <template v-if="delivery && delivery.ok && delivery.read">
+            <template v-if="delivery.answer">
+                <p class="ah-small cwc__note" data-test="connector-card-read">{{ t('Connectors.approval.read_answer') }}</p>
+                <div class="cwc__text" data-test="connector-card-answer">{{ delivery.answer }}</div>
+            </template>
+            <p v-else class="ah-small cwc__note" data-test="connector-card-read-hidden">{{ t('Connectors.approval.read_hidden') }}</p>
+        </template>
+        <p v-else-if="delivery" class="ah-small cwc__result" :class="{ 'ah-field__error': !delivery.ok }" data-test="connector-card-result">
             {{ delivery.ok ? t('Connectors.approval.sent', { answer: delivery.answer }) : t('Connectors.approval.failed', { error: delivery.error }) }}
         </p>
         <p v-else-if="waiting" class="ah-small cwc__note">{{ t('Connectors.approval.note') }}</p>
