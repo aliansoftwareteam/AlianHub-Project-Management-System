@@ -885,8 +885,9 @@ exports.dropCompanyDatabase = async (companyId) => {
             await settleSchemaInit(pooled.connection);
             closeConnection(companyId);
         }
-        const baseUrl = String(process.env.MONGODB_URL || '').replace(/\/+$/, '');
-        const connStr = baseUrl.startsWith('mongodb+srv') ? `${baseUrl}/${companyId}` : `${baseUrl}/${companyId}?authSource=admin`;
+        const baseUrl = String(process.env.MONGODB_URL || '');
+        const { withDatabase } = require('./connectionString');
+        const connStr = withDatabase(baseUrl, companyId, { authSource: baseUrl.startsWith('mongodb+srv') ? undefined : 'admin' });
         const connection = await mongoose.createConnection(connStr).asPromise();
         try {
             await connection.dropDatabase();

@@ -162,17 +162,29 @@ export function useAskConversation({ t }) {
         reason: item.code ? t(REASON_KEYS[item.code] || REASON_KEYS.refused) : String(item.reason || "")
     }));
 
+    /* apiRequest never settles a request it cancelled, so the abort has to end the wait itself. */
+    const unlessStopped = (request, signal) => Promise.race([
+        request,
+        new Promise((_, reject) => signal.addEventListener("abort", () => reject(new DOMException("Stopped", "AbortError")), { once: true }))
+    ]);
+
     /* A sentence planned with the server's model. It comes back as a proposal the person approves or declines; nothing is made before. */
-    const plan = async ({ sentence, projectId = "" }) => {
+    const plan = async ({ sentence, projectId = "", mentions = [], context = [] }) => {
         const asked = String(sentence || "").trim();
         if (!asked || streaming.value) return false;
         seq += 1;
-        turns.value.push({ key: `local-${seq}`, question: asked, answer: "", mode: "plan", cited: [], sources: [], cannot: [], status: "planning", error: "" });
+        turns.value.push({ key: `local-${seq}`, question: asked, mentions: mentions.filter((chip) => chip.kind !== "connector"), answer: "", mode: "plan", cited: [], sources: [], cannot: [], status: "planning", error: "" });
         const live = turns.value[turns.value.length - 1];
         streaming.value = true;
         announcement.value = "";
+        controller = new AbortController();
+        const { signal } = controller;
         try {
-            const res = await apiRequest("post", env.AI_ASK_PLAN, { sentence: asked, ...(projectId ? { projectId } : {}) });
+            const res = await unlessStopped(apiRequest("post", env.AI_ASK_PLAN, {
+                sentence: asked,
+                ...(projectId ? { projectId } : {}),
+                ...(context.length ? { context } : {})
+            }, undefined, { signal }), signal);
             const body = res?.data || {};
             const data = body.data || {};
             const code = data.code || body.code;
@@ -191,11 +203,17 @@ export function useAskConversation({ t }) {
                 });
                 announcement.value = live.error;
             }
-        } catch {
-            Object.assign(live, { status: "plan_error", error: t("Ask.plan_failed") });
-            announcement.value = live.error;
+        } catch (error) {
+            if (error && error.name === "AbortError") {
+                live.status = "stopped";
+                announcement.value = t("Ask.answer_stopped");
+            } else {
+                Object.assign(live, { status: "plan_error", error: t("Ask.plan_failed") });
+                announcement.value = live.error;
+            }
         } finally {
             streaming.value = false;
+            controller = null;
         }
         return true;
     };

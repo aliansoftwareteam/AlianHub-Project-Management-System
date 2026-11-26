@@ -236,11 +236,34 @@ describe('Ask through the lookup', () => {
         expect(out.notes).toEqual([expect.objectContaining({ code: 'not_allowed' })]);
     });
 
-    it('does not file a change to a live app it cannot carry yet', async () => {
+    it('files a change to a live app for its owner, and sends it once only on the owner\'s approval', async () => {
+        const proposals = require('../Modules/Agents/proposals');
         await connect();
         pick([{ tool: 'notesmcp.create_note', arguments: { title: 'Minutes', body: 'Ship it.' } }]);
         const out = await step([P]);
+        expect(out.notes).toEqual([]);
+        expect(out.proposals).toEqual([expect.objectContaining({ provider: P, tool: 'notesmcp.create_note' })]);
+        const [row] = mockDb.store[SCHEMA_TYPE.AGENT_PROPOSALS];
+        expect(row).toMatchObject({ source: 'ask', connectionOwner: MAYA, gate: 'connection_owner', status: 'pending', what: expect.stringMatching(/: create_note$/) });
+        expect(row.changes[0].card).toMatchObject({ title: 'create_note' });
+        const created = () => server.calls.filter((call) => call.name === 'create_note');
+        expect(created()).toEqual([]);
+
+        const id = out.proposals[0].proposalId;
+        const refused = await proposals.approve(C, id, { decider: { kind: 'human', userId: '6f0000000000000000000a82' }, isPrivileged: true, ip: '' });
+        expect(refused).toMatchObject({ status: 403 });
+        const approved = await egressContext.run({ companyId: C }, () => proposals.approve(C, id, { decider: { kind: 'human', userId: MAYA }, isPrivileged: false, ip: '' }));
+        expect(approved.error).toBeUndefined();
+        expect(created()).toEqual([expect.objectContaining({ args: { title: 'Minutes', body: 'Ship it.' } })]);
+    });
+
+    it('does not file a change to a live app for an asker without the connectors right', async () => {
+        await connect();
+        evaluatePermission.mockResolvedValueOnce(0);
+        pick([{ tool: 'notesmcp.create_note', arguments: { title: 'Minutes', body: 'Ship it.' } }]);
+        const out = await step([P]);
         expect(out.proposals).toEqual([]);
-        expect(out.notes).toEqual([expect.objectContaining({ code: 'live_write' })]);
+        expect(out.notes).toEqual([expect.objectContaining({ code: 'not_allowed' })]);
+        expect(mockDb.store[SCHEMA_TYPE.AGENT_PROPOSALS] || []).toEqual([]);
     });
 });

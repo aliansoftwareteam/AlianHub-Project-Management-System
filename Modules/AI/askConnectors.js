@@ -37,7 +37,6 @@ const CODE = Object.freeze({
     NO_TOOLS: 'no_tools',
     NEEDS_APPROVAL: 'needs_approval',
     UNREACHABLE: 'unreachable',
-    LIVE_WRITE: 'live_write',
     FAILED: 'failed',
 });
 
@@ -56,7 +55,6 @@ const SAID = Object.freeze({
     [CODE.NO_TOOLS]: (app) => `None of your ${app} tools is turned on, so nothing was read from it. Turn one on in AI › Customize › Connectors.`,
     [CODE.NEEDS_APPROVAL]: (app) => `Your ${app} tools that read wait for your approval each time, so AI chat does not read them. Set one to Always allow in AI › Customize › Connectors to read it here.`,
     [CODE.UNREACHABLE]: (app) => `${app} could not be reached just now, so nothing was read from it.`,
-    [CODE.LIVE_WRITE]: (app) => `A change to ${app} cannot be filed from the AI chat yet, so it was not made.`,
     [CODE.FAILED]: (app) => `${app} could not be read just now.`,
 });
 
@@ -187,19 +185,28 @@ const spokenOf = (error) => String((error && error.message) || '').replace(/^[a-
 const titleOf = (args, app) => clip(Object.entries(isPlainObject(args) ? args : {}).filter(([k, v]) => k !== 'method' && v !== '' && v !== undefined && v !== null).map(([, v]) => v).join(' · '), TITLE_MAX) || app.name;
 
 /* A change is filed exactly as far as an MCP call of the same tool is checked (Mcp/tools planned), and then as a
- * proposal only the asker, whose connection it uses, can approve. */
+ * proposal only the asker, whose connection it uses, can approve. A built-in MCP app's tool has no MCP-server entry, so
+ * it is held to the connectors right, and writes.js admits it against the asker's own connection when it is filed. */
+const plannedChange = async (ctx, tool, args) => {
+    if (tool.live) {
+        await authorizeLive(ctx);
+        // A server's own description runs to pages, so the proposal is titled by the app and its tool.
+        return { tool: { name: tool.key, title: [tool.definition.name, tool.label], action: tool.key }, params: args };
+    }
+    const planned = await require('../Mcp/tools').planned(ctx, tool.key, args);
+    if (planned.answer) throw Object.assign(new Error(String(planned.answer.error || planned.answer.message || '')), { code: CODE.NOT_ALLOWED });
+    return planned;
+};
+
 const fileChange = async (ctx, { tool, args, app }) => {
-    if (tool.live) throw Object.assign(new Error(SAID[CODE.LIVE_WRITE](app.name)), { code: CODE.LIVE_WRITE, deterministic: true });
-    const mcpTools = require('../Mcp/tools');
     const proposals = require('../Agents/proposals');
     const actions = require('../Agents/actions');
     const { toolLabel } = require('../Agents/changeLabels');
     const { joined } = require('../Agents/proposalText');
-    const planned = await mcpTools.planned(ctx, tool.key, args);
-    if (planned.answer) throw Object.assign(new Error(String(planned.answer.error || planned.answer.message || '')), { code: CODE.NOT_ALLOWED });
+    const planned = await plannedChange(ctx, tool, args);
     const saved = await proposals.create(ctx.companyId, {
         agent: { _id: ASKER, name: ASK_NAME },
-        what: joined([planned.tool.name, planned.tool.description]),
+        what: joined(planned.tool.title || [planned.tool.name, planned.tool.description]),
         why: 'Asked for in the Ask box.',
         changes: [{ action: planned.tool.action, params: planned.params, label: toolLabel(planned.tool.name), rating: actions.rating(planned.tool.action) }],
         source: proposals.SOURCE_ASK,

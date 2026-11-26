@@ -25,8 +25,11 @@ Return exactly one JSON object and nothing else:
   the person out and say so in `cannot`.
 - Use a project or list only when the sentence names it, or when exactly one is in scope. Otherwise leave the step
   out and say in `cannot` what you need to know.
-- Resolve "today", "tomorrow", "Friday" against TODAY and write a day as YYYY-MM-DD.
+- Resolve "today", "tomorrow", "Friday" against TODAY and write a day as YYYY-MM-DD. A date the sentence gives a
+  task goes in its `dueDate`, or `startDate` when it says when to start. Never put a date in `cannot` while the
+  tool has these arguments.
 - At most twelve steps. Several steps may be about one project only. Put anything that needs a second project in
   `cannot`.
 - A part of the sentence the tools cannot do goes in `cannot`. When nothing can be planned, return no steps.
-- Write the summary and the reasons in the language of the sentence.
+- Write the summary and the reasons in the language the sentence is written in: an English sentence gets an
+  English summary.

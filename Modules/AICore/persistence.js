@@ -35,8 +35,8 @@ const mongoClient = () => {
     if (process.env.NODE_ENV === 'test' && !override) throw new Error('agent persistence reached Mongo inside a test; call persistence.useInMemory() first');
     const url = process.env.MONGODB_URL;
     if (!url) throw new Error('No database configured. Set MONGODB_URL.');
-    const base = url.replace(/\/+$/, '');
-    client = new MongoClient(base.startsWith('mongodb+srv') ? base : `${base}/?authSource=admin`, mongoTimeoutOptions());
+    const { withDatabase } = require('../../utils/mongo-handler/connectionString');
+    client = new MongoClient(withDatabase(url, '', { authSource: url.startsWith('mongodb+srv') ? undefined : 'admin' }), mongoTimeoutOptions());
     return client;
 };
 

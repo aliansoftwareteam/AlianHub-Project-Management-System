@@ -58,6 +58,8 @@ const tracked = async (entry, work) => {
     }
 };
 
+const REFUSAL_REASON_MAX = 200;
+
 const busy = (tool, until) => Object.assign(refusal('provider_busy', `${tool.definition.name} asked to wait, so nothing goes to it until ${until.toISOString()}.`), { retryAt: until });
 
 const refuseWhileHeld = async (tool, companyId, connection) => {
@@ -151,8 +153,10 @@ const mcpRefusal = async (call, error) => {
     return refusal('provider_refused', `${name} answered ${error.status}, so this did not go through.`);
 };
 
-/* An MCP tool is handed a caller of the server's tools, never the token. Only the tool it was defined with is sent. */
-const mcpCallerFor = (call) => async (name, args) => {
+/* An MCP tool is handed a caller of the server's tools, never the token. Only the tool it was defined with is sent. A
+ * write's refusal carries the server's own reason, since only its owner reads it, on the approval card; a read's never
+ * does, because a read's refusal reaches the model. */
+const mcpCallerFor = (call, writing = false) => async (name, args) => {
     const { tool, companyId, userId, connection, trace } = call;
     if (name !== tool.mcp.tool) throw refusal('tool_off', `${tool.key} can only call ${tool.mcp.tool}.`);
     const checked = tool.live
@@ -171,12 +175,15 @@ const mcpCallerFor = (call) => async (name, args) => {
         if (tool.live && error && error.code === 'tool_missing') await connectionTools.noteGone({ companyId, connectionId: connection.connectionId, tool: name });
         throw await mcpRefusal(call, error);
     }
-    if (result && result.isError) throw refusal('provider_refused', `${tool.definition.name} said this could not be done, so it did not go through.`);
+    if (result && result.isError) {
+        const said = writing ? plain(mcpClient.textOf(result)).replace(/\s+/g, ' ').slice(0, REFUSAL_REASON_MAX) : '';
+        throw refusal('provider_refused', `${tool.definition.name} said this could not be done, so it did not go through.${said ? ` It said: ${said}` : ''}`);
+    }
     return mcpClient.textOf(result);
 };
 
 const handedTo = (call, { write: writing = false } = {}) => (call.tool.mcp
-    ? { connectionId: call.connection.connectionId, mcp: mcpCallerFor(call) }
+    ? { connectionId: call.connection.connectionId, mcp: mcpCallerFor(call, writing) }
     : { connectionId: call.connection.connectionId, request: (writing ? writeRequesterFor : requesterFor)(call) });
 
 const ownConnection = async (tool, companyId, userId, asked) => {

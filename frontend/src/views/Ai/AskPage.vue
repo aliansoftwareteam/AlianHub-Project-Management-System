@@ -542,7 +542,7 @@ const submit = async () => {
     const explicit = composer.body();
     const mentions = composer.chips.value.slice();
     composer.reset();
-    if (mode.value === "plan") await plan({ sentence: asked, projectId: projectId.value });
+    if (mode.value === "plan") await plan({ sentence: asked, projectId: projectId.value, mentions, context: explicit.context });
     else await send({ question: asked, mode: mode.value, projectId: projectId.value, mentions, ...explicit });
 };
 

@@ -81,7 +81,8 @@ const ratingTable = () => ({ ...RATINGS, ...Object.fromEntries(Object.entries(FL
 
 const isCompleteRating = (r) => Boolean(r) && typeof r.write === 'boolean' && typeof r.reversible === 'boolean'
     && Object.values(SCOPE).includes(r.scope) && typeof r.money === 'boolean';
-const rating = (key) => { const r = ratingTable()[String(key || '')]; return isCompleteRating(r) ? { ...r } : null; };
+const liveRating = (key) => { const action = registry.get(key); return action && action.live ? require('./registry/connectorTools').LIVE_WRITE_RATING : undefined; };
+const rating = (key) => { const r = ratingTable()[String(key || '')] || liveRating(key); return isCompleteRating(r) ? { ...r } : null; };
 const ratings = () => Object.fromEntries(Object.entries(ratingTable()).map(([k, v]) => [k, { ...v }]));
 const unrated = (keys = registry.keys()) => { const table = ratingTable(); return keys.filter((k) => !isCompleteRating(table[k])); };
 

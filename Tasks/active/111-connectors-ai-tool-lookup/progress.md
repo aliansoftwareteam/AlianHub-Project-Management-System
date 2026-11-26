@@ -27,7 +27,7 @@
   - `frontend/tests/unit/agentConnectors.spec.js` (+3)
 
 ## Left for later
-- Ask files a change only for REST apps. A change to a live MCP app is refused with `live_write`, because proposals and the agent registry have no entry for live keys yet (`proposals.validateChanges` → `registry.evaluate`).
+- Ask files every change as a proposal, an Always-allow write of a live MCP app included; task 110 lets that one run at once from AI chat, which is not done yet.
 - Agent skills read and propose only catalog tools (`skills/readers.js`, `registry/connectorTools.js`); a live tool ticked on an agent is honoured by the runner but no skill step calls it yet.
 - Agent settings list a live app's tools from the viewer's connection; a run uses the connection of the person it works for, which may list other tools.
 - Not checked in a running app: the instance here has no `CONNECTORS` set.
@@ -51,3 +51,9 @@ None.
 - Found that after 109 the MCP apps had no catalog tools, so Ask said they were off and agent settings did not list them; the lookup fixes both.
 - Tested in the running app with Supabase: Ask got Supabase's 36 live tools, but "list_extensions from supabase" needs a `project_id`, so the single pick read `list_projects` and stopped. Added the second pick round. The connected Supabase organization lists no projects, so that question still has nothing to read.
 - Decision: a REST app's tools stay tickable on an agent without a connection, since they do not depend on one; a live app's need the viewer's connection to be listed.
+
+### 2026-11-26
+- Live MCP writes from Ask: a live app's write gets an approval-only registry entry when named, so Ask files it as a proposal for the connection's owner and the approval sends it once. Tested in the running app: a Notion page, a Supabase table and a GitHub repository were made after approval.
+- A refused MCP write now shows the app's own reason on its approval card; a refused read still does not, since it reaches the model.
+- Plan mode: the @ chips go with the sentence, and Stop ends the request (the dev proxy now passes the disconnect on, so no plan is filed after Stop).
+- Plan due dates were lost because this instance's saved settings had `MCP_TOOLS_MANAGE` off, which leaves the planner the short `task.create`; the user turned it on.

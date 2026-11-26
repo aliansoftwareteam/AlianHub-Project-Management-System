@@ -31,7 +31,17 @@ const reads = connectorTools.reads();
 const writes = connectorTools.writes();
 const entryOf = (actionOf) => (tool) => ({ enabled: () => connectorTools.isOn(tool), action: Object.freeze(actionOf(tool)) });
 
+/* A built-in MCP app lists its tools per connection, so its writes have no entry until one is named. Only a write is
+ * ever filed under such a key, and writes.js admits it against the owner's connection before it is stored or sent. */
+const liveWriteOf = (key, appName) => Object.freeze({
+    ...writeOf({ key, input: { description: `A change to ${appName}` } }),
+    live: true,
+});
+const LIVE_WRITE_RATING = Object.freeze(write(SCOPE.WORKSPACE, false));
+
 module.exports = {
+    liveWriteOf,
+    LIVE_WRITE_RATING,
     entries: [...reads.map(entryOf(readOf)), ...writes.map(entryOf(writeOf))],
     ratings: Object.freeze({
         ...Object.fromEntries(reads.map((tool) => [tool.key, read(SCOPE.WORKSPACE)])),

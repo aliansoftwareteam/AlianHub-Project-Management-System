@@ -40,10 +40,34 @@ describe('planning a sentence in the Ask box', () => {
 
         await ask.plan({ sentence: '  Add a Budget field  ', projectId: 'proj1' });
 
-        expect(apiRequest).toHaveBeenCalledWith('post', env.AI_ASK_PLAN, { sentence: 'Add a Budget field', projectId: 'proj1' });
+        expect(apiRequest).toHaveBeenCalledWith('post', env.AI_ASK_PLAN, { sentence: 'Add a Budget field', projectId: 'proj1' }, undefined, expect.anything());
         const [turn] = ask.turns.value;
         expect(turn).toMatchObject({ mode: 'plan', status: 'planned', question: 'Add a Budget field' });
         expect(turn.plan).toMatchObject({ proposalId: 'p1', decision: 'pending', summary: 'Add a Budget field' });
+        expect(ask.streaming.value).toBe(false);
+    });
+
+    it('sends what was attached with @, and shows it on the turn without the app chips', async () => {
+        apiRequest.mockResolvedValue(planned());
+        const ask = conversation();
+        const task = { kind: 'task', id: 't1', title: 'Fix login' };
+
+        await ask.plan({ sentence: 'Close it', mentions: [task, { kind: 'connector', id: 'github', title: 'GitHub' }], context: [{ kind: 'task', id: 't1' }] });
+
+        expect(apiRequest).toHaveBeenCalledWith('post', env.AI_ASK_PLAN, { sentence: 'Close it', context: [{ kind: 'task', id: 't1' }] }, undefined, expect.anything());
+        expect(ask.turns.value[0].mentions).toEqual([task]);
+    });
+
+    it('stops waiting for a plan when Stop is pressed, and can plan again', async () => {
+        apiRequest.mockReturnValueOnce(new Promise(() => {}));
+        const ask = conversation();
+        const waiting = ask.plan({ sentence: 'Add a task' });
+
+        ask.stop();
+        await waiting;
+
+        expect(apiRequest.mock.calls[0][4].signal.aborted).toBe(true);
+        expect(ask.turns.value[0].status).toBe('stopped');
         expect(ask.streaming.value).toBe(false);
     });
 

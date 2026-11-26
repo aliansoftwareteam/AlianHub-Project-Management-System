@@ -135,11 +135,23 @@ const FLAGGED_BY_KEY = new Map(FLAGGED.map((f) => [f.action.key, f]));
 
 const active = () => [...ACTIONS, ...FLAGGED.filter((f) => f.enabled()).map((f) => f.action)];
 
+const SERVER_TOOL = /^[A-Za-z0-9_.\-/]{1,128}$/;
+const LIVE_WRITES = new Map();
+
+const liveWrite = (k) => {
+    const { splitKey, liveDefinition } = require('../Connectors/connectionTools');
+    const { provider, tool } = splitKey(k);
+    if (!SERVER_TOOL.test(tool) || !require('../Connectors/available').isLive(provider) || !require('../Connectors/tools').providerOn(provider)) return null;
+    if (!LIVE_WRITES.has(k)) LIVE_WRITES.set(k, require('./registry/connectorTools').liveWriteOf(k, liveDefinition(provider).name));
+    return LIVE_WRITES.get(k);
+};
+
 const get = (key) => {
     const k = String(key || '');
     if (BY_KEY.has(k)) return BY_KEY.get(k);
     const flagged = FLAGGED_BY_KEY.get(k);
-    return flagged && flagged.enabled() ? flagged.action : null;
+    if (flagged) return flagged.enabled() ? flagged.action : null;
+    return liveWrite(k);
 };
 const has = (key) => Boolean(get(key));
 const keys = () => active().map((a) => a.key);

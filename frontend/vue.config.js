@@ -11,7 +11,11 @@ module.exports = defineConfig({
     proxy: {
       '^/api': {
         target: 'http://localhost:4000',
-        changeOrigin: true
+        changeOrigin: true,
+        // The proxy keeps the backend request open after the browser aborts a POST it has fully sent.
+        onProxyReq: (proxyReq, req, res) => res.on('close', () => {
+          if (!res.writableEnded) proxyReq.destroy();
+        })
       },
       // Server-rendered public share pages (GET /share/:token and its intake
       // form POST) live on the backend, same as /api.

@@ -111,15 +111,39 @@ const toolsOffered = () => TOOLS.map((name) => tools().planTool(name)).filter(Bo
 
 const dayOf = (now) => `${now.toISOString().slice(0, 10)} (${now.toLocaleDateString('en-US', { weekday: 'long', timeZone: 'UTC' })})`;
 
-const dataFor = ({ places, people, offered, now }) => [
+/* What the person attached with @, as ids the planner can use. An id the person cannot open is dropped without a word. */
+const attachedOf = async (ctx, context, places, people) => {
+    const { pinnedSources, MAX_PINNED } = require('./askContext');
+    const refs = (Array.isArray(context) ? context : []).filter((r) => r && isId(r.id)).slice(0, MAX_PINNED);
+    if (!refs.length) return [];
+    const lists = places.flatMap((p) => (p.lists || []).map((l) => ({ ...l, projectId: p.id })));
+    const known = { project: places, list: lists, person: people };
+    const named = refs.flatMap((r) => {
+        const found = (known[r.kind] || []).find((row) => row.id === r.id);
+        return found ? [{ kind: r.kind, id: found.id, name: found.name, projectId: found.projectId }] : [];
+    });
+    if (!refs.some((r) => r.kind === 'task' || r.kind === 'page')) return named;
+    const { openProjects: visible } = require('./ask');
+    const projects = await visible(ctx.companyId, ctx.userId);
+    const pinned = await pinnedSources(ctx.companyId, ctx.userId, { context: refs, projects });
+    return [
+        ...named,
+        ...pinned.filter((s) => s.kind === 'task' || s.kind === 'page').map((s) => ({ kind: s.kind, id: s.id, name: s.title, projectId: s.projectId || undefined })),
+    ];
+};
+
+const dataFor = ({ places, people, offered, attached = [], now }) => [
     `TODAY: ${dayOf(now)}`,
     `TOOLS: ${JSON.stringify(offered.map(schemaOf))}`,
     `PLACES (projects, each with its lists): ${JSON.stringify(places)}`,
     `PEOPLE: ${JSON.stringify(people)}`,
+    ...(attached.length ? [`ATTACHED (what the person attached to the sentence with @; the sentence is about these): ${JSON.stringify(attached)}`] : []),
 ].join('\n');
 
 /* The person's sentence is the request, so it travels after the data block and outside it; only workspace text is data. */
-const messageFor = ({ sentence, ...data }) => `${untrusted.wrap(dataFor(data))}\n\nSENTENCE (the request, from the person):\n${untrusted.escape(sentence)}`;
+const LANGUAGE_LINE = 'Write the summary and every reason in the language of the SENTENCE, never another.';
+
+const messageFor = ({ sentence, ...data }) => `${untrusted.wrap(dataFor(data))}\n\nSENTENCE (the request, from the person):\n${untrusted.escape(sentence)}\n\n${LANGUAGE_LINE}`;
 
 const stepsOf = (raw) => {
     if (!raw || typeof raw !== 'object' || !Array.isArray(raw.steps)) return null;
@@ -216,9 +240,9 @@ const unplanned = (code, extra = {}) => ({
     data: { configured: code === CODE.NOTHING, planned: false, code, ...extra },
 });
 
-/* POST /api/v1/ai/ask/plan  body: { sentence, projectId? }
+/* POST /api/v1/ai/ask/plan  body: { sentence, projectId?, context? }
  * One sentence becomes one proposal, filed for the person to approve in the Ask box or the Inbox. Nothing is made here. */
-const planSentence = async (req, { sentence, projectId } = {}, { now = new Date() } = {}) => {
+const planSentence = async (req, { sentence, projectId, context } = {}, { now = new Date(), stopped = () => false } = {}) => {
     const companyId = String(req.headers['companyid'] || '');
     const uid = String(req.uid || '');
     if (!companyId || !uid) return { status: false, statusText: 'companyId and an authenticated user are required.', code: 'unauthenticated' };
@@ -236,11 +260,13 @@ const planSentence = async (req, { sentence, projectId } = {}, { now = new Date(
     const [places, people] = await Promise.all([placesOf(ctx, scoped), peopleOf(ctx)]);
     if (scoped && !places.length) return { status: false, statusText: 'That project was not found.', code: 'project_not_found' };
 
+    const attached = await attachedOf(ctx, context, places, people);
+
     const result = await withTimeout(getProvider().chat({
         systemPrompt: untrusted.withNotice(SYSTEM_PROMPT),
-        messages: [{ role: 'user', content: messageFor({ sentence: asked, places, people, offered, now }) }],
+        messages: [{ role: 'user', content: messageFor({ sentence: asked, places, people, offered, attached, now }) }],
         jsonMode: true,
-        temperature: 0.1,
+        temperature: 0,
         maxTokens: MAX_TOKENS,
         spend: { feature: FEATURES.ASK, companyId, userId: uid },
     }), REQUEST_TIMEOUT_MS, 'The AI request timed out.');
@@ -256,6 +282,8 @@ const planSentence = async (req, { sentence, projectId } = {}, { now = new Date(
     const { kept, left, projectId: home } = await inOneProject(companyId, vetted.ready);
     const notPlanned = [...cannot, ...vetted.cannot, ...left];
     if (!kept.length) return unplanned(CODE.NOTHING, { cannot: notPlanned, usage: usedBy });
+
+    if (stopped()) return unplanned(CODE.NOTHING, { cannot: [], usage: usedBy });
 
     const proposal = await fileProposal(ctx, { projectId: home, summary, ready: kept });
     return {
@@ -274,9 +302,11 @@ const planSentence = async (req, { sentence, projectId } = {}, { now = new Date(
 };
 
 const plan = async (req, res) => {
+    let gone = false;
+    if (res.on) res.on('close', () => { gone = !res.writableEnded; });
     try {
         const body = req.body || {};
-        return res.send(await planSentence(req, { sentence: body.sentence, projectId: body.projectId }));
+        return res.send(await planSentence(req, { sentence: body.sentence, projectId: body.projectId, context: body.context }, { stopped: () => gone }));
     } catch (error) {
         logger.error(`ai ask plan: ${error.message}`);
         if (aiSwitch.isAiOff(error)) return res.send(unplanned(CODE.AI_OFF));
