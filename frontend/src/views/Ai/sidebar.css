@@ -9,6 +9,8 @@
     display: flex;
     flex-direction: column;
     padding: 14px 10px 10px;
+    overflow: hidden auto;
+    scrollbar-width: none;
 }
 .ai-side__head { display: flex; align-items: center; gap: 8px; padding: 0 6px 12px; }
 .ai-side__nav { display: flex; flex-direction: column; gap: 2px; }

@@ -1,4 +1,8 @@
 .ai-page { display: flex; min-height: 100%; background: var(--canvas); }
+/* A phone stacks the page in a column that scrolls whole, so only wider screens pin it. */
+@media (min-width: 768px) {
+    .ah-page.ai-page { height: 100%; overflow: hidden; }
+}
 .ai-page__main { flex: 1; min-width: 0; display: flex; flex-direction: column; }
 .ai-page__body { flex: 1; min-height: 0; overflow: auto; padding: 20px 24px; }
 
@@ -62,7 +66,7 @@
 .ai-change__label { flex: 1; min-width: 0; font: 500 12.5px/1.35 var(--font-ui); }
 .ai-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 18px; }
 .ai-cost { margin-top: 14px; font: var(--text-data); color: var(--ink-2); }
-.ai-detail__empty { display: flex; align-items: center; justify-content: center; height: 100%; padding: 40px; }
+.ai-detail__empty { box-sizing: border-box; display: flex; align-items: center; justify-content: center; height: 100%; padding: 40px; }
 .ai-done { text-align: center; padding: 48px 24px; }
 
 @media (max-width: 1280px) {

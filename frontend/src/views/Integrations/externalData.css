@@ -1,4 +1,5 @@
 .xd { display: flex; flex-direction: column; min-height: 0; background: var(--canvas); }
+.ah-page.xd { height: 100%; overflow: hidden; }
 .xd__meta { color: var(--ink-2); margin-left: 10px; }
 .xd__body { display: flex; flex-direction: column; gap: 12px; padding: 20px 24px; overflow: auto; }
 .xd__card { max-width: 860px; }

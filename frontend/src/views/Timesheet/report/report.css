@@ -39,6 +39,10 @@
 .rpt__export-pop .ah-pop__item small { margin-inline-start: auto; color: var(--ink-2); font: var(--text-data); }
 
 .rpt__body { flex: 1; min-height: 0; padding: 16px var(--page-pad-x, 22px) 24px; display: flex; flex-direction: column; gap: 12px; }
+@media (min-width: 768px) {
+    .ah-page.ut2, .ah-page.wl { height: 100%; overflow: hidden; }
+    .ut2 > .rpt__body, .wl > .rpt__body { overflow-y: auto; }
+}
 .ah-input.rpt__select { height: var(--control-h, 30px); width: auto; max-width: 220px; padding: 0 28px 0 10px; font-size: var(--fs-sm, 12.5px); border-width: 1px; }
 
 @media (max-width: 767px) {
