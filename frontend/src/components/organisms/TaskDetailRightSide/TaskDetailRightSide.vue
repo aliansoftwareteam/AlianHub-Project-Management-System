@@ -229,11 +229,10 @@
                 </p>
                 <p v-if="aiEstimate.reasoning" class="ai-estimate-preview__reason">{{ aiEstimate.reasoning }}</p>
             </AiResultPreview>
-            <!-- AHE — reason required when RE-updating an already-set estimate; the
-                 reason is written to the task Activity Log by the backend. -->
             <Modal
                 :modelValue="showEstimateReasonModal"
                 :closeOnBackdrop="false"
+                styles="width: min(440px, calc(100vw - 32px))"
                 :acceptButtonText="$t('Home.Confirm')"
                 :cancelButtonText="$t('Projects.cancel')"
                 @accept="submitEstimateReason"
@@ -245,12 +244,12 @@
                 <template #body>
                     <textarea
                         v-model.trim="estimateReasonText"
-                        class="w-100 border border-radius-6-px task-detail-right-side-font-size-14"
-                        style="min-height:90px; resize:vertical; outline:none; padding:8px;"
+                        class="estimate-reason__input"
+                        :aria-label="$t('TaskPanel.estimate_reason_title')"
                         :placeholder="$t('TaskPanel.estimate_reason_ph')"
                         @input="estimateReasonError = false"
                     ></textarea>
-                    <span v-if="estimateReasonError" class="task-detail-right-side-red task-detail-right-side-font-size-12">{{ $t('TaskPanel.estimate_reason_required') }}</span>
+                    <span v-if="estimateReasonError" class="estimate-reason__error">{{ $t('TaskPanel.estimate_reason_required') }}</span>
                 </template>
             </Modal>
             <div class="d-flex task-detail-right-side-label" v-if="checkApps('TimeEstimates') && checkPermission('task.task_estimated_hours',project?.isGlobalPermission) !== null">
@@ -970,6 +969,31 @@ const applyAiEstimate = async () => {
 </style>
 
 <style scoped>
+.estimate-reason__input {
+    display: block;
+    box-sizing: border-box;
+    width: 100%;
+    min-height: 96px;
+    resize: vertical;
+    padding: 8px 10px;
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    background: var(--surface);
+    color: var(--ink);
+    font: inherit;
+    font-size: 14px;
+    line-height: 1.45;
+}
+.estimate-reason__input:focus {
+    outline: none;
+    border-color: var(--brand);
+}
+.estimate-reason__error {
+    display: block;
+    margin-top: 6px;
+    color: var(--danger-ink);
+    font-size: 12px;
+}
 .task-detail-right-side-black {
     color: var(--ink);
 }

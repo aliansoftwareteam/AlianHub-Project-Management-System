@@ -30,6 +30,7 @@
             v-if="asking"
             :modelValue="asking"
             :closeOnBackdrop="false"
+            styles="width: min(440px, calc(100vw - 32px))"
             :acceptButtonText="$t('Home.Confirm')"
             :cancelButtonText="$t('Projects.cancel')"
             @accept="confirmReason"
@@ -138,12 +139,15 @@ function dropReason() {
 <style>
 .est-cell__input { width: 72px; }
 .est-cell__reason {
-    width: 100%; min-height: 90px; resize: vertical;
-    padding: 8px;
+    display: block; box-sizing: border-box;
+    width: 100%; min-height: 96px; resize: vertical;
+    padding: 8px 10px;
     border: 1px solid var(--border); border-radius: 6px;
-    background: var(--surface); color: var(--ink); font: inherit;
+    background: var(--surface); color: var(--ink);
+    font: inherit; font-size: 14px; line-height: 1.45;
 }
-.est-cell__error { color: var(--danger-ink); font-size: 12px; }
+.est-cell__reason:focus { outline: none; border-color: var(--brand); }
+.est-cell__error { display: block; margin-top: 6px; color: var(--danger-ink); font-size: 12px; }
 </style>
 
 <style scoped>
