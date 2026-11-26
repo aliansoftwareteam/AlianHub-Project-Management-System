@@ -5,8 +5,13 @@
 - [x] Daily sweep
 - [x] Tests
 
+## Acceptance criteria
+- [x] Removing a member revokes at the provider and clears secrets
+- [x] A removal made while the provider was down is caught by the next sweep (proved 2026-11-26, `tests/connector-revoke-lifecycle.test.js`)
+- [x] Running the sweep twice changes nothing the second time
+
 ## Last step
-Implemented on branch `feat/task-067-connectors-member-removal-sweep` (cut from the 066 branch, which is done but not yet merged). Unit suite run pending; `connector-lifecycle.test.js` green (28 tests).
+2026-11-26: the three access-outliving-removal gaps from the 066 security review are fixed on `fix/connectors-067-revoke-retry` (from `origin/staging`), committed, not pushed. All 36 connector, SCIM and connector-migration suites green (702 tests), conventions green (489).
 
 ## Blockers
 None. Rides on 066's `connection.endForMember`, which already exists.
@@ -34,3 +39,12 @@ None. Rides on 066's `connection.endForMember`, which already exists.
 - **Change:** added `seatOf(companyId, userId)` → `yes` / `no` / `unknown`; `hasSeat` now derives from it (`=== yes`), so `findUsable`'s fail-closed behaviour is unchanged. The sweep ends a member **only on a definite `no`**; an `unknown` (read failed) is skipped and left for the next pass to retry.
 - **Test:** added a case where the seat read throws — the sweep ends nothing and revokes no one; once the read recovers and the member is gone, the next pass ends only them. `connector-lifecycle` → 29/29.
 - Supersedes the earlier *"Departed = `!hasSeat`"* decision: departed is now a definite no-seat answer, never an unreadable one.
+
+### 2026-11-26 — security review gaps (access outliving a disconnect or removal)
+- **Failed revoke is retried (criterion 2).** Closing a row now parks the handles it takes as `revokeRetry: { handles, attempts, nextAt, by }` in the same write, then asks the provider once. A refusal keeps only the token the revoke call needs (the refresh token; also the access token for `revokeWith: 'access'`), on the closed row, which no lookup returns; the daily sweep retries it once `nextAt` (1 h) has passed, up to 7 attempts, then retires it and audits `gave_up`. Every attempt audits `connector.revoke` with its outcome and attempt number. A process that dies between the close and the revoke leaves the parked row for the sweep too.
+- **Reconnect to another account** now audits the earlier grant's revoke (`by: 'reconnected'`) and parks it for the sweep when it fails, on a closed row of its own.
+- **Race with an in-flight exchange or refresh.** Chose "the late writer notices" over "block the close": every write to a row (`update`) matches a live row only, so a writer that lost the race gets null instead of writing to a closed row; `complete` then parks and revokes the grant it was just given (`by: 'late_grant'`) and answers 409 `connection_ended`, and a refresh retires the handle it made and hands out nothing. The close itself matches the handles it read, so a token written between the disconnect's read and its close makes it re-read rather than close over it. No lock, lease or waiting is needed, and nothing is left held if a process dies. `complete` now always stores new tokens under new handles and retires the old ones after a successful write: rotating them into the row's own handles would let a concurrent disconnect revoke the new grant and lose the old one's token.
+- **Provider not offered.** `endForMember` and `sweepCompany` end every module row of the person (`provider` a string), offered or not; `endableIds` is gone. Revoke still runs where a definition exists (a catalog provider's needs no app; `revokeWith: 'access'` with an expired token needs one and is skipped without it). The removal hook and `sweepAll` no longer return early when CONNECTORS names nothing.
+- Tests: `tests/connector-revoke-lifecycle.test.js` (11, each failing on `origin/staging`). Changed expectations: `connector-lifecycle` (a reconnect gets new handles, old ones retired) and `connector-google-member-leaves` (a removal with Google unreachable keeps the leaver's refresh token parked for the retry). `audit-event-labels` lists `handles.refresh`/`handles.access` as connection fields.
+- Not proved: real MongoDB behaviour of the conditional writes (fake Mongo only); the sweep's `revokeRetry.nextAt` query has no index (closed rows per company are few).
+

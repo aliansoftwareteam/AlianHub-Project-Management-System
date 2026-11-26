@@ -1,8 +1,6 @@
 const { dbCollections } = require('../../Config/collections');
 const { MongoDbCrudOpration } = require('../../utils/mongo-handler/mongoQueries');
 const logger = require('../../Config/loggerConfig');
-const { named } = require('../Agents/connectors/flag');
-const registry = require('./registry');
 const connection = require('./connection');
 
 const JOB_NAME = 'connectors.member-sweep';
@@ -14,12 +12,11 @@ const intervalMs = () => {
     return (Number.isFinite(hours) && hours >= 1 ? hours : DEFAULT_INTERVAL_HOURS) * 60 * 60 * 1000;
 };
 
-const anyNamed = () => registry.list().some((definition) => named().includes(definition.id));
-
-/* Ends the connections of every no-longer-seated member across every company. Never throws: one company's
- * failure leaves the rest to run. Idempotent — a connection ended on an earlier pass is already closed. */
+/* Ends the connections of every no-longer-seated member across every company and retries the provider revokes
+ * that are due. It runs whatever CONNECTORS names now, since a provider switched off still holds what it was
+ * given. Never throws: one company's failure leaves the rest to run. Idempotent: a connection ended on an earlier
+ * pass is already closed. */
 const sweepAll = async () => {
-    if (!anyNamed()) return { ended: 0 };
     const companies = await MongoDbCrudOpration(dbCollections.GLOBAL, { type: dbCollections.COMPANIES, data: [{}, '_id'] }, 'find').catch(() => []);
     let ended = 0;
     for (const c of companies || []) {
@@ -30,4 +27,4 @@ const sweepAll = async () => {
     return { ended };
 };
 
-module.exports = { JOB_NAME, intervalMs, anyNamed, sweepAll };
+module.exports = { JOB_NAME, intervalMs, sweepAll };

@@ -32,10 +32,15 @@ const EXPIRY_SKEW_MS = 60 * 1000;
 const OBJECT_ID = /^[a-f0-9]{24}$/i;
 const ERROR_CODE = /^[a-z0-9_]{1,60}$/;
 const STATUS = Object.freeze({ PENDING: 'pending', CONNECTED: 'connected', BROKEN: 'broken', REAUTH: 'reauth_required', REVOKED: 'revoked' });
-const BY = Object.freeze({ SELF: 'self', ADMIN: 'admin', MEMBER_REMOVED: 'member_removed', SERVER_REMOVED: 'server_removed' });
+const BY = Object.freeze({
+    SELF: 'self', ADMIN: 'admin', MEMBER_REMOVED: 'member_removed', SERVER_REMOVED: 'server_removed', RECONNECTED: 'reconnected', LATE_GRANT: 'late_grant',
+});
 const SIGN_IN = Object.freeze({ REGISTERED_APP: 'registered_app', SELF_REGISTER: 'self_register', PERSONAL_TOKEN: 'personal_token' });
 const MAX_PERSONAL_TOKEN = 4096;
 const SECRET_LABEL = Object.freeze({ refresh: 'refresh token', access: 'access token' });
+const REVOKE_RETRY_MS = 60 * 60 * 1000;
+const MAX_REVOKE_ATTEMPTS = 7;
+const MAX_CLOSE_TRIES = 3;
 
 class ConnectionError extends Error {
     constructor(status, message, code) { super(message); this.name = 'ConnectionError'; this.status = status; this.code = code || ''; }
@@ -79,13 +84,22 @@ const find = async (companyId, userId, provider) => plain(await MongoDbCrudOprat
 const byId = async (companyId, connectionId) => (OBJECT_ID.test(String(connectionId || ''))
     ? plain(await MongoDbCrudOpration(companyId, { type: T, data: [{ _id: connectionId, deletedStatusKey: { $ne: 1 } }] }, 'findOne'))
     : null);
+/* Writes only to a live row and answers null once it is closed, so a writer that lost a race with a disconnect
+ * learns it instead of putting tokens on a closed row. */
 const update = async (companyId, row, change) => plain(await MongoDbCrudOpration(companyId, {
-    type: T, data: [{ _id: row._id }, change, { returnDocument: 'after' }],
+    type: T, data: [{ _id: row._id, deletedStatusKey: { $ne: 1 } }, change, { returnDocument: 'after' }],
 }, 'findOneAndUpdate'));
 /* A pasted token is used as it is and never refreshed, so its row holds the access token alone. */
 const isPersonalToken = (row) => Boolean(row && row.signIn === SIGN_IN.PERSONAL_TOKEN);
 const tokenHandle = (row) => (row && row.handles ? (isPersonalToken(row) ? row.handles.access : row.handles.refresh) : null);
 const holdsToken = (row) => Boolean(tokenHandle(row));
+const handlesOf = (row) => Object.fromEntries(Object.entries((row && row.handles) || {}).filter(([, handle]) => Boolean(handle)));
+const retireAll = async (companyId, handles, actor) => {
+    for (const handle of Object.values(handles || {}).filter(Boolean)) {
+        // eslint-disable-next-line no-await-in-loop
+        await store.retire({ companyId, handle, actor });
+    }
+};
 
 const audit = (companyId, actor, action, provider, meta = {}, definition = null) => {
     const who = actorOf(actor);
@@ -327,6 +341,62 @@ const revokeAtProvider = async ({ companyId, actor, provider, row }) => {
     return out.ok ? (out.skipped ? 'no_endpoint' : 'revoked') : 'failed';
 };
 
+/* A grant still to be revoked rides on a closed row as `revokeRetry`: written in the same step that takes the
+ * handles off a live row, so a crash or a provider that is down leaves something the sweep finds, and on a closed
+ * row, so no lookup ever hands its token out. After a failed attempt only the token the revoke call needs stays. */
+const pendingRevoke = (handles, by) => ({ handles, attempts: 0, nextAt: new Date(Date.now() + REVOKE_RETRY_MS), by });
+const neededToRevoke = (definition, handles) => ({
+    ...(handles.refresh ? { refresh: handles.refresh } : {}),
+    ...(definition && definition.auth.revokeWith === 'access' && handles.access ? { access: handles.access } : {}),
+});
+
+const revokeParked = async (companyId, row, actor) => {
+    const retry = row.revokeRetry;
+    // Claimed by its attempt count, so two sweeps never both spend an attempt on one grant.
+    const claimed = plain(await MongoDbCrudOpration(companyId, { type: T, data: [
+        { _id: row._id, deletedStatusKey: 1, 'revokeRetry.attempts': retry.attempts },
+        { $inc: { 'revokeRetry.attempts': 1 }, $set: { 'revokeRetry.nextAt': new Date(Date.now() + REVOKE_RETRY_MS) } },
+        { returnDocument: 'after' },
+    ] }, 'findOneAndUpdate'));
+    if (!claimed) return null;
+    const { attempts: attempt, handles } = claimed.revokeRetry;
+    const definition = await definitionFor(companyId, row.provider).catch(() => null);
+    const result = await revokeAtProvider({ companyId, actor, provider: row.provider, row: { ...claimed, handles } }).catch(() => 'failed');
+    const again = result === 'failed' && attempt < MAX_REVOKE_ATTEMPTS;
+    const kept = again ? neededToRevoke(definition, handles) : {};
+    await retireAll(companyId, Object.fromEntries(Object.entries(handles).filter(([key]) => !kept[key])), actor);
+    await MongoDbCrudOpration(companyId, {
+        type: T, data: [{ _id: row._id, deletedStatusKey: 1 }, again ? { $set: { 'revokeRetry.handles': kept } } : { $unset: { revokeRetry: 1 } }],
+    }, 'updateOne');
+    const outcome = result === 'failed' && !again ? 'gave_up' : result;
+    audit(companyId, actor, 'connector.revoke', row.provider, { userId: String(row.userId), by: retry.by, provider: outcome, attempt, ...(again ? { retry: true } : {}) }, definition);
+    return outcome;
+};
+
+/* A grant that no live row holds any more (an earlier account's on a reconnect, or one granted to a row that was
+ * closed meanwhile) gets a closed row of its own to ride on. */
+const parkAndRevoke = async ({ companyId, from, handles, by, actor }) => {
+    if (!Object.keys(handles).length) return null;
+    const row = {
+        _id: new mongoose.Types.ObjectId(), companyId: String(companyId), userId: String(from.userId), provider: String(from.provider),
+        status: STATUS.REVOKED, signIn: from.signIn, kind: from.kind, account: from.account, app: from.app, accessExpiresAt: from.accessExpiresAt,
+        handles: {}, deletedStatusKey: 1, disconnectedAt: new Date(), disconnectedBy: by, createdBy: String(actorOf(actor).id || ''),
+        revokeRetry: pendingRevoke(handles, by),
+    };
+    await MongoDbCrudOpration(companyId, { type: T, data: row }, 'save');
+    return revokeParked(companyId, row, actor);
+};
+
+const retryRevokes = async (companyId) => {
+    const due = ((await MongoDbCrudOpration(companyId, { type: T, data: [{ deletedStatusKey: 1, 'revokeRetry.nextAt': { $lte: new Date(Date.now()) } }] }, 'find')) || []).map(plain);
+    for (const row of due) {
+        // eslint-disable-next-line no-await-in-loop
+        await revokeParked(companyId, row, { id: 'system' }).catch((error) => {
+            logger.error(`${LOG} retrying a provider revoke failed: ${(error && error.name) || 'Error'}`);
+        });
+    }
+};
+
 /* The account a connection belongs to: from the token answer, or with one call when the answer names none. */
 const accountFrom = async ({ definition, companyId, userId, answer, accessToken }) => {
     const unnamed = () => new ConnectionError(502, 'The provider did not identify the account.', 'no_account');
@@ -378,22 +448,31 @@ const complete = async ({ companyId, userId, sessionId, provider, state, code, a
         throw new ConnectionError(409, 'The provider sent no refresh token, so the connection could not be kept. Start again and allow offline access.', 'no_refresh_token');
     }
     const account = await accountFrom({ definition, companyId, userId, answer, accessToken: tokens.access_token });
-    const before = row.account && row.account.id;
-    if (holdsToken(row) && before && before !== account.id) await revokeAtProvider({ companyId, actor: who, provider, row });
 
+    // New handles, never the row's own: a disconnect that lands meanwhile takes the row's handles, and rotating
+    // the new tokens into them would leave the old grant with no token to revoke it by.
     const handles = {};
     for (const [key, value] of [['refresh', tokens.refresh_token], ['access', tokens.access_token]]) {
         // eslint-disable-next-line no-await-in-loop
-        handles[key] = await keep({ companyId, userId, provider, handle: row.handles && row.handles[key], key, value, actor: who, definition });
+        handles[key] = await keep({ companyId, userId, provider, handle: null, key, value, actor: who, definition });
     }
     const scopes = api.scopesOf(tokens.scope);
     const was = row.products || [];
     const products = Array.isArray(pending.products) ? pending.products : was;
-    const saved = await update(companyId, row, { $set: {
+    const fields = {
         status: STATUS.CONNECTED, handles, scopes, account, app: row.app || { source: app.source, appId: app.appId }, accessExpiresAt: lifetimeOf(tokens.expires_in),
         products: [...products], connectedAt: new Date(), lastError: '', brokenAt: null, updatedBy: String(userId),
         signIn: app.source === 'registered' ? SIGN_IN.SELF_REGISTER : SIGN_IN.REGISTERED_APP, kind: definition.transport || 'api',
-    } });
+    };
+    const saved = await update(companyId, row, { $set: fields });
+    if (!saved) {
+        await parkAndRevoke({ companyId, from: { ...row, ...fields }, handles, by: BY.LATE_GRANT, actor: who });
+        throw new ConnectionError(409, 'This connection was ended while it was being made. Start again from the Connections page.', 'connection_ended');
+    }
+    const earlier = handlesOf(row);
+    const before = row.account && row.account.id;
+    if (holdsToken(row) && before && before !== account.id) await parkAndRevoke({ companyId, from: row, handles: earlier, by: BY.RECONNECTED, actor: who });
+    else await retireAll(companyId, earlier, who);
     audit(companyId, who, 'connector.connect', provider, { userId: String(userId), products: [...(saved.products || [])], scopes }, definition);
     announce(companyId, userId, provider, 'connected');
     // A re-consent that changed the products of an already-connected account is also a product change (FR-10).
@@ -404,31 +483,54 @@ const complete = async ({ companyId, userId, sessionId, provider, state, code, a
     return view(provider, saved);
 };
 
-const close = (companyId, row, by, actor) => update(companyId, row, {
-    $set: { status: STATUS.REVOKED, handles: {}, deletedStatusKey: 1, disconnectedAt: new Date(), disconnectedBy: by, updatedBy: String(actorOf(actor).id || '') },
-    $unset: { oauth: 1 },
-});
+/* Closes the row only while it still holds the handles it was read with, so a token written since is never
+ * closed over unseen; the handles it takes are parked for the revoke in the same write. Null when it lost a race. */
+const close = async (companyId, row, by, actor) => {
+    const handles = handlesOf(row);
+    return plain(await MongoDbCrudOpration(companyId, { type: T, data: [
+        { _id: row._id, deletedStatusKey: { $ne: 1 }, 'handles.refresh': handles.refresh || null, 'handles.access': handles.access || null },
+        {
+            $set: {
+                status: STATUS.REVOKED, handles: {}, deletedStatusKey: 1, disconnectedAt: new Date(), disconnectedBy: by, updatedBy: String(actorOf(actor).id || ''),
+                ...(Object.keys(handles).length ? { revokeRetry: pendingRevoke(handles, by) } : {}),
+            },
+            $unset: { oauth: 1 },
+        },
+        { returnDocument: 'after' },
+    ] }, 'findOneAndUpdate'));
+};
 
-/* The provider is asked once to end the grant; whatever it answers, the tokens leave the store and the row closes. */
+/* The row closes first and the provider is then asked once to end the grant; a refusal leaves the grant parked
+ * for the sweep. Answers whether a connection holding a token was ended. */
+const endRow = async ({ companyId, row, actor, by }) => {
+    let current = row;
+    for (let tries = 0; current && tries < MAX_CLOSE_TRIES; tries += 1) {
+        // eslint-disable-next-line no-await-in-loop
+        const closed = await close(companyId, current, by, actor);
+        if (closed) {
+            if (!closed.revokeRetry) return false;
+            // eslint-disable-next-line no-await-in-loop
+            await revokeParked(companyId, closed, actor);
+            announce(companyId, closed.userId, closed.provider, 'disconnected');
+            return true;
+        }
+        // eslint-disable-next-line no-await-in-loop
+        current = await byId(companyId, current._id);
+    }
+    if (current) throw new ConnectionError(409, 'The connection changed while it was being ended. Try again.', 'connection_busy');
+    return false;
+};
+
 const disconnect = async ({ companyId, userId, provider, connectionId, actor, by = BY.SELF }) => {
     const row = await find(companyId, userId, provider);
-    const handles = Object.values((row && row.handles) || {}).filter(Boolean);
-    if (!row || !handles.length) throw new ConnectionError(404, 'There is no connection to end.', 'not_connected');
+    if (!row || !Object.keys(handlesOf(row)).length) throw new ConnectionError(404, 'There is no connection to end.', 'not_connected');
     if (connectionId && String(row._id) !== String(connectionId)) throw new ConnectionError(404, 'There is no such connection.', 'not_connected');
-    const providerResult = await revokeAtProvider({ companyId, actor, provider, row });
-    for (const handle of handles) {
-        // eslint-disable-next-line no-await-in-loop
-        await store.retire({ companyId, handle, actor });
-    }
-    await close(companyId, row, by, actor);
-    audit(companyId, actor, 'connector.revoke', provider, { userId: String(userId), by, provider: providerResult }, await definitionFor(companyId, provider));
-    announce(companyId, userId, provider, 'disconnected');
+    await endRow({ companyId, row, actor, by });
     return view(provider, null);
 };
 
 const endOne = async ({ companyId, row, actor, by }) => {
-    if (holdsToken(row)) return disconnect({ companyId, userId: String(row.userId), provider: row.provider, connectionId: String(row._id), actor, by });
-    await close(companyId, row, by, actor);
+    await endRow({ companyId, row, actor, by });
     return view(row.provider, null);
 };
 
@@ -460,8 +562,13 @@ const saveToken = async ({ companyId, userId, sessionId, provider, token, actor 
         app: { source: 'personal', appId: null }, accessExpiresAt: null, products, connectedAt: new Date(), lastError: '', brokenAt: null, updatedBy: String(userId),
     };
     let saved;
-    if (pending) saved = await update(companyId, pending, { $set: fields, $unset: { oauth: 1 } });
-    else {
+    if (pending) {
+        saved = await update(companyId, pending, { $set: fields, $unset: { oauth: 1 } });
+        if (!saved) {
+            await store.retire({ companyId, handle: access, actor: who });
+            throw new ConnectionError(409, 'This connection was ended while it was being made. Connect again from the Connections page.', 'connection_ended');
+        }
+    } else {
         await MongoDbCrudOpration(companyId, {
             type: T,
             data: { _id: new mongoose.Types.ObjectId(), companyId: String(companyId), userId: String(userId), provider: String(provider), createdBy: String(userId), deletedStatusKey: 0, ...fields },
@@ -483,7 +590,7 @@ const setToolsOff = async ({ companyId, row, toolsOff, actor }) => {
 };
 
 const markBroken = async (companyId, row, reason) => {
-    await update(companyId, row, { $set: { status: STATUS.BROKEN, lastError: String(reason || '').slice(0, 60), brokenAt: new Date() } });
+    if (!(await update(companyId, row, { $set: { status: STATUS.BROKEN, lastError: String(reason || '').slice(0, 60), brokenAt: new Date() } }))) return;
     audit(companyId, null, 'connector.broken', row.provider, { userId: String(row.userId), reason: String(reason || '').slice(0, 60) });
     announce(companyId, row.userId, row.provider, 'broken');
 };
@@ -512,7 +619,7 @@ const accessTokenFor = async ({ companyId, userId, provider }) => {
     if (isPersonalToken(row)) {
         const token = await store.resolve({ companyId, handle: handles.access }).catch(() => null);
         if (!token) return none('token_unavailable');
-        await update(companyId, row, { $set: { lastUsedAt: new Date() } });
+        if (!(await update(companyId, row, { $set: { lastUsedAt: new Date() } }))) return none('not_connected');
         return { token, reason: '' };
     }
     const held = await store.describe({ companyId, handle: handles.refresh }).then(() => true).catch(() => false);
@@ -521,7 +628,7 @@ const accessTokenFor = async ({ companyId, userId, provider }) => {
     if (fresh) {
         const token = await store.resolve({ companyId, handle: handles.access }).catch(() => null);
         if (!token) return none('token_unavailable');
-        await update(companyId, row, { $set: { lastUsedAt: new Date() } });
+        if (!(await update(companyId, row, { $set: { lastUsedAt: new Date() } }))) return none('not_connected');
         return { token, reason: '' };
     }
     const refreshToken = await store.resolve({ companyId, handle: handles.refresh }).catch(() => null);
@@ -543,7 +650,16 @@ const accessTokenFor = async ({ companyId, userId, provider }) => {
     if (typeof tokens.refresh_token === 'string' && tokens.refresh_token) {
         next.refresh = await keep({ companyId, userId, provider, handle: handles.refresh, key: 'refresh', value: tokens.refresh_token, actor, definition });
     }
-    await update(companyId, row, { $set: { handles: next, accessExpiresAt: lifetimeOf(tokens.expires_in), lastRefreshedAt: new Date(), lastUsedAt: new Date() } });
+    const accessExpiresAt = lifetimeOf(tokens.expires_in);
+    const saved = await update(companyId, row, { $set: { handles: next, accessExpiresAt, lastRefreshedAt: new Date(), lastUsedAt: new Date() } });
+    if (!saved) {
+        // Closed while refreshing: the disconnect took the row's own handles, so only a handle made here is left,
+        // made when the old one was already retired. A new refresh token among them is a grant of its own.
+        const made = Object.fromEntries(Object.entries(next).filter(([key, handle]) => handle && handle !== handles[key]));
+        if (made.refresh) await parkAndRevoke({ companyId, from: { ...row, accessExpiresAt }, handles: made, by: BY.LATE_GRANT, actor });
+        else await retireAll(companyId, made, actor);
+        return none('not_connected');
+    }
     return { token: tokens.access_token, reason: '' };
 };
 
@@ -593,59 +709,49 @@ const list = async (companyId, userId) => {
     };
 };
 
-/* What a departure ends: the catalog's offered providers and every custom server, switched on or not. */
-const endableIds = async (companyId) => [...registry.offered(await companyAppsOf(companyId)).map((d) => d.id), ...await custom().providerIds(companyId)];
-
 const membersWithConnections = async (companyId) => {
     const offered = [...registry.offered(await companyAppsOf(companyId)).map((d) => d.id), ...(await custom().offered(companyId)).map((d) => d.id)];
     const found = ((await MongoDbCrudOpration(companyId, { type: T, data: [{ provider: { $in: offered }, deletedStatusKey: { $ne: 1 } }] }, 'find')) || []).map(plain);
     return found.filter(holdsToken).map(memberView);
 };
 
-/* Called where a member is removed or deactivated. It never throws into that flow, and reads nothing while no
- * provider is offered. (The daily sweep and the removal hook are 067; this is the shared end-one-member path.) */
+/* A departure ends every module row of the person, whether or not its provider is offered now: one switched off
+ * or left without an app still holds a token and a grant. Rows from before the module carry no `provider`. */
+const moduleRows = (filter) => ({ ...filter, provider: { $type: 'string' }, deletedStatusKey: { $ne: 1 } });
+
+/* Called where a member is removed or deactivated. It never throws into that flow; one row that cannot be ended
+ * leaves the rest to end and itself to the daily sweep. */
 const endForMember = async (companyId, userId) => {
     if (!OBJECT_ID.test(String(companyId || '')) || !userId) return 0;
-    let offered;
+    let found;
     try {
-        offered = await endableIds(companyId);
-    } catch (e) {
+        found = ((await MongoDbCrudOpration(String(companyId), { type: T, data: [moduleRows({ userId: String(userId) })] }, 'find')) || []).map(plain);
+    } catch (error) {
+        logger.error(`${LOG} reading the connections of a departed member failed: ${(error && error.name) || 'Error'}`);
         return 0;
     }
-    if (!offered.length) return 0;
     let ended = 0;
-    try {
-        const found = ((await MongoDbCrudOpration(String(companyId), { type: T, data: [{ userId: String(userId), provider: { $in: offered }, deletedStatusKey: { $ne: 1 } }] }, 'find')) || []).map(plain);
-        for (const row of found) {
-            const actor = { id: 'system' };
+    for (const row of found) {
+        try {
             // eslint-disable-next-line no-await-in-loop
-            if (holdsToken(row)) { await disconnect({ companyId: String(companyId), userId, provider: row.provider, actor, by: BY.MEMBER_REMOVED }); ended += 1; }
-            // eslint-disable-next-line no-await-in-loop
-            else await close(String(companyId), row, BY.MEMBER_REMOVED, actor);
+            if (await endRow({ companyId: String(companyId), row, actor: { id: 'system' }, by: BY.MEMBER_REMOVED })) ended += 1;
+        } catch (error) {
+            logger.error(`${LOG} ending a connection of a departed member failed: ${(error && error.name) || 'Error'}`);
         }
-    } catch (error) {
-        logger.error(`${LOG} ending the connections of a departed member failed: ${(error && error.name) || 'Error'}`);
     }
     return ended;
 };
 
 /* The idempotent daily sweep (067): ends the connections of anyone in this company who still holds one but no
- * longer has a seat — the safety net for a removal whose end-one-member call never finished (the provider was
- * down, the process died). It reuses endForMember, so a closed row is not open on the next pass and a second run
- * ends nothing. A member who still has their seat is left alone. */
+ * longer has a seat, the safety net for a removal whose end-one-member call never finished, then retries the
+ * provider revokes that are due. A closed row is not open on the next pass and a settled revoke is not due again,
+ * so a second run ends nothing. A member who still has their seat is left alone. */
 const sweepCompany = async (companyId) => {
     if (!OBJECT_ID.test(String(companyId || ''))) return 0;
-    let offered;
-    try {
-        offered = await endableIds(companyId);
-    } catch (e) {
-        return 0;
-    }
-    if (!offered.length) return 0;
     let ended = 0;
     try {
-        const open = ((await MongoDbCrudOpration(String(companyId), { type: T, data: [{ provider: { $in: offered }, deletedStatusKey: { $ne: 1 } }, 'userId'] }, 'find')) || []).map(plain);
-        const userIds = [...new Set(open.map((row) => String(row.userId)))];
+        const open = ((await MongoDbCrudOpration(String(companyId), { type: T, data: [moduleRows({}), 'userId'] }, 'find')) || []).map(plain);
+        const userIds = [...new Set(open.filter((row) => row.userId).map((row) => String(row.userId)))];
         for (const userId of userIds) {
             // End only on a definite "no seat"; a read that failed is left for the next pass, never revoked on a blip.
             // eslint-disable-next-line no-await-in-loop
@@ -654,6 +760,11 @@ const sweepCompany = async (companyId) => {
     } catch (error) {
         logger.error(`${LOG} the departed-member connection sweep failed for a company: ${(error && error.name) || 'Error'}`);
     }
+    try {
+        await retryRevokes(String(companyId));
+    } catch (error) {
+        logger.error(`${LOG} retrying provider revokes failed for a company: ${(error && error.name) || 'Error'}`);
+    }
     return ended;
 };
 
@@ -661,5 +772,5 @@ module.exports = {
     STATUS, BY, SIGN_IN, STATE_TTL_SECONDS, SECRET_KIND, ConnectionError,
     isOffered, definitionFor, fallbackOrigin, redirectUri, callbackPath, byId,
     describe, list, membersWithConnections, start, setProducts, setToolsOff, returnFor, complete, disconnect, endOne, saveToken,
-    findUsable, accessTokenFor, markBrokenById, markBackoff, recordHealth, endForMember, sweepCompany,
+    findUsable, accessTokenFor, markBrokenById, markBackoff, recordHealth, endForMember, sweepCompany, MAX_REVOKE_ATTEMPTS,
 };

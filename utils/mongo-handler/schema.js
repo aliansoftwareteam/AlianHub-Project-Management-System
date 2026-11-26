@@ -2197,8 +2197,10 @@ const schema = {
         // { stateHash, verifier, sessionId, origin } of a connect attempt in progress; cleared when it is used
         oauth: { type: Object, required: false },
         disconnectedAt: { type: Date, required: false },
-        // self | admin | member_removed
+        // self | admin | member_removed | server_removed, or on a row that only carries a revoke: reconnected | late_grant
         disconnectedBy: { type: String, required: false },
+        // { handles, attempts, nextAt, by } on a closed row whose grant the provider has not yet revoked; the sweep retries it
+        revokeRetry: { type: Object, required: false },
         lastPostAt: { type: Date, required: false },
         lastReadAt: { type: Date, required: false },
         createdBy: { type: String, required: false },

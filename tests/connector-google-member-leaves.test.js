@@ -139,8 +139,12 @@ describe('a member with a Google connection leaves the workspace', () => {
         mockGoogle.answers.revoke = new Error('socket hang up');
         expect((await update(LEAVER, { isDelete: true })).code).toBe(200);
         expect(seat(LEAVER).isDelete).toBe(true);
-        expect(connection(LEAVER)).toMatchObject({ status: 'revoked', handles: {} });
-        expect(sealed()).toHaveLength(2);
+        expect(connection(LEAVER)).toMatchObject({ status: 'revoked', handles: {}, deletedStatusKey: 1 });
+        // Only the refresh token stays, parked on the closed row for the sweep to retry Google's revoke with.
+        const parked = connection(LEAVER).revokeRetry.handles;
+        expect(Object.keys(parked)).toEqual(['refresh']);
+        expect(sealed().map((s) => s.handle)).toEqual(expect.arrayContaining([parked.refresh, ...Object.values(connection(STAYER).handles)]));
+        expect(sealed()).toHaveLength(3);
     });
 
     it('a change that leaves the seat in place ends nothing', async () => {

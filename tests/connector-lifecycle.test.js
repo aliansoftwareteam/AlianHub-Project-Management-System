@@ -251,7 +251,9 @@ describe('two people, two accounts', () => {
         await connectAs(MEMBER, { accountId: 'acc-1b', email: 'again@example.test' });
         expect(mockProvider.endpoints()).toEqual(['token:authorization_code', 'revoke:revoke']);
         expect(mockProvider.calls[1].form.token).toBe(firstRefresh);
-        expect(rowOf(MEMBER).handles).toEqual(handles);
+        // The new tokens get handles of their own, so a disconnect landing mid-exchange never takes them unseen.
+        expect(rowOf(MEMBER).handles).not.toEqual(handles);
+        for (const handle of Object.values(handles)) expect(await store.resolve({ companyId: C, handle })).toBeNull();
         expect(rowOf(MEMBER).account.id).toBe('acc-1b');
         expect(rows(T).filter((r) => r.userId === MEMBER && r.deletedStatusKey !== 1)).toHaveLength(1);
     });
