@@ -180,6 +180,7 @@ import { forgetRememberedEmail, readRememberedEmail, saveRememberedEmail } from 
 import { away } from "@/offline";
 import { useDemoIndustry } from "@/composable/useDemoIndustry";
 import { isSignInLanding } from "@/router/sessionCheck";
+import { returnsInto } from "@/utils/loginReturn";
 
 const SSO_ERRORS = { not_allowed: "Auth.sso_not_allowed", seat_limit: "Plan.refused.seat_limit", config: "Auth.sso_not_configured" };
 
@@ -392,8 +393,7 @@ const finishLogin = async (cid, redirect = route.query.redirect_url) => {
     // or sso=ok) must be left first: reloading it signs in again and reloads again, for ever.
     let target = isSignInLanding(route) ? `/${cid}` : "";
     if (redirect && redirect !== "/login") {
-        const tmpcid = redirect.split("/")[1];
-        const ok = (tmpcid && userData.value?.AssignCompany?.includes(tmpcid)) || tmpcid === "oauth2" || redirect === "/oauth/consent" || INVITATION_REDIRECT.test(redirect);
+        const ok = returnsInto(redirect, userData.value?.AssignCompany) || redirect === "/oauth/consent" || INVITATION_REDIRECT.test(redirect);
         target = redirect !== "/" && ok ? redirect : `/${cid}`;
     }
     // A route guard that fails (its user lookup answering 500, say) rejects the navigation; the reload still has

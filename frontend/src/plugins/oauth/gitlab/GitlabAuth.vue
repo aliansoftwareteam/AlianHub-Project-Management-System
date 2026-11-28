@@ -19,6 +19,7 @@ import { useI18n } from "vue-i18n";
 // Utilities
 import { apiRequestWithoutSecure, apiRequestWithoutCompnay, getAuth } from "@/services";
 import * as env from '@/config/env';
+import { rememberReturnPath, returnsInto, takeReturnPath } from '@/utils/loginReturn';
 import { rememberInvitationLink, takeInvitationLink } from "../invitationLink";
 
 const props = defineProps({
@@ -79,6 +80,7 @@ onMounted(async () => {
 function loginWithGitLab() {
     localStorage.setItem("gitlabAuthMode", props.mode);
     rememberInvitationLink(props.linkId);
+    rememberReturnPath(route.query.redirect_url);
     const clientId = publicConfig.auth.gitlab.clientId;
     const scope = "read_user";
     const redirectUri = window.location.origin;
@@ -162,13 +164,13 @@ const login = async (userInfo) => {
 
         localStorage.setItem('SubmenuScreen', 'project');
 
-        if (route.query.redirect_url && route.query.redirect_url !== '/login') {
-            if (route.query.redirect_url === "/") {
-                await router.replace(`${route.query.redirect_url}${cid}`);
+        const redirect = takeReturnPath() || route.query.redirect_url;
+        if (redirect && redirect !== '/login') {
+            if (redirect === "/") {
+                await router.replace(`${redirect}${cid}`);
             } else {
-                const tmpcid = route.query.redirect_url?.split("/")[1];
-                if ((tmpcid && uData.AssignCompany.includes(tmpcid)) || tmpcid === 'oauth2') {
-                    await router.replace(route.query.redirect_url);
+                if (returnsInto(redirect, uData.AssignCompany)) {
+                    await router.replace(redirect);
                 } else {
                     await router.replace(`/${cid}`);
                 }
