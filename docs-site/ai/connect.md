@@ -57,29 +57,30 @@ To hand tasks to your own Claude Code so that it writes the code and opens a pul
 
 ## The question AlianHub asks
 
-You see "Allow (the app) to act for you?" and a list under "It asks to:". Then you choose the one workspace it may use. Choose **Approve** or **Deny**.
-
-These come as one set:
+You see "Allow (the app) to act for you?". Under **It will be able to read:** are the things it can always see once you connect it:
 
 - Read tasks you can see
-- Create and change tasks for you
 - Read projects you can see
 - Read pages and documents you can see
 - Read time logs you can see
-- Log time for you
 
-Then the screen says "It also asks for more. Tick only what you want it to do:". These start unticked:
+Under **Choose what it may do — tick only what you want:** are the actions it takes only if you tick them. They start unticked:
 
 | Name | On the screen |
 |---|---|
+| **Create and change tasks** | Create and change tasks for you |
+| **Log time** | Log time for you |
 | **Manage tasks** | Edit, assign, move, archive and close your tasks, several at a time |
 | **Write docs** | Create docs and change the ones you can edit |
 | **Read chat** | Read messages in channels you are in |
 
-- A permission like these works only when the app asked for it, you ticked it, and an owner or admin approved it for that app. If an admin has not, the screen says "An owner or admin has not approved this for the workspace you chose."
-- **Read chat** is offered only while your server has it switched on. It never reads direct messages. An app connected before it existed reads no chat until you connect it again and tick it.
-- If your workspace has not approved the app yet, the screen shows **Ask an admin**, then "Waiting for your admin".
-- The screen also says: "You can revoke this at any time under Accounts, Connected apps."
+Then choose the one workspace it may use, and **Approve** or **Deny**.
+
+- You grant these yourself, up to what your own role allows — a tool your role does not allow is still refused when the app tries it. No owner or admin approval is needed.
+- **Manage tasks**, **Write docs** and **Read chat** appear only while your server has those tools switched on. **Read chat** never reads direct messages; an app connected before it existed reads no chat until you connect it again and tick it.
+- You can change what a connection may do at any time, or revoke it, under **Accounts**, **Connected apps** (see Disconnect below).
+
+If an owner has turned on **Require approval for AI apps** (Settings, Instance, Security), it works the older way instead: an owner or admin must first approve each app under **Agent clients** and set the most it may get; the screen then offers only what that approval allows, shows **Ask an admin** for a workspace where the app is not approved, and grants **Manage tasks**, **Write docs** and **Read chat** only when the admin approved them by name.
 
 ## Check that it works
 
@@ -91,16 +92,18 @@ Under "What your AI can do here" the page lists what your server allows. Under "
 
 ## For owners and admins
 
-Open **Settings**, then **Agent clients**. Each app that asked to connect is listed under "Waiting for approval", "Approved" or "Denied or revoked".
+By default anyone may connect their own AI app with no approval from you. Open **Settings**, then **Agent clients** to see every app connected in this workspace and **Revoke** any of them (that ends everyone's connection to it here).
+
+To require your approval before an app can connect, turn on **Require approval for AI apps** under **Settings**, **Instance**, **Security**. Then each app that asks to connect is listed under "Waiting for approval", "Approved" or "Denied or revoked", and:
 
 - Choose **Approve** or **Deny**.
 - Under "Allow at most:" choose the permissions the app may get.
 - "Wider permissions, given only if you tick them:" holds Manage tasks, Write docs and Read chat. Approving without ticking them never includes them.
-- Later you can use **Change permissions** or **Revoke**. Revoke ends everyone's connection to that app in this workspace.
+- Later you can use **Change permissions** or **Revoke**.
 
 ## Disconnect
 
-- **You:** open **AI**, **Accounts**, then the tab **Connected apps**. Choose **Revoke** next to the app. **Withdraw** takes back one permission only and keeps the rest. It takes effect on the app's next call.
+- **You:** open **AI**, **Accounts**, then the tab **Connected apps**. **Edit permissions** lets you tick or untick what a connection may do, up to your own role; **Revoke** ends it entirely. Either takes effect on the app's next call.
 - **An owner or admin:** open **Settings**, then **Agent clients**, and choose **Revoke**. Everyone's connection to that app in this workspace ends now.
 - **A token:** revoke it in **AI**, **Accounts**, **My account**. It stops on its next call.
 

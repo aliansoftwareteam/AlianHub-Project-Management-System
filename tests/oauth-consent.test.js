@@ -63,7 +63,7 @@ const GUEST = '6f0000000000000000000a04';
 const REDIRECT = 'http://127.0.0.1:33418/callback';
 const HTTPS_REDIRECT = 'https://agent.s10s3.test/oauth/callback';
 const CIMD_ID = 'https://agent.s10s3.test/oauth/client.json';
-const ENV_KEYS = ['MCP_OAUTH', 'MCP_OAUTH_ISSUER', 'MCP_OAUTH_TOKEN_SECRET', 'MCP_OAUTH_RATE_LIMIT_PER_MIN', 'MCP_OAUTH_DCR', 'CSP_MODE', 'NODE_ENV', 'MCP_TOOLS_MANAGE', 'MCP_TOOLS_DATA'];
+const ENV_KEYS = ['MCP_OAUTH', 'MCP_OAUTH_ISSUER', 'MCP_OAUTH_TOKEN_SECRET', 'MCP_OAUTH_RATE_LIMIT_PER_MIN', 'MCP_OAUTH_DCR', 'CSP_MODE', 'NODE_ENV', 'MCP_TOOLS_MANAGE', 'MCP_TOOLS_DATA', 'AGENT_CLIENT_APPROVAL'];
 const savedEnv = Object.fromEntries(ENV_KEYS.map((key) => [key, process.env[key]]));
 
 const INDEX_DIR = fs.mkdtempSync(path.join(os.tmpdir(), 's10s3-consent-'));
@@ -111,6 +111,9 @@ beforeEach(() => {
     delete process.env.MCP_OAUTH_DCR;
     process.env.MCP_TOOLS_MANAGE = 'off';
     process.env.MCP_TOOLS_DATA = 'off';
+    // These suites specify the admin-approval gate, which is now opt-in; run them with it on. The default-off
+    // (open) behaviour has its own describe block that turns it back off.
+    process.env.AGENT_CLIENT_APPROVAL = 'on';
 });
 
 afterEach(stop);
@@ -1078,5 +1081,67 @@ describe('the chat scope', () => {
         expect((await withdraw(MEMBER, grant.grantId, [CHAT])).status).toBe(200);
         expect(grantRows()[0]).toMatchObject({ scopes: PLAIN, revokedAt: null });
         expect(await grants.introspect(tokens.access_token)).toMatchObject({ active: true, scopes: PLAIN });
+    });
+});
+
+describe('with approval not required (the default)', () => {
+    const open = (env = {}) => start({ AGENT_CLIENT_APPROVAL: 'off', ...env });
+    const grantsOf = (uid) => fetch(`${base}/api/v2/oauth-grants`, { headers: bearer(uid) }).then((r) => r.json());
+    const setScopes = (uid, grantId, scopes) => fetch(`${base}/api/v2/oauth-grants/${grantId}/scopes`, { method: 'POST', headers: bearer(uid), body: JSON.stringify({ scopes }) });
+
+    it('lets a member connect an app no owner ever approved, and issues a token', async () => {
+        await open();
+        const client = await registerPublicClient();
+        const tokens = await consentedTokens(client.clientId, { uid: MEMBER, workspace: ALPHA });
+        expect((await grants.introspect(tokens.access_token)).active).toBe(true);
+        expect(rows(SCHEMA_TYPE.OAUTH_CLIENT_APPROVALS)).toHaveLength(0);
+    });
+
+    it('offers every enabled scope — reads with the connection, writes to tick — and every member workspace is eligible', async () => {
+        await open();
+        const client = await registerPublicClient();
+        const { consent } = await flow.startAuthorization(authorizeUrl(client.clientId));
+        const { data } = (await flow.details(consent, { session: session(MEMBER) })).body;
+        expect(data.scopes).toEqual(['tasks:read', 'projects:read', 'docs:read', 'time:read']);
+        expect(data.manageScopes).toEqual(['tasks:write', 'time:write']);
+        expect(data.workspaces.map((w) => [w.id, w.eligible])).toEqual([[ALPHA, true], [BETA, true]]);
+    });
+
+    it('grants a scope the person ticked even though the app only asked to read', async () => {
+        await open();
+        const client = await registerPublicClient();
+        const verifier = newVerifier();
+        const done = await flow.consentThrough(authorizeUrl(client.clientId, { scope: 'tasks:read' }, verifier), { session: session(MEMBER), workspace: ALPHA, grant: ['tasks:write'] });
+        expect(done.status).toBe(303);
+        const tokens = await exchange(client.clientId, done.location.searchParams.get('code'), verifier);
+        expect((await grants.introspect(tokens.access_token)).scopes).toEqual(['tasks:read', 'tasks:write', 'projects:read', 'docs:read', 'time:read']);
+    });
+
+    it('offers manage scopes as checkboxes and grants them when ticked, with no approval', async () => {
+        await open({ MCP_TOOLS_MANAGE: 'on' });
+        const client = await registerPublicClient();
+        const { consent } = await flow.startAuthorization(authorizeUrl(client.clientId));
+        const { data } = (await flow.details(consent, { session: session(MEMBER) })).body;
+        expect(data.manageScopes).toEqual(expect.arrayContaining(['tasks:write', 'tasks:manage', 'docs:manage']));
+        const verifier = newVerifier();
+        const done = await flow.consentThrough(authorizeUrl(client.clientId, { scope: 'tasks:read' }, verifier), { session: session(MEMBER), workspace: ALPHA, grant: ['tasks:manage'] });
+        const tokens = await exchange(client.clientId, done.location.searchParams.get('code'), verifier);
+        expect((await grants.introspect(tokens.access_token)).scopes).toContain('tasks:manage');
+        expect(rows(SCHEMA_TYPE.OAUTH_CLIENT_APPROVALS)).toHaveLength(0);
+    });
+
+    it('lets the person widen and narrow a connection later, taking effect on the next call', async () => {
+        await open();
+        const client = await registerPublicClient();
+        const tokens = await consentedTokens(client.clientId, { uid: MEMBER, workspace: ALPHA, scope: 'tasks:read' });
+        const listed = await grantsOf(MEMBER);
+        expect(listed.offered).toEqual(['tasks:read', 'tasks:write', 'projects:read', 'docs:read', 'time:read', 'time:write']);
+        const [grant] = listed.data;
+        expect((await setScopes(MEMBER, grant.grantId, ['tasks:read', 'tasks:write'])).status).toBe(200);
+        expect((await grants.introspect(tokens.access_token)).scopes).toEqual(['tasks:read', 'tasks:write']);
+        expect((await setScopes(MEMBER, grant.grantId, ['tasks:read'])).status).toBe(200);
+        expect((await grants.introspect(tokens.access_token)).scopes).toEqual(['tasks:read']);
+        expect((await setScopes(MEMBER, grant.grantId, [])).status).toBe(400);
+        expect((await setScopes(OWNER, grant.grantId, ['tasks:read'])).status).toBe(404);
     });
 });

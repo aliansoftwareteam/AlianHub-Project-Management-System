@@ -34,7 +34,7 @@ const ADMIN = '6f0000000000000000000a72';
 const REDIRECT = 'http://127.0.0.1:41417/callback';
 const ALL = ['tasks:read', 'tasks:write', 'projects:read', 'docs:read', 'time:read', 'time:write'];
 
-const ENV_KEYS = ['MCP_OAUTH', 'APIURL', 'JWT_SECRET', 'MCP_OAUTH_ISSUER', 'MCP_TOOLS_MANAGE'];
+const ENV_KEYS = ['MCP_OAUTH', 'APIURL', 'JWT_SECRET', 'MCP_OAUTH_ISSUER', 'MCP_TOOLS_MANAGE', 'AGENT_CLIENT_APPROVAL'];
 const saved = Object.fromEntries(ENV_KEYS.map((k) => [k, process.env[k]]));
 afterAll(() => { ENV_KEYS.forEach((k) => { if (saved[k] === undefined) delete process.env[k]; else process.env[k] = saved[k]; }); });
 
@@ -81,6 +81,8 @@ beforeEach(() => {
     process.env.MCP_OAUTH_ISSUER = ISSUER;
     process.env.APIURL = `${ISSUER}/`;
     process.env.JWT_SECRET = 's10s3-enforcement-secret';
+    // This suite is about the per-workspace approval ceiling, which is now opt-in; run it with the gate on.
+    process.env.AGENT_CLIENT_APPROVAL = 'on';
     mockDb.seed(dbCollections.USERS, { _id: USER, Employee_Name: 'Priya', AssignCompany: C });
 });
 

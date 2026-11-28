@@ -64,7 +64,7 @@ const PROJECT = '6f0000000000000000000b51';
 const REDIRECT = 'http://127.0.0.1:41415/callback';
 const CHAIN_KEY = 's10s4-audit-chain-key-0123456789abcdef';
 
-const ENV_KEYS = ['MCP_OAUTH', 'APIURL', 'JWT_SECRET', 'AUDIT_CHAIN', 'AUDIT_CHAIN_KEY', 'AGENT_TAINT_ROUTING', 'MCP_TOOLS_MANAGE', 'MCP_TOOLS_WORK'];
+const ENV_KEYS = ['MCP_OAUTH', 'APIURL', 'JWT_SECRET', 'AUDIT_CHAIN', 'AUDIT_CHAIN_KEY', 'AGENT_TAINT_ROUTING', 'MCP_TOOLS_MANAGE', 'MCP_TOOLS_WORK', 'AGENT_CLIENT_APPROVAL'];
 const saved = Object.fromEntries(ENV_KEYS.map((k) => [k, process.env[k]]));
 afterAll(() => { ENV_KEYS.forEach((k) => { if (saved[k] === undefined) delete process.env[k]; else process.env[k] = saved[k]; }); });
 
@@ -108,6 +108,7 @@ beforeEach(() => {
     mockOutbound.length = 0;
     jest.clearAllMocks();
     process.env.MCP_OAUTH = 'both';
+    process.env.AGENT_CLIENT_APPROVAL = 'on';
     process.env.APIURL = `${ISSUER}/`;
     process.env.JWT_SECRET = 's10s4-actions-secret';
     delete process.env.AUDIT_CHAIN;

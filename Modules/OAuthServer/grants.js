@@ -283,6 +283,22 @@ async function revokeOwnGrant(userId, grantId, now = new Date()) {
     return revokeGrant(grant.grantId, REVOKED.REVOKED_BY_USER, now);
 }
 
+/* A person changes what a connection of theirs may do (task 108), up to what the server offers: the grant and
+ * every live token under it are set to the chosen scopes at once, so the change takes effect on the next call —
+ * the same effect as editing the scopes by hand, bounded to the offered set. Returns the scopes now held, or
+ * null when the grant is not theirs or nothing valid was chosen (revoke the app to drop it entirely). */
+async function setOwnGrantScopes(userId, grantId, scopes, now = new Date()) {
+    const grant = await store.grants.find(grantId);
+    if (!grant || String(grant.userId) !== String(userId) || grant.revokedAt) return null;
+    const wanted = new Set((Array.isArray(scopes) ? scopes : []).filter((scope) => typeof scope === 'string'));
+    const chosen = config.offeredScopes().filter((scope) => wanted.has(scope));
+    if (!chosen.length) return [];
+    await store.grants.setScopes(grant.grantId, chosen);
+    for (const token of await store.tokens.liveForGrant(grant.grantId)) await store.tokens.setScopes(token.tokenHash, chosen);
+    audit(grant, 'oauth.grant_scopes_set', { scopes: chosen });
+    return chosen;
+}
+
 /* A person takes back an opt-in scope they gave and keeps the rest of the connection. */
 async function withdrawOwnManageScopes(userId, grantId, scopes, now = new Date()) {
     const grant = await store.grants.find(grantId);
@@ -295,5 +311,5 @@ async function withdrawOwnManageScopes(userId, grantId, scopes, now = new Date()
 
 module.exports = {
     GrantError, REVOKED, issueCode, exchangeCode, refresh, revoke, introspect, revokeGrant, revokeClientGrants, narrowClientGrants, liveGrantsOf, revokeOwnGrant,
-    withdrawOwnManageScopes,
+    withdrawOwnManageScopes, setOwnGrantScopes,
 };

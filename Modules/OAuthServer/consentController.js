@@ -56,9 +56,10 @@ const clientView = (opened, client) => {
     };
 };
 
-/* Whether this workspace can be chosen: the client belongs to it (when it was pre-registered somewhere), an owner
- * or admin approved it there, and that approval covers every scope asked for. */
-const standingIn = (companyId, client, approval, scopes) => {
+/* Two models, chosen by AGENT_CLIENT_APPROVAL (task 108). Required (opt-in): the old per-workspace admin
+ * approval gate — the client belongs here, an owner or admin approved it, and the approval covers the scopes.
+ * Not required (default): any member allowed to use external clients may connect, no approval consulted. */
+const standingApproved = (companyId, client, approval, scopes) => {
     if (client.companyId && String(client.companyId) !== String(companyId)) return { approval: 'none', eligible: false, reason: 'other_workspace' };
     if (!approval) return { approval: 'none', eligible: false, reason: 'not_approved' };
     if (approval.status !== approvals.STATUS.APPROVED) return { approval: approval.status, eligible: false, reason: 'not_approved' };
@@ -66,16 +67,38 @@ const standingIn = (companyId, client, approval, scopes) => {
     return { approval: approval.status, eligible: true, reason: '' };
 };
 
-/* An opt-in scope is the person's to give or keep back: it is granted only when the client asked for it and the
- * person ticked it. Everything else asked for is granted together, as before. */
+const standingOpen = async (companyId, client, uid) => {
+    if (client.companyId && String(client.companyId) !== String(companyId)) return { eligible: false, reason: 'other_workspace' };
+    const aiRights = require('../../Config/aiRights');
+    if (!(await aiRights.mayUse(companyId, uid, aiRights.AI_RIGHT.EXTERNAL_CLIENTS))) return { eligible: false, reason: 'external_clients_off' };
+    return { eligible: true, reason: '' };
+};
+
+/* Required: an opt-in scope is granted only when the client asked and the person ticked; everything else asked
+ * for is granted together. Not required: every enabled scope is offered — reads granted with the connection,
+ * writes and manage scopes the person ticks — independent of what the client requested. */
 const partsOf = (scopes) => ({
     asked: scopes.filter((scope) => !config.isOptInScope(scope)),
     optional: scopes.filter((scope) => config.isOptInScope(scope)),
 });
 
+const offerParts = () => {
+    const offered = config.offeredScopes();
+    return {
+        base: offered.filter((scope) => config.READ_SCOPES.includes(scope)),
+        optional: offered.filter((scope) => !config.READ_SCOPES.includes(scope)),
+    };
+};
+
 const tickedOf = (value) => (Array.isArray(value) ? value : [value]).filter((scope) => typeof scope === 'string');
 
-const grantedOf = (opened, ticked) => opened.scopes.filter((scope) => !config.isOptInScope(scope) || ticked.includes(scope));
+const grantedApproved = (opened, ticked) => opened.scopes.filter((scope) => !config.isOptInScope(scope) || ticked.includes(scope));
+
+const grantedOpen = (ticked) => {
+    const { base, optional } = offerParts();
+    const chosen = new Set([...base, ...optional.filter((scope) => ticked.includes(scope))]);
+    return config.SCOPES.filter((scope) => chosen.has(scope));
+};
 
 // The person, from their session, never an API token: a token is not someone consenting.
 const personOrRefuse = (req, res) => {
@@ -107,13 +130,21 @@ exports.details = async (req, res) => {
         if (!csrf) return refuse(res, 403, 'access_denied', 'This sign-in request was started in another browser.');
         const client = await clientOf(opened);
         const [mine, person] = await Promise.all([workspaces.workspacesOf(req.uid), workspaces.personOf(req.uid)]);
-        const { asked, optional } = partsOf(opened.scopes);
+        if (config.approvalRequired()) {
+            const { asked, optional } = partsOf(opened.scopes);
+            const standing = await Promise.all(mine.map(async (w) => {
+                const approval = await store.approvals.find(w.id, client.clientId);
+                const state = standingApproved(w.id, client, approval, asked);
+                return { ...w, ...state, manageScopes: state.eligible ? optional.filter((scope) => approvals.covers(approval, [scope])) : [] };
+            }));
+            return noStore(res).send({ status: true, data: { client: clientView(opened, client), person, scopes: asked, manageScopes: optional, csrf, workspaces: standing } });
+        }
+        const { base, optional } = offerParts();
         const standing = await Promise.all(mine.map(async (w) => {
-            const approval = await store.approvals.find(w.id, client.clientId);
-            const state = standingIn(w.id, client, approval, asked);
-            return { ...w, ...state, manageScopes: state.eligible ? optional.filter((scope) => approvals.covers(approval, [scope])) : [] };
+            const state = await standingOpen(w.id, client, req.uid);
+            return { ...w, ...state, manageScopes: state.eligible ? optional : [] };
         }));
-        return noStore(res).send({ status: true, data: { client: clientView(opened, client), person, scopes: asked, manageScopes: optional, csrf, workspaces: standing } });
+        return noStore(res).send({ status: true, data: { client: clientView(opened, client), person, scopes: base, manageScopes: optional, csrf, workspaces: standing } });
     } catch (error) {
         if (error instanceof clients.ClientError) return refuse(res, 400, error.error, error.message);
         return failed(res, error, 'details');
@@ -134,7 +165,8 @@ exports.answer = async (req, res) => {
             consentRequest.clearCookie(res, opened);
             return redirectWith(res, opened.redirectUri, { ...params, state: opened.state, iss: config.issuer() });
         };
-        const granted = grantedOf(opened, tickedOf(body.grant));
+        const required = config.approvalRequired();
+        const granted = required ? grantedApproved(opened, tickedOf(body.grant)) : grantedOpen(tickedOf(body.grant));
         const spend = async (companyId) => {
             try {
                 await store.consents.spend({
@@ -156,17 +188,27 @@ exports.answer = async (req, res) => {
         const companyId = single(body.workspace);
         if (!(await workspaces.isMember(req.uid, companyId))) return refuse(res, 403, 'access_denied', 'You are not a member of that workspace.');
         const aiRights = require('../../Config/aiRights');
-        if (!(await aiRights.mayUse(companyId, req.uid, aiRights.AI_RIGHT.EXTERNAL_CLIENTS))) return refuse(res, 403, 'access_denied', aiRights.REFUSAL[aiRights.AI_RIGHT.EXTERNAL_CLIENTS]);
-        if (!granted.length) return (await spend('')) ? back({ error: 'access_denied', error_description: 'the user granted nothing that was asked for' }) : alreadyAnswered();
-        const approval = await store.approvals.find(companyId, client.clientId);
-        const standing = standingIn(companyId, client, approval, granted);
-        if (!standing.eligible) {
-            if (!approval && standing.reason === 'not_approved') {
-                await approvals.request({ companyId, client, userId: req.uid, scopes: opened.scopes, actor: actorOf(req) });
+        if (required) {
+            if (!(await aiRights.mayUse(companyId, req.uid, aiRights.AI_RIGHT.EXTERNAL_CLIENTS))) return refuse(res, 403, 'access_denied', aiRights.REFUSAL[aiRights.AI_RIGHT.EXTERNAL_CLIENTS]);
+            if (!granted.length) return (await spend('')) ? back({ error: 'access_denied', error_description: 'the user granted nothing that was asked for' }) : alreadyAnswered();
+            const approval = await store.approvals.find(companyId, client.clientId);
+            const standing = standingApproved(companyId, client, approval, granted);
+            if (!standing.eligible) {
+                if (!approval && standing.reason === 'not_approved') {
+                    await approvals.request({ companyId, client, userId: req.uid, scopes: opened.scopes, actor: actorOf(req) });
+                }
+                return refuse(res, 403, 'access_denied', standing.reason === 'scope_ceiling'
+                    ? 'This workspace has not approved the client for every scope it asks for.'
+                    : 'An owner or admin of this workspace has to approve this client first.');
             }
-            return refuse(res, 403, 'access_denied', standing.reason === 'scope_ceiling'
-                ? 'This workspace has not approved the client for every scope it asks for.'
-                : 'An owner or admin of this workspace has to approve this client first.');
+        } else {
+            const standing = await standingOpen(companyId, client, req.uid);
+            if (!standing.eligible) {
+                return refuse(res, 403, 'access_denied', standing.reason === 'other_workspace'
+                    ? 'This client is registered to another workspace.'
+                    : aiRights.REFUSAL[aiRights.AI_RIGHT.EXTERNAL_CLIENTS]);
+            }
+            if (!granted.length) return (await spend('')) ? back({ error: 'access_denied', error_description: 'the user granted nothing that was asked for' }) : alreadyAnswered();
         }
 
         if (!(await spend(companyId))) return alreadyAnswered();

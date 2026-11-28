@@ -55,4 +55,5 @@ exports.init = (app, env = process.env, { indexFile = INDEX_FILE } = {}) => {
     app.get('/api/v2/oauth-grants', verifyJWTTokenWithCV2, personalGrants.list);
     app.delete('/api/v2/oauth-grants/:grantId', verifyJWTTokenWithCV2, personalGrants.revoke);
     app.post('/api/v2/oauth-grants/:grantId/withdraw', verifyJWTTokenWithCV2, personalGrants.withdraw);
+    app.post('/api/v2/oauth-grants/:grantId/scopes', verifyJWTTokenWithCV2, personalGrants.setScopes);
 };
