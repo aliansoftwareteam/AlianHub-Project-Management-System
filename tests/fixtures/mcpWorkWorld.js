@@ -17,7 +17,7 @@ const TAGS = [{ uid: 'tag_bug', tagName: 'Bug', tagColor: '#ff0000' }, { uid: 't
 const PRIVATE_TAGS = [{ uid: 'tag_secret', tagName: 'Secret', tagColor: '#00ff00' }];
 const PROJECT_KEYS = ['project_list', 'project_details', 'project_sprint_create', 'project_sprint_name_edit', 'sprint_type_change', 'sprint_delete'];
 const BEFORE = ['tasks.next', 'tasks.search', 'task.get', 'task.comment', 'task.status.set', 'task.link', 'task.create', 'subtask.create', 'timelog.start', 'timelog.stop', 'docs.read'];
-const FLAGS = ['MCP_TOOLS_WORK', 'MCP_TOOLS_MANAGE', 'MCP_TOOLS_DATA', 'MCP_TOOLS_V2', 'AGENT_TAINT_ROUTING', 'MCP_OAUTH', 'MCP_OAUTH_ISSUER'];
+const FLAGS = ['MCP_TOOLS_WORK', 'MCP_TOOLS_MANAGE', 'MCP_TOOLS_DATA', 'MCP_TOOLS_V2', 'AGENT_TAINT_ROUTING', 'MCP_OAUTH', 'MCP_OAUTH_ISSUER', 'AGENT_CLIENT_APPROVAL'];
 const { FLAGS: DEFAULT_ON } = require('./mcpFlagsOff');
 
 const ctx = (uid, over = {}) => ({
@@ -99,6 +99,8 @@ const create = (mockDb) => {
     const seedGrant = (userId, scopes, over = {}) => {
         process.env.MCP_OAUTH = 'on';
         process.env.MCP_OAUTH_ISSUER = ISSUER;
+        // The workspace approval below only counts while approval is required (opt-in since task 108).
+        process.env.AGENT_CLIENT_APPROVAL = 'on';
         mockDb.seed(SCHEMA_TYPE.OAUTH_CLIENT_APPROVALS, {
             companyId: CID, clientId: CLIENT, clientName: 'Outside agent', clientKind: 'metadata_document', status: 'approved', scopes: [...scopes], privateSprints: false,
         });

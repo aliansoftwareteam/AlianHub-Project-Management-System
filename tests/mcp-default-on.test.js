@@ -6,7 +6,7 @@ const taint = require('../Modules/Agents/taint');
 const { describeSettings, validateSettings } = require('../Modules/Instance/settingsCatalog');
 
 const FLAGS = { MCP_TOOLS_DATA: dataFlag, MCP_TOOLS_MANAGE: manageFlag, MCP_TOOLS_WORK: workFlag };
-const KEYS = [...Object.keys(FLAGS), 'MCP_OAUTH', 'MCP_OAUTH_DCR', 'MCP_OAUTH_ISSUER', 'AGENT_TAINT_ROUTING', 'APIURL', 'NODE_ENV'];
+const KEYS = [...Object.keys(FLAGS), 'MCP_OAUTH', 'MCP_OAUTH_DCR', 'MCP_OAUTH_ISSUER', 'AGENT_TAINT_ROUTING', 'AGENT_CLIENT_APPROVAL', 'APIURL', 'NODE_ENV'];
 const HTTPS = { APIURL: 'https://hub.example.com' };
 const ALL_OFF = { MCP_TOOLS_DATA: 'off', MCP_TOOLS_MANAGE: 'off', MCP_TOOLS_WORK: 'off', MCP_OAUTH: 'off' };
 
@@ -82,18 +82,19 @@ describe('MCP_OAUTH', () => {
     });
 });
 
+/* Task 108: the gate ships off. Unset leaves it off whatever the tool flags say; an owner turns it on. */
 describe('AGENT_TAINT_ROUTING', () => {
-    it('is on when unset while the tool flags are at their defaults', () => {
-        expect(taint.enabled({})).toBe(true);
-        expect(taint.enabled()).toBe(true);
+    it('is off when unset while the tool flags are at their defaults', () => {
+        expect(taint.enabled({})).toBe(false);
+        expect(taint.enabled()).toBe(false);
     });
 
-    it.each(Object.keys(FLAGS))('is on when unset while only %s is on', (key) => {
-        expect(taint.enabled({ ...ALL_OFF, [key]: 'on' })).toBe(true);
+    it.each(Object.keys(FLAGS))('is off when unset while only %s is on', (key) => {
+        expect(taint.enabled({ ...ALL_OFF, [key]: 'on' })).toBe(false);
     });
 
-    it('is on when unset while only MCP_OAUTH is on', () => {
-        expect(taint.enabled({ ...ALL_OFF, ...HTTPS, MCP_OAUTH: 'on' })).toBe(true);
+    it('is off when unset while only MCP_OAUTH is on', () => {
+        expect(taint.enabled({ ...ALL_OFF, ...HTTPS, MCP_OAUTH: 'on' })).toBe(false);
     });
 
     it('is off when unset and every MCP flag is off', () => {
@@ -114,30 +115,39 @@ describe('AGENT_TAINT_ROUTING', () => {
 describe('the instance settings page', () => {
     const row = (env, saved = {}, locked = []) => describeSettings({ saved, env, locked }).find((r) => r.key === 'AGENT_TAINT_ROUTING');
 
-    it('shows taint routing under Security, on by default with the tools', () => {
-        expect(row({})).toMatchObject({ group: 'security', type: 'boolean', value: 'true', default: 'true', source: 'default' });
+    it('shows taint routing under Security, off by default with the tools on', () => {
+        expect(row({})).toMatchObject({ group: 'security', type: 'boolean', value: 'false', default: 'false', source: 'default' });
     });
 
     it('shows it off by default when every MCP flag is off', () => {
         expect(row(ALL_OFF)).toMatchObject({ value: 'false', default: 'false', source: 'default' });
     });
 
-    it('shows taint routing read-only: locked whether or not the environment names it', () => {
-        expect(row({})).toMatchObject({ readOnly: true, locked: true });
+    it('shows taint routing editable, and locked only when the environment names it', () => {
+        expect(row({})).toMatchObject({ readOnly: false, locked: false });
+        expect(row({}, { AGENT_TAINT_ROUTING: 'true' })).toMatchObject({ value: 'true', source: 'saved', locked: false });
         expect(row({ AGENT_TAINT_ROUTING: 'off' }, {}, ['AGENT_TAINT_ROUTING'])).toMatchObject({ value: 'false', source: 'env', locked: true });
         expect(row({ AGENT_TAINT_ROUTING: 'on' }, {}, ['AGENT_TAINT_ROUTING'])).toMatchObject({ value: 'true', source: 'env', locked: true });
     });
 
-    it('refuses to save taint routing from the console', () => {
-        expect(validateSettings({ AGENT_TAINT_ROUTING: 'false' })).toMatchObject({ valid: false, errors: { AGENT_TAINT_ROUTING: 'readonly' }, values: {} });
+    it('saves taint routing from the console', () => {
+        expect(validateSettings({ AGENT_TAINT_ROUTING: 'true' })).toMatchObject({ valid: true, errors: {}, values: { AGENT_TAINT_ROUTING: 'true' } });
     });
 
-    it('never applies a stored taint routing value', () => {
+    it('applies a stored taint routing value onto the environment the gate reads', () => {
         const instance = require('../Config/instanceSettings');
         instance._resetForTests();
-        expect(instance.applyInstanceSettings({ AGENT_TAINT_ROUTING: 'false' })).toEqual([]);
-        expect(process.env.AGENT_TAINT_ROUTING).toBeUndefined();
+        expect(instance.applyInstanceSettings({ AGENT_TAINT_ROUTING: 'true' })).toEqual(['AGENT_TAINT_ROUTING']);
+        expect(process.env.AGENT_TAINT_ROUTING).toBe('true');
+        expect(taint.enabled()).toBe(true);
         instance._resetForTests();
+    });
+
+    it('shows approval for AI apps under Security, off by default and editable', () => {
+        const approvalRow = describeSettings({ saved: {}, env: {}, locked: [] }).find((r) => r.key === 'AGENT_CLIENT_APPROVAL');
+        expect(approvalRow).toMatchObject({ group: 'security', type: 'boolean', value: 'false', default: 'false', locked: false });
+        expect(oauth.approvalRequired({})).toBe(false);
+        expect(oauth.approvalRequired({ AGENT_CLIENT_APPROVAL: 'on' })).toBe(true);
     });
 
     const toolRow = (key, env, saved = {}, locked = []) => describeSettings({ saved, env, locked }).find((r) => r.key === key);

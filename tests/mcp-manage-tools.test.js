@@ -76,7 +76,7 @@ let fx;
 
 beforeEach(() => { fx = seed(); });
 afterEach(settle);
-afterAll(() => { ['MCP_TOOLS_MANAGE', 'MCP_TOOLS_V2', 'MCP_OAUTH', 'MCP_OAUTH_ISSUER', 'AGENT_TAINT_ROUTING'].forEach((key) => { delete process.env[key]; }); });
+afterAll(() => { ['MCP_TOOLS_MANAGE', 'MCP_TOOLS_V2', 'MCP_OAUTH', 'MCP_OAUTH_ISSUER', 'AGENT_TAINT_ROUTING', 'AGENT_CLIENT_APPROVAL'].forEach((key) => { delete process.env[key]; }); });
 
 const CALLS = {
     'task.update': (taskId) => ({ taskId, title: 'Changed' }),
@@ -177,6 +177,7 @@ describe('an outside client under a person\'s grant', () => {
         process.env.MCP_OAUTH = 'on';
         process.env.MCP_OAUTH_ISSUER = ISSUER;
         process.env.AGENT_TAINT_ROUTING = 'off';
+        process.env.AGENT_CLIENT_APPROVAL = 'on';
     });
 
     it('lists and runs the write tools once its grant holds the scope, as that person and no further', async () => {

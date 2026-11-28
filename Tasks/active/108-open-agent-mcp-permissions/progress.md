@@ -27,6 +27,14 @@ Remaining: docs (connect.md / mcp-server.md / admin security + `api:doc` for the
 ## Blockers
 None. Open question resolved: existing installs keep their current taint value (migration 088); approval subsystem kept-but-optional per owner.
 
+## PR
+PR 1852 into staging (opened 2026-11-28): https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/pull/1852 — branch feat/open-agent-mcp-permissions (rebased onto origin/staging). Awaiting CI + review; not browser-checked on a running instance.
+
+### 2026-11-28 — first CI run (Auto-fix)
+- 8 backend suites, 1 frontend spec and 5 integration suites failed. Causes: tests that leaned on taint's old default-on or tested the approval gate without turning it on; `mcp-default-on` asserting the old taint contract; the new `oauth.grant_scopes_set` audit key without a label; `connectedApps.spec` testing the removed Withdraw buttons.
+- Real bug found by the integration step-up test: in open mode, a scope the app REQUESTED (e.g. tasks:write) was not granted unless ticked, so approving a write request gave read-only. Fixed: `offerParts(requested)` grants reads + requested plain scopes with the connection (as before); the person ticks anything else. Consent header back to "It asks to:".
+- Verified locally: 78 related backend suites (2,284 tests) green, conventions audit-labels green, frontend connectedApps/oauthConsent specs green, integration oauth-server / mcp-oauth-tokens / external-agent-step / agent-sessions green on a throwaway mongod. `mcp-authorization.int` cannot boot on Windows (NODE_OPTIONS strips backslashes from its --require path) — pre-existing, CI only.
+
 ## Log
 
 ### 2026-11-26

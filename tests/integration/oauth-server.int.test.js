@@ -14,7 +14,8 @@ const consentFlow = require('../fixtures/oauthConsent');
 const state = readState();
 const BOOT_TIMEOUT_MS = 180000;
 const REDIRECT = 'http://127.0.0.1:47291/callback';
-const TEST_ENV = { MCP_OAUTH: 'on', MCP_OAUTH_DCR: 'on', NODE_ENV: 'test', MCP_OAUTH_RATE_LIMIT_PER_MIN: '1000', CSP_MODE: 'enforce' };
+// The approval gate and taint routing these flows cover are opt-in since task 108.
+const TEST_ENV = { MCP_OAUTH: 'on', MCP_OAUTH_DCR: 'on', NODE_ENV: 'test', MCP_OAUTH_RATE_LIMIT_PER_MIN: '1000', CSP_MODE: 'enforce', AGENT_CLIENT_APPROVAL: 'on', AGENT_TAINT_ROUTING: 'on' };
 
 const newVerifier = () => crypto.randomBytes(32).toString('base64url');
 const challengeOf = (verifier) => crypto.createHash('sha256').update(verifier).digest('base64url');

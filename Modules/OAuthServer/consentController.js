@@ -75,27 +75,27 @@ const standingOpen = async (companyId, client, uid) => {
 };
 
 /* Required: an opt-in scope is granted only when the client asked and the person ticked; everything else asked
- * for is granted together. Not required: every enabled scope is offered — reads granted with the connection,
- * writes and manage scopes the person ticks — independent of what the client requested. */
+ * for is granted together. Not required: every enabled scope is offered. The reads, and the plain scopes the
+ * client asked for, come with the connection as they always did, so a client that asks for a write gets it on
+ * approval; every other enabled scope (a write it did not ask for, a manage, chat or connector scope) is the
+ * person's to tick, whatever the request named. */
 const partsOf = (scopes) => ({
     asked: scopes.filter((scope) => !config.isOptInScope(scope)),
     optional: scopes.filter((scope) => config.isOptInScope(scope)),
 });
 
-const offerParts = () => {
+const offerParts = (requested = []) => {
+    const given = (scope) => config.READ_SCOPES.includes(scope) || (requested.includes(scope) && !config.isOptInScope(scope));
     const offered = config.offeredScopes();
-    return {
-        base: offered.filter((scope) => config.READ_SCOPES.includes(scope)),
-        optional: offered.filter((scope) => !config.READ_SCOPES.includes(scope)),
-    };
+    return { base: offered.filter(given), optional: offered.filter((scope) => !given(scope)) };
 };
 
 const tickedOf = (value) => (Array.isArray(value) ? value : [value]).filter((scope) => typeof scope === 'string');
 
 const grantedApproved = (opened, ticked) => opened.scopes.filter((scope) => !config.isOptInScope(scope) || ticked.includes(scope));
 
-const grantedOpen = (ticked) => {
-    const { base, optional } = offerParts();
+const grantedOpen = (opened, ticked) => {
+    const { base, optional } = offerParts(opened.scopes);
     const chosen = new Set([...base, ...optional.filter((scope) => ticked.includes(scope))]);
     return config.SCOPES.filter((scope) => chosen.has(scope));
 };
@@ -139,7 +139,7 @@ exports.details = async (req, res) => {
             }));
             return noStore(res).send({ status: true, data: { client: clientView(opened, client), person, scopes: asked, manageScopes: optional, csrf, workspaces: standing } });
         }
-        const { base, optional } = offerParts();
+        const { base, optional } = offerParts(opened.scopes);
         const standing = await Promise.all(mine.map(async (w) => {
             const state = await standingOpen(w.id, client, req.uid);
             return { ...w, ...state, manageScopes: state.eligible ? optional : [] };
@@ -166,7 +166,7 @@ exports.answer = async (req, res) => {
             return redirectWith(res, opened.redirectUri, { ...params, state: opened.state, iss: config.issuer() });
         };
         const required = config.approvalRequired();
-        const granted = required ? grantedApproved(opened, tickedOf(body.grant)) : grantedOpen(tickedOf(body.grant));
+        const granted = required ? grantedApproved(opened, tickedOf(body.grant)) : grantedOpen(opened, tickedOf(body.grant));
         const spend = async (companyId) => {
             try {
                 await store.consents.spend({

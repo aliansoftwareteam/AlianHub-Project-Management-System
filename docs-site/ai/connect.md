@@ -57,14 +57,12 @@ To hand tasks to your own Claude Code so that it writes the code and opens a pul
 
 ## The question AlianHub asks
 
-You see "Allow (the app) to act for you?". Under **It will be able to read:** are the things it can always see once you connect it:
+You see "Allow (the app) to act for you?". Under **It asks to:** are the permissions that come with the connection, granted together when you approve:
 
-- Read tasks you can see
-- Read projects you can see
-- Read pages and documents you can see
-- Read time logs you can see
+- Read tasks, projects, pages and documents, and time logs you can see
+- Anything else the app asked for, such as **Create and change tasks for you** or **Log time for you**
 
-Under **Choose what it may do — tick only what you want:** are the actions it takes only if you tick them. They start unticked:
+Under **Choose what it may do — tick only what you want:** are the other permissions your server offers. The app gets these only if you tick them, even when it did not ask for them. They start unticked:
 
 | Name | On the screen |
 |---|---|

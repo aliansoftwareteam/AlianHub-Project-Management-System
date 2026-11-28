@@ -16,12 +16,13 @@ const grants = () => [
 ];
 
 const ok = (data) => Promise.resolve({ data: { status: true, data } });
+const OFFERED = ['tasks:read', 'tasks:write', 'projects:read', 'docs:read', 'time:read', 'time:write', 'tasks:manage'];
 
-const mountWith = async ({ rows = grants(), remove, withdraw } = {}) => {
+const mountWith = async ({ rows = grants(), offered = OFFERED, remove, post } = {}) => {
     apiRequest.mockImplementation((type, url, body) => {
-        if (type === 'get') return typeof rows === 'function' ? rows() : ok(rows);
+        if (type === 'get') return typeof rows === 'function' ? rows() : Promise.resolve({ data: { status: true, data: rows, offered } });
         if (type === 'delete') return remove ? remove(url) : ok({});
-        if (type === 'post') return withdraw ? withdraw(url, body) : ok({});
+        if (type === 'post') return post ? post(url, body) : ok({ scopes: body.scopes });
         return Promise.reject(new Error(`unexpected ${type} ${url}`));
     });
     const wrapper = mount(ConnectedApps);
@@ -79,31 +80,36 @@ describe('Accounts > Connected apps', () => {
         expect(wrapper.findAll('[data-test="grant-row"]')).toHaveLength(2);
     });
 
-    it('offers to withdraw a manage permission on its own, and none where a grant holds none', async () => {
-        const managing = [{ ...grants()[0], scopes: ['tasks:read', 'tasks:manage', 'docs:manage'] }, grants()[1]];
-        const wrapper = await mountWith({ rows: managing });
-        const rows = wrapper.findAll('[data-test="grant-row"]');
-        expect(rows[0].findAll('[data-test="grant-manage"]').map((line) => line.text())).toEqual([
-            'OAuthConsent.scope_tasks_manageConnectedApps.withdraw', 'OAuthConsent.scope_docs_manageConnectedApps.withdraw',
-        ]);
-        expect(rows[1].findAll('[data-test="grant-manage"]')).toHaveLength(0);
+    it('edits a connection: every offered permission as a box, ticked as held, and saves the new set', async () => {
+        const wrapper = await mountWith();
+        const row = () => wrapper.findAll('[data-test="grant-row"]')[0];
+        await row().find('button[data-test="edit-scopes"]').trigger('click');
+        const boxes = row().findAll('input[type="checkbox"]');
+        expect(boxes.map((box) => box.attributes('data-test'))).toEqual(OFFERED.map((scope) => `scope-box-${scope}`));
+        expect(boxes.filter((box) => box.element.checked).map((box) => box.element.value)).toEqual(['tasks:read', 'tasks:write']);
 
-        await rows[0].find('button[data-test="withdraw-tasks:manage"]').trigger('click');
+        await row().find('[data-test="scope-box-tasks:write"]').setValue(false);
+        await row().find('[data-test="scope-box-tasks:manage"]').setValue(true);
+        await row().find('button[data-test="save-scopes"]').trigger('click');
         await flushPromises();
-        expect(apiRequest).toHaveBeenCalledWith('post', '/api/v2/oauth-grants/g1/withdraw', { scopes: ['tasks:manage'] });
-        const after = wrapper.findAll('[data-test="grant-row"]');
-        expect(after).toHaveLength(2);
-        expect(after[0].findAll('[data-test="grant-scope"]').map((chip) => chip.text())).toEqual(['OAuthConsent.scope_name_tasks_read', 'OAuthConsent.scope_name_docs_manage']);
-        expect(after[0].find('button[data-test="withdraw-tasks:manage"]').exists()).toBe(false);
+
+        expect(apiRequest).toHaveBeenCalledWith('post', '/api/v2/oauth-grants/g1/scopes', { scopes: ['tasks:read', 'tasks:manage'] });
+        expect(row().find('[data-test="grant-edit"]').exists()).toBe(false);
+        expect(row().findAll('[data-test="grant-scope"]').map((chip) => chip.text())).toEqual(['OAuthConsent.scope_name_tasks_read', 'OAuthConsent.scope_name_tasks_manage']);
     });
 
-    it('keeps the permission and says why when the server refuses to withdraw it', async () => {
-        const managing = [{ ...grants()[0], scopes: ['tasks:read', 'tasks:manage'] }];
-        const wrapper = await mountWith({ rows: managing, withdraw: () => Promise.reject({ response: { status: 404, data: { status: false, statusText: 'No such permission on a connected app.' } } }) });
-        await wrapper.find('button[data-test="withdraw-tasks:manage"]').trigger('click');
+    it('keeps the permissions and says why when the server refuses the change; cancel leaves them as they were', async () => {
+        const wrapper = await mountWith({ post: () => Promise.reject({ response: { status: 400, data: { status: false, statusText: 'Choose at least one permission, or revoke the app instead.' } } }) });
+        const row = () => wrapper.findAll('[data-test="grant-row"]')[0];
+        await row().find('button[data-test="edit-scopes"]').trigger('click');
+        await row().find('[data-test="scope-box-tasks:write"]').setValue(false);
+        await row().find('button[data-test="save-scopes"]').trigger('click');
         await flushPromises();
-        expect(wrapper.find('[data-test="grant-error"]').text()).toContain('No such permission');
-        expect(wrapper.find('button[data-test="withdraw-tasks:manage"]').exists()).toBe(true);
+        expect(wrapper.find('[data-test="grant-error"]').text()).toContain('Choose at least one permission');
+        expect(row().find('[data-test="grant-edit"]').exists()).toBe(true);
+
+        await row().find('button[data-test="cancel-edit"]').trigger('click');
+        expect(row().findAll('[data-test="grant-scope"]').map((chip) => chip.text())).toEqual(['OAuthConsent.scope_name_tasks_read', 'OAuthConsent.scope_name_tasks_write']);
     });
 
     it('shows an empty state', async () => {

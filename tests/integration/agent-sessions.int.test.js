@@ -115,7 +115,8 @@ beforeAll(async () => {
     server = await startServer({
         mongoUrl: resolveMongoUrl(),
         logFile: path.join(STATE_DIR, 'agent-sessions-server.log'),
-        env: { MCP_OAUTH: 'both', MCP_OAUTH_DCR: 'on', NODE_ENV: 'test', MCP_OAUTH_RATE_LIMIT_PER_MIN: '1000', EXTERNAL_AGENT_SESSIONS: 'on' },
+        // The approval gate and taint routing a session's client goes through are opt-in since task 108.
+        env: { MCP_OAUTH: 'both', MCP_OAUTH_DCR: 'on', NODE_ENV: 'test', MCP_OAUTH_RATE_LIMIT_PER_MIN: '1000', EXTERNAL_AGENT_SESSIONS: 'on', AGENT_CLIENT_APPROVAL: 'on', AGENT_TAINT_ROUTING: 'on' },
     });
     owner = await login(server.baseURL, emailFor('owner'));
     member = await login(server.baseURL, emailFor('member'));

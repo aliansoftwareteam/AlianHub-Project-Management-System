@@ -9289,6 +9289,7 @@ export default {
         "oauth_grant_created": "Connected an outside app",
         "oauth_grant_revoked": "Disconnected an outside app",
         "oauth_grant_narrowed": "Reduced what an outside app may do",
+        "oauth_grant_scopes_set": "Changed what an outside app may do",
         "oauth_client_approval_requested": "Asked for an outside app to be approved",
         "oauth_client_approved": "Approved an outside app",
         "oauth_client_approval_denied": "Turned down an outside app",

@@ -2851,6 +2851,7 @@
     "AuditEvents.oauth_grant_created": "Connected an outside app",
     "AuditEvents.oauth_grant_narrowed": "Reduced what an outside app may do",
     "AuditEvents.oauth_grant_revoked": "Disconnected an outside app",
+    "AuditEvents.oauth_grant_scopes_set": "Changed what an outside app may do",
     "AuditEvents.permission_enforcement_mode": "Changed how permissions are enforced",
     "AuditEvents.permission_refused": "Tried something their role does not allow",
     "AuditEvents.platform_owner_login": "Signed in from their AlianHub account",

@@ -1117,6 +1117,17 @@ describe('with approval not required (the default)', () => {
         expect((await grants.introspect(tokens.access_token)).scopes).toEqual(['tasks:read', 'tasks:write', 'projects:read', 'docs:read', 'time:read']);
     });
 
+    it('grants a write the app asked for on approval, without a tick, listed with what comes with the connection', async () => {
+        await open();
+        const client = await registerPublicClient();
+        const { consent } = await flow.startAuthorization(authorizeUrl(client.clientId, { scope: 'tasks:read tasks:write' }));
+        const { data } = (await flow.details(consent, { session: session(MEMBER) })).body;
+        expect(data.scopes).toEqual(['tasks:read', 'tasks:write', 'projects:read', 'docs:read', 'time:read']);
+        expect(data.manageScopes).toEqual(['time:write']);
+        const tokens = await consentedTokens(client.clientId, { uid: MEMBER, workspace: ALPHA, scope: 'tasks:read tasks:write' });
+        expect((await grants.introspect(tokens.access_token)).scopes).toContain('tasks:write');
+    });
+
     it('offers manage scopes as checkboxes and grants them when ticked, with no approval', async () => {
         await open({ MCP_TOOLS_MANAGE: 'on' });
         const client = await registerPublicClient();
