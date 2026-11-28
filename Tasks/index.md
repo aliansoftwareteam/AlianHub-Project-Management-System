@@ -108,3 +108,4 @@ Auto-maintained registry of all tasks. Reflects YAML frontmatter from each `task
 | 104 | Time tracker access by role — a role switch, on by default, with seats only on plans that have a limit | active | high | — | active/104-time-tracker-by-role |
 | 105 | Docs site SEO, AEO and GEO — descriptions, canonical, social tags, structured data, robots.txt, llms.txt | active | medium | 088 | active/105-docs-seo-aeo-geo |
 | 106 | Integrations and Connectors — two places, each saying what it holds; App connections moves into Integrations | active | high | 101 | active/106-integrations-and-connectors |
+| 108 | Open agent permissions — self-service scope checkboxes, no admin gate, taint off by default | active | high | 100 | active/108-open-agent-mcp-permissions |

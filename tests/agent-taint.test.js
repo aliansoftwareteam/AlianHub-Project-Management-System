@@ -71,6 +71,25 @@ beforeEach(() => {
 });
 afterEach(() => { mem.reset(); persistence.useMongo(); process.env.AGENT_TAINT_ROUTING = 'off'; });
 
+describe('the gate ships off (task 108)', () => {
+    const KEYS = ['AGENT_TAINT_ROUTING', 'MCP_TOOLS_DATA', 'MCP_TOOLS_MANAGE', 'MCP_TOOLS_WORK', 'MCP_OAUTH'];
+    const saved = Object.fromEntries(KEYS.map((k) => [k, process.env[k]]));
+    afterAll(() => KEYS.forEach((k) => { if (saved[k] === undefined) delete process.env[k]; else process.env[k] = saved[k]; }));
+
+    it('is off when AGENT_TAINT_ROUTING is unset, even while the MCP tools are on', () => {
+        KEYS.forEach((k) => delete process.env[k]);
+        process.env.MCP_TOOLS_MANAGE = 'on';
+        expect(taint.enabled()).toBe(false);
+    });
+
+    it('an explicit value still wins', () => {
+        process.env.AGENT_TAINT_ROUTING = 'on';
+        expect(taint.enabled()).toBe(true);
+        process.env.AGENT_TAINT_ROUTING = 'off';
+        expect(taint.enabled()).toBe(false);
+    });
+});
+
 describe('taint sources — each kind marks the run once, with a reference and never the content', () => {
     const run = (over = {}) => ({ _id: '6f0000000000000000000e01', projectId: 'p1', ...over });
     const seeded = async (over = {}) => { const row = await start(agent(), over); return runRow(row._id); };

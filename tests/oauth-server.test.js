@@ -60,7 +60,7 @@ const REDIRECT = 'http://127.0.0.1:33418/callback';
 const CIMD_ID = 'https://agent.s10s2.test/oauth/client.json';
 const MINUTE = 60 * 1000;
 const DAY = 24 * 60 * MINUTE;
-const ENV_KEYS = ['APIURL', 'MCP_OAUTH', 'MCP_OAUTH_DCR', 'MCP_OAUTH_ISSUER', 'MCP_OAUTH_ACCESS_TOKEN_MINUTES', 'MCP_OAUTH_REFRESH_TOKEN_DAYS', 'MCP_OAUTH_GRANT_MAX_DAYS', 'MCP_OAUTH_RATE_LIMIT_PER_MIN', 'MCP_OAUTH_TOKEN_SECRET', 'NODE_ENV', 'MCP_TOOLS_MANAGE'];
+const ENV_KEYS = ['APIURL', 'MCP_OAUTH', 'MCP_OAUTH_DCR', 'MCP_OAUTH_ISSUER', 'MCP_OAUTH_ACCESS_TOKEN_MINUTES', 'MCP_OAUTH_REFRESH_TOKEN_DAYS', 'MCP_OAUTH_GRANT_MAX_DAYS', 'MCP_OAUTH_RATE_LIMIT_PER_MIN', 'MCP_OAUTH_TOKEN_SECRET', 'NODE_ENV', 'MCP_TOOLS_MANAGE', 'AGENT_CLIENT_APPROVAL'];
 const savedEnv = Object.fromEntries(ENV_KEYS.map((key) => [key, process.env[key]]));
 
 const newVerifier = () => crypto.randomBytes(32).toString('base64url');
@@ -95,6 +95,7 @@ beforeEach(() => {
     jest.clearAllMocks();
     delete process.env.MCP_OAUTH_DCR;
     process.env.MCP_TOOLS_MANAGE = 'off';
+    process.env.AGENT_CLIENT_APPROVAL = 'on';
     delete process.env.MCP_OAUTH_ACCESS_TOKEN_MINUTES;
     delete process.env.MCP_OAUTH_REFRESH_TOKEN_DAYS;
     delete process.env.MCP_OAUTH_GRANT_MAX_DAYS;

@@ -9289,6 +9289,7 @@ export default {
         "oauth_grant_created": "Connected an outside app",
         "oauth_grant_revoked": "Disconnected an outside app",
         "oauth_grant_narrowed": "Reduced what an outside app may do",
+        "oauth_grant_scopes_set": "Changed what an outside app may do",
         "oauth_client_approval_requested": "Asked for an outside app to be approved",
         "oauth_client_approved": "Approved an outside app",
         "oauth_client_approval_denied": "Turned down an outside app",
@@ -12526,6 +12527,7 @@ export default {
         "f_WEBHOOK_ALLOWED_PRIVATE_HOSTS": "Private webhook hosts",
         "h_WEBHOOK_ALLOWED_PRIVATE_HOSTS": "Webhooks refuse loopback, private and internal hosts. List the exact hostnames or CIDR ranges on your network they may post to. Removing an entry stops deliveries to it. Cloud metadata addresses stay blocked.",
         "f_AGENT_TAINT_ROUTING": "Hold risky AI writes for approval",
+        "f_AGENT_CLIENT_APPROVAL": "Require approval for AI apps",
         "h_AGENT_TAINT_ROUTING": "On by default while the AI tools are on. Shown here only: it is set in the server's environment.",
         "f_MCP_OAUTH": "Connect an AI app by address",
         "h_MCP_OAUTH": "Lets people connect Claude, ChatGPT or another AI app by pasting this instance's address and approving a consent screen. Needs an https public address.",
@@ -12869,6 +12871,8 @@ export default {
         "h_AUDIT_RETENTION_DAYS": "Entries older than this are deleted each night. Leave it empty to keep the built-in period.",
         "when_on_AGENT_TAINT_ROUTING": "A risky change by an AI that read outside content, or by an outside AI app, waits until a person approves it.",
         "when_off_AGENT_TAINT_ROUTING": "Those changes apply straight away, without approval.",
+        "when_on_AGENT_CLIENT_APPROVAL": "An owner or admin must approve each AI app under Agent clients before anyone can connect it.",
+        "when_off_AGENT_CLIENT_APPROVAL": "A member can connect their own AI app and grant it what they choose, up to their own role.",
         "f_TRUST_PROXY": "Trusted proxies",
         "h_TRUST_PROXY": "How many proxies sit in front of AlianHub, so it sees each visitor's real address: \"loopback\" for one on the same machine, a number such as 1, or \"true\" to trust any.",
         "f_GLOBAL_RATE_LIMIT_PER_MIN": "API requests per minute per address",
@@ -13747,7 +13751,12 @@ export default {
         "revoke_confirm": "Revoke {name}? It loses access at once.",
         "revoke_failed": "The app could not be revoked.",
         "withdraw": "Withdraw",
-        "withdraw_failed": "The permission could not be withdrawn."
+        "withdraw_failed": "The permission could not be withdrawn.",
+        "edit": "Edit permissions",
+        "edit_lead": "Tick what this app may do. Changes take effect on its next call.",
+        "save": "Save",
+        "cancel": "Cancel",
+        "update_failed": "The permissions could not be updated."
     },
     "Favourites": {
         "add": "Add to favourites",

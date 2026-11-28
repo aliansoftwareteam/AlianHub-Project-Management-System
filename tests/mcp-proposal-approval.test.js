@@ -146,7 +146,7 @@ describe('approving a proposal an outside client filed under a person\'s grant',
     const CLIENT = 'https://agent.approval.test/oauth/client.json';
     const GRANT = 'fedcba9876543210fedcba9876543210';
     const SCOPES = ['tasks:read', 'tasks:write', 'tasks:manage'];
-    const ENV = ['MCP_OAUTH', 'MCP_OAUTH_ISSUER', 'MCP_TOOLS_MANAGE'];
+    const ENV = ['MCP_OAUTH', 'MCP_OAUTH_ISSUER', 'MCP_TOOLS_MANAGE', 'AGENT_CLIENT_APPROVAL'];
     const savedEnv = Object.fromEntries(ENV.map((key) => [key, process.env[key]]));
     const grantRow = () => mockDb.store[SCHEMA_TYPE.OAUTH_GRANTS][0];
     const approvalRow = () => mockDb.store[SCHEMA_TYPE.OAUTH_CLIENT_APPROVALS][0];
@@ -156,7 +156,7 @@ describe('approving a proposal an outside client filed under a person\'s grant',
     });
 
     beforeEach(() => {
-        Object.assign(process.env, { MCP_OAUTH: 'on', MCP_OAUTH_ISSUER: ISSUER, MCP_TOOLS_MANAGE: 'on' });
+        Object.assign(process.env, { MCP_OAUTH: 'on', MCP_OAUTH_ISSUER: ISSUER, MCP_TOOLS_MANAGE: 'on', AGENT_CLIENT_APPROVAL: 'on' });
         mockDb.seed(SCHEMA_TYPE.OAUTH_CLIENT_APPROVALS, { companyId: C, clientId: CLIENT, clientKind: 'metadata_document', status: 'approved', scopes: [...SCOPES], privateSprints: false });
         mockDb.seed(SCHEMA_TYPE.OAUTH_GRANTS, {
             grantId: GRANT, clientId: CLIENT, companyId: C, userId: REQUESTER, scopes: [...SCOPES], resource: `${ISSUER}/mcp`,

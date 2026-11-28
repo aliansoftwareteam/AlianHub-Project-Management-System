@@ -1,4 +1,5 @@
 const grants = require('./grants');
+const config = require('./config');
 const store = require('./store');
 const tokenHash = require('./tokenHash');
 const { appLabel, hostOfClient } = require('./clientLabel');
@@ -48,9 +49,26 @@ exports.list = async (req, res) => {
             lastUsedAt: row.lastUsedAt || null,
             expiresAt: row.expiresAt,
         }));
-        return res.send({ status: true, statusText: 'Connected apps fetched.', data });
+        return res.send({ status: true, statusText: 'Connected apps fetched.', data, offered: config.offeredScopes() });
     } catch (error) {
         logger.error(`ERROR in list oauth grants: ${error.message}`);
+        return refuse(res, 500, 'Something went wrong.');
+    }
+};
+
+/* The person adds or removes what one of their connections may do, up to what the server offers (task 108). */
+exports.setScopes = async (req, res) => {
+    try {
+        if (!personOrRefuse(req, res)) return undefined;
+        const grantId = String(req.params.grantId || '');
+        const scopes = req.body && Array.isArray(req.body.scopes) ? req.body.scopes.filter((scope) => typeof scope === 'string') : [];
+        if (!GRANT_ID.test(grantId)) return refuse(res, 404, 'No such connected app.');
+        const held = await grants.setOwnGrantScopes(req.uid, grantId, scopes);
+        if (held === null) return refuse(res, 404, 'No such connected app.');
+        if (!held.length) return refuse(res, 400, 'Choose at least one permission, or revoke the app instead.');
+        return res.send({ status: true, statusText: 'Permissions updated.', data: { scopes: held } });
+    } catch (error) {
+        logger.error(`ERROR in set oauth grant scopes: ${error.message}`);
         return refuse(res, 500, 'Something went wrong.');
     }
 };

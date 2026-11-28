@@ -119,6 +119,8 @@ beforeAll(async () => {
         env: {
             MCP_OAUTH: 'both', MCP_OAUTH_DCR: 'on', NODE_ENV: 'test', MCP_OAUTH_RATE_LIMIT_PER_MIN: '1000',
             EXTERNAL_AGENT_SESSIONS: 'on', EXTERNAL_AGENT_STEPS: 'on', WORKFLOW_ENGINE: 'on',
+            // The approval gate and taint routing this step's client goes through are opt-in since task 108.
+            AGENT_CLIENT_APPROVAL: 'on', AGENT_TAINT_ROUTING: 'on',
             // The inline driver awaits a delayed job, so a step waiting on an outside agent would hold its request open.
             AUTOMATION_QUEUE_DRIVER: 'agenda',
         },

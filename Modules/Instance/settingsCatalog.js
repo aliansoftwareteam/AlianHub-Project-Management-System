@@ -158,12 +158,18 @@ const CATALOG = [
     }),
     field('HELMET_ENABLED', 'security', 'boolean', { default: 'true', label: 'Security response headers', restart: true }),
     field('AGENT_TAINT_ROUTING', 'security', 'boolean', {
-        default: (env) => (taintDefaultOn(env) ? 'true' : 'false'),
+        default: 'false',
         normalise: onOff,
-        readOnly: true,
         owner: 'customer',
         label: 'Hold risky AI writes for approval',
-        help: 'A risky write by an agent that read outside content, or by an outside AI app, waits for a person to approve it. On by default while the MCP tools or MCP_OAUTH are on. Shown here only: set AGENT_TAINT_ROUTING in .env and restart to change it.',
+        help: 'A risky write by an agent that read outside content, or by an outside AI app, waits for a person to approve it. Off by default; turn it on to require that approval. A value set in .env or Docker overrides this and shows as locked.',
+    }),
+    field('AGENT_CLIENT_APPROVAL', 'security', 'boolean', {
+        default: 'false',
+        normalise: onOff,
+        owner: 'customer',
+        label: 'Require approval for AI apps',
+        help: 'Off by default: a member can connect their own AI app and grant it what they choose, up to their own role. On: an owner or admin must approve each app under Agent clients before it can be connected.',
     }),
     field('PERMISSION_ENFORCEMENT_MODE', 'security', 'select', {
         default: 'off',
@@ -248,4 +254,4 @@ function describeSettings({ saved = {}, env = {}, locked = [], platform = {}, ma
     });
 }
 
-module.exports = { GROUPS, GROUP_OWNER, OWNERS, CATALOG, byKey, ownerOf, platformOwnedKeys, validateSettings, describeSettings };
+module.exports = { GROUPS, GROUP_OWNER, OWNERS, CATALOG, byKey, ownerOf, platformOwnedKeys, validateSettings, describeSettings, taintDefaultOn };

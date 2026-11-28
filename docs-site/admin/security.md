@@ -115,7 +115,8 @@ A range must also be `/8` or narrower for IPv4 and `/32` or narrower for IPv6, a
 
 ## AI safeguards
 
-- **Hold risky AI writes for approval** (`AGENT_TAINT_ROUTING`, on while the AI tools are on): a risky change by an agent that read outside content (a web page, an email, a form, an uploaded file), or by an outside AI app, waits for a person in the AI Inbox. Set `AGENT_TAINT_ROUTING=off` in `.env` and restart to let those changes apply at once.
+- **Hold risky AI writes for approval** (`AGENT_TAINT_ROUTING`, **off** by default): turn it on so a risky change by an agent that read outside content (a web page, an email, a form, an uploaded file), or by an outside AI app, waits for a person in the AI Inbox. Set it here or with `AGENT_TAINT_ROUTING` in `.env`; a value in `.env` wins. An install that already had a workspace keeps the value it ran with before this default changed.
+- **Require approval for AI apps** (`AGENT_CLIENT_APPROVAL`, off by default): off, a member connects their own AI app on the consent screen and grants it what they choose, up to their own role, with no admin step. Turn it on to make an owner or admin approve each app under **Settings**, **Agent clients**, and cap what it may get, before anyone can connect it.
 - **Instruction guard**: built-in patterns flag instruction-like text arriving from outside a workspace; add your own on the **Instruction guard** tab.
 - `AI_ENABLED=false` stops every model call. See [AI providers](./ai-providers).
 

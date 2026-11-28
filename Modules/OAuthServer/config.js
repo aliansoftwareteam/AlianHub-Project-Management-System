@@ -71,6 +71,10 @@ const mode = (env = process.env) => {
 
 const isOn = (env = process.env) => mode(env) !== MODE.OFF;
 
+/* Off by default (task 108): an outside client connects without an owner or admin approving it. Turned on
+ * (AGENT_CLIENT_APPROVAL, settable in Settings → Security), the per-workspace approval gate applies as before. */
+const approvalRequired = (env = process.env) => flagOn(env.AGENT_CLIENT_APPROVAL);
+
 const dcrOn = (env = process.env) => isOn(env) && flagOn(env.MCP_OAUTH_DCR);
 
 const positive = (value, fallback) => {
@@ -150,5 +154,5 @@ const endpoints = (env = process.env) => {
 
 module.exports = {
     SCOPES, READ_SCOPES, MANAGE_SCOPES, CHAT_SCOPE, CONNECTOR_SCOPES, OPT_IN_SCOPES, PLAIN_SCOPES, isManageScope, isOptInScope, offeredScopes, namedScopes, mayAskFor, CODE_TTL_MS, CODE_REUSE_WINDOW_MS, DEFAULTS, MODE,
-    mode, isOn, dcrOn, lifetimes, rateLimitPerMinute, metadataCacheMs, issuer, issuerProblem, unsetIssuerProblem, assertIssuer, resource, canonicalResource, endpoints,
+    mode, isOn, approvalRequired, dcrOn, lifetimes, rateLimitPerMinute, metadataCacheMs, issuer, issuerProblem, unsetIssuerProblem, assertIssuer, resource, canonicalResource, endpoints,
 };

@@ -4611,6 +4611,7 @@
         "GET /api/v2/oauth-grants": { "stability": "internal", "summary": "Lists the caller's own OAuth grants.", "apiToken":false },
         "DELETE /api/v2/oauth-grants/:grantId": { "stability": "internal", "summary": "Revokes one of the caller's OAuth grants.", "apiToken":false },
         "POST /api/v2/oauth-grants/:grantId/withdraw": { "stability": "internal", "summary": "Withdraws some of the permissions the caller gave a connected app.", "apiToken": false },
+        "POST /api/v2/oauth-grants/:grantId/scopes": { "stability": "internal", "summary": "Sets the permissions of one of the caller's connected apps, up to what the server offers.", "apiToken": false },
         "GET /api/v2/agent-sessions/endpoints": { "stability": "internal", "summary": "Reads where outside agents are reached." },
         "PUT /api/v2/agent-sessions/endpoints": { "stability": "internal", "summary": "Changes where outside agents are reached." },
         "GET /api/v2/agent-sessions": { "stability": "internal", "summary": "Lists the outside agent sessions of a task." },

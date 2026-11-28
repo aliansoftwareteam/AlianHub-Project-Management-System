@@ -162,12 +162,17 @@ async function revoke({ companyId, clientId, actor, now = new Date() }) {
 }
 
 /* What /mcp and the token endpoint ask on every use: the client counts as approved only while the row says so. */
+/* With the approval gate off (default, task 108) any client with a live grant may act, so a client is always
+ * "approved" and the ceiling is simply what the server offers (a grant carries only what the person ticked,
+ * always a subset). With AGENT_CLIENT_APPROVAL on, the per-workspace approval row gates as before. */
 async function isClientApproved(companyId, clientId) {
+    if (!config.approvalRequired()) return true;
     const row = await store.approvals.find(companyId, clientId);
     return Boolean(row) && row.status === STATUS.APPROVED;
 }
 
 async function approvedScopes(companyId, clientId) {
+    if (!config.approvalRequired()) return config.offeredScopes();
     const row = await store.approvals.find(companyId, clientId);
     return row && row.status === STATUS.APPROVED ? [...(row.scopes || [])] : null;
 }
